@@ -125,7 +125,7 @@ trait RVGenerator:
 
   def writeInstructionsToFile(filename: String = s"${name}_output.bin"): Unit =
     val outputs = toInstructions()
-    val fos     = new FileOutputStream(filename, false)
+    val fos     = new FileOutputStream(filename, true)
     try
       outputs.foreach { case (bytes, _) => fos.write(bytes) }
     finally fos.close()
