@@ -39,6 +39,74 @@ object CoreSpec extends TestSuite:
             val a = smtFunc(Seq(SInt, Bool), Bool)
             smtAssert(a(1.S, true.B))
           }
+    test("and"):
+      test("Const[Bool]"):
+        smtTest("and"):
+          solver {
+            smtAssert(smtAnd())
+          }
+        smtTest("and true"):
+          solver {
+            smtAssert(smtAnd(true.B))
+          }
+        smtTest("and true true"):
+          solver {
+            smtAssert(smtAnd(true.B, true.B))
+          }
+        smtTest("and true false"):
+          solver {
+            smtAssert(smtAnd(true.B, false.B))
+          }
+        smtTest("and true true false false"):
+          solver {
+            smtAssert(smtAnd(true.B, true.B, false.B, false.B))
+          }
+      test("Ref[Bool]"):
+        smtTest(
+          "(declare-const a Bool)",
+          "(declare-const b Bool)",
+          "(assert (let ((tmp (and a b)))",
+          "        tmp))"
+        ):
+          solver {
+            val a = smtValue(Bool)
+            val b = smtValue(Bool)
+            smtAssert(smtAnd(a, b))
+          }
+    test("or"):
+      test("Const[Bool]"):
+        smtTest("or"):
+          solver {
+            smtAssert(smtOr())
+          }
+        smtTest("or true"):
+          solver {
+            smtAssert(smtOr(true.B))
+          }
+        smtTest("or true true"):
+          solver {
+            smtAssert(smtOr(true.B, true.B))
+          }
+        smtTest("or true false"):
+          solver {
+            smtAssert(smtOr(true.B, false.B))
+          }
+        smtTest("or true true false false"):
+          solver {
+            smtAssert(smtOr(true.B, true.B, false.B, false.B))
+          }
+      test("Ref[Bool]"):
+        smtTest(
+          "(declare-const a Bool)",
+          "(declare-const b Bool)",
+          "(assert (let ((tmp (or a b)))",
+          "        tmp))"
+        ):
+          solver {
+            val a = smtValue(Bool)
+            val b = smtValue(Bool)
+            smtAssert(smtOr(a, b))
+          }
     test("distinct"):
       test("Const[Bool]"):
         smtTest("distinct"):
