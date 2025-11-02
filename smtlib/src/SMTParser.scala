@@ -69,6 +69,7 @@ def convert(sexpr: SExpr): SMTCommand =
       SMTCommand.IntCmp(">=", convert(lhs), convert(rhs))
     case List(Symbol("<=") :: lhs :: rhs :: Nil)                                                 =>
       SMTCommand.IntCmp("<=", convert(lhs), convert(rhs))
+    case List(Symbol("-") :: Number(n) :: Nil)                                                   => SMTCommand.IntConstant(BigInt(-n.toInt))
     case Symbol("true")                                                                          => SMTCommand.BoolConstant(true)
     case Symbol("false")                                                                         => SMTCommand.BoolConstant(false)
     case Symbol(x)                                                                               => SMTCommand.Variable(x)
