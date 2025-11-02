@@ -176,20 +176,20 @@ object SMTZ3Spec extends TestSuite:
           smtZ3Test("declare-const a Bool") {
             val a = smtValue(Bool)
             smtAssert(a)
-          }.model ==> Seq(("a", true))
+          }.model ==> Map("a" -> true)
 
       test("declare"):
         test("const"):
           smtZ3Test("declare-const a Bool") {
             val a = smtValue(Bool)
             smtAssert(a)
-          }.model ==> Seq(("a", true))
+          }.model ==> Map("a" -> true)
 
         test("fun"):
           smtZ3Test("declare-fun a (Int Bool) Bool") {
             val a = smtFunc(Seq(SInt, Bool), Bool)
             smtAssert(a(1.S, true.B))
-          }.model ==> Seq(("a", true))
+          }.model ==> Map("a" -> true)
 
       test("distinct"):
         test("Const[Bool]"):
