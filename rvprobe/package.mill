@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
+package build.rvprobe
+
+import mill._
+import mill.scalalib.TestModule.Utest
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+import os.Path
+
+import build.{circtlib, rvdecoderdb, smtlib, v}
+
+object `package` extends ScalaModule with ScalafmtModule { m =>
+  def scalaVersion = Task(v.scala)
+  def ivyDeps      = Task(Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode))
+  def moduleDeps   = Seq(rvdecoderdb, smtlib, circtlib)
+
+  override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Some("-Xprint-suspension"))
+
+  override def forkArgs: T[Seq[String]] = Task(
+    super.forkArgs() ++ circtlib.forkArgs()
+  )
+
+  object tests extends ScalaTests with ScalafmtModule with Utest {
+    def mvnDeps = Seq(v.utest)
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+}
