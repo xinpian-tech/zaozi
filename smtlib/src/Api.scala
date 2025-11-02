@@ -45,6 +45,18 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Ref[T]
 
+  def smtValue[T <: Data](
+    name:      String,
+    rangeType: T
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name
+  ): Ref[T]
+
   def smtFunc[T <: Data, U <: Data](
     domainTypes: Seq[T],
     rangeType:   U

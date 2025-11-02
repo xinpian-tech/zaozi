@@ -113,6 +113,23 @@ given ConstructorApi with
       val _tpe:       T         = rangeType
       val _operation: Operation = op.operation
 
+  def smtValue[T <: Data](
+    name:      String,
+    rangeType: T
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name
+  ): Ref[T] =
+    val op = summon[DeclareFunApi].op(name, locate, rangeType.toMlirType)
+    op.operation.appendToBlock()
+    new Ref[T]:
+      val _tpe:       T         = rangeType
+      val _operation: Operation = op.operation
+
   def smtFunc[T <: Data, U <: Data](
     domainTypes: Seq[T],
     rangeType:   U
