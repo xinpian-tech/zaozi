@@ -100,7 +100,7 @@ enum Z3Status:
 // This case class represents the result of a Z3 solver invocation.
 // status indicates whether the problem was satisfiable, unsatisfiable, or unknown.
 // model contains the variable assignments if the status is Sat, Or empty if Unsat or Unknown.
-final case class Z3Result(status: Z3Status, model: Seq[(String, Boolean | BigInt)])
+final case class Z3Result(status: Z3Status, model: Map[String, Boolean | BigInt])
 
 // This function parses the output from Z3 and returns a Z3Result.
 def parseZ3Output(input: String): Z3Result =
@@ -111,7 +111,7 @@ def parseZ3Output(input: String): Z3Result =
     case "unknown" => Z3Status.Unknown
     case _         => throw new Exception(s"Unexpected result: $statusLine")
 
-  val model: Seq[(String, Boolean | BigInt)] =
+  val model: Map[String, Boolean | BigInt] =
     if status == Z3Status.Sat then
       val modelRaw     = input.split("\n").drop(1).mkString("\n")
       val modelTrimmed = modelRaw.trim.stripPrefix("(").stripSuffix(")")
@@ -119,8 +119,8 @@ def parseZ3Output(input: String): Z3Result =
         case SMTCommand.DefineFun(name, _, _, SMTCommand.BoolConstant(value)) => (name, value)
         case SMTCommand.DefineFun(name, _, _, SMTCommand.IntConstant(value))  => (name, value)
         case other                                                            => throw new Exception(s"Unexpected command in result: $other")
-      }
-    else Seq.empty
+      }.toMap
+    else Map.empty
 
   Z3Result(status, model)
 

@@ -50,4 +50,11 @@ object ParseSpec extends TestSuite:
           |  (define-fun z () Int
           |    1)
           |)""".stripMargin
-      ) ==> Z3Result(Z3Status.Sat, Seq(("x", true), ("y", false), ("z", 1)))
+      ) ==> Z3Result(
+        Z3Status.Sat,
+        Map(
+          "x" -> true,
+          "y" -> false,
+          "z" -> BigInt(1)
+        )
+      )
