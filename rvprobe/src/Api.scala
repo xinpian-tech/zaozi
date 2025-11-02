@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
+package me.jiuyang.rvprobe
+
+import me.jiuyang.rvprobe.constraints.*
+
+import me.jiuyang.smtlib.default.{*, given}
+import me.jiuyang.smtlib.tpe.*
+
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Operation, Type, Value, given}
+
+import java.lang.foreign.Arena
+
+def recipe(
+  name:  String,
+  sets:  Seq[Recipe ?=> Ref[Bool]]
+)(
+  using Arena,
+  Context,
+  Block
+)(block: Recipe ?=> Unit
+): Recipe = {
+  given Recipe = new Recipe(name)
+
+  // assert sets are valid
+  val includedSets: List[Ref[Bool]] = sets.toList.map(f =>
+    f(
+      using summon[Recipe]
+    )
+  )
+  // assert that sets are mutually exclusive
+  val excludedSets = summon[Recipe].allSets.diff(includedSets)
+
+  smtAssert(smtAnd(includedSets*))
+  smtAssert(!smtOr(excludedSets*))
+
+  block
+
+  summon[Recipe]
+}
+
+// create an instruction with given index
+def instruction(
+  idx:   Int
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+)(block: Index ?=> Ref[Bool]
+): Unit = {
+  val index = new Index(idx)
+  summon[Recipe].addIndex(index)
+
+  given Index = index
+
+  smtAssert(block)
+}
+
+// get an instruction with given index
+def instruction(
+  idx: Int
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Index = summon[Recipe].getIndex(idx)
+
+def sequence(
+  start: Int,
+  end:   Int
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Seq[Index] =
+  val recipe = summon[Recipe]
+  (start until end).map(recipe.getIndex)
+
+def distinct[D <: Data, R <: Referable[D]](
+  indices: Iterable[Int]
+)(field:   Index => R
+)(
+  using Recipe,
+  Arena,
+  Context,
+  Block
+): Unit =
+  val recipe    = summon[Recipe]
+  val indexObjs = indices.map(recipe.getIndex)
+  smtAssert(smtDistinct(indexObjs.map(field).toSeq*))
+
+def isRV64G(
+): Seq[Recipe ?=> Ref[Bool]] =
+  Seq(
+    isRVI(),
+    isRVM(),
+    isRVA(),
+    isRVF(),
+    isRVD(),
+    isRV64I(),
+    isRV64M(),
+    isRV64A(),
+    isRV64F(),
+    isRV64D()
+  )
+
+def isRV64GC(
+): Seq[Recipe ?=> Ref[Bool]] =
+  isRV64G() :+ isRVC()
