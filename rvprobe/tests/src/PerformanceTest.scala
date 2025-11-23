@@ -109,7 +109,7 @@ object PerformanceTest extends TestSuite:
           }
 
           (0 until nInst-1).foreach { i =>
-            coverRAWHazards(i until i + 1, true)
+            sequence(i, i+1).coverRAW(true)
           }
         }
       }
