@@ -16,7 +16,7 @@ object PaperTest extends TestSuite:
         instruction(0) {
           isAddw() & rdRange(1, 5)
         }
-    
+
     test.printMLIR()
     test.printSMTLIB()
     test.printInstructions()

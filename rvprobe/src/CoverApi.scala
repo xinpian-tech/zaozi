@@ -11,123 +11,6 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Op
 
 import java.lang.foreign.Arena
 
-def coverBins(
-  indices: Iterable[Int]
-)(targets: Index => Referable[SInt],
-  bins:    Seq[Const[SInt]]
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-): Unit =
-  val recipe       = summon[Recipe]
-  val indexObjs    = indices.map(recipe.getIndex)
-  val targetValues = indexObjs.map(targets)
-
-  // For each element in bins, there exists at least one element in targets that is equal to it.
-  val constraints = bins.map { binElement =>
-    smtOr(targetValues.map(_ === binElement).toSeq*)
-  }
-
-  // Combine all constraints with AND and assert
-  smtAssert(smtAnd(constraints*))
-
-def coverNoHazards(
-  indices: Iterable[Int],
-  hasRd:   Boolean = false,
-  hasRs1:  Boolean = false,
-  hasRs2:  Boolean = false
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-): Unit =
-  val recipe    = summon[Recipe]
-  val indexObjs = indices.map(recipe.getIndex)
-  val pairs     = indexObjs.zip(indexObjs.tail)
-
-  smtAssert(smtOr(pairs.map { case (e, l) =>
-    (l.rs1 =/= e.rd) & (l.rs2 =/= e.rd) & (e.rs1 =/= l.rd) & (e.rs2 =/= l.rd) & (e.rd =/= l.rd)
-  }.toSeq*))
-
-def coverRAWHazards(
-  indices: Iterable[Int],
-  hasRd:   Boolean = false,
-  hasRs1:  Boolean = false,
-  hasRs2:  Boolean = false
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-): Unit =
-  val recipe    = summon[Recipe]
-  val indexObjs = indices.map(recipe.getIndex)
-  val pairs     = indexObjs.zip(indexObjs.tail)
-
-  if (hasRd && hasRs1 && hasRs2) {
-    // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
-    smtAssert(smtOr(pairs.map { case (e, l) =>
-      (l.rs1 === e.rd) | (l.rs2 === e.rd)
-    }.toSeq*))
-  } else if (hasRd && hasRs1) {
-    // only rs1 of the later instruction is equal to rd of the earlier instruction
-    smtAssert(smtOr(pairs.map { case (e, l) =>
-      (l.rs1 === e.rd)
-    }.toSeq*))
-  }
-
-def coverWARHazards(
-  indices: Iterable[Int],
-  hasRd:   Boolean = false,
-  hasRs1:  Boolean = false,
-  hasRs2:  Boolean = false
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-): Unit =
-  val recipe    = summon[Recipe]
-  val indexObjs = indices.map(recipe.getIndex)
-  val pairs     = indexObjs.zip(indexObjs.tail)
-
-  if (hasRd && hasRs1 && hasRs2) {
-    // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
-    smtAssert(smtOr(pairs.map { case (e, l) =>
-      ((e.rs1 === l.rd) | (e.rs2 === l.rd)) & !((l.rs1 === e.rd) | (l.rs2 === e.rd)) // and not raw
-    }.toSeq*))
-  } else if (hasRd && hasRs1) {
-    // only rs1 of the later instruction is equal to rd of the earlier instruction
-    smtAssert(smtOr(pairs.map { case (e, l) =>
-      (e.rs1 === l.rd) & !((l.rs1 === e.rd))
-    }.toSeq*))
-  }
-
-def coverWAWHazards(
-  indices: Iterable[Int],
-  hasRd:   Boolean = false,
-  hasRs1:  Boolean = false,
-  hasRs2:  Boolean = false
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-): Unit =
-  val recipe    = summon[Recipe]
-  val indexObjs = indices.map(recipe.getIndex)
-  val pairs     = indexObjs.zip(indexObjs.tail)
-
-  if (hasRd) {
-    // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
-    smtAssert(smtOr(pairs.map { case (e, l) =>
-      (e.rd === l.rd)
-    }.toSeq*))
-  }
-
 def coverSigns(
   instructionCount: Int,
   inst:             Index ?=> Ref[Bool],
@@ -164,3 +47,111 @@ def coverSigns(
     smtAssert(instruction(instructionCount + 2).rs2 === 2.S)
     smtAssert(instruction(instructionCount + 3).rs2 === 1.S)
   }
+
+extension (insts: Seq[Index])
+  def coverBins(
+    targets: Index => Referable[SInt],
+    bins:    Seq[Const[SInt]]
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    val recipe       = summon[Recipe]
+    val targetValues = insts.map(targets)
+
+    // For each element in bins, there exists at least one element in targets that is equal to it.
+    val constraints = bins.map { binElement =>
+      smtOr(targetValues.map(_ === binElement).toSeq*)
+    }
+
+    // Combine all constraints with AND and assert
+    smtAssert(smtAnd(constraints*))
+
+  def coverNoHazard(
+    hasRd:  Boolean = false,
+    hasRs1: Boolean = false,
+    hasRs2: Boolean = false
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    val recipe = summon[Recipe]
+    val pairs  = insts.zip(insts.tail)
+
+    smtAssert(smtOr(pairs.map { case (e, l) =>
+      (l.rs1 =/= e.rd) & (l.rs2 =/= e.rd) & (e.rs1 =/= l.rd) & (e.rs2 =/= l.rd) & (e.rd =/= l.rd)
+    }.toSeq*))
+
+  def coverRAW(
+    hasRd:  Boolean = false,
+    hasRs1: Boolean = false,
+    hasRs2: Boolean = false
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    val recipe = summon[Recipe]
+    val pairs  = insts.zip(insts.tail)
+
+    if (hasRd && hasRs1 && hasRs2) {
+      // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
+      smtAssert(smtOr(pairs.map { case (e, l) =>
+        (l.rs1 === e.rd) | (l.rs2 === e.rd)
+      }.toSeq*))
+    } else if (hasRd && hasRs1) {
+      // only rs1 of the later instruction is equal to rd of the earlier instruction
+      smtAssert(smtOr(pairs.map { case (e, l) =>
+        (l.rs1 === e.rd)
+      }.toSeq*))
+    }
+
+  def coverWAR(
+    hasRd:  Boolean = false,
+    hasRs1: Boolean = false,
+    hasRs2: Boolean = false
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    val recipe = summon[Recipe]
+    val pairs  = insts.zip(insts.tail)
+
+    if (hasRd && hasRs1 && hasRs2) {
+      // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
+      smtAssert(smtOr(pairs.map { case (e, l) =>
+        ((e.rs1 === l.rd) | (e.rs2 === l.rd)) & !((l.rs1 === e.rd) | (l.rs2 === e.rd)) // and not raw
+      }.toSeq*))
+    } else if (hasRd && hasRs1) {
+      // only rs1 of the later instruction is equal to rd of the earlier instruction
+      smtAssert(smtOr(pairs.map { case (e, l) =>
+        (e.rs1 === l.rd) & !((l.rs1 === e.rd))
+      }.toSeq*))
+    }
+
+  def coverWAW(
+    hasRd:  Boolean = false,
+    hasRs1: Boolean = false,
+    hasRs2: Boolean = false
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    val recipe = summon[Recipe]
+    val pairs  = insts.zip(insts.tail)
+
+    if (hasRd) {
+      // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
+      smtAssert(smtOr(pairs.map { case (e, l) =>
+        (e.rd === l.rd)
+      }.toSeq*))
+    }

@@ -22,13 +22,13 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isSlliRV64I(), true, true)
 
@@ -41,13 +41,13 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isSraiRV64I(), true, true)
 
@@ -60,13 +60,13 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isSrliRV64I(), true, true)
 
@@ -79,14 +79,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isAdd(), true, true, true)
 
@@ -99,14 +99,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isAddi(), true, true)
 
@@ -119,14 +119,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isAnd(), true, true, true)
 
@@ -139,14 +139,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isAndi(), true, true)
 
@@ -159,13 +159,13 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
 
-      coverRAWHazards(0 until instructionCount, true)
-      coverWARHazards(0 until instructionCount, true)
-      coverWAWHazards(0 until instructionCount, true)
-      coverNoHazards(0 until instructionCount, true)
+      sequence(0, instructionCount).coverRAW(true)
+      sequence(0, instructionCount).coverWAR(true)
+      sequence(0, instructionCount).coverWAW(true)
+      sequence(0, instructionCount).coverNoHazard(true)
 
       coverSigns(instructionCount, isAuipc(), true)
 
@@ -184,8 +184,8 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(5 until instructionCount + 5)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(5 until instructionCount + 5)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
       coverSigns(instructionCount + 5, isBeq() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
@@ -204,8 +204,8 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(5 until instructionCount + 5)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(5 until instructionCount + 5)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
       coverSigns(instructionCount + 5, isBge() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
@@ -224,8 +224,8 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(5 until instructionCount + 5)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(5 until instructionCount + 5)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
       coverSigns(instructionCount + 5, isBgeu() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
@@ -244,8 +244,8 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(5 until instructionCount + 5)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(5 until instructionCount + 5)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
       coverSigns(instructionCount + 5, isBlt() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
@@ -264,8 +264,8 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(5 until instructionCount + 5)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(5 until instructionCount + 5)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
       coverSigns(instructionCount + 5, isBltu() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
@@ -284,8 +284,8 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(5 until instructionCount + 5)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(5 until instructionCount + 5)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
       coverSigns(instructionCount + 5, isBne() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
@@ -298,13 +298,13 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
 
-      coverRAWHazards(0 until instructionCount, true)
-      coverWARHazards(0 until instructionCount, true)
-      coverWAWHazards(0 until instructionCount, true)
-      coverNoHazards(0 until instructionCount, true)
+      sequence(0, instructionCount).coverRAW(true)
+      sequence(0, instructionCount).coverWAR(true)
+      sequence(0, instructionCount).coverWAW(true)
+      sequence(0, instructionCount).coverNoHazard(true)
 
       coverSigns(instructionCount, isLui(), true)
 
@@ -317,14 +317,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isOr(), true, true, true)
 
@@ -337,14 +337,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isOri(), true, true)
 
@@ -357,14 +357,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isSll(), true, true, true)
 
@@ -377,14 +377,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isSlt(), true, true, true)
 
@@ -397,14 +397,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isSlti(), true, true)
 
@@ -417,14 +417,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isSltiu(), true, true)
 
@@ -437,14 +437,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isSltu(), true, true, true)
 
@@ -457,14 +457,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isSra(), true, true, true)
 
@@ -477,14 +477,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isSrl(), true, true, true)
 
@@ -497,14 +497,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isSub(), true, true, true)
 
@@ -517,14 +517,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs2, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverRAWHazards(0 until instructionCount, true, true, true)
-      coverWARHazards(0 until instructionCount, true, true, true)
-      coverWAWHazards(0 until instructionCount, true, true, true)
-      coverNoHazards(0 until instructionCount, true, true, true)
+      sequence(0, instructionCount).coverRAW(true, true, true)
+      sequence(0, instructionCount).coverWAR(true, true, true)
+      sequence(0, instructionCount).coverWAW(true, true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true, true)
 
       coverSigns(instructionCount, isXor(), true, true, true)
 
@@ -537,14 +537,14 @@ import scala.util.control.NonFatal
         }
       }
 
-      coverBins(0 until instructionCount)(_.rd, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.rs1, (1 until 32).map(i => i.S))
-      coverBins(0 until instructionCount)(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
+      sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
+      sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      coverRAWHazards(0 until instructionCount, true, true)
-      coverWARHazards(0 until instructionCount, true, true)
-      coverWAWHazards(0 until instructionCount, true, true)
-      coverNoHazards(0 until instructionCount, true, true)
+      sequence(0, instructionCount).coverRAW(true, true)
+      sequence(0, instructionCount).coverWAR(true, true)
+      sequence(0, instructionCount).coverWAW(true, true)
+      sequence(0, instructionCount).coverNoHazard(true, true)
 
       coverSigns(instructionCount, isXori(), true, true)
 
