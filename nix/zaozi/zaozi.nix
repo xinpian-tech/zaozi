@@ -39,6 +39,7 @@ let
           ./../../testlib
           ./../../rvdecoderdb
           ./../../omlib
+          ./../../rvprobe
         ];
       };
 

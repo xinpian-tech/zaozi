@@ -46,7 +46,7 @@ trait RVGenerator:
       }
       smtCheck
     }
-    
+
     (summon[Arena], summon[Context], summon[Module])
 
   private def InMLIRContext[T](action: WithMLIRContext[T]): T =
@@ -84,23 +84,23 @@ trait RVGenerator:
 
   // Separate methods for staged execution
   def createMLIRModule(): (Arena, Context, Module) = createMLIRContext()
-  
+
   def mlirToString(arena: Arena, context: Context, module: Module): String =
-    given Arena = arena
-    given Context = context  
-    given Module = module
-    val out = new StringBuilder
+    given Arena   = arena
+    given Context = context
+    given Module  = module
+    val out       = new StringBuilder
     module.getOperation.print(out ++= _)
     out.toString()
-    
+
   def mlirToSMTLIB(arena: Arena, context: Context, module: Module): String =
-    given Arena = arena
+    given Arena   = arena
     given Context = context
-    given Module = module
-    val out = new StringBuilder
+    given Module  = module
+    val out       = new StringBuilder
     module.exportSMTLIB(out ++= _)
     out.toString()
-    
+
   def closeMLIRContext(arena: Arena, context: Context): Unit =
     context.destroy()
     arena.close()
@@ -112,14 +112,15 @@ trait RVGenerator:
   def toSMTLIB():    String = InMLIRContext { getSMTLIBString }
   def printSMTLIB(): Unit   = InMLIRContext { println(getSMTLIBString) }
 
-  def toZ3Output(smtlib: String):    String =
-    val z3Output = os.proc("z3", "-in", "-t:5000").call(stdin = smtlib.toString().replace("(reset)", "(get-model)"), check = false)
+  def toZ3Output(smtlib: String): String =
+    val z3Output =
+      os.proc("z3", "-in", "-t:5000").call(stdin = smtlib.toString().replace("(reset)", "(get-model)"), check = false)
     z3Output.out.text()
-  def toZ3Output():    String =
+  def toZ3Output():               String =
     toZ3Output(toSMTLIB())
-  def printZ3Output(): Unit   = println(toZ3Output())
+  def printZ3Output():            Unit   = println(toZ3Output())
 
-  def toInstructions(z3Output: String): Seq[(Array[Byte], String)] =
+  def toInstructions(z3Output: String):                                  Seq[(Array[Byte], String)] =
     val z3Result: Z3Result = parseZ3Output(z3Output)
 
     assert(z3Result.status == Z3Status.Sat, s"Z3 result is not SAT: ${z3Result.status}")
@@ -164,12 +165,12 @@ trait RVGenerator:
 
       (bytes, instrString)
     }.toSeq
-  def toInstructions(): Seq[(Array[Byte], String)] =
+  def toInstructions():                                                  Seq[(Array[Byte], String)] =
     toInstructions(toZ3Output())
-  def printInstructions(): Unit =
+  def printInstructions():                                               Unit                       =
     val outputs = toInstructions()
     outputs.foreach { case (_, instrStr) => println(instrStr) }
-  def writeInstructionsToFile(filename: String = s"${name}_output.bin"): Unit =
+  def writeInstructionsToFile(filename: String = s"${name}_output.bin"): Unit                       =
     val outputs = toInstructions()
     val fos     = new FileOutputStream(filename, true)
     try
