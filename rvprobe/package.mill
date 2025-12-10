@@ -6,6 +6,7 @@ import mill._
 import mill.scalalib.TestModule.Utest
 import mill.scalalib._
 import mill.scalalib.scalafmt._
+import contrib.jmh.JmhModule
 import os.Path
 
 import build.{circtlib, rvdecoderdb, smtlib, v}
@@ -28,4 +29,30 @@ object `package` extends ScalaModule with ScalafmtModule { m =>
       super.forkArgs() ++ circtlib.forkArgs()
     )
   }
+
+  object benchmark extends ScalaModule with JmhModule {
+    def scalaVersion   = Task(v.scala)
+    def moduleDeps     = Seq(tests)
+    def jmhCoreVersion = Task(v.jmh)
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() :+ "-experimental")
+    override def forkArgs:      T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+    def runJmh(args: String*) = Task.Command {
+      val (_, resources) = generateBenchmarkSources()
+      mill.util.Jvm.callProcess(
+        mainClass = "org.openjdk.jmh.Main",
+        classPath = (runClasspath() ++ generatorDeps()).map(_.path) ++
+          Seq(compileGeneratedSources().path, resources.path),
+        mainArgs = args,
+        cwd = Task.ctx().dest,
+        jvmArgs = forkArgs(),
+        javaHome = javaHome().map(_.path),
+        stdin = os.Inherit,
+        stdout = os.Inherit
+      )
+      ()
+    }
+  }
+
 }

@@ -36,6 +36,7 @@ let
           ./../../smtlib
           ./../../rvdecoderdb
           ./../../omlib
+          ./../../rvprobe
         ];
       };
 
