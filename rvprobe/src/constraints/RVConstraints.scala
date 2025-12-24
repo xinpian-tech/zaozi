@@ -1218,32 +1218,21 @@ def isVsm3meVv()(using Arena, Context, Block, Index, Recipe): InstConstraint = I
 
 case class Recipe(val name: String)(using Arena, Context, Block) {
   private val indices = scala.collection.mutable.Map[Int, Index]()
-  private val typePreds = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
-  private val paramPreds = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
-  private val combinedPreds = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
+  private val opcodes = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
+  private val args = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
 
   def addIndex(idx: Index): Index = indices.getOrElseUpdate(idx.idx, idx)
   def getIndex(idx: Int): Index = indices(idx)
 
-  def addTypePred(idx: Index, pred: Index => Ref[Bool]): Unit =
-    val v = typePreds.getOrElse(idx.idx, Vector.empty)
-    typePreds.update(idx.idx, v :+ pred)
+  def addOpcode(idx: Index, opcode: Index => Ref[Bool]): Unit =
+    val v = opcodes.getOrElse(idx.idx, Vector.empty)
+    opcodes.update(idx.idx, v :+ opcode)
+  def getOpcodes(idx: Int): Vector[Index => Ref[Bool]] = opcodes.getOrElse(idx, Vector.empty)
 
-  def addTypeConst(idx: Index, value: Int): Unit =
-    val pred: Index => Ref[Bool] = (i: Index) => i.nameId === value.S
-    addTypePred(idx, pred)
-
-  def addParamPred(idx: Index, pred: Index => Ref[Bool]): Unit =
-    val v = paramPreds.getOrElse(idx.idx, Vector.empty)
-    paramPreds.update(idx.idx, v :+ pred)
-
-  def addCombinedPred(idx: Index, pred: Index => Ref[Bool]): Unit =
-    val v = combinedPreds.getOrElse(idx.idx, Vector.empty)
-    combinedPreds.update(idx.idx, v :+ pred)
-
-  def getTypePreds(idx: Int): Vector[Index => Ref[Bool]] = typePreds.getOrElse(idx, Vector.empty)
-  def getParamPreds(idx: Int): Vector[Index => Ref[Bool]] = paramPreds.getOrElse(idx, Vector.empty)
-  def getCombinedPreds(idx: Int): Vector[Index => Ref[Bool]] = combinedPreds.getOrElse(idx, Vector.empty)
+  def addArg(idx: Index, arg: Index => Ref[Bool]): Unit =
+    val v = args.getOrElse(idx.idx, Vector.empty)
+    args.update(idx.idx, v :+ arg)
+  def getArgs(idx: Int): Vector[Index => Ref[Bool]] = args.getOrElse(idx, Vector.empty)
 
   def allIndices(): Seq[Int] = indices.keys.toSeq.sorted
 

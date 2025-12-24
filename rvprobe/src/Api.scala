@@ -52,8 +52,7 @@ def instruction(
   val index = new Index(idx)
   summon[Recipe].addIndex(index)
 
-  // Register the combined predicate with the recipe for staged emission
-  summon[Recipe].addCombinedPred(
+  summon[Recipe].addOpcode(
     index,
     (i: Index) =>
       block(
@@ -77,39 +76,14 @@ def instruction(
   summon[Recipe].addIndex(index)
 
   // register type and parameter predicates for staged emission
-  summon[Recipe].addTypePred(
+  summon[Recipe].addOpcode(
     index,
     (i: Index) =>
       opcode(
         using i
       ).toRef
   )
-  summon[Recipe].addParamPred(
-    index,
-    (i: Index) =>
-      params(
-        using i
-      ).toRef
-  )
-}
-
-// convenience overload: specify concrete nameId value for the instruction type
-def instruction(
-  idx:    Int,
-  nameId: Int
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-)(params: Index ?=> ArgConstraint
-): Unit = {
-  val index = new Index(idx)
-  summon[Recipe].addIndex(index)
-
-  // register a concrete nameId assignment as a type predicate, and params
-  summon[Recipe].addTypeConst(index, nameId)
-  summon[Recipe].addParamPred(
+  summon[Recipe].addArg(
     index,
     (i: Index) =>
       params(
