@@ -13,7 +13,7 @@ import java.lang.foreign.Arena
 
 def coverSigns(
   instructionCount: Int,
-  inst:             Index ?=> Ref[Bool],
+  inst:             Index ?=> Constraint,
   hasRd:            Boolean = false,
   hasRs1:           Boolean = false,
   hasRs2:           Boolean = false
