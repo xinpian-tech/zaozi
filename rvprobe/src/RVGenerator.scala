@@ -7,7 +7,7 @@ import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Result, Z3Status}
 import me.jiuyang.smtlib.default.{smtCheck, smtSetLogic, solver}
 
 import me.jiuyang.rvprobe.recipe
-import me.jiuyang.rvprobe.constraints.Recipe
+import me.jiuyang.rvprobe.constraints.{Recipe, SetConstraint}
 
 import org.llvm.mlir.scalalib.capi.dialect.func.{Func, FuncApi, given}
 import org.llvm.mlir.scalalib.capi.dialect.func.DialectApi as FuncDialect
@@ -22,7 +22,7 @@ import java.io.FileOutputStream
 
 trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
-  val sets: Seq[Recipe ?=> Ref[Bool]] // should be implemented by subclass
+  val sets: Seq[Recipe ?=> SetConstraint] // should be implemented by subclass
 
   type WithMLIRContext[T] = (Arena, Context, Block, Module) ?=> T
 
@@ -120,7 +120,7 @@ trait RVGenerator:
     toZ3Output(toSMTLIB())
   def printZ3Output():            Unit   = println(toZ3Output())
 
-  def toInstructions(z3Output: String):                                  Seq[(Array[Byte], String)] =
+  def toInstructions(z3Output: String):                                  Seq[(scala.Array[Byte], String)] =
     val z3Result: Z3Result = parseZ3Output(z3Output)
 
     assert(z3Result.status == Z3Status.Sat, s"Z3 result is not SAT: ${z3Result.status}")
@@ -130,42 +130,43 @@ trait RVGenerator:
     // TODO: pass instruction count from outside? Get Recipe given here?
     val instructionCount = toSMTLIB().split('\n').count(_.startsWith("(declare-const nameId"))
 
-    (0 until instructionCount).map { i =>
-      val nameId = getModelField(model, s"nameId_$i")
-      val inst   = instructions(nameId)
+    (0 until instructionCount).map {
+      case i =>
+        val nameId = getModelField(model, s"nameId_$i")
+        val inst   = instructions(nameId)
 
-      val (args, bits) = inst.args.foldLeft((Vector.empty[String], inst.encoding.value)) {
-        case ((argsAcc, bitsAcc), arg) =>
-          val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
-          val prefix         = if arg.name.startsWith("r") then "x" else ""
-          val argValue       = getModelField(model, argNameLowered + s"_$i")
+        val (args, bits) = inst.args.foldLeft((Vector.empty[String], inst.encoding.value)) {
+          case ((argsAcc, bitsAcc), arg) =>
+            val argName        = translateToCamelCase(arg.name)
+            val argNameLowered = argName.head.toLower + argName.tail
+            val prefix         = if arg.name.startsWith("r") then "x" else ""
+            val argValue       = getModelField(model, argNameLowered + s"_$i")
 
-          val processedValue: Long = if argValue < 0 then
-            val fieldWidth = arg.lsb - arg.msb + 1
-            val mask       = (1L << fieldWidth) - 1
-            argValue.toLong & mask
-          else argValue.toLong
+            val processedValue: Long = if argValue < 0 then
+              val fieldWidth = arg.lsb - arg.msb + 1
+              val mask       = (1L << fieldWidth) - 1
+              argValue.toLong & mask
+            else argValue.toLong
 
-          (
-            argsAcc :+ (prefix + argValue.toString),
-            bitsAcc | (BigInt(processedValue) << arg.msb)
-          )
-      }
+            (
+              argsAcc :+ (prefix + argValue.toString),
+              bitsAcc | (BigInt(processedValue) << arg.msb)
+            )
+        }
 
-      val instrString = s"$i: ${inst.name} ${args.mkString(" ")}"
+        val instrString = s"$i: ${inst.name} ${args.mkString(" ")}"
 
-      val value: Long = bits.toLong & 0xffffffffL
-      val bytes = Array(
-        (value & 0xff).toByte,
-        ((value >> 8) & 0xff).toByte,
-        ((value >> 16) & 0xff).toByte,
-        ((value >> 24) & 0xff).toByte
-      )
+        val value: Long = bits.toLong & 0xffffffffL
+        val bytes = scala.Array[Byte](
+          (value & 0xff).toByte,
+          ((value >> 8) & 0xff).toByte,
+          ((value >> 16) & 0xff).toByte,
+          ((value >> 24) & 0xff).toByte
+        )
 
-      (bytes, instrString)
+        (bytes, instrString)
     }.toSeq
-  def toInstructions():                                                  Seq[(Array[Byte], String)] =
+  def toInstructions():                                                  Seq[(scala.Array[Byte], String)] =
     toInstructions(toZ3Output())
   def printInstructions():                                               Unit                       =
     val outputs = toInstructions()

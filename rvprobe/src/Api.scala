@@ -13,7 +13,7 @@ import java.lang.foreign.Arena
 
 def recipe(
   name:  String,
-  sets:  Seq[Recipe ?=> Ref[Bool]]
+  sets:  Seq[Recipe ?=> SetConstraint]
 )(
   using Arena,
   Context,
@@ -26,7 +26,7 @@ def recipe(
   val includedSets: List[Ref[Bool]] = sets.toList.map(f =>
     f(
       using summon[Recipe]
-    )
+    ).toRef
   )
   // assert that sets are mutually exclusive
   val excludedSets = summon[Recipe].allSets.diff(includedSets)
@@ -39,7 +39,7 @@ def recipe(
   summon[Recipe]
 }
 
-// create an instruction with given index
+// create an instruction with given index (Legacy/Mixed)
 def instruction(
   idx:   Int
 )(
@@ -47,14 +47,75 @@ def instruction(
   Context,
   Block,
   Recipe
-)(block: Index ?=> Ref[Bool]
+)(block: Index ?=> Constraint
 ): Unit = {
   val index = new Index(idx)
   summon[Recipe].addIndex(index)
 
-  given Index = index
+  // Register the combined predicate with the recipe for staged emission
+  summon[Recipe].addCombinedPred(
+    index,
+    (i: Index) =>
+      block(
+        using i
+      ).toRef
+  )
+}
 
-  smtAssert(block)
+// create an instruction with explicit type predicate and parameter predicate
+def instruction(
+  idx:    Int,
+  opcode: Index ?=> InstConstraint
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+)(params: Index ?=> ArgConstraint
+): Unit = {
+  val index = new Index(idx)
+  summon[Recipe].addIndex(index)
+
+  // register type and parameter predicates for staged emission
+  summon[Recipe].addTypePred(
+    index,
+    (i: Index) =>
+      opcode(
+        using i
+      ).toRef
+  )
+  summon[Recipe].addParamPred(
+    index,
+    (i: Index) =>
+      params(
+        using i
+      ).toRef
+  )
+}
+
+// convenience overload: specify concrete nameId value for the instruction type
+def instruction(
+  idx:    Int,
+  nameId: Int
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+)(params: Index ?=> ArgConstraint
+): Unit = {
+  val index = new Index(idx)
+  summon[Recipe].addIndex(index)
+
+  // register a concrete nameId assignment as a type predicate, and params
+  summon[Recipe].addTypeConst(index, nameId)
+  summon[Recipe].addParamPred(
+    index,
+    (i: Index) =>
+      params(
+        using i
+      ).toRef
+  )
 }
 
 // get an instruction with given index
@@ -93,7 +154,7 @@ def distinct[D <: Data, R <: Referable[D]](
   smtAssert(smtDistinct(indexObjs.map(field).toSeq*))
 
 def isRV64G(
-): Seq[Recipe ?=> Ref[Bool]] =
+): Seq[Recipe ?=> SetConstraint] =
   Seq(
     isRVI(),
     isRVM(),
@@ -108,5 +169,5 @@ def isRV64G(
   )
 
 def isRV64GC(
-): Seq[Recipe ?=> Ref[Bool]] =
+): Seq[Recipe ?=> SetConstraint] =
   isRV64G() :+ isRVC()
