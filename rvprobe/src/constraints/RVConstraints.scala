@@ -1216,7 +1216,7 @@ def isVsm4rVv()(using Arena, Context, Block, Index, Recipe): InstConstraint = In
 def isVsm3cVi()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint(nameId(892) & (isRVZVKSH() | isRVZVKS()))
 def isVsm3meVv()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint(nameId(893) & (isRVZVKSH() | isRVZVKS()))
 
-case class Recipe(val name: String)(using Arena, Context, Block) {
+case class Recipe(val name: String, val opcodeOnly: Boolean = false)(using Arena, Context, Block) {
   private val indices = scala.collection.mutable.Map[Int, Index]()
   private val opcodes = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
   private val args = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
@@ -1350,6 +1350,7 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
 }
 
 case class Index(val idx: Int)(using Arena, Context, Block) {
+  var solvedNameId: Option[Int] = None
   val nameId = smtValue(s"nameId_${idx}", SInt)
   val amoop = smtValue(s"amoop_${idx}", SInt)
   val aq = smtValue(s"aq_${idx}", SInt)

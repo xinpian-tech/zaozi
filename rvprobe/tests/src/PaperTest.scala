@@ -13,8 +13,8 @@ object PaperTest extends TestSuite:
     object test extends RVGenerator with HasRVProbeTest:
       val sets          = Seq(isRV64I())
       def constraints() =
-        instruction(0) {
-          isAddw() & rdRange(1, 5)
+        instruction(0, isAddw()) {
+          rdRange(1, 5)
         }
 
     test.printMLIR()
