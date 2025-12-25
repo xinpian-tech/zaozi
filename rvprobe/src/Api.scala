@@ -11,34 +11,6 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Op
 
 import java.lang.foreign.Arena
 
-def recipe(
-  name:  String,
-  sets:  Seq[Recipe ?=> SetConstraint]
-)(
-  using Arena,
-  Context,
-  Block
-)(block: Recipe ?=> Unit
-): Recipe = {
-  given Recipe = new Recipe(name)
-
-  // assert sets are valid
-  val includedSets: List[Ref[Bool]] = sets.toList.map(f =>
-    f(
-      using summon[Recipe]
-    ).toRef
-  )
-  // assert that sets are mutually exclusive
-  val excludedSets = summon[Recipe].allSets.diff(includedSets)
-
-  smtAssert(smtAnd(includedSets*))
-  smtAssert(!smtOr(excludedSets*))
-
-  block
-
-  summon[Recipe]
-}
-
 // create an instruction with given index (Legacy/Mixed)
 def instruction(
   idx:   Int
