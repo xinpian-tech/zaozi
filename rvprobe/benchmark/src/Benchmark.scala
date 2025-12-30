@@ -70,12 +70,12 @@ class RVProbeBenchmark {
         case other => throw IllegalArgumentException(s"Unknown $other")
 
     val t1a                      = System.nanoTime()
-    val (arena, context, module) = generator.createMLIRModule()
+    generator.createMLIRModule()
     val t1b                      = System.nanoTime()
     val mlirMs                   = (t1b - t1a).toDouble / 1e6
 
     val t2a    = System.nanoTime()
-    val smtlib = generator.mlirToSMTLIB(arena, context, module).replace("(reset)", "(get-model)")
+    val smtlib = generator.mlirToSMTLIB().replace("(reset)", "(get-model)")
     val t2b    = System.nanoTime()
     val smtMs  = (t2b - t2a).toDouble / 1e6
 
@@ -89,7 +89,7 @@ class RVProbeBenchmark {
     val t4b     = System.nanoTime()
     val parseMs = (t4b - t4a).toDouble / 1e6
 
-    generator.closeMLIRContext(arena, context)
+    generator.close()
 
     // accumulate
     runs += 1

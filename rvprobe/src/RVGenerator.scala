@@ -8,16 +8,15 @@ import me.jiuyang.smtlib.default.{smtAnd, smtAssert, smtCheck, smtOr, smtSetLogi
 
 import me.jiuyang.rvprobe.constraints.*
 
-import org.llvm.mlir.scalalib.capi.dialect.func.{Func, FuncApi, given}
-import org.llvm.mlir.scalalib.capi.dialect.func.DialectApi as FuncDialect
-import org.llvm.mlir.scalalib.capi.dialect.func.given_DialectApi
-import org.llvm.mlir.scalalib.capi.dialect.smt.DialectApi as SmtDialect
-import org.llvm.mlir.scalalib.capi.dialect.smt.given_DialectApi
+import org.llvm.mlir.scalalib.capi.dialect.func.{DialectApi as FuncDialect, Func, FuncApi, given}
+import org.llvm.mlir.scalalib.capi.dialect.smt.{given_DialectApi, DialectApi as SmtDialect}
 import org.llvm.mlir.scalalib.capi.target.exportsmtlib.given_ExportSmtlibApi
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, ContextApi, LocationApi, Module, ModuleApi, Value, given}
 
 import java.lang.foreign.Arena
 import java.io.FileOutputStream
+
+import scala.compiletime.uninitialized
 
 trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
@@ -27,58 +26,59 @@ trait RVGenerator:
 
   val name: String = this.getClass.getSimpleName
 
-  private def assertOpcodes(
-    recipe: Recipe
+  // Internal MLIR context state (initialized by createMLIRModule)
+  private var _arena:   Arena   = uninitialized
+  private var _context: Context = uninitialized
+  private var _module:  Module  = uninitialized
+
+  private def resolveSets(
+    name:  String,
+    sets:  Seq[Recipe ?=> SetConstraint]
   )(
     using Arena,
     Context,
     Block
+  )(block: Recipe ?=> Unit
   ): Unit = {
-    for (idx <- recipe.allIndices()) {
-      val index = recipe.getIndex(idx)
-      recipe.getOpcodes(idx).foreach(c => smtAssert(c(index)))
-    }
-  }
+    given Recipe = new Recipe(name)
 
-  private def assertAll(
-    recipe: Recipe
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Unit = {
-    for (idx <- recipe.allIndices()) {
-      val index = recipe.getIndex(idx)
-      recipe.getOpcodes(idx).foreach(c => smtAssert(c(index)))
-      recipe.getArgs(idx).foreach(c => smtAssert(c(index)))
-    }
-  }
-
-  private def preprocessAndGetRecipe(
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Recipe = {
-    given recipe: Recipe = new Recipe(name)
-
+    // assert sets are valid
     val includedSets: List[Ref[Bool]] = sets.toList.map(
       _(
-        using recipe
+        using summon
       ).toRef
     )
-    val excludedSets = recipe.allSets.diff(includedSets)
+    val excludedSets = summon[Recipe].allSets.diff(includedSets)
     smtAssert(smtAnd(includedSets*))
     smtAssert(!smtOr(excludedSets*))
 
-    constraints()(
-      using summon,
-      summon,
-      summon,
-      recipe
-    )
-    recipe
+    block
   }
+
+  def createMLIRModule(): Unit =
+    _arena = Arena.ofConfined()
+    given Arena   = _arena
+    _context = summon[ContextApi].contextCreate
+    given Context = _context
+    summon[SmtDialect].loadDialect()
+    _module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    given Module  = _module
+    given Func    = summon[FuncApi].op("func")
+    given Block   = summon[Func].block
+    summon[Func].appendToModule()
+
+    try
+      solver {
+        smtSetLogic("QF_LIA")
+        resolveSets(name, sets) {
+          constraints()
+        }
+        smtCheck
+      }
+    catch
+      case e: Throwable =>
+        close()
+        throw e
 
   private def InMLIRContext[T](action: WithMLIRContext[T]): T =
     given Arena   = Arena.ofConfined()
@@ -93,78 +93,15 @@ trait RVGenerator:
     try
       solver {
         smtSetLogic("QF_LIA")
-        val recipe = preprocessAndGetRecipe()
-        assertAll(recipe)
+        resolveSets(name, sets) {
+          constraints()
+        }
         smtCheck
       }
       action
     finally
       summon[Context].destroy()
       summon[Arena].close()
-
-  private def _createOpcodeContext(): (Arena, Context, Module, Recipe) = {
-    given Arena   = Arena.ofConfined()
-    given Context = summon[ContextApi].contextCreate
-    summon[SmtDialect].loadDialect()
-    summon[FuncDialect].loadDialect()
-    given Module  = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Func    = summon[FuncApi].op("func")
-    given Block   = summon[Func].block
-    summon[Func].appendToModule()
-
-    var recipeOut: Option[Recipe] = None
-
-    solver {
-      // 1. Call preprocessAndGetRecipe to populate the Recipe object
-      val recipe = preprocessAndGetRecipe()
-
-      // 2. This is the key part of stage 1: iterate through the recipe and assert only the opcode constraints
-      for (idx <- recipe.allIndices()) {
-        val index = recipe.getIndex(idx)
-        recipe.getOpcodes(idx).foreach(c => smtAssert(c(index)))
-      }
-
-      // 3. Add the solve command
-      smtCheck
-      recipeOut = Some(recipe) // Save the populated recipe
-    }
-
-    (summon[Arena], summon[Context], summon[Module], recipeOut.get)
-  }
-
-  def solveOpcodes(): Seq[Index] = {
-    // 1. Use the new context that only solves for opcodes
-    val (arena, context, module, recipe) = _createOpcodeContext()
-
-    try {
-      val smtlib   = mlirToSMTLIB(arena, context, module)
-      val z3Output = toZ3Output(smtlib)
-      val z3Result = parseZ3Output(z3Output)
-      assert(z3Result.status == Z3Status.Sat, s"Z3 result is not SAT: ${z3Result.status}")
-      val model    = z3Result.model
-
-      // 2. Parse the model and store the solved nameId back into the Index objects in the Recipe
-      for (idx <- recipe.allIndices()) {
-        val index  = recipe.getIndex(idx)
-        val nameId = getModelField(model, s"nameId_${index.idx}")
-        index.solvedNameId = Some(nameId)
-      }
-      // 3. Return the sequence of Index objects, now containing the solved opcode IDs
-      recipe.allIndices().map(recipe.getIndex).toSeq
-    } finally {
-      closeMLIRContext(arena, context)
-    }
-  }
-
-  def printOpcode(): Unit = {
-    val solvedIndices = solveOpcodes()
-    val instructions  = getInstructions()
-    // Iterate through the results, convert nameId to instruction name, and print
-    for (index <- solvedIndices.sortBy(_.idx)) {
-      val instName = index.solvedNameId.map(id => instructions(id).name).getOrElse("???")
-      println(s"${index.idx}: $instName")
-    }
-  }
 
   private def getMLIRString: WithMLIRContext[String] =
     val out = new StringBuilder
@@ -176,25 +113,30 @@ trait RVGenerator:
     summon[Module].exportSMTLIB(out ++= _)
     out.toString()
 
-  def mlirToString(arena: Arena, context: Context, module: Module): String =
-    given Arena   = arena
-    given Context = context
-    given Module  = module
+  def mlirToString(): String =
+    given Arena   = _arena
+    given Context = _context
+    given Module  = _module
     val out       = new StringBuilder
-    module.getOperation.print(out ++= _)
+    _module.getOperation.print(out ++= _)
     out.toString()
 
-  def mlirToSMTLIB(arena: Arena, context: Context, module: Module): String =
-    given Arena   = arena
-    given Context = context
-    given Module  = module
+  def mlirToSMTLIB(): String =
+    given Arena   = _arena
+    given Context = _context
+    given Module  = _module
     val out       = new StringBuilder
-    module.exportSMTLIB(out ++= _)
+    _module.exportSMTLIB(out ++= _)
     out.toString()
 
-  def closeMLIRContext(arena: Arena, context: Context): Unit =
-    context.destroy()
-    arena.close()
+  def close(): Unit =
+    if _context != null then
+      _context.destroy()
+      _context = null
+    if _arena != null then
+      _arena.close()
+      _arena = null
+    _module = null
 
   // Legacy methods for backward compatibility
   def toMLIR():    String = InMLIRContext { getMLIRString }
