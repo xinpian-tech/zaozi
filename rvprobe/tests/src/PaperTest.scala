@@ -17,6 +17,9 @@ object PaperTest extends TestSuite:
           rdRange(1, 5)
         }
 
-    test.printMLIR()
-    test.printSMTLIB()
-    test.printInstructions()
+    // test.printMLIROpcodes()
+    // test.printSMTLIBOpcodes()
+    val result = test.solveOpcodes()
+    println(result)
+    // test.printSMTLIB()
+    // test.printInstructions()
