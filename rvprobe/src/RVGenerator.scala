@@ -4,7 +4,7 @@ package me.jiuyang.rvprobe
 
 import me.jiuyang.smtlib.tpe.{Bool, Ref}
 import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Result, Z3Status}
-import me.jiuyang.smtlib.default.{smtAnd, smtAssert, smtCheck, smtOr, smtSetLogic, solver}
+import me.jiuyang.smtlib.default.{*, given}
 
 import me.jiuyang.rvprobe.constraints.*
 
@@ -21,15 +21,14 @@ import scala.compiletime.uninitialized
 trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
   val sets: Seq[Recipe ?=> SetConstraint] // should be implemented by subclass
-
-  type WithMLIRContext[T] = (Arena, Context, Block, Module) ?=> T
-
   val name: String = this.getClass.getSimpleName
 
-  // Internal MLIR context state (initialized by createMLIRModule)
+  // Internal MLIR context state
   private var _arena:   Arena   = uninitialized
   private var _context: Context = uninitialized
   private var _module:  Module  = uninitialized
+  private var _block:   Block   = uninitialized
+  private var _recipe:  Recipe  = uninitialized
 
   private def resolveSets(
     name:  String,
@@ -39,79 +38,189 @@ trait RVGenerator:
     Context,
     Block
   )(block: Recipe ?=> Unit
-  ): Unit = {
+  ): Recipe = {
     given Recipe = new Recipe(name)
 
-    // assert sets are valid
-    val includedSets: List[Ref[Bool]] = sets.toList.map(
-      _(
-        using summon
-      ).toRef
-    )
-    val excludedSets = summon[Recipe].allSets.diff(includedSets)
-    smtAssert(smtAnd(includedSets*))
-    smtAssert(!smtOr(excludedSets*))
+    // Store set constraints in Recipe
+    sets.foreach { constraint =>
+      summon[Recipe].addSet(r =>
+        constraint(
+          using r
+        ).toRef
+      )
+    }
 
     block
+    summon[Recipe]
   }
 
-  def createMLIRModule(): Unit =
+  def initialize(): Unit = {
+    if (_context != null) return
+
     _arena = Arena.ofConfined()
     given Arena   = _arena
     _context = summon[ContextApi].contextCreate
     given Context = _context
     summon[SmtDialect].loadDialect()
+    summon[FuncDialect].loadDialect()
     _module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
     given Module  = _module
-    given Func    = summon[FuncApi].op("func")
-    given Block   = summon[Func].block
-    summon[Func].appendToModule()
 
-    try
-      solver {
-        smtSetLogic("QF_LIA")
-        resolveSets(name, sets) {
-          constraints()
-        }
-        smtCheck
+    val func    = summon[FuncApi].op("func")
+    given Block = func.block
+    func.appendToModule()
+
+    solver {
+      _block = summon[Block]
+      smtSetLogic("QF_LIA")
+
+      _recipe = resolveSets(name, sets) {
+        constraints()
       }
+    }
+  }
+
+  private def withContext[T](f: (Arena, Context, Block, Module, Recipe) ?=> T): T = {
+    if (_context == null) initialize()
+    given Arena   = _arena
+    given Context = _context
+    given Module  = _module
+    given Block   = _block
+    given Recipe  = _recipe
+    f
+  }
+
+  // ================== Two-Stage Solving API ==================
+
+  /** Stage 1: Generate SMTLIB to solve only Opcodes (nameId) */
+  def printMLIROpcodes(): Unit = withContext {
+    applyOpcodeConstraints()
+    println(mlirToString())
+  }
+
+  def printSMTLIBOpcodes(): Unit = withContext {
+    applyOpcodeConstraints()
+    println(mlirToSMTLIB())
+  }
+
+  /** Stage 1 Helper: Parse Z3 output to get Opcode map */
+  def solveOpcodes(): Map[Int, Int] = withContext {
+    applyOpcodeConstraints()
+    val smtlib   = mlirToSMTLIB()
+    val z3Output = toZ3Output(smtlib)
+    println(z3Output)
+    val result   = parseZ3Output(z3Output)
+    assert(result.status == Z3Status.Sat, s"Opcode solving failed: ${result.status}")
+
+    result.model.collect {
+      case (k, v: BigInt) if k.startsWith("nameId_") =>
+        k.stripPrefix("nameId_").toInt -> v.toInt
+    }
+  }
+
+  private def applyOpcodeConstraints(
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit = {
+    val recipe = summon[Recipe]
+    // Apply Set constraints
+    val includedSets = recipe.getSet().map(_(recipe))
+    val excludedSets = recipe.allSets.diff(includedSets)
+    smtAssert(smtAnd(includedSets*) & !smtOr(excludedSets*))
+
+    recipe.allIndices().foreach { idx =>
+      val index   = recipe.getIndex(idx)
+      val opcodes = recipe.getOpcodes(idx).map(_(index))
+      if (opcodes.nonEmpty) {
+        smtAssert(smtAnd(opcodes*))
+      }
+    }
+
+    smtCheck
+  }
+
+  /** Stage 2: Generate SMTLIB to solve Arguments, given fixed Opcodes */
+  def printSMTLIBArgs(solvedOpcodes: Map[Int, Int]): Unit = withContext {
+    applyArgConstraints(solvedOpcodes)
+    println(mlirToSMTLIB())
+  }
+
+  /** Stage 2 Helper: Parse Z3 output to get all variables */
+  def solveArgs(solvedOpcodes: Map[Int, Int]): Map[String, BigInt] = withContext {
+    applyArgConstraints(solvedOpcodes)
+    val smtlib   = mlirToSMTLIB()
+    val z3Output = toZ3Output(smtlib)
+    val result   = parseZ3Output(z3Output)
+    assert(result.status == Z3Status.Sat, s"Argument solving failed: ${result.status}")
+    result.model.collect { case (k, v: BigInt) => k -> v }
+  }
+
+  private def applyArgConstraints(
+    solvedOpcodes: Map[Int, Int]
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit = {
+    val recipe = summon[Recipe]
+
+    // Apply Set constraints
+    val includedSets = recipe.getSet().map(_(recipe))
+    val excludedSets = recipe.allSets.diff(includedSets)
+    smtAssert(smtAnd(includedSets*))
+    smtAssert(!smtOr(excludedSets*))
+
+    val instructions = getInstructions()
+
+    recipe.allIndices().foreach { idx =>
+      val index    = recipe.getIndex(idx)
+      val opcodeId = solvedOpcodes.getOrElse(idx, throw new RuntimeException(s"No solved opcode for index $idx"))
+
+      // 1. Fix Opcode
+      smtAssert(index.nameId === opcodeId.S)
+
+      // 2. Auto-constrain Args
+      val inst = instructions(opcodeId)
+      inst.args.foreach { arg =>
+        applyArgRangeConstraint(index, arg)
+      }
+
+      // 3. Apply User Arg Constraints
+      val args = recipe.getArgs(idx).map(_(index))
+      if (args.nonEmpty) {
+        smtAssert(smtAnd(args*))
+      }
+    }
+  }
+
+  private def applyArgRangeConstraint(
+    index: Index,
+    arg:   org.chipsalliance.rvdecoderdb.Arg
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit = {
+    val fieldName        = translateToCamelCase(arg.name)
+    val fieldNameLowered = fieldName.head.toLower + fieldName.tail
+    try
+      val method     = index.getClass.getMethod(fieldNameLowered)
+      val field      = method.invoke(index).asInstanceOf[Ref[me.jiuyang.smtlib.tpe.SInt]]
+      val width      = arg.msb - arg.lsb + 1
+      val isSigned   =
+        arg.name.toLowerCase.contains("imm") || arg.name.toLowerCase.contains("offset") || arg.name == "bimm12hi"
+      val (min, max) = if isSigned then
+        val limit = BigInt(1) << (width - 1)
+        (-limit, limit)
+      else (BigInt(0), BigInt(1) << width)
+      smtAssert(field >= min.toInt.S & field < max.toInt.S)
     catch
-      case e: Throwable =>
-        close()
-        throw e
-
-  private def InMLIRContext[T](action: WithMLIRContext[T]): T =
-    given Arena   = Arena.ofConfined()
-    given Context = summon[ContextApi].contextCreate
-    summon[SmtDialect].loadDialect()
-    summon[FuncDialect].loadDialect()
-    given Module  = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Func    = summon[FuncApi].op("func")
-    given Block   = summon[Func].block
-    summon[Func].appendToModule()
-
-    try
-      solver {
-        smtSetLogic("QF_LIA")
-        resolveSets(name, sets) {
-          constraints()
-        }
-        smtCheck
-      }
-      action
-    finally
-      summon[Context].destroy()
-      summon[Arena].close()
-
-  private def getMLIRString: WithMLIRContext[String] =
-    val out = new StringBuilder
-    summon[Module].getOperation.print(out ++= _)
-    out.toString()
-
-  private def getSMTLIBString: WithMLIRContext[String] =
-    val out = new StringBuilder
-    summon[Module].exportSMTLIB(out ++= _)
-    out.toString()
+      case _: NoSuchMethodException => // Ignore if field not in Index
+  }
 
   def mlirToString(): String =
     given Arena   = _arena
@@ -138,33 +247,20 @@ trait RVGenerator:
       _arena = null
     _module = null
 
-  // Legacy methods for backward compatibility
-  def toMLIR():    String = InMLIRContext { getMLIRString }
-  def printMLIR(): Unit   = InMLIRContext { println(getMLIRString) }
-
-  def toSMTLIB():    String = InMLIRContext { getSMTLIBString }
-  def printSMTLIB(): Unit   = InMLIRContext { println(getSMTLIBString) }
-
   def toZ3Output(smtlib: String): String =
     val z3Output =
       os.proc("z3", "-in", "-t:5000").call(stdin = smtlib.toString().replace("(reset)", "(get-model)"), check = false)
     z3Output.out.text()
-  def toZ3Output():               String =
-    toZ3Output(toSMTLIB())
-  def printZ3Output():            Unit   = println(toZ3Output())
 
-  def toInstructions(z3Output: String):                                  Seq[(scala.Array[Byte], String)] =
-    val z3Result: Z3Result = parseZ3Output(z3Output)
+  def assembleInstructions(
+    solvedOpcodes: Map[Int, Int],
+    solvedArgs:    Map[String, BigInt]
+  ): Seq[(Array[Byte], String)] = {
+    val instructions  = getInstructions()
+    val sortedIndices = solvedOpcodes.keys.toSeq.sorted
 
-    assert(z3Result.status == Z3Status.Sat, s"Z3 result is not SAT: ${z3Result.status}")
-    val model        = z3Result.model
-    val instructions = getInstructions()
-
-    // TODO: pass instruction count from outside? Get Recipe given here?
-    val instructionCount = toSMTLIB().split('\n').count(_.startsWith("(declare-const nameId"))
-
-    (0 until instructionCount).map { case i =>
-      val nameId = getModelField(model, s"nameId_$i")
+    sortedIndices.map { i =>
+      val nameId = solvedOpcodes(i)
       val inst   = instructions(nameId)
 
       val (args, bits) = inst.args.foldLeft((Vector.empty[String], inst.encoding.value)) {
@@ -172,17 +268,22 @@ trait RVGenerator:
           val argName        = translateToCamelCase(arg.name)
           val argNameLowered = argName.head.toLower + argName.tail
           val prefix         = if arg.name.startsWith("r") then "x" else ""
-          val argValue       = getModelField(model, argNameLowered + s"_$i")
+
+          // Fetch value from solvedArgs
+          val argValue = solvedArgs.getOrElse(
+            argNameLowered + s"_$i",
+            BigInt(0)
+          )
 
           val processedValue: Long = if argValue < 0 then
-            val fieldWidth = arg.lsb - arg.msb + 1
+            val fieldWidth = arg.msb - arg.lsb + 1
             val mask       = (1L << fieldWidth) - 1
             argValue.toLong & mask
           else argValue.toLong
 
           (
             argsAcc :+ (prefix + argValue.toString),
-            bitsAcc | (BigInt(processedValue) << arg.msb)
+            bitsAcc | (BigInt(processedValue) << arg.lsb)
           )
       }
 
@@ -197,24 +298,40 @@ trait RVGenerator:
       )
 
       (bytes, instrString)
-    }.toSeq
-  def toInstructions():                                                  Seq[(scala.Array[Byte], String)] =
-    toInstructions(toZ3Output())
-  def printInstructions():                                               Unit                             =
+    }
+  }
+
+  // ================== Convenience Methods ==================
+
+  def toInstructions(): Seq[(Array[Byte], String)] = {
+    val opcodes = solveOpcodes()
+    val args    = solveArgs(opcodes)
+    assembleInstructions(opcodes, args)
+  }
+
+  def printInstructions(): Unit =
     val outputs = toInstructions()
     outputs.foreach { case (_, instrStr) => println(instrStr) }
-  def writeInstructionsToFile(filename: String = s"${name}_output.bin"): Unit                             =
+
+  def writeInstructionsToFile(filename: String = s"${name}_output.bin"): Unit =
     val outputs = toInstructions()
     val fos     = new FileOutputStream(filename, true)
     try
       outputs.foreach { case (bytes, _) => fos.write(bytes) }
     finally fos.close()
 
-  private def getModelField(model: Map[String, Boolean | BigInt], name: String): Int =
-    model
-      .get(name)
-      .map {
-        case b: Boolean => throw new RuntimeException(s"Expected an integer for $name, but got a boolean: $b")
-        case i: BigInt  => i.toInt
-      }
-      .getOrElse(throw new RuntimeException(s"Model does not contain field: $name"))
+  // Legacy support for tests
+  def toSMTLIB(): String = withContext {
+    applyOpcodeConstraints()
+    mlirToSMTLIB()
+  }
+
+  def toMLIR(): String = withContext {
+    applyOpcodeConstraints()
+    mlirToString()
+  }
+
+  def toZ3Output(): String = {
+    val smtlib = toSMTLIB()
+    toZ3Output(smtlib)
+  }

@@ -1218,11 +1218,15 @@ def isVsm3meVv()(using Arena, Context, Block, Index, Recipe): InstConstraint = I
 
 case class Recipe(val name: String, val opcodeOnly: Boolean = false)(using Arena, Context, Block) {
   private val indices = scala.collection.mutable.Map[Int, Index]()
+  private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
   private val opcodes = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
   private val args = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
 
   def addIndex(idx: Index): Index = indices.getOrElseUpdate(idx.idx, idx)
   def getIndex(idx: Int): Index = indices(idx)
+
+  def addSet(c: Recipe => Ref[Bool]): Unit = sets += c
+  def getSet(): Seq[Recipe => Ref[Bool]] = sets.toSeq
 
   def addOpcode(idx: Index, opcode: Index => Ref[Bool]): Unit =
     val v = opcodes.getOrElse(idx.idx, Vector.empty)
