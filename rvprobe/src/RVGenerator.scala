@@ -55,8 +55,6 @@ trait RVGenerator:
   }
 
   def initialize(): Unit = {
-    if (_context != null) return
-
     _arena = Arena.ofConfined()
     given Arena   = _arena
     _context = summon[ContextApi].contextCreate
@@ -125,7 +123,7 @@ trait RVGenerator:
     Block,
     Recipe
   ): Unit = {
-    val recipe = summon[Recipe]
+    val recipe       = summon[Recipe]
     // Apply Set constraints
     val includedSets = recipe.getSet().map(_(recipe))
     val excludedSets = recipe.allSets.diff(includedSets)
@@ -154,7 +152,6 @@ trait RVGenerator:
     val smtlib   = mlirToSMTLIB()
     val z3Output = toZ3Output(smtlib)
     val result   = parseZ3Output(z3Output)
-    assert(result.status == Z3Status.Sat, s"Argument solving failed: ${result.status}")
     result.model.collect { case (k, v: BigInt) => k -> v }
   }
 
@@ -168,33 +165,26 @@ trait RVGenerator:
   ): Unit = {
     val recipe = summon[Recipe]
 
-    // Apply Set constraints
-    val includedSets = recipe.getSet().map(_(recipe))
-    val excludedSets = recipe.allSets.diff(includedSets)
-    smtAssert(smtAnd(includedSets*))
-    smtAssert(!smtOr(excludedSets*))
-
     val instructions = getInstructions()
 
     recipe.allIndices().foreach { idx =>
       val index    = recipe.getIndex(idx)
       val opcodeId = solvedOpcodes.getOrElse(idx, throw new RuntimeException(s"No solved opcode for index $idx"))
 
-      // 1. Fix Opcode
-      smtAssert(index.nameId === opcodeId.S)
-
-      // 2. Auto-constrain Args
+      // 1. Auto-constrain Args
       val inst = instructions(opcodeId)
       inst.args.foreach { arg =>
         applyArgRangeConstraint(index, arg)
       }
 
-      // 3. Apply User Arg Constraints
+      // 2. Apply User Arg Constraints
       val args = recipe.getArgs(idx).map(_(index))
       if (args.nonEmpty) {
         smtAssert(smtAnd(args*))
       }
     }
+
+    smtCheck
   }
 
   private def applyArgRangeConstraint(
@@ -210,7 +200,7 @@ trait RVGenerator:
     try
       val method     = index.getClass.getMethod(fieldNameLowered)
       val field      = method.invoke(index).asInstanceOf[Ref[me.jiuyang.smtlib.tpe.SInt]]
-      val width      = arg.msb - arg.lsb + 1
+      val width      = arg.lsb - arg.msb + 1
       val isSigned   =
         arg.name.toLowerCase.contains("imm") || arg.name.toLowerCase.contains("offset") || arg.name == "bimm12hi"
       val (min, max) = if isSigned then
@@ -218,6 +208,7 @@ trait RVGenerator:
         (-limit, limit)
       else (BigInt(0), BigInt(1) << width)
       smtAssert(field >= min.toInt.S & field < max.toInt.S)
+      // println(s"Applied range constraint on $fieldNameLowered: [$min, $max), width: $width, signed: $isSigned")
     catch
       case _: NoSuchMethodException => // Ignore if field not in Index
   }

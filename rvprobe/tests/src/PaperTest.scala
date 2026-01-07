@@ -11,7 +11,7 @@ import utest.*
 object PaperTest extends TestSuite:
   val tests = Tests:
     object test extends RVGenerator with HasRVProbeTest:
-      val sets          = Seq(isRV64I())
+      val sets          = Seq(isRV64I(), isRVI())
       def constraints() =
         instruction(0, isAddw()) {
           rdRange(1, 5)
@@ -19,7 +19,14 @@ object PaperTest extends TestSuite:
 
     // test.printMLIROpcodes()
     // test.printSMTLIBOpcodes()
-    val result = test.solveOpcodes()
-    println(result)
+    val solvedOpcodes = test.solveOpcodes()
+    // println(solvedOpcodes)
+    test.initialize()
+    // val args = test.printSMTLIBArgs(solvedOpcodes)
+    // println(args)
+    val solvedArgs = test.solveArgs(solvedOpcodes)
+    // println(solvedArgs)
+    val insts = test.assembleInstructions(solvedOpcodes, solvedArgs)
+    println(insts)
     // test.printSMTLIB()
     // test.printInstructions()
