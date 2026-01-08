@@ -16,15 +16,15 @@ def makeL1(nInst: Int): RVGenerator & HasRVProbeTest = new RVGenerator with HasR
   val sets          = isRV64GC()
   def constraints() =
     (0 until nInst).foreach { i =>
-      instruction(i) { isAddi() }
+      instruction(i, isAddi()) { rdRange(1, 5) }
     }
 
 def makeL2(nInst: Int): RVGenerator & HasRVProbeTest = new RVGenerator with HasRVProbeTest:
   val sets          = isRV64GC()
   def constraints() =
     (0 until nInst).foreach { i =>
-      instruction(i) {
-        isAddi() & rdRange(1, 5) & rs1Range(1, 10) & imm12Range(-100, 100)
+      instruction(i, isAddi()) {
+        rdRange(1, 5) & rs1Range(1, 10) & imm12Range(-100, 100)
       }
     }
 
@@ -32,7 +32,7 @@ def makeL3(nInst: Int): RVGenerator & HasRVProbeTest = new RVGenerator with HasR
   val sets          = isRV64GC()
   def constraints() =
     (0 until nInst).foreach { i =>
-      instruction(i) { isAddi() & rdRange(1, 5) & imm12Range(-100, 100) }
+      instruction(i, isAddi()) { rdRange(1, 5) & imm12Range(-100, 100) }
     }
 
     (0 until (nInst - 1)).foreach { i =>
@@ -69,25 +69,70 @@ class RVProbeBenchmark {
         case "L3"  => makeL3(nInst)
         case other => throw IllegalArgumentException(s"Unknown $other")
 
-    val t1a                      = System.nanoTime()
-    generator.createMLIRModule()
-    val t1b                      = System.nanoTime()
-    val mlirMs                   = (t1b - t1a).toDouble / 1e6
+    // Stage 1: Solve Opcodes
+    val t1a    = System.nanoTime()
+    generator.initialize()
+    generator.withContext {
+      generator.applyOpcodeConstraints()
+    }
+    val t1b    = System.nanoTime()
+    var mlirMs = (t1b - t1a).toDouble / 1e6
 
     val t2a    = System.nanoTime()
-    val smtlib = generator.mlirToSMTLIB().replace("(reset)", "(get-model)")
+    var smtlib = generator.withContext { generator.mlirToSMTLIB() }.replace("(reset)", "(get-model)")
     val t2b    = System.nanoTime()
-    val smtMs  = (t2b - t2a).toDouble / 1e6
+    var smtMs  = (t2b - t2a).toDouble / 1e6
 
     val t3a      = System.nanoTime()
-    val z3Output = os.proc("z3", "-in", "-t:5000").call(stdin = smtlib, check = false)
+    var z3Output = os.proc("z3", "-in", "-t:5000").call(stdin = smtlib, check = false).out.text()
     val t3b      = System.nanoTime()
-    val z3Ms     = (t3b - t3a).toDouble / 1e6
+    var z3Ms     = (t3b - t3a).toDouble / 1e6
 
     val t4a     = System.nanoTime()
-    generator.toInstructions(z3Output.out.text())
+    import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Status}
+    // println(s"Z3 Output: $z3Output") // Debugging
+    val result1 =
+      try {
+        parseZ3Output(z3Output)
+      } catch {
+        case e: Exception =>
+          System.err.println(f"Parse error for complexity=$complexity nInst=$nInst")
+          System.err.println(f"Z3 Output length: ${z3Output.length}")
+          System.err.println(f"Z3 Output start: ${z3Output.take(100)}")
+          System.err.println(f"Z3 Output end: ${z3Output.takeRight(100)}")
+          throw e
+      }
+    val opcodes = result1.model.collect {
+      case (k, v: BigInt) if k.startsWith("nameId_") =>
+        k.stripPrefix("nameId_").toInt -> v.toInt
+    }
     val t4b     = System.nanoTime()
-    val parseMs = (t4b - t4a).toDouble / 1e6
+    var parseMs = (t4b - t4a).toDouble / 1e6
+
+    // Stage 2: Solve Args
+    val t5a = System.nanoTime()
+    generator.withContext {
+      generator.applyArgConstraints(opcodes)
+    }
+    val t5b = System.nanoTime()
+    mlirMs += (t5b - t5a).toDouble / 1e6
+
+    val t6a = System.nanoTime()
+    smtlib = generator.withContext { generator.mlirToSMTLIB() }.replace("(reset)", "(get-model)")
+    val t6b = System.nanoTime()
+    smtMs += (t6b - t6a).toDouble / 1e6
+
+    val t7a = System.nanoTime()
+    z3Output = os.proc("z3", "-in", "-t:5000").call(stdin = smtlib, check = false).out.text()
+    val t7b = System.nanoTime()
+    z3Ms += (t7b - t7a).toDouble / 1e6
+
+    val t8a     = System.nanoTime()
+    val result2 = parseZ3Output(z3Output)
+    val args    = result2.model.collect { case (k, v: BigInt) => k -> v }
+    generator.assembleInstructions(opcodes, args)
+    val t8b     = System.nanoTime()
+    parseMs += (t8b - t8a).toDouble / 1e6
 
     generator.close()
 

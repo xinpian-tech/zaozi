@@ -78,7 +78,7 @@ trait RVGenerator:
     }
   }
 
-  private def withContext[T](f: (Arena, Context, Block, Module, Recipe) ?=> T): T = {
+  def withContext[T](f: (Arena, Context, Block, Module, Recipe) ?=> T): T = {
     if (_context == null) initialize()
     given Arena   = _arena
     given Context = _context
@@ -116,7 +116,7 @@ trait RVGenerator:
     }
   }
 
-  private def applyOpcodeConstraints(
+  def applyOpcodeConstraints(
   )(
     using Arena,
     Context,
@@ -155,7 +155,7 @@ trait RVGenerator:
     result.model.collect { case (k, v: BigInt) => k -> v }
   }
 
-  private def applyArgConstraints(
+  def applyArgConstraints(
     solvedOpcodes: Map[Int, Int]
   )(
     using Arena,
