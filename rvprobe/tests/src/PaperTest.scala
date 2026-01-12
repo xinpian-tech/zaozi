@@ -17,16 +17,4 @@ object PaperTest extends TestSuite:
           rdRange(1, 5)
         }
 
-    // test.printMLIROpcodes()
-    // test.printSMTLIBOpcodes()
-    val solvedOpcodes = test.solveOpcodes()
-    // println(solvedOpcodes)
-    test.initialize()
-    // val args = test.printSMTLIBArgs(solvedOpcodes)
-    // println(args)
-    val solvedArgs = test.solveArgs(solvedOpcodes)
-    // println(solvedArgs)
-    val insts = test.assembleInstructions(solvedOpcodes, solvedArgs)
-    println(insts)
-    // test.printSMTLIB()
-    // test.printInstructions()
+    test.printInstructions()
