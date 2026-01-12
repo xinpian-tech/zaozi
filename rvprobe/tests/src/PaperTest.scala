@@ -17,4 +17,4 @@ object PaperTest extends TestSuite:
           rdRange(1, 5)
         }
 
-    test.printInstructions()
+    test.printArgMLIR()

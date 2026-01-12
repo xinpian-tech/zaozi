@@ -112,17 +112,6 @@ trait RVGenerator:
   }
 
   // ================== Two-Stage Solving API ==================
-
-  /** Stage 1: Generate SMTLIB to solve only Opcodes (nameId) */
-  def printSMTLIBOpcodes(): Unit = withOpcodeContext(
-    postProcess = (arena, context, module, recipe) => {
-      given Arena  = arena
-      given Module = module
-      println(mlirToSMTLIB())
-    }
-  )
-
-  /** Stage 1 Helper: Parse Z3 output to get Opcode map */
   def solveOpcodes(): Map[Int, Int] = withOpcodeContext(
     postProcess = (arena, context, module, recipe) => {
       given Arena  = arena
@@ -145,16 +134,6 @@ trait RVGenerator:
     }
   )
 
-  /** Stage 2: Generate SMTLIB to solve Arguments, given fixed Opcodes */
-  def printSMTLIBArgs(solvedOpcodes: Map[Int, Int]): Unit = withArgContext(
-    solvedOpcodes = solvedOpcodes,
-    postProcess = (arena, context, module, recipe) => {
-      given Arena  = arena
-      given Module = module
-      println(mlirToSMTLIB())
-    }
-  )
-
   /** Stage 2 Helper: Parse Z3 output to get all variables */
   def solveArgs(solvedOpcodes: Map[Int, Int]): Map[String, BigInt] = withArgContext(
     solvedOpcodes = solvedOpcodes,
@@ -170,7 +149,6 @@ trait RVGenerator:
   )
 
   // ================== Constraint Emission (Internal) ==================
-
   /** Stage 1: Emit only opcode-related constraints */
   private def emitOpcodeConstraints(
   )(
@@ -263,7 +241,6 @@ trait RVGenerator:
   }
 
   // ================== Helpers ==================
-
   private def mlirToSMTLIB(
   )(
     using Arena,
@@ -280,8 +257,69 @@ trait RVGenerator:
     z3Output.out.text()
   }
 
-  // ================== Assembly & Legacy ==================
+  // ================== Stage 1 Helper ==================
+  def toOpcodeSMTLIB(): String = withOpcodeContext(
+    postProcess = (arena, context, module, recipe) => {
+      given Arena  = arena
+      given Module = module
+      mlirToSMTLIB()
+    }
+  )
 
+  def printOpcodeSMTLIB() = println(toOpcodeSMTLIB())
+
+  def toOpcodeMLIR(): String = withOpcodeContext(
+    postProcess = (arena, context, module, recipe) => {
+      given Arena  = arena
+      given Module = module
+      val out      = new StringBuilder
+      summon[Module].getOperation.print(out ++= _)
+      out.toString()
+    }
+  )
+
+  def printOpcodeMLIR() = println(toOpcodeMLIR())
+
+  def toOpcodeZ3Output(): String = {
+    val smtlib = toOpcodeSMTLIB()
+    toZ3Output(smtlib)
+  }
+
+  def printOpcodeZ3Output() = println(toOpcodeZ3Output())
+
+  // ================== Stage 2 Helper ==================
+  def toArgSMTLIB(): String = withArgContext(
+    solvedOpcodes = solveOpcodes(),
+    postProcess = (arena, context, module, recipe) => {
+      given Arena  = arena
+      given Module = module
+      mlirToSMTLIB()
+    }
+  )
+
+  def printArgSMTLIB() = println(toArgSMTLIB())
+
+  def toArgMLIR(): String = withArgContext(
+    solvedOpcodes = solveOpcodes(),
+    postProcess = (arena, context, module, recipe) => {
+      given Arena  = arena
+      given Module = module
+      val out      = new StringBuilder
+      summon[Module].getOperation.print(out ++= _)
+      out.toString()
+    }
+  )
+
+  def printArgMLIR() = println(toArgMLIR())
+
+  def toArgZ3Output(): String = {
+    val smtlib = toArgSMTLIB()
+    toZ3Output(smtlib)
+  }
+
+  def printArgZ3Output() = println(toArgZ3Output())
+
+  // ================== Assembly & Legacy ==================
   def assembleInstructions(
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt]
@@ -347,27 +385,3 @@ trait RVGenerator:
     try
       outputs.foreach { case (bytes, _) => fos.write(bytes) }
     finally fos.close()
-
-  // For tests that expect SMTLIB output of opcodes stage
-  def toSMTLIB(): String = withOpcodeContext(
-    postProcess = (arena, context, module, recipe) => {
-      given Arena  = arena
-      given Module = module
-      mlirToSMTLIB()
-    }
-  )
-
-  def toMLIR(): String = withOpcodeContext(
-    postProcess = (arena, context, module, recipe) => {
-      given Arena  = arena
-      given Module = module
-      val out      = new StringBuilder
-      summon[Module].getOperation.print(out ++= _)
-      out.toString()
-    }
-  )
-
-  def toZ3Output(): String = {
-    val smtlib = toSMTLIB()
-    toZ3Output(smtlib)
-  }
