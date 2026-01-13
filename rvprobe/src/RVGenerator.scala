@@ -165,10 +165,10 @@ trait RVGenerator:
     smtAssert(smtAnd(includedSets*))
     smtAssert(!smtOr(excludedSets*))
 
-    // 2. Apply User Opcode Constraints (isAddw, etc.)
+    // 2. Apply User Opcode Constraints from each Index (isAddw, etc.)
     recipe.allIndices().foreach { idx =>
       val index   = recipe.getIndex(idx)
-      val opcodes = recipe.getOpcodes(idx).map(_(index))
+      val opcodes = index.getOpcodeConstraints().map(_(index))
       if (opcodes.nonEmpty) {
         smtAssert(smtAnd(opcodes*))
       }
@@ -194,6 +194,9 @@ trait RVGenerator:
       val index    = recipe.getIndex(idx)
       val opcodeId = solvedOpcodes.getOrElse(idx, throw new RuntimeException(s"No solved opcode for index $idx"))
 
+      // Store opcodeId in Index for later use (e.g., cover constraints)
+      index.setOpcodeId(opcodeId)
+
       // 1. Fix Opcode (this is a given, not a constraint to solve)
       smtAssert(index.nameId === opcodeId.S)
 
@@ -203,12 +206,16 @@ trait RVGenerator:
         emitArgRangeConstraint(index, arg)
       }
 
-      // 3. Apply User Arg Constraints (rdRange, rs1Range, etc.)
-      val args = recipe.getArgs(idx).map(_(index))
+      // 3. Apply User Arg Constraints from Index (rdRange, rs1Range, etc.)
+      val args = index.getArgConstraints().map(_(index))
       if (args.nonEmpty) {
         smtAssert(smtAnd(args*))
       }
     }
+
+    // 4. Execute cross-index constraints (cover constraints)
+    recipe.executeCrossIndexConstraints()
+
     smtCheck
   }
 

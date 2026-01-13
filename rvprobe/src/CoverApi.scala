@@ -12,30 +12,8 @@ import org.chipsalliance.rvdecoderdb.Instruction
 
 import java.lang.foreign.Arena
 
-// Lazy cache for instruction lookup by name
-private lazy val instructionsByName: Map[String, (Int, Instruction)] = {
-  getInstructions().zipWithIndex.map { case (inst, idx) => (inst.name, (idx, inst)) }.toMap
-}
-
-/** Get opcode ID by instruction name (e.g., "addw" -> 55) */
-def getOpcodeIdByName(name: String): Int = {
-  instructionsByName.get(name) match {
-    case Some((idx, _)) => idx
-    case None => throw new IllegalArgumentException(s"Unknown instruction: $name")
-  }
-}
-
-/** Helper to check if an instruction has specific args based on its definition */
-private def instructionHasArg(opcodeId: Int, argName: String): Boolean = {
-  val instructions = getInstructions()
-  instructions(opcodeId).args.exists(_.name == argName)
-}
-
-private def instructionHasRd(opcodeId: Int): Boolean = instructionHasArg(opcodeId, "rd")
-private def instructionHasRs1(opcodeId: Int): Boolean = instructionHasArg(opcodeId, "rs1")
-private def instructionHasRs2(opcodeId: Int): Boolean = instructionHasArg(opcodeId, "rs2")
-
 extension (insts: Seq[Index])
+  /** Cover bins for a specific field across all instructions */
   def coverBins(
     targets: Index => Referable[SInt],
     bins:    Seq[Const[SInt]]
@@ -45,7 +23,6 @@ extension (insts: Seq[Index])
     Block,
     Recipe
   ): Unit =
-    val recipe       = summon[Recipe]
     val targetValues = insts.map(targets)
 
     // For each element in bins, there exists at least one element in targets that is equal to it.
@@ -56,141 +33,125 @@ extension (insts: Seq[Index])
     // Combine all constraints with AND and assert
     smtAssert(smtAnd(constraints*))
 
-  /** Cover no hazard with explicit opcode ID for all instructions (assumes same type) */
+  /** Cover no hazard - auto-detect instruction args from Index.opcodeId Registered as cross-index constraint, executed
+    * in Stage 2
+    */
   def coverNoHazard(
-    opcodeId: Int
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    val pairs = insts.zip(insts.tail)
+    summon[Recipe].addCrossIndexConstraint { () =>
+      val pairs = insts.zip(insts.tail)
 
-    val hasRd  = instructionHasRd(opcodeId)
-    val hasRs1 = instructionHasRs1(opcodeId)
-    val hasRs2 = instructionHasRs2(opcodeId)
+      val constraints = pairs.flatMap { case (e, l) =>
+        val conditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
 
-    if (hasRd && hasRs1 && hasRs2) {
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        (l.rs1 =/= e.rd) & (l.rs2 =/= e.rd) & (e.rs1 =/= l.rd) & (e.rs2 =/= l.rd) & (e.rd =/= l.rd)
-      }.toSeq*))
-    } else if (hasRd && hasRs1) {
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        (l.rs1 =/= e.rd) & (e.rs1 =/= l.rd) & (e.rd =/= l.rd)
-      }.toSeq*))
+        // No RAW: later's source != earlier's destination
+        if (e.hasRd && l.hasRs1) conditions += (l.rs1 =/= e.rd)
+        if (e.hasRd && l.hasRs2) conditions += (l.rs2 =/= e.rd)
+
+        // No WAR: earlier's source != later's destination
+        if (l.hasRd && e.hasRs1) conditions += (e.rs1 =/= l.rd)
+        if (l.hasRd && e.hasRs2) conditions += (e.rs2 =/= l.rd)
+
+        // No WAW: earlier's destination != later's destination
+        if (e.hasRd && l.hasRd) conditions += (e.rd =/= l.rd)
+
+        if (conditions.nonEmpty) Some(smtAnd(conditions.toSeq*)) else None
+      }
+
+      if (constraints.nonEmpty) {
+        smtAssert(smtOr(constraints.toSeq*))
+      }
     }
 
-  /** Cover no hazard with instruction name */
-  def coverNoHazardByName(
-    instName: String
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit = coverNoHazard(getOpcodeIdByName(instName))
-
-  /** Cover RAW (Read After Write) hazard with explicit opcode ID */
+  /** Cover RAW (Read After Write) hazard - auto-detect instruction args from Index.opcodeId Registered as cross-index
+    * constraint, executed in Stage 2
+    */
   def coverRAW(
-    opcodeId: Int
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    val pairs = insts.zip(insts.tail)
+    summon[Recipe].addCrossIndexConstraint { () =>
+      val pairs = insts.zip(insts.tail)
 
-    val hasRd  = instructionHasRd(opcodeId)
-    val hasRs1 = instructionHasRs1(opcodeId)
-    val hasRs2 = instructionHasRs2(opcodeId)
+      val constraints = pairs.flatMap { case (e, l) =>
+        val conditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
 
-    if (hasRd && hasRs1 && hasRs2) {
-      // rs1 or rs2 of the later instruction is equal to rd of the earlier instruction
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        (l.rs1 === e.rd) | (l.rs2 === e.rd)
-      }.toSeq*))
-    } else if (hasRd && hasRs1) {
-      // only rs1 of the later instruction is equal to rd of the earlier instruction
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        (l.rs1 === e.rd)
-      }.toSeq*))
+        // RAW: later's source == earlier's destination
+        if (e.hasRd && l.hasRs1) conditions += (l.rs1 === e.rd)
+        if (e.hasRd && l.hasRs2) conditions += (l.rs2 === e.rd)
+
+        if (conditions.nonEmpty) Some(smtOr(conditions.toSeq*)) else None
+      }
+
+      if (constraints.nonEmpty) {
+        smtAssert(smtOr(constraints.toSeq*))
+      }
     }
 
-  /** Cover RAW with instruction name */
-  def coverRAWByName(
-    instName: String
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit = coverRAW(getOpcodeIdByName(instName))
-
-  /** Cover WAR (Write After Read) hazard with explicit opcode ID */
+  /** Cover WAR (Write After Read) hazard - auto-detect instruction args from Index.opcodeId Registered as cross-index
+    * constraint, executed in Stage 2
+    */
   def coverWAR(
-    opcodeId: Int
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    val pairs = insts.zip(insts.tail)
+    summon[Recipe].addCrossIndexConstraint { () =>
+      val pairs = insts.zip(insts.tail)
 
-    val hasRd  = instructionHasRd(opcodeId)
-    val hasRs1 = instructionHasRs1(opcodeId)
-    val hasRs2 = instructionHasRs2(opcodeId)
+      val constraints = pairs.flatMap { case (e, l) =>
+        val warConditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
+        val rawConditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
 
-    if (hasRd && hasRs1 && hasRs2) {
-      // rs1 or rs2 of the earlier instruction is equal to rd of the later instruction
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        ((e.rs1 === l.rd) | (e.rs2 === l.rd)) & !((l.rs1 === e.rd) | (l.rs2 === e.rd)) // and not raw
-      }.toSeq*))
-    } else if (hasRd && hasRs1) {
-      // only rs1 of the earlier instruction is equal to rd of the later instruction
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        (e.rs1 === l.rd) & !(l.rs1 === e.rd)
-      }.toSeq*))
+        // WAR: earlier's source == later's destination
+        if (l.hasRd && e.hasRs1) warConditions += (e.rs1 === l.rd)
+        if (l.hasRd && e.hasRs2) warConditions += (e.rs2 === l.rd)
+
+        // Exclude RAW (to get pure WAR)
+        if (e.hasRd && l.hasRs1) rawConditions += (l.rs1 === e.rd)
+        if (e.hasRd && l.hasRs2) rawConditions += (l.rs2 === e.rd)
+
+        if (warConditions.nonEmpty) {
+          val warPart = smtOr(warConditions.toSeq*)
+          val notRaw  = if (rawConditions.nonEmpty) !smtOr(rawConditions.toSeq*) else true.B
+          Some(warPart & notRaw)
+        } else None
+      }
+
+      if (constraints.nonEmpty) {
+        smtAssert(smtOr(constraints.toSeq*))
+      }
     }
 
-  /** Cover WAR with instruction name */
-  def coverWARByName(
-    instName: String
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit = coverWAR(getOpcodeIdByName(instName))
-
-  /** Cover WAW (Write After Write) hazard with explicit opcode ID */
+  /** Cover WAW (Write After Write) hazard - auto-detect instruction args from Index.opcodeId Registered as cross-index
+    * constraint, executed in Stage 2
+    */
   def coverWAW(
-    opcodeId: Int
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    val pairs = insts.zip(insts.tail)
+    summon[Recipe].addCrossIndexConstraint { () =>
+      val pairs = insts.zip(insts.tail)
 
-    val hasRd = instructionHasRd(opcodeId)
+      val constraints = pairs.flatMap { case (e, l) =>
+        // WAW: earlier's destination == later's destination
+        if (e.hasRd && l.hasRd) Some(e.rd === l.rd) else None
+      }
 
-    if (hasRd) {
-      // rd of the later instruction is equal to rd of the earlier instruction
-      smtAssert(smtOr(pairs.map { case (e, l) =>
-        (e.rd === l.rd)
-      }.toSeq*))
+      if (constraints.nonEmpty) {
+        smtAssert(smtOr(constraints.toSeq*))
+      }
     }
-
-  /** Cover WAW with instruction name */
-  def coverWAWByName(
-    instName: String
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit = coverWAW(getOpcodeIdByName(instName))
