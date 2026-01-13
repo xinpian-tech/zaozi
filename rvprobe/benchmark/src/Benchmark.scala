@@ -36,7 +36,7 @@ def makeL3(nInst: Int): RVGenerator = new RVGenerator:
     }
 
     (0 until (nInst - 1)).foreach { i =>
-      sequence(i, i + 1).coverRAWByName("addi")
+      sequence(i, i + 1).coverRAW()
     }
 
 @State(Scope.Thread)

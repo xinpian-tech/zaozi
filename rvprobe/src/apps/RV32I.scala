@@ -25,10 +25,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("slli")
-      sequence(0, instructionCount).coverWARByName("slli")
-      sequence(0, instructionCount).coverWAWByName("slli")
-      sequence(0, instructionCount).coverNoHazardByName("slli")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Srai extends RVGenerator:
     val sets          = isRV64GC()
@@ -42,10 +42,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("srai")
-      sequence(0, instructionCount).coverWARByName("srai")
-      sequence(0, instructionCount).coverWAWByName("srai")
-      sequence(0, instructionCount).coverNoHazardByName("srai")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Srli extends RVGenerator:
     val sets          = isRV64GC()
@@ -59,10 +59,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("srli")
-      sequence(0, instructionCount).coverWARByName("srli")
-      sequence(0, instructionCount).coverWAWByName("srli")
-      sequence(0, instructionCount).coverNoHazardByName("srli")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Add extends RVGenerator:
     val sets          = isRV64GC()
@@ -77,10 +77,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("add")
-      sequence(0, instructionCount).coverWARByName("add")
-      sequence(0, instructionCount).coverWAWByName("add")
-      sequence(0, instructionCount).coverNoHazardByName("add")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Addi extends RVGenerator:
     val sets          = isRV64GC()
@@ -95,10 +95,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAWByName("addi")
-      sequence(0, instructionCount).coverWARByName("addi")
-      sequence(0, instructionCount).coverWAWByName("addi")
-      sequence(0, instructionCount).coverNoHazardByName("addi")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object And extends RVGenerator:
     val sets          = isRV64GC()
@@ -113,10 +113,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("and")
-      sequence(0, instructionCount).coverWARByName("and")
-      sequence(0, instructionCount).coverWAWByName("and")
-      sequence(0, instructionCount).coverNoHazardByName("and")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Andi extends RVGenerator:
     val sets          = isRV64GC()
@@ -131,10 +131,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAWByName("andi")
-      sequence(0, instructionCount).coverWARByName("andi")
-      sequence(0, instructionCount).coverWAWByName("andi")
-      sequence(0, instructionCount).coverNoHazardByName("andi")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Auipc extends RVGenerator:
     val sets          = isRV64GC()
@@ -148,10 +148,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
 
-      sequence(0, instructionCount).coverRAWByName("auipc")
-      sequence(0, instructionCount).coverWARByName("auipc")
-      sequence(0, instructionCount).coverWAWByName("auipc")
-      sequence(0, instructionCount).coverNoHazardByName("auipc")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Beq extends RVGenerator:
     val sets          = isRV64GC()
@@ -273,10 +273,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
 
-      sequence(0, instructionCount).coverRAWByName("lui")
-      sequence(0, instructionCount).coverWARByName("lui")
-      sequence(0, instructionCount).coverWAWByName("lui")
-      sequence(0, instructionCount).coverNoHazardByName("lui")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Or extends RVGenerator:
     val sets          = isRV64GC()
@@ -291,10 +291,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("or")
-      sequence(0, instructionCount).coverWARByName("or")
-      sequence(0, instructionCount).coverWAWByName("or")
-      sequence(0, instructionCount).coverNoHazardByName("or")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Ori extends RVGenerator:
     val sets          = isRV64GC()
@@ -309,10 +309,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAWByName("ori")
-      sequence(0, instructionCount).coverWARByName("ori")
-      sequence(0, instructionCount).coverWAWByName("ori")
-      sequence(0, instructionCount).coverNoHazardByName("ori")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Sll extends RVGenerator:
     val sets          = isRV64GC()
@@ -327,10 +327,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("sll")
-      sequence(0, instructionCount).coverWARByName("sll")
-      sequence(0, instructionCount).coverWAWByName("sll")
-      sequence(0, instructionCount).coverNoHazardByName("sll")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Slt extends RVGenerator:
     val sets          = isRV64GC()
@@ -345,10 +345,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("slt")
-      sequence(0, instructionCount).coverWARByName("slt")
-      sequence(0, instructionCount).coverWAWByName("slt")
-      sequence(0, instructionCount).coverNoHazardByName("slt")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Slti extends RVGenerator:
     val sets          = isRV64GC()
@@ -363,10 +363,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAWByName("slti")
-      sequence(0, instructionCount).coverWARByName("slti")
-      sequence(0, instructionCount).coverWAWByName("slti")
-      sequence(0, instructionCount).coverNoHazardByName("slti")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Sltiu extends RVGenerator:
     val sets          = isRV64GC()
@@ -381,10 +381,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAWByName("sltiu")
-      sequence(0, instructionCount).coverWARByName("sltiu")
-      sequence(0, instructionCount).coverWAWByName("sltiu")
-      sequence(0, instructionCount).coverNoHazardByName("sltiu")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Sltu extends RVGenerator:
     val sets          = isRV64GC()
@@ -399,10 +399,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("sltu")
-      sequence(0, instructionCount).coverWARByName("sltu")
-      sequence(0, instructionCount).coverWAWByName("sltu")
-      sequence(0, instructionCount).coverNoHazardByName("sltu")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Sra extends RVGenerator:
     val sets          = isRV64GC()
@@ -417,10 +417,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("sra")
-      sequence(0, instructionCount).coverWARByName("sra")
-      sequence(0, instructionCount).coverWAWByName("sra")
-      sequence(0, instructionCount).coverNoHazardByName("sra")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Srl extends RVGenerator:
     val sets          = isRV64GC()
@@ -435,10 +435,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("srl")
-      sequence(0, instructionCount).coverWARByName("srl")
-      sequence(0, instructionCount).coverWAWByName("srl")
-      sequence(0, instructionCount).coverNoHazardByName("srl")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Sub extends RVGenerator:
     val sets          = isRV64GC()
@@ -453,10 +453,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("sub")
-      sequence(0, instructionCount).coverWARByName("sub")
-      sequence(0, instructionCount).coverWAWByName("sub")
-      sequence(0, instructionCount).coverNoHazardByName("sub")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Xor extends RVGenerator:
     val sets          = isRV64GC()
@@ -471,10 +471,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAWByName("xor")
-      sequence(0, instructionCount).coverWARByName("xor")
-      sequence(0, instructionCount).coverWAWByName("xor")
-      sequence(0, instructionCount).coverNoHazardByName("xor")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   object Xori extends RVGenerator:
     val sets          = isRV64GC()
@@ -489,10 +489,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAWByName("xori")
-      sequence(0, instructionCount).coverWARByName("xori")
-      sequence(0, instructionCount).coverWAWByName("xori")
-      sequence(0, instructionCount).coverNoHazardByName("xori")
+      sequence(0, instructionCount).coverRAW()
+      sequence(0, instructionCount).coverWAR()
+      sequence(0, instructionCount).coverWAW()
+      sequence(0, instructionCount).coverNoHazard()
 
   // clear the output file if it exists
   try Files.deleteIfExists(Paths.get(outputPath))

@@ -518,8 +518,4 @@ object RecipeTest extends TestSuite:
                                               |47: addw x1 x10 x29
                                               |48: addw x1 x23 x30
                                               |49: addw x7 x29 x31
-                                              |50: addi x1 x31 -2048
-                                              |51: addi x2 x31 2047
-                                              |52: addw x3 x1 x2
-                                              |53: addw x3 x2 x1
                                               |""".stripMargin.split('\n').toSeq*)

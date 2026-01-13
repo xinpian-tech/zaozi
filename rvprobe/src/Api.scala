@@ -22,24 +22,12 @@ def instruction(
   Recipe
 )(params: Index ?=> ArgConstraint
 ): Unit = {
-  val index = new Index(idx)
-  summon[Recipe].addIndex(index)
+  val recipe = summon[Recipe]
+  val index = recipe.addIndex(new Index(idx))
 
-  // register type and parameter predicates for staged emission
-  summon[Recipe].addOpcode(
-    index,
-    (i: Index) =>
-      opcode(
-        using i
-      ).toRef
-  )
-  summon[Recipe].addArg(
-    index,
-    (i: Index) =>
-      params(
-        using i
-      ).toRef
-  )
+  // Register constraints to Index itself
+  index.addOpcodeConstraint((i: Index) => opcode(using i).toRef)
+  index.addArgConstraint((i: Index) => params(using i).toRef)
 }
 
 // get an instruction with given index

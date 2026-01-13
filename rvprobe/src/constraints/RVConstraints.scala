@@ -1219,8 +1219,7 @@ def isVsm3meVv()(using Arena, Context, Block, Index, Recipe): InstConstraint = I
 case class Recipe(val name: String)(using Arena, Context, Block) {
   private val indices = scala.collection.mutable.Map[Int, Index]()
   private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
-  private val opcodes = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
-  private val args = scala.collection.mutable.Map.empty[Int, Vector[Index => Ref[Bool]]]
+  private val crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
 
   def addIndex(idx: Index): Index = indices.getOrElseUpdate(idx.idx, idx)
   def getIndex(idx: Int): Index = indices(idx)
@@ -1228,15 +1227,9 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
   def addSetConstraint(c: Recipe => Ref[Bool]): Unit = sets += c
   def getSetConstraints(): Seq[Recipe => Ref[Bool]] = sets.toSeq
 
-  def addOpcode(idx: Index, opcode: Index => Ref[Bool]): Unit =
-    val v = opcodes.getOrElse(idx.idx, Vector.empty)
-    opcodes.update(idx.idx, v :+ opcode)
-  def getOpcodes(idx: Int): Vector[Index => Ref[Bool]] = opcodes.getOrElse(idx, Vector.empty)
-
-  def addArg(idx: Index, arg: Index => Ref[Bool]): Unit =
-    val v = args.getOrElse(idx.idx, Vector.empty)
-    args.update(idx.idx, v :+ arg)
-  def getArgs(idx: Int): Vector[Index => Ref[Bool]] = args.getOrElse(idx, Vector.empty)
+  // Cross-index constraints (e.g., cover constraints) - executed in Stage 2
+  def addCrossIndexConstraint(c: () => Unit): Unit = crossIndexConstraints += c
+  def executeCrossIndexConstraints(): Unit = crossIndexConstraints.foreach(_())
 
   def allIndices(): Seq[Int] = indices.keys.toSeq.sorted
 
@@ -1355,6 +1348,33 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
 }
 
 case class Index(val idx: Int)(using Arena, Context, Block) {
+  // Opcode ID solved in Stage 1
+  private var _opcodeId: Option[Int] = None
+  def opcodeId: Int = _opcodeId.getOrElse(
+    throw new RuntimeException(s"Opcode not yet solved for index $idx. Call this after Stage 1 solving.")
+  )
+  def setOpcodeId(id: Int): Unit = _opcodeId = Some(id)
+  def hasOpcodeId: Boolean = _opcodeId.isDefined
+
+  // Constraints stored in Index
+  private val _opcodeConstraints = scala.collection.mutable.ListBuffer[Index => Ref[Bool]]()
+  private val _argConstraints = scala.collection.mutable.ListBuffer[Index => Ref[Bool]]()
+
+  def addOpcodeConstraint(c: Index => Ref[Bool]): Unit = _opcodeConstraints += c
+  def addArgConstraint(c: Index => Ref[Bool]): Unit = _argConstraints += c
+  def getOpcodeConstraints(): Seq[Index => Ref[Bool]] = _opcodeConstraints.toSeq
+  def getArgConstraints(): Seq[Index => Ref[Bool]] = _argConstraints.toSeq
+
+  // Convenience methods to check instruction args (requires opcodeId to be set)
+  def hasArg(argName: String): Boolean = {
+    val instructions = me.jiuyang.rvprobe.getInstructions()
+    instructions(opcodeId).args.exists(_.name == argName)
+  }
+  def hasRd: Boolean = hasArg("rd")
+  def hasRs1: Boolean = hasArg("rs1")
+  def hasRs2: Boolean = hasArg("rs2")
+
+  // Legacy field for compatibility
   var solvedNameId: Option[Int] = None
   // Using lazy val so variables are only created when accessed
   lazy val nameId = smtValue(s"nameId_${idx}", SInt)
