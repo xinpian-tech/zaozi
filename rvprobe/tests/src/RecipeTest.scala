@@ -467,7 +467,6 @@ object RecipeTest extends TestSuite:
           sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
           sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-          coverSigns(instructionCount, isAddw(), true, true, true)
       ComplexRecipe.rvprobeTestInstructions("""
                                               |0: addw x30 x2 x7
                                               |1: addw x9 x31 x1

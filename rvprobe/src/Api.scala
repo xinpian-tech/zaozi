@@ -11,28 +11,6 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Op
 
 import java.lang.foreign.Arena
 
-// create an instruction with given index (Legacy/Mixed)
-def instruction(
-  idx:   Int
-)(
-  using Arena,
-  Context,
-  Block,
-  Recipe
-)(block: Index ?=> Constraint
-): Unit = {
-  val index = new Index(idx)
-  summon[Recipe].addIndex(index)
-
-  summon[Recipe].addOpcode(
-    index,
-    (i: Index) =>
-      block(
-        using i
-      ).toRef
-  )
-}
-
 // create an instruction with explicit type predicate and parameter predicate
 def instruction(
   idx:    Int,

@@ -17,65 +17,59 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSlliRV64I() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isSlliRV64I()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isSlliRV64I(), true, true)
+      sequence(0, instructionCount).coverRAWByName("slli")
+      sequence(0, instructionCount).coverWARByName("slli")
+      sequence(0, instructionCount).coverWAWByName("slli")
+      sequence(0, instructionCount).coverNoHazardByName("slli")
 
   object Srai extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSraiRV64I() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isSraiRV64I()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isSraiRV64I(), true, true)
+      sequence(0, instructionCount).coverRAWByName("srai")
+      sequence(0, instructionCount).coverWARByName("srai")
+      sequence(0, instructionCount).coverWAWByName("srai")
+      sequence(0, instructionCount).coverNoHazardByName("srai")
 
   object Srli extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSrliRV64I() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isSrliRV64I()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isSrliRV64I(), true, true)
+      sequence(0, instructionCount).coverRAWByName("srli")
+      sequence(0, instructionCount).coverWARByName("srli")
+      sequence(0, instructionCount).coverWAWByName("srli")
+      sequence(0, instructionCount).coverNoHazardByName("srli")
 
   object Add extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isAdd() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isAdd()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -83,19 +77,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isAdd(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("add")
+      sequence(0, instructionCount).coverWARByName("add")
+      sequence(0, instructionCount).coverWAWByName("add")
+      sequence(0, instructionCount).coverNoHazardByName("add")
 
   object Addi extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isAddi()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
@@ -103,19 +95,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isAddi(), true, true)
+      sequence(0, instructionCount).coverRAWByName("addi")
+      sequence(0, instructionCount).coverWARByName("addi")
+      sequence(0, instructionCount).coverWAWByName("addi")
+      sequence(0, instructionCount).coverNoHazardByName("addi")
 
   object And extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isAnd() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isAnd()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -123,19 +113,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isAnd(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("and")
+      sequence(0, instructionCount).coverWARByName("and")
+      sequence(0, instructionCount).coverWAWByName("and")
+      sequence(0, instructionCount).coverNoHazardByName("and")
 
   object Andi extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isAndi() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isAndi()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
@@ -143,177 +131,159 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isAndi(), true, true)
+      sequence(0, instructionCount).coverRAWByName("andi")
+      sequence(0, instructionCount).coverWARByName("andi")
+      sequence(0, instructionCount).coverWAWByName("andi")
+      sequence(0, instructionCount).coverNoHazardByName("andi")
 
   object Auipc extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isAuipc() & rdRange(1, 32)
+        instruction(i, isAuipc()) {
+          rdRange(1, 32)
         }
       }
 
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
 
-      sequence(0, instructionCount).coverRAW(true)
-      sequence(0, instructionCount).coverWAR(true)
-      sequence(0, instructionCount).coverWAW(true)
-      sequence(0, instructionCount).coverNoHazard(true)
-
-      coverSigns(instructionCount, isAuipc(), true)
+      sequence(0, instructionCount).coverRAWByName("auipc")
+      sequence(0, instructionCount).coverWARByName("auipc")
+      sequence(0, instructionCount).coverWAWByName("auipc")
+      sequence(0, instructionCount).coverNoHazardByName("auipc")
 
   object Beq extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until 5).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
+        instruction(i, isAddi()) {
+          rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
         }
       }
 
       (5 until instructionCount + 5).foreach { i =>
-        instruction(i) {
-          isBeq() & rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
+        instruction(i, isBeq()) {
+          rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
         }
       }
 
       sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
-
-      coverSigns(instructionCount + 5, isBeq() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
   object Bge extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until 5).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
+        instruction(i, isAddi()) {
+          rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
         }
       }
 
       (5 until instructionCount + 5).foreach { i =>
-        instruction(i) {
-          isBge() & rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
+        instruction(i, isBge()) {
+          rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
         }
       }
 
       sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
-
-      coverSigns(instructionCount + 5, isBge() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
   object Bgeu extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until 5).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
+        instruction(i, isAddi()) {
+          rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
         }
       }
 
       (5 until instructionCount + 5).foreach { i =>
-        instruction(i) {
-          isBgeu() & rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
+        instruction(i, isBgeu()) {
+          rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
         }
       }
 
       sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
-
-      coverSigns(instructionCount + 5, isBgeu() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
   object Blt extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until 5).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
+        instruction(i, isAddi()) {
+          rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
         }
       }
 
       (5 until instructionCount + 5).foreach { i =>
-        instruction(i) {
-          isBlt() & rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
+        instruction(i, isBlt()) {
+          rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
         }
       }
 
       sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
-
-      coverSigns(instructionCount + 5, isBlt() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
   object Bltu extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until 5).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
+        instruction(i, isAddi()) {
+          rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
         }
       }
 
       (5 until instructionCount + 5).foreach { i =>
-        instruction(i) {
-          isBltu() & rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
+        instruction(i, isBltu()) {
+          rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
         }
       }
 
       sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
-
-      coverSigns(instructionCount + 5, isBltu() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
 
   object Bne extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until 5).foreach { i =>
-        instruction(i) {
-          isAddi() & rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
+        instruction(i, isAddi()) {
+          rdRange(i + 1, i + 2) & rs1Range(0, 1) & imm12Range(-5, -1)
         }
       }
 
       (5 until instructionCount + 5).foreach { i =>
-        instruction(i) {
-          isBne() & rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
+        instruction(i, isBne()) {
+          rs1Range(1, 32) & rs2Range(1, 32) & bimm12loRange(4, 5) & bimm12hiRange(0, 1)
         }
       }
 
       sequence(5, instructionCount + 5).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(5, instructionCount + 5).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      coverSigns(instructionCount + 5, isBne() & bimm12loRange(4, 5) & bimm12hiRange(0, 1), true, true)
-
   object Lui extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isLui() & rdRange(1, 32)
+        instruction(i, isLui()) {
+          rdRange(1, 32)
         }
       }
 
       sequence(0, instructionCount).coverBins(_.rd, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm20, Seq((-1).S, 0.S, 1.S, (-524288).S, 524287.S))
 
-      sequence(0, instructionCount).coverRAW(true)
-      sequence(0, instructionCount).coverWAR(true)
-      sequence(0, instructionCount).coverWAW(true)
-      sequence(0, instructionCount).coverNoHazard(true)
-
-      coverSigns(instructionCount, isLui(), true)
+      sequence(0, instructionCount).coverRAWByName("lui")
+      sequence(0, instructionCount).coverWARByName("lui")
+      sequence(0, instructionCount).coverWAWByName("lui")
+      sequence(0, instructionCount).coverNoHazardByName("lui")
 
   object Or extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isOr() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isOr()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -321,19 +291,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isOr(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("or")
+      sequence(0, instructionCount).coverWARByName("or")
+      sequence(0, instructionCount).coverWAWByName("or")
+      sequence(0, instructionCount).coverNoHazardByName("or")
 
   object Ori extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isOri() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isOri()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
@@ -341,19 +309,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isOri(), true, true)
+      sequence(0, instructionCount).coverRAWByName("ori")
+      sequence(0, instructionCount).coverWARByName("ori")
+      sequence(0, instructionCount).coverWAWByName("ori")
+      sequence(0, instructionCount).coverNoHazardByName("ori")
 
   object Sll extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSll() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isSll()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -361,19 +327,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isSll(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("sll")
+      sequence(0, instructionCount).coverWARByName("sll")
+      sequence(0, instructionCount).coverWAWByName("sll")
+      sequence(0, instructionCount).coverNoHazardByName("sll")
 
   object Slt extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSlt() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isSlt()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -381,19 +345,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isSlt(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("slt")
+      sequence(0, instructionCount).coverWARByName("slt")
+      sequence(0, instructionCount).coverWAWByName("slt")
+      sequence(0, instructionCount).coverNoHazardByName("slt")
 
   object Slti extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSlti() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isSlti()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
@@ -401,19 +363,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isSlti(), true, true)
+      sequence(0, instructionCount).coverRAWByName("slti")
+      sequence(0, instructionCount).coverWARByName("slti")
+      sequence(0, instructionCount).coverWAWByName("slti")
+      sequence(0, instructionCount).coverNoHazardByName("slti")
 
   object Sltiu extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSltiu() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isSltiu()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
@@ -421,19 +381,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isSltiu(), true, true)
+      sequence(0, instructionCount).coverRAWByName("sltiu")
+      sequence(0, instructionCount).coverWARByName("sltiu")
+      sequence(0, instructionCount).coverWAWByName("sltiu")
+      sequence(0, instructionCount).coverNoHazardByName("sltiu")
 
   object Sltu extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSltu() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isSltu()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -441,19 +399,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isSltu(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("sltu")
+      sequence(0, instructionCount).coverWARByName("sltu")
+      sequence(0, instructionCount).coverWAWByName("sltu")
+      sequence(0, instructionCount).coverNoHazardByName("sltu")
 
   object Sra extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSra() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isSra()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -461,19 +417,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isSra(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("sra")
+      sequence(0, instructionCount).coverWARByName("sra")
+      sequence(0, instructionCount).coverWAWByName("sra")
+      sequence(0, instructionCount).coverNoHazardByName("sra")
 
   object Srl extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSrl() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isSrl()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -481,19 +435,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isSrl(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("srl")
+      sequence(0, instructionCount).coverWARByName("srl")
+      sequence(0, instructionCount).coverWAWByName("srl")
+      sequence(0, instructionCount).coverNoHazardByName("srl")
 
   object Sub extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isSub() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isSub()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -501,19 +453,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isSub(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("sub")
+      sequence(0, instructionCount).coverWARByName("sub")
+      sequence(0, instructionCount).coverWAWByName("sub")
+      sequence(0, instructionCount).coverNoHazardByName("sub")
 
   object Xor extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isXor() & rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
+        instruction(i, isXor()) {
+          rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
         }
       }
 
@@ -521,19 +471,17 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.rs2, (1 until 32).map(i => i.S))
 
-      sequence(0, instructionCount).coverRAW(true, true, true)
-      sequence(0, instructionCount).coverWAR(true, true, true)
-      sequence(0, instructionCount).coverWAW(true, true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true, true)
-
-      coverSigns(instructionCount, isXor(), true, true, true)
+      sequence(0, instructionCount).coverRAWByName("xor")
+      sequence(0, instructionCount).coverWARByName("xor")
+      sequence(0, instructionCount).coverWAWByName("xor")
+      sequence(0, instructionCount).coverNoHazardByName("xor")
 
   object Xori extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i) {
-          isXori() & rdRange(1, 32) & rs1Range(1, 32)
+        instruction(i, isXori()) {
+          rdRange(1, 32) & rs1Range(1, 32)
         }
       }
 
@@ -541,12 +489,10 @@ import scala.util.control.NonFatal
       sequence(0, instructionCount).coverBins(_.rs1, (1 until 32).map(i => i.S))
       sequence(0, instructionCount).coverBins(_.imm12, Seq((-1).S, 0.S, 1.S, (-2048).S, 2047.S))
 
-      sequence(0, instructionCount).coverRAW(true, true)
-      sequence(0, instructionCount).coverWAR(true, true)
-      sequence(0, instructionCount).coverWAW(true, true)
-      sequence(0, instructionCount).coverNoHazard(true, true)
-
-      coverSigns(instructionCount, isXori(), true, true)
+      sequence(0, instructionCount).coverRAWByName("xori")
+      sequence(0, instructionCount).coverWARByName("xori")
+      sequence(0, instructionCount).coverWAWByName("xori")
+      sequence(0, instructionCount).coverNoHazardByName("xori")
 
   // clear the output file if it exists
   try Files.deleteIfExists(Paths.get(outputPath))
