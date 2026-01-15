@@ -23,11 +23,19 @@ def instruction(
 )(params: Index ?=> ArgConstraint
 ): Unit = {
   val recipe = summon[Recipe]
-  val index = recipe.addIndex(new Index(idx))
+  val index  = recipe.addIndex(new Index(idx))
 
   // Register constraints to Index itself
-  index.addOpcodeConstraint((i: Index) => opcode(using i).toRef)
-  index.addArgConstraint((i: Index) => params(using i).toRef)
+  index.addOpcodeConstraint((i: Index) =>
+    opcode(
+      using i
+    ).toRef
+  )
+  index.addArgConstraint((i: Index) =>
+    params(
+      using i
+    ).toRef
+  )
 }
 
 // get an instruction with given index
