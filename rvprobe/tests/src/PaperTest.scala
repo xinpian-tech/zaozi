@@ -17,4 +17,4 @@ object PaperTest extends TestSuite:
           rdRange(1, 5)
         }
 
-    test.printArgMLIR()
+    test.rvprobeTestInstructions("0: addw x1 x0 x0")
