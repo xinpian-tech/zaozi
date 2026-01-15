@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.constraints
 
+import me.jiuyang.rvprobe.InstructionArgsCache
+
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
 
@@ -1366,13 +1368,11 @@ case class Index(val idx: Int)(using Arena, Context, Block) {
   def getArgConstraints(): Seq[Index => Ref[Bool]] = _argConstraints.toSeq
 
   // Convenience methods to check instruction args (requires opcodeId to be set)
-  def hasArg(argName: String): Boolean = {
-    val instructions = me.jiuyang.rvprobe.getInstructions()
-    instructions(opcodeId).args.exists(_.name == argName)
-  }
-  def hasRd: Boolean = hasArg("rd")
-  def hasRs1: Boolean = hasArg("rs1")
-  def hasRs2: Boolean = hasArg("rs2")
+  // Uses cached lookup table for performance optimization
+  def hasArg(argName: String): Boolean = InstructionArgsCache.hasArg(opcodeId, argName)
+  def hasRd: Boolean = InstructionArgsCache.hasRd(opcodeId)
+  def hasRs1: Boolean = InstructionArgsCache.hasRs1(opcodeId)
+  def hasRs2: Boolean = InstructionArgsCache.hasRs2(opcodeId)
 
   // Legacy field for compatibility
   var solvedNameId: Option[Int] = None

@@ -3,6 +3,24 @@ package me.jiuyang.rvprobe
 import org.chipsalliance.rvdecoderdb.*
 import os.Path
 
+// Cached instruction argument lookup table for performance optimization
+object InstructionArgsCache {
+  // Lazy initialization: only load instructions once when first accessed
+  private lazy val instructionArgsMap: Map[Int, Set[String]] = {
+    val instructions = me.jiuyang.rvprobe.getInstructions()
+    instructions.zipWithIndex.map { case (instr, idx) =>
+      idx -> instr.args.map(_.name).toSet
+    }.toMap
+  }
+
+  def hasArg(opcodeId: Int, argName: String): Boolean =
+    instructionArgsMap.get(opcodeId).exists(_.contains(argName))
+
+  def hasRd(opcodeId:  Int): Boolean = hasArg(opcodeId, "rd")
+  def hasRs1(opcodeId: Int): Boolean = hasArg(opcodeId, "rs1")
+  def hasRs2(opcodeId: Int): Boolean = hasArg(opcodeId, "rs2")
+}
+
 def getInstructions(): Seq[Instruction] =
   val riscvOpcodesPath: Path = Path(
     sys.env.getOrElse(
