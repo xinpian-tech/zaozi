@@ -66,10 +66,10 @@ object NopTest extends TestSuite:
 
       MultipleGapsInstructions.rvprobeTestInstructions(
         "0: addw x1 x1 x1",
-        "1: nop (addi x0, x0, 0)",
+        "1: nop",
         "2: subw x1 x1 x1",
-        "3: nop (addi x0, x0, 0)",
-        "4: nop (addi x0, x0, 0)",
+        "3: nop",
+        "4: nop",
         "5: addw x1 x1 x1"
       )
 
