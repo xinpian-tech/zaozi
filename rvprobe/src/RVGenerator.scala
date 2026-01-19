@@ -327,6 +327,15 @@ trait RVGenerator:
   def printArgZ3Output() = println(toArgZ3Output())
 
   // ================== Assembly & Legacy ==================
+  // NOP instruction encoding: ADDI x0, x0, 0 = 0x00000013
+  private val NOP_ENCODING: Long = 0x00000013L
+  private val NOP_BYTES: scala.Array[Byte] = scala.Array[Byte](
+    (NOP_ENCODING & 0xff).toByte,
+    ((NOP_ENCODING >> 8) & 0xff).toByte,
+    ((NOP_ENCODING >> 16) & 0xff).toByte,
+    ((NOP_ENCODING >> 24) & 0xff).toByte
+  )
+
   def assembleInstructions(
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt]
@@ -334,7 +343,26 @@ trait RVGenerator:
     val instructions  = getInstructions()
     val sortedIndices = solvedOpcodes.keys.toSeq.sorted
 
-    sortedIndices.map { i =>
+    // Generate instructions with NOP padding for non-contiguous indices
+    val result = scala.collection.mutable.ListBuffer[(Array[Byte], String)]()
+
+    sortedIndices.zipWithIndex.foreach { case (i, pos) =>
+      // Insert NOP instructions for gaps
+      if (pos == 0) {
+        // For the first instruction, insert NOPs from index 0 to i-1
+        for (nopIdx <- 0 until i) {
+          result += ((NOP_BYTES.clone(), s"$nopIdx: nop (addi x0, x0, 0)"))
+        }
+      } else {
+        // Insert NOP instructions for gaps between indices
+        val prevIndex = sortedIndices(pos - 1)
+        val gap = i - prevIndex - 1
+        for (nopIdx <- 1 to gap) {
+          val nopPos = prevIndex + nopIdx
+          result += ((NOP_BYTES.clone(), s"$nopPos: nop (addi x0, x0, 0)"))
+        }
+      }
+
       val nameId = solvedOpcodes(i)
       val inst   = instructions(nameId)
 
@@ -372,8 +400,10 @@ trait RVGenerator:
         ((value >> 24) & 0xff).toByte
       )
 
-      (bytes, instrString)
+      result += ((bytes, instrString))
     }
+
+    result.toSeq
   }
 
   def toInstructions(): Seq[(Array[Byte], String)] = {
