@@ -351,7 +351,7 @@ trait RVGenerator:
       if (pos == 0) {
         // For the first instruction, insert NOPs from index 0 to i-1
         for (nopIdx <- 0 until i) {
-          result += ((NOP_BYTES.clone(), s"$nopIdx: nop (addi x0, x0, 0)"))
+          result += ((NOP_BYTES.clone(), s"$nopIdx: nop"))
         }
       } else {
         // Insert NOP instructions for gaps between indices
@@ -359,7 +359,7 @@ trait RVGenerator:
         val gap = i - prevIndex - 1
         for (nopIdx <- 1 to gap) {
           val nopPos = prevIndex + nopIdx
-          result += ((NOP_BYTES.clone(), s"$nopPos: nop (addi x0, x0, 0)"))
+          result += ((NOP_BYTES.clone(), s"$nopPos: nop"))
         }
       }
 
