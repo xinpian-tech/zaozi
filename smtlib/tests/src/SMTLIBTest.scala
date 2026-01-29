@@ -4,7 +4,7 @@ package me.jiuyang.smtlib.tests
 
 import me.jiuyang.smtlib.{*, given}
 import me.jiuyang.smtlib.default.{*, given}
-import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Result}
+import me.jiuyang.smtlib.parser.{parseZ3Output, parseZ3OutputOrFail, getUnsatCore, handleUnsatResult, Z3Result}
 
 import org.llvm.mlir.scalalib.capi.dialect.func.{Func, FuncApi, given}
 import org.llvm.mlir.scalalib.capi.dialect.smt.DialectApi as SmtDialect
@@ -78,3 +78,53 @@ def smtZ3Test(checkLines: String*)(body: (Arena, Context, Block) ?=> Unit): Z3Re
     )
 
   parseZ3Output(z3Output.out.text())
+
+/** Test helper for UNSAT scenarios
+  *
+  * Creates a Z3 test that is expected to be UNSAT and tests the unsat core generation.
+  * Unlike smtZ3Test, this doesn't fail on UNSAT - it expects it.
+  *
+  * @param body The SMT constraints to test (should be unsatisfiable)
+  * @return Z3Result (expected to have status = Unsat)
+  */
+def smtZ3UnsatTest(body: (Arena, Context, Block) ?=> Unit): Z3Result =
+  given Arena   = Arena.ofConfined()
+  given Context = summon[ContextApi].contextCreate
+  summon[SmtDialect].loadDialect()
+  summon[FuncDialect].loadDialect()
+
+  given Module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+  given Func   = summon[FuncApi].op("func")
+  given Block  = summon[Func].block
+  summon[Func].appendToModule()
+
+  solver {
+    body
+    smtCheck
+  }
+
+  val out = new StringBuilder
+  summon[Module].exportSMTLIB(out ++= _)
+  val smt = out.toString
+
+  summon[Context].destroy()
+  summon[Arena].close()
+
+  // Z3 runner function for getting unsat core
+  def runZ3(smtlib: String): String =
+    os.proc("z3", "-in", "-t:1000")
+      .call(stdin = smtlib, check = false)
+      .out.text()
+
+  // For UNSAT tests, just check satisfiability without requesting model
+  val z3Output = runZ3(smt.replace("(reset)", ""))
+  val result   = parseZ3Output(z3Output)
+
+  // If UNSAT, also test that we can get the unsat core
+  if (result.status == me.jiuyang.smtlib.parser.Z3Status.Unsat) {
+    val unsatCore = getUnsatCore(smt, runZ3)
+    // Just verify we got something back (not empty)
+    assert(unsatCore.nonEmpty, "Unsat core should not be empty")
+  }
+
+  result

@@ -3,7 +3,7 @@
 package me.jiuyang.rvprobe
 
 import me.jiuyang.smtlib.tpe.{Bool, Ref}
-import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Result, Z3Status}
+import me.jiuyang.smtlib.parser.{parseZ3OutputOrFail, Z3Result, Z3Status}
 import me.jiuyang.smtlib.default.{*, given}
 
 import me.jiuyang.rvprobe.constraints.*
@@ -119,13 +119,18 @@ trait RVGenerator:
       val smtlib   = mlirToSMTLIB()
       val z3Output = toZ3Output(smtlib)
       try {
-        val result = parseZ3Output(z3Output)
-        assert(result.status == Z3Status.Sat, s"Opcode solving failed: ${result.status}")
+        val result = parseZ3OutputOrFail(
+          z3Output = z3Output,
+          smtlib = smtlib,
+          z3Runner = runZ3,
+          context = "Opcode solving"
+        )
         result.model.collect {
           case (k, v: BigInt) if k.startsWith("nameId_") =>
             k.stripPrefix("nameId_").toInt -> v.toInt
         }
       } catch {
+        case e: RuntimeException => throw e  // Re-throw our custom exception
         case e: Exception =>
           System.err.println(s"SMTLIB:\n$smtlib")
           System.err.println(s"Z3 Parsing/Solving failed. Output:\n$z3Output")
@@ -142,9 +147,21 @@ trait RVGenerator:
       given Module = module
       val smtlib   = mlirToSMTLIB()
       val z3Output = toZ3Output(smtlib)
-      val result   = parseZ3Output(z3Output)
-      assert(result.status == Z3Status.Sat, s"Argument solving failed: ${result.status}")
-      result.model.collect { case (k, v: BigInt) => k -> v }
+      try {
+        val result = parseZ3OutputOrFail(
+          z3Output = z3Output,
+          smtlib = smtlib,
+          z3Runner = runZ3,
+          context = "Argument solving"
+        )
+        result.model.collect { case (k, v: BigInt) => k -> v }
+      } catch {
+        case e: RuntimeException => throw e  // Re-throw our custom exception
+        case e: Exception =>
+          System.err.println(s"SMTLIB:\n$smtlib")
+          System.err.println(s"Z3 Parsing/Solving failed. Output:\n$z3Output")
+          throw e
+      }
     }
   )
 
@@ -258,10 +275,21 @@ trait RVGenerator:
     out.toString()
   }
 
-  private def toZ3Output(smtlib: String): String = {
-    val z3Output =
-      os.proc("z3", "-in", "-t:5000").call(stdin = smtlib.toString().replace("(reset)", "(get-model)"), check = false)
+  /** Run Z3 on given SMTLIB input
+    *
+    * @param smtlib The SMTLIB input to run
+    * @return The output from Z3
+    */
+  private def runZ3(smtlib: String): String = {
+    val z3Output = os.proc("z3", "-in", "-t:5000")
+      .call(stdin = smtlib, check = false)
     z3Output.out.text()
+  }
+
+  private def toZ3Output(smtlib: String): String = {
+    // Replace (reset) with (get-model) to get the model output
+    val smtlibWithGetModel = smtlib.replace("(reset)", "(get-model)")
+    runZ3(smtlibWithGetModel)
   }
 
   // ================== Stage 1 Helper ==================
