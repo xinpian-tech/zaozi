@@ -32,3 +32,9 @@ trait HasRVProbeTest:
   def rvprobeTestInstructions(expected: String*): Unit =
     val instructions = toInstructions().map(_._2).mkString("\n")
     rvprobeTest(instructions)(out => expected.forall(l => out.contains(l)))
+
+  def rvprobeTestRecipeAsm(expectedLines: String*): Unit =
+    rvprobeTest(toRecipeAsm())(out => expectedLines.forall(l => out.contains(l)))
+
+  def rvprobeTestAssemblyFile(expectedLines: String*): Unit =
+    rvprobeTest(toAssemblyFile())(out => expectedLines.forall(l => out.contains(l)))

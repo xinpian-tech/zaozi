@@ -15,8 +15,19 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, ContextApi, LocationApi, 
 
 import java.lang.foreign.Arena
 import java.io.FileOutputStream
+import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.nio.charset.StandardCharsets
 
 import scala.compiletime.uninitialized
+
+/** Output mode selector for the unified [[RVGenerator.emit]] API. */
+sealed trait OutputMode
+
+/** Emit a complete GAS assembly file (template + recipe instructions). */
+case object AsmMode extends OutputMode
+
+/** Emit raw binary machine code (existing behaviour). */
+case object BinMode extends OutputMode
 
 /** RVGenerator - Two-Stage SMT Constraint Solving for RISC-V Instruction Generation
   *
@@ -36,6 +47,7 @@ import scala.compiletime.uninitialized
   */
 trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
+  def template(): String = "" // can be overridden by subclass to provide custom assembly template
   val sets: Seq[Recipe ?=> SetConstraint] // should be implemented by subclass
   val name: String = this.getClass.getSimpleName
 
@@ -130,8 +142,8 @@ trait RVGenerator:
             k.stripPrefix("nameId_").toInt -> v.toInt
         }
       } catch {
-        case e: RuntimeException => throw e  // Re-throw our custom exception
-        case e: Exception =>
+        case e: RuntimeException => throw e // Re-throw our custom exception
+        case e: Exception        =>
           System.err.println(s"SMTLIB:\n$smtlib")
           System.err.println(s"Z3 Parsing/Solving failed. Output:\n$z3Output")
           throw e
@@ -156,8 +168,8 @@ trait RVGenerator:
         )
         result.model.collect { case (k, v: BigInt) => k -> v }
       } catch {
-        case e: RuntimeException => throw e  // Re-throw our custom exception
-        case e: Exception =>
+        case e: RuntimeException => throw e // Re-throw our custom exception
+        case e: Exception        =>
           System.err.println(s"SMTLIB:\n$smtlib")
           System.err.println(s"Z3 Parsing/Solving failed. Output:\n$z3Output")
           throw e
@@ -277,11 +289,14 @@ trait RVGenerator:
 
   /** Run Z3 on given SMTLIB input
     *
-    * @param smtlib The SMTLIB input to run
-    * @return The output from Z3
+    * @param smtlib
+    *   The SMTLIB input to run
+    * @return
+    *   The output from Z3
     */
   private def runZ3(smtlib: String): String = {
-    val z3Output = os.proc("z3", "-in", "-t:5000")
+    val z3Output = os
+      .proc("z3", "-in", "-t:5000")
       .call(stdin = smtlib, check = false)
     z3Output.out.text()
   }
@@ -356,8 +371,8 @@ trait RVGenerator:
 
   // ================== Assembly & Legacy ==================
   // NOP instruction encoding: ADDI x0, x0, 0 = 0x00000013
-  private val NOP_ENCODING: Long = 0x00000013L
-  private val NOP_BYTES: scala.Array[Byte] = scala.Array[Byte](
+  private val NOP_ENCODING: Long              = 0x00000013L
+  private val NOP_BYTES:    scala.Array[Byte] = scala.Array[Byte](
     (NOP_ENCODING & 0xff).toByte,
     ((NOP_ENCODING >> 8) & 0xff).toByte,
     ((NOP_ENCODING >> 16) & 0xff).toByte,
@@ -384,7 +399,7 @@ trait RVGenerator:
       } else {
         // Insert NOP instructions for gaps between indices
         val prevIndex = sortedIndices(pos - 1)
-        val gap = i - prevIndex - 1
+        val gap       = i - prevIndex - 1
         for (nopIdx <- 1 to gap) {
           val nopPos = prevIndex + nopIdx
           result += ((NOP_BYTES.clone(), s"$nopPos: nop"))
@@ -450,3 +465,174 @@ trait RVGenerator:
     try
       outputs.foreach { case (bytes, _) => fos.write(bytes) }
     finally fos.close()
+  // ================== Template / GAS Assembly ==================
+
+  /** True when instruction `name` is a memory load (formats as `name rd, imm(rs1)`). */
+  private def isLoadInstruction(name: String): Boolean =
+    Set("lb", "lh", "lw", "ld", "lbu", "lhu", "lwu", "flw", "fld", "flq", "c.lw", "c.ld", "c.flw", "c.fld").contains(
+      name
+    )
+
+  /** Combine a split immediate (e.g. imm12hi/imm12lo) into a single signed value.
+    *
+    * Both fields are retrieved from `solvedArgs` using their camelCase key + `_idx`. After masking to unsigned within
+    * each field width, the bits are concatenated and sign-extended to the full `hiWidth + loWidth` precision.
+    */
+  private def combineSignedImm(
+    hiName:  String,
+    loName:  String,
+    hiWidth: Int,
+    loWidth: Int,
+    idx:     Int,
+    solved:  Map[String, BigInt]
+  ): BigInt = {
+    def key(n: String): String =
+      val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
+    val hi = solved.getOrElse(key(hiName), BigInt(0)) & ((BigInt(1) << hiWidth) - 1)
+    val lo    = solved.getOrElse(key(loName), BigInt(0)) & ((BigInt(1) << loWidth) - 1)
+    val raw   = (hi << loWidth) | lo
+    val total = hiWidth + loWidth
+    if (raw.testBit(total - 1)) raw - (BigInt(1) << total) else raw
+  }
+
+  /** Format a single solved instruction as a GAS assembly line (without indentation).
+    *
+    * Handles the main RISC-V base/extension instruction formats:
+    *   - R-type : `name rd, rs1, rs2`
+    *   - I-type : `name rd, rs1, imm` (ALU, shifts, JALR)
+    *   - Load : `name rd, imm(rs1)`
+    *   - Store : `name rs2, imm(rs1)` (imm12hi/lo combined)
+    *   - Branch : `name rs1, rs2, . + imm` (bimm12hi/lo combined)
+    *   - JAL : `name rd, . + imm`
+    *   - U-type : `name rd, imm`
+    *   - Fallback: comma-separated args in rvdecoderdb order
+    */
+  private def toGasLine(
+    idx:    Int,
+    inst:   org.chipsalliance.rvdecoderdb.Instruction,
+    solved: Map[String, BigInt]
+  ): String = {
+    val instName = inst.name
+    val names    = inst.args.map(_.name).toSet
+
+    def key(n: String):    String =
+      val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
+    def regVal(n: String): String = s"x${solved.getOrElse(key(n), BigInt(0))}"
+    def immVal(n: String): String = solved.getOrElse(key(n), BigInt(0)).toString
+    def argFmt(n: String): String =
+      val prefix = if n.startsWith("r") then "x" else ""
+      prefix + solved.getOrElse(key(n), BigInt(0)).toString
+
+    val hasRd    = names("rd")
+    val hasRs1   = names("rs1")
+    val hasRs2   = names("rs2")
+    val hasImm12 = names("imm12")
+    val hasSplit = names("imm12hi") && names("imm12lo")
+    val hasBimm  = names("bimm12hi") && names("bimm12lo")
+    val hasJimm  = names("jimm20")
+    val hasImm20 = names("imm20")
+    val hasShamt = names("shamt") || names("shamtw")
+
+    if (!hasRd && !hasRs1 && !hasRs2)
+      // System / fence instructions that take no register args
+      instName
+    else if (hasRd && hasRs1 && hasRs2 && !hasImm12 && !hasSplit)
+      // R-type
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${regVal("rs2")}"
+    else if (hasRd && hasRs1 && hasShamt && !hasRs2)
+      // Shift-immediate (slli / srli / srai / *w variants)
+      val sName = if names("shamt") then "shamt" else "shamtw"
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${immVal(sName)}"
+    else if (hasRd && hasRs1 && !hasRs2 && hasImm12 && isLoadInstruction(instName))
+      // Load
+      s"$instName ${regVal("rd")}, ${immVal("imm12")}(${regVal("rs1")})"
+    else if (hasRd && hasRs1 && !hasRs2 && hasImm12)
+      // I-type ALU / JALR
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${immVal("imm12")}"
+    else if (!hasRd && hasRs1 && hasRs2 && hasSplit)
+      // Store
+      val imm = combineSignedImm("imm12hi", "imm12lo", 7, 5, idx, solved)
+      s"$instName ${regVal("rs2")}, $imm(${regVal("rs1")})"
+    else if (!hasRd && hasRs1 && hasRs2 && hasBimm)
+      // Branch
+      val imm = combineSignedImm("bimm12hi", "bimm12lo", 7, 5, idx, solved)
+      s"$instName ${regVal("rs1")}, ${regVal("rs2")}, . + $imm"
+    else if (hasRd && hasJimm)
+      // JAL
+      s"$instName ${regVal("rd")}, . + ${immVal("jimm20")}"
+    else if (hasRd && hasImm20)
+      // LUI / AUIPC
+      s"$instName ${regVal("rd")}, ${immVal("imm20")}"
+    else
+      // Fallback: positional args in rvdecoderdb order
+      s"$instName ${inst.args.map(a => argFmt(a.name)).mkString(", ")}"
+  }
+
+  /** Build GAS assembly lines (without bytes) mirroring the NOP-padding logic of [[assembleInstructions]], but
+    * formatting each instruction with [[toGasLine]].
+    */
+  private def assembleInstructionsGas(
+    solvedOpcodes: Map[Int, Int],
+    solvedArgs:    Map[String, BigInt]
+  ): Seq[String] = {
+    val instructions  = getInstructions()
+    val sortedIndices = solvedOpcodes.keys.toSeq.sorted
+    val lines         = scala.collection.mutable.ListBuffer[String]()
+
+    sortedIndices.zipWithIndex.foreach { case (i, pos) =>
+      // Insert nop padding for gaps
+      if (pos == 0) for (_ <- 0 until i) lines += "    nop"
+      else
+        val prevIdx = sortedIndices(pos - 1)
+        for (_ <- 1 to (i - prevIdx - 1)) lines += "    nop"
+
+      val gasLine = toGasLine(i, instructions(solvedOpcodes(i)), solvedArgs)
+      lines += s"    $gasLine"
+    }
+    lines.toSeq
+  }
+
+  /** Solve the recipe and return it formatted as GAS assembly lines (indented, newline-joined).
+    *
+    * This is the string that replaces `{{recipe}}` inside [[template]].
+    */
+  def toRecipeAsm(): String = {
+    val opcodes = solveOpcodes()
+    val args    = solveArgs(opcodes)
+    assembleInstructionsGas(opcodes, args).mkString("\n")
+  }
+
+  /** Produce the final assembly file contents.
+    *
+    * If [[template]] is non-empty, `{{recipe}}` inside it is replaced with the result of [[toRecipeAsm]]. Otherwise the
+    * recipe lines are returned as-is.
+    */
+  def toAssemblyFile(): String = {
+    val recipe = toRecipeAsm()
+    val tmpl   = template()
+    if (tmpl.isEmpty) recipe
+    else tmpl.replace("{{recipe}}", recipe)
+  }
+
+  /** Unified output API.
+    *
+    * @param filename
+    *   Target file path.
+    * @param mode
+    *   [[AsmMode]] writes a GAS `.s` file; [[BinMode]] writes raw binary.
+    */
+  def emit(filename: String = s"${name}_output", mode: OutputMode = AsmMode): Unit =
+    mode match
+      case AsmMode =>
+        val content = toAssemblyFile()
+        Files.write(
+          Paths.get(filename),
+          content.getBytes(StandardCharsets.UTF_8),
+          StandardOpenOption.CREATE,
+          StandardOpenOption.TRUNCATE_EXISTING
+        )
+      case BinMode =>
+        val outputs = toInstructions()
+        val fos     = new FileOutputStream(filename)
+        try outputs.foreach { case (bytes, _) => fos.write(bytes) }
+        finally fos.close()
