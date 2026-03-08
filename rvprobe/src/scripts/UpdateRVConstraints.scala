@@ -53,7 +53,7 @@ import java.io.{File, FileWriter}
   writer.write("\n")
 
   // ======================================================================================================
-  // def amoopEqual(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].amoop == n.S)
+  // def amoopEqual(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].amoop === n.S)
   // ======================================================================================================
   getArgLut().foreach { case (name, arg) =>
     // camelCase the argument name
@@ -61,7 +61,7 @@ import java.io.{File, FileWriter}
     val argNameLowered = argName.head.toLower + argName.tail
 
     writer.write(
-      s"def ${argNameLowered}Equal(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} == n.S)\n"
+      s"def ${argNameLowered}Equal(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} === n.S)\n"
     )
   }
 
