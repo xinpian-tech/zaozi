@@ -7,9 +7,9 @@ import org.chipsalliance.rvdecoderdb.{Encoding, Instruction, InstructionSet}
 import os.Path
 import java.io.{File, FileWriter}
 
-// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateRVConstraints
+// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateRVConstraints rvprobe/src/constraints/RVConstraints.scala
 // make sure git repo is clear before running this script
-@main def UpdateRVConstraints(outputPath: String = "rvprobe/src/constraints/RVConstraints.scala"): Unit =
+@main def UpdateRVConstraints(outputPath: String): Unit =
   val writer = new FileWriter(new File(outputPath))
   val riscvOpcodesPath: Path = Path(
     sys.env.getOrElse(
@@ -22,6 +22,8 @@ import java.io.{File, FileWriter}
     """// SPDX-License-Identifier: Apache-2.0
       |// SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
       |package me.jiuyang.rvprobe.constraints
+      |
+      |import me.jiuyang.rvprobe.InstructionArgsCache
       |
       |import me.jiuyang.smtlib.default.{*, given}
       |import me.jiuyang.smtlib.tpe.*
@@ -36,7 +38,7 @@ import java.io.{File, FileWriter}
   )
 
   // ======================================================================================================
-  // def amoopRange(start: Int, end: Int)(using Arena, Context, Block, Index): Ref[Bool] = summon[Index].amoop >= start.S & summon[Index].amoop < end.S
+  // def amoopRange(start: Int, end: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].amoop >= start.S & summon[Index].amoop < end.S)
   // ======================================================================================================
   getArgLut().foreach { case (name, arg) =>
     // camelCase the argument name
@@ -44,14 +46,29 @@ import java.io.{File, FileWriter}
     val argNameLowered = argName.head.toLower + argName.tail
 
     writer.write(
-      s"def ${argNameLowered}Range(start: Int, end: Int)(using Arena, Context, Block, Index): Ref[Bool] = summon[Index].${argNameLowered} >= start.S & summon[Index].${argNameLowered} < end.S\n"
+      s"def ${argNameLowered}Range(start: Int, end: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} >= start.S & summon[Index].${argNameLowered} < end.S)\n"
     )
   }
 
   writer.write("\n")
 
   // ======================================================================================================
-  // def hasAmoop()(using Arena, Context, Block, Index): Ref[Bool] = amoopRange(0, 32)
+  // def amoopEqual(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].amoop == n.S)
+  // ======================================================================================================
+  getArgLut().foreach { case (name, arg) =>
+    // camelCase the argument name
+    val argName: String = translateToCamelCase(name)
+    val argNameLowered = argName.head.toLower + argName.tail
+
+    writer.write(
+      s"def ${argNameLowered}Equal(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} == n.S)\n"
+    )
+  }
+
+  writer.write("\n")
+
+  // ======================================================================================================
+  // def hasAmoop()(using Arena, Context, Block, Index): ArgConstraint = amoopRange(0, 32)
   // ======================================================================================================
   getArgLut().foreach { case (name, arg) =>
     // camelCase the argument name
@@ -69,31 +86,31 @@ import java.io.{File, FileWriter}
     }
 
     writer.write(
-      s"def has$argName()(using Arena, Context, Block, Index): Ref[Bool] = ${argNameLowered}Range$range\n"
+      s"def has$argName()(using Arena, Context, Block, Index): ArgConstraint = ${argNameLowered}Range$range\n"
     )
   }
 
   writer.write("\n")
 
   // ======================================================================================================
-  // def nameId(idx: Int)(using Arena, Context, Block, Index): Ref[Bool] = summon[Index].nameId === idx.S
+  // def nameId(idx: Int)(using Arena, Context, Block, Index): OpcodeConstraint = OpcodeConstraint(summon[Index].nameId === idx.S)
   // ======================================================================================================
   writer.write(
-    "def nameId(idx: Int)(using Arena, Context, Block, Index): Ref[Bool] = summon[Index].nameId === idx.S\n"
+    "def nameId(idx: Int)(using Arena, Context, Block, Index): OpcodeConstraint = OpcodeConstraint(summon[Index].nameId === idx.S)\n"
   )
 
   // ======================================================================================================
-  // def isRVA()(using Arena, Context, Block, Recipe): Ref[Bool] = summon[Recipe].rv_a
+  // def isRV32C()(using Recipe): SetConstraint = SetConstraint(summon[Recipe].rv32_c)
   // ======================================================================================================
   getExtensions().foreach { ext =>
     val extName = ext.replace("_", "").toUpperCase()
     writer.write(
-      s"def is$extName()(using Recipe): Ref[Bool] = summon[Recipe].$ext\n"
+      s"def is$extName()(using Recipe): SetConstraint = SetConstraint(summon[Recipe].$ext)\n"
     )
   }
 
   // ======================================================================================================
-  // def isAdd()(using Arena, Context, Block, Index): Ref[Bool] = nameId(0) & hasRd() & hasRs1() & hasRs2() & isRVI()
+  // def isAdd()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint(nameId(238) & isRVI())
   // ======================================================================================================
   getInstructions().zipWithIndex.foreach { case (instruction, idx) =>
     // CamelCase the instruction name
@@ -106,12 +123,7 @@ import java.io.{File, FileWriter}
       case _      => ""
     }
 
-    writer.write(s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): Ref[Bool] = nameId($idx)")
-    instruction.args.foreach { arg =>
-      // CamelCase the argument name
-      val argName = translateToCamelCase(arg.name)
-      writer.write(s" & has$argName()")
-    }
+    writer.write(s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint(nameId($idx)")
 
     val sets = instruction.instructionSets
       .map(_.name) // e.g., "rv_i", "rv_zicsr", etc.
@@ -121,7 +133,7 @@ import java.io.{File, FileWriter}
       if (sets.length == 1) sets.mkString(" | ") // If there's only one extension, just return join it with " | "
       else sets.mkString("(", " | ", ")")        // If there are multiple extensions, join them with "( | )"
 
-    writer.write(s" & ${s}\n")
+    writer.write(s" & ${s})\n")
   }
 
   writer.write("\n")
@@ -131,17 +143,31 @@ import java.io.{File, FileWriter}
   // ======================================================================================================
   writer.write("""case class Recipe(val name: String)(using Arena, Context, Block) {
   private val indices = scala.collection.mutable.Map[Int, Index]()
+  private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
+  private val crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
+
+  def addIndex(idx: Index): Index = indices.getOrElseUpdate(idx.idx, idx)
+  def getIndex(idx: Int): Index = indices(idx)
+
+  def addSetConstraint(c: Recipe => Ref[Bool]): Unit = sets += c
+  def getSetConstraints(): Seq[Recipe => Ref[Bool]] = sets.toSeq
+
+  // Cross-index constraints (e.g., cover constraints) - executed in Stage 2
+  def addCrossIndexConstraint(c: () => Unit): Unit = crossIndexConstraints += c
+  def executeCrossIndexConstraints(): Unit = crossIndexConstraints.foreach(_())
+
+  def allIndices(): Seq[Int] = indices.keys.toSeq.sorted
+
+  // Using lazy val so set variables are only created when accessed (Stage 1 only)
 """)
 
   getExtensions().foreach { ext =>
-    writer.write(s"  val $ext = smtValue(\"$ext\", Bool)\n")
+    writer.write(s"  lazy val $ext = smtValue(\"$ext\", Bool)\n")
   }
 
-  writer.write(s"  val allSets: List[Ref[Bool]] = List(${getExtensions().mkString(", ")})\n")
+  writer.write(s"  lazy val allSets: List[Ref[Bool]] = List(${getExtensions().mkString(", ")})\n")
 
   writer.write("""
-  def addIndex(idx: Index): Index = indices.getOrElseUpdate(idx.idx, idx)
-  def getIndex(idx: Int): Index = indices(idx)
 
   override def toString(): String = s"Recipe: $name\nIndices:\n${indices.values.map(_.toString).mkString("\n")}"
 }
@@ -152,13 +178,40 @@ import java.io.{File, FileWriter}
   // case class Index(val idx: Int)(using Arena, Context, Block)
   // ======================================================================================================
   writer.write("""case class Index(val idx: Int)(using Arena, Context, Block) {
-  val nameId = smtValue(s"nameId_${idx}", SInt)
+  // Opcode ID solved in Stage 1
+  private var _opcodeId: Option[Int] = None
+  def opcodeId: Int = _opcodeId.getOrElse(
+    throw new RuntimeException(s"Opcode not yet solved for index $idx. Call this after Stage 1 solving.")
+  )
+  def setOpcodeId(id: Int): Unit = _opcodeId = Some(id)
+  def hasOpcodeId: Boolean = _opcodeId.isDefined
+
+  // Constraints stored in Index
+  private val _opcodeConstraints = scala.collection.mutable.ListBuffer[Index => Ref[Bool]]()
+  private val _argConstraints = scala.collection.mutable.ListBuffer[Index => Ref[Bool]]()
+
+  def addOpcodeConstraint(c: Index => Ref[Bool]): Unit = _opcodeConstraints += c
+  def addArgConstraint(c: Index => Ref[Bool]): Unit = _argConstraints += c
+  def getOpcodeConstraints(): Seq[Index => Ref[Bool]] = _opcodeConstraints.toSeq
+  def getArgConstraints(): Seq[Index => Ref[Bool]] = _argConstraints.toSeq
+
+  // Convenience methods to check instruction args (requires opcodeId to be set)
+  // Uses cached lookup table for performance optimization
+  def hasArg(argName: String): Boolean = InstructionArgsCache.hasArg(opcodeId, argName)
+  def hasRd: Boolean = InstructionArgsCache.hasRd(opcodeId)
+  def hasRs1: Boolean = InstructionArgsCache.hasRs1(opcodeId)
+  def hasRs2: Boolean = InstructionArgsCache.hasRs2(opcodeId)
+
+  // Legacy field for compatibility
+  var solvedNameId: Option[Int] = None
+  // Using lazy val so variables are only created when accessed
+  lazy val nameId = smtValue(s"nameId_${idx}", SInt)
 """)
 
   getArgLut().foreach { case (name, arg) =>
     val argName: String = translateToCamelCase(name)
     val argNameLowered = argName.head.toLower + argName.tail
-    writer.write(s"  val ${argNameLowered} = smtValue(s\"${name.replace(".", "_")}_$${idx}\", SInt)\n")
+    writer.write(s"  lazy val ${argNameLowered} = smtValue(s\"${name.replace(".", "_")}_$${idx}\", SInt)\n")
   }
 
   val s = getArgLut().map { case (name, arg) =>
@@ -168,9 +221,6 @@ import java.io.{File, FileWriter}
     s"$$$${${argNameLowered}_$${idx}}"
   }.mkString(", ")
 
-  writer.write(s"""
-  override def toString: String = s\"$${idx}, $$$${nameId_$${idx}}, $s\"
-}
-""")
+  writer.write(s"""}\n""")
 
   writer.close()
