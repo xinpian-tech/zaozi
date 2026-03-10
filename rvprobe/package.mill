@@ -43,7 +43,7 @@ object `package` extends ScalaModule with ScalafmtModule { m =>
       mill.util.Jvm.callProcess(
         mainClass = "org.openjdk.jmh.Main",
         classPath = (runClasspath() ++ generatorDeps()).map(_.path) ++
-          Seq(compileGeneratedSources().path, resources.path),
+          Seq(jmhGeneratedSources().path, resources.path),
         mainArgs = args,
         cwd = Task.ctx().dest,
         jvmArgs = forkArgs(),
