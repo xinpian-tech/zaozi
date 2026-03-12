@@ -154,7 +154,15 @@ import java.io.{File, FileWriter}
   private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
   private val crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
 
-  def addIndex(idx: Index): Index = indices.getOrElseUpdate(idx.idx, idx)
+  // Auto-incrementing instruction index for assembly-like API
+  private var _nextIdx: Int = 0
+  def nextIdx(): Int = { val idx = _nextIdx; _nextIdx += 1; idx }
+
+  def addIndex(idx: Index): Index = {
+    // Keep _nextIdx above any manually-added index to avoid collisions
+    if (idx.idx >= _nextIdx) _nextIdx = idx.idx + 1
+    indices.getOrElseUpdate(idx.idx, idx)
+  }
   def getIndex(idx: Int): Index = indices(idx)
 
   def addSetConstraint(c: Recipe => Ref[Bool]): Unit = sets += c
