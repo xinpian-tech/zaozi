@@ -4,7 +4,7 @@ package me.jiuyang.rvprobe.tests
 
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
-import me.jiuyang.rvprobe.constraints.*
+import me.jiuyang.rvprobe.constraints.{*, given}
 
 import utest.*
 
