@@ -43,24 +43,6 @@ object ArgConstraint:
 extension (self: Constraint)
   def toRef: Ref[Bool] = self
 
-  @targetName("notConstraint")
-  def unary_!(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Constraint =
-    val op = summon[NotApi].op(
-      self.refer,
-      summon[LocationApi].locationFileLineColGet(summon[sourcecode.File].value, summon[sourcecode.Line].value, 0)
-    )
-    op.operation.appendToBlock()
-    Constraint(new Ref[Bool]:
-      val _tpe: Bool = new Object with Bool
-      val _operation = op.operation)
-
   @targetName("andConstraint")
   def &(
     other: Constraint
@@ -190,6 +172,23 @@ extension (self: SetConstraint)
     InstConstraint(smtOr(self, other))
 
 extension (self: ArgConstraint)
+  @targetName("notArg")
+  def unary_!(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): ArgConstraint =
+    val op = summon[NotApi].op(
+      self.refer,
+      summon[LocationApi].locationFileLineColGet(summon[sourcecode.File].value, summon[sourcecode.Line].value, 0)
+    )
+    op.operation.appendToBlock()
+    ArgConstraint(new Ref[Bool]:
+      val _tpe: Bool = new Object with Bool
+      val _operation = op.operation)
   @targetName("andArg")
   def &(
     other: ArgConstraint

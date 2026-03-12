@@ -38,7 +38,7 @@ given SpecFor[IsFence] with
 // Spec §16.3: The encoding with nzuimm=0 is reserved.
 given SpecFor[IsCAddi4spn] with
   def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
-    Some(ArgConstraint((!cNzuimm10Equal(0)).toRef))
+    Some(!cNzuimm10Equal(0))
 
 // C.LUI — nzimm.
 // Spec §16.5: The encoding with nzimm=0 is reserved (would be C.LI with rd=x2,
@@ -46,14 +46,14 @@ given SpecFor[IsCAddi4spn] with
 // simultaneously zero.
 given SpecFor[IsCLui] with
   def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
-    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzimm18hiEqual(0).toRef, cNzimm18loEqual(0).toRef))).toRef))
+    Some(!(cNzimm18hiEqual(0) & cNzimm18loEqual(0)))
 
 // C.ADDI — nzimm.
 // Spec §16.3: The encoding with nzimm=0 and rd≠x0 is a HINT (C.NOP when rd=x0).
 // Exclude nzimm=0 to avoid generating pointless no-op hints.
 given SpecFor[IsCAddi] with
   def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
-    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzimm6hiEqual(0).toRef, cNzimm6loEqual(0).toRef))).toRef))
+    Some(!(cNzimm6hiEqual(0) & cNzimm6loEqual(0)))
 
 // C.ADDIW (RV64C) — rd.
 // Spec §16.4: The encoding with rd=x0 is reserved.
@@ -66,14 +66,14 @@ given SpecFor[IsCAddiw] with
 // Spec §16.4: The encoding with nzimm=0 is reserved.
 given SpecFor[IsCAddi16sp] with
   def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
-    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzimm10hiEqual(0).toRef, cNzimm10loEqual(0).toRef))).toRef))
+    Some(!(cNzimm10hiEqual(0) & cNzimm10loEqual(0)))
 
 // C.SLLI (RV64C) — nzuimm.
 // Spec §16.5: The encoding with nzuimm=0 (shamt=0) is reserved (RV32C);
 // also excluded for RV64C as a zero shift is a no-op and generates no useful tests.
 given SpecFor[IsCSlli] with
   def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
-    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzuimm6hiEqual(0).toRef, cNzuimm6loEqual(0).toRef))).toRef))
+    Some(!(cNzuimm6hiEqual(0) & cNzuimm6loEqual(0)))
 
 // C.LDSP (RV64C) — rd.
 // Spec §16.5: The encoding with rd=x0 is reserved.
