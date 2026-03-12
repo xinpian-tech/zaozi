@@ -110,7 +110,9 @@ import java.io.{File, FileWriter}
   }
 
   // ======================================================================================================
-  // def isAdd()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint(nameId(238) & isRVI())
+  // opaque type IsAdd <: InstConstraint = InstConstraint
+  // object IsAdd { def apply(r: InstConstraint): IsAdd = r }
+  // def isAdd()(using Arena, Context, Block, Index, Recipe): IsAdd = IsAdd(InstConstraint(nameId(238) & isRVI()))
   // ======================================================================================================
   getInstructions().zipWithIndex.foreach { case (instruction, idx) =>
     // CamelCase the instruction name
@@ -123,7 +125,13 @@ import java.io.{File, FileWriter}
       case _      => ""
     }
 
-    writer.write(s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint(nameId($idx)")
+    val typeName = s"Is${name}${suffix}"
+
+    // Unique opaque type for type-safe SpecFor dispatch.
+    // Outside this file: IsXxx <: InstConstraint (subtype relationship is known).
+    // Within this file: IsXxx = InstConstraint (transparent, enabling the apply).
+    writer.write(s"opaque type $typeName <: InstConstraint = InstConstraint\n")
+    writer.write(s"object $typeName { def apply(r: InstConstraint): $typeName = r }\n")
 
     val sets = instruction.instructionSets
       .map(_.name) // e.g., "rv_i", "rv_zicsr", etc.
@@ -133,7 +141,7 @@ import java.io.{File, FileWriter}
       if (sets.length == 1) sets.mkString(" | ") // If there's only one extension, just return join it with " | "
       else sets.mkString("(", " | ", ")")        // If there are multiple extensions, join them with "( | )"
 
-    writer.write(s" & ${s})\n")
+    writer.write(s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(InstConstraint(nameId($idx) & ${s}))\n")
   }
 
   writer.write("\n")
