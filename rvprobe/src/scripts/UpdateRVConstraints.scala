@@ -81,6 +81,10 @@ import java.io.{File, FileWriter}
       val min = -(1 << (width - 1))
       val max = (1 << (width - 1))
       s"($min, $max)"
+    } else if (argName.endsWith("P")) {
+      s"(8, ${8 + (1 << width) - 1})"
+    } else if (argName.endsWith("N0")) {
+      s"(1, ${1 << width})"
     } else {
       s"(0, ${1 << width})"
     }
