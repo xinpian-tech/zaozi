@@ -68,7 +68,10 @@ import java.io.{File, FileWriter}
   writer.write("\n")
 
   // ======================================================================================================
-  // def hasAmoop()(using Arena, Context, Block, Index): ArgConstraint = amoopRange(0, 32)
+  // def hasRs1()(using Arena, Context, Block, Index): ArgConstraint = rs1Range(0, 32)
+  // def hasRs1N0()(using Arena, Context, Block, Index): ArgConstraint = rs1N0Range(1, 32)
+  // def hasRs1P()(using Arena, Context, Block, Index): ArgConstraint = rs1PRange(8, 15)
+  // def hasRdN2()(using Arena, Context, Block, Index): ArgConstraint = rdN2Range(1, 32) & !rdN2Equal(2)
   // ======================================================================================================
   getArgLut().foreach { case (name, arg) =>
     // camelCase the argument name
@@ -90,8 +93,16 @@ import java.io.{File, FileWriter}
     }
 
     writer.write(
-      s"def has$argName()(using Arena, Context, Block, Index): ArgConstraint = ${argNameLowered}Range$range\n"
+      s"def has$argName()(using Arena, Context, Block, Index): ArgConstraint = ${argNameLowered}Range$range"
     )
+
+    if (argName.endsWith("N2")) {
+      writer.write(
+        s" & !${argNameLowered}Equal(2)"
+      )
+    }
+
+    writer.write("\n")
   }
 
   writer.write("\n")
