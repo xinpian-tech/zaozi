@@ -48,6 +48,39 @@ given SpecFor[IsCLui] with
   def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
     Some(ArgConstraint((!ArgConstraint(smtAnd(cNzimm18hiEqual(0).toRef, cNzimm18loEqual(0).toRef))).toRef))
 
+// C.ADDI — nzimm.
+// Spec §16.3: The encoding with nzimm=0 and rd≠x0 is a HINT (C.NOP when rd=x0).
+// Exclude nzimm=0 to avoid generating pointless no-op hints.
+given SpecFor[IsCAddi] with
+  def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
+    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzimm6hiEqual(0).toRef, cNzimm6loEqual(0).toRef))).toRef))
+
+// C.ADDIW (RV64C) — rd.
+// Spec §16.4: The encoding with rd=x0 is reserved.
+// C.ADDIW uses CI format where rd=rs1; rvdecoderdb encodes this as rdRs1N0.
+given SpecFor[IsCAddiw] with
+  def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
+    Some(rdRs1N0Range(1, 32))
+
+// C.ADDI16SP — nzimm.
+// Spec §16.4: The encoding with nzimm=0 is reserved.
+given SpecFor[IsCAddi16sp] with
+  def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
+    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzimm10hiEqual(0).toRef, cNzimm10loEqual(0).toRef))).toRef))
+
+// C.SLLI (RV64C) — nzuimm.
+// Spec §16.5: The encoding with nzuimm=0 (shamt=0) is reserved (RV32C);
+// also excluded for RV64C as a zero shift is a no-op and generates no useful tests.
+given SpecFor[IsCSlli] with
+  def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
+    Some(ArgConstraint((!ArgConstraint(smtAnd(cNzuimm6hiEqual(0).toRef, cNzuimm6loEqual(0).toRef))).toRef))
+
+// C.LDSP (RV64C) — rd.
+// Spec §16.5: The encoding with rd=x0 is reserved.
+given SpecFor[IsCLdsp] with
+  def spec(using Arena, Context, Block, Index): Option[ArgConstraint] =
+    Some(rdN0Range(1, 32))
+
 // C.LWSP — rd.
 // Spec §16.5: The encoding with rd=x0 is reserved.
 // (rvdecoderdb models this field as rdN0, whose range already excludes 0 by
