@@ -214,3 +214,14 @@ extension (self: ArgConstraint)
     sourcecode.Name.Machine
   ): ArgConstraint =
     ArgConstraint(smtOr(self, other))
+
+// SpecFor[T] — typeclass that associates spec-mandated arg constraints with a
+// specific instruction opaque type T (e.g. IsFence, IsAddi, …).
+trait SpecFor[T <: InstConstraint]:
+  def spec(using Arena, Context, Block, Index): Option[ArgConstraint]
+
+// When no explicit given is provided for a type T, the low-priority
+// `noSpec` instance is used and no additional constraint is injected.
+object SpecFor:
+  given noSpec[T <: InstConstraint]: SpecFor[T] with
+    def spec(using Arena, Context, Block, Index): Option[ArgConstraint] = None

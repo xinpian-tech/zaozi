@@ -11,19 +11,23 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Op
 
 import java.lang.foreign.Arena
 
-// create an instruction with explicit type predicate and parameter predicate
-def instruction(
+// create an instruction with explicit type predicate and parameter predicate.
+// T is the specific opaque instruction type (e.g. IsFence, IsAddi) returned by
+// the corresponding isXxx() function.  The compiler automatically summons
+// SpecFor[T]; if no explicit given exists, the low-priority noSpec instance
+// is used and no additional constraint is injected.
+def instruction[T <: InstConstraint](
   idx:    Int,
-  opcode: Index ?=> InstConstraint
+  opcode: Index ?=> T
 )(
-  using Arena,
-  Context,
-  Block,
-  Recipe
+  using arena: Arena,
+  context: Context,
+  block: Block,
+  recipe: Recipe
+)(using sf: SpecFor[T]
 )(params: Index ?=> ArgConstraint
 ): Unit = {
-  val recipe = summon[Recipe]
-  val index  = recipe.addIndex(new Index(idx))
+  val index = recipe.addIndex(new Index(idx)(using arena, context, block))
 
   // Register constraints to Index itself
   index.addOpcodeConstraint((i: Index) =>
@@ -31,11 +35,14 @@ def instruction(
       using i
     ).toRef
   )
-  index.addArgConstraint((i: Index) =>
-    params(
-      using i
-    ).toRef
-  )
+  index.addArgConstraint { (i: Index) =>
+    val userConstraint = params(using i)
+    // Merge spec-mandated constraints (if any) with the user-provided constraints.
+    // Both are AND'd so both must be satisfied simultaneously.
+    sf.spec(using arena, context, block, i) match
+      case Some(specConstraint) => (userConstraint & specConstraint).toRef
+      case None                 => userConstraint.toRef
+  }
 }
 
 // get an instruction with given index
