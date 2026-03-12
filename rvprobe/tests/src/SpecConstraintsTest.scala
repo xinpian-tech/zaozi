@@ -129,3 +129,104 @@ object SpecConstraintsTest extends TestSuite:
         def constraints() =
           instruction(0, isCLwsp()) { rdN0Range(31, 32) }
       CLwspRd31.rvprobeTestArgZ3Output("sat")
+
+    // -------------------------------------------------------------------------
+    // IsCAddi — nzimm field
+    //   Spec §16.3: nzimm=0 is a HINT (no useful work); excluded for clean tests.
+    // -------------------------------------------------------------------------
+
+    test("IsCAddi/nzimm=0 is hint (unsat)"):
+      object CAddiNzimm0 extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC()
+        def constraints() =
+          instruction(0, isCAddi()) {
+            ArgConstraint(smtAnd(cNzimm6hiEqual(0).toRef, cNzimm6loEqual(0).toRef))
+          }
+      CAddiNzimm0.rvprobeTestArgZ3Output("unsat")
+
+    test("IsCAddi/nzimm=1 (lo=1) is valid (sat)"):
+      object CAddiNzimm1 extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC()
+        def constraints() =
+          instruction(0, isCAddi()) { cNzimm6loEqual(1) }
+      CAddiNzimm1.rvprobeTestArgZ3Output("sat")
+
+    // -------------------------------------------------------------------------
+    // IsCAddiw (RV64C) — rd field
+    //   Spec §16.4: encoding with rd=x0 is reserved.
+    // -------------------------------------------------------------------------
+
+    test("IsCAddiw/rd=x0 is reserved (unsat)"):
+      object CAddiwRd0 extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC() ++ Seq(isRV64C())
+        def constraints() =
+          instruction(0, isCAddiw()) { rdRs1N0Range(0, 1) }
+      CAddiwRd0.rvprobeTestArgZ3Output("unsat")
+
+    test("IsCAddiw/rd=x1 is valid (sat)"):
+      object CAddiwRd1 extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC() ++ Seq(isRV64C())
+        def constraints() =
+          instruction(0, isCAddiw()) { rdRs1N0Range(1, 2) }
+      CAddiwRd1.rvprobeTestArgZ3Output("sat")
+
+    // -------------------------------------------------------------------------
+    // IsCAddi16sp — nzimm field
+    //   Spec §16.4: encoding with nzimm=0 is reserved.
+    // -------------------------------------------------------------------------
+
+    test("IsCAddi16sp/nzimm=0 is reserved (unsat)"):
+      object CAddi16spZero extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC()
+        def constraints() =
+          instruction(0, isCAddi16sp()) {
+            ArgConstraint(smtAnd(cNzimm10hiEqual(0).toRef, cNzimm10loEqual(0).toRef))
+          }
+      CAddi16spZero.rvprobeTestArgZ3Output("unsat")
+
+    test("IsCAddi16sp/nzimm nonzero (lo=16) is valid (sat)"):
+      object CAddi16spNonzero extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC()
+        def constraints() =
+          instruction(0, isCAddi16sp()) { cNzimm10loEqual(16) }
+      CAddi16spNonzero.rvprobeTestArgZ3Output("sat")
+
+    // -------------------------------------------------------------------------
+    // IsCSlli (RV64C) — nzuimm field
+    //   nzuimm=0 is reserved (shamt=0 is meaningless shift).
+    // -------------------------------------------------------------------------
+
+    test("IsCSlli/nzuimm=0 is reserved (unsat)"):
+      object CSlliZero extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC() ++ Seq(isRV64C())
+        def constraints() =
+          instruction(0, isCSlli()) {
+            ArgConstraint(smtAnd(cNzuimm6hiEqual(0).toRef, cNzuimm6loEqual(0).toRef))
+          }
+      CSlliZero.rvprobeTestArgZ3Output("unsat")
+
+    test("IsCSlli/nzuimm=1 is valid (sat)"):
+      object CSlliOne extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC() ++ Seq(isRV64C())
+        def constraints() =
+          instruction(0, isCSlli()) { cNzuimm6loEqual(1) }
+      CSlliOne.rvprobeTestArgZ3Output("sat")
+
+    // -------------------------------------------------------------------------
+    // IsCLdsp (RV64C) — rd field
+    //   Spec §16.5: encoding with rd=x0 is reserved.
+    // -------------------------------------------------------------------------
+
+    test("IsCLdsp/rd=x0 is reserved (unsat)"):
+      object CLdspRd0 extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC() ++ Seq(isRV64C())
+        def constraints() =
+          instruction(0, isCLdsp()) { rdN0Range(0, 1) }
+      CLdspRd0.rvprobeTestArgZ3Output("unsat")
+
+    test("IsCLdsp/rd=x1 is valid (sat)"):
+      object CLdspRd1 extends RVGenerator with HasRVProbeTest:
+        val sets          = isRV64GC() ++ Seq(isRV64C())
+        def constraints() =
+          instruction(0, isCLdsp()) { rdN0Range(1, 2) }
+      CLdspRd1.rvprobeTestArgZ3Output("sat")
