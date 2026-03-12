@@ -64,24 +64,23 @@ import java.io.{File, FileWriter}
         val full = s"${name}${suffix}"
         full.head.toLower + full.tail
       }
-      val isFunc = s"is${name}${suffix}"
+      val isFunc   = s"is${name}${suffix}"
 
       // Build parameter list and constraint body from instruction args
       val params = instruction.args.map { arg =>
-        val argName = translateToCamelCase(arg.name)
+        val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
         s"$argNameLowered: Int"
       }.mkString(", ")
 
       val constraints = instruction.args.map { arg =>
-        val argName = translateToCamelCase(arg.name)
+        val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
         s"${argNameLowered}Equal($argNameLowered)"
       }.mkString(" & ")
 
       writer.write(
-        s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit =\n" +
-        s"  instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
+        s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
       )
     }
   }
