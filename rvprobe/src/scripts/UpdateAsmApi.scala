@@ -9,29 +9,13 @@ import java.io.{File, FileWriter}
 
 // Register argument names (raw names from rvdecoderdb ArgLUT) that should use Register enum type
 val registerArgNames: Set[String] = Set(
-  "rd",
-  "rs1",
-  "rs2",
-  "rs3",
-  "rt",
-  "vd",
-  "vs1",
-  "vs2",
-  "vs3",
-  "rd_p",
-  "rs1_p",
-  "rs2_p",
-  "rd_rs1",
-  "rd_rs1_p",
-  "rd_rs1_n0",
-  "rd_n0",
-  "rd_n2",
-  "rs1_n0",
-  "c_rs1_n0",
-  "c_rs2_n0",
-  "c_rs2",
-  "c_sreg1",
-  "c_sreg2"
+  "rd", "rs1", "rs2", "rs3", "rt",
+  "vd", "vs1", "vs2", "vs3",
+  "rd_p", "rs1_p", "rs2_p",
+  "rd_rs1", "rd_rs1_p", "rd_rs1_n0",
+  "rd_n0", "rd_n2", "rs1_n0",
+  "c_rs1_n0", "c_rs2_n0", "c_rs2",
+  "c_sreg1", "c_sreg2"
 )
 
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateAsmApi rvprobe/src/AsmApi.scala

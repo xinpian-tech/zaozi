@@ -156,7 +156,9 @@ import java.io.{File, FileWriter}
       if (sets.length == 1) sets.mkString(" | ") // If there's only one extension, just return join it with " | "
       else sets.mkString("(", " | ", ")")        // If there are multiple extensions, join them with "( | )"
 
-    writer.write(s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(InstConstraint(nameId($idx) & ${s}))\n")
+    writer.write(
+      s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(InstConstraint(nameId($idx) & ${s}))\n"
+    )
   }
 
   writer.write("\n")

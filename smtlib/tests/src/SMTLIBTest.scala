@@ -4,7 +4,7 @@ package me.jiuyang.smtlib.tests
 
 import me.jiuyang.smtlib.{*, given}
 import me.jiuyang.smtlib.default.{*, given}
-import me.jiuyang.smtlib.parser.{parseZ3Output, parseZ3OutputOrFail, getUnsatCore, handleUnsatResult, Z3Result}
+import me.jiuyang.smtlib.parser.{getUnsatCore, handleUnsatResult, parseZ3Output, parseZ3OutputOrFail, Z3Result}
 
 import org.llvm.mlir.scalalib.capi.dialect.func.{Func, FuncApi, given}
 import org.llvm.mlir.scalalib.capi.dialect.smt.DialectApi as SmtDialect
@@ -81,11 +81,13 @@ def smtZ3Test(checkLines: String*)(body: (Arena, Context, Block) ?=> Unit): Z3Re
 
 /** Test helper for UNSAT scenarios
   *
-  * Creates a Z3 test that is expected to be UNSAT and tests the unsat core generation.
-  * Unlike smtZ3Test, this doesn't fail on UNSAT - it expects it.
+  * Creates a Z3 test that is expected to be UNSAT and tests the unsat core generation. Unlike smtZ3Test, this doesn't
+  * fail on UNSAT - it expects it.
   *
-  * @param body The SMT constraints to test (should be unsatisfiable)
-  * @return Z3Result (expected to have status = Unsat)
+  * @param body
+  *   The SMT constraints to test (should be unsatisfiable)
+  * @return
+  *   Z3Result (expected to have status = Unsat)
   */
 def smtZ3UnsatTest(body: (Arena, Context, Block) ?=> Unit): Z3Result =
   given Arena   = Arena.ofConfined()
@@ -114,7 +116,8 @@ def smtZ3UnsatTest(body: (Arena, Context, Block) ?=> Unit): Z3Result =
   def runZ3(smtlib: String): String =
     os.proc("z3", "-in", "-t:1000")
       .call(stdin = smtlib, check = false)
-      .out.text()
+      .out
+      .text()
 
   // For UNSAT tests, just check satisfiability without requesting model
   val z3Output = runZ3(smt.replace("(reset)", ""))

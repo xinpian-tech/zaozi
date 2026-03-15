@@ -126,37 +126,48 @@ def parseZ3Output(input: String): Z3Result =
 
 /** Get unsat core from Z3 for debugging constraint conflicts
   *
-  * @param smtlib The SMTLIB input to analyze
-  * @param z3Runner Function to run Z3 with given SMTLIB input and return output
-  * @return String containing the unsat core output from Z3
+  * @param smtlib
+  *   The SMTLIB input to analyze
+  * @param z3Runner
+  *   Function to run Z3 with given SMTLIB input and return output
+  * @return
+  *   String containing the unsat core output from Z3
   */
 def getUnsatCore(smtlib: String, z3Runner: String => String): String =
   // Add option to produce unsat cores right after set-logic
   // This avoids issues with redeclaration of constants
-  val smtlibWithCore = smtlib.replaceFirst(
-    "\\(set-logic [^)]+\\)",
-    "$0\n(set-option :produce-unsat-cores true)"
-  ).replace("(check-sat)", "(check-sat)\n(get-unsat-core)")
+  val smtlibWithCore = smtlib
+    .replaceFirst(
+      "\\(set-logic [^)]+\\)",
+      "$0\n(set-option :produce-unsat-cores true)"
+    )
+    .replace("(check-sat)", "(check-sat)\n(get-unsat-core)")
 
   z3Runner(smtlibWithCore)
 
 /** Parse Z3 output and automatically handle UNSAT/Unknown results
   *
-  * This is a convenience function that combines parseZ3Output with automatic UNSAT handling.
-  * If the result is SAT, returns the Z3Result. If UNSAT/Unknown, prints debugging info and throws.
+  * This is a convenience function that combines parseZ3Output with automatic UNSAT handling. If the result is SAT,
+  * returns the Z3Result. If UNSAT/Unknown, prints debugging info and throws.
   *
-  * @param z3Output The output from Z3
-  * @param smtlib The original SMTLIB input (for unsat core generation)
-  * @param z3Runner Function to run Z3 with given SMTLIB input
-  * @param context Context description for error messages (e.g., "Opcode solving", "Argument solving")
-  * @return Z3Result if SAT
-  * @throws RuntimeException if UNSAT/Unknown with detailed debugging information
+  * @param z3Output
+  *   The output from Z3
+  * @param smtlib
+  *   The original SMTLIB input (for unsat core generation)
+  * @param z3Runner
+  *   Function to run Z3 with given SMTLIB input
+  * @param context
+  *   Context description for error messages (e.g., "Opcode solving", "Argument solving")
+  * @return
+  *   Z3Result if SAT
+  * @throws RuntimeException
+  *   if UNSAT/Unknown with detailed debugging information
   */
 def parseZ3OutputOrFail(
   z3Output: String,
-  smtlib: String,
+  smtlib:   String,
   z3Runner: String => String,
-  context: String
+  context:  String
 ): Z3Result =
   val result = parseZ3Output(z3Output)
 
@@ -181,19 +192,25 @@ def parseZ3OutputOrFail(
   *
   * This method should be called when Z3 result is not SAT to provide detailed debugging info.
   *
-  * @param result The Z3Result that is not SAT
-  * @param smtlib The original SMTLIB input
-  * @param z3Output The Z3 output
-  * @param z3Runner Function to run Z3 (used for getting unsat core)
-  * @param context Context description for error messages (e.g., "Opcode solving", "Argument solving")
-  * @throws RuntimeException Always throws with detailed error information
+  * @param result
+  *   The Z3Result that is not SAT
+  * @param smtlib
+  *   The original SMTLIB input
+  * @param z3Output
+  *   The Z3 output
+  * @param z3Runner
+  *   Function to run Z3 (used for getting unsat core)
+  * @param context
+  *   Context description for error messages (e.g., "Opcode solving", "Argument solving")
+  * @throws RuntimeException
+  *   Always throws with detailed error information
   */
 def handleUnsatResult(
-  result: Z3Result,
-  smtlib: String,
+  result:   Z3Result,
+  smtlib:   String,
   z3Output: String,
   z3Runner: String => String,
-  context: String
+  context:  String
 ): Nothing =
   System.err.println(s"=== $context failed: ${result.status} ===")
   System.err.println(s"\nSMTLIB:\n$smtlib")

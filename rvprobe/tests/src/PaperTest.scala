@@ -27,18 +27,18 @@ object PaperTest extends TestSuite:
     //   rem  x13, x1, x2
     test("IntegerOps"):
       object IntegerOps extends RVGenerator with HasRVProbeTest:
-        val sets = isRV64GC()
+        val sets          = isRV64GC()
         def constraints() =
-          instruction(0, isAdd())  { rdEqual(3)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(1, isSub())  { rdEqual(4)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(2, isAnd())  { rdEqual(5)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(3, isOr())   { rdEqual(6)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(4, isXor())  { rdEqual(7)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(5, isSll())  { rdEqual(8)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(6, isSrl())  { rdEqual(9)  & rs1Equal(1) & rs2Equal(2) }
-          instruction(7, isSra())  { rdEqual(10) & rs1Equal(1) & rs2Equal(2) }
-          instruction(8, isMul())  { rdEqual(11) & rs1Equal(1) & rs2Equal(2) }
-          instruction(9, isDiv())  { rdEqual(12) & rs1Equal(1) & rs2Equal(2) }
+          instruction(0, isAdd()) { rdEqual(3) & rs1Equal(1) & rs2Equal(2) }
+          instruction(1, isSub()) { rdEqual(4) & rs1Equal(1) & rs2Equal(2) }
+          instruction(2, isAnd()) { rdEqual(5) & rs1Equal(1) & rs2Equal(2) }
+          instruction(3, isOr()) { rdEqual(6) & rs1Equal(1) & rs2Equal(2) }
+          instruction(4, isXor()) { rdEqual(7) & rs1Equal(1) & rs2Equal(2) }
+          instruction(5, isSll()) { rdEqual(8) & rs1Equal(1) & rs2Equal(2) }
+          instruction(6, isSrl()) { rdEqual(9) & rs1Equal(1) & rs2Equal(2) }
+          instruction(7, isSra()) { rdEqual(10) & rs1Equal(1) & rs2Equal(2) }
+          instruction(8, isMul()) { rdEqual(11) & rs1Equal(1) & rs2Equal(2) }
+          instruction(9, isDiv()) { rdEqual(12) & rs1Equal(1) & rs2Equal(2) }
           instruction(10, isRem()) { rdEqual(13) & rs1Equal(1) & rs2Equal(2) }
 
       IntegerOps.rvprobeTestInstructions(
@@ -68,14 +68,14 @@ object PaperTest extends TestSuite:
     //   jalr x0,  x1,  0          # indirect jump (return)
     test("ControlFlow"):
       object ControlFlow extends RVGenerator with HasRVProbeTest:
-        val sets = isRV64GC()
+        val sets          = isRV64GC()
         def constraints() =
           instruction(0, isAddi()) { rdEqual(10) & rs1Equal(10) & imm12Equal(1) }
-          instruction(1, isBlt())  { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(2, isBge())  { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(3, isBeq())  { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(4, isBne())  { rs1Equal(1)  & rs2Equal(3)  & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(5, isJal())  { rdEqual(1) & jimm20Equal(0) }
+          instruction(1, isBlt()) { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(2, isBge()) { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(3, isBeq()) { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(4, isBne()) { rs1Equal(1) & rs2Equal(3) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(5, isJal()) { rdEqual(1) & jimm20Equal(0) }
           instruction(6, isJalr()) { rdEqual(0) & rs1Equal(1) & imm12Equal(0) }
 
       ControlFlow.rvprobeTestRecipeAsm(
