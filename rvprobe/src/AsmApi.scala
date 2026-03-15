@@ -17,14 +17,9 @@ import java.lang.foreign.Arena
 //
 //  Assembly-like API for writing fixed-value constraints.
 //
-//  Instead of:
-//    instruction(0, isAddi()) { rdEqual(1) & rs1Equal(1) & imm12Equal(1) }
-//  Write:
-//    addi(x1, x1, 1)   // → addi x1, x1, 1
-//
 //  The instruction index is auto-incremented via Recipe.nextIdx().
 //  Parameters follow the rvdecoderdb argument order for each instruction.
-//  Only instructions with at least one argument field are generated.
+//  Zero-arg instructions (ecall, mret, etc.) are also generated.
 // =============================================================================
 
 def cJal(cImm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCJal()) { cImm12Equal(cImm12) }
@@ -165,6 +160,7 @@ def cAnd(rs2P: Register, rdRs1P: Register)(using Arena, Context, Block, Recipe):
 def cAndi(cImm6lo: Int, rdRs1P: Register, cImm6hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCAndi()) { cImm6loEqual(cImm6lo) & rdRs1PEqual(rdRs1P.ordinal) & cImm6hiEqual(cImm6hi) }
 def cBeqz(cBimm9lo: Int, rs1P: Register, cBimm9hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCBeqz()) { cBimm9loEqual(cBimm9lo) & rs1PEqual(rs1P.ordinal) & cBimm9hiEqual(cBimm9hi) }
 def cBnez(cBimm9lo: Int, rs1P: Register, cBimm9hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCBnez()) { cBimm9loEqual(cBimm9lo) & rs1PEqual(rs1P.ordinal) & cBimm9hiEqual(cBimm9hi) }
+def cEbreak()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCEbreak()) { ArgConstraint.noArgs }
 def cJ(cImm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCJ()) { cImm12Equal(cImm12) }
 def cJalr(cRs1N0: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCJalr()) { cRs1N0Equal(cRs1N0.ordinal) }
 def cJr(rs1N0: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCJr()) { rs1N0Equal(rs1N0.ordinal) }
@@ -275,6 +271,8 @@ def bgeu(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena
 def blt(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBlt()) { bimm12loEqual(bimm12lo) & rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(bimm12hi) }
 def bltu(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBltu()) { bimm12loEqual(bimm12lo) & rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(bimm12hi) }
 def bne(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBne()) { bimm12loEqual(bimm12lo) & rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(bimm12hi) }
+def ebreak()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isEbreak()) { ArgConstraint.noArgs }
+def ecall()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isEcall()) { ArgConstraint.noArgs }
 def fence(rd: Register, rs1: Register, succ: Int, pred: Int, fm: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFence()) { rdEqual(rd.ordinal) & rs1Equal(rs1.ordinal) & succEqual(succ) & predEqual(pred) & fmEqual(fm) }
 def jal(rd: Register, jimm20: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isJal()) { rdEqual(rd.ordinal) & jimm20Equal(jimm20) }
 def jalr(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isJalr()) { rdEqual(rd.ordinal) & rs1Equal(rs1.ordinal) & imm12Equal(imm12) }
@@ -345,9 +343,17 @@ def froundnxQ(rd: Register, rm: Int, rs1: Register)(using Arena, Context, Block,
 def fcvtHQ(rd: Register, rm: Int, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFcvtHQ()) { rdEqual(rd.ordinal) & rmEqual(rm) & rs1Equal(rs1.ordinal) }
 def fcvtQH(rd: Register, rm: Int, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFcvtQH()) { rdEqual(rd.ordinal) & rmEqual(rm) & rs1Equal(rs1.ordinal) }
 def sfenceVma(rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSfenceVma()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
+def sret()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSret()) { ArgConstraint.noArgs }
+def dret()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isDret()) { ArgConstraint.noArgs }
+def sctrclr()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSctrclr()) { ArgConstraint.noArgs }
+def mnret()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isMnret()) { ArgConstraint.noArgs }
 def hinvalGvma(rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isHinvalGvma()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
 def hinvalVvma(rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isHinvalVvma()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
+def sfenceInvalIr()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSfenceInvalIr()) { ArgConstraint.noArgs }
+def sfenceWInval()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSfenceWInval()) { ArgConstraint.noArgs }
 def sinvalVma(rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSinvalVma()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
+def mret()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isMret()) { ArgConstraint.noArgs }
+def wfi()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isWfi()) { ArgConstraint.noArgs }
 def vaaddVv(vd: Register, vs1: Register, vs2: Register, vm: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isVaaddVv()) { vdEqual(vd.ordinal) & vs1Equal(vs1.ordinal) & vs2Equal(vs2.ordinal) & vmEqual(vm) }
 def vaaddVx(vd: Register, rs1: Register, vs2: Register, vm: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isVaaddVx()) { vdEqual(vd.ordinal) & rs1Equal(rs1.ordinal) & vs2Equal(vs2.ordinal) & vmEqual(vm) }
 def vaadduVv(vd: Register, vs1: Register, vs2: Register, vm: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isVaadduVv()) { vdEqual(vd.ordinal) & vs1Equal(vs1.ordinal) & vs2Equal(vs2.ordinal) & vmEqual(vm) }
@@ -753,6 +759,8 @@ def sbRl(rs1: Register, rs2: Register, aq: Int)(using Arena, Context, Block, Rec
 def sdRl(rs1: Register, rs2: Register, aq: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSdRl()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & aqEqual(aq) }
 def shRl(rs1: Register, rs2: Register, aq: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isShRl()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & aqEqual(aq) }
 def swRl(rs1: Register, rs2: Register, aq: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSwRl()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & aqEqual(aq) }
+def wrsNto()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isWrsNto()) { ArgConstraint.noArgs }
+def wrsSto()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isWrsSto()) { ArgConstraint.noArgs }
 def sh1add(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSh1add()) { rdEqual(rd.ordinal) & rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
 def sh2add(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSh2add()) { rdEqual(rd.ordinal) & rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
 def sh3add(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSh3add()) { rdEqual(rd.ordinal) & rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) }
@@ -793,6 +801,7 @@ def cSextH(rdRs1P: Register)(using Arena, Context, Block, Recipe): Unit = instru
 def cSh(rs2P: Register, cUimm1: Int, rs1P: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCSh()) { rs2PEqual(rs2P.ordinal) & cUimm1Equal(cUimm1) & rs1PEqual(rs1P.ordinal) }
 def cZextB(rdRs1P: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCZextB()) { rdRs1PEqual(rdRs1P.ordinal) }
 def cZextH(rdRs1P: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCZextH()) { rdRs1PEqual(rdRs1P.ordinal) }
+def cMopN()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCMopN()) { ArgConstraint.noArgs }
 def cmMva01s(cSreg2: Register, cSreg1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCmMva01s()) { cSreg2Equal(cSreg2.ordinal) & cSreg1Equal(cSreg1.ordinal) }
 def cmMvsa01(cSreg2: Register, cSreg1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCmMvsa01()) { cSreg2Equal(cSreg2.ordinal) & cSreg1Equal(cSreg1.ordinal) }
 def cmPop(cSpimm: Int, cRlist: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isCmPop()) { cSpimmEqual(cSpimm) & cRlistEqual(cRlist) }
