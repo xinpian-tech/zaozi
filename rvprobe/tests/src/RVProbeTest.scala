@@ -35,6 +35,3 @@ trait HasRVProbeTest:
 
   def rvprobeTestRecipeAsm(expectedLines: String*): Unit =
     rvprobeTest(toRecipeAsm())(out => expectedLines.forall(l => out.contains(l)))
-
-  def rvprobeTestAssemblyFile(expectedLines: String*): Unit =
-    rvprobeTest(toAssemblyFile())(out => expectedLines.forall(l => out.contains(l)))
