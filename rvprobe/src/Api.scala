@@ -28,6 +28,7 @@ def instruction[T <: InstConstraint](
 )(params: Index ?=> ArgConstraint
 ): Unit = {
   val index = recipe.addIndex(new Index(idx)(using arena, context, block))
+  recipe.addStatement(Statement.Inst(idx))
 
   // Register constraints to Index itself
   index.addOpcodeConstraint((i: Index) =>
@@ -98,3 +99,23 @@ def isRV64G(
 def isRV64GC(
 ): Seq[Recipe ?=> SetConstraint] =
   isRV64G() :+ isRVC()
+
+// ================== Assembly Directive & Label DSL ==================
+
+def label(name: String)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Label(name))
+
+def section(name: String, flags: String*)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Section(name, flags*))
+
+def global(symbol: String)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Global(symbol))
+
+def align(n: Int)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Align(n))
+
+def word(value: Long)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Word(value))
+
+def raw(content: String)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Raw(content))

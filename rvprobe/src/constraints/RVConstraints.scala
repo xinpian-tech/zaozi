@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.constraints
 
-import me.jiuyang.rvprobe.InstructionArgsCache
+import me.jiuyang.rvprobe.{InstructionArgsCache, Statement}
 
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
@@ -3111,10 +3111,14 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
   private val indices = scala.collection.mutable.Map[Int, Index]()
   private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
   private val crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
+  private val _statements = scala.collection.mutable.ArrayBuffer[Statement]()
 
   // Auto-incrementing instruction index for assembly-like API
   private var _nextIdx: Int = 0
   def nextIdx(): Int = { val idx = _nextIdx; _nextIdx += 1; idx }
+
+  def addStatement(s: Statement): Unit = _statements += s
+  def allStatements(): Seq[Statement] = _statements.toSeq
 
   def addIndex(idx: Index): Index = {
     // Keep _nextIdx above any manually-added index to avoid collisions

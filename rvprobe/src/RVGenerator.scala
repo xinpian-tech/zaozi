@@ -47,7 +47,6 @@ case object BinMode extends OutputMode
   */
 trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
-  def template(): String = "" // can be overridden by subclass to provide custom assembly template
   val sets: Seq[Recipe ?=> SetConstraint] // should be implemented by subclass
   val name: String = this.getClass.getSimpleName
 
@@ -124,7 +123,7 @@ trait RVGenerator:
   }
 
   // ================== Two-Stage Solving API ==================
-  def solveOpcodes(): Map[Int, Int] = withOpcodeContext(
+  def solveOpcodes(): (Map[Int, Int], Seq[Statement]) = withOpcodeContext(
     postProcess = (arena, context, module, recipe) => {
       given Arena  = arena
       given Module = module
@@ -137,10 +136,11 @@ trait RVGenerator:
           z3Runner = runZ3,
           context = "Opcode solving"
         )
-        result.model.collect {
+        val opcodes = result.model.collect {
           case (k, v: BigInt) if k.startsWith("nameId_") =>
             k.stripPrefix("nameId_").toInt -> v.toInt
         }
+        (opcodes, recipe.allStatements())
       } catch {
         case e: RuntimeException => throw e // Re-throw our custom exception
         case e: Exception        =>
@@ -339,7 +339,7 @@ trait RVGenerator:
 
   // ================== Stage 2 Helper ==================
   def toArgSMTLIB(): String = withArgContext(
-    solvedOpcodes = solveOpcodes(),
+    solvedOpcodes = solveOpcodes()._1,
     postProcess = (arena, context, module, recipe) => {
       given Arena  = arena
       given Module = module
@@ -350,7 +350,7 @@ trait RVGenerator:
   def printArgSMTLIB() = println(toArgSMTLIB())
 
   def toArgMLIR(): String = withArgContext(
-    solvedOpcodes = solveOpcodes(),
+    solvedOpcodes = solveOpcodes()._1,
     postProcess = (arena, context, module, recipe) => {
       given Arena  = arena
       given Module = module
@@ -450,8 +450,8 @@ trait RVGenerator:
   }
 
   def toInstructions(): Seq[(Array[Byte], String)] = {
-    val opcodes = solveOpcodes()
-    val args    = solveArgs(opcodes)
+    val (opcodes, _) = solveOpcodes()
+    val args          = solveArgs(opcodes)
     assembleInstructions(opcodes, args)
   }
 
@@ -568,9 +568,40 @@ trait RVGenerator:
       s"$instName ${inst.args.map(a => argFmt(a.name)).mkString(", ")}"
   }
 
-  /** Build GAS assembly lines (without bytes) mirroring the NOP-padding logic of [[assembleInstructions]], but
-    * formatting each instruction with [[toGasLine]].
-    */
+  /** Render a single [[Statement]] as a GAS assembly line. */
+  private def statementToGas(
+    stmt:          Statement,
+    solvedOpcodes: Map[Int, Int],
+    solvedArgs:    Map[String, BigInt],
+    instructions:  Seq[org.chipsalliance.rvdecoderdb.Instruction]
+  ): String = stmt match
+    case Statement.Inst(idx) =>
+      s"    ${toGasLine(idx, instructions(solvedOpcodes(idx)), solvedArgs)}"
+    case Statement.Label(name) =>
+      s"$name:"
+    case Statement.Section(name, flags*) =>
+      val flagStr = if flags.isEmpty then "" else s", ${flags.mkString(", ")}"
+      s"    .section $name$flagStr"
+    case Statement.Global(symbol) =>
+      s"    .globl $symbol"
+    case Statement.Align(n) =>
+      s"    .align $n"
+    case Statement.Word(value) =>
+      s"    .word 0x${value.toHexString}"
+    case Statement.Raw(content) =>
+      content
+
+  /** Build GAS assembly lines from the ordered statement list. */
+  private def assembleStatementsGas(
+    statements:    Seq[Statement],
+    solvedOpcodes: Map[Int, Int],
+    solvedArgs:    Map[String, BigInt]
+  ): Seq[String] = {
+    val instructions = getInstructions()
+    statements.map(s => statementToGas(s, solvedOpcodes, solvedArgs, instructions))
+  }
+
+  /** Legacy: Build GAS assembly lines with NOP-padding for explicit-index programs. */
   private def assembleInstructionsGas(
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt]
@@ -580,7 +611,6 @@ trait RVGenerator:
     val lines         = scala.collection.mutable.ListBuffer[String]()
 
     sortedIndices.zipWithIndex.foreach { case (i, pos) =>
-      // Insert nop padding for gaps
       if (pos == 0) for (_ <- 0 until i) lines += "    nop"
       else
         val prevIdx = sortedIndices(pos - 1)
@@ -592,26 +622,19 @@ trait RVGenerator:
     lines.toSeq
   }
 
-  /** Solve the recipe and return it formatted as GAS assembly lines (indented, newline-joined).
+  /** Solve the recipe and return it formatted as GAS assembly lines (newline-joined).
     *
-    * This is the string that replaces `{{recipe}}` inside [[template]].
+    * If the program contains directives or labels, the full statement ordering is used.
+    * Otherwise falls back to legacy NOP-padding for explicit-index programs.
     */
   def toRecipeAsm(): String = {
-    val opcodes = solveOpcodes()
-    val args    = solveArgs(opcodes)
-    assembleInstructionsGas(opcodes, args).mkString("\n")
-  }
-
-  /** Produce the final assembly file contents.
-    *
-    * If [[template]] is non-empty, `{{recipe}}` inside it is replaced with the result of [[toRecipeAsm]]. Otherwise the
-    * recipe lines are returned as-is.
-    */
-  def toAssemblyFile(): String = {
-    val recipe = toRecipeAsm()
-    val tmpl   = template()
-    if (tmpl.isEmpty) recipe
-    else tmpl.replace("{{recipe}}", recipe)
+    val (opcodes, statements) = solveOpcodes()
+    val args                  = solveArgs(opcodes)
+    val hasDirectives         = statements.exists { case _: Statement.Inst => false; case _ => true }
+    if hasDirectives then
+      assembleStatementsGas(statements, opcodes, args).mkString("\n")
+    else
+      assembleInstructionsGas(opcodes, args).mkString("\n")
   }
 
   /** Unified output API.
@@ -624,7 +647,7 @@ trait RVGenerator:
   def emit(filename: String = s"${name}_output", mode: OutputMode = AsmMode): Unit =
     mode match
       case AsmMode =>
-        val content = toAssemblyFile()
+        val content = toRecipeAsm()
         Files.write(
           Paths.get(filename),
           content.getBytes(StandardCharsets.UTF_8),
