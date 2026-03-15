@@ -9,13 +9,29 @@ import java.io.{File, FileWriter}
 
 // Register argument names (raw names from rvdecoderdb ArgLUT) that should use Register enum type
 val registerArgNames: Set[String] = Set(
-  "rd", "rs1", "rs2", "rs3", "rt",
-  "vd", "vs1", "vs2", "vs3",
-  "rd_p", "rs1_p", "rs2_p",
-  "rd_rs1", "rd_rs1_p", "rd_rs1_n0",
-  "rd_n0", "rd_n2", "rs1_n0",
-  "c_rs1_n0", "c_rs2_n0", "c_rs2",
-  "c_sreg1", "c_sreg2"
+  "rd",
+  "rs1",
+  "rs2",
+  "rs3",
+  "rt",
+  "vd",
+  "vs1",
+  "vs2",
+  "vs3",
+  "rd_p",
+  "rs1_p",
+  "rs2_p",
+  "rd_rs1",
+  "rd_rs1_p",
+  "rd_rs1_n0",
+  "rd_n0",
+  "rd_n2",
+  "rs1_n0",
+  "c_rs1_n0",
+  "c_rs2_n0",
+  "c_rs2",
+  "c_sreg1",
+  "c_sreg2"
 )
 
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateAsmApi rvprobe/src/AsmApi.scala
@@ -43,14 +59,9 @@ val registerArgNames: Set[String] = Set(
       |//
       |//  Assembly-like API for writing fixed-value constraints.
       |//
-      |//  Instead of:
-      |//    instruction(0, isAddi()) { rdEqual(1) & rs1Equal(1) & imm12Equal(1) }
-      |//  Write:
-      |//    addi(x1, x1, 1)   // → addi x1, x1, 1
-      |//
       |//  The instruction index is auto-incremented via Recipe.nextIdx().
       |//  Parameters follow the rvdecoderdb argument order for each instruction.
-      |//  Only instructions with at least one argument field are generated.
+      |//  Zero-arg instructions (ecall, mret, etc.) are also generated.
       |// =============================================================================
       |
 """.stripMargin
@@ -59,25 +70,27 @@ val registerArgNames: Set[String] = Set(
   // For each instruction, generate an assembly-like convenience function:
   //   def instrName(arg1: Int, arg2: Int, ...)(using Arena, Context, Block, Recipe): Unit =
   //     instruction(summon[Recipe].nextIdx(), isInstrName()) { arg1Equal(v1) & arg2Equal(v2) & ... }
+  //   For zero-arg instructions (ecall, mret, etc.):
+  //   def ecall()(using Arena, Context, Block, Recipe): Unit =
+  //     instruction(summon[Recipe].nextIdx(), isEcall()) { ArgConstraint(true.B) }
   getInstructions().foreach { instruction =>
-    // Skip instructions with no argument fields (e.g., ecall, ebreak)
+    val name = translateToCamelCase(instruction.name)
+
+    // Handle slli/srli/srai suffix disambiguation (same logic as UpdateRVConstraints.scala)
+    val suffix = name match {
+      case "Slli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
+      case "Srai" => instruction.instructionSet.name.replace("_", "").toUpperCase()
+      case "Srli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
+      case _      => ""
+    }
+
+    val funcName = {
+      val full = s"${name}${suffix}"
+      full.head.toLower + full.tail
+    }
+    val isFunc   = s"is${name}${suffix}"
+
     if (instruction.args.nonEmpty) {
-      val name = translateToCamelCase(instruction.name)
-
-      // Handle slli/srli/srai suffix disambiguation (same logic as UpdateRVConstraints.scala)
-      val suffix = name match {
-        case "Slli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-        case "Srai" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-        case "Srli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-        case _      => ""
-      }
-
-      val funcName = {
-        val full = s"${name}${suffix}"
-        full.head.toLower + full.tail
-      }
-      val isFunc   = s"is${name}${suffix}"
-
       // Build parameter list and constraint body from instruction args
       val params = instruction.args.map { arg =>
         val argName        = translateToCamelCase(arg.name)
@@ -95,6 +108,11 @@ val registerArgNames: Set[String] = Set(
 
       writer.write(
         s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
+      )
+    } else {
+      // Zero-arg instructions (ecall, ebreak, mret, etc.)
+      writer.write(
+        s"def $funcName()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { ArgConstraint.noArgs }\n"
       )
     }
   }
