@@ -7,6 +7,17 @@ import org.chipsalliance.rvdecoderdb.{Encoding, Instruction, InstructionSet}
 import os.Path
 import java.io.{File, FileWriter}
 
+// Register argument names (raw names from rvdecoderdb ArgLUT) that should use Register enum type
+val registerArgNames: Set[String] = Set(
+  "rd", "rs1", "rs2", "rs3", "rt",
+  "vd", "vs1", "vs2", "vs3",
+  "rd_p", "rs1_p", "rs2_p",
+  "rd_rs1", "rd_rs1_p", "rd_rs1_n0",
+  "rd_n0", "rd_n2", "rs1_n0",
+  "c_rs1_n0", "c_rs2_n0", "c_rs2",
+  "c_sreg1", "c_sreg2"
+)
+
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateAsmApi rvprobe/src/AsmApi.scala
 // make sure git repo is clear before running this script
 @main def UpdateAsmApi(outputPath: String): Unit =
@@ -17,6 +28,7 @@ import java.io.{File, FileWriter}
       |// SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
       |package me.jiuyang.rvprobe
       |
+      |import me.jiuyang.rvprobe.Register
       |import me.jiuyang.rvprobe.constraints.*
       |
       |import me.jiuyang.smtlib.default.{*, given}
@@ -34,7 +46,7 @@ import java.io.{File, FileWriter}
       |//  Instead of:
       |//    instruction(0, isAddi()) { rdEqual(1) & rs1Equal(1) & imm12Equal(1) }
       |//  Write:
-      |//    addi(1, 1, 1)   // → addi x1, x1, 1
+      |//    addi(x1, x1, 1)   // → addi x1, x1, 1
       |//
       |//  The instruction index is auto-incremented via Recipe.nextIdx().
       |//  Parameters follow the rvdecoderdb argument order for each instruction.
@@ -70,13 +82,15 @@ import java.io.{File, FileWriter}
       val params = instruction.args.map { arg =>
         val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
-        s"$argNameLowered: Int"
+        val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+        s"$argNameLowered: $tpe"
       }.mkString(", ")
 
       val constraints = instruction.args.map { arg =>
         val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
-        s"${argNameLowered}Equal($argNameLowered)"
+        val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
+        s"${argNameLowered}Equal($value)"
       }.mkString(" & ")
 
       writer.write(
