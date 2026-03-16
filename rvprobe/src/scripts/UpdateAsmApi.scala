@@ -9,13 +9,29 @@ import java.io.{File, FileWriter}
 
 // Register argument names (raw names from rvdecoderdb ArgLUT) that should use Register enum type
 val registerArgNames: Set[String] = Set(
-  "rd", "rs1", "rs2", "rs3", "rt",
-  "vd", "vs1", "vs2", "vs3",
-  "rd_p", "rs1_p", "rs2_p",
-  "rd_rs1", "rd_rs1_p", "rd_rs1_n0",
-  "rd_n0", "rd_n2", "rs1_n0",
-  "c_rs1_n0", "c_rs2_n0", "c_rs2",
-  "c_sreg1", "c_sreg2"
+  "rd",
+  "rs1",
+  "rs2",
+  "rs3",
+  "rt",
+  "vd",
+  "vs1",
+  "vs2",
+  "vs3",
+  "rd_p",
+  "rs1_p",
+  "rs2_p",
+  "rd_rs1",
+  "rd_rs1_p",
+  "rd_rs1_n0",
+  "rd_n0",
+  "rd_n2",
+  "rs1_n0",
+  "c_rs1_n0",
+  "c_rs2_n0",
+  "c_rs2",
+  "c_sreg1",
+  "c_sreg2"
 )
 
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateAsmApi rvprobe/src/AsmApi.scala
@@ -60,19 +76,8 @@ val registerArgNames: Set[String] = Set(
   getInstructions().foreach { instruction =>
     val name = translateToCamelCase(instruction.name)
 
-    // Handle slli/srli/srai suffix disambiguation (same logic as UpdateRVConstraints.scala)
-    val suffix = name match {
-      case "Slli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-      case "Srai" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-      case "Srli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-      case _      => ""
-    }
-
-    val funcName = {
-      val full = s"${name}${suffix}"
-      full.head.toLower + full.tail
-    }
-    val isFunc   = s"is${name}${suffix}"
+    val funcName = name.head.toLower + name.tail
+    val isFunc   = s"is${name}"
 
     if (instruction.args.nonEmpty) {
       // Build parameter list and constraint body from instruction args
