@@ -68,7 +68,7 @@ class RVProbeBenchmark {
 
     // Stage 1: Solve Opcodes
     val t1a     = System.nanoTime()
-    val opcodes = generator.solveOpcodes()
+    val (opcodes, _) = generator.solveOpcodes()
     val t1b     = System.nanoTime()
     val stage1Ms = (t1b - t1a).toDouble / 1e6
 
