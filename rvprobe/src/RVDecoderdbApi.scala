@@ -31,12 +31,7 @@ def getInstructions(): Seq[Instruction] =
   org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
-    .filter {
-      // special case for rv32 pseudo from rv64
-      case i if i.pseudoFrom.isDefined && Seq("slli", "srli", "srai").contains(i.name) => true
-      case i if i.pseudoFrom.isDefined                                                 => false
-      case _                                                                           => true
-    }
+    .distinctBy(_.name)
     .sortBy(i => (i.instructionSet.name, i.name))
 
 // set argLut

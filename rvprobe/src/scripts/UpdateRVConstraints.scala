@@ -23,7 +23,7 @@ import java.io.{File, FileWriter}
       |// SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
       |package me.jiuyang.rvprobe.constraints
       |
-      |import me.jiuyang.rvprobe.InstructionArgsCache
+      |import me.jiuyang.rvprobe.{InstructionArgsCache, Statement}
       |
       |import me.jiuyang.smtlib.default.{*, given}
       |import me.jiuyang.smtlib.tpe.*
@@ -130,34 +130,22 @@ import java.io.{File, FileWriter}
   // def isAdd()(using Arena, Context, Block, Index, Recipe): IsAdd = IsAdd(InstConstraint(nameId(238) & isRVI()))
   // ======================================================================================================
   getInstructions().zipWithIndex.foreach { case (instruction, idx) =>
-    // CamelCase the instruction name
     val name = translateToCamelCase(instruction.name)
+    val typeName = s"Is$name"
 
-    val suffix = name match {
-      case "Slli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-      case "Srai" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-      case "Srli" => instruction.instructionSet.name.replace("_", "").toUpperCase()
-      case _      => ""
-    }
-
-    val typeName = s"Is${name}${suffix}"
-
-    // Unique opaque type for type-safe SpecFor dispatch.
-    // Outside this file: IsXxx <: InstConstraint (subtype relationship is known).
-    // Within this file: IsXxx = InstConstraint (transparent, enabling the apply).
     writer.write(s"opaque type $typeName <: InstConstraint = InstConstraint\n")
     writer.write(s"object $typeName { def apply(r: InstConstraint): $typeName = r }\n")
 
     val sets = instruction.instructionSets
-      .map(_.name) // e.g., "rv_i", "rv_zicsr", etc.
-      .map("is" + _.replace("_", "").toUpperCase() + "()") // e.g., "isRVI()", "isRVZICSR()", etc.
+      .map(_.name)
+      .map("is" + _.replace("_", "").toUpperCase() + "()")
 
     val s =
-      if (sets.length == 1) sets.mkString(" | ") // If there's only one extension, just return join it with " | "
-      else sets.mkString("(", " | ", ")")        // If there are multiple extensions, join them with "( | )"
+      if (sets.length == 1) sets.mkString(" | ")
+      else sets.mkString("(", " | ", ")")
 
     writer.write(
-      s"def is${name}${suffix}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(InstConstraint(nameId($idx) & ${s}))\n"
+      s"def is${name}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(InstConstraint(nameId($idx) & ${s}))\n"
     )
   }
 
