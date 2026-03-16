@@ -379,6 +379,19 @@ trait RVGenerator:
     ((NOP_ENCODING >> 24) & 0xff).toByte
   )
 
+  // C.NOP instruction encoding: 0x0001
+  private val C_NOP_ENCODING: Int              = 0x0001
+  private val C_NOP_BYTES:    scala.Array[Byte] = scala.Array[Byte](
+    (C_NOP_ENCODING & 0xff).toByte,
+    ((C_NOP_ENCODING >> 8) & 0xff).toByte
+  )
+
+  /** Check if instruction is a compressed (16-bit) instruction.
+    * C extension instructions have names starting with "c." or belong to instruction sets containing "_c".
+    */
+  private def isCompressedInstruction(inst: org.chipsalliance.rvdecoderdb.Instruction): Boolean =
+    inst.name.startsWith("c.") || inst.instructionSets.exists(_.name.contains("_c"))
+
   def assembleInstructions(
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt]
@@ -435,13 +448,23 @@ trait RVGenerator:
 
       val instrString = s"$i: ${inst.name} ${args.mkString(" ")}"
 
-      val value: Long = bits.toLong & 0xffffffffL
-      val bytes = scala.Array[Byte](
-        (value & 0xff).toByte,
-        ((value >> 8) & 0xff).toByte,
-        ((value >> 16) & 0xff).toByte,
-        ((value >> 24) & 0xff).toByte
-      )
+      val isCompressed = isCompressedInstruction(inst)
+      val bytes =
+        if (isCompressed) {
+          val value: Int = bits.toInt & 0xffff
+          scala.Array[Byte](
+            (value & 0xff).toByte,
+            ((value >> 8) & 0xff).toByte
+          )
+        } else {
+          val value: Long = bits.toLong & 0xffffffffL
+          scala.Array[Byte](
+            (value & 0xff).toByte,
+            ((value >> 8) & 0xff).toByte,
+            ((value >> 16) & 0xff).toByte,
+            ((value >> 24) & 0xff).toByte
+          )
+        }
 
       result += ((bytes, instrString))
     }
