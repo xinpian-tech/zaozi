@@ -17,7 +17,7 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i, isSlliRV64I()) {
+        instruction(i, isSlli()) {
           rdRange(1, 32) & rs1Range(1, 32)
         }
       }
@@ -34,7 +34,7 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i, isSraiRV64I()) {
+        instruction(i, isSrai()) {
           rdRange(1, 32) & rs1Range(1, 32)
         }
       }
@@ -51,7 +51,7 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() =
       (0 until instructionCount).foreach { i =>
-        instruction(i, isSrliRV64I()) {
+        instruction(i, isSrli()) {
           rdRange(1, 32) & rs1Range(1, 32)
         }
       }

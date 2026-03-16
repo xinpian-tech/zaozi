@@ -3573,29 +3573,33 @@ object IsVsm3meVv { def apply(r: InstConstraint): IsVsm3meVv = r }
 def isVsm3meVv()(using Arena, Context, Block, Index, Recipe): IsVsm3meVv = IsVsm3meVv(InstConstraint(nameId(1048) & (isRVZVKSH() | isRVZVKS())))
 
 case class Recipe(val name: String)(using Arena, Context, Block) {
-  private val indices = scala.collection.mutable.Map[Int, Index]()
-  private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
-  private val crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
+  private val _indices = scala.collection.mutable.Map[Int, Index]()
+  private val _sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
+  private val _crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
+  private val _statements = scala.collection.mutable.ArrayBuffer[Statement]()
 
   // Auto-incrementing instruction index for assembly-like API
   private var _nextIdx: Int = 0
   def nextIdx(): Int = { val idx = _nextIdx; _nextIdx += 1; idx }
 
+  def addStatement(s: Statement): Unit = _statements += s
+  def allStatements(): Seq[Statement] = _statements.toSeq
+
   def addIndex(idx: Index): Index = {
     // Keep _nextIdx above any manually-added index to avoid collisions
     if (idx.idx >= _nextIdx) _nextIdx = idx.idx + 1
-    indices.getOrElseUpdate(idx.idx, idx)
+    _indices.getOrElseUpdate(idx.idx, idx)
   }
-  def getIndex(idx: Int): Index = indices(idx)
+  def getIndex(idx: Int): Index = _indices(idx)
 
-  def addSetConstraint(c: Recipe => Ref[Bool]): Unit = sets += c
-  def getSetConstraints(): Seq[Recipe => Ref[Bool]] = sets.toSeq
+  def addSetConstraint(c: Recipe => Ref[Bool]): Unit = _sets += c
+  def getSetConstraints(): Seq[Recipe => Ref[Bool]] = _sets.toSeq
 
   // Cross-index constraints (e.g., cover constraints) - executed in Stage 2
-  def addCrossIndexConstraint(c: () => Unit): Unit = crossIndexConstraints += c
-  def executeCrossIndexConstraints(): Unit = crossIndexConstraints.foreach(_())
+  def addCrossIndexConstraint(c: () => Unit): Unit = _crossIndexConstraints += c
+  def executeCrossIndexConstraints(): Unit = _crossIndexConstraints.foreach(_())
 
-  def allIndices(): Seq[Int] = indices.keys.toSeq.sorted
+  def allIndices(): Seq[Int] = _indices.keys.toSeq.sorted
 
   // Using lazy val so set variables are only created when accessed (Stage 1 only)
   lazy val rv32_c = smtValue("rv32_c", Bool)
@@ -3707,8 +3711,7 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
   lazy val rv_zvksh = smtValue("rv_zvksh", Bool)
   lazy val allSets: List[Ref[Bool]] = List(rv32_c, rv32_c_f, rv32_d_zfa, rv32_i, rv32_zbb, rv32_zbkb, rv32_zbs, rv32_zicntr, rv32_zk, rv32_zkn, rv32_zknd, rv32_zkne, rv32_zknh, rv32_zks, rv64_a, rv64_c, rv64_d, rv64_f, rv64_h, rv64_i, rv64_m, rv64_q, rv64_q_zfa, rv64_zacas, rv64_zba, rv64_zbb, rv64_zbkb, rv64_zbp, rv64_zbs, rv64_zcb, rv64_zfh, rv64_zk, rv64_zkn, rv64_zknd, rv64_zkne, rv64_zknh, rv64_zks, rv_a, rv_c, rv_c_d, rv_c_zicfiss, rv_c_zihintntl, rv_d, rv_d_zfa, rv_d_zfh, rv_f, rv_f_zfa, rv_h, rv_i, rv_m, rv_q, rv_q_zfa, rv_q_zfh, rv_s, rv_sdext, rv_smdbltrp, rv_smrnmi, rv_svinval, rv_system, rv_v, rv_v_aliases, rv_zabha, rv_zacas, rv_zalasr, rv_zawrs, rv_zba, rv_zbb, rv_zbc, rv_zbkb, rv_zbkc, rv_zbkx, rv_zbp, rv_zbs, rv_zcb, rv_zcmop, rv_zcmp, rv_zcmt, rv_zfbfmin, rv_zfh, rv_zfh_zfa, rv_zicbo, rv_zicfilp, rv_zicfiss, rv_zicntr, rv_zicond, rv_zicsr, rv_zifencei, rv_zihintntl, rv_zimop, rv_zk, rv_zkn, rv_zknh, rv_zks, rv_zksed, rv_zksh, rv_zvbb, rv_zvbc, rv_zvfbfmin, rv_zvfbfwma, rv_zvkg, rv_zvkn, rv_zvkned, rv_zvknha, rv_zvknhb, rv_zvks, rv_zvksed, rv_zvksh)
 
-
-  override def toString(): String = s"Recipe: $name\nIndices:\n${indices.values.map(_.toString).mkString("\n")}"
+  override def toString(): String = s"Recipe: $name\nIndices:\n${_indices.values.map(_.toString).mkString("\n")}"
 }
 
 case class Index(val idx: Int)(using Arena, Context, Block) {

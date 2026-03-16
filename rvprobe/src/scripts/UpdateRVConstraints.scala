@@ -155,29 +155,33 @@ import java.io.{File, FileWriter}
   // case class Recipe(val name: String)(using Arena, Context, Block)
   // ======================================================================================================
   writer.write("""case class Recipe(val name: String)(using Arena, Context, Block) {
-  private val indices = scala.collection.mutable.Map[Int, Index]()
-  private val sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
-  private val crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
+  private val _indices = scala.collection.mutable.Map[Int, Index]()
+  private val _sets = scala.collection.mutable.ListBuffer[Recipe => Ref[Bool]]()
+  private val _crossIndexConstraints = scala.collection.mutable.ListBuffer[() => Unit]()
+  private val _statements = scala.collection.mutable.ArrayBuffer[Statement]()
 
   // Auto-incrementing instruction index for assembly-like API
   private var _nextIdx: Int = 0
   def nextIdx(): Int = { val idx = _nextIdx; _nextIdx += 1; idx }
 
+  def addStatement(s: Statement): Unit = _statements += s
+  def allStatements(): Seq[Statement] = _statements.toSeq
+
   def addIndex(idx: Index): Index = {
     // Keep _nextIdx above any manually-added index to avoid collisions
     if (idx.idx >= _nextIdx) _nextIdx = idx.idx + 1
-    indices.getOrElseUpdate(idx.idx, idx)
+    _indices.getOrElseUpdate(idx.idx, idx)
   }
-  def getIndex(idx: Int): Index = indices(idx)
+  def getIndex(idx: Int): Index = _indices(idx)
 
-  def addSetConstraint(c: Recipe => Ref[Bool]): Unit = sets += c
-  def getSetConstraints(): Seq[Recipe => Ref[Bool]] = sets.toSeq
+  def addSetConstraint(c: Recipe => Ref[Bool]): Unit = _sets += c
+  def getSetConstraints(): Seq[Recipe => Ref[Bool]] = _sets.toSeq
 
   // Cross-index constraints (e.g., cover constraints) - executed in Stage 2
-  def addCrossIndexConstraint(c: () => Unit): Unit = crossIndexConstraints += c
-  def executeCrossIndexConstraints(): Unit = crossIndexConstraints.foreach(_())
+  def addCrossIndexConstraint(c: () => Unit): Unit = _crossIndexConstraints += c
+  def executeCrossIndexConstraints(): Unit = _crossIndexConstraints.foreach(_())
 
-  def allIndices(): Seq[Int] = indices.keys.toSeq.sorted
+  def allIndices(): Seq[Int] = _indices.keys.toSeq.sorted
 
   // Using lazy val so set variables are only created when accessed (Stage 1 only)
 """)
@@ -188,9 +192,7 @@ import java.io.{File, FileWriter}
 
   writer.write(s"  lazy val allSets: List[Ref[Bool]] = List(${getExtensions().mkString(", ")})\n")
 
-  writer.write("""
-
-  override def toString(): String = s"Recipe: $name\nIndices:\n${indices.values.map(_.toString).mkString("\n")}"
+  writer.write("""override def toString(): String = s"Recipe: $name\nIndices:\n${_indices.values.map(_.toString).mkString("\n")}"
 }
 
 """)

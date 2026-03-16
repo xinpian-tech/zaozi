@@ -65,8 +65,8 @@ object Program extends RVGenerator:
 
     // write satp to enable Sv39 paging
     addi(x7, x0, 8)       // li t2, 8
-    slliRV64I(x7, x7, 60) // slli t2, t2, 60
-    srliRV64I(x6, x5, 12) // srli t1, t0, 12
+    slli(x7, x7, 60) // slli t2, t2, 60
+    srli(x6, x5, 12) // srli t1, t0, 12
     or(x7, x7, x6)        // or   t2, t2, t1
     csrrw(x0, x7, 0x180)  // csrw satp, t2
     sfenceVma(x0, x0)     // sfence.vma
@@ -94,8 +94,8 @@ object Program extends RVGenerator:
     csrrs(x29, x0, 0x343) // csrr t4, mtval
 
     // extract exception code
-    slliRV64I(x30, x6, 1) // slli t5, t1, 1
-    srliRV64I(x6, x30, 1) // srli t1, t5, 1
+    slli(x30, x6, 1) // slli t5, t1, 1
+    srli(x6, x30, 1) // srli t1, t5, 1
 
     // handle ecall from S-mode
     addi(x28, x0, 9)                            // li t3, 9
