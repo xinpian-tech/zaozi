@@ -190,12 +190,7 @@ import java.io.{File, FileWriter}
     writer.write(s"  lazy val $ext = smtValue(\"$ext\", Bool)\n")
   }
 
-  writer.write(s"  lazy val allSets: List[Ref[Bool]] = List(${getExtensions().mkString(", ")})\n")
-
-  writer.write("""override def toString(): String = s"Recipe: $name\nIndices:\n${_indices.values.map(_.toString).mkString("\n")}"
-}
-
-""")
+  writer.write(s"  lazy val allSets: List[Ref[Bool]] = List(${getExtensions().mkString(", ")})\n}\n")
 
   // ======================================================================================================
   // case class Index(val idx: Int)(using Arena, Context, Block)
