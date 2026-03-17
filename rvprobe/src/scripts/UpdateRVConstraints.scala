@@ -80,7 +80,7 @@ import java.io.{File, FileWriter}
 
     val width = arg.msb - arg.lsb + 1
     // if the argument name contains "imm" (case insensitive), use signed range
-    val range = if (argName.toLowerCase.contains("imm")) {
+    val range = if (argName.toLowerCase.contains("imm") && !argName.contains("lo") && !argName.contains("hi")) {
       val min = -(1 << (width - 1))
       val max = (1 << (width - 1))
       s"($min, $max)"

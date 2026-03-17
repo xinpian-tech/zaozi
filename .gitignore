@@ -8,6 +8,7 @@
 .direnv/
 .idea/
 .opencode/
+.claude/
 .scala-build/
 __pycache__/
 .codex

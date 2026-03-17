@@ -36,6 +36,11 @@ val registerArgNames: Set[String] = Set(
 
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateAsmApi rvprobe/src/AsmApi.scala
 // make sure git repo is clear before running this script
+
+// Instructions that should NOT generate label-based overloads
+// (because rvdecoderdb defines them as pseudo-instructions with wrong args)
+val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
+
 @main def UpdateAsmApi(outputPath: String): Unit =
   val writer = new FileWriter(new File(outputPath))
 
@@ -79,6 +84,10 @@ val registerArgNames: Set[String] = Set(
     val funcName = name.head.toLower + name.tail
     val isFunc   = s"is${name}"
 
+    val argNames = instruction.args.map(_.name).toSet
+    val hasBimm  = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
+    val hasJimm  = argNames.contains("jimm20")
+
     if (instruction.args.nonEmpty) {
       // Build parameter list and constraint body from instruction args
       val params = instruction.args.map { arg =>
@@ -98,6 +107,78 @@ val registerArgNames: Set[String] = Set(
       writer.write(
         s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
       )
+
+      // Generate label-based overload for branch instructions (bimm12hi/bimm12lo)
+      if (hasBimm && !skipLabelOverload.contains(instruction.name)) {
+        val nonImmArgs = instruction.args.filter(arg => arg.name != "bimm12hi" && arg.name != "bimm12lo")
+        val nonImmParams = nonImmArgs.map { arg =>
+          val argName        = translateToCamelCase(arg.name)
+          val argNameLowered = argName.head.toLower + argName.tail
+          val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+          s"$argNameLowered: $tpe"
+        }.mkString(", ")
+        val labelParams = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
+
+        val labelConstraints = nonImmArgs.map { arg =>
+          val argName        = translateToCamelCase(arg.name)
+          val argNameLowered = argName.head.toLower + argName.tail
+          val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
+          s"${argNameLowered}Equal($value)"
+        }.mkString(" & ")
+        val fullConstraints = if (labelConstraints.isEmpty) "bimm12hiEqual(0) & bimm12loEqual(0)" else s"$labelConstraints & bimm12hiEqual(0) & bimm12loEqual(0)"
+
+        writer.write(
+          s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
+        )
+        writer.write(
+          s"  val idx = summon[Recipe].nextIdx()\n"
+        )
+        writer.write(
+          s"  instruction(idx, $isFunc()) { $fullConstraints }\n"
+        )
+        writer.write(
+          s"  labelRef(idx, target)\n"
+        )
+        writer.write(
+          s"}\n"
+        )
+      }
+
+      // Generate label-based overload for jump instructions (jimm20)
+      if (hasJimm) {
+        val nonImmArgs = instruction.args.filter(arg => arg.name != "jimm20")
+        val nonImmParams = nonImmArgs.map { arg =>
+          val argName        = translateToCamelCase(arg.name)
+          val argNameLowered = argName.head.toLower + argName.tail
+          val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+          s"$argNameLowered: $tpe"
+        }.mkString(", ")
+        val labelParams = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
+
+        val labelConstraints = nonImmArgs.map { arg =>
+          val argName        = translateToCamelCase(arg.name)
+          val argNameLowered = argName.head.toLower + argName.tail
+          val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
+          s"${argNameLowered}Equal($value)"
+        }.mkString(" & ")
+        val fullConstraints = if (labelConstraints.isEmpty) "jimm20Equal(0)" else s"$labelConstraints & jimm20Equal(0)"
+
+        writer.write(
+          s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
+        )
+        writer.write(
+          s"  val idx = summon[Recipe].nextIdx()\n"
+        )
+        writer.write(
+          s"  instruction(idx, $isFunc()) { $fullConstraints }\n"
+        )
+        writer.write(
+          s"  labelRef(idx, target)\n"
+        )
+        writer.write(
+          s"}\n"
+        )
+      }
     } else {
       // Zero-arg instructions (ecall, ebreak, mret, etc.)
       writer.write(

@@ -117,5 +117,20 @@ def align(n: Int)(using recipe: Recipe): Unit =
 def word(value: Long)(using recipe: Recipe): Unit =
   recipe.addStatement(Statement.Word(value))
 
+def dword(value: Long)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Dword(value))
+
+def zero(size: Int)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Zero(size))
+
+def balign(alignment: Int)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Balign(alignment))
+
+def pseudo(mnemonic: String, operands: String = "")(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.Pseudo(mnemonic, operands))
+
 def raw(content: String)(using recipe: Recipe): Unit =
   recipe.addStatement(Statement.Raw(content))
+
+def labelRef(idx: Int, targetLabel: String)(using recipe: Recipe): Unit =
+  recipe.addStatement(Statement.LabelRef(idx, targetLabel))

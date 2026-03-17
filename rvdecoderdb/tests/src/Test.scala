@@ -18,3 +18,4 @@ object rvdecoderdbTest extends TestSuite:
       )
       val instTable:        Iterable[rvdecoderdb.Instruction] = rvdecoderdb.instructions(riscvOpcodesPath)
       instTable.size ==> 1078
+      instTable.foreach(inst => println(inst))
