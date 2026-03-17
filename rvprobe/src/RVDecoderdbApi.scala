@@ -31,8 +31,9 @@ def getInstructions(): Seq[Instruction] =
   org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
-    .distinctBy(_.name)
     .sortBy(i => (i.instructionSet.name, i.name))
+    .reverse
+    .distinctBy(_.name)
 
 // set argLut
 def getArgLut(): Seq[(String, org.chipsalliance.rvdecoderdb.Arg)] =

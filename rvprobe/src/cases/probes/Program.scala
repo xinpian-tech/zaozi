@@ -7,93 +7,94 @@ import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
 
-// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.probes.Program
-@main def Program(outputPath: String = "out/program.S"): Unit =
+// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.probes.Program out/program.S
+@main def Program(outputPath: String): Unit =
   object Program extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVFZFA(), isRVZICSR(), isRVSYSTEM())
+    val sets = isRV64GC() ++ Seq(isRVFZFA(), isRVZICSR(), isRVSYSTEM(), isRVS())
     // TODO: need additional sets for Zfa (fround.s), Zicsr (csr*), etc.
 
     def constraints() =
-      // section(".text")
-      // global("_start")
+      section(".text")
+      global("_start")
 
-      // label("_start")
-      // raw("    la      t0, trap_handler") // pseudo: auipc + addi, references label
-      // csrrw(x0, x5, 0x305)                // csrw mtvec, t0
+      label("_start")
+      raw("    la      t0, trap_handler") // pseudo: auipc + addi, references label
+      csrrw(x0, x5, 0x305)                // csrw mtvec, t0
 
-      // csrrs(x5, x0, 0x300) // csrr t0, mstatus
-      // // li t1, 0x00003000 — expands to lui+addi or longer sequence
-      // lui(x6, 3)           // lui t1, 3 (upper 20 bits: 0x3 << 12 = 0x3000)
-      // or(x5, x5, x6)       // or  t0, t0, t1
-      // csrrw(x0, x5, 0x300) // csrw mstatus, t0
-      // csrrw(x0, x0, 0x003) // csrw fcsr, x0
-      // csrrw(x0, x0, 0x340) // csrw mscratch, x0
+      csrrs(x5, x0, 0x300) // csrr t0, mstatus
+      // li t1, 0x00003000 — expands to lui+addi or longer sequence
+      lui(x6, 3)           // lui t1, 3 (upper 20 bits: 0x3 << 12 = 0x3000)
+      or(x5, x5, x6)       // or  t0, t0, t1
+      csrrw(x0, x5, 0x300) // csrw mstatus, t0
+      csrrw(x0, x0, 0x003) // csrw fcsr, x0
+      csrrw(x0, x0, 0x340) // csrw mscratch, x0
 
-      // // PMP: NAPOT covering entire address space
-      // addi(x5, x0, -1)     // li t0, -1 (for rv64 this is pseudo, simplified here)
-      // csrrw(x0, x5, 0x3b0) // csrw pmpaddr0, t0
-      // addi(x5, x0, 0x1f)   // li t0, 0x1f
-      // csrrw(x0, x5, 0x3a0) // csrw pmpcfg0, t0
+      // PMP: NAPOT covering entire address space
+      addi(x5, x0, -1)     // li t0, -1 (for rv64 this is pseudo, simplified here)
+      csrrw(x0, x5, 0x3b0) // csrw pmpaddr0, t0
+      addi(x5, x0, 0x1f)   // li t0, 0x1f
+      csrrw(x0, x5, 0x3a0) // csrw pmpcfg0, t0
 
-      // j("user_code") // references label
+      j("user_code") // references label
 
-      // label("user_code")
-      // raw("    li x8, 0x774492720dbedb91") // pseudo: multi-instruction sequence
-      // fmvDX(x16, x8)                       // fmv.d.x f16, x8
-      // raw("    li x8, 0x271141afdb5a2f58") // pseudo: multi-instruction sequence
-      // fmvDX(x17, x8)                       // fmv.d.x f17, x8
+      label("user_code")
+      raw("    li x8, 0x774492720dbedb91") // pseudo: multi-instruction sequence
+      fmvDX(x16, x8)                       // fmv.d.x f16, x8
+      raw("    li x8, 0x271141afdb5a2f58") // pseudo: multi-instruction sequence
+      fmvDX(x17, x8)                       // fmv.d.x f17, x8
 
-      // froundS(x17, 7, x16)                // fround.s f17, f16, dyn (rm=7=dyn)
-      // jal(x1, "switch_to_s_mode") // references label
+      froundS(x17, 7, x16)                // fround.s f17, f16, dyn (rm=7=dyn)
+      jal(x1, "switch_to_s_mode") // references label
 
-      // lui(x11, 0x40000)       // li x11, 0x40000000 (0x40000 << 12)
-      // ld(x12, x11, 0)         // ld x12, 0(x11)
-      // fsubS(x16, 1, x16, x17) // fsub.s f16, f16, f17, rtz (rm=1=rtz)
-      // froundS(x17, 7, x16)    // fround.s f17, f16, dyn
+      lui(x11, 0x40000)       // li x11, 0x40000000 (0x40000 << 12)
+      ld(x12, x11, 0)         // ld x12, 0(x11)
+      fsubS(x16, 1, x16, x17) // fsub.s f16, f16, f17, rtz (rm=1=rtz)
+      froundS(x17, 7, x16)    // fround.s f17, f16, dyn
 
-      // label("exit")
-      // addi(x5, x0, 1)               // li t0, 1
-      // raw("    la      t1, tohost") // pseudo, references label
-      // sd(0, x6, x5, 0)              // sd t0, 0(x6)
-      // label("1")
-      // j("1b")         // backward reference to local label
+      label("exit")
+      addi(x5, x0, 1)               // li t0, 1
+      raw("    la      t1, tohost") // pseudo, references label
+      sd(0, x6, x5, 0)              // sd t0, 0(x6)
+      label("1")
+      j("1b")         // backward reference to local label
 
-      // align(2)
-      // label("switch_to_s_mode")
-      // // configure page table: identity map for 0x80000000 1GB region
-      // raw("    la      t0, pgtbl")                  // references label
-      // raw("    li      t1, (0x80000 << 10) | 0xCF") // complex immediate
-      // sd(16, x5, x6, 0)                             // sd t1, 16(t0)
+      align(2)
+      label("switch_to_s_mode")
 
-      // // write satp to enable Sv39 paging
-      // addi(x7, x0, 8)       // li t2, 8
-      // slli(x7, x7, 60) // slli t2, t2, 60
-      // srli(x6, x5, 12) // srli t1, t0, 12
-      // or(x7, x7, x6)        // or   t2, t2, t1
-      // csrrw(x0, x7, 0x180)  // csrw satp, t2
-      // sfenceVma(x0, x0)     // sfence.vma
+      // configure page table: identity map for 0x80000000 1GB region
+      raw("    la      t0, pgtbl")                  // references label
+      raw("    li      t1, (0x80000 << 10) | 0xCF") // complex immediate
+      sd(16, x5, x6, 0)                             // sd t1, 16(t0)
 
-      // // set MPP to S-mode (1), prepare mret
-      // raw("    li      t0, ~(3 << 11)") // complex immediate
-      // csrrs(x6, x0, 0x300)              // csrr t1, mstatus
-      // and(x6, x6, x5)                   // and  t1, t1, t0
-      // raw("    li      t2, (1 << 11)")  // complex immediate
-      // or(x6, x6, x7)                    // or   t1, t1, t2
-      // csrrw(x0, x6, 0x300)              // csrw mstatus, t1
+      // write satp to enable sv39 paging
+      addi(x7, x0, 8)       // li t2, 8
+      slli(x7, x7, 60) // slli t2, t2, 60
+      srli(x6, x5, 12) // srli t1, t0, 12
+      or(x7, x7, x6)        // or   t2, t2, t1
+      csrrw(x0, x7, 0x180)  // csrw satp, t2
+      sfenceVma(x0, x0)     // sfence.vma
 
-      // csrrw(x0, x1, 0x341) // csrw mepc, ra
-      // mret()
+      // set mpp to s-mode (1), prepare mret
+      raw("    li      t0, ~(3 << 11)") // complex immediate
+      csrrs(x6, x0, 0x300)              // csrr t1, mstatus
+      and(x6, x6, x5)                   // and  t1, t1, t0
+      raw("    li      t2, (1 << 11)")  // complex immediate
+      or(x6, x6, x7)                    // or   t1, t1, t2
+      csrrw(x0, x6, 0x300)              // csrw mstatus, t1
 
-      // align(2)
-      // label("exit_s_mode")
-      // ecall()
-      // jalr(x0, x1, 0) // ret = jalr x0, ra, 0
+      csrrw(x0, x1, 0x341) // csrw mepc, ra
+      mret()
 
-      // align(2)
-      // label("trap_handler")
-      // csrrs(x5, x0, 0x341)  // csrr t0, mepc
-      // csrrs(x6, x0, 0x342)  // csrr t1, mcause
-      // csrrs(x29, x0, 0x343) // csrr t4, mtval
+      align(2)
+      label("exit_s_mode")
+      ecall()
+      jalr(x0, x1, 0) // ret = jalr x0, ra, 0
+
+      align(2)
+      label("trap_handler")
+      csrrs(x5, x0, 0x341)  // csrr t0, mepc
+      csrrs(x6, x0, 0x342)  // csrr t1, mcause
+      csrrs(x29, x0, 0x343) // csrr t4, mtval
 
       // extract exception code
       slli(x30, x6, 1) // slli t5, t1, 1

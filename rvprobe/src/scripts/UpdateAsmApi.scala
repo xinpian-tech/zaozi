@@ -101,7 +101,7 @@ val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
         val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
         val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-        s"${argNameLowered}Equal($value)"
+        s"${argNameLowered}Equal($value) & has${argName}()"
       }.mkString(" & ")
 
       writer.write(

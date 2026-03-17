@@ -229,51 +229,17 @@ trait RVGenerator:
       // 1. Fix Opcode (this is a given, not a constraint to solve)
       smtAssert(index.nameId === opcodeId.S)
 
-      // 2. Auto-constrain Args based on instruction definition
-      val inst = instructions(opcodeId)
-      inst.args.foreach { arg =>
-        emitArgRangeConstraint(index, arg)
-      }
-
-      // 3. Apply User Arg Constraints from Index (rdRange, rs1Range, etc.)
+      // 2. Apply User Arg Constraints from Index (rdRange, rs1Range, etc.)
       val args = index.getArgConstraints().map(_(index))
       if (args.nonEmpty) {
         smtAssert(smtAnd(args*))
       }
     }
 
-    // 4. Execute cross-index constraints (cover constraints)
+    // 3. Execute cross-index constraints (cover constraints)
     recipe.executeCrossIndexConstraints()
 
     smtCheck
-  }
-
-  /** Helper: Emit range constraint for a single arg based on its bit width */
-  private def emitArgRangeConstraint(
-    index: Index,
-    arg:   org.chipsalliance.rvdecoderdb.Arg
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Unit = {
-    val fieldName        = translateToCamelCase(arg.name)
-    val fieldNameLowered = fieldName.head.toLower + fieldName.tail
-    try
-      val method     = index.getClass.getMethod(fieldNameLowered)
-      val field      = method.invoke(index).asInstanceOf[Ref[me.jiuyang.smtlib.tpe.SInt]]
-      // Note: In rvdecoderdb, msb/lsb might be swapped (msb < lsb), use absolute value
-      val width      = Math.abs(arg.msb - arg.lsb) + 1
-      val isSigned   =
-        arg.name.toLowerCase.contains("imm") || arg.name.toLowerCase.contains("offset") || arg.name == "bimm12hi"
-      val (min, max) = if isSigned then
-        val limit = BigInt(1) << (width - 1)
-        (-limit, limit)
-      else (BigInt(0), BigInt(1) << width)
-      smtAssert(field >= min.toInt.S)
-      smtAssert(field < max.toInt.S)
-    catch
-      case _: NoSuchMethodException => // Ignore if field not in Index
   }
 
   // ================== Helpers ==================
