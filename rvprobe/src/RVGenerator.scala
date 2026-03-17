@@ -596,10 +596,17 @@ trait RVGenerator:
     stmt:          Statement,
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt],
-    instructions:  Seq[org.chipsalliance.rvdecoderdb.Instruction]
+    instructions:  Seq[org.chipsalliance.rvdecoderdb.Instruction],
+    labelRefs:     Map[Int, String]
   ): String = stmt match
     case Statement.Inst(idx) =>
-      s"    ${toGasLine(idx, instructions(solvedOpcodes(idx)), solvedArgs)}"
+      val inst        = instructions(solvedOpcodes(idx))
+      val baseLine    = toGasLine(idx, inst, solvedArgs)
+      labelRefs.get(idx) match
+        case Some(target) =>
+          replaceImmWithLabel(baseLine, inst, target)
+        case None =>
+          s"    $baseLine"
     case Statement.Label(name) =>
       s"$name:"
     case Statement.Section(name, flags*) =>
@@ -611,8 +618,34 @@ trait RVGenerator:
       s"    .align $n"
     case Statement.Word(value) =>
       s"    .word 0x${value.toHexString}"
+    case Statement.Dword(value) =>
+      s"    .dword 0x${value.toHexString}"
+    case Statement.Zero(size) =>
+      s"    .zero $size"
+    case Statement.Balign(alignment) =>
+      s"    .balign $alignment"
+    case Statement.Pseudo(mnemonic, operands) =>
+      if operands.isEmpty then s"    $mnemonic" else s"    $mnemonic $operands"
     case Statement.Raw(content) =>
       content
+    case Statement.LabelRef(_, _) =>
+      ""
+
+  /** Replace immediate offset with label in GAS assembly line. */
+  private def replaceImmWithLabel(
+    line:    String,
+    inst:    org.chipsalliance.rvdecoderdb.Instruction,
+    target:  String
+  ): String =
+    val argNames = inst.args.map(_.name).toSet
+    val hasBimm  = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
+    val hasJimm  = argNames.contains("jimm20")
+    if hasBimm then
+      line.replaceFirst("""\. \+ -?\d+""", target)
+    else if hasJimm then
+      line.replaceFirst("""\. \+ -?\d+""", target)
+    else
+      s"    $line"
 
   /** Build GAS assembly lines from the ordered statement list. */
   private def assembleStatementsGas(
@@ -620,8 +653,9 @@ trait RVGenerator:
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt]
   ): Seq[String] = {
-    val instructions = getInstructions()
-    statements.map(s => statementToGas(s, solvedOpcodes, solvedArgs, instructions))
+    val instructions  = getInstructions()
+    val labelRefs     = statements.collect { case Statement.LabelRef(idx, target) => idx -> target }.toMap
+    statements.map(s => statementToGas(s, solvedOpcodes, solvedArgs, instructions, labelRefs))
   }
 
   /** Legacy: Build GAS assembly lines with NOP-padding for explicit-index programs. */

@@ -26,5 +26,20 @@ enum Statement:
   /** `.word` directive (e.g. `.word 0xdeadbeef`). */
   case Word(value: Long)
 
+  /** `.dword` / `.8byte` directive (64-bit value). */
+  case Dword(value: Long)
+
+  /** `.zero` directive (fill with N zero bytes). */
+  case Zero(size: Int)
+
+  /** `.balign` directive (byte alignment). */
+  case Balign(alignment: Int)
+
+  /** Pseudo instruction (e.g. `la`, `li`, `j`, `beqz`). */
+  case Pseudo(mnemonic: String, operands: String)
+
   /** Escape hatch for directives not yet modelled. */
   case Raw(content: String)
+
+  /** Reference to a label for branch/jump instructions (e.g. `beq x1, x2, target`). */
+  case LabelRef(idx: Int, targetLabel: String)
