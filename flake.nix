@@ -75,7 +75,11 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ nixd ];
+          nativeBuildInputs = with pkgs; [
+            nixd
+            pkgsCross.riscv64.buildPackages.gcc
+            pkgsCross.riscv64.buildPackages.binutils
+          ];
           env = with pkgs;
             {
               CIRCT_INSTALL_PATH = circt-install;

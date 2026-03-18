@@ -496,6 +496,58 @@ trait RVGenerator:
     *   - U-type : `name rd, imm`
     *   - Fallback: comma-separated args in rvdecoderdb order
     */
+  /** Reverse CSR number → name mapping for GAS output. */
+  private val csrNumberToName: Map[Int, String] = Map(
+    0x300 -> "mstatus", 0x301 -> "misa", 0x302 -> "medeleg", 0x303 -> "mideleg",
+    0x304 -> "mie", 0x305 -> "mtvec", 0x306 -> "mcounteren",
+    0x340 -> "mscratch", 0x341 -> "mepc", 0x342 -> "mcause", 0x343 -> "mtval",
+    0x344 -> "mip",
+    0x3a0 -> "pmpcfg0", 0x3a1 -> "pmpcfg1", 0x3a2 -> "pmpcfg2", 0x3a3 -> "pmpcfg3",
+    0x3b0 -> "pmpaddr0", 0x3b1 -> "pmpaddr1", 0x3b2 -> "pmpaddr2", 0x3b3 -> "pmpaddr3",
+    0xf11 -> "mvendorid", 0xf12 -> "marchid", 0xf13 -> "mimpid", 0xf14 -> "mhartid",
+    0x100 -> "sstatus", 0x104 -> "sie", 0x105 -> "stvec", 0x106 -> "scounteren",
+    0x140 -> "sscratch", 0x141 -> "sepc", 0x142 -> "scause", 0x143 -> "stval",
+    0x144 -> "sip", 0x180 -> "satp",
+    0x000 -> "ustatus", 0x001 -> "fflags", 0x002 -> "frm", 0x003 -> "fcsr",
+    0xc00 -> "cycle", 0xc01 -> "time", 0xc02 -> "instret",
+  )
+
+  /** RISC-V rounding mode number → name for GAS output. */
+  private val rmNumberToName: Map[Int, String] = Map(
+    0 -> "rne", 1 -> "rtz", 2 -> "rdn", 3 -> "rup", 4 -> "rmm", 7 -> "dyn",
+  )
+
+  /** Instruction names that use floating-point registers (rd/rs1/rs2 are FP regs). */
+  private val fpInstructionPrefixes: Set[String] = Set(
+    "fadd", "fsub", "fmul", "fdiv", "fsqrt", "fmadd", "fmsub", "fnmadd", "fnmsub",
+    "fsgnj", "fsgnjn", "fsgnjx", "fmin", "fmax", "fcvt", "fmv", "fclass",
+    "feq", "flt", "fle", "fround", "fli", "fleq", "fltq", "fminm", "fmaxm",
+    "fld", "flw", "flh", "flq", "fsd", "fsw", "fsh", "fsq",
+  )
+
+  /** Check whether a given arg is a floating-point register for this instruction. */
+  private def isFpReg(instName: String, argName: String): Boolean =
+    val baseName = instName.split('.').head.toLowerCase
+    val isFpInst = fpInstructionPrefixes.exists(p => baseName.startsWith(p))
+    if !isFpInst then return false
+    argName match
+      // For FP instructions: rd, rs1, rs2, rs3 are FP regs,
+      // EXCEPT: fcvt.*.int, fmv.x.*, fclass.* where rd is integer;
+      //         fmv.*.x, fcvt.int.* where rs1 is integer
+      case "rd" =>
+        // fmv.x.d, fmv.x.w, fclass.*, feq/flt/fle: rd is integer
+        val intRd = instName.startsWith("fmv.x.") || instName.startsWith("fclass.") ||
+          instName.startsWith("feq.") || instName.startsWith("flt.") || instName.startsWith("fle.") ||
+          instName.startsWith("fltq.") || instName.startsWith("fleq.") ||
+          (instName.startsWith("fcvt.") && (instName.contains(".w") || instName.contains(".l")) && !instName.matches("fcvt\\.[sdqh]\\..*"))
+        !intRd
+      case "rs1" =>
+        // fmv.d.x, fmv.w.x: rs1 is integer
+        val intRs1 = instName.startsWith("fmv.") && instName.endsWith(".x")
+        !intRs1
+      case "rs2" | "rs3" => true
+      case _ => false
+
   private def toGasLine(
     idx:    Int,
     inst:   org.chipsalliance.rvdecoderdb.Instruction,
@@ -506,8 +558,17 @@ trait RVGenerator:
 
     def key(n: String):    String =
       val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
-    def regVal(n: String): String = s"x${solved.getOrElse(key(n), BigInt(0))}"
+    def regVal(n: String): String =
+      val num = solved.getOrElse(key(n), BigInt(0))
+      val prefix = if isFpReg(instName, n) then "f" else "x"
+      s"$prefix$num"
     def immVal(n: String): String = solved.getOrElse(key(n), BigInt(0)).toString
+    def csrVal: String =
+      val num = solved.getOrElse(key("csr"), BigInt(0)).toInt
+      csrNumberToName.getOrElse(num, s"0x${num.toHexString}")
+    def rmVal: String =
+      val num = solved.getOrElse(key("rm"), BigInt(0)).toInt
+      rmNumberToName.getOrElse(num, num.toString)
     def argFmt(n: String): String =
       val prefix = if n.startsWith("r") then "x" else ""
       prefix + solved.getOrElse(key(n), BigInt(0)).toString
@@ -515,22 +576,31 @@ trait RVGenerator:
     val hasRd    = names("rd")
     val hasRs1   = names("rs1")
     val hasRs2   = names("rs2")
+    val hasCsr   = names("csr") || solved.contains(key("csr"))
+    val hasRm    = names("rm") || solved.contains(key("rm"))
     val hasImm12 = names("imm12")
     val hasSplit = names("imm12hi") && names("imm12lo")
     val hasBimm  = names("bimm12hi") && names("bimm12lo")
     val hasJimm  = names("jimm20")
     val hasImm20 = names("imm20")
-    val hasShamt = names("shamt") || names("shamtw")
+    val hasShamt = names("shamt") || names("shamtw") || names("shamtd")
 
-    if (!hasRd && !hasRs1 && !hasRs2)
+    if (!hasRd && !hasRs1 && !hasRs2 && hasJimm)
+      // Unconditional jump pseudo (j): jimm only, implicit rd=x0
+      s"$instName . + ${immVal("jimm20")}"
+    else if (!hasRd && !hasRs1 && !hasRs2 && !hasJimm)
       // System / fence instructions that take no register args
       instName
-    else if (hasRd && hasRs1 && hasRs2 && !hasImm12 && !hasSplit)
-      // R-type
+    else if (hasRd && hasRs1 && hasRs2 && !hasImm12 && !hasSplit && !hasRm)
+      // R-type (no rounding mode)
       s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${regVal("rs2")}"
     else if (hasRd && hasRs1 && hasShamt && !hasRs2)
       // Shift-immediate (slli / srli / srai / *w variants)
-      val sName = if names("shamt") then "shamt" else "shamtw"
+      // The rvdecoderdb arg name may differ from the AsmApi constraint key
+      // (e.g., instruction has shamtw but AsmApi writes shamtd), so try all variants
+      val shamtVariants = Seq("shamtd", "shamt", "shamtw")
+      val sName = shamtVariants.find(n => solved.contains(key(n)))
+        .getOrElse(if names("shamt") then "shamt" else if names("shamtw") then "shamtw" else "shamtd")
       s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${immVal(sName)}"
     else if (hasRd && hasRs1 && !hasRs2 && hasImm12 && isLoadInstruction(instName))
       // Load
@@ -546,12 +616,43 @@ trait RVGenerator:
       // Branch
       val imm = combineSignedImm("bimm12hi", "bimm12lo", 7, 5, idx, solved)
       s"$instName ${regVal("rs1")}, ${regVal("rs2")}, . + $imm"
+    else if (!hasRd && hasRs1 && !hasRs2 && hasBimm)
+      // Pseudo-branch (beqz/bnez): rs1 + bimm, implicit rs2=x0
+      val imm = combineSignedImm("bimm12hi", "bimm12lo", 7, 5, idx, solved)
+      s"$instName ${regVal("rs1")}, . + $imm"
     else if (hasRd && hasJimm)
       // JAL
       s"$instName ${regVal("rd")}, . + ${immVal("jimm20")}"
     else if (hasRd && hasImm20)
       // LUI / AUIPC
       s"$instName ${regVal("rd")}, ${immVal("imm20")}"
+    // === CSR instructions ===
+    else if (hasCsr && hasRd && hasRs1)
+      // csrrw rd, csr, rs1 / csrrs rd, csr, rs1 / csrrc rd, csr, rs1
+      s"$instName ${regVal("rd")}, $csrVal, ${regVal("rs1")}"
+    else if (hasCsr && !hasRd && hasRs1)
+      // csrw csr, rs1 / csrs csr, rs1 / csrc csr, rs1 (pseudo: rd=x0 implicit)
+      s"$instName $csrVal, ${regVal("rs1")}"
+    else if (hasCsr && hasRd && !hasRs1)
+      // csrr rd, csr (pseudo: rs1=x0 implicit)
+      s"$instName ${regVal("rd")}, $csrVal"
+    else if (hasCsr && names("zimm"))
+      // csrrwi/csrrsi/csrrci with zimm
+      if hasRd then s"$instName ${regVal("rd")}, $csrVal, ${immVal("zimm")}"
+      else s"$instName $csrVal, ${immVal("zimm")}"
+    // === FP instructions with rounding mode ===
+    else if (hasRm && hasRd && hasRs1 && hasRs2)
+      // fadd.s, fsub.s, fmul.s, fdiv.s etc: rd, rs1, rs2, rm
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${regVal("rs2")}, $rmVal"
+    else if (hasRm && hasRd && hasRs1 && !hasRs2)
+      // fround.s, fsqrt.s etc: rd, rs1, rm
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, $rmVal"
+    // === Simple FP two-register (fmv.d.x, fmv.x.d, fclass, etc.) ===
+    else if (hasRd && hasRs1 && !hasRs2 && !hasImm12 && !hasShamt && !hasCsr)
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}"
+    // === FP R-type without rounding mode (fsgnj, fmin, fmax, etc.) ===
+    else if (hasRd && hasRs1 && hasRs2 && !hasImm12 && !hasSplit && !hasCsr)
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${regVal("rs2")}"
     else
       // Fallback: positional args in rvdecoderdb order
       s"$instName ${inst.args.map(a => argFmt(a.name)).mkString(", ")}"
@@ -576,7 +677,13 @@ trait RVGenerator:
     case Statement.Label(name) =>
       s"$name:"
     case Statement.Section(name, flags*) =>
-      val flagStr = if flags.isEmpty then "" else s", ${flags.mkString(", ")}"
+      val flagStr =
+        if flags.isEmpty then ""
+        else
+          val parts = flags.map: f =>
+            if f.startsWith("@") || f.startsWith("\"") then f
+            else s"\"$f\""
+          s",${parts.mkString(",")}"
       s"    .section $name$flagStr"
     case Statement.Global(symbol) =>
       s"    .globl $symbol"
@@ -606,10 +713,8 @@ trait RVGenerator:
     val argNames = inst.args.map(_.name).toSet
     val hasBimm  = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
     val hasJimm  = argNames.contains("jimm20")
-    if hasBimm then
-      line.replaceFirst("""\. \+ -?\d+""", target)
-    else if hasJimm then
-      line.replaceFirst("""\. \+ -?\d+""", target)
+    if hasBimm || hasJimm then
+      s"    ${line.replaceFirst("""\. \+ -?\d+""", target)}"
     else
       s"    $line"
 

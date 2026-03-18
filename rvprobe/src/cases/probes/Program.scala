@@ -164,7 +164,7 @@ import me.jiuyang.rvprobe.constraints.{*, given}
       label("pgtbl")
       zero(4096)   // .zero not yet modeled
 
-      section(".tohost", "\"aw\"", "@progbits")
+      section(".tohost", "aw", "@progbits")
       align(6)
       global("tohost")
       global("fromhost")
