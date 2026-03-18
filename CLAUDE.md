@@ -31,7 +31,14 @@ Active development is on the **rvprobe** module (RISC-V instruction generation v
 
 ## Environment Setup
 
-**Nix (recommended):** `nix develop` or use direnv with the `.envrc`.
+This project uses **Nix Flake** for dependency management. All commands must be run within the Nix development shell using the `nix develop . -c` prefix:
+
+```bash
+nix develop . -c mill --version   # example: check mill version
+nix develop . -c mill __.compile  # example: compile everything
+```
+
+Alternatively, enter an interactive shell with `nix develop` or use direnv with the `.envrc`.
 
 **Non-nix:** Install JDK 21, mill, jextract, and set:
 - `CIRCT_INSTALL_PATH` — path to CIRCT install

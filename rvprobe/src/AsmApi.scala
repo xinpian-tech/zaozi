@@ -165,7 +165,7 @@ def fliH(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit
 def fleqH(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFleqH()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsubH(rd: Register, rm: Int, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsubH()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsqrtH(rd: Register, rm: Int, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsqrtH()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() }
-def fsh(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsh()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def fsh(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsh()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def fsgnjxH(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjxH()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsgnjnH(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjnH()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsgnjH(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjH()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
@@ -694,7 +694,7 @@ def fliQ(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit
 def fleqQ(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFleqQ()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsubQ(rd: Register, rm: Int, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsubQ()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsqrtQ(rd: Register, rm: Int, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsqrtQ()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() }
-def fsq(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsq()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def fsq(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsq()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def fsgnjxQ(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjxQ()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsgnjnQ(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjnQ()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsgnjQ(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjQ()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
@@ -734,7 +734,7 @@ def div(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block,
 def zextB(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isZextB()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() }
 def xori(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isXori()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & imm12Equal(imm12) & hasImm12() }
 def xor(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isXor()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
-def sw(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSw()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def sw(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSw()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def sub(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSub()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def srl(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSrl()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def sra(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSra()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
@@ -745,12 +745,12 @@ def sltiu(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, 
 def slti(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSlti()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & imm12Equal(imm12) & hasImm12() }
 def slt(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSlt()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def sll(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSll()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
-def sh(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSh()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def sh(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSh()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def sgtz(rd: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSgtz()) { rdEqual(rd.ordinal) & hasRd() & rs2Equal(rs2.ordinal) & hasRs2() }
 def seqz(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSeqz()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() }
 def scall()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isScall()) { ArgConstraint.noArgs }
 def sbreak()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSbreak()) { ArgConstraint.noArgs }
-def sb(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSb()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def sb(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSb()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def ret()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isRet()) { ArgConstraint.noArgs }
 def pause()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isPause()) { ArgConstraint.noArgs }
 def ori(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isOri()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & imm12Equal(imm12) & hasImm12() }
@@ -782,97 +782,97 @@ def fenceTso(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): 
 def fence(rd: Register, rs1: Register, succ: Int, pred: Int, fm: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFence()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & succEqual(succ) & hasSucc() & predEqual(pred) & hasPred() & fmEqual(fm) & hasFm() }
 def ecall()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isEcall()) { ArgConstraint.noArgs }
 def ebreak()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isEbreak()) { ArgConstraint.noArgs }
-def bnez(bimm12lo: Int, rs1: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBnez()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bnez(rs1: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBnez()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bnez(rs1: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBnez()) { rs1Equal(rs1.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bne(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBne()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bne(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBne()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bne(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBne()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bltz(bimm12lo: Int, rs1: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBltz()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bltz(rs1: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBltz()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bltz(rs1: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBltz()) { rs1Equal(rs1.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bltu(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBltu()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bltu(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBltu()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bltu(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBltu()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def blt(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBlt()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def blt(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBlt()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def blt(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBlt()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def blez(bimm12lo: Int, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBlez()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def blez(rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBlez()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def blez(rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBlez()) { rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bleu(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBleu()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bleu(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBleu()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bleu(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBleu()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def ble(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBle()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def ble(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBle()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def ble(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBle()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bgtz(bimm12lo: Int, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgtz()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bgtz(rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgtz()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bgtz(rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBgtz()) { rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bgtu(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgtu()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bgtu(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgtu()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bgtu(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBgtu()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bgt(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgt()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bgt(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgt()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bgt(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBgt()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bgez(bimm12lo: Int, rs1: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgez()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bgez(rs1: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgez()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bgez(rs1: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBgez()) { rs1Equal(rs1.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bgeu(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgeu()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bgeu(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBgeu()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bgeu(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBgeu()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def bge(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBge()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def bge(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBge()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def bge(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBge()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def beqz(bimm12lo: Int, rs1: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBeqz()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def beqz(rs1: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBeqz()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def beqz(rs1: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBeqz()) { rs1Equal(rs1.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
   labelRef(idx, target)
 }
-def beq(bimm12lo: Int, rs1: Register, rs2: Register, bimm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBeq()) { bimm12loEqual(bimm12lo) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(bimm12hi) & hasBimm12hi() }
+def beq(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isBeq()) { bimm12loEqual(offset & 31) & hasBimm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & bimm12hiEqual(offset >> 5) & hasBimm12hi() }
 def beq(rs1: Register, rs2: Register, target: String)(using Arena, Context, Block, Recipe): Unit = {
   val idx = summon[Recipe].nextIdx()
   instruction(idx, isBeq()) { rs1Equal(rs1.ordinal) & rs2Equal(rs2.ordinal) & bimm12hiEqual(0) & bimm12loEqual(0) }
@@ -902,7 +902,7 @@ def fmaxmS(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Blo
 def fltqS(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFltqS()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fliS(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFliS()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() }
 def fleqS(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFleqS()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
-def fsw(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsw()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def fsw(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsw()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def fsubS(rd: Register, rm: Int, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsubS()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsrmi(rd: Register, zimm: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsrmi()) { rdEqual(rd.ordinal) & hasRd() & zimmEqual(zimm) & hasZimm() }
 def fsrm(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsrm()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() }
@@ -956,7 +956,7 @@ def fsqrtD(rd: Register, rm: Int, rs1: Register)(using Arena, Context, Block, Re
 def fsgnjxD(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjxD()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsgnjnD(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjnD()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
 def fsgnjD(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsgnjD()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
-def fsd(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsd()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def fsd(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFsd()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def fnmsubD(rd: Register, rm: Int, rs1: Register, rs2: Register, rs3: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFnmsubD()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & rs3Equal(rs3.ordinal) & hasRs3() }
 def fnmaddD(rd: Register, rm: Int, rs1: Register, rs2: Register, rs3: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFnmaddD()) { rdEqual(rd.ordinal) & hasRd() & rmEqual(rm) & hasRm() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & rs3Equal(rs3.ordinal) & hasRs3() }
 def fnegD(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isFnegD()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
@@ -1087,7 +1087,7 @@ def sllw(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block
 def slliw(rd: Register, rs1: Register, shamtw: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSlliw()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & shamtwEqual(shamtw) & hasShamtw() }
 def slli(rd: Register, rs1: Register, shamtd: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSlli()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & shamtdEqual(shamtd) & hasShamtd() }
 def sextW(rd: Register, rs1: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSextW()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() }
-def sd(imm12lo: Int, rs1: Register, rs2: Register, imm12hi: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSd()) { imm12loEqual(imm12lo) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(imm12hi) & hasImm12hi() }
+def sd(rs1: Register, rs2: Register, offset: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isSd()) { imm12loEqual(offset & 31) & hasImm12lo() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() & imm12hiEqual(offset >> 5) & hasImm12hi() }
 def lwu(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isLwu()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & imm12Equal(imm12) & hasImm12() }
 def ld(rd: Register, rs1: Register, imm12: Int)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isLd()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & imm12Equal(imm12) & hasImm12() }
 def addw(rd: Register, rs1: Register, rs2: Register)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), isAddw()) { rdEqual(rd.ordinal) & hasRd() & rs1Equal(rs1.ordinal) & hasRs1() & rs2Equal(rs2.ordinal) & hasRs2() }
