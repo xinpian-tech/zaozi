@@ -41,6 +41,20 @@ val registerArgNames: Set[String] = Set(
 // (because rvdecoderdb defines them as pseudo-instructions with wrong args)
 val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
 
+// Immediate merge rules: when an instruction has both hiField and loField,
+// they are merged into a single semantic parameter in the generated API.
+// The constraint body splits the merged value back into hi/lo parts.
+case class ImmMergeRule(hiField: String, loField: String, mergedName: String, hiWidth: Int, loWidth: Int)
+
+val immMergeRules: Seq[ImmMergeRule] = Seq(
+  ImmMergeRule(hiField = "imm12hi",  loField = "imm12lo",  mergedName = "offset",  hiWidth = 7, loWidth = 5),
+  ImmMergeRule(hiField = "bimm12hi", loField = "bimm12lo", mergedName = "offset",  hiWidth = 7, loWidth = 5)
+)
+
+// Find applicable merge rule for an instruction's arg set
+def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
+  immMergeRules.find(r => argNames.contains(r.hiField) && argNames.contains(r.loField))
+
 @main def UpdateAsmApi(outputPath: String): Unit =
   val writer = new FileWriter(new File(outputPath))
 
@@ -65,7 +79,8 @@ val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
       |//  Assembly-like API for writing fixed-value constraints.
       |//
       |//  The instruction index is auto-incremented via Recipe.nextIdx().
-      |//  Parameters follow the rvdecoderdb argument order for each instruction.
+      |//  Split immediates (imm12hi/lo, bimm12hi/lo) are merged into a single
+      |//  semantic parameter (offset) matching GAS syntax conventions.
       |//  Zero-arg instructions (ecall, mret, etc.) are also generated.
       |// =============================================================================
       |
@@ -84,25 +99,50 @@ val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
     val funcName = name.head.toLower + name.tail
     val isFunc   = s"is${name}"
 
-    val argNames = instruction.args.map(_.name).toSet
-    val hasBimm  = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
-    val hasJimm  = argNames.contains("jimm20")
+    val argNames  = instruction.args.map(_.name).toSet
+    val mergeRule = findMergeRule(argNames)
+    val hasBimm   = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
+    val hasJimm   = argNames.contains("jimm20")
 
     if (instruction.args.nonEmpty) {
-      // Build parameter list and constraint body from instruction args
-      val params = instruction.args.map { arg =>
+      // Filter out fields that will be merged, collect non-merged args
+      val mergedFields = mergeRule.map(r => Set(r.hiField, r.loField)).getOrElse(Set.empty)
+      val nonMergedArgs = instruction.args.filterNot(a => mergedFields.contains(a.name))
+
+      // Build parameter list: non-merged args + merged parameter (if any)
+      val nonMergedParams = nonMergedArgs.map { arg =>
         val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
         val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
         s"$argNameLowered: $tpe"
-      }.mkString(", ")
+      }
+      val params = mergeRule match {
+        case Some(rule) => (nonMergedParams :+ s"${rule.mergedName}: Int").mkString(", ")
+        case None       => nonMergedParams.mkString(", ")
+      }
 
-      val constraints = instruction.args.map { arg =>
+      // Build constraint body: non-merged arg constraints + split constraints for merged imm
+      val nonMergedConstraints = nonMergedArgs.map { arg =>
         val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
         val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
         s"${argNameLowered}Equal($value) & has${argName}()"
-      }.mkString(" & ")
+      }
+      val constraints = mergeRule match {
+        case Some(rule) =>
+          val hiCamel    = translateToCamelCase(rule.hiField)
+          val hiLowered  = hiCamel.head.toLower + hiCamel.tail
+          val loCamel    = translateToCamelCase(rule.loField)
+          val loLowered  = loCamel.head.toLower + loCamel.tail
+          val loMask     = (1 << rule.loWidth) - 1
+          val splitParts = Seq(
+            s"${hiLowered}Equal(${rule.mergedName} >> ${rule.loWidth}) & has${hiCamel}()",
+            s"${loLowered}Equal(${rule.mergedName} & $loMask) & has${loCamel}()"
+          )
+          (nonMergedConstraints ++ splitParts).mkString(" & ")
+        case None =>
+          nonMergedConstraints.mkString(" & ")
+      }
 
       writer.write(
         s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
@@ -110,8 +150,9 @@ val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
 
       // Generate label-based overload for branch instructions (bimm12hi/bimm12lo)
       if (hasBimm && !skipLabelOverload.contains(instruction.name)) {
-        val nonImmArgs = instruction.args.filter(arg => arg.name != "bimm12hi" && arg.name != "bimm12lo")
-        val nonImmParams = nonImmArgs.map { arg =>
+        // With merged imm, non-imm args are already in nonMergedArgs (since bimm fields are merged)
+        val labelNonImmArgs = nonMergedArgs
+        val nonImmParams = labelNonImmArgs.map { arg =>
           val argName        = translateToCamelCase(arg.name)
           val argNameLowered = argName.head.toLower + argName.tail
           val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
@@ -119,7 +160,7 @@ val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
         }.mkString(", ")
         val labelParams = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
 
-        val labelConstraints = nonImmArgs.map { arg =>
+        val labelConstraints = labelNonImmArgs.map { arg =>
           val argName        = translateToCamelCase(arg.name)
           val argNameLowered = argName.head.toLower + argName.tail
           val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
