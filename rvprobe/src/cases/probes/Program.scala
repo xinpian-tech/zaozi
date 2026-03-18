@@ -54,7 +54,7 @@ import me.jiuyang.rvprobe.constraints.{*, given}
       label("exit")
       addi(x5, x0, 1)               // li t0, 1
       raw("    la      t1, tohost") // pseudo, references label
-      sd(0, x6, x5, 0)              // sd t0, 0(x6)
+      sd(x6, x5, 0)                 // sd t0, 0(x6)
       label("1")
       j("1b")         // backward reference to local label
 
@@ -64,7 +64,7 @@ import me.jiuyang.rvprobe.constraints.{*, given}
       // configure page table: identity map for 0x80000000 1GB region
       raw("    la      t0, pgtbl")                  // references label
       raw("    li      t1, (0x80000 << 10) | 0xCF") // complex immediate
-      sd(16, x5, x6, 0)                             // sd t1, 16(t0)
+      sd(x5, x6, 16)                                 // sd t1, 16(t0)
 
       // write satp to enable sv39 paging
       addi(x7, x0, 8)       // li t2, 8
