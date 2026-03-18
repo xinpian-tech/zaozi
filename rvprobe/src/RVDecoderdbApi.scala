@@ -21,6 +21,12 @@ object InstructionArgsCache {
   def hasRs2(opcodeId: Int): Boolean = hasArg(opcodeId, "rs2")
 }
 
+// Filter out instructions whose names end with ISA-variant suffixes (e.g. "_rv32").
+// These are architecture-width-specific duplicates of instructions that already
+// exist without the suffix.
+private val isaSuffixPattern = """[._]rv\d+$""".r
+private def isIsaSuffixedName(name: String): Boolean = isaSuffixPattern.findFirstIn(name).isDefined
+
 // A merged view of instructions with OR'd sets.
 case class MergedInstructionVariant(
   name:  String,
@@ -40,6 +46,7 @@ def getInstructions(): Seq[Instruction] =
   org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
+    .filterNot(i => isIsaSuffixedName(i.name))
     .groupBy(_.name)
     .toSeq
     .sortBy(_._1)
@@ -58,6 +65,7 @@ def getMergedInstructions(): Seq[MergedInstructionVariant] =
   val all = org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
+    .filterNot(i => isIsaSuffixedName(i.name))
 
   all
     .groupBy(_.name)
@@ -85,6 +93,7 @@ def getAllMergedVariants(): Seq[MergedInstructionVariant] =
   val all = org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
+    .filterNot(i => isIsaSuffixedName(i.name))
 
   // Group by name, then within each name group, sub-group by arg names
   all
@@ -129,6 +138,7 @@ def getExtensions(): Seq[String] =
   org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
+    .filterNot(i => isIsaSuffixedName(i.name))
     .map(_.instructionSets)
     .flatMap(_.map(_.name))
     .distinct
