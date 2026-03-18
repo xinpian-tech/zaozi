@@ -35,12 +35,15 @@ def getInstructions(): Seq[Instruction] =
       throw new RuntimeException("Environment variable RISCV_OPCODES_INSTALL_PATH not set")
     )
   )
+  // Must use the same ordering as getMergedInstructions() so that
+  // nameId indices from constraint solving map to the correct instruction.
   org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
-    .sortBy(i => (i.instructionSet.name, i.name))
-    .reverse
-    .distinctBy(_.name)
+    .groupBy(_.name)
+    .toSeq
+    .sortBy(_._1)
+    .map(_._2.maxBy(_.args.size))
 
 // Returns one entry per unique instruction name with sets merged.
 // Picks the variant with the most args as representative.
