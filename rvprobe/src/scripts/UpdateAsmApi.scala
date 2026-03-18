@@ -93,21 +93,28 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
   //   For zero-arg instructions (ecall, mret, etc.):
   //   def ecall()(using Arena, Context, Block, Recipe): Unit =
   //     instruction(summon[Recipe].nextIdx(), isEcall()) { ArgConstraint(true.B) }
-  getInstructions().foreach { instruction =>
-    val name = translateToCamelCase(instruction.name)
+  // Uses getAllMergedVariants() to generate all arg variants as Scala overloads.
+  // Same name + different args → separate overloaded methods (e.g. jal with/without rd).
+  // All variants call the same isXxx() constraint.
+  // Variants whose Scala parameter signatures collide (e.g. shamtd vs shamtw, both Int)
+  // are deduplicated — only the first variant is kept.
+  val emittedSignatures = scala.collection.mutable.Set[(String, String)]() // (funcName, paramTypes)
+
+  getAllMergedVariants().foreach { variant =>
+    val name = translateToCamelCase(variant.name)
 
     val funcName = name.head.toLower + name.tail
     val isFunc   = s"is${name}"
 
-    val argNames  = instruction.args.map(_.name).toSet
+    val argNames  = variant.args.map(_.name).toSet
     val mergeRule = findMergeRule(argNames)
     val hasBimm   = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
     val hasJimm   = argNames.contains("jimm20")
 
-    if (instruction.args.nonEmpty) {
+    if (variant.args.nonEmpty) {
       // Filter out fields that will be merged, collect non-merged args
       val mergedFields = mergeRule.map(r => Set(r.hiField, r.loField)).getOrElse(Set.empty)
-      val nonMergedArgs = instruction.args.filterNot(a => mergedFields.contains(a.name))
+      val nonMergedArgs = variant.args.filterNot(a => mergedFields.contains(a.name))
 
       // Build parameter list: non-merged args + merged parameter (if any)
       val nonMergedParams = nonMergedArgs.map { arg =>
@@ -120,6 +127,23 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         case Some(rule) => (nonMergedParams :+ s"${rule.mergedName}: Int").mkString(", ")
         case None       => nonMergedParams.mkString(", ")
       }
+
+      // Compute Scala type signature for dedup (e.g. "Register,Register,Int")
+      val paramTypes = {
+        val nonMergedTypes = nonMergedArgs.map { arg =>
+          if registerArgNames.contains(arg.name) then "Register" else "Int"
+        }
+        mergeRule match {
+          case Some(_) => nonMergedTypes :+ "Int"
+          case None    => nonMergedTypes
+        }
+      }.mkString(",")
+
+      val sig = (funcName, paramTypes)
+      if (emittedSignatures.contains(sig)) {
+        // Skip: another variant with the same Scala signature was already emitted
+      } else {
+        emittedSignatures += sig
 
       // Build constraint body: non-merged arg constraints + split constraints for merged imm
       val nonMergedConstraints = nonMergedArgs.map { arg =>
@@ -149,8 +173,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
       )
 
       // Generate label-based overload for branch instructions (bimm12hi/bimm12lo)
-      if (hasBimm && !skipLabelOverload.contains(instruction.name)) {
-        // With merged imm, non-imm args are already in nonMergedArgs (since bimm fields are merged)
+      if (hasBimm && !skipLabelOverload.contains(variant.name)) {
         val labelNonImmArgs = nonMergedArgs
         val nonImmParams = labelNonImmArgs.map { arg =>
           val argName        = translateToCamelCase(arg.name)
@@ -187,7 +210,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
 
       // Generate label-based overload for jump instructions (jimm20)
       if (hasJimm) {
-        val nonImmArgs = instruction.args.filter(arg => arg.name != "jimm20")
+        val nonImmArgs = variant.args.filter(arg => arg.name != "jimm20")
         val nonImmParams = nonImmArgs.map { arg =>
           val argName        = translateToCamelCase(arg.name)
           val argNameLowered = argName.head.toLower + argName.tail
@@ -220,6 +243,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
           s"}\n"
         )
       }
+      } // end if !emittedSignatures.contains(sig)
     } else {
       // Zero-arg instructions (ecall, ebreak, mret, etc.)
       writer.write(

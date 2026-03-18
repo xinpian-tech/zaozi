@@ -7,9 +7,9 @@ import os.Path
 object InstructionArgsCache {
   // Lazy initialization: only load instructions once when first accessed
   private lazy val instructionArgsMap: Map[Int, Set[String]] = {
-    val instructions = me.jiuyang.rvprobe.getInstructions()
-    instructions.zipWithIndex.map { case (instr, idx) =>
-      idx -> instr.args.map(_.name).toSet
+    val merged = me.jiuyang.rvprobe.getMergedInstructions()
+    merged.zipWithIndex.map { case (variant, idx) =>
+      idx -> variant.args.map(_.name).toSet
     }.toMap
   }
 
@@ -20,6 +20,13 @@ object InstructionArgsCache {
   def hasRs1(opcodeId: Int): Boolean = hasArg(opcodeId, "rs1")
   def hasRs2(opcodeId: Int): Boolean = hasArg(opcodeId, "rs2")
 }
+
+// A merged view of instructions with OR'd sets.
+case class MergedInstructionVariant(
+  name:  String,
+  args:  Seq[org.chipsalliance.rvdecoderdb.Arg],
+  sets:  Seq[InstructionSet]
+)
 
 def getInstructions(): Seq[Instruction] =
   val riscvOpcodesPath: Path = Path(
@@ -34,6 +41,67 @@ def getInstructions(): Seq[Instruction] =
     .sortBy(i => (i.instructionSet.name, i.name))
     .reverse
     .distinctBy(_.name)
+
+// Returns one entry per unique instruction name with sets merged.
+// Picks the variant with the most args as representative.
+// Used for nameId assignment (RVConstraints) and InstructionArgsCache.
+def getMergedInstructions(): Seq[MergedInstructionVariant] =
+  val riscvOpcodesPath: Path = Path(
+    sys.env.getOrElse(
+      "RISCV_OPCODES_INSTALL_PATH",
+      throw new RuntimeException("Environment variable RISCV_OPCODES_INSTALL_PATH not set")
+    )
+  )
+  val all = org.chipsalliance.rvdecoderdb
+    .instructions(riscvOpcodesPath)
+    .toSeq
+
+  all
+    .groupBy(_.name)
+    .toSeq
+    .sortBy(_._1)
+    .map { case (name, instrs) =>
+      val representative = instrs.maxBy(_.args.size)
+      MergedInstructionVariant(
+        name = name,
+        args = representative.args,
+        sets = instrs.flatMap(_.instructionSets).distinctBy(_.name)
+      )
+    }
+
+// Returns all unique (name, args) variants with sets merged.
+// Same name + different args → separate variants (pseudo-instruction overloads).
+// Used by UpdateAsmApi to generate overloaded methods.
+def getAllMergedVariants(): Seq[MergedInstructionVariant] =
+  val riscvOpcodesPath: Path = Path(
+    sys.env.getOrElse(
+      "RISCV_OPCODES_INSTALL_PATH",
+      throw new RuntimeException("Environment variable RISCV_OPCODES_INSTALL_PATH not set")
+    )
+  )
+  val all = org.chipsalliance.rvdecoderdb
+    .instructions(riscvOpcodesPath)
+    .toSeq
+
+  // Group by name, then within each name group, sub-group by arg names
+  all
+    .groupBy(_.name)
+    .toSeq
+    .sortBy(_._1)
+    .flatMap { case (name, instrs) =>
+      // Sub-group by arg signature (list of arg names, order-sensitive)
+      instrs
+        .groupBy(_.args.map(_.name).toList)
+        .toSeq
+        .sortBy(_._1.mkString(","))
+        .map { case (_, variants) =>
+          MergedInstructionVariant(
+            name = name,
+            args = variants.head.args,
+            sets = variants.flatMap(_.instructionSets).distinctBy(_.name)
+          )
+        }
+    }
 
 // set argLut
 def getArgLut(): Seq[(String, org.chipsalliance.rvdecoderdb.Arg)] =
