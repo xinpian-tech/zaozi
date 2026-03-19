@@ -116,6 +116,7 @@ cases/
 
 | 日期 | 内容 |
 |------|------|
+| 2026-03-19 | AsmApi 返回 Int idx 支持 CoverApi；提取 CoverageLib 重构覆盖率测试 |
 | 2026-03-19 | 新建 cases/coverage/ 目录，迁移 RV32I，添加 RV64I/RVM/RVLoadStore 覆盖率测试 |
 | 2026-03-19 | 添加 23 个特权模式测试探针（PMP + 虚拟内存），提取 PrivilegeProbeLib，重构 Program.scala |
 | 2026-03-19 | 添加 `li(Long)`/`la(String)` 伪指令到 Api.scala，消除所有 `raw()` 的 li/la 调用 |

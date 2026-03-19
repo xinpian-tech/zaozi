@@ -27,7 +27,7 @@ def instruction[T <: InstConstraint](
 )(
   using sf:    SpecFor[T]
 )(params:      Index ?=> ArgConstraint
-): Unit = {
+): Int = {
   val index = recipe.addIndex(
     new Index(idx)(
       using arena,
@@ -58,6 +58,7 @@ def instruction[T <: InstConstraint](
       case Some(specConstraint) => (userConstraint & specConstraint).toRef
       case None                 => userConstraint.toRef
   }
+  idx
 }
 
 // get an instruction with given index
