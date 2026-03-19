@@ -16,8 +16,15 @@ import java.io.{File, FileWriter}
 // Opaque types to keep for SpecFor type class instances.
 // All other instruction types use InstConstraint directly.
 val keepOpaqueTypes: Set[String] = Set(
-  "IsFence", "IsCAddi4spn", "IsCLui", "IsCAddi", "IsCAddiw",
-  "IsCAddi16sp", "IsCSlli", "IsCLdsp", "IsCLwsp"
+  "IsFence",
+  "IsCAddi4spn",
+  "IsCLui",
+  "IsCAddi",
+  "IsCAddiw",
+  "IsCAddi16sp",
+  "IsCSlli",
+  "IsCLdsp",
+  "IsCLwsp"
 )
 
 val header: String =
@@ -184,11 +191,11 @@ val header: String =
   val merged = getMergedInstructions().zipWithIndex
 
   merged.foreach { case (variant, nameIdIdx) =>
-    val name = translateToCamelCase(variant.name)
+    val name     = translateToCamelCase(variant.name)
     val typeName = s"Is$name"
 
     val setsExprParts = variant.sets.map(s => "is" + s.name.replace("_", "").toUpperCase() + "()")
-    val setsExpr =
+    val setsExpr      =
       if (setsExprParts.length == 1) setsExprParts.head
       else setsExprParts.mkString("(", " | ", ")")
 

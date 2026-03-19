@@ -17,17 +17,24 @@ import java.lang.foreign.Arena
 // SpecFor[T]; if no explicit given exists, the low-priority noSpec instance
 // is used and no additional constraint is injected.
 def instruction[T <: InstConstraint](
-  idx:    Int,
-  opcode: Index ?=> T
+  idx:         Int,
+  opcode:      Index ?=> T
 )(
   using arena: Arena,
-  context: Context,
-  block: Block,
-  recipe: Recipe
-)(using sf: SpecFor[T]
-)(params: Index ?=> ArgConstraint
+  context:     Context,
+  block:       Block,
+  recipe:      Recipe
+)(
+  using sf:    SpecFor[T]
+)(params:      Index ?=> ArgConstraint
 ): Unit = {
-  val index = recipe.addIndex(new Index(idx)(using arena, context, block))
+  val index = recipe.addIndex(
+    new Index(idx)(
+      using arena,
+      context,
+      block
+    )
+  )
   recipe.addStatement(Statement.Inst(idx))
 
   // Register constraints to Index itself
@@ -37,10 +44,17 @@ def instruction[T <: InstConstraint](
     ).toRef
   )
   index.addArgConstraint { (i: Index) =>
-    val userConstraint = params(using i)
+    val userConstraint = params(
+      using i
+    )
     // Merge spec-mandated constraints (if any) with the user-provided constraints.
     // Both are AND'd so both must be satisfied simultaneously.
-    sf.spec(using arena, context, block, i) match
+    sf.spec(
+      using arena,
+      context,
+      block,
+      i
+    ) match
       case Some(specConstraint) => (userConstraint & specConstraint).toRef
       case None                 => userConstraint.toRef
   }
@@ -102,35 +116,91 @@ def isRV64GC(
 
 // ================== Assembly Directive & Label DSL ==================
 
-def label(name: String)(using recipe: Recipe): Unit =
+def label(
+  name:         String
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Label(name))
 
-def section(name: String, flags: String*)(using recipe: Recipe): Unit =
+def label(
+  name:         String
+)(body:         => Unit
+)(
+  using recipe: Recipe
+): Unit =
+  recipe.addStatement(Statement.Label(name))
+  body
+
+def section(
+  name:         String,
+  flags:        String*
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Section(name, flags*))
 
-def global(symbol: String)(using recipe: Recipe): Unit =
+def global(
+  symbol:       String
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Global(symbol))
 
-def align(n: Int)(using recipe: Recipe): Unit =
+def align(
+  n:            Int
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Align(n))
 
-def word(value: Long)(using recipe: Recipe): Unit =
+def word(
+  value:        Long
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Word(value))
 
-def dword(value: Long)(using recipe: Recipe): Unit =
+def dword(
+  value:        Long
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Dword(value))
 
-def zero(size: Int)(using recipe: Recipe): Unit =
+def zero(
+  size:         Int
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Zero(size))
 
-def balign(alignment: Int)(using recipe: Recipe): Unit =
+def balign(
+  alignment:    Int
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Balign(alignment))
 
-def pseudo(mnemonic: String, operands: String = "")(using recipe: Recipe): Unit =
+def pseudo(
+  mnemonic:     String,
+  operands:     String = ""
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Pseudo(mnemonic, operands))
 
-def raw(content: String)(using recipe: Recipe): Unit =
+def raw(
+  content:      String
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.Raw(content))
 
-def labelRef(idx: Int, targetLabel: String)(using recipe: Recipe): Unit =
+def labelRef(
+  idx:          Int,
+  targetLabel:  String
+)(
+  using recipe: Recipe
+): Unit =
   recipe.addStatement(Statement.LabelRef(idx, targetLabel))

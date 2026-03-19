@@ -5,7 +5,7 @@ package me.jiuyang.rvprobe.constraints
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Operation, Type, Value, given}
-import org.llvm.mlir.scalalib.dialect.smt.operation.{given_NotApi, NotApi, given_BoolConstantApi, BoolConstantApi}
+import org.llvm.mlir.scalalib.dialect.smt.operation.{given_BoolConstantApi, given_NotApi, BoolConstantApi, NotApi}
 
 import java.lang.foreign.Arena
 import scala.annotation.targetName
@@ -40,13 +40,16 @@ object ArgConstraint:
   def apply(ref: Ref[Bool]): ArgConstraint = ref
 
   /** Trivially-true constraint for zero-arg instructions. */
-  def noArgs(using Arena, Context, Block): ArgConstraint =
+  def noArgs(
+    using Arena,
+    Context,
+    Block
+  ): ArgConstraint =
     val c = summon[BoolConstantApi].op(true, summon[LocationApi].locationUnknownGet)
     c.operation.appendToBlock()
     ArgConstraint(new Ref[Bool]:
       val _tpe: Bool = new Object with Bool
-      val _operation = c.operation
-    )
+      val _operation = c.operation)
 
 // Extension methods at package level to ensure they are picked up
 extension (self: Constraint)
@@ -226,10 +229,20 @@ extension (self: ArgConstraint)
 // SpecFor[T] — typeclass that associates spec-mandated arg constraints with a
 // specific instruction opaque type T (e.g. IsFence, IsAddi, …).
 trait SpecFor[T <: InstConstraint]:
-  def spec(using Arena, Context, Block, Index): Option[ArgConstraint]
+  def spec(
+    using Arena,
+    Context,
+    Block,
+    Index
+  ): Option[ArgConstraint]
 
 // When no explicit given is provided for a type T, the low-priority
 // `noSpec` instance is used and no additional constraint is injected.
 object SpecFor:
   given noSpec[T <: InstConstraint]: SpecFor[T] with
-    def spec(using Arena, Context, Block, Index): Option[ArgConstraint] = None
+    def spec(
+      using Arena,
+      Context,
+      Block,
+      Index
+    ): Option[ArgConstraint] = None
