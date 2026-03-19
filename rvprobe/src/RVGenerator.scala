@@ -49,6 +49,7 @@ trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
   val sets: Seq[Recipe ?=> SetConstraint] // should be implemented by subclass
   val name: String = this.getClass.getSimpleName
+  val seed: Int    = scala.util.Random.nextInt(Int.MaxValue)
 
   // ================== Stage 1: Opcode Solving ==================
 
@@ -130,7 +131,7 @@ trait RVGenerator:
       val smtlib   = mlirToSMTLIB()
       val z3Output = toZ3Output(smtlib)
       try {
-        val result = parseZ3OutputOrFail(
+        val result  = parseZ3OutputOrFail(
           z3Output = z3Output,
           smtlib = smtlib,
           z3Runner = runZ3,
@@ -267,9 +268,23 @@ trait RVGenerator:
     z3Output.out.text()
   }
 
+  /** Inject Z3 randomization options before `(set-logic ...)` so that each solve explores a different search path.
+    * Override [[seed]] to fix the value for reproducibility.
+    */
+  private def injectRandomSeed(smtlib: String): String =
+    val options = Seq(
+      s"(set-option :smt.random_seed $seed)",
+      s"(set-option :sat.random_seed $seed)"
+    ).mkString("\n")
+    smtlib.replaceFirst(
+      """\(set-logic """,
+      s"$options\n(set-logic "
+    )
+
   private def toZ3Output(smtlib: String): String = {
+    val randomized         = injectRandomSeed(smtlib)
     // Replace (reset) with (get-model) to get the model output
-    val smtlibWithGetModel = smtlib.replace("(reset)", "(get-model)")
+    val smtlibWithGetModel = randomized.replace("(reset)", "(get-model)")
     runZ3(smtlibWithGetModel)
   }
 
@@ -346,14 +361,14 @@ trait RVGenerator:
   )
 
   // C.NOP instruction encoding: 0x0001
-  private val C_NOP_ENCODING: Int              = 0x0001
+  private val C_NOP_ENCODING: Int               = 0x0001
   private val C_NOP_BYTES:    scala.Array[Byte] = scala.Array[Byte](
     (C_NOP_ENCODING & 0xff).toByte,
     ((C_NOP_ENCODING >> 8) & 0xff).toByte
   )
 
-  /** Check if instruction is a compressed (16-bit) instruction.
-    * C extension instructions have names starting with "c." or belong to instruction sets containing "_c".
+  /** Check if instruction is a compressed (16-bit) instruction. C extension instructions have names starting with "c."
+    * or belong to instruction sets containing "_c".
     */
   private def isCompressedInstruction(inst: org.chipsalliance.rvdecoderdb.Instruction): Boolean =
     inst.name.startsWith("c.") || inst.instructionSets.exists(_.name.contains("_c"))
@@ -415,7 +430,7 @@ trait RVGenerator:
       val instrString = s"$i: ${inst.name} ${args.mkString(" ")}"
 
       val isCompressed = isCompressedInstruction(inst)
-      val bytes =
+      val bytes        =
         if (isCompressed) {
           val value: Int = bits.toInt & 0xffff
           scala.Array[Byte](
@@ -440,7 +455,7 @@ trait RVGenerator:
 
   def toInstructions(): Seq[(Array[Byte], String)] = {
     val (opcodes, _) = solveOpcodes()
-    val args          = solveArgs(opcodes)
+    val args         = solveArgs(opcodes)
     assembleInstructions(opcodes, args)
   }
 
@@ -498,31 +513,95 @@ trait RVGenerator:
     */
   /** Reverse CSR number → name mapping for GAS output. */
   private val csrNumberToName: Map[Int, String] = Map(
-    0x300 -> "mstatus", 0x301 -> "misa", 0x302 -> "medeleg", 0x303 -> "mideleg",
-    0x304 -> "mie", 0x305 -> "mtvec", 0x306 -> "mcounteren",
-    0x340 -> "mscratch", 0x341 -> "mepc", 0x342 -> "mcause", 0x343 -> "mtval",
+    0x300 -> "mstatus",
+    0x301 -> "misa",
+    0x302 -> "medeleg",
+    0x303 -> "mideleg",
+    0x304 -> "mie",
+    0x305 -> "mtvec",
+    0x306 -> "mcounteren",
+    0x340 -> "mscratch",
+    0x341 -> "mepc",
+    0x342 -> "mcause",
+    0x343 -> "mtval",
     0x344 -> "mip",
-    0x3a0 -> "pmpcfg0", 0x3a1 -> "pmpcfg1", 0x3a2 -> "pmpcfg2", 0x3a3 -> "pmpcfg3",
-    0x3b0 -> "pmpaddr0", 0x3b1 -> "pmpaddr1", 0x3b2 -> "pmpaddr2", 0x3b3 -> "pmpaddr3",
-    0xf11 -> "mvendorid", 0xf12 -> "marchid", 0xf13 -> "mimpid", 0xf14 -> "mhartid",
-    0x100 -> "sstatus", 0x104 -> "sie", 0x105 -> "stvec", 0x106 -> "scounteren",
-    0x140 -> "sscratch", 0x141 -> "sepc", 0x142 -> "scause", 0x143 -> "stval",
-    0x144 -> "sip", 0x180 -> "satp",
-    0x000 -> "ustatus", 0x001 -> "fflags", 0x002 -> "frm", 0x003 -> "fcsr",
-    0xc00 -> "cycle", 0xc01 -> "time", 0xc02 -> "instret",
+    0x3a0 -> "pmpcfg0",
+    0x3a1 -> "pmpcfg1",
+    0x3a2 -> "pmpcfg2",
+    0x3a3 -> "pmpcfg3",
+    0x3b0 -> "pmpaddr0",
+    0x3b1 -> "pmpaddr1",
+    0x3b2 -> "pmpaddr2",
+    0x3b3 -> "pmpaddr3",
+    0xf11 -> "mvendorid",
+    0xf12 -> "marchid",
+    0xf13 -> "mimpid",
+    0xf14 -> "mhartid",
+    0x100 -> "sstatus",
+    0x104 -> "sie",
+    0x105 -> "stvec",
+    0x106 -> "scounteren",
+    0x140 -> "sscratch",
+    0x141 -> "sepc",
+    0x142 -> "scause",
+    0x143 -> "stval",
+    0x144 -> "sip",
+    0x180 -> "satp",
+    0x000 -> "ustatus",
+    0x001 -> "fflags",
+    0x002 -> "frm",
+    0x003 -> "fcsr",
+    0xc00 -> "cycle",
+    0xc01 -> "time",
+    0xc02 -> "instret"
   )
 
   /** RISC-V rounding mode number → name for GAS output. */
   private val rmNumberToName: Map[Int, String] = Map(
-    0 -> "rne", 1 -> "rtz", 2 -> "rdn", 3 -> "rup", 4 -> "rmm", 7 -> "dyn",
+    0 -> "rne",
+    1 -> "rtz",
+    2 -> "rdn",
+    3 -> "rup",
+    4 -> "rmm",
+    7 -> "dyn"
   )
 
   /** Instruction names that use floating-point registers (rd/rs1/rs2 are FP regs). */
   private val fpInstructionPrefixes: Set[String] = Set(
-    "fadd", "fsub", "fmul", "fdiv", "fsqrt", "fmadd", "fmsub", "fnmadd", "fnmsub",
-    "fsgnj", "fsgnjn", "fsgnjx", "fmin", "fmax", "fcvt", "fmv", "fclass",
-    "feq", "flt", "fle", "fround", "fli", "fleq", "fltq", "fminm", "fmaxm",
-    "fld", "flw", "flh", "flq", "fsd", "fsw", "fsh", "fsq",
+    "fadd",
+    "fsub",
+    "fmul",
+    "fdiv",
+    "fsqrt",
+    "fmadd",
+    "fmsub",
+    "fnmadd",
+    "fnmsub",
+    "fsgnj",
+    "fsgnjn",
+    "fsgnjx",
+    "fmin",
+    "fmax",
+    "fcvt",
+    "fmv",
+    "fclass",
+    "feq",
+    "flt",
+    "fle",
+    "fround",
+    "fli",
+    "fleq",
+    "fltq",
+    "fminm",
+    "fmaxm",
+    "fld",
+    "flw",
+    "flh",
+    "flq",
+    "fsd",
+    "fsw",
+    "fsh",
+    "fsq"
   )
 
   /** Check whether a given arg is a floating-point register for this instruction. */
@@ -534,19 +613,21 @@ trait RVGenerator:
       // For FP instructions: rd, rs1, rs2, rs3 are FP regs,
       // EXCEPT: fcvt.*.int, fmv.x.*, fclass.* where rd is integer;
       //         fmv.*.x, fcvt.int.* where rs1 is integer
-      case "rd" =>
+      case "rd"          =>
         // fmv.x.d, fmv.x.w, fclass.*, feq/flt/fle: rd is integer
         val intRd = instName.startsWith("fmv.x.") || instName.startsWith("fclass.") ||
           instName.startsWith("feq.") || instName.startsWith("flt.") || instName.startsWith("fle.") ||
           instName.startsWith("fltq.") || instName.startsWith("fleq.") ||
-          (instName.startsWith("fcvt.") && (instName.contains(".w") || instName.contains(".l")) && !instName.matches("fcvt\\.[sdqh]\\..*"))
+          (instName.startsWith("fcvt.") && (instName.contains(".w") || instName.contains(".l")) && !instName.matches(
+            "fcvt\\.[sdqh]\\..*"
+          ))
         !intRd
-      case "rs1" =>
+      case "rs1"         =>
         // fmv.d.x, fmv.w.x: rs1 is integer
         val intRs1 = instName.startsWith("fmv.") && instName.endsWith(".x")
         !intRs1
       case "rs2" | "rs3" => true
-      case _ => false
+      case _             => false
 
   private def toGasLine(
     idx:    Int,
@@ -559,14 +640,14 @@ trait RVGenerator:
     def key(n: String):    String =
       val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
     def regVal(n: String): String =
-      val num = solved.getOrElse(key(n), BigInt(0))
+      val num    = solved.getOrElse(key(n), BigInt(0))
       val prefix = if isFpReg(instName, n) then "f" else "x"
       s"$prefix$num"
     def immVal(n: String): String = solved.getOrElse(key(n), BigInt(0)).toString
-    def csrVal: String =
+    def csrVal:            String =
       val num = solved.getOrElse(key("csr"), BigInt(0)).toInt
       csrNumberToName.getOrElse(num, s"0x${num.toHexString}")
-    def rmVal: String =
+    def rmVal:             String =
       val num = solved.getOrElse(key("rm"), BigInt(0)).toInt
       rmNumberToName.getOrElse(num, num.toString)
     def argFmt(n: String): String =
@@ -599,7 +680,8 @@ trait RVGenerator:
       // The rvdecoderdb arg name may differ from the AsmApi constraint key
       // (e.g., instruction has shamtw but AsmApi writes shamtd), so try all variants
       val shamtVariants = Seq("shamtd", "shamt", "shamtw")
-      val sName = shamtVariants.find(n => solved.contains(key(n)))
+      val sName         = shamtVariants
+        .find(n => solved.contains(key(n)))
         .getOrElse(if names("shamt") then "shamt" else if names("shamtw") then "shamtw" else "shamtd")
       s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${immVal(sName)}"
     else if (hasRd && hasRs1 && !hasRs2 && hasImm12 && isLoadInstruction(instName))
@@ -666,17 +748,17 @@ trait RVGenerator:
     instructions:  Seq[org.chipsalliance.rvdecoderdb.Instruction],
     labelRefs:     Map[Int, String]
   ): String = stmt match
-    case Statement.Inst(idx) =>
-      val inst        = instructions(solvedOpcodes(idx))
-      val baseLine    = toGasLine(idx, inst, solvedArgs)
+    case Statement.Inst(idx)                  =>
+      val inst     = instructions(solvedOpcodes(idx))
+      val baseLine = toGasLine(idx, inst, solvedArgs)
       labelRefs.get(idx) match
         case Some(target) =>
           replaceImmWithLabel(baseLine, inst, target)
-        case None =>
+        case None         =>
           s"    $baseLine"
-    case Statement.Label(name) =>
+    case Statement.Label(name)                =>
       s"$name:"
-    case Statement.Section(name, flags*) =>
+    case Statement.Section(name, flags*)      =>
       val flagStr =
         if flags.isEmpty then ""
         else
@@ -685,38 +767,36 @@ trait RVGenerator:
             else s"\"$f\""
           s",${parts.mkString(",")}"
       s"    .section $name$flagStr"
-    case Statement.Global(symbol) =>
+    case Statement.Global(symbol)             =>
       s"    .globl $symbol"
-    case Statement.Align(n) =>
+    case Statement.Align(n)                   =>
       s"    .align $n"
-    case Statement.Word(value) =>
+    case Statement.Word(value)                =>
       s"    .word 0x${value.toHexString}"
-    case Statement.Dword(value) =>
+    case Statement.Dword(value)               =>
       s"    .dword 0x${value.toHexString}"
-    case Statement.Zero(size) =>
+    case Statement.Zero(size)                 =>
       s"    .zero $size"
-    case Statement.Balign(alignment) =>
+    case Statement.Balign(alignment)          =>
       s"    .balign $alignment"
     case Statement.Pseudo(mnemonic, operands) =>
       if operands.isEmpty then s"    $mnemonic" else s"    $mnemonic $operands"
-    case Statement.Raw(content) =>
+    case Statement.Raw(content)               =>
       content
-    case Statement.LabelRef(_, _) =>
+    case Statement.LabelRef(_, _)             =>
       ""
 
   /** Replace immediate offset with label in GAS assembly line. */
   private def replaceImmWithLabel(
-    line:    String,
-    inst:    org.chipsalliance.rvdecoderdb.Instruction,
-    target:  String
+    line:   String,
+    inst:   org.chipsalliance.rvdecoderdb.Instruction,
+    target: String
   ): String =
     val argNames = inst.args.map(_.name).toSet
     val hasBimm  = argNames.contains("bimm12hi") && argNames.contains("bimm12lo")
     val hasJimm  = argNames.contains("jimm20")
-    if hasBimm || hasJimm then
-      s"    ${line.replaceFirst("""\. \+ -?\d+""", target)}"
-    else
-      s"    $line"
+    if hasBimm || hasJimm then s"    ${line.replaceFirst("""\. \+ -?\d+""", target)}"
+    else s"    $line"
 
   /** Build GAS assembly lines from the ordered statement list. */
   private def assembleStatementsGas(
@@ -724,8 +804,8 @@ trait RVGenerator:
     solvedOpcodes: Map[Int, Int],
     solvedArgs:    Map[String, BigInt]
   ): Seq[String] = {
-    val instructions  = getInstructions()
-    val labelRefs     = statements.collect { case Statement.LabelRef(idx, target) => idx -> target }.toMap
+    val instructions = getInstructions()
+    val labelRefs    = statements.collect { case Statement.LabelRef(idx, target) => idx -> target }.toMap
     statements.map(s => statementToGas(s, solvedOpcodes, solvedArgs, instructions, labelRefs))
   }
 
@@ -752,17 +832,15 @@ trait RVGenerator:
 
   /** Solve the recipe and return it formatted as GAS assembly lines (newline-joined).
     *
-    * If the program contains directives or labels, the full statement ordering is used.
-    * Otherwise falls back to legacy NOP-padding for explicit-index programs.
+    * If the program contains directives or labels, the full statement ordering is used. Otherwise falls back to legacy
+    * NOP-padding for explicit-index programs.
     */
   def toRecipeAsm(): String = {
     val (opcodes, statements) = solveOpcodes()
     val args                  = solveArgs(opcodes)
     val hasDirectives         = statements.exists { case _: Statement.Inst => false; case _ => true }
-    if hasDirectives then
-      assembleStatementsGas(statements, opcodes, args).mkString("\n")
-    else
-      assembleInstructionsGas(opcodes, args).mkString("\n")
+    if hasDirectives then assembleStatementsGas(statements, opcodes, args).mkString("\n")
+    else assembleInstructionsGas(opcodes, args).mkString("\n")
   }
 
   /** Unified output API.

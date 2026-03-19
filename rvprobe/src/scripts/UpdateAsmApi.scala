@@ -47,8 +47,8 @@ val skipLabelOverload: Set[String] = Set("jalr", "jr", "c.jalr", "c.jr")
 case class ImmMergeRule(hiField: String, loField: String, mergedName: String, hiWidth: Int, loWidth: Int)
 
 val immMergeRules: Seq[ImmMergeRule] = Seq(
-  ImmMergeRule(hiField = "imm12hi",  loField = "imm12lo",  mergedName = "offset",  hiWidth = 7, loWidth = 5),
-  ImmMergeRule(hiField = "bimm12hi", loField = "bimm12lo", mergedName = "offset",  hiWidth = 7, loWidth = 5)
+  ImmMergeRule(hiField = "imm12hi", loField = "imm12lo", mergedName = "offset", hiWidth = 7, loWidth = 5),
+  ImmMergeRule(hiField = "bimm12hi", loField = "bimm12lo", mergedName = "offset", hiWidth = 7, loWidth = 5)
 )
 
 // Find applicable merge rule for an instruction's arg set
@@ -113,7 +113,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
 
     if (variant.args.nonEmpty) {
       // Filter out fields that will be merged, collect non-merged args
-      val mergedFields = mergeRule.map(r => Set(r.hiField, r.loField)).getOrElse(Set.empty)
+      val mergedFields  = mergeRule.map(r => Set(r.hiField, r.loField)).getOrElse(Set.empty)
       val nonMergedArgs = variant.args.filterNot(a => mergedFields.contains(a.name))
 
       // Build parameter list: non-merged args + merged parameter (if any)
@@ -123,7 +123,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
         s"$argNameLowered: $tpe"
       }
-      val params = mergeRule match {
+      val params          = mergeRule match {
         case Some(rule) => (nonMergedParams :+ s"${rule.mergedName}: Int").mkString(", ")
         case None       => nonMergedParams.mkString(", ")
       }
@@ -145,104 +145,107 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
       } else {
         emittedSignatures += sig
 
-      // Build constraint body: non-merged arg constraints + split constraints for merged imm
-      val nonMergedConstraints = nonMergedArgs.map { arg =>
-        val argName        = translateToCamelCase(arg.name)
-        val argNameLowered = argName.head.toLower + argName.tail
-        val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-        s"${argNameLowered}Equal($value) & has${argName}()"
-      }
-      val constraints = mergeRule match {
-        case Some(rule) =>
-          val hiCamel    = translateToCamelCase(rule.hiField)
-          val hiLowered  = hiCamel.head.toLower + hiCamel.tail
-          val loCamel    = translateToCamelCase(rule.loField)
-          val loLowered  = loCamel.head.toLower + loCamel.tail
-          val loMask     = (1 << rule.loWidth) - 1
-          val splitParts = Seq(
-            s"${hiLowered}Equal(${rule.mergedName} >> ${rule.loWidth}) & has${hiCamel}()",
-            s"${loLowered}Equal(${rule.mergedName} & $loMask) & has${loCamel}()"
+        // Build constraint body: non-merged arg constraints + split constraints for merged imm
+        val nonMergedConstraints = nonMergedArgs.map { arg =>
+          val argName        = translateToCamelCase(arg.name)
+          val argNameLowered = argName.head.toLower + argName.tail
+          val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
+          s"${argNameLowered}Equal($value) & has${argName}()"
+        }
+        val constraints          = mergeRule match {
+          case Some(rule) =>
+            val hiCamel    = translateToCamelCase(rule.hiField)
+            val hiLowered  = hiCamel.head.toLower + hiCamel.tail
+            val loCamel    = translateToCamelCase(rule.loField)
+            val loLowered  = loCamel.head.toLower + loCamel.tail
+            val loMask     = (1 << rule.loWidth) - 1
+            val splitParts = Seq(
+              s"${hiLowered}Equal(${rule.mergedName} >> ${rule.loWidth}) & has${hiCamel}()",
+              s"${loLowered}Equal(${rule.mergedName} & $loMask) & has${loCamel}()"
+            )
+            (nonMergedConstraints ++ splitParts).mkString(" & ")
+          case None       =>
+            nonMergedConstraints.mkString(" & ")
+        }
+
+        writer.write(
+          s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
+        )
+
+        // Generate label-based overload for branch instructions (bimm12hi/bimm12lo)
+        if (hasBimm && !skipLabelOverload.contains(variant.name)) {
+          val labelNonImmArgs = nonMergedArgs
+          val nonImmParams    = labelNonImmArgs.map { arg =>
+            val argName        = translateToCamelCase(arg.name)
+            val argNameLowered = argName.head.toLower + argName.tail
+            val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+            s"$argNameLowered: $tpe"
+          }.mkString(", ")
+          val labelParams     = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
+
+          val labelConstraints = labelNonImmArgs.map { arg =>
+            val argName        = translateToCamelCase(arg.name)
+            val argNameLowered = argName.head.toLower + argName.tail
+            val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
+            s"${argNameLowered}Equal($value)"
+          }.mkString(" & ")
+          val fullConstraints  =
+            if (labelConstraints.isEmpty) "bimm12hiEqual(0) & bimm12loEqual(0)"
+            else s"$labelConstraints & bimm12hiEqual(0) & bimm12loEqual(0)"
+
+          writer.write(
+            s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
           )
-          (nonMergedConstraints ++ splitParts).mkString(" & ")
-        case None =>
-          nonMergedConstraints.mkString(" & ")
-      }
+          writer.write(
+            s"  val idx = summon[Recipe].nextIdx()\n"
+          )
+          writer.write(
+            s"  instruction(idx, $isFunc()) { $fullConstraints }\n"
+          )
+          writer.write(
+            s"  labelRef(idx, target)\n"
+          )
+          writer.write(
+            s"}\n"
+          )
+        }
 
-      writer.write(
-        s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
-      )
+        // Generate label-based overload for jump instructions (jimm20)
+        if (hasJimm) {
+          val nonImmArgs   = variant.args.filter(arg => arg.name != "jimm20")
+          val nonImmParams = nonImmArgs.map { arg =>
+            val argName        = translateToCamelCase(arg.name)
+            val argNameLowered = argName.head.toLower + argName.tail
+            val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+            s"$argNameLowered: $tpe"
+          }.mkString(", ")
+          val labelParams  = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
 
-      // Generate label-based overload for branch instructions (bimm12hi/bimm12lo)
-      if (hasBimm && !skipLabelOverload.contains(variant.name)) {
-        val labelNonImmArgs = nonMergedArgs
-        val nonImmParams = labelNonImmArgs.map { arg =>
-          val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
-          val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
-          s"$argNameLowered: $tpe"
-        }.mkString(", ")
-        val labelParams = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
+          val labelConstraints = nonImmArgs.map { arg =>
+            val argName        = translateToCamelCase(arg.name)
+            val argNameLowered = argName.head.toLower + argName.tail
+            val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
+            s"${argNameLowered}Equal($value)"
+          }.mkString(" & ")
+          val fullConstraints  =
+            if (labelConstraints.isEmpty) "jimm20Equal(0)" else s"$labelConstraints & jimm20Equal(0)"
 
-        val labelConstraints = labelNonImmArgs.map { arg =>
-          val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
-          val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-          s"${argNameLowered}Equal($value)"
-        }.mkString(" & ")
-        val fullConstraints = if (labelConstraints.isEmpty) "bimm12hiEqual(0) & bimm12loEqual(0)" else s"$labelConstraints & bimm12hiEqual(0) & bimm12loEqual(0)"
-
-        writer.write(
-          s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
-        )
-        writer.write(
-          s"  val idx = summon[Recipe].nextIdx()\n"
-        )
-        writer.write(
-          s"  instruction(idx, $isFunc()) { $fullConstraints }\n"
-        )
-        writer.write(
-          s"  labelRef(idx, target)\n"
-        )
-        writer.write(
-          s"}\n"
-        )
-      }
-
-      // Generate label-based overload for jump instructions (jimm20)
-      if (hasJimm) {
-        val nonImmArgs = variant.args.filter(arg => arg.name != "jimm20")
-        val nonImmParams = nonImmArgs.map { arg =>
-          val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
-          val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
-          s"$argNameLowered: $tpe"
-        }.mkString(", ")
-        val labelParams = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
-
-        val labelConstraints = nonImmArgs.map { arg =>
-          val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
-          val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-          s"${argNameLowered}Equal($value)"
-        }.mkString(" & ")
-        val fullConstraints = if (labelConstraints.isEmpty) "jimm20Equal(0)" else s"$labelConstraints & jimm20Equal(0)"
-
-        writer.write(
-          s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
-        )
-        writer.write(
-          s"  val idx = summon[Recipe].nextIdx()\n"
-        )
-        writer.write(
-          s"  instruction(idx, $isFunc()) { $fullConstraints }\n"
-        )
-        writer.write(
-          s"  labelRef(idx, target)\n"
-        )
-        writer.write(
-          s"}\n"
-        )
-      }
+          writer.write(
+            s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
+          )
+          writer.write(
+            s"  val idx = summon[Recipe].nextIdx()\n"
+          )
+          writer.write(
+            s"  instruction(idx, $isFunc()) { $fullConstraints }\n"
+          )
+          writer.write(
+            s"  labelRef(idx, target)\n"
+          )
+          writer.write(
+            s"}\n"
+          )
+        }
       } // end if !emittedSignatures.contains(sig)
     } else {
       // Zero-arg instructions (ecall, ebreak, mret, etc.)

@@ -29,10 +29,9 @@ private def isIsaSuffixedName(name: String): Boolean = isaSuffixPattern.findFirs
 
 // A merged view of instructions with OR'd sets.
 case class MergedInstructionVariant(
-  name:  String,
-  args:  Seq[org.chipsalliance.rvdecoderdb.Arg],
-  sets:  Seq[InstructionSet]
-)
+  name: String,
+  args: Seq[org.chipsalliance.rvdecoderdb.Arg],
+  sets: Seq[InstructionSet])
 
 def getInstructions(): Seq[Instruction] =
   val riscvOpcodesPath: Path = Path(

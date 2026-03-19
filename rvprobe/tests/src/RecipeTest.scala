@@ -28,9 +28,9 @@ object RecipeTest extends TestSuite:
       // End-to-end: generates an addw instruction with registers in [1,31]
       val instructions = SingleInstruction.toInstructions()
       assert(instructions.length == 1)
-      val instrStr = instructions.head._2
+      val instrStr     = instructions.head._2
       assert(instrStr.startsWith("0: addw "))
-      val parts = instrStr.split(" ")
+      val parts        = instrStr.split(" ")
       // parts: ["0:", "addw", "x1", "x2", "x3"]
       // Register operands are at indices 2, 3, 4
       (2 to 4).foreach { i =>
@@ -126,9 +126,9 @@ object RecipeTest extends TestSuite:
       instructions.foreach { case (_, instrStr) =>
         assert(instrStr.contains("addw"))
         val parts = instrStr.split("\\s+")
-        val rd  = parts(2).stripPrefix("x").toInt
-        val rs1 = parts(3).stripPrefix("x").toInt
-        val rs2 = parts(4).stripPrefix("x").toInt
+        val rd    = parts(2).stripPrefix("x").toInt
+        val rs1   = parts(3).stripPrefix("x").toInt
+        val rs2   = parts(4).stripPrefix("x").toInt
         assert(rd >= 1 && rd < 32)
         assert(rs1 >= 1 && rs1 < 32)
         assert(rs2 >= 1 && rs2 < 32)
