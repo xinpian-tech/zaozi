@@ -204,3 +204,23 @@ def labelRef(
   using recipe: Recipe
 ): Unit =
   recipe.addStatement(Statement.LabelRef(idx, targetLabel))
+
+// ================== Pseudo-instruction helpers (raw emission) ==================
+
+/** `li rd, imm` — load immediate (pseudo, expands to lui+addi or longer sequence). */
+def li(
+  rd:           Register,
+  imm:          Long
+)(
+  using recipe: Recipe
+): Unit =
+  recipe.addStatement(Statement.Raw(s"    li ${rd}, 0x${imm.toHexString}"))
+
+/** `la rd, symbol` — load address of symbol (pseudo, expands to auipc+addi). */
+def la(
+  rd:           Register,
+  symbol:       String
+)(
+  using recipe: Recipe
+): Unit =
+  recipe.addStatement(Statement.Raw(s"    la ${rd}, $symbol"))
