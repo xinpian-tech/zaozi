@@ -73,10 +73,14 @@ cases/
 │   ├── ICache.scala           — 顺序取指、跳转冷区、自修改+fence.i（O, P, Q）
 │   ├── DCacheFence.scala      — fence rw/tso（R）
 │   └── DCacheAtomic.scala     — lr/sc、AMO（U）
+├── coverage/
+│   ├── RV32I.scala            — RV32I 指令覆盖率（27 条指令，coverBins + 冒险覆盖）
+│   ├── RV64I.scala            — RV64I word 操作覆盖率（addw/subw/sllw/srlw/sraw/addiw/slliw/srliw/sraiw）
+│   ├── RVM.scala              — M 扩展覆盖率（mul/div/rem 全系列 + 64 位 word 变体）
+│   └── RVLoadStore.scala      — 加载/存储覆盖率（lb/lbu/lh/lhu/lw/lwu/ld/sb/sh/sw/sd）
 ├── output/                    — 预生成的 .S 汇编文件（镜像源码目录结构）
 │   ├── privilege/Program.S
 │   └── cache/*.S
-└── RV32I.scala                — 35+ 基础 RVGenerator 实现
 ```
 
 每个目录以被测功能命名（cache、privilege），未来可扩展更多功能目录（如 mmu、vector 等）。
@@ -112,6 +116,7 @@ cases/
 
 | 日期 | 内容 |
 |------|------|
+| 2026-03-19 | 新建 cases/coverage/ 目录，迁移 RV32I，添加 RV64I/RVM/RVLoadStore 覆盖率测试 |
 | 2026-03-19 | 添加 23 个特权模式测试探针（PMP + 虚拟内存），提取 PrivilegeProbeLib，重构 Program.scala |
 | 2026-03-19 | 添加 `li(Long)`/`la(String)` 伪指令到 Api.scala，消除所有 `raw()` 的 li/la 调用 |
 | 2026-03-19 | 目录重命名：cache-probes→cache、probes→privilege，包名同步更新 |

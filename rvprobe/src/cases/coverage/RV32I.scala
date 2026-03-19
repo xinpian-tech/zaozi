@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.cases
+package me.jiuyang.rvprobe.cases.coverage
 
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
@@ -9,7 +9,7 @@ import me.jiuyang.rvprobe.constraints.*
 import java.nio.file.{Files, Paths}
 import scala.util.control.NonFatal
 
-// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.RV32I
+// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I
 @main def RV32I(outputPath: String = "out/rv32i.bin"): Unit =
   val instructionCount = 35
 
