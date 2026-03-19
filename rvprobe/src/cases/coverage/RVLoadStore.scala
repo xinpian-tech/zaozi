@@ -5,144 +5,61 @@ package me.jiuyang.rvprobe.cases.coverage
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
+import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 import java.nio.file.{Files, Paths}
 import scala.util.control.NonFatal
 
-// Load/store coverage: lb, lbu, lh, lhu, lw, lwu, ld, sb, sh, sw, sd
-// Covers register bins and immediate boundary values for offsets.
+// Load/store instruction coverage (11 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RVLoadStore
 @main def RVLoadStore(outputPath: String = "out/rvloadstore.bin"): Unit =
   val n = 35
 
   // --- Loads ---
-
   object Lb extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLb()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLb())
 
   object Lbu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLbu()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLbu())
 
   object Lh extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLh()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLh())
 
   object Lhu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLhu()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLhu())
 
   object Lw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLw()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLw())
 
   object Lwu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLwu()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLwu())
 
   object Ld extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isLd()) { rdRange(1, 32) & rs1Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.imm12, Seq((-2048).S, (-1).S, 0.S, 1.S, 2047.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = load(n, isLd())
 
   // --- Stores ---
-  // Stores have split immediates (imm12hi/imm12lo), so we cover rs1/rs2 register bins.
-
   object Sb extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isSb()) { rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverNoHazard()
+    def constraints() = store(n, isSb())
 
   object Sh extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isSh()) { rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverNoHazard()
+    def constraints() = store(n, isSh())
 
   object Sw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isSw()) { rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverNoHazard()
+    def constraints() = store(n, isSw())
 
   object Sd extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isSd()) { rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverNoHazard()
+    def constraints() = store(n, isSd())
 
   try Files.deleteIfExists(Paths.get(outputPath))
   catch case NonFatal(e) => System.err.println(s"warning: failed to delete ${outputPath}: ${e.getMessage}")

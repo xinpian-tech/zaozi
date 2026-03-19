@@ -5,196 +5,69 @@ package me.jiuyang.rvprobe.cases.coverage
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
+import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 import java.nio.file.{Files, Paths}
 import scala.util.control.NonFatal
 
-// M-extension: mul, mulh, mulhsu, mulhu, div, divu, rem, remu + 64-bit word variants
+// M-extension coverage: multiply/divide/remainder (13 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RVM
 @main def RVM(outputPath: String = "out/rvm.bin"): Unit =
   val n = 35
 
+  // --- Base M (rv_m) ---
   object Mul extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isMul()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isMul())
 
   object Mulh extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isMulh()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isMulh())
 
   object Mulhsu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isMulhsu()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isMulhsu())
 
   object Mulhu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isMulhu()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isMulhu())
 
   object Div extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isDiv()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isDiv())
 
   object Divu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isDivu()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isDivu())
 
   object Rem extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isRem()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isRem())
 
   object Remu extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isRemu()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isRemu())
 
+  // --- 64-bit word variants (rv64_m) ---
   object Mulw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isMulw()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isMulw())
 
   object Divw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isDivw()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isDivw())
 
   object Divuw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isDivuw()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isDivuw())
 
   object Remw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isRemw()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isRemw())
 
   object Remuw extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isRemuw()) { rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32) }
-      }
-      sequence(0, n).coverBins(_.rd, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs1, (1 until 32).map(_.S))
-      sequence(0, n).coverBins(_.rs2, (1 until 32).map(_.S))
-      sequence(0, n).coverRAW()
-      sequence(0, n).coverWAR()
-      sequence(0, n).coverWAW()
-      sequence(0, n).coverNoHazard()
+    def constraints() = rType(n, isRemuw())
 
   try Files.deleteIfExists(Paths.get(outputPath))
   catch case NonFatal(e) => System.err.println(s"warning: failed to delete ${outputPath}: ${e.getMessage}")

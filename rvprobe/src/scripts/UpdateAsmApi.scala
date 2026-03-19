@@ -79,6 +79,8 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
       |//  Assembly-like API for writing fixed-value constraints.
       |//
       |//  The instruction index is auto-incremented via Recipe.nextIdx().
+      |//  Each method returns the Int index of the emitted instruction,
+      |//  enabling downstream use with CoverApi (e.g. sequence/coverBins).
       |//  Split immediates (imm12hi/lo, bimm12hi/lo) are merged into a single
       |//  semantic parameter (offset) matching GAS syntax conventions.
       |//  Zero-arg instructions (ecall, mret, etc.) are also generated.
@@ -169,7 +171,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         }
 
         writer.write(
-          s"def $funcName($params)(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
+          s"def $funcName($params)(using Arena, Context, Block, Recipe): Int = instruction(summon[Recipe].nextIdx(), $isFunc()) { $constraints }\n"
         )
 
         // Generate label-based overload for branch instructions (bimm12hi/bimm12lo)
@@ -194,7 +196,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
             else s"$labelConstraints & bimm12hiEqual(0) & bimm12loEqual(0)"
 
           writer.write(
-            s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
+            s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Int = {\n"
           )
           writer.write(
             s"  val idx = summon[Recipe].nextIdx()\n"
@@ -204,6 +206,9 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
           )
           writer.write(
             s"  labelRef(idx, target)\n"
+          )
+          writer.write(
+            s"  idx\n"
           )
           writer.write(
             s"}\n"
@@ -231,7 +236,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
             if (labelConstraints.isEmpty) "jimm20Equal(0)" else s"$labelConstraints & jimm20Equal(0)"
 
           writer.write(
-            s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Unit = {\n"
+            s"def $funcName($labelParams)(using Arena, Context, Block, Recipe): Int = {\n"
           )
           writer.write(
             s"  val idx = summon[Recipe].nextIdx()\n"
@@ -243,6 +248,9 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
             s"  labelRef(idx, target)\n"
           )
           writer.write(
+            s"  idx\n"
+          )
+          writer.write(
             s"}\n"
           )
         }
@@ -250,7 +258,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
     } else {
       // Zero-arg instructions (ecall, ebreak, mret, etc.)
       writer.write(
-        s"def $funcName()(using Arena, Context, Block, Recipe): Unit = instruction(summon[Recipe].nextIdx(), $isFunc()) { ArgConstraint.noArgs }\n"
+        s"def $funcName()(using Arena, Context, Block, Recipe): Int = instruction(summon[Recipe].nextIdx(), $isFunc()) { ArgConstraint.noArgs }\n"
       )
     }
   }
