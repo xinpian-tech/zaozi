@@ -118,16 +118,16 @@ cases/
 |------|------|
 | 2026-03-19 | AsmApi 返回 Int idx 支持 CoverApi；提取 CoverageLib 重构覆盖率测试 |
 | 2026-03-19 | 新建 cases/coverage/ 目录，迁移 RV32I，添加 RV64I/RVM/RVLoadStore 覆盖率测试 |
-| 2026-03-19 | 添加 23 个特权模式测试探针（PMP + 虚拟内存），提取 PrivilegeProbeLib，重构 Program.scala |
-| 2026-03-19 | 添加 `li(Long)`/`la(String)` 伪指令到 Api.scala，消除所有 `raw()` 的 li/la 调用 |
-| 2026-03-19 | 目录重命名：cache-probes→cache、probes→privilege，包名同步更新 |
-| 2026-03-19 | 实现 20 个缓存验证探针测试用例，提取 CacheProbeLib，重组目录结构 |
-| 2026-03-19 | Z3 求解结果随机化（smt.random_seed / sat.random_seed） |
-| 2026-03-18 | Round-trip 测试框架（113 条指令匹配），修复 asm2dsl 和 RVGenerator 渲染 |
-| 2026-03-18 | 过滤 ISA 后缀指令变体（如 bclri.rv32），减少 13 条重复指令 |
-| 2026-03-18 | 修复 getInstructions() 排序一致性，RecipeTest 改为语义断言 |
-| 2026-03-18 | 合并 RVConstraints 为单文件，添加 asm2dsl.py 脚本 |
-| 2026-03-18 | 合并分裂立即数（ImmMergeRule），AsmApi 生成 GAS 风格语义参数 |
-| 2026-03-17 | 添加 dword/zero/balign 指令，标签引用支持 |
-| 2026-03-16 | 重构 UpdateAsmApi 和 UpdateRVConstraints 脚本 |
+| 2026-03-18 | 添加 23 个特权模式测试探针（PMP + 虚拟内存），提取 PrivilegeProbeLib，重构 Program.scala |
+| 2026-03-18 | 添加 `li(Long)`/`la(String)` 伪指令到 Api.scala，消除所有 `raw()` 的 li/la 调用 |
+| 2026-03-18 | 目录重命名：cache-probes→cache、probes→privilege，包名同步更新 |
+| 2026-03-17 | 实现 20 个缓存验证探针测试用例，提取 CacheProbeLib，重组目录结构 |
+| 2026-03-17 | Z3 求解结果随机化（smt.random_seed / sat.random_seed） |
+| 2026-03-17 | Round-trip 测试框架（113 条指令匹配），修复 asm2dsl 和 RVGenerator 渲染 |
+| 2026-03-17 | 过滤 ISA 后缀指令变体（如 bclri.rv32），减少 13 条重复指令 |
+| 2026-03-16 | 修复 getInstructions() 排序一致性，RecipeTest 改为语义断言 |
+| 2026-03-16 | 合并 RVConstraints 为单文件，添加 asm2dsl.py 脚本 |
+| 2026-03-16 | 合并分裂立即数（ImmMergeRule），AsmApi 生成 GAS 风格语义参数 |
+| 2026-03-15 | 添加 dword/zero/balign 指令，标签引用支持 |
+| 2026-03-15 | 重构 UpdateAsmApi 和 UpdateRVConstraints 脚本 |
 | 2026-03-14 | 添加压缩指令支持 |
