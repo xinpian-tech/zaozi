@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence M: store-load forwarding — immediate load after store
 @main def DCacheStoreLoadForward(outputPath: String): Unit =
   object DCacheStoreLoadForward extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -21,14 +21,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x11, x5, 0) // immediate load → forwarding
 
       exitSeq()
-      dataBuffer("buf", 64)
+      dataBuffer("buf", CacheLineBytes)
       tohostSection()
   DCacheStoreLoadForward.emit(outputPath)
 
 // Sequence N: partial forwarding — byte write then full word read
 @main def DCachePartialForward(outputPath: String): Unit =
   object DCachePartialForward extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -39,6 +39,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x11, x5, 0) // full word read → merge: 0x0000AA00
 
       exitSeq()
-      dataBuffer("buf", 64)
+      dataBuffer("buf", CacheLineBytes)
       tohostSection()
   DCachePartialForward.emit(outputPath)

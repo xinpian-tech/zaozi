@@ -16,6 +16,24 @@ import java.lang.foreign.Arena
   * All helpers require the standard DSL context parameters (`Arena`, `Context`, `Block`, `Recipe`).
   */
 object CacheProbeLib:
+  val CacheLineBytes:      Int = 64
+  val SameSetStrideBytes:  Int = 4096
+  val ConflictRegionBytes: Int = 32768
+  private val WordBytes:   Int = java.lang.Integer.BYTES
+
+  def cacheSets(
+    extra: (Recipe ?=> SetConstraint)*
+  ): Seq[Recipe ?=> SetConstraint] =
+    isRV64GC() ++ extra
+
+  def cacheSetsWithCsr(): Seq[Recipe ?=> SetConstraint] =
+    cacheSets(isRVZICSR())
+
+  def cacheSetsWithCounters(): Seq[Recipe ?=> SetConstraint] =
+    cacheSets(isRVZICSR(), isRVZICNTR())
+
+  def cacheSetsWithFenceI(): Seq[Recipe ?=> SetConstraint] =
+    cacheSets(isRVZICSR(), isRVZIFENCEI())
 
   /** Emit `.text` section header with `_start` entry point. */
   def textStart(
@@ -93,6 +111,24 @@ object CacheProbeLib:
     label(name)
     zero(size)
 
+  /** Emit a 64-byte-aligned `.data` buffer with the first word initialized and the rest zero-filled. */
+  def initializedWordBuffer(
+    name:      String,
+    value:     Long,
+    lineBytes: Int = CacheLineBytes
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    require(lineBytes >= WordBytes, s"lineBytes ($lineBytes) must be >= $WordBytes")
+    section(".data")
+    balign(lineBytes)
+    label(name)
+    word(value)
+    zero(lineBytes - WordBytes)
+
   /** Emit a `.data` section with multiple 64-byte-aligned buffers. */
   def dataBuffers(
     bufs: (String, Int)*
@@ -107,6 +143,44 @@ object CacheProbeLib:
       balign(64)
       label(name)
       zero(size)
+
+  /** Build a chain of same-set addresses using a constant stride: A=base, B=A+stride, C=B+stride, ... */
+  def sameSetAddresses(
+    base:   Register,
+    stride: Register,
+    regs:   Register*
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    regs.headOption.foreach(first => add(first, base, x0))
+    regs.sliding(2).foreach {
+      case Seq(prev, next) => add(next, prev, stride)
+      case _               =>
+    }
+
+  def repeat(
+    count: Int
+  )(body:  => Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    for _ <- 0 until count do body
+
+  def nops(
+    count: Int
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    repeat(count) { nop() }
 
   /** Measure the cycle cost of a block: `rdcycle before` / body / `rdcycle after` / `sub delta`. */
   def timed(

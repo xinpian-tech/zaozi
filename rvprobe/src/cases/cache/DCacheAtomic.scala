@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence U: lr/sc spin lock
 @main def DCacheLrSc(outputPath: String): Unit =
   object DCacheLrSc extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -33,14 +33,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       fence(x0, x0, 3, 3, 0) // fence rw, rw
 
       exitSeq()
-      dataBuffers("lock" -> 64, "shared_data" -> 64)
+      dataBuffers("lock" -> CacheLineBytes, "shared_data" -> CacheLineBytes)
       tohostSection()
   DCacheLrSc.emit(outputPath)
 
 // AMO operations: amoadd.w, amoswap.w
 @main def DCacheAmoOps(outputPath: String): Unit =
   object DCacheAmoOps extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -57,6 +57,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x15, x5, 0) // should read 200
 
       exitSeq()
-      dataBuffer("amo_buf", 64)
+      dataBuffer("amo_buf", CacheLineBytes)
       tohostSection()
   DCacheAmoOps.emit(outputPath)

@@ -779,6 +779,8 @@ trait RVGenerator:
       s"    .zero $size"
     case Statement.Balign(alignment)          =>
       s"    .balign $alignment"
+    case Statement.Space(size)                =>
+      s"    .space $size"
     case Statement.Pseudo(mnemonic, operands) =>
       if operands.isEmpty then s"    $mnemonic" else s"    $mnemonic $operands"
     case Statement.Raw(content)               =>

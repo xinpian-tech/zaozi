@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence H: SB/SH/SW mixed byte mask — partial write verification
 @main def DCachePartialWrite(outputPath: String): Unit =
   object DCachePartialWrite extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -28,6 +28,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x13, x5, 0) // expected: 0xBBBBAA44 (little-endian)
 
       exitSeq()
-      dataBuffer("buf", 64)
+      dataBuffer("buf", CacheLineBytes)
       tohostSection()
   DCachePartialWrite.emit(outputPath)

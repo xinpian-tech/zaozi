@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence R: fence rw/tso semantics
 @main def DCacheFence(outputPath: String): Unit =
   object DCacheFence extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZIFENCEI())
+    val sets          = cacheSetsWithFenceI()
     def constraints() =
       textStart()
 
@@ -28,6 +28,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x12, x6, 0)   // should see stored value
 
       exitSeq()
-      dataBuffers("buf" -> 64, "buf2" -> 64)
+      dataBuffers("buf" -> CacheLineBytes, "buf2" -> CacheLineBytes)
       tohostSection()
   DCacheFence.emit(outputPath)

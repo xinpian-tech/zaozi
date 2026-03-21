@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence J: sequential scan — spatial locality test
 @main def DCacheSequentialScan(outputPath: String): Unit =
   object DCacheSequentialScan extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -24,20 +24,20 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       bnez(x20, "loop_seq")
 
       exitSeq()
-      dataBuffer("array", 4096)
+      dataBuffer("array", CacheLineBytes * 64)
       tohostSection()
   DCacheSequentialScan.emit(outputPath)
 
 // Sequence K: stride access — one load per cache line
 @main def DCacheStride(outputPath: String): Unit =
   object DCacheStride extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
       la(x5, "array")
       li(x20, 256L)
-      li(x22, 64L) // stride = line size
+      li(x22, CacheLineBytes.toLong) // stride = line size
       label("loop_stride")
       lw(x10, x5, 0)
       add(x5, x5, x22)
@@ -45,14 +45,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       bnez(x20, "loop_stride")
 
       exitSeq()
-      dataBuffer("array", 16384)
+      dataBuffer("array", CacheLineBytes * 256)
       tohostSection()
   DCacheStride.emit(outputPath)
 
 // Sequence L: two-pass scan — capacity miss detection
 @main def DCacheCapacityMiss(outputPath: String): Unit =
   object DCacheCapacityMiss extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZICNTR())
+    val sets          = cacheSetsWithCounters()
     def constraints() =
       textStart()
 
@@ -79,6 +79,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       sub(x17, x15, x14) // T2 (compare with T1)
 
       exitSeq()
-      dataBuffer("big_array", 65536)
+      dataBuffer("big_array", ConflictRegionBytes * 2)
       tohostSection()
   DCacheCapacityMiss.emit(outputPath)

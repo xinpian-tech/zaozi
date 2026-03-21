@@ -183,6 +183,13 @@ def balign(
 ): Unit =
   recipe.addStatement(Statement.Balign(alignment))
 
+def space(
+  size:         Int
+)(
+  using recipe: Recipe
+): Unit =
+  recipe.addStatement(Statement.Space(size))
+
 def pseudo(
   mnemonic:     String,
   operands:     String = ""
@@ -215,7 +222,7 @@ def li(
 )(
   using recipe: Recipe
 ): Unit =
-  recipe.addStatement(Statement.Raw(s"    li ${rd}, 0x${imm.toHexString}"))
+  recipe.addStatement(Statement.Pseudo("li", s"${rd}, 0x${imm.toHexString}"))
 
 /** `la rd, symbol` — load address of symbol (pseudo, expands to auipc+addi). */
 def la(
@@ -224,4 +231,4 @@ def la(
 )(
   using recipe: Recipe
 ): Unit =
-  recipe.addStatement(Statement.Raw(s"    la ${rd}, $symbol"))
+  recipe.addStatement(Statement.Pseudo("la", s"${rd}, $symbol"))
