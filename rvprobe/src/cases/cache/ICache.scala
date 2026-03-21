@@ -11,17 +11,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence O: sequential fetch spanning multiple I-cache lines
 @main def ICacheSequentialFetch(outputPath: String): Unit =
   object ICacheSequentialFetch extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZIFENCEI())
+    val sets          = cacheSetsWithFenceI()
     def constraints() =
       textStart()
 
       li(x20, 100L)
       label("icache_loop")
       // 16 nops = 64 bytes = 1 I-cache line
-      nop(); nop(); nop(); nop()
-      nop(); nop(); nop(); nop()
-      nop(); nop(); nop(); nop()
-      nop(); nop(); nop(); nop()
+      nops(CacheLineBytes / 4)
       addi(x20, x20, -1)
       bnez(x20, "icache_loop")
 
@@ -32,12 +29,12 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence P: jump over cold code area — non-sequential fetch
 @main def ICacheJumpCold(outputPath: String): Unit =
   object ICacheJumpCold extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZIFENCEI())
+    val sets          = cacheSetsWithFenceI()
     def constraints() =
       textStart()
 
       j("target_far")
-      raw("    .space 256") // cold code gap spanning multiple I-cache lines
+      space(CacheLineBytes * 4) // cold code gap spanning multiple I-cache lines
       label("target_far")
       addi(x10, x10, 1)
 
@@ -48,7 +45,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence Q: self-modifying code + fence.i — I-cache invalidation
 @main def ICacheSelfModify(outputPath: String): Unit =
   object ICacheSelfModify extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZIFENCEI())
+    val sets          = cacheSetsWithFenceI()
     def constraints() =
       textStart()
 

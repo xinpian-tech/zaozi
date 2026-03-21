@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence E: write hit — pull into cache then write
 @main def DCacheWriteHit(outputPath: String): Unit =
   object DCacheWriteHit extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
@@ -22,20 +22,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x12, x5, 0) // read back → 0x11223344
 
       exitSeq()
-
-      section(".data")
-      balign(64)
-      label("buf")
-      word(0x12345678)
-      zero(60)
-
+      initializedWordBuffer("buf", 0x12345678L)
       tohostSection()
   DCacheWriteHit.emit(outputPath)
 
 // Sequence F: write miss — write to untouched address
 @main def DCacheWriteMiss(outputPath: String): Unit =
   object DCacheWriteMiss extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZICNTR())
+    val sets          = cacheSetsWithCounters()
     def constraints() =
       textStart()
 
@@ -45,22 +39,20 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       timed(x14, x15, x17) { lw(x12, x5, 0) } // if write-allocate → hit
 
       exitSeq()
-      dataBuffer("buf2", 256)
+      dataBuffer("buf2", CacheLineBytes * 4)
       tohostSection()
   DCacheWriteMiss.emit(outputPath)
 
 // Sequence G: dirty writeback — dirty line eviction
 @main def DCacheWriteback(outputPath: String): Unit =
   object DCacheWriteback extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
       la(x5, "buf")
-      li(x22, 4096L)
-      add(x6, x5, x0)   // A
-      add(x7, x5, x22)  // B
-      add(x28, x7, x22) // C
+      li(x22, SameSetStrideBytes.toLong)
+      sameSetAddresses(x5, x22, x6, x7, x28) // A/B/C
 
       lw(x10, x6, 0) // fill A
       li(x11, 0xdeadbeefL)
@@ -73,6 +65,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x12, x6, 0)         // re-read A → should be 0xDEADBEEF
 
       exitSeq()
-      dataBuffers("buf" -> 32768, "buf2" -> 256)
+      dataBuffers("buf" -> ConflictRegionBytes, "buf2" -> (CacheLineBytes * 4))
       tohostSection()
   DCacheWriteback.emit(outputPath)

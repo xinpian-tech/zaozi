@@ -11,7 +11,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 // Sequence A: same-address repeated reads — hit/miss latency
 @main def DCacheHitMiss(outputPath: String): Unit =
   object DCacheHitMiss extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVZICNTR())
+    val sets          = cacheSetsWithCounters()
     def constraints() =
       textStart()
 
@@ -21,54 +21,48 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x12, x5, 0) // hit
 
       exitSeq()
-
-      section(".data")
-      balign(64)
-      label("buf")
-      word(0x12345678)
-      zero(60)
-
+      initializedWordBuffer("buf", 0x12345678L)
       tohostSection()
   DCacheHitMiss.emit(outputPath)
 
 // Sequence B: same-line multi-offset reads — line fill verification
 @main def DCacheLineFill(outputPath: String): Unit =
   object DCacheLineFill extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
       la(x5, "buf")
-      lw(x10, x5, 0)  // miss, line fill
-      lw(x11, x5, 4)  // hit (same line)
-      lw(x12, x5, 8)  // hit
-      lw(x13, x5, 60) // hit (near end of 64B line)
-      lw(x10, x5, 64) // miss (next line)
-      lw(x11, x5, 68) // hit
+      lw(x10, x5, 0)                  // miss, line fill
+      lw(x11, x5, 4)                  // hit (same line)
+      lw(x12, x5, 8)                  // hit
+      lw(x13, x5, CacheLineBytes - 4) // hit (near end of 64B line)
+      lw(x10, x5, CacheLineBytes)     // miss (next line)
+      lw(x11, x5, CacheLineBytes + 4) // hit
 
       exitSeq()
-      dataBuffer("buf", 256)
+      dataBuffer("buf", CacheLineBytes * 4)
       tohostSection()
   DCacheLineFill.emit(outputPath)
 
 // Cross cache line boundary access
 @main def DCacheCrossLine(outputPath: String): Unit =
   object DCacheCrossLine extends RVGenerator:
-    val sets          = isRV64GC() ++ Seq(isRVZICSR())
+    val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
       la(x5, "buf")
-      addi(x5, x5, 60)
+      addi(x5, x5, CacheLineBytes - 4)
       lw(x10, x5, 0) // offset 60, within line
       lw(x11, x5, 4) // offset 64, crosses into next line
 
       // RV64 doubleword cross-line
       la(x6, "buf")
-      addi(x6, x6, 60)
+      addi(x6, x6, CacheLineBytes - 4)
       ld(x12, x6, 0) // 8-byte load straddling 64B boundary
 
       exitSeq()
-      dataBuffer("buf", 256)
+      dataBuffer("buf", CacheLineBytes * 4)
       tohostSection()
   DCacheCrossLine.emit(outputPath)

@@ -35,6 +35,9 @@ enum Statement:
   /** `.balign` directive (byte alignment). */
   case Balign(alignment: Int)
 
+  /** `.space` directive (reserve N bytes, uninitialized). */
+  case Space(size: Int)
+
   /** Pseudo instruction (e.g. `la`, `li`, `j`, `beqz`). */
   case Pseudo(mnemonic: String, operands: String)
 
