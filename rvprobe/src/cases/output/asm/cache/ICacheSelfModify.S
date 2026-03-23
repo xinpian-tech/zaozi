@@ -3,15 +3,15 @@
 _start:
     jal x1, code_area
 
-    la      x5, code_area
-    li      x6, 0x00200513
+    la x5, code_area
+    li x6, 0x200513
     sw x6, 0(x5)
-    fence.i x0, x0, 0
+    fence.i
     jal x1, code_area
 
 exit:
     addi x5, x0, 1
-    la      x6, tohost
+    la x6, tohost
     sd x5, 0(x6)
 spin:
     j spin

@@ -1,0 +1,32 @@
+
+/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/cache/DCacheWriteback.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	00008297          	auipc	t0,0x8
+    80000004:	3f82b283          	ld	t0,1016(t0) # 800083f8 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000008:	6b05                	lui	s6,0x1
+    8000000a:	00028333          	add	t1,t0,zero
+    8000000e:	016303b3          	add	t2,t1,s6
+    80000012:	01638e33          	add	t3,t2,s6
+    80000016:	00032503          	lw	a0,0(t1)
+    8000001a:	000385b7          	lui	a1,0x38
+    8000001e:	ab75859b          	addiw	a1,a1,-1353 # 37ab7 <_start-0x7ffc8549>
+    80000022:	05ba                	slli	a1,a1,0xe
+    80000024:	eef58593          	addi	a1,a1,-273
+    80000028:	00b32023          	sw	a1,0(t1)
+    8000002c:	0003a503          	lw	a0,0(t2)
+    80000030:	000e2503          	lw	a0,0(t3)
+    80000034:	0330000f          	fence	rw,rw
+    80000038:	00032603          	lw	a2,0(t1)
+
+000000008000003c <exit>:
+    8000003c:	4285                	li	t0,1
+    8000003e:	00008317          	auipc	t1,0x8
+    80000042:	3c233303          	ld	t1,962(t1) # 80008400 <_GLOBAL_OFFSET_TABLE_+0x10>
+    80000046:	00533023          	sd	t0,0(t1)
+
+000000008000004a <spin>:
+    8000004a:	a001                	j	8000004a <spin>

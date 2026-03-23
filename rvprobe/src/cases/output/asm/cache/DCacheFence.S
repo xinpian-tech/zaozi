@@ -1,19 +1,19 @@
     .section .text
     .globl _start
 _start:
-    la      x5, buf
-    li      x10, 0xCAFEBABE
+    la x5, buf
+    li x10, 0xcafebabe
     sw x10, 0(x5)
-    fence x0, x0
+    fence rw, rw
     lw x11, 0(x5)
-    la      x6, buf2
-    li      x10, 0xDEADCAFE
+    la x6, buf2
+    li x10, 0xdeadcafe
     sw x10, 0(x6)
-    fence.tso x0, x0
+    fence.tso
     lw x12, 0(x6)
 exit:
     addi x5, x0, 1
-    la      x6, tohost
+    la x6, tohost
     sd x5, 0(x6)
 spin:
     j spin
