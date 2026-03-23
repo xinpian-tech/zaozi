@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
@@ -43,35 +44,17 @@ object CacheProbeLib:
     Block,
     Recipe
   ): Unit =
-    section(".text")
-    global("_start")
-    label("_start")
+    HTIFLib.textStart()
 
-  /** Emit the exit sequence: write 1 to `tohost` then spin forever.
-    *
-    * Produces:
-    * {{{
-    *   exit:
-    *       addi x5, x0, 1
-    *       la   x6, tohost
-    *       sd   x5, 0(x6)
-    *   spin:
-    *       j    spin
-    * }}}
-    */
-  def exitSeq(
+  /** Emit the standard HTIF pass-exit sequence then spin forever. */
+  def exit(
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    label("exit")
-    addi(x5, x0, 1)
-    la(x6, "tohost")
-    sd(x6, x5, 0)
-    label("spin")
-    j("spin")
+    HTIFLib.exit()
 
   /** Emit the `.tohost` section with `tohost` and `fromhost` symbols. */
   def tohostSection(
@@ -81,14 +64,17 @@ object CacheProbeLib:
     Block,
     Recipe
   ): Unit =
-    section(".tohost", "aw", "@progbits")
-    align(6)
-    global("tohost")
-    global("fromhost")
-    label("tohost")
-    dword(0)
-    label("fromhost")
-    dword(0)
+    HTIFLib.tohostSection()
+
+  /** Convenience helper for simple cache cases where `exit` and `.tohost` are adjacent. */
+  def finish(
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    HTIFLib.finish()
 
   /** Emit a `.data` section with one 64-byte-aligned buffer.
     *

@@ -42,8 +42,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       sw(x10, x11, 0) // store — should succeed
       j("exit")
 
-      exitSeq()
-      tohostSection()
+      finish()
 
       section(".data")
       balign(4096)
@@ -89,16 +88,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       bne(x11, x12, "fail")
       j("exit")
 
-      label("fail")
-      // write 0 to tohost (fail)
-      la(x6, "tohost")
-      sd(x6, x0, 0)
-      j("spin_fail")
-      label("spin_fail")
-      j("spin_fail")
+      fail()
 
-      exitSeq()
-      tohostSection()
+      finish()
       trapResultData()
 
       section(".data")
@@ -138,14 +130,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       bne(x11, x12, "fail")
       j("exit")
 
-      label("fail")
-      la(x6, "tohost")
-      sd(x6, x0, 0)
-      label("spin_fail")
-      j("spin_fail")
+      fail()
 
-      exitSeq()
-      tohostSection()
+      finish()
       trapResultData()
 
       section(".data")

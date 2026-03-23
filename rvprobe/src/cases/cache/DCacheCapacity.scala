@@ -23,7 +23,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       addi(x20, x20, -1)
       bnez(x20, "loop_seq")
 
-      exitSeq()
+      exit()
       dataBuffer("array", CacheLineBytes * 64)
       tohostSection()
   DCacheSequentialScan.emit(outputPath)
@@ -44,7 +44,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       addi(x20, x20, -1)
       bnez(x20, "loop_stride")
 
-      exitSeq()
+      exit()
       dataBuffer("array", CacheLineBytes * 256)
       tohostSection()
   DCacheStride.emit(outputPath)
@@ -78,7 +78,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       rdcycle(x15)
       sub(x17, x15, x14) // T2 (compare with T1)
 
-      exitSeq()
+      exit()
       dataBuffer("big_array", ConflictRegionBytes * 2)
       tohostSection()
   DCacheCapacityMiss.emit(outputPath)

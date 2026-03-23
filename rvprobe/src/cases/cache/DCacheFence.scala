@@ -27,7 +27,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       fenceTso(x0, x0) // fence.tso
       lw(x12, x6, 0)   // should see stored value
 
-      exitSeq()
+      exit()
       dataBuffers("buf" -> CacheLineBytes, "buf2" -> CacheLineBytes)
       tohostSection()
   DCacheFence.emit(outputPath)

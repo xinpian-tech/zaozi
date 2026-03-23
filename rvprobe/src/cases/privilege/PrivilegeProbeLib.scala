@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
@@ -60,9 +61,7 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
-    section(".text")
-    global("_start")
-    label("_start")
+    HTIFLib.textStart()
     la(x5, trapLabel)
     csrrw(x0, x5, CSR.MTVEC)
 
@@ -323,20 +322,26 @@ object PrivilegeProbeLib:
     csrrw(x0, x0, CSR.MTVAL)
     mret()
 
-  /** Emit the exit sequence: write 1 to `tohost` then spin forever. */
-  def exitSeq(
+  /** Emit the standard HTIF pass-exit sequence then spin forever. */
+  def exit(
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    label("exit")
-    addi(x5, x0, 1)
-    la(x6, "tohost")
-    sd(x6, x5, 0)
-    label("spin")
-    j("spin")
+    HTIFLib.exit()
+
+  /** Emit the standard HTIF fail sequence (non-zero fail code) then spin forever. */
+  def fail(
+    failCode: Long = HTIFLib.DefaultFailCode
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    HTIFLib.fail(failCode = failCode)
 
   /** Emit the `.tohost` section with `tohost` and `fromhost` symbols. */
   def tohostSection(
@@ -346,14 +351,17 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
-    section(".tohost", "aw", "@progbits")
-    align(6)
-    global("tohost")
-    global("fromhost")
-    label("tohost")
-    dword(0)
-    label("fromhost")
-    dword(0)
+    HTIFLib.tohostSection()
+
+  /** Convenience helper for simple privilege cases where `exit` and `.tohost` are adjacent. */
+  def finish(
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    HTIFLib.finish()
 
   /** Emit a `.data` section with a page-aligned page table buffer.
     *

@@ -27,7 +27,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
       lw(x13, x5, 0) // expected: 0xBBBBAA44 (little-endian)
 
-      exitSeq()
+      exit()
       dataBuffer("buf", CacheLineBytes)
       tohostSection()
   DCachePartialWrite.emit(outputPath)

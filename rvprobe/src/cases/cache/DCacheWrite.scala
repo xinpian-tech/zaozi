@@ -21,7 +21,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       sw(x5, x11, 0) // write hit
       lw(x12, x5, 0) // read back → 0x11223344
 
-      exitSeq()
+      exit()
       initializedWordBuffer("buf", 0x12345678L)
       tohostSection()
   DCacheWriteHit.emit(outputPath)
@@ -38,7 +38,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       timed(x14, x15, x16) { sw(x5, x11, 0) } // write miss
       timed(x14, x15, x17) { lw(x12, x5, 0) } // if write-allocate → hit
 
-      exitSeq()
+      exit()
       dataBuffer("buf2", CacheLineBytes * 4)
       tohostSection()
   DCacheWriteMiss.emit(outputPath)
@@ -64,7 +64,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       fence(x0, x0, 3, 3, 0) // fence rw, rw
       lw(x12, x6, 0)         // re-read A → should be 0xDEADBEEF
 
-      exitSeq()
+      exit()
       dataBuffers("buf" -> ConflictRegionBytes, "buf2" -> (CacheLineBytes * 4))
       tohostSection()
   DCacheWriteback.emit(outputPath)

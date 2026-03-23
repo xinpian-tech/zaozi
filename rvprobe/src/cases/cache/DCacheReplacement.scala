@@ -27,7 +27,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
       timed(x14, x15, x16) { lw(x11, x6, 0) } // hit or miss? (was A replaced?)
 
-      exitSeq()
+      exit()
       dataBuffer("buf", ConflictRegionBytes)
       tohostSection()
   DCacheConflict.emit(outputPath)
@@ -51,7 +51,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       timed(x14, x15, x16) { lw(x11, x7, 0) } // should miss (B evicted)
       timed(x14, x15, x17) { lw(x12, x6, 0) } // should hit (A kept)
 
-      exitSeq()
+      exit()
       dataBuffer("buf", ConflictRegionBytes)
       tohostSection()
   DCacheLRU.emit(outputPath)

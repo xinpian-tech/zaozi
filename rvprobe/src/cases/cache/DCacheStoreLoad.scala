@@ -20,7 +20,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       sw(x5, x10, 0)
       lw(x11, x5, 0) // immediate load → forwarding
 
-      exitSeq()
+      exit()
       dataBuffer("buf", CacheLineBytes)
       tohostSection()
   DCacheStoreLoadForward.emit(outputPath)
@@ -38,7 +38,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       sb(x5, x10, 1) // partial byte write
       lw(x11, x5, 0) // full word read → merge: 0x0000AA00
 
-      exitSeq()
+      exit()
       dataBuffer("buf", CacheLineBytes)
       tohostSection()
   DCachePartialForward.emit(outputPath)
