@@ -52,6 +52,11 @@ def compile_asm(
         compiler,
         "-nostdlib",
         "-nostartfiles",
+        # Bare-metal test binaries are loaded directly; disable PIE/PIC so symbol
+        # addresses are materialized locally instead of via GOT indirection.
+        "-fno-pic",
+        "-fno-pie",
+        "-no-pie",
         f"-march={march}",
         f"-mabi={mabi}",
         "-T",
