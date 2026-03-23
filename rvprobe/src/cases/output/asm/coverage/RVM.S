@@ -1,4 +1,8 @@
-    mul x11, x26, x4
+    .section .text
+    .globl _start
+_start:
+
+mul x11, x26, x4
     mul x2, x24, x18
     mul x15, x18, x19
     mul x22, x22, x2
@@ -34,7 +38,7 @@
     mul x28, x12, x31
     mul x29, x1, x9
 
-    mulh x11, x26, x4
+mulh x11, x26, x4
     mulh x2, x24, x18
     mulh x15, x18, x19
     mulh x22, x22, x2
@@ -70,7 +74,7 @@
     mulh x28, x12, x31
     mulh x29, x1, x9
 
-    mulhsu x11, x26, x4
+mulhsu x11, x26, x4
     mulhsu x2, x24, x18
     mulhsu x15, x18, x19
     mulhsu x22, x22, x2
@@ -106,7 +110,7 @@
     mulhsu x28, x12, x31
     mulhsu x29, x1, x9
 
-    mulhu x11, x26, x4
+mulhu x11, x26, x4
     mulhu x2, x24, x18
     mulhu x15, x18, x19
     mulhu x22, x22, x2
@@ -142,7 +146,7 @@
     mulhu x28, x12, x31
     mulhu x29, x1, x9
 
-    div x11, x26, x4
+div x11, x26, x4
     div x2, x24, x18
     div x15, x18, x19
     div x22, x22, x2
@@ -178,7 +182,7 @@
     div x28, x12, x31
     div x29, x1, x9
 
-    divu x11, x26, x4
+divu x11, x26, x4
     divu x2, x24, x18
     divu x15, x18, x19
     divu x22, x22, x2
@@ -214,7 +218,7 @@
     divu x28, x12, x31
     divu x29, x1, x9
 
-    rem x11, x26, x4
+rem x11, x26, x4
     rem x2, x24, x18
     rem x15, x18, x19
     rem x22, x22, x2
@@ -250,7 +254,7 @@
     rem x28, x12, x31
     rem x29, x1, x9
 
-    remu x11, x26, x4
+remu x11, x26, x4
     remu x2, x24, x18
     remu x15, x18, x19
     remu x22, x22, x2
@@ -286,7 +290,7 @@
     remu x28, x12, x31
     remu x29, x1, x9
 
-    mulw x11, x26, x4
+mulw x11, x26, x4
     mulw x2, x24, x18
     mulw x15, x18, x19
     mulw x22, x22, x2
@@ -322,7 +326,7 @@
     mulw x28, x12, x31
     mulw x29, x1, x9
 
-    divw x11, x26, x4
+divw x11, x26, x4
     divw x2, x24, x18
     divw x15, x18, x19
     divw x22, x22, x2
@@ -358,7 +362,7 @@
     divw x28, x12, x31
     divw x29, x1, x9
 
-    divuw x11, x26, x4
+divuw x11, x26, x4
     divuw x2, x24, x18
     divuw x15, x18, x19
     divuw x22, x22, x2
@@ -394,7 +398,7 @@
     divuw x28, x12, x31
     divuw x29, x1, x9
 
-    remw x11, x26, x4
+remw x11, x26, x4
     remw x2, x24, x18
     remw x15, x18, x19
     remw x22, x22, x2
@@ -430,7 +434,7 @@
     remw x28, x12, x31
     remw x29, x1, x9
 
-    remuw x11, x26, x4
+remuw x11, x26, x4
     remuw x2, x24, x18
     remuw x15, x18, x19
     remuw x22, x22, x2
@@ -465,3 +469,19 @@
     remuw x21, x29, x16
     remuw x28, x12, x31
     remuw x29, x1, x9
+
+exit:
+    addi x5, x0, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin:
+    j spin
+
+    .section .tohost,"aw",@progbits
+    .align 6
+    .globl tohost
+    .globl fromhost
+tohost:
+    .dword 0x0
+fromhost:
+    .dword 0x0

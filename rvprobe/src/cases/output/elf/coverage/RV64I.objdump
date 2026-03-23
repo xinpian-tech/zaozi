@@ -4,7 +4,7 @@
 
 Disassembly of section .text:
 
-0000000080000000 <.text>:
+0000000080000000 <_start>:
     80000000:	004d05bb          	addw	a1,s10,tp
     80000004:	012c013b          	addw	sp,s8,s2
     80000008:	013907bb          	addw	a5,s2,s3
@@ -180,41 +180,41 @@ Disassembly of section .text:
     800002b0:	410edabb          	sraw	s5,t4,a6
     800002b4:	41f65e3b          	sraw	t3,a2,t6
     800002b8:	4090debb          	sraw	t4,ra,s1
-    800002bc:	7ffb0f9b          	addiw	t6,s6,2047
-    800002c0:	7fff0f1b          	addiw	t5,t5,2047
-    800002c4:	7ffa8e9b          	addiw	t4,s5,2047
-    800002c8:	000d0e1b          	sext.w	t3,s10
-    800002cc:	7ffc8d9b          	addiw	s11,s9,2047
-    800002d0:	7ffb8d1b          	addiw	s10,s7,2047
-    800002d4:	7ff10c9b          	addiw	s9,sp,2047
-    800002d8:	7ff1841b          	addiw	s0,gp,2047
-    800002dc:	7ff38c1b          	addiw	s8,t2,2047
-    800002e0:	7ff58b9b          	addiw	s7,a1,2047
-    800002e4:	7ff80b1b          	addiw	s6,a6,2047
-    800002e8:	7ff88a9b          	addiw	s5,a7,2047
-    800002ec:	7ff90a1b          	addiw	s4,s2,2047
-    800002f0:	7ff9891b          	addiw	s2,s3,2047
-    800002f4:	7ffa091b          	addiw	s2,s4,2047
-    800002f8:	7fff899b          	addiw	s3,t6,2047
-    800002fc:	7ff7081b          	addiw	a6,a4,2047
-    80000300:	7ff6879b          	addiw	a5,a3,2047
-    80000304:	7ff6071b          	addiw	a4,a2,2047
-    80000308:	7ff1069b          	addiw	a3,sp,2047
-    8000030c:	7ff5061b          	addiw	a2,a0,2047
-    80000310:	0014859b          	addiw	a1,s1,1
-    80000314:	7ff4051b          	addiw	a0,s0,2047
-    80000318:	7ff3049b          	addiw	s1,t1,2047
-    8000031c:	7ff2839b          	addiw	t2,t0,2047
-    80000320:	7ff1031b          	addiw	t1,sp,2047
-    80000324:	7ff1029b          	addiw	t0,sp,2047
-    80000328:	7ffe021b          	addiw	tp,t3,2047
-    8000032c:	7ff0811b          	addiw	sp,ra,2047
-    80000330:	7ffd819b          	addiw	gp,s11,2047
-    80000334:	7ffe809b          	addiw	ra,t4,2047
-    80000338:	7ff08f9b          	addiw	t6,ra,2047
-    8000033c:	7ff7889b          	addiw	a7,a5,2047
-    80000340:	8002081b          	addiw	a6,tp,-2048 # fffffffffffff800 <_GLOBAL_OFFSET_TABLE_+0xffffffff7ffff0d8>
-    80000344:	fffc029b          	addiw	t0,s8,-1
+    800002bc:	7ffb8b1b          	addiw	s6,s7,2047
+    800002c0:	7ff38c1b          	addiw	s8,t2,2047
+    800002c4:	7ff2011b          	addiw	sp,tp,2047 # 7ff <_start-0x7ffff801>
+    800002c8:	7ff20f9b          	addiw	t6,tp,2047 # 7ff <_start-0x7ffff801>
+    800002cc:	7ff18f1b          	addiw	t5,gp,2047
+    800002d0:	7ffc8e9b          	addiw	t4,s9,2047
+    800002d4:	7ffd0e1b          	addiw	t3,s10,2047
+    800002d8:	7ff40d9b          	addiw	s11,s0,2047
+    800002dc:	7ff88c9b          	addiw	s9,a7,2047
+    800002e0:	7ff48a9b          	addiw	s5,s1,2047
+    800002e4:	7ffa0a1b          	addiw	s4,s4,2047
+    800002e8:	7ff6099b          	addiw	s3,a2,2047
+    800002ec:	7ff9091b          	addiw	s2,s2,2047
+    800002f0:	7ff8089b          	addiw	a7,a6,2047
+    800002f4:	7ff7081b          	addiw	a6,a4,2047
+    800002f8:	7ff1079b          	addiw	a5,sp,2047
+    800002fc:	7ff6871b          	addiw	a4,a3,2047
+    80000300:	7ff5069b          	addiw	a3,a0,2047
+    80000304:	7ffa861b          	addiw	a2,s5,2047
+    80000308:	7ff9859b          	addiw	a1,s3,2047
+    8000030c:	7ff5841b          	addiw	s0,a1,2047
+    80000310:	7fff819b          	addiw	gp,t6,2047
+    80000314:	7ff0851b          	addiw	a0,ra,2047
+    80000318:	7ff2029b          	addiw	t0,tp,2047 # 7ff <_start-0x7ffff801>
+    8000031c:	7ffc031b          	addiw	t1,s8,2047
+    80000320:	7ff28d1b          	addiw	s10,t0,2047
+    80000324:	7ff7849b          	addiw	s1,a5,2047
+    80000328:	7fff021b          	addiw	tp,t5,2047
+    8000032c:	7ffe8f9b          	addiw	t6,t4,2047
+    80000330:	7ff30f9b          	addiw	t6,t1,2047
+    80000334:	7ffe839b          	addiw	t2,t4,2047
+    80000338:	001e009b          	addiw	ra,t3,1
+    8000033c:	800d8e9b          	addiw	t4,s11,-2048
+    80000340:	fffb0e1b          	addiw	t3,s6,-1
+    80000344:	000e8b9b          	sext.w	s7,t4
     80000348:	0004981b          	slliw	a6,s1,0x0
     8000034c:	0008921b          	slliw	tp,a7,0x0
     80000350:	0009189b          	slliw	a7,s2,0x0
@@ -320,3 +320,12 @@ Disassembly of section .text:
     800004e0:	4007541b          	sraiw	s0,a4,0x0
     800004e4:	40065b9b          	sraiw	s7,a2,0x0
     800004e8:	400c559b          	sraiw	a1,s8,0x0
+
+00000000800004ec <exit>:
+    800004ec:	4285                	li	t0,1
+    800004ee:	00000317          	auipc	t1,0x0
+    800004f2:	29233303          	ld	t1,658(t1) # 80000780 <_GLOBAL_OFFSET_TABLE_+0x8>
+    800004f6:	00533023          	sd	t0,0(t1)
+
+00000000800004fa <spin>:
+    800004fa:	a001                	j	800004fa <spin>
