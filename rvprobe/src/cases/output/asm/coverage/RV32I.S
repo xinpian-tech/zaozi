@@ -1,4 +1,8 @@
-    slli x16, x9, 0
+    .section .text
+    .globl _start
+_start:
+
+slli x16, x9, 0
     slli x4, x17, 0
     slli x17, x18, 0
     slli x27, x21, 0
@@ -34,7 +38,7 @@
     slli x23, x12, 0
     slli x11, x24, 0
 
-    srai x16, x9, 0
+srai x16, x9, 0
     srai x4, x17, 0
     srai x17, x18, 0
     srai x27, x21, 0
@@ -70,7 +74,7 @@
     srai x23, x12, 0
     srai x11, x24, 0
 
-    srli x16, x9, 0
+srli x16, x9, 0
     srli x4, x17, 0
     srli x17, x18, 0
     srli x27, x21, 0
@@ -106,7 +110,7 @@
     srli x23, x12, 0
     srli x11, x24, 0
 
-    add x28, x3, x15
+add x28, x3, x15
     add x16, x12, x29
     add x12, x26, x10
     add x4, x1, x14
@@ -142,43 +146,43 @@
     add x26, x14, x19
     add x20, x4, x23
 
-    addi x21, x21, 2047
-    addi x21, x20, 2047
-    addi x31, x28, 2047
-    addi x29, x30, 2047
-    addi x31, x17, 2047
-    addi x22, x16, 2047
-    addi x20, x18, 2047
-    addi x19, x22, 2047
-    addi x6, x18, 2047
-    addi x18, x31, 2047
-    addi x29, x27, 2047
-    addi x28, x4, 2047
-    addi x27, x25, 2047
-    addi x26, x23, 2047
-    addi x24, x24, 2047
-    addi x1, x13, 2047
-    addi x23, x14, 2047
-    addi x15, x12, 2047
-    addi x14, x4, 2047
-    addi x13, x11, 2047
-    addi x12, x10, 2047
-    addi x11, x9, 2047
-    addi x10, x5, 2047
-    addi x9, x26, 2047
-    addi x8, x8, 2047
-    addi x7, x7, 2047
-    addi x5, x3, 2047
-    addi x4, x1, 2047
-    addi x3, x1, 2047
-    addi x2, x6, 2047
-    addi x7, x2, 2047
-    addi x16, x29, 1
-    addi x30, x1, -2048
-    addi x25, x15, -1
-    addi x17, x19, 0
+addi x15, x8, 2047
+    addi x12, x12, 2047
+    addi x24, x26, 2047
+    addi x20, x30, 2047
+    addi x14, x17, 2047
+    addi x10, x25, 2047
+    addi x9, x10, 2047
+    addi x26, x16, 2047
+    addi x27, x4, 2047
+    addi x16, x15, 2047
+    addi x30, x16, 2047
+    addi x31, x13, 2047
+    addi x29, x25, 2047
+    addi x25, x1, 2047
+    addi x18, x16, 2047
+    addi x17, x3, 0
+    addi x2, x14, 2047
+    addi x6, x2, 2047
+    addi x2, x5, 2047
+    addi x22, x19, 2047
+    addi x1, x11, 2047
+    addi x23, x28, 2047
+    addi x11, x21, 2047
+    addi x8, x31, 2047
+    addi x7, x24, 2047
+    addi x5, x27, 2047
+    addi x4, x16, 2046
+    addi x19, x29, 2047
+    addi x3, x7, 2047
+    addi x14, x20, 2047
+    addi x14, x9, 2047
+    addi x21, x23, 2047
+    addi x28, x18, -1
+    addi x14, x6, -2048
+    addi x13, x22, 1
 
-    and x11, x26, x4
+and x11, x26, x4
     and x2, x24, x18
     and x15, x18, x19
     and x22, x22, x2
@@ -214,79 +218,79 @@
     and x28, x12, x31
     and x29, x1, x9
 
-    andi x18, x3, 2047
-    andi x16, x28, 2047
-    andi x30, x1, 2047
-    andi x21, x7, 2047
-    andi x8, x26, 2047
-    andi x2, x13, 2047
-    andi x23, x14, 2047
-    andi x6, x30, 2047
-    andi x17, x6, 2047
-    andi x9, x2, 2047
-    andi x20, x9, 2047
-    andi x27, x21, 2047
-    andi x22, x16, 2047
-    andi x24, x22, 2047
-    andi x3, x9, 2047
-    andi x31, x20, 2047
-    andi x12, x8, 2047
-    andi x5, x5, 0
-    andi x26, x18, 2047
+andi x8, x27, 2047
+    andi x31, x8, 2047
+    andi x5, x7, 2047
+    andi x29, x3, 2047
+    andi x21, x14, 2047
+    andi x20, x4, 2047
     andi x4, x31, 2047
-    andi x10, x10, 2047
-    andi x21, x4, 1
-    andi x1, x23, 2047
-    andi x7, x12, 2047
-    andi x29, x14, 2047
-    andi x11, x22, 2047
-    andi x21, x11, 2047
-    andi x21, x25, 1
-    andi x25, x24, 2047
-    andi x28, x15, 2047
-    andi x19, x19, 2047
-    andi x13, x29, 2047
-    andi x21, x17, 2047
-    andi x14, x20, -2048
-    andi x15, x27, -1
+    andi x15, x28, 2047
+    andi x15, x7, 2047
+    andi x30, x13, 2047
+    andi x26, x20, 2047
+    andi x3, x24, 2047
+    andi x28, x10, 2047
+    andi x7, x18, 2047
+    andi x6, x30, 2047
+    andi x2, x22, 2047
+    andi x27, x9, 2047
+    andi x1, x1, 2047
+    andi x29, x11, 2047
+    andi x22, x17, 2047
+    andi x24, x7, 2047
+    andi x17, x19, 2047
+    andi x16, x26, 2047
+    andi x13, x25, 2047
+    andi x12, x7, 2047
+    andi x25, x5, 2047
+    andi x23, x15, 2047
+    andi x19, x2, 2047
+    andi x18, x12, 2047
+    andi x16, x21, 2047
+    andi x14, x16, 2047
+    andi x11, x6, 1
+    andi x10, x23, -2048
+    andi x9, x7, -1
+    andi x8, x29, 0
 
-    auipc x26, 524287
-    auipc x15, 524287
-    auipc x14, 524287
-    auipc x12, 524287
+auipc x1, 1048575
     auipc x6, 524287
-    auipc x3, 524287
-    auipc x27, 524287
-    auipc x28, 524287
-    auipc x28, 524287
-    auipc x19, 524287
-    auipc x29, 524287
-    auipc x9, 524287
-    auipc x12, 524287
-    auipc x25, 524287
-    auipc x12, 524287
-    auipc x16, 524287
+    auipc x18, 524288
+    auipc x23, 524288
+    auipc x22, 0
+    auipc x1, 1
+    auipc x30, 0
+    auipc x3, 524288
+    auipc x7, 0
+    auipc x8, 524288
+    auipc x9, 0
+    auipc x10, 0
     auipc x11, 524287
-    auipc x24, 524287
-    auipc x22, 524287
-    auipc x31, 524287
-    auipc x21, 524287
-    auipc x7, 524287
-    auipc x23, 524287
-    auipc x12, 524287
-    auipc x20, 524287
-    auipc x17, 524287
-    auipc x1, 524287
+    auipc x12, 524288
+    auipc x13, 524288
+    auipc x14, 0
+    auipc x15, 2
+    auipc x16, 1048575
+    auipc x17, 1048575
+    auipc x20, 524288
+    auipc x21, 1
+    auipc x22, 1048575
+    auipc x24, 1048574
+    auipc x25, 1048574
+    auipc x26, 524288
+    auipc x27, 524288
+    auipc x28, 2
+    auipc x29, 524288
+    auipc x31, 1048575
     auipc x2, 524287
-    auipc x30, 524287
-    auipc x8, 524287
-    auipc x18, 524287
-    auipc x5, 0
+    auipc x19, 524287
+    auipc x5, 524288
+    auipc x4, 524288
+    auipc x4, 0
     auipc x4, 1
-    auipc x10, 524288
-    auipc x13, 1048575
 
-    addi x1, x0, -2
+addi x1, x0, -2
     addi x2, x0, -2
     addi x3, x0, -2
     addi x4, x0, -2
@@ -327,7 +331,7 @@
     beq x27, x30, . + 4
     beq x2, x31, . + 4
 
-    addi x1, x0, -2
+addi x1, x0, -2
     addi x2, x0, -2
     addi x3, x0, -2
     addi x4, x0, -2
@@ -368,7 +372,7 @@
     bge x27, x30, . + 4
     bge x2, x31, . + 4
 
-    addi x1, x0, -2
+addi x1, x0, -2
     addi x2, x0, -2
     addi x3, x0, -2
     addi x4, x0, -2
@@ -409,7 +413,7 @@
     bgeu x27, x30, . + 4
     bgeu x2, x31, . + 4
 
-    addi x1, x0, -2
+addi x1, x0, -2
     addi x2, x0, -2
     addi x3, x0, -2
     addi x4, x0, -2
@@ -450,7 +454,7 @@
     blt x27, x30, . + 4
     blt x2, x31, . + 4
 
-    addi x1, x0, -2
+addi x1, x0, -2
     addi x2, x0, -2
     addi x3, x0, -2
     addi x4, x0, -2
@@ -491,7 +495,7 @@
     bltu x27, x30, . + 4
     bltu x2, x31, . + 4
 
-    addi x1, x0, -2
+addi x1, x0, -2
     addi x2, x0, -2
     addi x3, x0, -2
     addi x4, x0, -2
@@ -532,43 +536,43 @@
     bne x27, x30, . + 4
     bne x2, x31, . + 4
 
-    lui x29, 524287
-    lui x11, 524287
-    lui x6, 524287
-    lui x24, 524287
-    lui x10, 524287
-    lui x6, 524287
-    lui x30, 524287
-    lui x8, 524287
-    lui x18, 524287
-    lui x20, 524287
-    lui x17, 524287
-    lui x15, 524287
-    lui x6, 524287
-    lui x6, 1048575
-    lui x6, 524287
-    lui x26, 524287
-    lui x14, 524287
-    lui x28, 524287
-    lui x16, 524287
-    lui x3, 524287
-    lui x2, 524287
-    lui x9, 524287
-    lui x23, 524287
-    lui x31, 524287
-    lui x22, 524287
-    lui x27, 524287
-    lui x25, 1048574
-    lui x5, 524287
-    lui x12, 524287
-    lui x13, 524287
-    lui x4, 524287
+lui x8, 524287
     lui x7, 524287
-    lui x1, 524288
-    lui x19, 1
-    lui x21, 0
+    lui x12, 524287
+    lui x17, 524287
+    lui x6, 524287
+    lui x10, 524287
+    lui x9, 524287
+    lui x18, 524287
+    lui x11, 524287
+    lui x16, 524287
+    lui x21, 524287
+    lui x15, 524287
+    lui x23, 524287
+    lui x13, 524287
+    lui x3, 524287
+    lui x14, 524287
+    lui x26, 524287
+    lui x25, 524287
+    lui x4, 524287
+    lui x4, 524287
+    lui x4, 524287
+    lui x1, 524287
+    lui x22, 524287
+    lui x4, 524287
+    lui x4, 524287
+    lui x30, 524287
+    lui x20, 524287
+    lui x24, 524287
+    lui x2, 524287
+    lui x31, 524287
+    lui x19, 524287
+    lui x5, 0
+    lui x28, 1
+    lui x27, 524288
+    lui x29, 1048575
 
-    or x11, x26, x4
+or x11, x26, x4
     or x2, x24, x18
     or x15, x18, x19
     or x22, x22, x2
@@ -604,43 +608,43 @@
     or x28, x12, x31
     or x29, x1, x9
 
-    ori x31, x23, 2047
-    ori x13, x22, 2047
-    ori x11, x29, 2047
-    ori x24, x11, 2047
-    ori x30, x16, 2047
-    ori x22, x1, 2047
-    ori x28, x18, 2047
-    ori x27, x12, 2047
-    ori x29, x8, 2047
-    ori x23, x27, 2047
-    ori x17, x3, 2047
-    ori x21, x14, 2047
-    ori x3, x13, 2047
-    ori x19, x20, 2047
-    ori x18, x4, 2047
-    ori x17, x10, 2047
-    ori x15, x5, 2047
-    ori x3, x21, 2047
-    ori x3, x11, 2047
-    ori x14, x11, 2047
-    ori x12, x2, 2047
+ori x9, x7, 2047
+    ori x9, x11, 2047
+    ori x9, x15, 2047
+    ori x4, x6, 2047
+    ori x26, x8, 2047
+    ori x9, x22, 2047
+    ori x27, x23, 2047
+    ori x13, x16, 2047
+    ori x1, x9, 2047
     ori x25, x31, 2047
-    ori x16, x30, 2047
-    ori x10, x7, 2047
-    ori x7, x15, 2047
-    ori x6, x28, 2047
-    ori x8, x17, 2047
-    ori x5, x11, 2047
-    ori x4, x24, 2047
-    ori x9, x26, 2047
-    ori x29, x19, 2047
-    ori x2, x11, 1
-    ori x26, x25, -2048
-    ori x1, x9, -1
-    ori x20, x6, 0
+    ori x15, x18, 2047
+    ori x21, x31, 2047
+    ori x8, x22, 2047
+    ori x22, x4, 2047
+    ori x6, x3, 2047
+    ori x18, x31, 2047
+    ori x20, x26, 2047
+    ori x2, x28, 2047
+    ori x29, x10, 2047
+    ori x19, x14, 2047
+    ori x11, x24, 2047
+    ori x31, x25, 2047
+    ori x30, x2, 2047
+    ori x10, x30, 2047
+    ori x14, x20, 2047
+    ori x23, x12, 2047
+    ori x28, x1, 2047
+    ori x12, x27, 2047
+    ori x5, x1, 2047
+    ori x24, x13, 2047
+    ori x7, x19, 2047
+    ori x17, x17, 1
+    ori x9, x5, -2048
+    ori x16, x21, -1
+    ori x3, x29, 0
 
-    sll x11, x26, x4
+sll x11, x26, x4
     sll x2, x24, x18
     sll x15, x18, x19
     sll x22, x22, x2
@@ -676,7 +680,7 @@
     sll x28, x12, x31
     sll x29, x1, x9
 
-    slt x11, x26, x4
+slt x11, x26, x4
     slt x2, x24, x18
     slt x15, x18, x19
     slt x22, x22, x2
@@ -712,79 +716,79 @@
     slt x28, x12, x31
     slt x29, x1, x9
 
-    slti x24, x9, 2047
-    slti x29, x27, 2047
-    slti x8, x4, 2047
-    slti x23, x8, 2047
-    slti x6, x13, 2047
-    slti x3, x18, 2047
-    slti x2, x11, 2047
-    slti x1, x22, 2047
-    slti x16, x11, 2047
-    slti x10, x20, 2047
-    slti x12, x25, 2047
-    slti x25, x2, 2047
-    slti x28, x7, 2047
-    slti x26, x21, 2047
-    slti x19, x17, 2047
-    slti x30, x28, 2047
-    slti x18, x31, 2047
-    slti x15, x30, 2047
-    slti x9, x23, 2047
-    slti x13, x14, 2047
-    slti x18, x11, 2047
+slti x31, x22, 2047
+    slti x22, x28, 2047
+    slti x30, x2, 1
+    slti x29, x3, 2047
+    slti x28, x25, 2047
+    slti x27, x17, 2047
+    slti x20, x30, 2047
+    slti x31, x27, 2047
+    slti x15, x20, 2047
+    slti x24, x26, 2047
+    slti x24, x13, 2047
+    slti x19, x23, 2047
+    slti x18, x15, 2047
+    slti x17, x5, 2047
+    slti x23, x21, 2047
+    slti x3, x19, 2047
+    slti x30, x14, 2047
+    slti x26, x11, 2047
+    slti x13, x2, 2047
+    slti x11, x8, 2047
+    slti x10, x6, 2047
+    slti x9, x7, 2047
+    slti x8, x9, 2047
+    slti x16, x10, 2047
+    slti x12, x12, 2047
+    slti x14, x18, 2047
+    slti x21, x4, 2047
+    slti x6, x1, 2047
+    slti x5, x1, 2047
     slti x4, x1, 2047
-    slti x21, x5, 2047
-    slti x31, x10, 2047
-    slti x18, x29, 2047
-    slti x7, x26, 2047
-    slti x14, x19, 2047
-    slti x17, x6, 2047
-    slti x18, x16, 2047
-    slti x18, x3, 2047
-    slti x27, x24, 2047
-    slti x11, x15, 1
-    slti x22, x11, -2048
-    slti x20, x12, -1
-    slti x5, x11, 0
+    slti x2, x29, 2047
+    slti x1, x16, 2047
+    slti x28, x24, -2048
+    slti x25, x4, 0
+    slti x7, x31, -1
 
-    sltiu x11, x5, 1
-    sltiu x6, x24, 1
-    sltiu x30, x7, 1
-    sltiu x7, x13, 1
-    sltiu x28, x15, 1
-    sltiu x29, x11, 1
-    sltiu x29, x6, 1
-    sltiu x9, x15, 1
-    sltiu x18, x29, 1
-    sltiu x31, x21, 1
-    sltiu x17, x27, 1
-    sltiu x10, x17, 1
-    sltiu x23, x15, 1
-    sltiu x16, x31, 1
-    sltiu x14, x18, 1
-    sltiu x20, x9, 1
-    sltiu x24, x15, 1
-    sltiu x13, x2, 1
-    sltiu x8, x22, 1
-    sltiu x10, x16, 1
-    sltiu x22, x25, 1
-    sltiu x1, x20, 1
-    sltiu x7, x12, 1
-    sltiu x1, x3, 1
-    sltiu x15, x14, 1
-    sltiu x25, x15, 1
-    sltiu x12, x4, 2047
-    sltiu x5, x28, 1
-    sltiu x4, x1, 1
-    sltiu x26, x23, 1
-    sltiu x2, x10, 1
-    sltiu x3, x30, 1
-    sltiu x27, x19, -2048
-    sltiu x21, x26, -1
-    sltiu x19, x8, 0
+sltiu x18, x31, 2047
+    sltiu x30, x31, 2047
+    sltiu x30, x29, 2047
+    sltiu x28, x4, 2047
+    sltiu x31, x30, 2047
+    sltiu x30, x26, 2047
+    sltiu x29, x25, 1
+    sltiu x26, x5, 2047
+    sltiu x25, x6, 2047
+    sltiu x24, x8, 2047
+    sltiu x23, x9, 2047
+    sltiu x22, x17, 2047
+    sltiu x21, x18, 2047
+    sltiu x20, x19, 2047
+    sltiu x7, x22, 2047
+    sltiu x6, x27, 2047
+    sltiu x27, x24, 2047
+    sltiu x19, x7, 2047
+    sltiu x9, x3, 2047
+    sltiu x8, x28, 2047
+    sltiu x4, x23, 2047
+    sltiu x1, x15, 2047
+    sltiu x17, x1, 2047
+    sltiu x16, x14, 2047
+    sltiu x15, x13, 2047
+    sltiu x14, x12, 2047
+    sltiu x13, x11, 2047
+    sltiu x12, x10, 2047
+    sltiu x11, x2, -2048
+    sltiu x10, x1, 2047
+    sltiu x3, x21, 2047
+    sltiu x1, x16, 2047
+    sltiu x17, x1, 2047
+    sltiu x2, x1, -1
+    sltiu x5, x20, 0
 
-    sltu x11, x26, x4
+sltu x11, x26, x4
     sltu x2, x24, x18
     sltu x15, x18, x19
     sltu x22, x22, x2
@@ -820,7 +824,7 @@
     sltu x28, x12, x31
     sltu x29, x1, x9
 
-    sra x11, x26, x4
+sra x11, x26, x4
     sra x2, x24, x18
     sra x15, x18, x19
     sra x22, x22, x2
@@ -856,7 +860,7 @@
     sra x28, x12, x31
     sra x29, x1, x9
 
-    srl x11, x26, x4
+srl x11, x26, x4
     srl x2, x24, x18
     srl x15, x18, x19
     srl x22, x22, x2
@@ -892,7 +896,7 @@
     srl x28, x12, x31
     srl x29, x1, x9
 
-    sub x11, x26, x4
+sub x11, x26, x4
     sub x2, x24, x18
     sub x15, x18, x19
     sub x22, x22, x2
@@ -928,7 +932,7 @@
     sub x28, x12, x31
     sub x29, x1, x9
 
-    xor x11, x26, x4
+xor x11, x26, x4
     xor x2, x24, x18
     xor x15, x18, x19
     xor x22, x22, x2
@@ -964,38 +968,54 @@
     xor x28, x12, x31
     xor x29, x1, x9
 
-    xori x2, x10, -2048
-    xori x2, x24, 2047
-    xori x28, x19, 2047
-    xori x26, x27, 2047
-    xori x16, x15, 2047
-    xori x18, x12, 2047
-    xori x13, x13, 2047
-    xori x22, x18, 2047
-    xori x12, x20, 2047
-    xori x4, x8, 2047
-    xori x24, x6, 2047
-    xori x20, x7, 2047
-    xori x6, x9, 2047
-    xori x21, x3, 2047
-    xori x23, x4, 2047
-    xori x19, x31, 2047
-    xori x29, x16, 2047
-    xori x15, x17, 2047
-    xori x7, x2, 2047
-    xori x20, x1, 2047
-    xori x2, x2, 2047
-    xori x30, x2, 2047
-    xori x5, x26, 2047
-    xori x9, x11, 2047
-    xori x27, x22, 2047
-    xori x8, x29, 2047
-    xori x10, x5, 2047
-    xori x25, x25, 2047
-    xori x11, x28, 2047
-    xori x14, x1, 2047
-    xori x1, x23, 2047
-    xori x3, x21, 0
-    xori x20, x1, -2048
-    xori x31, x14, 1
-    xori x17, x30, -1
+xori x9, x30, 2047
+    xori x4, x16, 2047
+    xori x10, x8, 2047
+    xori x29, x26, 2047
+    xori x27, x10, 2047
+    xori x8, x17, 2047
+    xori x14, x11, 2047
+    xori x26, x30, 2047
+    xori x24, x22, 2047
+    xori x23, x29, 2047
+    xori x22, x23, 2047
+    xori x21, x21, 2047
+    xori x20, x9, 2047
+    xori x18, x31, 2047
+    xori x31, x19, 2047
+    xori x3, x12, 2047
+    xori x30, x15, 2047
+    xori x29, x27, 2047
+    xori x28, x2, 2047
+    xori x5, x18, 2047
+    xori x6, x24, 2047
+    xori x25, x4, 2047
+    xori x16, x13, 2047
+    xori x16, x20, 2047
+    xori x11, x7, 2047
+    xori x15, x6, 2047
+    xori x1, x1, 2047
+    xori x2, x3, 2047
+    xori x22, x1, 2047
+    xori x17, x5, 2047
+    xori x7, x31, 2047
+    xori x12, x28, 1
+    xori x31, x14, -2048
+    xori x19, x1, -1
+    xori x13, x25, 0
+
+exit:
+    addi x5, x0, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin:
+    j spin
+
+    .section .tohost,"aw",@progbits
+    .align 6
+    .globl tohost
+    .globl fromhost
+tohost:
+    .dword 0x0
+fromhost:
+    .dword 0x0

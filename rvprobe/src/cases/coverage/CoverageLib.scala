@@ -18,12 +18,39 @@ import java.lang.foreign.Arena
   */
 object CoverageLib:
   private val CoverageSectionSeparator = "\n\n"
+  private val BaremetalPreamble =
+    """    .section .text
+      |    .globl _start
+      |_start:""".stripMargin
+  private val BaremetalEpilogue =
+    """exit:
+      |    addi x5, x0, 1
+      |    la x6, tohost
+      |    sd x5, 0(x6)
+      |spin:
+      |    j spin
+      |
+      |    .section .tohost,"aw",@progbits
+      |    .align 6
+      |    .globl tohost
+      |    .globl fromhost
+      |tohost:
+      |    .dword 0x0
+      |fromhost:
+      |    .dword 0x0""".stripMargin
 
   def writeCoverageAsm(
     outputPath: String,
     generators: RVGenerator*
   ): Unit =
-    val content = generators.map(_.toRecipeAsm()).mkString(CoverageSectionSeparator) + "\n"
+    val body = generators.map(_.toRecipeAsm().trim).mkString(CoverageSectionSeparator)
+    val content =
+      s"""$BaremetalPreamble
+         |
+         |$body
+         |
+         |$BaremetalEpilogue
+         |""".stripMargin
     os.write.over(os.Path(outputPath, os.pwd), content, createFolders = true)
 
   /** All non-zero registers: x1..x31 */
