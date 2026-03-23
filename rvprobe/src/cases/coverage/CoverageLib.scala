@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
+import me.jiuyang.rvprobe.cases.HTIFLib
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
@@ -18,26 +19,11 @@ import java.lang.foreign.Arena
   */
 object CoverageLib:
   private val CoverageSectionSeparator = "\n\n"
-  private val BaremetalPreamble =
-    """    .section .text
-      |    .globl _start
-      |_start:""".stripMargin
+  private val BaremetalPreamble = HTIFLib.asmTextStart()
   private val BaremetalEpilogue =
-    """exit:
-      |    addi x5, x0, 1
-      |    la x6, tohost
-      |    sd x5, 0(x6)
-      |spin:
-      |    j spin
-      |
-      |    .section .tohost,"aw",@progbits
-      |    .align 6
-      |    .globl tohost
-      |    .globl fromhost
-      |tohost:
-      |    .dword 0x0
-      |fromhost:
-      |    .dword 0x0""".stripMargin
+    s"""${HTIFLib.asmExit()}
+       |
+       |${HTIFLib.asmTohostSection()}""".stripMargin
 
   def writeCoverageAsm(
     outputPath: String,

@@ -49,14 +49,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       bne(x11, x12, "fail")
       j("exit")
 
-      label("fail")
-      la(x6, "tohost")
-      sd(x6, x0, 0)
-      label("spin_fail")
-      j("spin_fail")
+      fail()
 
-      exitSeq()
-      tohostSection()
+      finish()
       pageTableData()
       trapResultData()
 
@@ -96,14 +91,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       bne(x11, x12, "fail")
       j("exit")
 
-      label("fail")
-      la(x6, "tohost")
-      sd(x6, x0, 0)
-      label("spin_fail")
-      j("spin_fail")
+      fail()
 
-      exitSeq()
-      tohostSection()
+      finish()
       pageTableData()
       trapResultData()
 
@@ -154,14 +144,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       bne(x11, x12, "fail")
       j("exit")
 
-      label("fail")
-      la(x6, "tohost")
-      sd(x6, x0, 0)
-      label("spin_fail")
-      j("spin_fail")
+      fail()
 
-      exitSeq()
-      tohostSection()
+      finish()
       pageTableData()
       trapResultData()
 

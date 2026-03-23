@@ -42,7 +42,7 @@ import me.jiuyang.rvprobe.cases.privilege.CSR
       fsubS(x16, 1, x16, x17)
       froundS(x17, 7, x16)
 
-      exitSeq()
+      exit()
 
       align(2)
       label("switch_to_s_mode")

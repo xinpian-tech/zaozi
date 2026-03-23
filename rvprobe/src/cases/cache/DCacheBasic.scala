@@ -20,7 +20,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       timed(x14, x15, x17) { lw(x11, x5, 0) } // hit
       lw(x12, x5, 0) // hit
 
-      exitSeq()
+      exit()
       initializedWordBuffer("buf", 0x12345678L)
       tohostSection()
   DCacheHitMiss.emit(outputPath)
@@ -40,7 +40,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       lw(x10, x5, CacheLineBytes)     // miss (next line)
       lw(x11, x5, CacheLineBytes + 4) // hit
 
-      exitSeq()
+      exit()
       dataBuffer("buf", CacheLineBytes * 4)
       tohostSection()
   DCacheLineFill.emit(outputPath)
@@ -62,7 +62,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       addi(x6, x6, CacheLineBytes - 4)
       ld(x12, x6, 0) // 8-byte load straddling 64B boundary
 
-      exitSeq()
+      exit()
       dataBuffer("buf", CacheLineBytes * 4)
       tohostSection()
   DCacheCrossLine.emit(outputPath)

@@ -22,8 +22,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       addi(x20, x20, -1)
       bnez(x20, "icache_loop")
 
-      exitSeq()
-      tohostSection()
+      finish()
   ICacheSequentialFetch.emit(outputPath)
 
 // Sequence P: jump over cold code area — non-sequential fetch
@@ -38,8 +37,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       label("target_far")
       addi(x10, x10, 1)
 
-      exitSeq()
-      tohostSection()
+      finish()
   ICacheJumpCold.emit(outputPath)
 
 // Sequence Q: self-modifying code + fence.i — I-cache invalidation
@@ -61,7 +59,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       jal(x1, "code_area") // execute modified
       // x10 = 2
 
-      exitSeq()
+      exit()
 
       align(2)
       label("code_area")

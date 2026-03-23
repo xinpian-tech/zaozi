@@ -32,7 +32,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       sw(x5, x0, 0)
       fence(x0, x0, 3, 3, 0) // fence rw, rw
 
-      exitSeq()
+      exit()
       dataBuffers("lock" -> CacheLineBytes, "shared_data" -> CacheLineBytes)
       tohostSection()
   DCacheLrSc.emit(outputPath)
@@ -56,7 +56,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
       lw(x15, x5, 0) // should read 200
 
-      exitSeq()
+      exit()
       dataBuffer("amo_buf", CacheLineBytes)
       tohostSection()
   DCacheAmoOps.emit(outputPath)
