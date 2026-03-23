@@ -6,9 +6,9 @@ By default, scans `rvprobe/src/cases/output/asm/**/*.S` and writes
 matching `.elf`, `.bin`, and `.objdump` files under `rvprobe/src/cases/output/elf/`.
 
 Examples:
-    python3 rvprobe/scripts/asm2bin.py
-    python3 rvprobe/scripts/asm2bin.py rvprobe/src/cases/output/asm/cache/DCacheHitMiss.S
-    python3 rvprobe/scripts/asm2bin.py --asm-root rvprobe/src/cases/output/asm --elf-root rvprobe/src/cases/output/elf
+    python3 rvprobe/scripts/asm2elf.py
+    python3 rvprobe/scripts/asm2elf.py rvprobe/src/cases/output/asm/cache/DCacheHitMiss.S
+    python3 rvprobe/scripts/asm2elf.py --asm-root rvprobe/src/cases/output/asm --elf-root rvprobe/src/cases/output/elf
 """
 
 from __future__ import annotations

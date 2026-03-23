@@ -499,6 +499,51 @@ trait RVGenerator:
     if (raw.testBit(total - 1)) raw - (BigInt(1) << total) else raw
   }
 
+  private def signedFieldValue(
+    idx:    Int,
+    name:   String,
+    width:  Int,
+    solved: Map[String, BigInt]
+  ): BigInt = {
+    def key(n: String): String =
+      val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
+    val raw = solved.getOrElse(key(name), BigInt(0)) & ((BigInt(1) << width) - 1)
+    if (raw.testBit(width - 1)) raw - (BigInt(1) << width) else raw
+  }
+
+  private def unsignedFieldValue(
+    idx:    Int,
+    name:   String,
+    width:  Int,
+    solved: Map[String, BigInt]
+  ): BigInt = {
+    def key(n: String): String =
+      val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
+    solved.getOrElse(key(name), BigInt(0)) & ((BigInt(1) << width) - 1)
+  }
+
+  private def fenceMaskToGas(mask: Int): String = {
+    val ordered = Seq(8 -> "i", 4 -> "o", 2 -> "r", 1 -> "w")
+    val rendered = ordered.collect { case (bit, label) if (mask & bit) != 0 => label }.mkString
+    if rendered.isEmpty then "0" else rendered
+  }
+
+  private def withAqRlSuffix(
+    idx:    Int,
+    solved: Map[String, BigInt],
+    base:   String
+  ): String = {
+    def key(n: String): String =
+      val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
+    val aq = solved.getOrElse(key("aq"), BigInt(0)).toInt
+    val rl = solved.getOrElse(key("rl"), BigInt(0)).toInt
+    (aq, rl) match
+      case (0, 0) => base
+      case (1, 0) => s"$base.aq"
+      case (0, 1) => s"$base.rl"
+      case _      => s"$base.aqrl"
+  }
+
   /** Format a single solved instruction as a GAS assembly line (without indentation).
     *
     * Handles the main RISC-V base/extension instruction formats:
@@ -644,6 +689,8 @@ trait RVGenerator:
       val prefix = if isFpReg(instName, n) then "f" else "x"
       s"$prefix$num"
     def immVal(n: String): String = solved.getOrElse(key(n), BigInt(0)).toString
+    def signedImm(n: String, width: Int): String = signedFieldValue(idx, n, width, solved).toString
+    def unsignedImm(n: String, width: Int): String = unsignedFieldValue(idx, n, width, solved).toString
     def csrVal:            String =
       val num = solved.getOrElse(key("csr"), BigInt(0)).toInt
       csrNumberToName.getOrElse(num, s"0x${num.toHexString}")
@@ -666,7 +713,24 @@ trait RVGenerator:
     val hasImm20 = names("imm20")
     val hasShamt = names("shamt") || names("shamtw") || names("shamtd")
 
-    if (!hasRd && !hasRs1 && !hasRs2 && hasJimm)
+    if instName == "fence.tso" then
+      "fence.tso"
+    else if instName == "fence.i" then
+      "fence.i"
+    else if instName == "fence" && names("pred") && names("succ") then
+      val pred = solved.getOrElse(key("pred"), BigInt(0)).toInt
+      val succ = solved.getOrElse(key("succ"), BigInt(0)).toInt
+      s"fence ${fenceMaskToGas(pred)}, ${fenceMaskToGas(succ)}"
+    else if instName.startsWith("lr.") then
+      val mnemonic = withAqRlSuffix(idx, solved, instName)
+      s"$mnemonic ${regVal("rd")}, (${regVal("rs1")})"
+    else if instName.startsWith("sc.") then
+      val mnemonic = withAqRlSuffix(idx, solved, instName)
+      s"$mnemonic ${regVal("rd")}, ${regVal("rs2")}, (${regVal("rs1")})"
+    else if instName.startsWith("amo") || instName.startsWith("ssamo") then
+      val mnemonic = withAqRlSuffix(idx, solved, instName)
+      s"$mnemonic ${regVal("rd")}, ${regVal("rs2")}, (${regVal("rs1")})"
+    else if (!hasRd && !hasRs1 && !hasRs2 && hasJimm)
       // Unconditional jump pseudo (j): jimm only, implicit rd=x0
       s"$instName . + ${immVal("jimm20")}"
     else if (!hasRd && !hasRs1 && !hasRs2 && !hasJimm)
@@ -686,10 +750,10 @@ trait RVGenerator:
       s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${immVal(sName)}"
     else if (hasRd && hasRs1 && !hasRs2 && hasImm12 && isLoadInstruction(instName))
       // Load
-      s"$instName ${regVal("rd")}, ${immVal("imm12")}(${regVal("rs1")})"
+      s"$instName ${regVal("rd")}, ${signedImm("imm12", 12)}(${regVal("rs1")})"
     else if (hasRd && hasRs1 && !hasRs2 && hasImm12)
       // I-type ALU / JALR
-      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${immVal("imm12")}"
+      s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${signedImm("imm12", 12)}"
     else if (!hasRd && hasRs1 && hasRs2 && hasSplit)
       // Store
       val imm = combineSignedImm("imm12hi", "imm12lo", 7, 5, idx, solved)
@@ -707,7 +771,7 @@ trait RVGenerator:
       s"$instName ${regVal("rd")}, . + ${immVal("jimm20")}"
     else if (hasRd && hasImm20)
       // LUI / AUIPC
-      s"$instName ${regVal("rd")}, ${immVal("imm20")}"
+      s"$instName ${regVal("rd")}, ${unsignedImm("imm20", 20)}"
     // === CSR instructions ===
     else if (hasCsr && hasRd && hasRs1)
       // csrrw rd, csr, rs1 / csrrs rd, csr, rs1 / csrrc rd, csr, rs1
