@@ -6,7 +6,7 @@
 #
 # Usage:
 #   roundtrip-test.sh [file.S ...]
-#   No args → runs all .S files in rvprobe/src/cases/probes/
+#   No args → runs all .S files in rvprobe/src/cases/output/privilege/
 #   With args → runs specified .S files only
 
 set -euo pipefail
@@ -17,7 +17,8 @@ ASM2DSL="$REPO_ROOT/rvprobe/scripts/asm2dsl.py"
 WRAP_DSL="$SCRIPT_DIR/wrap_dsl.py"
 COMPARE="$SCRIPT_DIR/compare_objdump.py"
 LINKER_SCRIPT="$SCRIPT_DIR/baremetal.ld"
-PROBES_DIR="$REPO_ROOT/rvprobe/src/cases/probes"
+PROBES_DIR="$REPO_ROOT/rvprobe/src/cases/output/privilege"
+GENERATED_DIR="$REPO_ROOT/rvprobe/src/cases/privilege"
 
 CC="riscv64-unknown-linux-gnu-gcc"
 OBJDUMP="riscv64-unknown-linux-gnu-objdump"
@@ -51,7 +52,7 @@ run_test() {
   work_dir="$(mktemp -d)"
   trap "rm -rf '$work_dir'" RETURN
 
-  local gen_scala="$PROBES_DIR/${class_name}.scala"
+  local gen_scala="$GENERATED_DIR/${class_name}.scala"
   local output_s="$work_dir/output.S"
 
   echo -n "Testing $basename... "
@@ -66,7 +67,7 @@ run_test() {
   fi
 
   # Step 2: mill runMain to generate output.S
-  if ! mill -i rvprobe.runMain "me.jiuyang.rvprobe.cases.probes.$class_name" "$output_s" >"$work_dir/mill.out" 2>&1; then
+  if ! mill -i rvprobe.runMain "me.jiuyang.rvprobe.cases.privilege.$class_name" "$output_s" >"$work_dir/mill.out" 2>&1; then
     echo -e "${RED}FAIL${NC} (mill runMain failed)"
     cat "$work_dir/mill.out" >&2
     rm -f "$gen_scala"

@@ -80,7 +80,8 @@ cases/
 │   └── RVLoadStore.scala      — 加载/存储覆盖率（lb/lbu/lh/lhu/lw/lwu/ld/sb/sh/sw/sd）
 ├── output/                    — 预生成的 .S 汇编文件（镜像源码目录结构）
 │   ├── privilege/Program.S
-│   └── cache/*.S
+│   ├── cache/*.S
+│   └── coverage/*.S
 ```
 
 每个目录以被测功能命名（cache、privilege），未来可扩展更多功能目录（如 mmu、vector 等）。
@@ -120,6 +121,7 @@ cases/
 
 | 日期 | 内容 |
 |------|------|
+| 2026-03-23 | 删除重复的 probes 目录并迁移 roundtrip 脚本到 privilege；新增 output/coverage 预生成汇编 |
 | 2026-03-21 | cache case 抽取公共几何/sets helper，`li/la` 改为 `Statement.Pseudo`，新增 20 个 cache golden tests |
 | 2026-03-19 | AsmApi 返回 Int idx 支持 CoverApi；提取 CoverageLib 重构覆盖率测试 |
 | 2026-03-19 | 新建 cases/coverage/ 目录，迁移 RV32I，添加 RV64I/RVM/RVLoadStore 覆盖率测试 |

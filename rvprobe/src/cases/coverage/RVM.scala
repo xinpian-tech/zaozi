@@ -7,12 +7,9 @@ import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
 import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
-import java.nio.file.{Files, Paths}
-import scala.util.control.NonFatal
-
 // M-extension coverage: multiply/divide/remainder (13 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RVM
-@main def RVM(outputPath: String = "out/rvm.bin"): Unit =
+@main def RVM(outputPath: String = "rvprobe/src/cases/output/coverage/RVM.S"): Unit =
   val n = 35
 
   // --- Base M (rv_m) ---
@@ -69,19 +66,4 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() = rType(n, isRemuw())
 
-  try Files.deleteIfExists(Paths.get(outputPath))
-  catch case NonFatal(e) => System.err.println(s"warning: failed to delete ${outputPath}: ${e.getMessage}")
-
-  Mul.writeInstructionsToFile(outputPath)
-  Mulh.writeInstructionsToFile(outputPath)
-  Mulhsu.writeInstructionsToFile(outputPath)
-  Mulhu.writeInstructionsToFile(outputPath)
-  Div.writeInstructionsToFile(outputPath)
-  Divu.writeInstructionsToFile(outputPath)
-  Rem.writeInstructionsToFile(outputPath)
-  Remu.writeInstructionsToFile(outputPath)
-  Mulw.writeInstructionsToFile(outputPath)
-  Divw.writeInstructionsToFile(outputPath)
-  Divuw.writeInstructionsToFile(outputPath)
-  Remw.writeInstructionsToFile(outputPath)
-  Remuw.writeInstructionsToFile(outputPath)
+  writeCoverageAsm(outputPath, Mul, Mulh, Mulhsu, Mulhu, Div, Divu, Rem, Remu, Mulw, Divw, Divuw, Remw, Remuw)
