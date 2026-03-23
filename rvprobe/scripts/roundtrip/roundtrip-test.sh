@@ -6,7 +6,7 @@
 #
 # Usage:
 #   roundtrip-test.sh [file.S ...]
-#   No args → runs all .S files in rvprobe/src/cases/output/privilege/
+#   No args → runs all .S files in rvprobe/src/cases/output/asm/privilege/
 #   With args → runs specified .S files only
 
 set -euo pipefail
@@ -17,7 +17,7 @@ ASM2DSL="$REPO_ROOT/rvprobe/scripts/asm2dsl.py"
 WRAP_DSL="$SCRIPT_DIR/wrap_dsl.py"
 COMPARE="$SCRIPT_DIR/compare_objdump.py"
 LINKER_SCRIPT="$SCRIPT_DIR/baremetal.ld"
-PROBES_DIR="$REPO_ROOT/rvprobe/src/cases/output/privilege"
+PROBES_DIR="$REPO_ROOT/rvprobe/src/cases/output/asm/privilege"
 GENERATED_DIR="$REPO_ROOT/rvprobe/src/cases/privilege"
 
 CC="riscv64-unknown-linux-gnu-gcc"

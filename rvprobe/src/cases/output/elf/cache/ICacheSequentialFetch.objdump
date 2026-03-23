@@ -1,0 +1,37 @@
+
+/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/cache/ICacheSequentialFetch.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	06400a13          	li	s4,100
+
+0000000080000004 <icache_loop>:
+    80000004:	0001                	nop
+    80000006:	0001                	nop
+    80000008:	0001                	nop
+    8000000a:	0001                	nop
+    8000000c:	0001                	nop
+    8000000e:	0001                	nop
+    80000010:	0001                	nop
+    80000012:	0001                	nop
+    80000014:	0001                	nop
+    80000016:	0001                	nop
+    80000018:	0001                	nop
+    8000001a:	0001                	nop
+    8000001c:	0001                	nop
+    8000001e:	0001                	nop
+    80000020:	0001                	nop
+    80000022:	0001                	nop
+    80000024:	1a7d                	addi	s4,s4,-1
+    80000026:	fc0a1fe3          	bnez	s4,80000004 <icache_loop>
+
+000000008000002a <exit>:
+    8000002a:	4285                	li	t0,1
+    8000002c:	00000317          	auipc	t1,0x0
+    80000030:	29433303          	ld	t1,660(t1) # 800002c0 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000034:	00533023          	sd	t0,0(t1)
+
+0000000080000038 <spin>:
+    80000038:	a001                	j	80000038 <spin>

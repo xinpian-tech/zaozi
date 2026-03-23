@@ -9,7 +9,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 // Load/store instruction coverage (11 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RVLoadStore
-@main def RVLoadStore(outputPath: String = "rvprobe/src/cases/output/coverage/RVLoadStore.S"): Unit =
+@main def RVLoadStore(outputPath: String = "rvprobe/src/cases/output/asm/coverage/RVLoadStore.S"): Unit =
   val n = 35
 
   // --- Loads ---

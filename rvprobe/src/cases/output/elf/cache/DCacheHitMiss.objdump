@@ -1,0 +1,27 @@
+
+/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/cache/DCacheHitMiss.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	00000297          	auipc	t0,0x0
+    80000004:	3382b283          	ld	t0,824(t0) # 80000338 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000008:	c0002773          	rdcycle	a4
+    8000000c:	0002a503          	lw	a0,0(t0)
+    80000010:	c00027f3          	rdcycle	a5
+    80000014:	40e78833          	sub	a6,a5,a4
+    80000018:	c0002773          	rdcycle	a4
+    8000001c:	0002a583          	lw	a1,0(t0)
+    80000020:	c00027f3          	rdcycle	a5
+    80000024:	40e788b3          	sub	a7,a5,a4
+    80000028:	0002a603          	lw	a2,0(t0)
+
+000000008000002c <exit>:
+    8000002c:	4285                	li	t0,1
+    8000002e:	00000317          	auipc	t1,0x0
+    80000032:	31233303          	ld	t1,786(t1) # 80000340 <_GLOBAL_OFFSET_TABLE_+0x10>
+    80000036:	00533023          	sd	t0,0(t1)
+
+000000008000003a <spin>:
+    8000003a:	a001                	j	8000003a <spin>

@@ -9,7 +9,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 // RV32I base integer instruction coverage (27 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I
-@main def RV32I(outputPath: String = "rvprobe/src/cases/output/coverage/RV32I.S"): Unit =
+@main def RV32I(outputPath: String = "rvprobe/src/cases/output/asm/coverage/RV32I.S"): Unit =
   val n = 35
 
   // --- Shift-immediate ---
