@@ -7,12 +7,9 @@ import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
 import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
-import java.nio.file.{Files, Paths}
-import scala.util.control.NonFatal
-
 // RV32I base integer instruction coverage (27 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I
-@main def RV32I(outputPath: String = "out/rv32i.bin"): Unit =
+@main def RV32I(outputPath: String = "rvprobe/src/cases/output/coverage/RV32I.S"): Unit =
   val n = 35
 
   // --- Shift-immediate ---
@@ -128,35 +125,33 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() = branch(n, isBne())
 
-  // clear the output file if it exists
-  try Files.deleteIfExists(Paths.get(outputPath))
-  catch case NonFatal(e) => System.err.println(s"warning: failed to delete ${outputPath}: ${e.getMessage}")
-
-  // write instructions to the output file
-  Slli.writeInstructionsToFile(outputPath)
-  Srai.writeInstructionsToFile(outputPath)
-  Srli.writeInstructionsToFile(outputPath)
-  Add.writeInstructionsToFile(outputPath)
-  Addi.writeInstructionsToFile(outputPath)
-  And.writeInstructionsToFile(outputPath)
-  Andi.writeInstructionsToFile(outputPath)
-  Auipc.writeInstructionsToFile(outputPath)
-  Beq.writeInstructionsToFile(outputPath)
-  Bge.writeInstructionsToFile(outputPath)
-  Bgeu.writeInstructionsToFile(outputPath)
-  Blt.writeInstructionsToFile(outputPath)
-  Bltu.writeInstructionsToFile(outputPath)
-  Bne.writeInstructionsToFile(outputPath)
-  Lui.writeInstructionsToFile(outputPath)
-  Or.writeInstructionsToFile(outputPath)
-  Ori.writeInstructionsToFile(outputPath)
-  Sll.writeInstructionsToFile(outputPath)
-  Slt.writeInstructionsToFile(outputPath)
-  Slti.writeInstructionsToFile(outputPath)
-  Sltiu.writeInstructionsToFile(outputPath)
-  Sltu.writeInstructionsToFile(outputPath)
-  Sra.writeInstructionsToFile(outputPath)
-  Srl.writeInstructionsToFile(outputPath)
-  Sub.writeInstructionsToFile(outputPath)
-  Xor.writeInstructionsToFile(outputPath)
-  Xori.writeInstructionsToFile(outputPath)
+  writeCoverageAsm(
+    outputPath,
+    Slli,
+    Srai,
+    Srli,
+    Add,
+    Addi,
+    And,
+    Andi,
+    Auipc,
+    Beq,
+    Bge,
+    Bgeu,
+    Blt,
+    Bltu,
+    Bne,
+    Lui,
+    Or,
+    Ori,
+    Sll,
+    Slt,
+    Slti,
+    Sltiu,
+    Sltu,
+    Sra,
+    Srl,
+    Sub,
+    Xor,
+    Xori
+  )

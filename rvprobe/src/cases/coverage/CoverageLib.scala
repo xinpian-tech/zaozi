@@ -17,6 +17,14 @@ import java.lang.foreign.Arena
   * what's unique (the opcode and which fields to cover).
   */
 object CoverageLib:
+  private val CoverageSectionSeparator = "\n\n"
+
+  def writeCoverageAsm(
+    outputPath: String,
+    generators: RVGenerator*
+  ): Unit =
+    val content = generators.map(_.toRecipeAsm()).mkString(CoverageSectionSeparator) + "\n"
+    os.write.over(os.Path(outputPath, os.pwd), content, createFolders = true)
 
   /** All non-zero registers: x1..x31 */
   def allRegs(

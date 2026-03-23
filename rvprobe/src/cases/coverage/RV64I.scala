@@ -7,12 +7,9 @@ import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
 import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
-import java.nio.file.{Files, Paths}
-import scala.util.control.NonFatal
-
 // RV64I word-width operations coverage (9 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV64I
-@main def RV64I(outputPath: String = "out/rv64i.bin"): Unit =
+@main def RV64I(outputPath: String = "rvprobe/src/cases/output/coverage/RV64I.S"): Unit =
   val n = 35
 
   // --- R-type word ---
@@ -54,15 +51,4 @@ import scala.util.control.NonFatal
     val sets          = isRV64GC()
     def constraints() = shiftImm(n, isSraiw())
 
-  try Files.deleteIfExists(Paths.get(outputPath))
-  catch case NonFatal(e) => System.err.println(s"warning: failed to delete ${outputPath}: ${e.getMessage}")
-
-  Addw.writeInstructionsToFile(outputPath)
-  Subw.writeInstructionsToFile(outputPath)
-  Sllw.writeInstructionsToFile(outputPath)
-  Srlw.writeInstructionsToFile(outputPath)
-  Sraw.writeInstructionsToFile(outputPath)
-  Addiw.writeInstructionsToFile(outputPath)
-  Slliw.writeInstructionsToFile(outputPath)
-  Srliw.writeInstructionsToFile(outputPath)
-  Sraiw.writeInstructionsToFile(outputPath)
+  writeCoverageAsm(outputPath, Addw, Subw, Sllw, Srlw, Sraw, Addiw, Slliw, Srliw, Sraiw)
