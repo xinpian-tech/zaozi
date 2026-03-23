@@ -78,10 +78,12 @@ cases/
 │   ├── RV64I.scala            — RV64I word 操作覆盖率（addw/subw/sllw/srlw/sraw/addiw/slliw/srliw/sraiw）
 │   ├── RVM.scala              — M 扩展覆盖率（mul/div/rem 全系列 + 64 位 word 变体）
 │   └── RVLoadStore.scala      — 加载/存储覆盖率（lb/lbu/lh/lhu/lw/lwu/ld/sb/sh/sw/sd）
-├── output/                    — 预生成的 .S 汇编文件（镜像源码目录结构）
-│   ├── privilege/Program.S
-│   ├── cache/*.S
-│   └── coverage/*.S
+├── output/
+│   ├── asm/                  — 预生成的 .S 汇编文件（镜像源码目录结构）
+│   │   ├── privilege/Program.S
+│   │   ├── cache/*.S
+│   │   └── coverage/*.S
+│   └── elf/                  — 由脚本从 `asm/` 批量编译出的 `.elf` / `.bin` / `.objdump`
 ```
 
 每个目录以被测功能命名（cache、privilege），未来可扩展更多功能目录（如 mmu、vector 等）。
@@ -114,14 +116,15 @@ cases/
 
 ### 目录组织原则
 
-- 源码（.scala）和产物（.S）分离：源码在 `cases/<category>/`，产物在 `cases/output/<category>/`
+- 源码（.scala）和产物（.S/.elf/.bin/.objdump）分离：源码在 `cases/<category>/`，汇编产物在 `cases/output/asm/<category>/`，编译产物在 `cases/output/elf/<category>/`
 - 目录以被测功能命名（`cache/`、`privilege/`），不要嵌套，不加 `-probes` 后缀
 
 ## 变更记录
 
 | 日期 | 内容 |
 |------|------|
-| 2026-03-23 | 删除重复的 probes 目录并迁移 roundtrip 脚本到 privilege；新增 output/coverage 预生成汇编 |
+| 2026-03-23 | output 目录拆分为 asm/elf，新增 `rvprobe/scripts/asm2bin.py` 将 `.S` 批量编译为 `.elf` / `.bin` / `.objdump` |
+| 2026-03-23 | 删除重复的 probes 目录并迁移 roundtrip 脚本到 privilege；新增 output/asm/coverage 预生成汇编 |
 | 2026-03-21 | cache case 抽取公共几何/sets helper，`li/la` 改为 `Statement.Pseudo`，新增 20 个 cache golden tests |
 | 2026-03-19 | AsmApi 返回 Int idx 支持 CoverApi；提取 CoverageLib 重构覆盖率测试 |
 | 2026-03-19 | 新建 cases/coverage/ 目录，迁移 RV32I，添加 RV64I/RVM/RVLoadStore 覆盖率测试 |

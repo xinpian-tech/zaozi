@@ -9,7 +9,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 // M-extension coverage: multiply/divide/remainder (13 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RVM
-@main def RVM(outputPath: String = "rvprobe/src/cases/output/coverage/RVM.S"): Unit =
+@main def RVM(outputPath: String = "rvprobe/src/cases/output/asm/coverage/RVM.S"): Unit =
   val n = 35
 
   // --- Base M (rv_m) ---

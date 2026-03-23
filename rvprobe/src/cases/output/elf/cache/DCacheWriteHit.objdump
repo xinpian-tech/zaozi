@@ -1,0 +1,23 @@
+
+/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/cache/DCacheWriteHit.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	00000297          	auipc	t0,0x0
+    80000004:	3382b283          	ld	t0,824(t0) # 80000338 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000008:	0002a503          	lw	a0,0(t0)
+    8000000c:	112235b7          	lui	a1,0x11223
+    80000010:	3445859b          	addiw	a1,a1,836 # 11223344 <_start-0x6eddccbc>
+    80000014:	00b2a023          	sw	a1,0(t0)
+    80000018:	0002a603          	lw	a2,0(t0)
+
+000000008000001c <exit>:
+    8000001c:	4285                	li	t0,1
+    8000001e:	00000317          	auipc	t1,0x0
+    80000022:	32233303          	ld	t1,802(t1) # 80000340 <_GLOBAL_OFFSET_TABLE_+0x10>
+    80000026:	00533023          	sd	t0,0(t1)
+
+000000008000002a <spin>:
+    8000002a:	a001                	j	8000002a <spin>

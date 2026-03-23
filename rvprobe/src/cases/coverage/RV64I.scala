@@ -9,7 +9,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 // RV64I word-width operations coverage (9 instructions)
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV64I
-@main def RV64I(outputPath: String = "rvprobe/src/cases/output/coverage/RV64I.S"): Unit =
+@main def RV64I(outputPath: String = "rvprobe/src/cases/output/asm/coverage/RV64I.S"): Unit =
   val n = 35
 
   // --- R-type word ---
