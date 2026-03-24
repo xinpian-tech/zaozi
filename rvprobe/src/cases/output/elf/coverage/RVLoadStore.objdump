@@ -178,7 +178,7 @@ Disassembly of section .text:
     800002a8:	7ff3a283          	lw	t0,2047(t2)
     800002ac:	00132203          	lw	tp,1(t1)
     800002b0:	8002a183          	lw	gp,-2048(t0)
-    800002b4:	fff22103          	lw	sp,-1(tp) # ffffffffffffffff <fromhost+0xffffffff7ffff737>
+    800002b4:	fff22103          	lw	sp,-1(tp) # ffffffffffffffff <fromhost+0xffffffff7ffff9b7>
     800002b8:	0001a083          	lw	ra,0(gp)
     800002bc:	7ffb6983          	lwu	s3,2047(s6)
     800002c0:	7ff66b83          	lwu	s7,2047(a2)
@@ -394,7 +394,7 @@ Disassembly of section .text:
 00000000800005f8 <exit>:
     800005f8:	4285                	li	t0,1
     800005fa:	00000317          	auipc	t1,0x0
-    800005fe:	29633303          	ld	t1,662(t1) # 80000890 <_GLOBAL_OFFSET_TABLE_+0x8>
+    800005fe:	04630313          	addi	t1,t1,70 # 80000640 <tohost>
     80000602:	00533023          	sd	t0,0(t1)
 
 0000000080000606 <spin>:

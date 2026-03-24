@@ -984,7 +984,7 @@ Disassembly of section .text:
 0000000080000ef2 <exit>:
     80000ef2:	4285                	li	t0,1
     80000ef4:	00000317          	auipc	t1,0x0
-    80000ef8:	29433303          	ld	t1,660(t1) # 80001188 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000ef8:	04c30313          	addi	t1,t1,76 # 80000f40 <tohost>
     80000efc:	00533023          	sd	t0,0(t1)
 
 0000000080000f00 <spin>:

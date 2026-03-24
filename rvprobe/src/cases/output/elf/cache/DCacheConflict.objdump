@@ -5,8 +5,8 @@
 Disassembly of section .text:
 
 0000000080000000 <_start>:
-    80000000:	00008297          	auipc	t0,0x8
-    80000004:	2f82b283          	ld	t0,760(t0) # 800082f8 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000000:	00000297          	auipc	t0,0x0
+    80000004:	08028293          	addi	t0,t0,128 # 80000080 <buf>
     80000008:	6b05                	lui	s6,0x1
     8000000a:	00028333          	add	t1,t0,zero
     8000000e:	016283b3          	add	t2,t0,s6
@@ -26,7 +26,7 @@ Disassembly of section .text:
 0000000080000042 <exit>:
     80000042:	4285                	li	t0,1
     80000044:	00008317          	auipc	t1,0x8
-    80000048:	2bc33303          	ld	t1,700(t1) # 80008300 <_GLOBAL_OFFSET_TABLE_+0x10>
+    80000048:	03c30313          	addi	t1,t1,60 # 80008080 <tohost>
     8000004c:	00533023          	sd	t0,0(t1)
 
 0000000080000050 <spin>:
