@@ -62,7 +62,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       la(x10, "buf")
       li(x11, 0xdeadbeefL)
       sw(x10, x11, 0) // write value
-      lw(x12, x10, 0) // read back
+      lwu(x12, x10, 0) // read back (zero-extend on RV64)
       bne(x11, x12, "fail")
       j("exit")
 
