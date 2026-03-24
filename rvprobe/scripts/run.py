@@ -2,15 +2,17 @@
 """
 Batch-regenerate rvprobe output artifacts.
 
-This script does two phases:
+This script does three phases:
 1) Regenerate output assembly (.S) from all @main case generators.
 2) Rebuild ELF/BIN/OBJDUMP from output assembly (in parallel).
+3) Optionally run spike on selected ELF test cases.
 
 Examples:
-  python3 rvprobe/scripts/regenerate_outputs.py
-  python3 rvprobe/scripts/regenerate_outputs.py --include 'PrivilegeSv39'
-  python3 rvprobe/scripts/regenerate_outputs.py --skip-asm --elf-workers 16
-  python3 rvprobe/scripts/regenerate_outputs.py --asm-workers 4 --elf-workers 16
+  python3 rvprobe/scripts/run.py
+  python3 rvprobe/scripts/run.py --include 'PrivilegeSv39'
+  python3 rvprobe/scripts/run.py --skip-asm --elf-workers 16
+  python3 rvprobe/scripts/run.py --asm-workers 4 --elf-workers 16
+  python3 rvprobe/scripts/run.py --include 'PMP' --skip-asm --skip-elf --run-spike --spike-command "nix shell --extra-experimental-features 'nix-command flakes' nixpkgs#spike -c spike"
 """
 
 from __future__ import annotations
