@@ -1,4 +1,4 @@
-    .section .text
+    .section ".text"
     .globl _start
 _start:
 
@@ -471,17 +471,21 @@ remuw x11, x26, x4
     remuw x29, x1, x9
 
 exit:
-    addi x5, x0, 1
-    la x6, tohost
-    sd x5, 0(x6)
-spin:
-    j spin
+    li   t0, 0
+    slli t0, t0, 1
+    ori  t0, t0, 1
 
-    .section .tohost,"aw",@progbits
+    la   t1, tohost
+    sd   t0, 0(t1)
+spin:
+    j    spin
+
+    .section ".tohost","aw",@progbits
     .align 6
     .globl tohost
-    .globl fromhost
 tohost:
-    .dword 0x0
+    .dword 0
+    .align 6
+    .globl fromhost
 fromhost:
-    .dword 0x0
+    .dword 0

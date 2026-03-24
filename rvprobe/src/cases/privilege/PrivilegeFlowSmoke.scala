@@ -109,8 +109,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       switchToSMode("s_code")
 
       label("s_code")
-      li(x10, 0x40000000L)
-      lw(x11, x10, 0)       // expected: load page fault (cause=13), then handler skips this instruction
+      li(x16, 0x40000000L)
+      lw(x17, x16, 0)       // expected: load page fault (cause=13)
+      label("after_fault")
       la(x12, "trap_cause")
       ld(x13, x12, 0)
       addi(x14, x0, Cause.LOAD_PAGE_FAULT)
@@ -118,7 +119,22 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       j("exit")
 
       fail()
-      trapHandlerWithRecord()
+      align(2)
+      label("trap_handler_rec")
+      csrrs(x6, x0, CSR.MCAUSE)
+      la(x28, "trap_cause")
+      sd(x28, x6, 0)
+
+      // For this case we only recover the expected load-page-fault path.
+      // Unexpected causes fail fast to avoid infinite mret/retrap loops.
+      addi(x7, x0, Cause.LOAD_PAGE_FAULT)
+      bne(x6, x7, "fail")
+
+      la(x5, "after_fault")
+      csrrw(x0, x5, CSR.MEPC)
+      csrrw(x0, x0, CSR.MCAUSE)
+      csrrw(x0, x0, CSR.MTVAL)
+      mret()
       finish()
       pageTableData()
       trapResultData()

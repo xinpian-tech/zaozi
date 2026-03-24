@@ -1,4 +1,4 @@
-    .section .text
+    .section ".text"
     .globl _start
 _start:
     jal x1, code_area
@@ -10,21 +10,23 @@ _start:
     jal x1, code_area
 
 exit:
-    addi x5, x0, 1
+    li x5, 0x0
+    slli x5, x5, 1
+    ori x5, x5, 1
     la x6, tohost
     sd x5, 0(x6)
 spin:
     j spin
 
-    .align 2
+    .balign 8
 code_area:
-    addi x10, x0, 1
-    jalr x0, x1, 0
-    .section .tohost,"aw",@progbits
+    .dword 0x806700100513
+    .section ".tohost","aw",@progbits
     .align 6
     .globl tohost
-    .globl fromhost
 tohost:
     .dword 0x0
+    .align 6
+    .globl fromhost
 fromhost:
     .dword 0x0

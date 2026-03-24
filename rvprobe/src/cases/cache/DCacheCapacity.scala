@@ -57,22 +57,22 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       textStart()
 
       la(x5, "big_array")
-      li(x20, 8192L)     // 32KB @ 4B each
+      li(x20, 4096L)     // 32KB @ 8B each
       rdcycle(x14)
       label("loop1")
-      lw(x10, x5, 0)
-      addi(x5, x5, 4)
+      ld(x10, x5, 0)
+      addi(x5, x5, 8)
       addi(x20, x20, -1)
       bnez(x20, "loop1")
       rdcycle(x15)
       sub(x16, x15, x14) // T1
 
       la(x5, "big_array")
-      li(x20, 8192L)
+      li(x20, 4096L)
       rdcycle(x14)
       label("loop2")
-      lw(x10, x5, 0)
-      addi(x5, x5, 4)
+      ld(x10, x5, 0)
+      addi(x5, x5, 8)
       addi(x20, x20, -1)
       bnez(x20, "loop2")
       rdcycle(x15)

@@ -1,4 +1,4 @@
-    .section .text
+    .section ".text"
     .globl _start
 _start:
 
@@ -182,41 +182,41 @@ sraw x11, x26, x4
     sraw x28, x12, x31
     sraw x29, x1, x9
 
-addiw x22, x23, 2047
-    addiw x24, x7, 2047
-    addiw x2, x4, 2047
-    addiw x31, x4, 2047
-    addiw x30, x3, 2047
-    addiw x29, x25, 2047
-    addiw x28, x26, 2047
-    addiw x27, x8, 2047
-    addiw x25, x17, 2047
-    addiw x21, x9, 2047
-    addiw x20, x20, 2047
-    addiw x19, x12, 2047
-    addiw x18, x18, 2047
-    addiw x17, x16, 2047
-    addiw x16, x14, 2047
-    addiw x15, x2, 2047
-    addiw x14, x13, 2047
-    addiw x13, x10, 2047
-    addiw x12, x21, 2047
-    addiw x11, x19, 2047
-    addiw x8, x11, 2047
-    addiw x3, x31, 2047
-    addiw x10, x1, 2047
-    addiw x5, x4, 2047
-    addiw x6, x24, 2047
-    addiw x26, x5, 2047
-    addiw x9, x15, 2047
+addiw x5, x18, 2047
+    addiw x13, x15, 2047
+    addiw x28, x19, 2047
+    addiw x27, x11, 2047
+    addiw x21, x25, 2047
+    addiw x26, x23, 2047
+    addiw x24, x20, 2047
+    addiw x29, x12, 2047
+    addiw x9, x21, 2047
+    addiw x10, x2, 2047
+    addiw x2, x6, 2047
+    addiw x17, x6, 2047
+    addiw x12, x7, 2047
+    addiw x19, x17, 2047
+    addiw x16, x6, 2047
+    addiw x16, x16, 2047
+    addiw x18, x3, 2047
+    addiw x15, x4, 2047
+    addiw x15, x8, 2047
+    addiw x11, x13, 2047
+    addiw x14, x22, 2047
+    addiw x8, x1, 2047
     addiw x4, x30, 2047
-    addiw x31, x29, 2047
     addiw x31, x6, 2047
-    addiw x7, x29, 2047
-    addiw x1, x28, 1
-    addiw x29, x27, -2048
-    addiw x28, x22, -1
-    addiw x23, x29, 0
+    addiw x18, x24, 2047
+    addiw x25, x9, 2047
+    addiw x22, x5, 2047
+    addiw x6, x29, 2047
+    addiw x20, x31, 2047
+    addiw x1, x6, 2047
+    addiw x7, x26, 2047
+    addiw x3, x27, 1
+    addiw x30, x14, -2048
+    addiw x23, x10, -1
+    addiw x18, x28, 0
 
 slliw x16, x9, 0
     slliw x4, x17, 0
@@ -327,17 +327,21 @@ sraiw x16, x9, 0
     sraiw x11, x24, 0
 
 exit:
-    addi x5, x0, 1
-    la x6, tohost
-    sd x5, 0(x6)
-spin:
-    j spin
+    li   t0, 0
+    slli t0, t0, 1
+    ori  t0, t0, 1
 
-    .section .tohost,"aw",@progbits
+    la   t1, tohost
+    sd   t0, 0(t1)
+spin:
+    j    spin
+
+    .section ".tohost","aw",@progbits
     .align 6
     .globl tohost
-    .globl fromhost
 tohost:
-    .dword 0x0
+    .dword 0
+    .align 6
+    .globl fromhost
 fromhost:
-    .dword 0x0
+    .dword 0

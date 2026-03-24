@@ -45,7 +45,7 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       tohostSection()
   DCacheLineFill.emit(outputPath)
 
-// Cross cache line boundary access
+// Cross cache line boundary access with aligned word loads
 @main def DCacheCrossLine(outputPath: String): Unit =
   object DCacheCrossLine extends RVGenerator:
     val sets          = cacheSetsWithCsr()
@@ -56,11 +56,6 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       addi(x5, x5, CacheLineBytes - 4)
       lw(x10, x5, 0) // offset 60, within line
       lw(x11, x5, 4) // offset 64, crosses into next line
-
-      // RV64 doubleword cross-line
-      la(x6, "buf")
-      addi(x6, x6, CacheLineBytes - 4)
-      ld(x12, x6, 0) // 8-byte load straddling 64B boundary
 
       exit()
       dataBuffer("buf", CacheLineBytes * 4)

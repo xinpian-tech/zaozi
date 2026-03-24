@@ -40,6 +40,9 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       la(x10, "buf")
       lw(x11, x10, 0) // load — should succeed
       sw(x10, x11, 0) // store — should succeed
+      ecall()
+
+      label("m_check")
       j("exit")
 
       finish()
@@ -107,9 +110,10 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       textStartWithTrap("trap_handler_rec")
       trapHandlerWithRecord()
 
-      // entry0: NAPOT covering only code region (.text), RWX
-      // Use a large region covering 0x80000000 (typical code start)
-      li(x5, 0x2fffffffL) // NAPOT covering 0x80000000-0xbfffffff
+      // entry0: NAPOT 4KB covering only code region around _start (.text), RWX
+      la(x5, "_start")
+      srli(x5, x5, 2)
+      ori(x5, x5, 0x1ff)
       csrrw(x0, x5, CSR.PMPADDR0)
 
       // Only one entry — buf is not covered by any PMP entry

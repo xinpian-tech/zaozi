@@ -1,0 +1,145 @@
+
+/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/privilege/PMPNapotOutside.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	00000297          	auipc	t0,0x0
+    80000004:	01028293          	addi	t0,t0,16 # 80000010 <trap_handler_rec>
+    80000008:	30529073          	csrw	mtvec,t0
+    8000000c:	a04d                	j	800000ae <trap_handler_rec_skip>
+    8000000e:	0001                	nop
+
+0000000080000010 <trap_handler_rec>:
+    80000010:	341022f3          	csrr	t0,mepc
+    80000014:	34202373          	csrr	t1,mcause
+    80000018:	34302ef3          	csrr	t4,mtval
+    8000001c:	00131f13          	slli	t5,t1,0x1
+    80000020:	001f5313          	srli	t1,t5,0x1
+    80000024:	4e25                	li	t3,9
+    80000026:	01c30963          	beq	t1,t3,80000038 <rec_handle_ecall>
+    8000002a:	00001e17          	auipc	t3,0x1
+    8000002e:	fd6e0e13          	addi	t3,t3,-42 # 80001000 <trap_cause>
+    80000032:	006e3023          	sd	t1,0(t3)
+    80000036:	a801                	j	80000046 <rec_check_page_fault>
+
+0000000080000038 <rec_handle_ecall>:
+    80000038:	6389                	lui	t2,0x2
+    8000003a:	8003839b          	addiw	t2,t2,-2048 # 1800 <_start-0x7fffe800>
+    8000003e:	3003a073          	csrs	mstatus,t2
+    80000042:	4391                	li	t2,4
+    80000044:	a8a1                	j	8000009c <rec_update_mepc>
+
+0000000080000046 <rec_check_page_fault>:
+    80000046:	4e35                	li	t3,13
+    80000048:	03c30263          	beq	t1,t3,8000006c <rec_handle_fault>
+    8000004c:	4e3d                	li	t3,15
+    8000004e:	01c30f63          	beq	t1,t3,8000006c <rec_handle_fault>
+    80000052:	4e15                	li	t3,5
+    80000054:	01c30c63          	beq	t1,t3,8000006c <rec_handle_fault>
+    80000058:	4e1d                	li	t3,7
+    8000005a:	01c30963          	beq	t1,t3,8000006c <rec_handle_fault>
+    8000005e:	4e05                	li	t3,1
+    80000060:	03c30463          	beq	t1,t3,80000088 <rec_instr_fault_len>
+    80000064:	4e31                	li	t3,12
+    80000066:	03c30163          	beq	t1,t3,80000088 <rec_instr_fault_len>
+    8000006a:	a011                	j	8000006e <rec_original_logic>
+
+000000008000006c <rec_handle_fault>:
+    8000006c:	a009                	j	8000006e <rec_original_logic>
+
+000000008000006e <rec_original_logic>:
+    8000006e:	4389                	li	t2,2
+    80000070:	4e09                	li	t3,2
+    80000072:	01c30863          	beq	t1,t3,80000082 <rec_illegal_len>
+    80000076:	0002de83          	lhu	t4,0(t0)
+    8000007a:	a809                	j	8000008c <rec_decode_length>
+
+000000008000007c <rec_other_len>:
+    8000007c:	0002de83          	lhu	t4,0(t0)
+    80000080:	a031                	j	8000008c <rec_decode_length>
+
+0000000080000082 <rec_illegal_len>:
+    80000082:	fe0e8de3          	beqz	t4,8000007c <rec_other_len>
+    80000086:	a019                	j	8000008c <rec_decode_length>
+
+0000000080000088 <rec_instr_fault_len>:
+    80000088:	4391                	li	t2,4
+    8000008a:	a809                	j	8000009c <rec_update_mepc>
+
+000000008000008c <rec_decode_length>:
+    8000008c:	003efe93          	andi	t4,t4,3
+    80000090:	4e0d                	li	t3,3
+    80000092:	01ce9463          	bne	t4,t3,8000009a <rec_compressed_len>
+    80000096:	4391                	li	t2,4
+    80000098:	a011                	j	8000009c <rec_update_mepc>
+
+000000008000009a <rec_compressed_len>:
+    8000009a:	4389                	li	t2,2
+
+000000008000009c <rec_update_mepc>:
+    8000009c:	929e                	add	t0,t0,t2
+    8000009e:	34129073          	csrw	mepc,t0
+    800000a2:	34201073          	csrw	mcause,zero
+    800000a6:	34301073          	csrw	mtval,zero
+    800000aa:	30200073          	mret
+
+00000000800000ae <trap_handler_rec_skip>:
+    800000ae:	00000297          	auipc	t0,0x0
+    800000b2:	f5228293          	addi	t0,t0,-174 # 80000000 <_start>
+    800000b6:	0022d293          	srli	t0,t0,0x2
+    800000ba:	1ff2e293          	ori	t0,t0,511
+    800000be:	3b029073          	csrw	pmpaddr0,t0
+    800000c2:	42fd                	li	t0,31
+    800000c4:	3a029073          	csrw	pmpcfg0,t0
+    800000c8:	30201073          	csrw	medeleg,zero
+    800000cc:	30301073          	csrw	mideleg,zero
+    800000d0:	72f9                	lui	t0,0xffffe
+    800000d2:	7ff2829b          	addiw	t0,t0,2047 # ffffffffffffe7ff <fromhost+0xffffffff7fffb7bf>
+    800000d6:	30002373          	csrr	t1,mstatus
+    800000da:	00537333          	and	t1,t1,t0
+    800000de:	6385                	lui	t2,0x1
+    800000e0:	8003839b          	addiw	t2,t2,-2048 # 800 <_start-0x7ffff800>
+    800000e4:	00736333          	or	t1,t1,t2
+    800000e8:	30031073          	csrw	mstatus,t1
+    800000ec:	00000297          	auipc	t0,0x0
+    800000f0:	01028293          	addi	t0,t0,16 # 800000fc <s_code>
+    800000f4:	34129073          	csrw	mepc,t0
+    800000f8:	30200073          	mret
+
+00000000800000fc <s_code>:
+    800000fc:	00002517          	auipc	a0,0x2
+    80000100:	f0450513          	addi	a0,a0,-252 # 80002000 <buf>
+    80000104:	410c                	lw	a1,0(a0)
+    80000106:	00000073          	ecall
+
+000000008000010a <m_check>:
+    8000010a:	00001517          	auipc	a0,0x1
+    8000010e:	ef650513          	addi	a0,a0,-266 # 80001000 <trap_cause>
+    80000112:	610c                	ld	a1,0(a0)
+    80000114:	4615                	li	a2,5
+    80000116:	00c59363          	bne	a1,a2,8000011c <fail>
+    8000011a:	a821                	j	80000132 <exit>
+
+000000008000011c <fail>:
+    8000011c:	4285                	li	t0,1
+    8000011e:	0286                	slli	t0,t0,0x1
+    80000120:	0012e293          	ori	t0,t0,1
+    80000124:	00003317          	auipc	t1,0x3
+    80000128:	edc30313          	addi	t1,t1,-292 # 80003000 <tohost>
+    8000012c:	00533023          	sd	t0,0(t1)
+
+0000000080000130 <spin_fail>:
+    80000130:	a001                	j	80000130 <spin_fail>
+
+0000000080000132 <exit>:
+    80000132:	4281                	li	t0,0
+    80000134:	0286                	slli	t0,t0,0x1
+    80000136:	0012e293          	ori	t0,t0,1
+    8000013a:	00003317          	auipc	t1,0x3
+    8000013e:	ec630313          	addi	t1,t1,-314 # 80003000 <tohost>
+    80000142:	00533023          	sd	t0,0(t1)
+
+0000000080000146 <spin>:
+    80000146:	a001                	j	80000146 <spin>
