@@ -123,10 +123,18 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       ori(x6, x6, 0x01) // V=1 non-leaf
       sd(x5, x6, 0)     // L2[0]
 
-      // L3[0] = leaf 4KB PTE for physical page at 0x80000000
+      // L3[vpn0(buf)] = leaf 4KB PTE for physical page containing `buf`
+      // Keep VA==PA identity by deriving both vpn0/ppn from the symbol address.
       la(x5, "pgtbl_l3")
-      li(x6, (0x80000L << 10) | 0xcfL) // V|R|W|X|A|D
-      sd(x5, x6, 0)                    // L3[0]
+      la(x6, "buf")
+      srli(x7, x6, 12)  // ppn(buf)
+      slli(x7, x7, 10)  // PTE.PPN field
+      ori(x7, x7, 0xcf) // V|R|W|X|A|D
+      srli(x6, x6, 12)
+      andi(x6, x6, 0x1ff) // vpn0
+      slli(x6, x6, 3)     // vpn0 * 8 (PTE byte offset)
+      add(x5, x5, x6)
+      sd(x5, x7, 0)
 
       enableSv39("pgtbl_root")
       switchToSMode("s_code")

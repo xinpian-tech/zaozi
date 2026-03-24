@@ -105,7 +105,7 @@ s_code:
     la x10, buf
     li x11, 0xdeadbeef
     sw x11, 0(x10)
-    lw x12, 0(x10)
+    lwu x12, 0(x10)
     bne x11, x12, fail
 
     j exit
