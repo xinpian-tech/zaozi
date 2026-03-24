@@ -30,7 +30,7 @@ Disassembly of section .text:
 000000008000002a <exit>:
     8000002a:	4285                	li	t0,1
     8000002c:	00000317          	auipc	t1,0x0
-    80000030:	29433303          	ld	t1,660(t1) # 800002c0 <_GLOBAL_OFFSET_TABLE_+0x8>
+    80000030:	01430313          	addi	t1,t1,20 # 80000040 <tohost>
     80000034:	00533023          	sd	t0,0(t1)
 
 0000000080000038 <spin>:
