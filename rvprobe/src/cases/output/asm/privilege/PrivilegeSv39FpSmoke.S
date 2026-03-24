@@ -23,6 +23,8 @@ _start:
     or x7, x7, x6
     csrrw x0, satp, x7
     sfence.vma x0, x0
+    csrrw x0, medeleg, x0
+    csrrw x0, mideleg, x0
     li x5, 0xffffffffffffe7ff
     csrrs x6, mstatus, x0
     and x6, x6, x5
@@ -55,6 +57,8 @@ fail:
     sd x5, 0(x6)
 spin_fail:
     j spin_fail
+
+    j trap_handler_skip
 
     .align 2
 trap_handler:
@@ -126,6 +130,7 @@ update_mepc:
     csrrw x0, mcause, x0
     csrrw x0, mtval, x0
     mret
+trap_handler_skip:
 exit:
     li x5, 0x0
     slli x5, x5, 1

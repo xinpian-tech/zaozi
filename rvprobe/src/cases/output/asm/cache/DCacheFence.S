@@ -1,4 +1,4 @@
-    .section .text
+    .section ".text"
     .globl _start
 _start:
     la x5, buf
@@ -12,7 +12,9 @@ _start:
     fence.tso
     lw x12, 0(x6)
 exit:
-    addi x5, x0, 1
+    li x5, 0x0
+    slli x5, x5, 1
+    ori x5, x5, 1
     la x6, tohost
     sd x5, 0(x6)
 spin:
@@ -25,11 +27,12 @@ buf:
     .balign 64
 buf2:
     .zero 64
-    .section .tohost,"aw",@progbits
+    .section ".tohost","aw",@progbits
     .align 6
     .globl tohost
-    .globl fromhost
 tohost:
     .dword 0x0
+    .align 6
+    .globl fromhost
 fromhost:
     .dword 0x0

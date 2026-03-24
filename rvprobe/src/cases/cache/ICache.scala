@@ -61,10 +61,9 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
       exit()
 
-      align(2)
+      balign(8)
       label("code_area")
-      addi(x10, x0, 1)
-      jalr(x0, x1, 0) // ret
+      dword(0x0000806700100513L) // addi a0, x0, 1; ret
 
       tohostSection()
   ICacheSelfModify.emit(outputPath)

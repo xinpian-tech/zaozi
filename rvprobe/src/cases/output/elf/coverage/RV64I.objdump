@@ -180,41 +180,41 @@ Disassembly of section .text:
     800002b0:	410edabb          	sraw	s5,t4,a6
     800002b4:	41f65e3b          	sraw	t3,a2,t6
     800002b8:	4090debb          	sraw	t4,ra,s1
-    800002bc:	7ffb8b1b          	addiw	s6,s7,2047
-    800002c0:	7ff38c1b          	addiw	s8,t2,2047
-    800002c4:	7ff2011b          	addiw	sp,tp,2047 # 7ff <_start-0x7ffff801>
-    800002c8:	7ff20f9b          	addiw	t6,tp,2047 # 7ff <_start-0x7ffff801>
-    800002cc:	7ff18f1b          	addiw	t5,gp,2047
-    800002d0:	7ffc8e9b          	addiw	t4,s9,2047
-    800002d4:	7ffd0e1b          	addiw	t3,s10,2047
-    800002d8:	7ff40d9b          	addiw	s11,s0,2047
-    800002dc:	7ff88c9b          	addiw	s9,a7,2047
-    800002e0:	7ff48a9b          	addiw	s5,s1,2047
-    800002e4:	7ffa0a1b          	addiw	s4,s4,2047
-    800002e8:	7ff6099b          	addiw	s3,a2,2047
-    800002ec:	7ff9091b          	addiw	s2,s2,2047
-    800002f0:	7ff8089b          	addiw	a7,a6,2047
-    800002f4:	7ff7081b          	addiw	a6,a4,2047
-    800002f8:	7ff1079b          	addiw	a5,sp,2047
-    800002fc:	7ff6871b          	addiw	a4,a3,2047
-    80000300:	7ff5069b          	addiw	a3,a0,2047
-    80000304:	7ffa861b          	addiw	a2,s5,2047
-    80000308:	7ff9859b          	addiw	a1,s3,2047
-    8000030c:	7ff5841b          	addiw	s0,a1,2047
-    80000310:	7fff819b          	addiw	gp,t6,2047
-    80000314:	7ff0851b          	addiw	a0,ra,2047
-    80000318:	7ff2029b          	addiw	t0,tp,2047 # 7ff <_start-0x7ffff801>
-    8000031c:	7ffc031b          	addiw	t1,s8,2047
-    80000320:	7ff28d1b          	addiw	s10,t0,2047
-    80000324:	7ff7849b          	addiw	s1,a5,2047
-    80000328:	7fff021b          	addiw	tp,t5,2047
-    8000032c:	7ffe8f9b          	addiw	t6,t4,2047
-    80000330:	7ff30f9b          	addiw	t6,t1,2047
-    80000334:	7ffe839b          	addiw	t2,t4,2047
-    80000338:	001e009b          	addiw	ra,t3,1
-    8000033c:	800d8e9b          	addiw	t4,s11,-2048
-    80000340:	fffb0e1b          	addiw	t3,s6,-1
-    80000344:	000e8b9b          	sext.w	s7,t4
+    800002bc:	7ff9029b          	addiw	t0,s2,2047
+    800002c0:	7ff7869b          	addiw	a3,a5,2047
+    800002c4:	7ff98e1b          	addiw	t3,s3,2047
+    800002c8:	7ff58d9b          	addiw	s11,a1,2047
+    800002cc:	7ffc8a9b          	addiw	s5,s9,2047
+    800002d0:	7ffb8d1b          	addiw	s10,s7,2047
+    800002d4:	7ffa0c1b          	addiw	s8,s4,2047
+    800002d8:	7ff60e9b          	addiw	t4,a2,2047
+    800002dc:	7ffa849b          	addiw	s1,s5,2047
+    800002e0:	7ff1051b          	addiw	a0,sp,2047
+    800002e4:	7ff3011b          	addiw	sp,t1,2047
+    800002e8:	7ff3089b          	addiw	a7,t1,2047
+    800002ec:	7ff3861b          	addiw	a2,t2,2047
+    800002f0:	7ff8899b          	addiw	s3,a7,2047
+    800002f4:	7ff3081b          	addiw	a6,t1,2047
+    800002f8:	7ff8081b          	addiw	a6,a6,2047
+    800002fc:	7ff1891b          	addiw	s2,gp,2047
+    80000300:	7ff2079b          	addiw	a5,tp,2047 # 7ff <_start-0x7ffff801>
+    80000304:	7ff4079b          	addiw	a5,s0,2047
+    80000308:	7ff6859b          	addiw	a1,a3,2047
+    8000030c:	7ffb071b          	addiw	a4,s6,2047
+    80000310:	7ff0841b          	addiw	s0,ra,2047
+    80000314:	7fff021b          	addiw	tp,t5,2047
+    80000318:	7ff30f9b          	addiw	t6,t1,2047
+    8000031c:	7ffc091b          	addiw	s2,s8,2047
+    80000320:	7ff48c9b          	addiw	s9,s1,2047
+    80000324:	7ff28b1b          	addiw	s6,t0,2047
+    80000328:	7ffe831b          	addiw	t1,t4,2047
+    8000032c:	7fff8a1b          	addiw	s4,t6,2047
+    80000330:	7ff3009b          	addiw	ra,t1,2047
+    80000334:	7ffd039b          	addiw	t2,s10,2047
+    80000338:	001d819b          	addiw	gp,s11,1
+    8000033c:	80070f1b          	addiw	t5,a4,-2048
+    80000340:	fff50b9b          	addiw	s7,a0,-1
+    80000344:	000e091b          	sext.w	s2,t3
     80000348:	0004981b          	slliw	a6,s1,0x0
     8000034c:	0008921b          	slliw	tp,a7,0x0
     80000350:	0009189b          	slliw	a7,s2,0x0
@@ -322,10 +322,12 @@ Disassembly of section .text:
     800004e8:	400c559b          	sraiw	a1,s8,0x0
 
 00000000800004ec <exit>:
-    800004ec:	4285                	li	t0,1
-    800004ee:	00000317          	auipc	t1,0x0
-    800004f2:	01230313          	addi	t1,t1,18 # 80000500 <tohost>
-    800004f6:	00533023          	sd	t0,0(t1)
+    800004ec:	4281                	li	t0,0
+    800004ee:	0286                	slli	t0,t0,0x1
+    800004f0:	0012e293          	ori	t0,t0,1
+    800004f4:	00000317          	auipc	t1,0x0
+    800004f8:	04c30313          	addi	t1,t1,76 # 80000540 <tohost>
+    800004fc:	00533023          	sd	t0,0(t1)
 
-00000000800004fa <spin>:
-    800004fa:	a001                	j	800004fa <spin>
+0000000080000500 <spin>:
+    80000500:	a001                	j	80000500 <spin>

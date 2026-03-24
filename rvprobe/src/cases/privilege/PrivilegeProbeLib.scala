@@ -117,6 +117,11 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
+    // Route all delegated traps back to M-mode so S-mode exceptions/interrupts
+    // are consistently handled by the M-mode trap handler.
+    csrrw(x0, x0, CSR.MEDELEG)
+    csrrw(x0, x0, CSR.MIDELEG)
+
     li(x5, ~(3L << 11))
     csrrs(x6, x0, CSR.MSTATUS)
     and(x6, x6, x5)
@@ -162,6 +167,10 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
+    val skipLabel = s"${handlerLabel}_skip"
+    // Normal boot flow should not fall through into trap handler body.
+    // Execution jumps over the handler; only traps enter via mtvec=handlerLabel.
+    j(skipLabel)
     align(2)
     label(handlerLabel)
     csrrs(x5, x0, CSR.MEPC)
@@ -230,6 +239,7 @@ object PrivilegeProbeLib:
     csrrw(x0, x0, CSR.MCAUSE)
     csrrw(x0, x0, CSR.MTVAL)
     mret()
+    label(skipLabel)
 
   /** Trap handler that additionally records mcause to a memory location.
     *
@@ -245,23 +255,32 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
+    val skipLabel = s"${handlerLabel}_skip"
+    // Normal boot flow should not fall through into trap handler body.
+    // Execution jumps over the handler; only traps enter via mtvec=handlerLabel.
+    j(skipLabel)
     align(2)
     label(handlerLabel)
     csrrs(x5, x0, CSR.MEPC)
     csrrs(x6, x0, CSR.MCAUSE)
     csrrs(x29, x0, CSR.MTVAL)
 
-    // record mcause to memory
-    la(x28, resultLabel)
-    sd(x28, x6, 0)
-
     // extract exception code
     slli(x30, x6, 1)
     srli(x6, x30, 1)
 
-    // handle ecall from S-mode
+    // Keep the first/last fault cause observable by tests:
+    // ecall-from-S is only a control-transfer trampoline and should not overwrite trap_cause.
     addi(x28, x0, Cause.ECALL_FROM_S)
-    bne(x6, x28, "rec_check_page_fault")
+    beq(x6, x28, "rec_handle_ecall")
+
+    // record exception cause to memory (without interrupt bit)
+    la(x28, resultLabel)
+    sd(x28, x6, 0)
+
+    j("rec_check_page_fault")
+
+    label("rec_handle_ecall")
     li(x7, 3L << 11)
     csrrs(x0, x7, CSR.MSTATUS)
     addi(x7, x0, 4)
@@ -321,6 +340,7 @@ object PrivilegeProbeLib:
     csrrw(x0, x0, CSR.MCAUSE)
     csrrw(x0, x0, CSR.MTVAL)
     mret()
+    label(skipLabel)
 
   /** Emit the standard HTIF pass-exit sequence then spin forever. */
   def exit(

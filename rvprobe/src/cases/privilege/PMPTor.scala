@@ -71,11 +71,13 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       srli(x10, x10, 2)
       csrrw(x0, x10, CSR.PMPADDR1)
 
-      // entry2: NAPOT all space for code execution
-      addi(x5, x0, -1)
+      // entry2: NAPOT 4KB covering code region around _start, for S-mode instruction fetch
+      la(x5, "_start")
+      srli(x5, x5, 2)
+      ori(x5, x5, 0x1ff)
       csrrw(x0, x5, CSR.PMPADDR2)
 
-      // pmpcfg0: entry0=0x00, entry1=0x0f (TOR+RWX), entry2=0x1f (NAPOT+RWX)
+      // pmpcfg0: entry0=0x00, entry1=0x0f (TOR+RWX for buf window), entry2=0x1f (NAPOT+RWX for .text)
       li(x5, 0x1f0f00L)
       csrrw(x0, x5, CSR.PMPCFG0)
 
