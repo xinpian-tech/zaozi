@@ -2,13 +2,13 @@
     .globl _start
 _start:
     la x5, amo_buf
-    li x10, 0x64
-    sw x10, 0(x5)
-    addi x1, x0, 5
-    amoadd.w x12, x1, (x5)
-    li x13, 0xc8
-    amoswap.w x14, x13, (x5)
-    lw x15, 0(x5)
+    li x4, 0x64
+    sw x4, 0(x5)
+    addi x6, x0, 5
+    amoadd.w x1, x6, (x5)
+    li x7, 0xc8
+    amoswap.w x2, x7, (x5)
+    lw x3, 0(x5)
 exit:
     li x5, 0x0
     slli x5, x5, 1
@@ -18,10 +18,6 @@ exit:
 spin:
     j spin
 
-    .section .data
-    .balign 64
-amo_buf:
-    .zero 64
     .section ".tohost","aw",@progbits
     .align 6
     .globl tohost
@@ -31,3 +27,7 @@ tohost:
     .globl fromhost
 fromhost:
     .dword 0x0
+    .section .data
+    .balign 64
+amo_buf:
+    .zero 64

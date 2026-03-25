@@ -221,23 +221,30 @@ trait RVGenerator:
     // Note: We deliberately SKIP set constraints here - opcodes are already solved.
 
     recipe.allIndices().foreach { idx =>
-      val index    = recipe.getIndex(idx)
-      val opcodeId = solvedOpcodes.getOrElse(idx, throw new RuntimeException(s"No solved opcode for index $idx"))
+      val index = recipe.getIndex(idx)
 
-      // Store opcodeId in Index for later use (e.g., cover constraints)
-      index.setOpcodeId(opcodeId)
+      solvedOpcodes.get(idx) match
+        case Some(opcodeId) =>
+          // Real instruction: fix opcode and apply arg constraints
+          index.setOpcodeId(opcodeId)
+          smtAssert(index.nameId === opcodeId.S)
+        case None           =>
+        // Pseudo instruction (la/li with FreeReg): no opcode, only arg constraints
 
-      // 1. Fix Opcode (this is a given, not a constraint to solve)
-      smtAssert(index.nameId === opcodeId.S)
-
-      // 2. Apply User Arg Constraints from Index (rdRange, rs1Range, etc.)
       val args = index.getArgConstraints().map(_(index))
       if (args.nonEmpty) {
         smtAssert(smtAnd(args*))
       }
     }
 
-    // 3. Execute cross-index constraints (cover constraints)
+    // 3. Pairwise distinct for all freshReg() symbolic register variables.
+    val fregs = recipe.freshRegs()
+    for
+      i <- fregs.indices
+      j <- (i + 1) until fregs.size
+    do smtAssert(fregs(i) =/= fregs(j))
+
+    // 4. Execute cross-index constraints (cover constraints)
     recipe.executeCrossIndexConstraints()
 
     smtCheck
@@ -810,7 +817,7 @@ trait RVGenerator:
     instructions:  Seq[org.chipsalliance.rvdecoderdb.Instruction],
     labelRefs:     Map[Int, String]
   ): String = stmt match
-    case Statement.Inst(idx)                  =>
+    case Statement.Inst(idx)                             =>
       val inst     = instructions(solvedOpcodes(idx))
       val baseLine = toGasLine(idx, inst, solvedArgs)
       labelRefs.get(idx) match
@@ -818,9 +825,9 @@ trait RVGenerator:
           replaceImmWithLabel(baseLine, inst, target)
         case None         =>
           s"    $baseLine"
-    case Statement.Label(name)                =>
+    case Statement.Label(name)                           =>
       s"$name:"
-    case Statement.Section(name, flags*)      =>
+    case Statement.Section(name, flags*)                 =>
       val flagStr =
         if flags.isEmpty then ""
         else
@@ -829,25 +836,30 @@ trait RVGenerator:
             else s"\"$f\""
           s",${parts.mkString(",")}"
       s"    .section $name$flagStr"
-    case Statement.Global(symbol)             =>
+    case Statement.Global(symbol)                        =>
       s"    .globl $symbol"
-    case Statement.Align(n)                   =>
+    case Statement.Align(n)                              =>
       s"    .align $n"
-    case Statement.Word(value)                =>
+    case Statement.Word(value)                           =>
       s"    .word 0x${value.toHexString}"
-    case Statement.Dword(value)               =>
+    case Statement.Dword(value)                          =>
       s"    .dword 0x${value.toHexString}"
-    case Statement.Zero(size)                 =>
+    case Statement.Zero(size)                            =>
       s"    .zero $size"
-    case Statement.Balign(alignment)          =>
+    case Statement.Balign(alignment)                     =>
       s"    .balign $alignment"
-    case Statement.Space(size)                =>
+    case Statement.Space(size)                           =>
       s"    .space $size"
-    case Statement.Pseudo(mnemonic, operands) =>
-      if operands.isEmpty then s"    $mnemonic" else s"    $mnemonic $operands"
-    case Statement.Raw(content)               =>
+    case Statement.Pseudo(mnemonic, operands, solvedIdx) =>
+      val resolved = solvedIdx match
+        case Some(idx) =>
+          val regNum = solvedArgs.getOrElse(s"rd_$idx", BigInt(0)).toInt
+          operands.replace("{rd}", s"x$regNum")
+        case None      => operands
+      if resolved.isEmpty then s"    $mnemonic" else s"    $mnemonic $resolved"
+    case Statement.Raw(content)                          =>
       content
-    case Statement.LabelRef(_, _)             =>
+    case Statement.LabelRef(_, _)                        =>
       ""
 
   /** Replace immediate offset with label in GAS assembly line. */

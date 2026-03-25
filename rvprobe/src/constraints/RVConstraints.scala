@@ -22,6 +22,14 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
   // Auto-incrementing instruction index for assembly-like API
   private var _nextIdx: Int = 0
   def nextIdx(): Int = { val idx = _nextIdx; _nextIdx += 1; idx }
+  def peekNextIdx(): Int = _nextIdx
+
+  // Symbolic register variables created by freshReg(). Auto-distinct in Stage 2.
+  private var _freshRegCounter: Int = 0
+  private val _freshRegs = scala.collection.mutable.ListBuffer[Referable[SInt]]()
+  def nextFreshRegId(): Int = { val id = _freshRegCounter; _freshRegCounter += 1; id }
+  def registerFreshReg(v: Referable[SInt]): Unit = _freshRegs += v
+  def freshRegs(): Seq[Referable[SInt]] = _freshRegs.toSeq
 
   def addStatement(s: Statement): Unit = _statements += s
   def allStatements(): Seq[Statement] = _statements.toSeq

@@ -14,17 +14,17 @@ object CacheCaseTest extends TestSuite:
     mustContainCount: Seq[(String, Int)] = Seq.empty)
 
   private val cacheCases = Seq(
-    CacheCaseSpec("DCacheHitMiss", DCacheHitMiss, Seq("lw x10, 0(x5)", "lw x11, 0(x5)", ".word 0x12345678")),
-    CacheCaseSpec("DCacheLineFill", DCacheLineFill, Seq("lw x13, 60(x5)", "lw x10, 64(x5)", ".zero 256")),
-    CacheCaseSpec("DCacheCrossLine", DCacheCrossLine, Seq("addi x5, x5, 60", "lw x10, 0(x5)", "lw x11, 4(x5)")),
+    CacheCaseSpec("DCacheHitMiss", DCacheHitMiss, Seq("lw", ".word 0x12345678")),
+    CacheCaseSpec("DCacheLineFill", DCacheLineFill, Seq("lw", ".zero 256")),
+    CacheCaseSpec("DCacheCrossLine", DCacheCrossLine, Seq("addi", "lw")),
     CacheCaseSpec("DCacheConflict", DCacheConflict, Seq("li x22, 0x1000", "add x30, x29, x22", "lw x11, 0(x6)")),
     CacheCaseSpec("DCacheLRU", DCacheLRU, Seq("lw x10, 0(x28)", "lw x11, 0(x7)", "lw x12, 0(x6)")),
-    CacheCaseSpec("DCacheWriteHit", DCacheWriteHit, Seq("sw", "0(x5)", ".word 0x12345678")),
-    CacheCaseSpec("DCacheWriteMiss", DCacheWriteMiss, Seq("sw", "0(x5)", ".zero 256")),
+    CacheCaseSpec("DCacheWriteHit", DCacheWriteHit, Seq("sw", "lw", ".word 0x12345678")),
+    CacheCaseSpec("DCacheWriteMiss", DCacheWriteMiss, Seq("sw", "lw", ".zero 256")),
     CacheCaseSpec("DCacheWriteback", DCacheWriteback, Seq("sw", "fence rw, rw", ".zero 32768")),
-    CacheCaseSpec("DCachePartialWrite", DCachePartialWrite, Seq("sb", "sh", "lw x13, 0(x5)")),
-    CacheCaseSpec("DCacheStoreLoadForward", DCacheStoreLoadForward, Seq("sw", "lw", "0(x5)", ".zero 64")),
-    CacheCaseSpec("DCachePartialForward", DCachePartialForward, Seq("sw x0, 0(x5)", "sb", "lw", "0(x5)")),
+    CacheCaseSpec("DCachePartialWrite", DCachePartialWrite, Seq("sb", "sh", "lw")),
+    CacheCaseSpec("DCacheStoreLoadForward", DCacheStoreLoadForward, Seq("sw", "lw", ".zero 64")),
+    CacheCaseSpec("DCachePartialForward", DCachePartialForward, Seq("sw", "sb", "lw")),
     CacheCaseSpec("DCacheSequentialScan", DCacheSequentialScan, Seq("loop_seq:", "addi x5, x5, 4", ".zero 4096")),
     CacheCaseSpec("DCacheStride", DCacheStride, Seq("li x22, 0x40", "add x5, x5, x22", ".zero 16384")),
     CacheCaseSpec(
@@ -32,13 +32,9 @@ object CacheCaseTest extends TestSuite:
       DCacheCapacityMiss,
       Seq("loop1:", "ld x10, 0(x5)", "addi x5, x5, 8", ".zero 65536")
     ),
-    CacheCaseSpec("DCacheFence", DCacheFence, Seq("fence rw, rw", "fence.tso", ".zero 64")),
-    CacheCaseSpec("DCacheLrSc", DCacheLrSc, Seq("lr.w.aq x10, (x5)", "sc.w", "(x5)", "retry:")),
-    CacheCaseSpec(
-      "DCacheAmoOps",
-      DCacheAmoOps,
-      Seq("amoadd.w", "(x5)", "amoswap.w", "lw x15, 0(x5)")
-    ),
+    CacheCaseSpec("DCacheFence", DCacheFence, Seq("fence rw, rw", "fence.tso")),
+    CacheCaseSpec("DCacheLrSc", DCacheLrSc, Seq("lr.w.aq", "sc.w", "retry:")),
+    CacheCaseSpec("DCacheAmoOps", DCacheAmoOps, Seq("amoadd.w", "amoswap.w", "lw")),
     CacheCaseSpec(
       "ICacheSequentialFetch",
       ICacheSequentialFetch,

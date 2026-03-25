@@ -17,19 +17,22 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      val i1 = addi(FreeReg, x0, 0x44) // rd symbolic
-      sw(x5, instruction(i1).rd, 0)
+      val base = freshReg()
+      val v1   = freshReg()
+      val v2   = freshReg()
+      val v3   = freshReg()
+      la(base, "buf")
+      addi(v1, x0, 0x44)
+      sw(base, v1, 0)
 
-      val i2 = addi(FreeReg, x0, 0xaa) // rd symbolic
-      sb(x5, instruction(i2).rd, 1) // modify byte 1
+      addi(v2, x0, 0xaa)
+      sb(base, v2, 1) // modify byte 1
 
-      val i3 = addi(FreeReg, x0, 0xbb) // rd symbolic
-      sh(x5, instruction(i3).rd, 2) // modify bytes 2-3
+      addi(v3, x0, 0xbb)
+      sh(base, v3, 2) // modify bytes 2-3
 
-      lw(x13, x5, 0) // expected: 0x00BB_AA44 (little-endian)
+      lw(freshReg(), base, 0) // expected: 0x00BB_AA44 (little-endian)
 
-      exit()
+      finish()
       dataBuffer("buf", CacheLineBytes)
-      tohostSection()
   DCachePartialWrite.emit(outputPath)

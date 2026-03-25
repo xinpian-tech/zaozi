@@ -143,6 +143,7 @@ cases/
 
 | 日期 | 内容 |
 |------|------|
+| 2026-03-24 | 引入 freshReg() 符号化寄存器变量替代 FreeReg 哨兵；la/li 支持符号化 rd；Pseudo 指令参与 Stage 2 求解；自动 pairwise distinct；重构 10 个 cache 测试用例使用 freshReg() 数据流 |
 | 2026-03-24 | 统一 API 职责划分：HTIFLib 管 HTIF 协议，PrivilegeProbeLib 管特权模式；删除 8 个冗余转发；textStartWithTrap(recordCause) 统一 trap handler 选择；新增 verifyTrapCause helper；run.py 重构+生成前清理 output；Z3 种子默认 0；spike 默认 nix run |
 | 2026-03-24 | 修复 5 个 VM 测试用例的代码页/数据页权限混叠问题：引入两级页表（setupCodeDataPageTable）分离代码和数据权限，trap handler 增加 mscratch 恢复机制处理 INSN_PAGE_FAULT |
 | 2026-03-24 | 重构 privilege 测试用例的内存访问处理，更新 ELF/binary 产物 |
