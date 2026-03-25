@@ -164,28 +164,28 @@ Disassembly of section .text:
     800001a8:	e5c50513          	addi	a0,a0,-420 # 80002000 <trap_cause>
     800001ac:	610c                	ld	a1,0(a0)
     800001ae:	463d                	li	a2,15
-    800001b0:	00c59363          	bne	a1,a2,800001b6 <fail>
-    800001b4:	a821                	j	800001cc <exit>
+    800001b0:	00c59e63          	bne	a1,a2,800001cc <fail>
+    800001b4:	a009                	j	800001b6 <exit>
 
-00000000800001b6 <fail>:
-    800001b6:	4285                	li	t0,1
+00000000800001b6 <exit>:
+    800001b6:	4281                	li	t0,0
     800001b8:	0286                	slli	t0,t0,0x1
     800001ba:	0012e293          	ori	t0,t0,1
     800001be:	00002317          	auipc	t1,0x2
     800001c2:	ec230313          	addi	t1,t1,-318 # 80002080 <tohost>
     800001c6:	00533023          	sd	t0,0(t1)
 
-00000000800001ca <spin_fail>:
-    800001ca:	a001                	j	800001ca <spin_fail>
+00000000800001ca <spin>:
+    800001ca:	a001                	j	800001ca <spin>
 
-00000000800001cc <exit>:
-    800001cc:	4281                	li	t0,0
+00000000800001cc <fail>:
+    800001cc:	4285                	li	t0,1
     800001ce:	0286                	slli	t0,t0,0x1
     800001d0:	0012e293          	ori	t0,t0,1
     800001d4:	00002317          	auipc	t1,0x2
     800001d8:	eac30313          	addi	t1,t1,-340 # 80002080 <tohost>
     800001dc:	00533023          	sd	t0,0(t1)
 
-00000000800001e0 <spin>:
-    800001e0:	a001                	j	800001e0 <spin>
+00000000800001e0 <spin_fail>:
+    800001e0:	a001                	j	800001e0 <spin_fail>
     800001e2:	0001                	nop

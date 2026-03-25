@@ -173,9 +173,9 @@ object HTIFLib:
     label("fromhost")
     dword(0)
 
-  /** Emit the complete test epilogue: `fail:` path + `exit:` path + `.tohost` section.
+  /** Emit the complete test epilogue: `exit:` (pass) + `fail:` + `.tohost` section.
     *
-    * Typical test structure: `... j("exit") ... finish()` at the end.
+    * Layout: code falls through into `exit:` (pass). Assertions branch to `fail:` on mismatch.
     */
   def finish(
     exitLabel:     String = "exit",
@@ -190,8 +190,8 @@ object HTIFLib:
     Block,
     Recipe
   ): Unit =
-    fail(failLabel, failCode, codeReg, encodedReg, tohostAddrReg)
     exit(exitLabel, codeReg, encodedReg, tohostAddrReg)
+    fail(failLabel, failCode, codeReg, encodedReg, tohostAddrReg)
     tohostSection()
 
   /** String template for `.text` + `_start` (for template-based emitters). */
