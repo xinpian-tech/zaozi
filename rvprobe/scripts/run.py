@@ -330,7 +330,7 @@ def main() -> int:
     ap.add_argument("--linker-script", default=str(DEFAULT_LINKER))
 
     # Spike
-    ap.add_argument("--spike-command", default="nix run nixpkgs#spike --")
+    ap.add_argument("--spike-command", default="nix shell nixpkgs#spike nixpkgs#dtc -c spike")
     ap.add_argument("--spike-timeout", type=float, default=15.0)
     ap.add_argument("--spike-log-dir", default="")
     ap.add_argument("--spike-results", default="")
