@@ -8,15 +8,6 @@ _start:
     lw x4, 60(x7)
     lw x5, 64(x7)
     lw x6, 68(x7)
-fail:
-    li x5, 0x1
-    slli x5, x5, 1
-    ori x5, x5, 1
-    la x6, tohost
-    sd x5, 0(x6)
-spin_fail:
-    j spin_fail
-
 exit:
     li x5, 0x0
     slli x5, x5, 1
@@ -25,6 +16,15 @@ exit:
     sd x5, 0(x6)
 spin:
     j spin
+
+fail:
+    li x5, 0x1
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin_fail:
+    j spin_fail
 
     .section ".tohost","aw",@progbits
     .align 6

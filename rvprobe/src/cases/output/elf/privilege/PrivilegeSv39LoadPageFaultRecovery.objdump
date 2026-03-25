@@ -49,9 +49,9 @@ Disassembly of section .text:
     80000088:	f7c50513          	addi	a0,a0,-132 # 80002000 <trap_cause>
     8000008c:	610c                	ld	a1,0(a0)
     8000008e:	4635                	li	a2,13
-    80000090:	02c59b63          	bne	a1,a2,800000c6 <fail>
-    80000094:	a0a1                	j	800000dc <exit>
-    80000096:	a805                	j	800000c6 <fail>
+    80000090:	04c59663          	bne	a1,a2,800000dc <fail>
+    80000094:	a80d                	j	800000c6 <exit>
+    80000096:	a805                	j	800000c6 <exit>
 
 0000000080000098 <trap_handler_custom>:
     80000098:	34202373          	csrr	t1,mcause
@@ -59,7 +59,7 @@ Disassembly of section .text:
     800000a0:	f64e0e13          	addi	t3,t3,-156 # 80002000 <trap_cause>
     800000a4:	006e3023          	sd	t1,0(t3)
     800000a8:	43b5                	li	t2,13
-    800000aa:	00731e63          	bne	t1,t2,800000c6 <fail>
+    800000aa:	02731963          	bne	t1,t2,800000dc <fail>
     800000ae:	00000297          	auipc	t0,0x0
     800000b2:	fd628293          	addi	t0,t0,-42 # 80000084 <after_fault>
     800000b6:	34129073          	csrw	mepc,t0
@@ -67,24 +67,24 @@ Disassembly of section .text:
     800000be:	34301073          	csrw	mtval,zero
     800000c2:	30200073          	mret
 
-00000000800000c6 <fail>:
-    800000c6:	4285                	li	t0,1
+00000000800000c6 <exit>:
+    800000c6:	4281                	li	t0,0
     800000c8:	0286                	slli	t0,t0,0x1
     800000ca:	0012e293          	ori	t0,t0,1
     800000ce:	00002317          	auipc	t1,0x2
     800000d2:	f7230313          	addi	t1,t1,-142 # 80002040 <tohost>
     800000d6:	00533023          	sd	t0,0(t1)
 
-00000000800000da <spin_fail>:
-    800000da:	a001                	j	800000da <spin_fail>
+00000000800000da <spin>:
+    800000da:	a001                	j	800000da <spin>
 
-00000000800000dc <exit>:
-    800000dc:	4281                	li	t0,0
+00000000800000dc <fail>:
+    800000dc:	4285                	li	t0,1
     800000de:	0286                	slli	t0,t0,0x1
     800000e0:	0012e293          	ori	t0,t0,1
     800000e4:	00002317          	auipc	t1,0x2
     800000e8:	f5c30313          	addi	t1,t1,-164 # 80002040 <tohost>
     800000ec:	00533023          	sd	t0,0(t1)
 
-00000000800000f0 <spin>:
-    800000f0:	a001                	j	800000f0 <spin>
+00000000800000f0 <spin_fail>:
+    800000f0:	a001                	j	800000f0 <spin_fail>
