@@ -17,19 +17,23 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      val i1 = addi(FreeReg, x0, 42) // rd symbolic
-      sw(x5, instruction(i1).rd, 0)
-      fence(x0, x0, 3, 3, 0) // fence rw, rw
-      lw(x11, x5, 0) // should see stored value
+      val base1 = freshReg()
+      val base2 = freshReg()
+      val data1 = freshReg()
+      val data2 = freshReg()
 
-      la(x6, "buf2")
-      val i2 = addi(FreeReg, x0, 99) // rd symbolic
-      sw(x6, instruction(i2).rd, 0)
-      fenceTso(x0, x0) // fence.tso
-      lw(x12, x6, 0) // should see stored value
+      la(base1, "buf")
+      addi(data1, x0, 42)
+      sw(base1, data1, 0)
+      fence(x0, x0, 3, 3, 0)   // fence rw, rw
+      lw(freshReg(), base1, 0) // should see stored value
 
-      exit()
+      la(base2, "buf2")
+      addi(data2, x0, 99)
+      sw(base2, data2, 0)
+      fenceTso(x0, x0)         // fence.tso
+      lw(freshReg(), base2, 0) // should see stored value
+
+      finish()
       dataBuffers("buf" -> CacheLineBytes, "buf2" -> CacheLineBytes)
-      tohostSection()
   DCacheFence.emit(outputPath)

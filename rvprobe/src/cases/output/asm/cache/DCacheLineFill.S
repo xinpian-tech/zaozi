@@ -1,13 +1,13 @@
     .section ".text"
     .globl _start
 _start:
-    la x5, buf
-    lw x10, 0(x5)
-    lw x11, 4(x5)
-    lw x12, 8(x5)
-    lw x13, 60(x5)
-    lw x10, 64(x5)
-    lw x11, 68(x5)
+    la x7, buf
+    lw x1, 0(x7)
+    lw x2, 4(x7)
+    lw x3, 8(x7)
+    lw x4, 60(x7)
+    lw x5, 64(x7)
+    lw x6, 68(x7)
 exit:
     li x5, 0x0
     slli x5, x5, 1
@@ -17,10 +17,6 @@ exit:
 spin:
     j spin
 
-    .section .data
-    .balign 64
-buf:
-    .zero 256
     .section ".tohost","aw",@progbits
     .align 6
     .globl tohost
@@ -30,3 +26,7 @@ tohost:
     .globl fromhost
 fromhost:
     .dword 0x0
+    .section .data
+    .balign 64
+buf:
+    .zero 256

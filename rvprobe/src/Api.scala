@@ -230,22 +230,95 @@ def crossFields(
     smtAssert(f(summon[Recipe].getIndex(i)) === g(summon[Recipe].getIndex(j)))
   }
 
+// ================== Symbolic register variables ==================
+
+/** Create a fresh symbolic register variable constrained to x1–x31.
+  *
+  * All fresh registers are automatically constrained to be pairwise distinct. Use the returned variable in multiple
+  * instruction positions — the solver guarantees the same physical register everywhere.
+  *
+  * {{{
+  * val base = freshReg()
+  * val data = freshReg()
+  * la(base, "buf")         // rd = base
+  * addi(data, x0, 42)      // rd = data
+  * sw(base, data, 0)        // rs1 = base, rs2 = data  (auto: base ≠ data)
+  * }}}
+  */
+def freshReg(
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Referable[SInt] =
+  val recipe = summon[Recipe]
+  val id     = recipe.nextFreshRegId()
+  val v      = smtValue(s"freg_$id", SInt)
+  smtAssert(v >= 1.S & v < 32.S)
+  recipe.registerFreshReg(v)
+  v
+
 // ================== Pseudo-instruction helpers (raw emission) ==================
 
-/** `li rd, imm` — load immediate (pseudo, expands to lui+addi or longer sequence). */
+/** `li rd, imm` — load immediate (pseudo). Returns instruction idx. */
 def li(
   rd:           Register,
   imm:          Long
 )(
   using recipe: Recipe
-): Unit =
+): Int =
+  val idx = recipe.nextIdx()
   recipe.addStatement(Statement.Pseudo("li", s"${rd}, 0x${imm.toHexString}"))
+  idx
 
-/** `la rd, symbol` — load address of symbol (pseudo, expands to auipc+addi). */
+/** `li rd, imm` — symbolic rd. Placeholder `{rd}` resolved at render time. */
+def li(
+  rd:  Referable[SInt],
+  imm: Long
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Int =
+  val recipe = summon[Recipe]
+  val idx    = recipe.nextIdx()
+  val index  = recipe.addIndex(new Index(idx))
+  index.addArgConstraint { (i: Index) =>
+    given Index = i
+    rdEqual(rd).toRef
+  }
+  recipe.addStatement(Statement.Pseudo("li", s"{rd}, 0x${imm.toHexString}", Some(idx)))
+  idx
+
+/** `la rd, symbol` — load address of symbol (pseudo). Returns instruction idx. */
 def la(
   rd:           Register,
   symbol:       String
 )(
   using recipe: Recipe
-): Unit =
+): Int =
+  val idx = recipe.nextIdx()
   recipe.addStatement(Statement.Pseudo("la", s"${rd}, $symbol"))
+  idx
+
+/** `la rd, symbol` — symbolic rd. */
+def la(
+  rd:     Referable[SInt],
+  symbol: String
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Int =
+  val recipe = summon[Recipe]
+  val idx    = recipe.nextIdx()
+  val index  = recipe.addIndex(new Index(idx))
+  index.addArgConstraint { (i: Index) =>
+    given Index = i
+    rdEqual(rd).toRef
+  }
+  recipe.addStatement(Statement.Pseudo("la", s"{rd}, $symbol", Some(idx)))
+  idx

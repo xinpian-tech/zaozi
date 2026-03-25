@@ -17,26 +17,32 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "lock")
+      val lock     = freshReg()
+      val lrVal    = freshReg()
+      val scOne    = freshReg()
+      val scResult = freshReg()
+      val shared   = freshReg()
+      val sdata    = freshReg()
+
+      la(lock, "lock")
       label("retry")
-      lrW(x10, x5, 0, 1) // lr.w x10, (x5) — aq=1
-      bnez(x10, "retry")
-      val i = addi(FreeReg, x0, 1) // rd symbolic
-      scW(x12, x5, instruction(i).rd, 0, 0) // sc.w x12, <solver-picked-rd>, (x5)
-      bnez(x12, "retry")
+      lrW(lrVal, lock, 0, 1)           // lr.w — aq=1
+      bnez(lrVal, "retry")
+      addi(scOne, x0, 1)
+      scW(scResult, lock, scOne, 0, 0) // sc.w
+      bnez(scResult, "retry")
 
       // critical section
-      la(x6, "shared_data")
-      li(x13, 0xbeefL)
-      sw(x6, x13, 0)
+      la(shared, "shared_data")
+      li(sdata, 0xbeefL)
+      sw(shared, sdata, 0)
 
       // release
-      sw(x5, x0, 0)
-      fence(x0, x0, 3, 3, 0) // fence rw, rw
+      sw(lock, x0, 0)
+      fence(x0, x0, 3, 3, 0)
 
-      exit()
+      finish()
       dataBuffers("lock" -> CacheLineBytes, "shared_data" -> CacheLineBytes)
-      tohostSection()
   DCacheLrSc.emit(outputPath)
 
 // AMO operations: amoadd.w, amoswap.w
@@ -46,19 +52,23 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "amo_buf")
-      li(x10, 100L)
-      sw(x5, x10, 0)
+      val base    = freshReg()
+      val init    = freshReg()
+      val addVal  = freshReg()
+      val swapVal = freshReg()
 
-      val i = addi(FreeReg, x0, 5) // rd symbolic
-      amoaddW(x12, x5, instruction(i).rd, 0, 0) // old=100, mem=105
+      la(base, "amo_buf")
+      li(init, 100L)
+      sw(base, init, 0)
 
-      li(x13, 200L)
-      amoswapW(x14, x5, x13, 0, 0) // old=105, mem=200
+      addi(addVal, x0, 5)
+      amoaddW(freshReg(), base, addVal, 0, 0) // old=100, mem=105
 
-      lw(x15, x5, 0) // should read 200
+      li(swapVal, 200L)
+      amoswapW(freshReg(), base, swapVal, 0, 0) // old=105, mem=200
 
-      exit()
+      lw(freshReg(), base, 0) // should read 200
+
+      finish()
       dataBuffer("amo_buf", CacheLineBytes)
-      tohostSection()
   DCacheAmoOps.emit(outputPath)

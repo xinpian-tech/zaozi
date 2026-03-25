@@ -17,15 +17,16 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      lw(x10, x5, 0) // pull into cache
-      val i = addi(FreeReg, x0, 42) // rd symbolic, imm12=42
-      sw(x5, instruction(i).rd, 0) // write hit — rs2 = addi's rd
-      lw(x12, x5, 0) // read back
+      val base = freshReg()
+      val data = freshReg()
+      la(base, "buf")
+      lw(freshReg(), base, 0) // pull into cache
+      addi(data, x0, 42)
+      sw(base, data, 0)       // write hit
+      lw(freshReg(), base, 0) // read back
 
-      exit()
+      finish()
       initializedWordBuffer("buf", 0x12345678L)
-      tohostSection()
   DCacheWriteHit.emit(outputPath)
 
 // Sequence F: write miss — write to untouched address
@@ -35,14 +36,15 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf2")
-      li(x11, 0x55667788L)
-      timed(x14, x15, x16) { sw(x5, x11, 0) } // write miss
-      timed(x14, x15, x17) { lw(x12, x5, 0) } // if write-allocate → hit
+      val base = freshReg()
+      val data = freshReg()
+      la(base, "buf2")
+      li(data, 0x55667788L)
+      timed(x14, x15, x16) { sw(base, data, 0) } // write miss
+      timed(x14, x15, x17) { lw(freshReg(), base, 0) } // if write-allocate → hit
 
-      exit()
+      finish()
       dataBuffer("buf2", CacheLineBytes * 4)
-      tohostSection()
   DCacheWriteMiss.emit(outputPath)
 
 // Sequence G: dirty writeback — dirty line eviction
@@ -52,21 +54,21 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
+      val data = freshReg()
       la(x5, "buf")
       li(x22, SameSetStrideBytes.toLong)
-      sameSetAddresses(x5, x22, x6, x7, x28) // A/B/C
+      sameSetAddresses(x5, x22, x6, x7, x28) // A/B/C — infrastructure regs stay fixed
 
-      lw(x10, x6, 0) // fill A
-      val i = addi(FreeReg, x0, 42) // rd symbolic
-      sw(x6, instruction(i).rd, 0) // dirty A — rs2 = addi's rd
+      lw(freshReg(), x6, 0) // fill A
+      addi(data, x0, 42)
+      sw(x6, data, 0)       // dirty A
 
-      lw(x10, x7, 0)  // fill B
-      lw(x10, x28, 0) // fill C → evict A (writeback)
+      lw(freshReg(), x7, 0)  // fill B
+      lw(freshReg(), x28, 0) // fill C → evict A (writeback)
 
       fence(x0, x0, 3, 3, 0) // fence rw, rw
-      lw(x12, x6, 0)         // re-read A → should be 0xDEADBEEF
+      lw(freshReg(), x6, 0)  // re-read A
 
-      exit()
+      finish()
       dataBuffers("buf" -> ConflictRegionBytes, "buf2" -> (CacheLineBytes * 4))
-      tohostSection()
   DCacheWriteback.emit(outputPath)

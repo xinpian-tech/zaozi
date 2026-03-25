@@ -11,20 +11,22 @@ import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
 // Sequence M: store-load forwarding — immediate load after store
+// All registers are symbolic (solver-picked via FreeReg).
 @main def DCacheStoreLoadForward(outputPath: String): Unit =
   object DCacheStoreLoadForward extends RVGenerator:
     val sets          = cacheSetsWithCsr()
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      val i = addi(FreeReg, x0, 42) // rd symbolic
-      sw(x5, instruction(i).rd, 0)
-      lw(x11, x5, 0) // immediate load → forwarding
+      val base = freshReg()
+      val data = freshReg()
+      la(base, "buf")         // rd = base
+      addi(data, x0, 42)      // rd = data
+      sw(base, data, 0)       // store: rs1 = base, rs2 = data
+      lw(freshReg(), base, 0) // load: rs1 = base → forwarding
 
-      exit()
+      finish()
       dataBuffer("buf", CacheLineBytes)
-      tohostSection()
   DCacheStoreLoadForward.emit(outputPath)
 
 // Sequence N: partial forwarding — byte write then full word read
@@ -34,13 +36,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      sw(x5, x0, 0) // zero out
-      val i = addi(FreeReg, x0, 0xaa) // rd symbolic
-      sb(x5, instruction(i).rd, 1) // partial byte write — rs2 = addi's rd
-      lw(x11, x5, 0) // full word read → merge: 0x0000AA00
+      val base = freshReg()
+      val data = freshReg()
+      la(base, "buf")
+      sw(base, x0, 0)         // zero out
+      addi(data, x0, 0xaa)
+      sb(base, data, 1)       // partial byte write
+      lw(freshReg(), base, 0) // full word read → merge: 0x0000AA00
 
-      exit()
+      finish()
       dataBuffer("buf", CacheLineBytes)
-      tohostSection()
   DCachePartialForward.emit(outputPath)

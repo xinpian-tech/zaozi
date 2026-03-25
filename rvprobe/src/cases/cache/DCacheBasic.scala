@@ -16,14 +16,14 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      timed(x14, x15, x16) { lw(x10, x5, 0) } // miss
-      timed(x14, x15, x17) { lw(x11, x5, 0) } // hit
-      lw(x12, x5, 0) // hit
+      val base = freshReg()
+      la(base, "buf")
+      timed(x14, x15, x16) { lw(freshReg(), base, 0) } // miss
+      timed(x14, x15, x17) { lw(freshReg(), base, 0) } // hit
+      lw(freshReg(), base, 0) // hit
 
-      exit()
+      finish()
       initializedWordBuffer("buf", 0x12345678L)
-      tohostSection()
   DCacheHitMiss.emit(outputPath)
 
 // Sequence B: same-line multi-offset reads — line fill verification
@@ -33,17 +33,17 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      lw(x10, x5, 0)                  // miss, line fill
-      lw(x11, x5, 4)                  // hit (same line)
-      lw(x12, x5, 8)                  // hit
-      lw(x13, x5, CacheLineBytes - 4) // hit (near end of 64B line)
-      lw(x10, x5, CacheLineBytes)     // miss (next line)
-      lw(x11, x5, CacheLineBytes + 4) // hit
+      val base = freshReg()
+      la(base, "buf")
+      lw(freshReg(), base, 0)                  // miss, line fill
+      lw(freshReg(), base, 4)                  // hit (same line)
+      lw(freshReg(), base, 8)                  // hit
+      lw(freshReg(), base, CacheLineBytes - 4) // hit (near end of 64B line)
+      lw(freshReg(), base, CacheLineBytes)     // miss (next line)
+      lw(freshReg(), base, CacheLineBytes + 4) // hit
 
-      exit()
+      finish()
       dataBuffer("buf", CacheLineBytes * 4)
-      tohostSection()
   DCacheLineFill.emit(outputPath)
 
 // Cross cache line boundary access with aligned word loads
@@ -53,12 +53,12 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      la(x5, "buf")
-      addi(x5, x5, CacheLineBytes - 4)
-      lw(x10, x5, 0) // offset 60, within line
-      lw(x11, x5, 4) // offset 64, crosses into next line
+      val base = freshReg()
+      la(base, "buf")
+      addi(base, base, CacheLineBytes - 4)
+      lw(freshReg(), base, 0) // offset 60, within line
+      lw(freshReg(), base, 4) // offset 64, crosses into next line
 
-      exit()
+      finish()
       dataBuffer("buf", CacheLineBytes * 4)
-      tohostSection()
   DCacheCrossLine.emit(outputPath)

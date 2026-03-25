@@ -38,8 +38,12 @@ enum Statement:
   /** `.space` directive (reserve N bytes, uninitialized). */
   case Space(size: Int)
 
-  /** Pseudo instruction (e.g. `la`, `li`, `j`, `beqz`). */
-  case Pseudo(mnemonic: String, operands: String)
+  /** Pseudo instruction (e.g. `la`, `li`, `j`, `beqz`).
+    *
+    * When `idx` is set, the pseudo participates in register allocation: the solver picks `rd`, and the renderer
+    * replaces `{rd}` in `operands` with the solved register name.
+    */
+  case Pseudo(mnemonic: String, operands: String, idx: Option[Int] = None)
 
   /** Escape hatch for directives not yet modelled. */
   case Raw(content: String)
