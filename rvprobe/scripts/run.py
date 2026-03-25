@@ -313,7 +313,7 @@ def main() -> int:
     # Phase toggles
     ap.add_argument("--skip-asm", action="store_true")
     ap.add_argument("--skip-elf", action="store_true")
-    ap.add_argument("--run-spike", action="store_true")
+    ap.add_argument("--skip-spike", action="store_true")
 
     # Parallelism
     cpu = max(1, os.cpu_count() or 1)
@@ -376,7 +376,7 @@ def main() -> int:
         print("[elf] skipped")
 
     # Phase 3: Spike
-    if args.run_spike:
+    if not args.skip_spike:
         spike_cmd = shlex.split(args.spike_command)
         if not spike_cmd:
             print("spike command is empty", file=sys.stderr)
