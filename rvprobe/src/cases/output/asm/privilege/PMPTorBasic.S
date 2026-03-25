@@ -104,6 +104,15 @@ s_code:
     lw x11, 0(x10)
     j exit
 
+fail:
+    li x5, 0x1
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin_fail:
+    j spin_fail
+
 exit:
     li x5, 0x0
     slli x5, x5, 1

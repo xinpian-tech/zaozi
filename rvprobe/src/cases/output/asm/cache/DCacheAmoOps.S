@@ -9,6 +9,15 @@ _start:
     li x7, 0xc8
     amoswap.w x2, x7, (x5)
     lw x3, 0(x5)
+fail:
+    li x5, 0x1
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin_fail:
+    j spin_fail
+
 exit:
     li x5, 0x0
     slli x5, x5, 1

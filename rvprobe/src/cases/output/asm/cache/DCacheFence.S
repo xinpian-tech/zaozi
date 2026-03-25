@@ -11,6 +11,15 @@ _start:
     sw x5, 0(x6)
     fence.tso
     lw x2, 0(x6)
+fail:
+    li x5, 0x1
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin_fail:
+    j spin_fail
+
 exit:
     li x5, 0x0
     slli x5, x5, 1

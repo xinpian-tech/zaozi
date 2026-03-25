@@ -29,10 +29,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       li(x11, 0x42L)
       sw(x10, x11, 0)
       lw(x12, x10, 0)
-      bne(x11, x12, "fail")
-      j("exit")
-
-      fail()
+      assertEq(x11, x12)
 
       finish()
 
@@ -75,10 +72,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       li(x11, 0x55L)
       sw(x10, x11, 0)
       lw(x12, x10, 0)
-      bne(x11, x12, "fail")
-      j("exit")
-
-      fail()
+      assertEq(x11, x12)
 
       finish()
 
@@ -145,10 +139,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       li(x11, 0x77L)
       sw(x10, x11, 0)
       lw(x12, x10, 0)
-      bne(x11, x12, "fail")
-      j("exit")
-
-      fail()
+      assertEq(x11, x12)
 
       finish()
 
