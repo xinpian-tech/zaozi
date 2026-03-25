@@ -129,7 +129,7 @@ trait RVGenerator:
       given Arena  = arena
       given Module = module
       val smtlib   = mlirToSMTLIB()
-      val z3Output = toZ3Output(smtlib)
+      val z3Output = toZ3Output(smtlib, "stage1_opcode")
       try {
         val result  = parseZ3OutputOrFail(
           z3Output = z3Output,
@@ -159,7 +159,7 @@ trait RVGenerator:
       given Arena  = arena
       given Module = module
       val smtlib   = mlirToSMTLIB()
-      val z3Output = toZ3Output(smtlib)
+      val z3Output = toZ3Output(smtlib, "stage2_args")
       try {
         val result = parseZ3OutputOrFail(
           z3Output = z3Output,
@@ -250,6 +250,123 @@ trait RVGenerator:
     smtCheck
   }
 
+  /** Check if Stage 2 is SAT when only the first `limit` indices have their arg constraints emitted. */
+  private def checkArgSatWithLimit(
+    solvedOpcodes: Map[Int, Int],
+    limit:         Int
+  ): Boolean = {
+    given arena:   Arena   = Arena.ofConfined()
+    given context: Context = summon[ContextApi].contextCreate
+    summon[SmtDialect].loadDialect()
+    summon[FuncDialect].loadDialect()
+    given module:  Module  = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    val func = summon[FuncApi].op("func")
+    given funcBlock: Block = func.block
+    func.appendToModule()
+
+    try
+      var sat      = false
+      solver {
+        smtSetLogic("QF_LIA")
+        given recipe: Recipe = new Recipe(name)
+        constraints()
+
+        val allIdx  = recipe.allIndices()
+        val limited = allIdx.take(limit)
+
+        limited.foreach { idx =>
+          val index = recipe.getIndex(idx)
+          solvedOpcodes.get(idx).foreach { opcodeId =>
+            index.setOpcodeId(opcodeId)
+            smtAssert(index.nameId === opcodeId.S)
+          }
+          val args  = index.getArgConstraints().map(_(index))
+          if args.nonEmpty then smtAssert(smtAnd(args*))
+        }
+
+        // freshReg distinct
+        val fregs = recipe.freshRegs()
+        for
+          i <- fregs.indices
+          j <- (i + 1) until fregs.size
+        do smtAssert(fregs(i) =/= fregs(j))
+
+        recipe.executeCrossIndexConstraints()
+        smtCheck
+      }
+      given Arena  = arena
+      given Module = module
+      val smtlib   = mlirToSMTLIB()
+      val output   = runZ3(injectRandomSeed(smtlib).replace("(reset)", ""))
+      sat = output.trim.startsWith("sat")
+      sat
+    finally
+      context.destroy()
+      arena.close()
+  }
+
+  /** Debug mode: binary-search Stage 2 to find the first instruction whose constraints cause UNSAT. */
+  def debugSolve(): Unit = {
+    System.err.println(s"[debug] Stage 1: solving opcodes...")
+    val (opcodes, statements) = solveOpcodes()
+    System.err.println(s"[debug] Stage 1: OK, ${opcodes.size} opcodes solved")
+
+    // Discover total indices
+    given arena:   Arena   = Arena.ofConfined()
+    given context: Context = summon[ContextApi].contextCreate
+    summon[SmtDialect].loadDialect()
+    summon[FuncDialect].loadDialect()
+    given module:  Module  = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    val func = summon[FuncApi].op("func")
+    given funcBlock: Block = func.block
+    func.appendToModule()
+
+    var capturedIndices: Seq[Int] = Seq.empty
+    try
+      solver {
+        smtSetLogic("QF_LIA")
+        given Recipe = new Recipe(name)
+        constraints()
+        capturedIndices = summon[Recipe].allIndices()
+      }
+    finally
+      context.destroy()
+      arena.close()
+    val allIdx = capturedIndices
+
+    val n = allIdx.size
+    System.err.println(s"[debug] Stage 2: ${n} indices, binary-searching...")
+
+    if checkArgSatWithLimit(opcodes, n) then
+      System.err.println(s"[debug] All ${n} indices are SAT. No issue found.")
+      return
+
+    if !checkArgSatWithLimit(opcodes, 0) then
+      System.err.println(
+        s"[debug] UNSAT with 0 indices — freshReg distinct or cross-index constraints alone are contradictory."
+      )
+      return
+
+    var lo = 0
+    var hi = n
+    while hi - lo > 1 do
+      val mid = (lo + hi) / 2
+      System.err.print(s"[debug]   [$lo..$hi] trying $mid/$n... ")
+      if checkArgSatWithLimit(opcodes, mid) then
+        System.err.println("sat")
+        lo = mid
+      else
+        System.err.println("unsat")
+        hi = mid
+
+    val culpritIdx = allIdx(hi - 1)
+    val stmt       = statements.lift(culpritIdx)
+    System.err.println(s"\n[debug] ============================================================")
+    System.err.println(s"[debug] First UNSAT at instruction index $culpritIdx (position $hi of $n)")
+    stmt.foreach(s => System.err.println(s"[debug] Statement: $s"))
+    System.err.println(s"[debug] ============================================================")
+  }
+
   // ================== Helpers ==================
   private def mlirToSMTLIB(
   )(
@@ -288,10 +405,29 @@ trait RVGenerator:
       s"$options\n(set-logic "
     )
 
-  private def toZ3Output(smtlib: String): String = {
+  /** Dump SMT-LIB to file if `RVPROBE_DEBUG_SMTLIB` env var is set.
+    *
+    * The env var value is a directory path. Files are written as `{name}_{stage}.smt2`.
+    */
+  private def maybeDumpSmtlib(smtlib: String, stage: String): Unit =
+    Option(System.getenv("RVPROBE_DEBUG_SMTLIB")).foreach { dir =>
+      val path = Paths.get(dir, s"${name}_$stage.smt2")
+      Files.createDirectories(path.getParent)
+      Files.writeString(
+        path,
+        smtlib,
+        StandardCharsets.UTF_8,
+        StandardOpenOption.CREATE,
+        StandardOpenOption.TRUNCATE_EXISTING
+      )
+      System.err.println(s"[debug] dumped $stage SMT-LIB to $path")
+    }
+
+  private def toZ3Output(smtlib: String, stage: String = "unknown"): String = {
     val randomized         = injectRandomSeed(smtlib)
     // Replace (reset) with (get-model) to get the model output
     val smtlibWithGetModel = randomized.replace("(reset)", "(get-model)")
+    maybeDumpSmtlib(smtlibWithGetModel, stage)
     runZ3(smtlibWithGetModel)
   }
 
@@ -927,6 +1063,9 @@ trait RVGenerator:
     *   [[AsmMode]] writes a GAS `.s` file; [[BinMode]] writes raw binary.
     */
   def emit(filename: String = s"${name}_output", mode: OutputMode = AsmMode): Unit =
+    if Option(System.getenv("RVPROBE_DEBUG")).exists(_.nonEmpty) then
+      debugSolve()
+      return
     mode match
       case AsmMode =>
         val content = toRecipeAsm()
