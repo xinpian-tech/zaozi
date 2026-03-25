@@ -143,6 +143,7 @@ cases/
 
 | 日期 | 内容 |
 |------|------|
+| 2026-03-24 | 新增 debug.py：DSL 级二分（RVPROBE_DEBUG=1 触发 debugSolve）+ SMT-LIB 级二分（RVPROBE_DEBUG_SMTLIB 导出 smt2）定位 UNSAT 约束 |
 | 2026-03-24 | 清理测试 epilogue：finish() 吸收 fail()；新增 HTIFLib.assertEq 通用断言；verifyTrapCause 基于 assertEq 构建；删除 Program.scala；消除所有手写 bne+j("exit") 模式 |
 | 2026-03-24 | 引入 freshReg() 符号化寄存器变量替代 FreeReg 哨兵；la/li 支持符号化 rd；Pseudo 指令参与 Stage 2 求解；自动 pairwise distinct；重构 10 个 cache 测试用例使用 freshReg() 数据流 |
 | 2026-03-24 | 统一 API 职责划分：HTIFLib 管 HTIF 协议，PrivilegeProbeLib 管特权模式；删除 8 个冗余转发；textStartWithTrap(recordCause) 统一 trap handler 选择；新增 verifyTrapCause helper；run.py 重构+生成前清理 output；Z3 种子默认 0；spike 默认 nix run |
@@ -186,3 +187,4 @@ cases/
   - 新增 `mapGigapageIdentity` helper，替代手工 `la/li/sd` 页表配置
   - 迁移 6 个 gigapage 测试用例使用新 helper，获得自动验证
   - 8 个 PageTableModel 单元测试覆盖正反例
+- [ ] Z3 unsat core 支持：在 SMT-LIB 导出时给每个 assert 加 `:named` 标注 + `(set-option :produce-unsat-cores true)`，使 `(get-unsat-core)` 返回最小冲突子集，替代二分法一次定位 UNSAT 原因
