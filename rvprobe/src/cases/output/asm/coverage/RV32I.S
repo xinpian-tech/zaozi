@@ -146,41 +146,41 @@ add x28, x3, x15
     add x26, x14, x19
     add x20, x4, x23
 
-addi x28, x31, 2047
-    addi x12, x26, 2047
-    addi x26, x25, 2047
-    addi x2, x11, 2047
-    addi x6, x18, 2047
-    addi x31, x19, 2047
-    addi x25, x22, 2047
-    addi x19, x8, 2047
-    addi x11, x20, 2047
-    addi x22, x31, 2047
-    addi x26, x26, 2047
-    addi x1, x27, 2047
-    addi x7, x14, 2047
-    addi x24, x23, 2047
-    addi x20, x30, 2047
-    addi x17, x17, 2047
-    addi x18, x13, 2047
-    addi x15, x12, 0
-    addi x21, x2, 2047
-    addi x13, x10, 2047
-    addi x14, x9, 2047
-    addi x14, x5, 2047
-    addi x16, x7, 2047
-    addi x23, x4, 2047
-    addi x5, x2, 2047
-    addi x10, x3, 2047
-    addi x12, x28, 2047
-    addi x3, x16, 2047
-    addi x9, x21, 2047
-    addi x29, x1, 2047
-    addi x8, x6, -1
-    addi x27, x24, 2047
-    addi x30, x29, 2047
-    addi x4, x30, -2048
-    addi x22, x15, 1
+addi x31, x16, 2047
+    addi x16, x19, 2047
+    addi x30, x11, 2047
+    addi x29, x2, 2047
+    addi x27, x18, 2047
+    addi x31, x20, 2047
+    addi x26, x13, 2047
+    addi x25, x29, 2047
+    addi x25, x25, 2047
+    addi x22, x23, 2047
+    addi x21, x30, 2047
+    addi x20, x14, -2048
+    addi x19, x28, 2047
+    addi x18, x15, 2047
+    addi x28, x31, 2047
+    addi x17, x26, 2047
+    addi x16, x10, 2047
+    addi x15, x3, 2047
+    addi x14, x12, 2047
+    addi x13, x2, 2047
+    addi x12, x9, 2047
+    addi x11, x6, 2047
+    addi x10, x8, 2047
+    addi x9, x4, 2047
+    addi x8, x24, 2047
+    addi x7, x5, 2047
+    addi x6, x1, 2047
+    addi x4, x1, 2047
+    addi x23, x21, 2047
+    addi x2, x17, 2047
+    addi x24, x7, 2047
+    addi x1, x27, 1
+    addi x9, x1, -2048
+    addi x3, x4, -1
+    addi x5, x22, 0
 
 and x11, x26, x4
     and x2, x24, x18
@@ -218,77 +218,77 @@ and x11, x26, x4
     and x28, x12, x31
     and x29, x1, x9
 
-andi x9, x25, 2047
-    andi x2, x18, 2047
-    andi x29, x27, 2047
-    andi x28, x13, 2047
-    andi x20, x14, 2047
-    andi x17, x7, 2047
-    andi x13, x5, 2047
-    andi x5, x28, 2047
-    andi x30, x19, 2047
-    andi x4, x30, 2047
-    andi x8, x22, 2047
-    andi x23, x15, 2047
-    andi x12, x10, 2047
-    andi x10, x15, 2047
-    andi x15, x3, 2047
-    andi x5, x4, 2047
-    andi x19, x17, 2047
-    andi x18, x2, 2047
-    andi x16, x12, 2047
-    andi x14, x11, 2047
+andi x21, x20, 2047
+    andi x13, x16, 2047
+    andi x7, x27, 2047
+    andi x17, x23, 2047
+    andi x24, x17, 2047
+    andi x30, x22, 2047
+    andi x22, x24, 1
+    andi x6, x19, 2047
+    andi x26, x14, 2047
+    andi x19, x3, 2047
+    andi x7, x4, 2047
+    andi x9, x4, 2047
+    andi x23, x1, 2047
+    andi x1, x4, 2047
+    andi x2, x6, -2048
+    andi x15, x12, -1
+    andi x20, x29, 2047
+    andi x28, x30, 2047
+    andi x29, x28, 2047
+    andi x27, x25, 2047
+    andi x31, x21, 0
+    andi x16, x13, 2047
+    andi x7, x11, 2047
+    andi x7, x15, 2047
     andi x7, x1, 2047
-    andi x6, x15, 2047
-    andi x30, x4, -2048
-    andi x27, x4, 2047
-    andi x25, x23, 2047
-    andi x24, x8, 2047
-    andi x11, x24, 2047
-    andi x26, x20, 2047
-    andi x21, x21, 2047
-    andi x22, x16, 2047
-    andi x3, x31, 2047
-    andi x1, x9, 1
-    andi x12, x29, -2048
-    andi x31, x26, -1
-    andi x31, x6, 0
+    andi x5, x5, 2047
+    andi x3, x2, 2047
+    andi x10, x10, 2047
+    andi x11, x7, 2047
+    andi x4, x8, 2047
+    andi x12, x18, 2047
+    andi x18, x31, 2047
+    andi x25, x9, 2047
+    andi x8, x26, 2047
+    andi x14, x24, 2047
 
-auipc x18, 524288
-    auipc x7, 0
-    auipc x13, 524287
-    auipc x15, 524287
-    auipc x2, 524287
-    auipc x5, 524287
+auipc x11, 524287
     auipc x8, 524287
-    auipc x8, 524287
-    auipc x8, 524287
-    auipc x8, 524287
-    auipc x19, 524287
-    auipc x17, 524287
-    auipc x22, 524287
-    auipc x23, 524287
-    auipc x25, 524287
-    auipc x28, 524287
-    auipc x31, 524287
-    auipc x10, 524287
     auipc x27, 524287
-    auipc x16, 524287
-    auipc x1, 524287
-    auipc x3, 524287
-    auipc x4, 524287
-    auipc x29, 524287
-    auipc x29, 524287
-    auipc x24, 524287
-    auipc x21, 524287
     auipc x30, 524287
-    auipc x9, 524287
-    auipc x26, 524287
+    auipc x25, 524287
     auipc x6, 524287
-    auipc x12, 1
-    auipc x14, 1
-    auipc x20, 1048575
-    auipc x11, 1048575
+    auipc x9, 524287
+    auipc x31, 524287
+    auipc x24, 524287
+    auipc x20, 524287
+    auipc x14, 524287
+    auipc x13, 524287
+    auipc x7, 524287
+    auipc x29, 524287
+    auipc x16, 524287
+    auipc x19, 524287
+    auipc x22, 524287
+    auipc x22, 524287
+    auipc x22, 524287
+    auipc x3, 524287
+    auipc x5, 524287
+    auipc x1, 524287
+    auipc x16, 524287
+    auipc x21, 524287
+    auipc x17, 524287
+    auipc x15, 524287
+    auipc x23, 524287
+    auipc x22, 524287
+    auipc x12, 524287
+    auipc x2, 524287
+    auipc x18, 524287
+    auipc x28, 0
+    auipc x4, 1
+    auipc x26, 524288
+    auipc x10, 1048575
 
 addi x1, x0, -2
     addi x2, x0, -2
@@ -536,41 +536,41 @@ addi x1, x0, -2
     bne x27, x30, . + 4
     bne x2, x31, . + 4
 
-lui x2, 524287
-    lui x1, 524287
-    lui x8, 524287
-    lui x9, 524287
-    lui x10, 524287
-    lui x11, 524287
-    lui x11, 524287
-    lui x12, 524287
-    lui x27, 524287
-    lui x28, 524287
-    lui x26, 524287
-    lui x24, 524287
-    lui x25, 524287
-    lui x14, 524287
-    lui x15, 524287
-    lui x20, 0
-    lui x22, 524287
-    lui x4, 1048575
-    lui x4, 1048575
-    lui x6, 1
-    lui x16, 1048575
-    lui x17, 0
-    lui x19, 1
-    lui x21, 524287
-    lui x30, 524287
-    lui x4, 524288
-    lui x13, 1048575
-    lui x18, 524287
-    lui x23, 1048574
-    lui x4, 1
-    lui x7, 524287
-    lui x3, 524288
-    lui x5, 524287
+lui x6, 1048575
+    lui x9, 0
+    lui x21, 524288
+    lui x27, 524288
+    lui x25, 1
     lui x31, 1
-    lui x29, 524288
+    lui x24, 524288
+    lui x5, 0
+    lui x2, 1048574
+    lui x15, 1048575
+    lui x30, 524287
+    lui x7, 1
+    lui x8, 524288
+    lui x16, 524287
+    lui x19, 524288
+    lui x23, 2
+    lui x18, 524287
+    lui x29, 0
+    lui x12, 524287
+    lui x20, 524287
+    lui x20, 524288
+    lui x25, 524287
+    lui x3, 524288
+    lui x1, 1048574
+    lui x5, 524288
+    lui x4, 0
+    lui x14, 524288
+    lui x13, 524287
+    lui x10, 524288
+    lui x17, 524288
+    lui x22, 524288
+    lui x28, 524288
+    lui x11, 1048574
+    lui x26, 0
+    lui x25, 0
 
 or x11, x26, x4
     or x2, x24, x18
@@ -608,41 +608,41 @@ or x11, x26, x4
     or x28, x12, x31
     or x29, x1, x9
 
-ori x6, x26, 2047
-    ori x26, x21, 2047
-    ori x30, x2, 2047
-    ori x29, x11, 2047
-    ori x28, x25, 2047
-    ori x27, x22, 2047
-    ori x25, x23, 2047
-    ori x24, x24, 2047
-    ori x23, x31, 2047
-    ori x22, x13, 2047
-    ori x21, x15, 2047
-    ori x20, x17, 2047
-    ori x19, x18, 2047
-    ori x18, x19, 2047
-    ori x17, x20, 2047
-    ori x16, x30, 2047
-    ori x15, x28, 2047
-    ori x14, x12, 2047
-    ori x13, x2, 2047
-    ori x12, x10, 2047
-    ori x11, x9, 2047
-    ori x10, x8, 2047
-    ori x9, x6, 2047
-    ori x8, x5, 2047
+ori x1, x21, 2047
+    ori x31, x22, 2047
+    ori x31, x6, 2047
+    ori x30, x14, 2047
+    ori x29, x18, 2047
+    ori x28, x23, 2047
+    ori x27, x24, 2047
+    ori x25, x27, 2047
+    ori x6, x14, 2047
+    ori x21, x31, 2047
+    ori x20, x19, 2047
+    ori x17, x5, 2047
+    ori x15, x11, 2047
+    ori x13, x9, 2047
+    ori x9, x4, 2047
+    ori x8, x12, 2047
+    ori x22, x7, 2047
+    ori x19, x15, 2047
+    ori x16, x13, 2047
+    ori x14, x10, 2047
+    ori x12, x16, 2047
+    ori x11, x8, 2047
+    ori x10, x29, 2047
+    ori x25, x3, 2047
+    ori x24, x2, 2047
+    ori x23, x30, 2047
+    ori x4, x17, 2047
+    ori x18, x2, 0
     ori x7, x2, 2047
-    ori x3, x27, 2047
-    ori x31, x14, 2047
-    ori x15, x1, 2047
-    ori x2, x3, 2047
-    ori x4, x1, 2047
-    ori x4, x29, 0
-    ori x1, x16, 2047
-    ori x17, x1, -1
-    ori x5, x7, -2048
-    ori x8, x4, 1
+    ori x5, x25, 2047
+    ori x26, x1, 2047
+    ori x2, x28, -1
+    ori x31, x20, 2047
+    ori x24, x14, -2048
+    ori x3, x26, 1
 
 sll x11, x26, x4
     sll x2, x24, x18
@@ -716,77 +716,77 @@ slt x11, x26, x4
     slt x28, x12, x31
     slt x29, x1, x9
 
-slti x23, x24, 2047
-    slti x13, x23, 2047
-    slti x19, x27, 2047
-    slti x2, x10, 2047
-    slti x4, x22, 2047
-    slti x27, x20, 2047
-    slti x9, x23, 2047
-    slti x28, x13, 2047
-    slti x31, x12, 2047
-    slti x5, x9, 2047
-    slti x8, x7, 2047
-    slti x5, x19, 2047
-    slti x16, x2, 2047
-    slti x25, x16, 2047
-    slti x6, x1, 2047
-    slti x1, x21, 2047
-    slti x3, x26, 0
-    slti x11, x25, 2047
-    slti x7, x11, 2047
-    slti x29, x18, 2047
-    slti x17, x8, 2047
-    slti x30, x3, 2047
-    slti x5, x14, 2047
-    slti x26, x4, 2047
-    slti x10, x5, 2047
-    slti x21, x6, 2047
-    slti x22, x1, 2047
-    slti x12, x1, 2047
-    slti x20, x28, 2047
-    slti x14, x1, 2047
-    slti x18, x31, 2047
-    slti x24, x30, 2047
-    slti x15, x17, -1
-    slti x5, x15, -2048
-    slti x5, x29, 1
+slti x4, x3, 2047
+    slti x4, x28, 2047
+    slti x29, x30, 2047
+    slti x28, x26, 2047
+    slti x27, x14, 2047
+    slti x26, x16, 2047
+    slti x24, x13, 2047
+    slti x23, x3, 2047
+    slti x23, x10, 2047
+    slti x21, x9, 2047
+    slti x21, x2, 2047
+    slti x19, x18, 2047
+    slti x18, x21, 2047
+    slti x17, x31, 2047
+    slti x16, x19, 2047
+    slti x15, x6, 2047
+    slti x14, x12, 2047
+    slti x13, x11, 2047
+    slti x12, x7, 2047
+    slti x11, x2, 2047
+    slti x20, x23, 2047
+    slti x9, x20, 2047
+    slti x8, x8, 2047
+    slti x6, x5, 2047
+    slti x5, x1, 2047
+    slti x2, x17, 2047
+    slti x22, x25, 2047
+    slti x25, x22, 2047
+    slti x3, x24, 2047
+    slti x1, x4, 2047
+    slti x10, x1, 2047
+    slti x7, x1, 1
+    slti x30, x15, -2048
+    slti x31, x29, -1
+    slti x17, x27, 0
 
-sltiu x26, x19, 2047
-    sltiu x23, x28, 2047
-    sltiu x22, x29, 2047
-    sltiu x21, x26, 2047
-    sltiu x20, x14, 2047
-    sltiu x19, x17, 2047
-    sltiu x18, x11, 2047
-    sltiu x17, x11, 2047
-    sltiu x15, x21, 2047
-    sltiu x14, x18, 2047
-    sltiu x13, x12, 2047
-    sltiu x12, x10, 2047
-    sltiu x11, x20, 2047
-    sltiu x10, x8, 2047
-    sltiu x9, x18, 2047
-    sltiu x7, x5, 2047
-    sltiu x6, x27, 2047
-    sltiu x4, x15, 2047
-    sltiu x3, x1, 2047
+sltiu x18, x8, 2047
+    sltiu x31, x31, 2047
+    sltiu x30, x23, 2047
+    sltiu x29, x19, 2047
+    sltiu x28, x18, 2047
+    sltiu x27, x22, 2047
+    sltiu x25, x18, 2047
+    sltiu x25, x5, 2047
+    sltiu x24, x3, 2047
+    sltiu x15, x2, 2047
+    sltiu x14, x13, 2047
+    sltiu x13, x28, 2047
+    sltiu x12, x11, 2047
+    sltiu x21, x12, 2047
+    sltiu x19, x7, 2047
+    sltiu x17, x10, 2047
+    sltiu x16, x18, 2047
+    sltiu x12, x26, 2047
+    sltiu x27, x27, 2047
+    sltiu x3, x20, 2047
+    sltiu x20, x17, 2047
+    sltiu x8, x25, 2047
+    sltiu x5, x24, 2047
+    sltiu x9, x21, 2047
+    sltiu x23, x29, 2047
+    sltiu x4, x1, 2047
+    sltiu x6, x18, 2047
+    sltiu x11, x6, 2047
+    sltiu x10, x16, 0
+    sltiu x22, x14, 2047
     sltiu x2, x30, 2047
-    sltiu x1, x26, 2047
-    sltiu x28, x16, 2047
-    sltiu x25, x13, 2047
-    sltiu x29, x9, 0
-    sltiu x9, x4, 2047
-    sltiu x6, x7, 2047
-    sltiu x27, x6, 2047
-    sltiu x8, x22, 2047
-    sltiu x8, x3, 2047
-    sltiu x3, x24, 2047
-    sltiu x24, x2, 2047
-    sltiu x31, x25, 2047
-    sltiu x30, x11, 1
-    sltiu x16, x23, -2048
-    sltiu x5, x31, -1
+    sltiu x1, x15, 2047
+    sltiu x26, x9, 1
+    sltiu x7, x4, -2048
+    sltiu x12, x18, -1
 
 sltu x11, x26, x4
     sltu x2, x24, x18
@@ -968,41 +968,41 @@ xor x11, x26, x4
     xor x28, x12, x31
     xor x29, x1, x9
 
-xori x31, x2, 2047
-    xori x22, x20, 2047
-    xori x23, x31, 2047
-    xori x31, x23, 2047
-    xori x28, x14, 2047
-    xori x2, x21, 2047
-    xori x21, x22, 2047
-    xori x27, x27, 2047
-    xori x20, x31, 2047
+xori x31, x11, 2047
+    xori x31, x19, -2048
+    xori x30, x27, 2047
+    xori x29, x28, 2047
+    xori x29, x24, 2047
+    xori x25, x25, 2047
+    xori x28, x22, 2047
+    xori x3, x16, 2047
+    xori x16, x14, 2047
+    xori x23, x18, 2047
+    xori x21, x12, 2047
+    xori x19, x17, 2047
+    xori x26, x15, 2047
     xori x24, x30, 2047
-    xori x14, x17, 2047
-    xori x21, x5, 2047
-    xori x25, x15, 2047
-    xori x25, x12, 2047
-    xori x15, x11, 2047
-    xori x17, x10, 2047
-    xori x11, x7, 2047
-    xori x16, x16, 2047
-    xori x1, x18, 2047
-    xori x18, x31, 2047
-    xori x7, x31, 2047
-    xori x26, x25, 2047
-    xori x4, x13, 2047
-    xori x8, x24, 2047
-    xori x12, x9, 2047
-    xori x9, x29, 2047
-    xori x30, x31, 0
-    xori x10, x26, 2047
-    xori x13, x1, 2047
-    xori x29, x6, 2047
-    xori x19, x3, 2047
-    xori x5, x8, 1
-    xori x6, x4, 2047
-    xori x5, x28, -1
-    xori x3, x19, -2048
+    xori x18, x20, 2047
+    xori x20, x4, 2047
+    xori x16, x4, -2048
+    xori x15, x8, 2047
+    xori x14, x2, 0
+    xori x13, x9, 2047
+    xori x12, x10, 2047
+    xori x11, x26, 2047
+    xori x27, x4, 2047
+    xori x7, x4, 2047
+    xori x5, x5, 2047
+    xori x9, x7, 2047
+    xori x8, x21, 2047
+    xori x22, x6, 2047
+    xori x10, x29, 2047
+    xori x30, x3, 2047
+    xori x4, x31, 2047
+    xori x1, x13, 2047
+    xori x17, x1, 1
+    xori x6, x1, -2048
+    xori x2, x23, -1
 
 exit:
     li   t0, 0

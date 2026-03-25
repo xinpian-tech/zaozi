@@ -52,6 +52,15 @@ object Cause:
   */
 object PrivilegeProbeLib:
 
+  /** Per-invocation page table verification model. Reset by [[textStartWithTrap]]. */
+  private val _ptModel = new ThreadLocal[PageTableModel]()
+  private[privilege] def ptModel: PageTableModel =
+    var m = _ptModel.get()
+    if m == null then
+      m = new PageTableModel
+      _ptModel.set(m)
+    m
+
   /** Emit `.text` + `_start` + install trap handler to mtvec. */
   def textStartWithTrap(
     trapLabel: String = "trap_handler"
@@ -61,6 +70,7 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
+    _ptModel.set(new PageTableModel)
     HTIFLib.textStart()
     la(x5, trapLabel)
     csrrw(x0, x5, CSR.MTVEC)
@@ -108,7 +118,10 @@ object PrivilegeProbeLib:
     or(x6, x6, x5)
     csrrw(x0, x6, CSR.PMPCFG0)
 
-  /** Switch to S-mode: set mpp=01, write mepc=targetLabel, mret. */
+  /** Switch to S-mode: set mpp=01, write mepc=targetLabel, mret.
+    *
+    * Automatically verifies that the code region has V+X+A via [[PageTableModel]].
+    */
   def switchToSMode(
     targetLabel: String
   )(
@@ -117,6 +130,7 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
+    ptModel.verifyCodeFetchable(targetLabel)
     // Route all delegated traps back to M-mode so S-mode exceptions/interrupts
     // are consistently handled by the M-mode trap handler.
     csrrw(x0, x0, CSR.MEDELEG)
@@ -172,6 +186,7 @@ object PrivilegeProbeLib:
     Block,
     Recipe
   ): Unit =
+    ptModel.registerTwoLevel(0xcfL, dataPteFlags)
     // root[2] = non-leaf PTE → L2
     la(x5, rootLabel)
     la(x6, l2Label)
@@ -210,6 +225,25 @@ object PrivilegeProbeLib:
     balign(4096)
     label(l2Label)
     zero(4096)
+
+  /** Map a single gigapage identity (0x80000000, root[2]) with given PTE flags.
+    *
+    * Registers the mapping with [[PageTableModel]] for automatic verification in [[switchToSMode]]. Use this instead of
+    * raw `la/li/sd` sequences when setting up a gigapage.
+    */
+  def mapGigapageIdentity(
+    pteFlags:   Long,
+    pgtblLabel: String = "pgtbl"
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    ptModel.registerGigapage(pteFlags)
+    la(x5, pgtblLabel)
+    li(x6, (0x80000L << 10) | pteFlags)
+    sd(x5, x6, 16) // root[2] for VPN[2]=2 (0x80000000)
 
   /** Generic M-mode trap handler (extracted from Program.scala).
     *

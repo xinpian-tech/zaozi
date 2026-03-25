@@ -58,10 +58,8 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       trapHandlerWithRecord()
       pmpOpenAll()
 
-      // identity map gigapage with A=1, D=0: V|R|W|X|A (no D) = 0x01|0x02|0x04|0x08|0x40 = 0x4f
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0x4fL)
-      sd(x5, x6, 16)
+      // identity map gigapage with A=1, D=0: V|R|W|X|A (no D) = 0x4f
+      mapGigapageIdentity(0x4fL)
 
       enableSv39()
       switchToSMode("s_code")
