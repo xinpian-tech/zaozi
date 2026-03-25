@@ -153,6 +153,64 @@ object PrivilegeProbeLib:
     csrrw(x0, x7, CSR.SATP)
     sfenceVma(x0, x0)
 
+  /** Set up a two-level identity-mapped page table for permission testing.
+    *
+    * Creates root[2] → L2, with:
+    *   - L2[0] = code megapage (0x80000000, 2MB, full V|R|W|X|A|D)
+    *   - L2[1] = data megapage (0x80200000, 2MB, custom permissions)
+    *
+    * Pair with [[pageTableDataTwoLevel]] for .data declarations and place `buf` at `.balign 0x200000` so it lands in
+    * the second megapage.
+    */
+  def setupCodeDataPageTable(
+    dataPteFlags: Long,
+    rootLabel:    String = "pgtbl",
+    l2Label:      String = "pgtbl_l2"
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    // root[2] = non-leaf PTE → L2
+    la(x5, rootLabel)
+    la(x6, l2Label)
+    srli(x6, x6, 12)  // PPN
+    slli(x6, x6, 10)  // PTE.PPN field
+    ori(x6, x6, 0x01) // V=1, non-leaf
+    sd(x5, x6, 16)    // root[2] for VPN[2]=2 (0x80000000)
+
+    // L2[0] = code megapage at 0x80000000 with full permissions
+    la(x5, l2Label)
+    li(x6, (0x80000L << 10) | 0xcfL) // PPN=0x80000, V|R|W|X|A|D
+    sd(x5, x6, 0)                    // L2[0] for VPN[1]=0
+
+    // L2[1] = data megapage at 0x80200000 with custom permissions
+    li(x6, (0x80200L << 10) | dataPteFlags) // PPN=0x80200
+    sd(x5, x6, 8)                           // L2[1] for VPN[1]=1
+
+  /** Emit .data declarations for a two-level page table (root + L2).
+    *
+    * @see
+    *   [[setupCodeDataPageTable]]
+    */
+  def pageTableDataTwoLevel(
+    rootLabel: String = "pgtbl",
+    l2Label:   String = "pgtbl_l2"
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    section(".data")
+    balign(4096)
+    label(rootLabel)
+    zero(4096)
+    balign(4096)
+    label(l2Label)
+    zero(4096)
+
   /** Generic M-mode trap handler (extracted from Program.scala).
     *
     * Reads mepc/mcause/mtval. For ecall-from-S, restores M-mode (sets mpp=11) and advances mepc by 4. For instruction
@@ -321,8 +379,15 @@ object PrivilegeProbeLib:
     j("rec_decode_length")
 
     label("rec_instr_fault_len")
-    addi(x7, x0, 4)
-    j("rec_update_mepc")
+    // Instruction fetch fault in a non-fetchable region: advancing mepc won't help.
+    // Recover to M-mode at the address saved in mscratch.
+    csrrs(x5, x0, CSR.MSCRATCH)
+    csrrw(x0, x5, CSR.MEPC)
+    li(x7, 3L << 11)
+    csrrs(x0, x7, CSR.MSTATUS) // set MPP=M
+    csrrw(x0, x0, CSR.MCAUSE)
+    csrrw(x0, x0, CSR.MTVAL)
+    mret()
 
     label("rec_decode_length")
     andi(x29, x29, 3)

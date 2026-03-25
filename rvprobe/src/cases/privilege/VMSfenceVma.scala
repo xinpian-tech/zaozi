@@ -67,6 +67,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   VMSfenceVmaRemap.emit(outputPath)
 
 // Without sfence.vma, TLB may keep stale mapping. After sfence, access faults.
+// Uses two-level page table so only the data megapage is invalidated (code megapage stays valid).
 @main def VMSfenceVmaStale(outputPath: String): Unit =
   object VMSfenceVmaStale extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
@@ -75,10 +76,8 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       trapHandlerWithRecord()
       pmpOpenAll()
 
-      // identity map gigapage: V|R|W|X|A|D = 0xcf
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0xcfL)
-      sd(x5, x6, 16)
+      // Two-level: code megapage (full perms) + data megapage (full perms initially)
+      setupCodeDataPageTable(0xcfL)
 
       enableSv39()
       switchToSMode("s_code_phase1")
@@ -88,11 +87,11 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       lw(x11, x10, 0) // load — succeeds, TLB entry cached
       ecall()
 
-      // M-mode: invalidate PTE (V=0)
+      // M-mode: invalidate data megapage PTE in L2[1] (V=0)
       label("m_invalidate")
-      la(x5, "pgtbl")
-      li(x6, 0L) // PTE = 0 (V=0)
-      sd(x5, x6, 16)
+      la(x5, "pgtbl_l2")
+      li(x6, 0L)    // PTE = 0 (V=0)
+      sd(x5, x6, 8) // L2[1] — only data megapage; code megapage L2[0] stays valid
       // deliberately NO sfence.vma — TLB may still have old entry
       switchToSMode("s_code_phase2")
 
@@ -121,11 +120,11 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       fail()
 
       finish()
-      pageTableData()
+      pageTableDataTwoLevel()
       trapResultData()
 
       section(".data")
-      balign(64)
+      balign(0x200000) // 2MB-align buf into the second megapage
       label("buf")
       zero(64)
   VMSfenceVmaStale.emit(outputPath)

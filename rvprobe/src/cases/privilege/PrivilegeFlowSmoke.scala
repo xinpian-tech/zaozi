@@ -80,7 +80,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
       label("s_code")
       addi(x20, x0, 1)
-      ecall()               // should trap and return to the next instruction
+      ecall() // should trap and return to the next instruction
       addi(x20, x20, 1)
       addi(x21, x0, 2)
       bne(x20, x21, "fail")
@@ -110,7 +110,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
       label("s_code")
       li(x16, 0x40000000L)
-      lw(x17, x16, 0)       // expected: load page fault (cause=13)
+      lw(x17, x16, 0) // expected: load page fault (cause=13)
       label("after_fault")
       la(x12, "trap_cause")
       ld(x13, x12, 0)

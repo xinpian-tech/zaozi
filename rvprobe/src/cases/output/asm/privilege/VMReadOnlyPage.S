@@ -67,9 +67,13 @@ rec_illegal_len:
     j rec_decode_length
 
 rec_instr_fault_len:
-    addi x7, x0, 4
-    j rec_update_mepc
-
+    csrrs x5, mscratch, x0
+    csrrw x0, mepc, x5
+    li x7, 0x1800
+    csrrs x0, mstatus, x7
+    csrrw x0, mcause, x0
+    csrrw x0, mtval, x0
+    mret
 rec_decode_length:
     andi x29, x29, 3
     addi x28, x0, 3
@@ -92,11 +96,16 @@ trap_handler_rec_skip:
     addi x5, x0, 31
     csrrw x0, pmpcfg0, x5
     la x5, pgtbl
+    la x6, pgtbl_l2
+    srli x6, x6, 12
+    slli x6, x6, 10
+    ori x6, x6, 1
+    sd x6, 16(x5)
+    la x5, pgtbl_l2
     li x6, 0x200000cf
-    sd x6, 16(x5)
-    la x5, pgtbl
-    li x6, 0x200000c3
-    sd x6, 16(x5)
+    sd x6, 0(x5)
+    li x6, 0x200800c3
+    sd x6, 8(x5)
     la x5, pgtbl
     addi x7, x0, 8
     slli x7, x7, 60
@@ -159,11 +168,14 @@ fromhost:
     .balign 4096
 pgtbl:
     .zero 4096
+    .balign 4096
+pgtbl_l2:
+    .zero 4096
     .section .data
     .balign 8
 trap_cause:
     .dword 0x0
     .section .data
-    .balign 64
+    .balign 2097152
 buf:
     .zero 64

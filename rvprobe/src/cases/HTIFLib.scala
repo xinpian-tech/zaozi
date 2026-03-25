@@ -18,7 +18,7 @@ import java.lang.foreign.Arena
   *   - value written to `tohost` is `(code << 1) | 1`
   */
 object HTIFLib:
-  val PassCode: Long       = 0L
+  val PassCode:        Long = 0L
   val DefaultFailCode: Long = 1L
 
   /** Emit `.section ".text"` + `_start:` entry label. */
@@ -47,9 +47,9 @@ object HTIFLib:
 
   /** Write encoded HTIF value to `tohost`. */
   def writeTohost(
-    encodedReg:   Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    tohostSymbol: String = "tohost"
+    tohostSymbol:  String = "tohost"
   )(
     using Arena,
     Context,
@@ -61,11 +61,11 @@ object HTIFLib:
 
   /** Write a raw code to HTIF after encoding and then spin forever. */
   def signalCodeAndSpin(
-    code:         Long,
-    codeReg:      Register = x5,
-    encodedReg:   Register = x5,
+    code:          Long,
+    codeReg:       Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    spinLabel:    String = "spin"
+    spinLabel:     String = "spin"
   )(
     using Arena,
     Context,
@@ -80,10 +80,10 @@ object HTIFLib:
 
   /** Pass (code=0) and spin forever. */
   def passAndSpin(
-    codeReg:      Register = x5,
-    encodedReg:   Register = x5,
+    codeReg:       Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    spinLabel:    String = "spin"
+    spinLabel:     String = "spin"
   )(
     using Arena,
     Context,
@@ -94,11 +94,11 @@ object HTIFLib:
 
   /** Fail (non-zero code) and spin forever. */
   def failAndSpin(
-    failCode:     Long = DefaultFailCode,
-    codeReg:      Register = x5,
-    encodedReg:   Register = x5,
+    failCode:      Long = DefaultFailCode,
+    codeReg:       Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    spinLabel:    String = "spin_fail"
+    spinLabel:     String = "spin_fail"
   )(
     using Arena,
     Context,
@@ -110,11 +110,11 @@ object HTIFLib:
 
   /** Emit pass-exit sequence. */
   def exit(
-    exitLabel:    String = "exit",
-    codeReg:      Register = x5,
-    encodedReg:   Register = x5,
+    exitLabel:     String = "exit",
+    codeReg:       Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    spinLabel:    String = "spin"
+    spinLabel:     String = "spin"
   )(
     using Arena,
     Context,
@@ -126,12 +126,12 @@ object HTIFLib:
 
   /** Emit fail sequence with `fail:` label. */
   def fail(
-    failLabel:    String = "fail",
-    failCode:     Long = DefaultFailCode,
-    codeReg:      Register = x5,
-    encodedReg:   Register = x5,
+    failLabel:     String = "fail",
+    failCode:      Long = DefaultFailCode,
+    codeReg:       Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    spinLabel:    String = "spin_fail"
+    spinLabel:     String = "spin_fail"
   )(
     using Arena,
     Context,
@@ -158,11 +158,11 @@ object HTIFLib:
 
   /** Convenience helper for simple tests: emit `exit` and `.tohost` section together. */
   def finish(
-    exitLabel:    String = "exit",
-    codeReg:      Register = x5,
-    encodedReg:   Register = x5,
+    exitLabel:     String = "exit",
+    codeReg:       Register = x5,
+    encodedReg:    Register = x5,
     tohostAddrReg: Register = x6,
-    spinLabel:    String = "spin"
+    spinLabel:     String = "spin"
   )(
     using Arena,
     Context,

@@ -67,9 +67,13 @@ rec_illegal_len:
     j rec_decode_length
 
 rec_instr_fault_len:
-    addi x7, x0, 4
-    j rec_update_mepc
-
+    csrrs x5, mscratch, x0
+    csrrw x0, mepc, x5
+    li x7, 0x1800
+    csrrs x0, mstatus, x7
+    csrrw x0, mcause, x0
+    csrrw x0, mtval, x0
+    mret
 rec_decode_length:
     andi x29, x29, 3
     addi x28, x0, 3
