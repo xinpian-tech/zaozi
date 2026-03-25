@@ -102,6 +102,9 @@ trap_handler_skip:
     slli x6, x6, 3
     add x5, x5, x6
     sd x7, 0(x5)
+    la x5, pgtbl_l3
+    li x6, 0x200000cf
+    sd x6, 0(x5)
     la x5, pgtbl_root
     addi x7, x0, 8
     slli x7, x7, 60

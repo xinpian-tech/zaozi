@@ -523,7 +523,7 @@ trait RVGenerator:
   }
 
   private def fenceMaskToGas(mask: Int): String = {
-    val ordered = Seq(8 -> "i", 4 -> "o", 2 -> "r", 1 -> "w")
+    val ordered  = Seq(8 -> "i", 4 -> "o", 2 -> "r", 1 -> "w")
     val rendered = ordered.collect { case (bit, label) if (mask & bit) != 0 => label }.mkString
     if rendered.isEmpty then "0" else rendered
   }
@@ -682,22 +682,22 @@ trait RVGenerator:
     val instName = inst.name
     val names    = inst.args.map(_.name).toSet
 
-    def key(n: String):    String =
+    def key(n: String):                     String =
       val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
-    def regVal(n: String): String =
+    def regVal(n: String):                  String =
       val num    = solved.getOrElse(key(n), BigInt(0))
       val prefix = if isFpReg(instName, n) then "f" else "x"
       s"$prefix$num"
-    def immVal(n: String): String = solved.getOrElse(key(n), BigInt(0)).toString
-    def signedImm(n: String, width: Int): String = signedFieldValue(idx, n, width, solved).toString
+    def immVal(n:      String):             String = solved.getOrElse(key(n), BigInt(0)).toString
+    def signedImm(n:   String, width: Int): String = signedFieldValue(idx, n, width, solved).toString
     def unsignedImm(n: String, width: Int): String = unsignedFieldValue(idx, n, width, solved).toString
-    def csrVal:            String =
+    def csrVal:                             String =
       val num = solved.getOrElse(key("csr"), BigInt(0)).toInt
       csrNumberToName.getOrElse(num, s"0x${num.toHexString}")
-    def rmVal:             String =
+    def rmVal:                              String =
       val num = solved.getOrElse(key("rm"), BigInt(0)).toInt
       rmNumberToName.getOrElse(num, num.toString)
-    def argFmt(n: String): String =
+    def argFmt(n: String):                  String =
       val prefix = if n.startsWith("r") then "x" else ""
       prefix + solved.getOrElse(key(n), BigInt(0)).toString
 
@@ -713,10 +713,8 @@ trait RVGenerator:
     val hasImm20 = names("imm20")
     val hasShamt = names("shamt") || names("shamtw") || names("shamtd")
 
-    if instName == "fence.tso" then
-      "fence.tso"
-    else if instName == "fence.i" then
-      "fence.i"
+    if instName == "fence.tso" then "fence.tso"
+    else if instName == "fence.i" then "fence.i"
     else if instName == "fence" && names("pred") && names("succ") then
       val pred = solved.getOrElse(key("pred"), BigInt(0)).toInt
       val succ = solved.getOrElse(key("succ"), BigInt(0)).toInt

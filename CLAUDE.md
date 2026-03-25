@@ -18,11 +18,9 @@ mill mill.bsp.BSP/install      # IDE setup (BSP)
 
 ## Version Control
 
-This project uses **Jujutsu (jj)** for version control. Use `jj` commands instead of `git`.
-
 **Task workflow (MUST follow):**
 - When task is complete: run `/done` AFTER verifying the work
-- `/done` will reformat, test, describe the change, update PROGRESS.md, and run `jj new` to start a fresh change
+- `/done` will reformat, test, describe the change, update PROGRESS.md
 - Track progress in `PROGRESS.md` at repo root
 
 ## Current Focus

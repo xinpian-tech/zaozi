@@ -1,5 +1,5 @@
 
-/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/cache/DCacheFence.elf:     file format elf64-littleriscv
+/root/zaozi/rvprobe/src/cases/output/elf/cache/DCacheFence.elf:     file format elf64-littleriscv
 
 
 Disassembly of section .text:

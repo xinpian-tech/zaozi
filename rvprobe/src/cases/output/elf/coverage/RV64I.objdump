@@ -1,5 +1,5 @@
 
-/home/clo91eaf/Project/zaozi/rvprobe/src/cases/output/elf/coverage/RV64I.elf:     file format elf64-littleriscv
+/root/zaozi/rvprobe/src/cases/output/elf/coverage/RV64I.elf:     file format elf64-littleriscv
 
 
 Disassembly of section .text:
@@ -180,41 +180,41 @@ Disassembly of section .text:
     800002b0:	410edabb          	sraw	s5,t4,a6
     800002b4:	41f65e3b          	sraw	t3,a2,t6
     800002b8:	4090debb          	sraw	t4,ra,s1
-    800002bc:	7ff9029b          	addiw	t0,s2,2047
-    800002c0:	7ff7869b          	addiw	a3,a5,2047
-    800002c4:	7ff98e1b          	addiw	t3,s3,2047
-    800002c8:	7ff58d9b          	addiw	s11,a1,2047
-    800002cc:	7ffc8a9b          	addiw	s5,s9,2047
-    800002d0:	7ffb8d1b          	addiw	s10,s7,2047
-    800002d4:	7ffa0c1b          	addiw	s8,s4,2047
-    800002d8:	7ff60e9b          	addiw	t4,a2,2047
-    800002dc:	7ffa849b          	addiw	s1,s5,2047
-    800002e0:	7ff1051b          	addiw	a0,sp,2047
-    800002e4:	7ff3011b          	addiw	sp,t1,2047
-    800002e8:	7ff3089b          	addiw	a7,t1,2047
-    800002ec:	7ff3861b          	addiw	a2,t2,2047
-    800002f0:	7ff8899b          	addiw	s3,a7,2047
-    800002f4:	7ff3081b          	addiw	a6,t1,2047
-    800002f8:	7ff8081b          	addiw	a6,a6,2047
-    800002fc:	7ff1891b          	addiw	s2,gp,2047
-    80000300:	7ff2079b          	addiw	a5,tp,2047 # 7ff <_start-0x7ffff801>
-    80000304:	7ff4079b          	addiw	a5,s0,2047
-    80000308:	7ff6859b          	addiw	a1,a3,2047
-    8000030c:	7ffb071b          	addiw	a4,s6,2047
-    80000310:	7ff0841b          	addiw	s0,ra,2047
-    80000314:	7fff021b          	addiw	tp,t5,2047
-    80000318:	7ff30f9b          	addiw	t6,t1,2047
-    8000031c:	7ffc091b          	addiw	s2,s8,2047
-    80000320:	7ff48c9b          	addiw	s9,s1,2047
-    80000324:	7ff28b1b          	addiw	s6,t0,2047
-    80000328:	7ffe831b          	addiw	t1,t4,2047
-    8000032c:	7fff8a1b          	addiw	s4,t6,2047
-    80000330:	7ff3009b          	addiw	ra,t1,2047
-    80000334:	7ffd039b          	addiw	t2,s10,2047
-    80000338:	001d819b          	addiw	gp,s11,1
-    8000033c:	80070f1b          	addiw	t5,a4,-2048
-    80000340:	fff50b9b          	addiw	s7,a0,-1
-    80000344:	000e091b          	sext.w	s2,t3
+    800002bc:	7ffc0f9b          	addiw	t6,s8,2047
+    800002c0:	7ff58c1b          	addiw	s8,a1,2047
+    800002c4:	7ffa049b          	addiw	s1,s4,2047
+    800002c8:	7ffa8b9b          	addiw	s7,s5,2047
+    800002cc:	7ff40b1b          	addiw	s6,s0,2047
+    800002d0:	7ffb879b          	addiw	a5,s7,2047
+    800002d4:	7ff90e1b          	addiw	t3,s2,2047
+    800002d8:	7ffe0e1b          	addiw	t3,t3,2047
+    800002dc:	7ff9881b          	addiw	a6,s3,2047
+    800002e0:	7ff80a9b          	addiw	s5,a6,2047
+    800002e4:	7ff7099b          	addiw	s3,a4,2047
+    800002e8:	7ff6089b          	addiw	a7,a2,2047
+    800002ec:	7ff3069b          	addiw	a3,t1,2047
+    800002f0:	7ff1091b          	addiw	s2,sp,2047
+    800002f4:	7ff38c1b          	addiw	s8,t2,2047
+    800002f8:	7ff68c9b          	addiw	s9,a3,2047
+    800002fc:	7ff1829b          	addiw	t0,gp,2047
+    80000300:	7ff50f1b          	addiw	t5,a0,2047
+    80000304:	7ff1059b          	addiw	a1,sp,2047
+    80000308:	7ff2851b          	addiw	a0,t0,2047
+    8000030c:	7ff4871b          	addiw	a4,s1,2047
+    80000310:	7ffb061b          	addiw	a2,s6,2047
+    80000314:	7fff819b          	addiw	gp,t6,2047
+    80000318:	7ffc839b          	addiw	t2,s9,2047
+    8000031c:	7ff88d1b          	addiw	s10,a7,2047
+    80000320:	7ff10a1b          	addiw	s4,sp,2047
+    80000324:	7ffd021b          	addiw	tp,s10,2047
+    80000328:	7ff08d9b          	addiw	s11,ra,2047
+    8000032c:	7ffd841b          	addiw	s0,s11,2047
+    80000330:	7ff0811b          	addiw	sp,ra,2047
+    80000334:	7ffe831b          	addiw	t1,t4,2047
+    80000338:	001f009b          	addiw	ra,t5,1
+    8000033c:	80008f9b          	addiw	t6,ra,-2048
+    80000340:	fff20d1b          	addiw	s10,tp,-1 # ffffffffffffffff <fromhost+0xffffffff7ffffa7f>
+    80000344:	00078e9b          	sext.w	t4,a5
     80000348:	0004981b          	slliw	a6,s1,0x0
     8000034c:	0008921b          	slliw	tp,a7,0x0
     80000350:	0009189b          	slliw	a7,s2,0x0

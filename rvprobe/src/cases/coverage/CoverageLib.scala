@@ -19,8 +19,8 @@ import java.lang.foreign.Arena
   */
 object CoverageLib:
   private val CoverageSectionSeparator = "\n\n"
-  private val BaremetalPreamble = HTIFLib.asmTextStart()
-  private val BaremetalEpilogue =
+  private val BaremetalPreamble        = HTIFLib.asmTextStart()
+  private val BaremetalEpilogue        =
     s"""${HTIFLib.asmExit()}
        |
        |${HTIFLib.asmTohostSection()}""".stripMargin
@@ -29,7 +29,7 @@ object CoverageLib:
     outputPath: String,
     generators: RVGenerator*
   ): Unit =
-    val body = generators.map(_.toRecipeAsm().trim).mkString(CoverageSectionSeparator)
+    val body    = generators.map(_.toRecipeAsm().trim).mkString(CoverageSectionSeparator)
     val content =
       s"""$BaremetalPreamble
          |

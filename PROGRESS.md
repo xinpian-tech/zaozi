@@ -114,6 +114,25 @@ cases/
 
 - **rvprobe 单元测试优先使用 forked 模式**：由于测试会加载 MLIR/CIRCT native 库，应优先运行 `mill rvprobe.tests.testForked`；`testLocal` 可能因 `java.library.path` 未继承完整 native 路径而失败
 
+### VM 测试用例设计原则
+
+- **代码页与数据页必须分离权限**：测试页表权限时，S-mode 代码页（包含 `s_code` 标签）必须保持可执行（X=1），仅对数据页（`buf`）施加受限权限。否则一进 S-mode 取指就触发 INSN_PAGE_FAULT(12) 死循环
+- **使用两级页表（root→L2 megapage）**：`setupCodeDataPageTable(flags)` 创建 L2[0]（代码兆页，full perms）和 L2[1]（数据兆页，自定义权限），buf 通过 `.balign 0x200000` 放入第二个兆页
+- **INSN_PAGE_FAULT 无法通过 mepc+=4 恢复**：当整个区域不可执行时，mepc+4 仍在同一区域。使用 mscratch 保存恢复地址，trap handler 对 INSN_PAGE_FAULT 改为读取 mscratch 返回 M-mode
+
+### 约束求解扩展方向（页表语义建模）
+
+当前约束系统不建模内存权限，以下 bug 类型只能在运行时发现：
+- 代码页缺少 X 权限（取指失败）
+- 数据页缺少 R/W 权限（load/store 失败）
+- A/D 位未设置导致意外 page fault
+
+**扩展思路**：在 Stage 2（参数求解）中增加内存访问约束：
+1. 为每条指令增加 SMT 变量：`accessType`（fetch/load/store）、`targetPage`、`pagePerms`（R/W/X/A/D bitmap）
+2. 通过 `addCrossIndexConstraint` 添加一致性约束：fetch 需要 X，load 需要 R+A，store 需要 W+A+D
+3. 页表配置代码（`setupCodeDataPageTable` 等）可作为约束输入源，声明各区域的权限
+4. 优势：Z3 在生成时即报 UNSAT，而非运行时死循环；可与现有 coverBins/hazard 约束组合
+
 ### 目录组织原则
 
 - 源码（.scala）和产物（.S/.elf/.bin/.objdump）分离：源码在 `cases/<category>/`，汇编产物在 `cases/output/asm/<category>/`，编译产物在 `cases/output/elf/<category>/`
@@ -123,10 +142,18 @@ cases/
 
 | 日期 | 内容 |
 |------|------|
+| 2026-03-24 | 修复 5 个 VM 测试用例的代码页/数据页权限混叠问题：引入两级页表（setupCodeDataPageTable）分离代码和数据权限，trap handler 增加 mscratch 恢复机制处理 INSN_PAGE_FAULT |
+| 2026-03-24 | 重构 privilege 测试用例的内存访问处理，更新 ELF/binary 产物 |
+| 2026-03-24 | 更新脚本文档，说明产物再生成的三阶段流程 |
+| 2026-03-24 | 新增 privilege 测试用例并更新已有用例 |
+| 2026-03-24 | 移除 RV32I 测试用例实现；重构退出序列改用 HTIFLib 方法 |
+| 2026-03-23 | 新增 fence/atomic 缓存测试，更新 CacheCaseTest |
+| 2026-03-23 | 添加 RVM.S 覆盖率汇编，删除过时的 Program.S |
 | 2026-03-23 | coverage 输出重构为可链接 bare-metal 程序，linker script 增加 text/data 分段与 `_start` 入口约束 |
 | 2026-03-23 | output 目录拆分为 asm/elf，新增 `rvprobe/scripts/asm2elf.py` 将 `.S` 批量编译为 `.elf` / `.bin` / `.objdump` |
 | 2026-03-23 | 删除重复的 probes 目录并迁移 roundtrip 脚本到 privilege；新增 output/asm/coverage 预生成汇编 |
 | 2026-03-21 | cache case 抽取公共几何/sets helper，`li/la` 改为 `Statement.Pseudo`，新增 20 个 cache golden tests |
+| 2026-03-19 | 重构 AsmApi 寄存器参数类型：Register → Referable[SInt]，引入 FreeReg 哨兵值 |
 | 2026-03-19 | AsmApi 返回 Int idx 支持 CoverApi；提取 CoverageLib 重构覆盖率测试 |
 | 2026-03-19 | 新建 cases/coverage/ 目录，迁移 RV32I，添加 RV64I/RVM/RVLoadStore 覆盖率测试 |
 | 2026-03-18 | 添加 23 个特权模式测试探针（PMP + 虚拟内存），提取 PrivilegeProbeLib，重构 Program.scala |
@@ -142,3 +169,12 @@ cases/
 | 2026-03-15 | 添加 dword/zero/balign 指令，标签引用支持 |
 | 2026-03-15 | 重构 UpdateAsmApi 和 UpdateRVConstraints 脚本 |
 | 2026-03-14 | 添加压缩指令支持 |
+
+## TODO
+
+- [x] 重新审阅 `rvprobe/src/cases/` 中的测试用例，重构 API 使其更统一、易读
+  - 修复 5 个 VM 测试用例（VM4KBPage、VMReadOnlyPage、VMNoExecutePage、VMADAccessBit、VMSfenceVmaStale）的代码页/数据页权限混叠
+  - 引入 `setupCodeDataPageTable` / `pageTableDataTwoLevel` 两级页表公共 helper
+  - trap handler 增加 mscratch 恢复机制处理 INSN_PAGE_FAULT 死循环
+- [ ] 将 rvprobe 发布为 Maven 包，支持 Chisel 等外部项目直接依赖引入（如 cases/cache 中的参数化方法可直接接受 Chisel 侧的 cache 配置）
+- [ ] 探索在 SMT 约束求解阶段建模页表语义，在生成时而非运行时捕获权限错误（见开发备忘）

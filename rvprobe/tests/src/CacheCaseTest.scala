@@ -8,11 +8,10 @@ import utest.*
 
 object CacheCaseTest extends TestSuite:
   private case class CacheCaseSpec(
-    name:            String,
-    generate:        String => Unit,
-    mustContain:     Seq[String],
-    mustContainCount: Seq[(String, Int)] = Seq.empty
-  )
+    name:             String,
+    generate:         String => Unit,
+    mustContain:      Seq[String],
+    mustContainCount: Seq[(String, Int)] = Seq.empty)
 
   private val cacheCases = Seq(
     CacheCaseSpec("DCacheHitMiss", DCacheHitMiss, Seq("lw x10, 0(x5)", "lw x11, 0(x5)", ".word 0x12345678")),
@@ -28,10 +27,18 @@ object CacheCaseTest extends TestSuite:
     CacheCaseSpec("DCachePartialForward", DCachePartialForward, Seq("sw x0, 0(x5)", "sb x10, 1(x5)", "lw x11, 0(x5)")),
     CacheCaseSpec("DCacheSequentialScan", DCacheSequentialScan, Seq("loop_seq:", "addi x5, x5, 4", ".zero 4096")),
     CacheCaseSpec("DCacheStride", DCacheStride, Seq("li x22, 0x40", "add x5, x5, x22", ".zero 16384")),
-    CacheCaseSpec("DCacheCapacityMiss", DCacheCapacityMiss, Seq("loop1:", "ld x10, 0(x5)", "addi x5, x5, 8", ".zero 65536")),
+    CacheCaseSpec(
+      "DCacheCapacityMiss",
+      DCacheCapacityMiss,
+      Seq("loop1:", "ld x10, 0(x5)", "addi x5, x5, 8", ".zero 65536")
+    ),
     CacheCaseSpec("DCacheFence", DCacheFence, Seq("fence rw, rw", "fence.tso", ".zero 64")),
     CacheCaseSpec("DCacheLrSc", DCacheLrSc, Seq("lr.w.aq x10, (x5)", "sc.w x12, x11, (x5)", "retry:")),
-    CacheCaseSpec("DCacheAmoOps", DCacheAmoOps, Seq("amoadd.w x12, x11, (x5)", "amoswap.w x14, x13, (x5)", "lw x15, 0(x5)")),
+    CacheCaseSpec(
+      "DCacheAmoOps",
+      DCacheAmoOps,
+      Seq("amoadd.w x12, x11, (x5)", "amoswap.w x14, x13, (x5)", "lw x15, 0(x5)")
+    ),
     CacheCaseSpec(
       "ICacheSequentialFetch",
       ICacheSequentialFetch,
@@ -49,13 +56,12 @@ object CacheCaseTest extends TestSuite:
     val tmp = os.temp(prefix = s"${spec.name}_", suffix = ".S")
     try
       spec.generate(tmp.toString)
-      val actual   = os.read(tmp)
+      val actual = os.read(tmp)
       spec.mustContain.foreach(expected => assert(actual.contains(expected)))
       spec.mustContainCount.foreach { case (needle, expectedCount) =>
         assert(countOccurrences(actual, needle) == expectedCount)
       }
-    finally
-      os.remove(tmp)
+    finally os.remove(tmp)
 
   val tests = Tests:
     test("cache case outputs contain expected signatures"):

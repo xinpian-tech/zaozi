@@ -10,6 +10,7 @@ import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
 // A=0: first access causes page fault (hardware doesn't set A bit automatically on all impls).
+// Uses two-level page table: code megapage (full perms) + data megapage (A=0).
 @main def VMADAccessBit(outputPath: String): Unit =
   object VMADAccessBit extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
@@ -18,10 +19,8 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       trapHandlerWithRecord()
       pmpOpenAll()
 
-      // identity map gigapage with A=0: V|R|W|X|D (no A) = 0x01|0x02|0x04|0x08|0x80 = 0x8f
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0x8fL)
-      sd(x5, x6, 16)
+      // Two-level: code megapage (full perms) + data megapage (A=0: V|R|W|X|D = 0x8f)
+      setupCodeDataPageTable(0x8fL)
 
       enableSv39()
       switchToSMode("s_code")
@@ -41,11 +40,11 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       fail()
 
       finish()
-      pageTableData()
+      pageTableDataTwoLevel()
       trapResultData()
 
       section(".data")
-      balign(64)
+      balign(0x200000) // 2MB-align buf into the second megapage
       label("buf")
       zero(64)
   VMADAccessBit.emit(outputPath)
