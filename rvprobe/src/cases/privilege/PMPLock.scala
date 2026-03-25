@@ -36,13 +36,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       sw(x10, x11, 0) // store in M-mode — should trap (cause=7) because L=1
 
       // after trap, check cause
-      la(x10, "trap_cause")
-      ld(x11, x10, 0)
-      addi(x12, x0, Cause.STORE_ACCESS_FAULT)
-      bne(x11, x12, "fail")
-      j("exit")
-
-      fail()
+      verifyTrapCause(Cause.STORE_ACCESS_FAULT)
 
       finish()
       trapResultData()
@@ -82,10 +76,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       csrrs(x10, x0, CSR.PMPCFG0)
       li(x11, 0x9fL)       // expected: original value
       andi(x10, x10, 0xff) // isolate entry0 byte
-      bne(x10, x11, "fail")
-      j("exit")
-
-      fail()
+      assertEq(x10, x11)
 
       finish()
 

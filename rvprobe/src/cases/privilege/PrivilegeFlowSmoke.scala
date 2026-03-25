@@ -54,7 +54,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
       j("exit")
 
-      fail()
       finish()
       pageTableData()
       section(".data")
@@ -83,10 +82,8 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       ecall() // should trap and return to the next instruction
       addi(x20, x20, 1)
       addi(x21, x0, 2)
-      bne(x20, x21, "fail")
-      j("exit")
+      assertEq(x20, x21)
 
-      fail()
       finish()
       pageTableData()
   PrivilegeSv39EcallRoundTrip.emit(outputPath)
@@ -97,13 +94,15 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
 
     def constraints() =
-      textStartWithTrap(recordCause = true)
+      // Custom trap handler — NOT using textStartWithTrap because this test
+      // needs specialized recovery logic (jump to after_fault, not mepc+4).
+      textStart()
+      la(x5, "trap_handler_custom")
+      csrrw(x0, x5, CSR.MTVEC)
       pmpOpenAll()
 
       // map only 0x80000000 1GB region; 0x40000000 remains unmapped.
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0xcfL)
-      sd(x5, x6, 16)
+      mapGigapageIdentity(0xcfL)
       enableSv39()
       switchToSMode("s_code")
 
@@ -111,29 +110,24 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       li(x16, 0x40000000L)
       lw(x17, x16, 0) // expected: load page fault (cause=13)
       label("after_fault")
-      la(x12, "trap_cause")
-      ld(x13, x12, 0)
-      addi(x14, x0, Cause.LOAD_PAGE_FAULT)
-      bne(x13, x14, "fail")
-      j("exit")
+      verifyTrapCause(Cause.LOAD_PAGE_FAULT)
 
-      fail()
+      // Custom trap handler: record cause, recover to after_fault for LOAD_PAGE_FAULT.
+      j("trap_handler_custom_skip")
       align(2)
-      label("trap_handler_rec")
+      label("trap_handler_custom")
       csrrs(x6, x0, CSR.MCAUSE)
       la(x28, "trap_cause")
       sd(x28, x6, 0)
-
-      // For this case we only recover the expected load-page-fault path.
-      // Unexpected causes fail fast to avoid infinite mret/retrap loops.
       addi(x7, x0, Cause.LOAD_PAGE_FAULT)
       bne(x6, x7, "fail")
-
       la(x5, "after_fault")
       csrrw(x0, x5, CSR.MEPC)
       csrrw(x0, x0, CSR.MCAUSE)
       csrrw(x0, x0, CSR.MTVAL)
       mret()
+      label("trap_handler_custom_skip")
+
       finish()
       pageTableData()
       trapResultData()

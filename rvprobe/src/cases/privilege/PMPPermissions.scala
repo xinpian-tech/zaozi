@@ -40,13 +40,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       ecall()
 
       label("m_check")
-      la(x10, "trap_cause")
-      ld(x11, x10, 0)
-      addi(x12, x0, Cause.STORE_ACCESS_FAULT)
-      bne(x11, x12, "fail")
-      j("exit")
-
-      fail()
+      verifyTrapCause(Cause.STORE_ACCESS_FAULT)
 
       finish()
       trapResultData()
@@ -127,13 +121,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       ecall()
 
       label("m_check")
-      la(x10, "trap_cause")
-      ld(x11, x10, 0)
-      addi(x12, x0, Cause.LOAD_ACCESS_FAULT)
-      bne(x11, x12, "fail")
-      j("exit")
-
-      fail()
+      verifyTrapCause(Cause.LOAD_ACCESS_FAULT)
 
       finish()
       trapResultData()

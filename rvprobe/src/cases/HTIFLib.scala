@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.cases
 
+import me.jiuyang.smtlib.default.{*, given}
+import me.jiuyang.smtlib.tpe.*
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
-import me.jiuyang.rvprobe.constraints.Recipe
+import me.jiuyang.rvprobe.constraints.{*, given}
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
@@ -30,6 +32,21 @@ object HTIFLib:
     section("\".text\"")
     global(entryLabel)
     label(entryLabel)
+
+  /** Assert two registers are equal: `bne a, b, "fail"; j "exit"`. */
+  def assertEq(
+    a:         Referable[SInt],
+    b:         Referable[SInt],
+    failLabel: String = "fail",
+    passLabel: String = "exit"
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    bne(a, b, failLabel)
+    j(passLabel)
 
   /** Encode an HTIF code as `(code << 1) | 1`. */
   def encodeHtifCode(
@@ -156,20 +173,25 @@ object HTIFLib:
     label("fromhost")
     dword(0)
 
-  /** Convenience helper for simple tests: emit `exit` and `.tohost` section together. */
+  /** Emit the complete test epilogue: `fail:` path + `exit:` path + `.tohost` section.
+    *
+    * Typical test structure: `... j("exit") ... finish()` at the end.
+    */
   def finish(
     exitLabel:     String = "exit",
+    failLabel:     String = "fail",
+    failCode:      Long = DefaultFailCode,
     codeReg:       Register = x5,
     encodedReg:    Register = x5,
-    tohostAddrReg: Register = x6,
-    spinLabel:     String = "spin"
+    tohostAddrReg: Register = x6
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
-    exit(exitLabel, codeReg, encodedReg, tohostAddrReg, spinLabel)
+    fail(failLabel, failCode, codeReg, encodedReg, tohostAddrReg)
+    exit(exitLabel, codeReg, encodedReg, tohostAddrReg)
     tohostSection()
 
   /** String template for `.text` + `_start` (for template-based emitters). */

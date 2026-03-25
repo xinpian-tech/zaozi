@@ -48,7 +48,7 @@ object Cause:
 
 /** Reusable assembly snippets for bare-metal privilege verification probes.
   *
-  * Register convention (matches Program.scala): x5=mepc/scratch, x6=mcause/scratch, x7=advance, x28-x30=scratch.
+  * Register convention: x5=mepc/scratch, x6=mcause/scratch, x7=advance, x28-x30=scratch.
   */
 object PrivilegeProbeLib:
 
@@ -81,10 +81,7 @@ object PrivilegeProbeLib:
     csrrw(x0, x5, CSR.MTVEC)
     if recordCause then trapHandlerWithRecord() else trapHandler()
 
-  /** Verify that `trap_cause` equals the expected value, branching to `fail` on mismatch.
-    *
-    * Emits: `la x10, resultLabel; ld x11, 0(x10); addi x12, x0, expectedCause; bne x11, x12, "fail"; j "exit"`
-    */
+  /** Verify that `trap_cause` equals the expected value, branching to `fail` on mismatch. */
   def verifyTrapCause(
     expectedCause: Int,
     resultLabel:   String = "trap_cause"
@@ -97,8 +94,7 @@ object PrivilegeProbeLib:
     la(x10, resultLabel)
     ld(x11, x10, 0)
     addi(x12, x0, expectedCause)
-    bne(x11, x12, "fail")
-    j("exit")
+    HTIFLib.assertEq(x11, x12)
 
   /** PMP: NAPOT covering entire address space (pmpaddr0=-1, pmpcfg0=0x1f). */
   def pmpOpenAll(
@@ -270,7 +266,7 @@ object PrivilegeProbeLib:
     li(x6, (0x80000L << 10) | pteFlags)
     sd(x5, x6, 16) // root[2] for VPN[2]=2 (0x80000000)
 
-  /** Generic M-mode trap handler (extracted from Program.scala).
+  /** Generic M-mode trap handler.
     *
     * Reads mepc/mcause/mtval. For ecall-from-S, restores M-mode (sets mpp=11) and advances mepc by 4. For instruction
     * access/page faults, advances mepc by 4. For other exceptions, decodes instruction length and advances mepc

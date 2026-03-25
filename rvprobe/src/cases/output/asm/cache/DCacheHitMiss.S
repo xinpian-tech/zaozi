@@ -11,6 +11,15 @@ _start:
     rdcycle x15
     sub x17, x15, x14
     lw x3, 0(x4)
+fail:
+    li x5, 0x1
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin_fail:
+    j spin_fail
+
 exit:
     li x5, 0x0
     slli x5, x5, 1
