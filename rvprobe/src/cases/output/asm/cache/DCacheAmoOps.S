@@ -4,8 +4,8 @@ _start:
     la x5, amo_buf
     li x10, 0x64
     sw x10, 0(x5)
-    addi x11, x0, 5
-    amoadd.w x12, x11, (x5)
+    addi x1, x0, 5
+    amoadd.w x12, x1, (x5)
     li x13, 0xc8
     amoswap.w x14, x13, (x5)
     lw x15, 0(x5)

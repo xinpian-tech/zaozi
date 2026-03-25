@@ -2,8 +2,8 @@
     .globl _start
 _start:
     la x5, buf
-    li x10, 0x12345678
-    sw x10, 0(x5)
+    addi x1, x0, 42
+    sw x1, 0(x5)
     lw x11, 0(x5)
 exit:
     li x5, 0x0

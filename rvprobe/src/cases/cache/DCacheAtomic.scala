@@ -3,6 +3,7 @@
 package me.jiuyang.rvprobe.cases.cache
 
 import me.jiuyang.smtlib.default.{*, given}
+import me.jiuyang.smtlib.tpe.FreeReg
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
@@ -18,10 +19,10 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
       la(x5, "lock")
       label("retry")
-      lrW(x10, x5, 0, 1)      // lr.w x10, (x5) — aq=1
+      lrW(x10, x5, 0, 1) // lr.w x10, (x5) — aq=1
       bnez(x10, "retry")
-      addi(x11, x0, 1)
-      scW(x12, x5, x11, 0, 0) // sc.w x12, x11, (x5)
+      val i = addi(FreeReg, x0, 1) // rd symbolic
+      scW(x12, x5, instruction(i).rd, 0, 0) // sc.w x12, <solver-picked-rd>, (x5)
       bnez(x12, "retry")
 
       // critical section
@@ -49,8 +50,8 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       li(x10, 100L)
       sw(x5, x10, 0)
 
-      addi(x11, x0, 5)
-      amoaddW(x12, x5, x11, 0, 0) // old=100, mem=105
+      val i = addi(FreeReg, x0, 5) // rd symbolic
+      amoaddW(x12, x5, instruction(i).rd, 0, 0) // old=100, mem=105
 
       li(x13, 200L)
       amoswapW(x14, x5, x13, 0, 0) // old=105, mem=200

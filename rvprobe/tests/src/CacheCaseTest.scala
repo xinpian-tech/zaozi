@@ -19,12 +19,12 @@ object CacheCaseTest extends TestSuite:
     CacheCaseSpec("DCacheCrossLine", DCacheCrossLine, Seq("addi x5, x5, 60", "lw x10, 0(x5)", "lw x11, 4(x5)")),
     CacheCaseSpec("DCacheConflict", DCacheConflict, Seq("li x22, 0x1000", "add x30, x29, x22", "lw x11, 0(x6)")),
     CacheCaseSpec("DCacheLRU", DCacheLRU, Seq("lw x10, 0(x28)", "lw x11, 0(x7)", "lw x12, 0(x6)")),
-    CacheCaseSpec("DCacheWriteHit", DCacheWriteHit, Seq("li x11, 0x11223344", "sw x11, 0(x5)", ".word 0x12345678")),
-    CacheCaseSpec("DCacheWriteMiss", DCacheWriteMiss, Seq("li x11, 0x55667788", "sw x11, 0(x5)", ".zero 256")),
-    CacheCaseSpec("DCacheWriteback", DCacheWriteback, Seq("li x11, 0xdeadbeef", "fence rw, rw", ".zero 32768")),
-    CacheCaseSpec("DCachePartialWrite", DCachePartialWrite, Seq("sb x11, 1(x5)", "sh x12, 2(x5)", "lw x13, 0(x5)")),
-    CacheCaseSpec("DCacheStoreLoadForward", DCacheStoreLoadForward, Seq("sw x10, 0(x5)", "lw x11, 0(x5)", ".zero 64")),
-    CacheCaseSpec("DCachePartialForward", DCachePartialForward, Seq("sw x0, 0(x5)", "sb x10, 1(x5)", "lw x11, 0(x5)")),
+    CacheCaseSpec("DCacheWriteHit", DCacheWriteHit, Seq("sw", "0(x5)", ".word 0x12345678")),
+    CacheCaseSpec("DCacheWriteMiss", DCacheWriteMiss, Seq("sw", "0(x5)", ".zero 256")),
+    CacheCaseSpec("DCacheWriteback", DCacheWriteback, Seq("sw", "fence rw, rw", ".zero 32768")),
+    CacheCaseSpec("DCachePartialWrite", DCachePartialWrite, Seq("sb", "sh", "lw x13, 0(x5)")),
+    CacheCaseSpec("DCacheStoreLoadForward", DCacheStoreLoadForward, Seq("sw", "lw", "0(x5)", ".zero 64")),
+    CacheCaseSpec("DCachePartialForward", DCachePartialForward, Seq("sw x0, 0(x5)", "sb", "lw", "0(x5)")),
     CacheCaseSpec("DCacheSequentialScan", DCacheSequentialScan, Seq("loop_seq:", "addi x5, x5, 4", ".zero 4096")),
     CacheCaseSpec("DCacheStride", DCacheStride, Seq("li x22, 0x40", "add x5, x5, x22", ".zero 16384")),
     CacheCaseSpec(
@@ -33,11 +33,11 @@ object CacheCaseTest extends TestSuite:
       Seq("loop1:", "ld x10, 0(x5)", "addi x5, x5, 8", ".zero 65536")
     ),
     CacheCaseSpec("DCacheFence", DCacheFence, Seq("fence rw, rw", "fence.tso", ".zero 64")),
-    CacheCaseSpec("DCacheLrSc", DCacheLrSc, Seq("lr.w.aq x10, (x5)", "sc.w x12, x11, (x5)", "retry:")),
+    CacheCaseSpec("DCacheLrSc", DCacheLrSc, Seq("lr.w.aq x10, (x5)", "sc.w", "(x5)", "retry:")),
     CacheCaseSpec(
       "DCacheAmoOps",
       DCacheAmoOps,
-      Seq("amoadd.w x12, x11, (x5)", "amoswap.w x14, x13, (x5)", "lw x15, 0(x5)")
+      Seq("amoadd.w", "(x5)", "amoswap.w", "lw x15, 0(x5)")
     ),
     CacheCaseSpec(
       "ICacheSequentialFetch",

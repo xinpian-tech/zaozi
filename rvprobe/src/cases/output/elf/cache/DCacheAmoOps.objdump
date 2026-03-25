@@ -9,8 +9,8 @@ Disassembly of section .text:
     80000004:	04028293          	addi	t0,t0,64 # 80000040 <amo_buf>
     80000008:	06400513          	li	a0,100
     8000000c:	00a2a023          	sw	a0,0(t0)
-    80000010:	4595                	li	a1,5
-    80000012:	00b2a62f          	amoadd.w	a2,a1,(t0)
+    80000010:	4095                	li	ra,5
+    80000012:	0012a62f          	amoadd.w	a2,ra,(t0)
     80000016:	0c800693          	li	a3,200
     8000001a:	08d2a72f          	amoswap.w	a4,a3,(t0)
     8000001e:	0002a783          	lw	a5,0(t0)

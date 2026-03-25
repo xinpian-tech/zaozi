@@ -7,7 +7,7 @@ import org.chipsalliance.rvdecoderdb.{Encoding, Instruction, InstructionSet}
 import os.Path
 import java.io.{File, FileWriter}
 
-// Register argument names (raw names from rvdecoderdb ArgLUT) that should use Register enum type
+// Register argument names (raw names from rvdecoderdb ArgLUT) that should use Referable[SInt] type
 val registerArgNames: Set[String] = Set(
   "rd",
   "rs1",
@@ -32,6 +32,14 @@ val registerArgNames: Set[String] = Set(
   "c_rs2",
   "c_sreg1",
   "c_sreg2"
+)
+
+// rd-like argument names — instructions with these get an overload that omits the rd parameter
+val rdArgNames: Set[String] = Set(
+  "rd",
+  "rd_p",
+  "rd_n0",
+  "rd_n2"
 )
 
 // Run with: mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateAsmApi rvprobe/src/AsmApi.scala
@@ -84,16 +92,18 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
       |//  Split immediates (imm12hi/lo, bimm12hi/lo) are merged into a single
       |//  semantic parameter (offset) matching GAS syntax conventions.
       |//  Zero-arg instructions (ecall, mret, etc.) are also generated.
+      |//  Register parameters accept Referable[SInt] — pass Register (auto-converts),
+      |//  instruction(i).rd (solver variable), or FreeReg (solver picks freely).
       |// =============================================================================
       |
 """.stripMargin
   )
 
   // For each instruction, generate an assembly-like convenience function:
-  //   def instrName(arg1: Int, arg2: Int, ...)(using Arena, Context, Block, Recipe): Unit =
+  //   def instrName(arg1: Referable[SInt], arg2: Int, ...)(using Arena, Context, Block, Recipe): Int =
   //     instruction(summon[Recipe].nextIdx(), isInstrName()) { arg1Equal(v1) & arg2Equal(v2) & ... }
   //   For zero-arg instructions (ecall, mret, etc.):
-  //   def ecall()(using Arena, Context, Block, Recipe): Unit =
+  //   def ecall()(using Arena, Context, Block, Recipe): Int =
   //     instruction(summon[Recipe].nextIdx(), isEcall()) { ArgConstraint(true.B) }
   // Uses getAllMergedVariants() to generate all arg variants as Scala overloads.
   // Same name + different args → separate overloaded methods (e.g. jal with/without rd).
@@ -122,7 +132,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
       val nonMergedParams = nonMergedArgs.map { arg =>
         val argName        = translateToCamelCase(arg.name)
         val argNameLowered = argName.head.toLower + argName.tail
-        val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+        val tpe            = if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
         s"$argNameLowered: $tpe"
       }
       val params          = mergeRule match {
@@ -130,10 +140,10 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         case None       => nonMergedParams.mkString(", ")
       }
 
-      // Compute Scala type signature for dedup (e.g. "Register,Register,Int")
+      // Compute Scala type signature for dedup (e.g. "Referable[SInt],Referable[SInt],Int")
       val paramTypes = {
         val nonMergedTypes = nonMergedArgs.map { arg =>
-          if registerArgNames.contains(arg.name) then "Register" else "Int"
+          if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
         }
         mergeRule match {
           case Some(_) => nonMergedTypes :+ "Int"
@@ -148,11 +158,19 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         emittedSignatures += sig
 
         // Build constraint body: non-merged arg constraints + split constraints for merged imm
+        // For rd-like fields, generate a FreeReg check:
+        //   if (rd eq FreeReg) rdRange(1, 32) else rdEqual(rd) & hasRd()
+        // For non-rd register and non-register fields: equalFn & hasFn as before
         val nonMergedConstraints = nonMergedArgs.map { arg =>
           val argName        = translateToCamelCase(arg.name)
           val argNameLowered = argName.head.toLower + argName.tail
-          val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-          s"${argNameLowered}Equal($value) & has${argName}()"
+          if (rdArgNames.contains(arg.name)) {
+            // rd-like field: FreeReg sentinel check
+            val freeRange = if (arg.name == "rd") s"${argNameLowered}Range(1, 32)" else s"has${argName}()"
+            s"(if ($argNameLowered eq FreeReg) $freeRange else ${argNameLowered}Equal($argNameLowered) & has${argName}())"
+          } else {
+            s"${argNameLowered}Equal($argNameLowered) & has${argName}()"
+          }
         }
         val constraints          = mergeRule match {
           case Some(rule) =>
@@ -180,7 +198,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
           val nonImmParams    = labelNonImmArgs.map { arg =>
             val argName        = translateToCamelCase(arg.name)
             val argNameLowered = argName.head.toLower + argName.tail
-            val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+            val tpe            = if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
             s"$argNameLowered: $tpe"
           }.mkString(", ")
           val labelParams     = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
@@ -188,8 +206,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
           val labelConstraints = labelNonImmArgs.map { arg =>
             val argName        = translateToCamelCase(arg.name)
             val argNameLowered = argName.head.toLower + argName.tail
-            val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-            s"${argNameLowered}Equal($value)"
+            s"${argNameLowered}Equal($argNameLowered)"
           }.mkString(" & ")
           val fullConstraints  =
             if (labelConstraints.isEmpty) "bimm12hiEqual(0) & bimm12loEqual(0)"
@@ -221,7 +238,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
           val nonImmParams = nonImmArgs.map { arg =>
             val argName        = translateToCamelCase(arg.name)
             val argNameLowered = argName.head.toLower + argName.tail
-            val tpe            = if registerArgNames.contains(arg.name) then "Register" else "Int"
+            val tpe            = if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
             s"$argNameLowered: $tpe"
           }.mkString(", ")
           val labelParams  = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
@@ -229,8 +246,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
           val labelConstraints = nonImmArgs.map { arg =>
             val argName        = translateToCamelCase(arg.name)
             val argNameLowered = argName.head.toLower + argName.tail
-            val value          = if registerArgNames.contains(arg.name) then s"$argNameLowered.ordinal" else argNameLowered
-            s"${argNameLowered}Equal($value)"
+            s"${argNameLowered}Equal($argNameLowered)"
           }.mkString(" & ")
           val fullConstraints  =
             if (labelConstraints.isEmpty) "jimm20Equal(0)" else s"$labelConstraints & jimm20Equal(0)"

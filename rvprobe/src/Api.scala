@@ -213,6 +213,23 @@ def labelRef(
 ): Unit =
   recipe.addStatement(Statement.LabelRef(idx, targetLabel))
 
+// ================== Cross-index field constraints ==================
+
+def crossFields(
+  i: Int,
+  f: Index => Ref[SInt],
+  j: Int,
+  g: Index => Ref[SInt]
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Unit =
+  summon[Recipe].addCrossIndexConstraint { () =>
+    smtAssert(f(summon[Recipe].getIndex(i)) === g(summon[Recipe].getIndex(j)))
+  }
+
 // ================== Pseudo-instruction helpers (raw emission) ==================
 
 /** `li rd, imm` — load immediate (pseudo, expands to lui+addi or longer sequence). */

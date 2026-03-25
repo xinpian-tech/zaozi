@@ -2,12 +2,12 @@
     .globl _start
 _start:
     la x5, buf
-    li x10, 0x11223344
-    sw x10, 0(x5)
-    addi x11, x0, 170
-    sb x11, 1(x5)
-    li x12, 0xbbbb
-    sh x12, 2(x5)
+    addi x1, x0, 68
+    sw x1, 0(x5)
+    addi x1, x0, 170
+    sb x1, 1(x5)
+    addi x1, x0, 187
+    sh x1, 2(x5)
     lw x13, 0(x5)
 exit:
     li x5, 0x0
