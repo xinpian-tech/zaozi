@@ -29,17 +29,17 @@ object PaperTest extends TestSuite:
       object IntegerOps extends RVGenerator with HasRVProbeTest:
         val sets          = isRV64GC()
         def constraints() =
-          instruction(0, isAdd()) { rdEqual(3) & rs1Equal(1) & rs2Equal(2) }
-          instruction(1, isSub()) { rdEqual(4) & rs1Equal(1) & rs2Equal(2) }
-          instruction(2, isAnd()) { rdEqual(5) & rs1Equal(1) & rs2Equal(2) }
-          instruction(3, isOr()) { rdEqual(6) & rs1Equal(1) & rs2Equal(2) }
-          instruction(4, isXor()) { rdEqual(7) & rs1Equal(1) & rs2Equal(2) }
-          instruction(5, isSll()) { rdEqual(8) & rs1Equal(1) & rs2Equal(2) }
-          instruction(6, isSrl()) { rdEqual(9) & rs1Equal(1) & rs2Equal(2) }
-          instruction(7, isSra()) { rdEqual(10) & rs1Equal(1) & rs2Equal(2) }
-          instruction(8, isMul()) { rdEqual(11) & rs1Equal(1) & rs2Equal(2) }
-          instruction(9, isDiv()) { rdEqual(12) & rs1Equal(1) & rs2Equal(2) }
-          instruction(10, isRem()) { rdEqual(13) & rs1Equal(1) & rs2Equal(2) }
+          instruction(0, isAdd()) { rdEqual(3.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(1, isSub()) { rdEqual(4.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(2, isAnd()) { rdEqual(5.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(3, isOr()) { rdEqual(6.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(4, isXor()) { rdEqual(7.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(5, isSll()) { rdEqual(8.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(6, isSrl()) { rdEqual(9.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(7, isSra()) { rdEqual(10.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(8, isMul()) { rdEqual(11.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(9, isDiv()) { rdEqual(12.S) & rs1Equal(1.S) & rs2Equal(2.S) }
+          instruction(10, isRem()) { rdEqual(13.S) & rs1Equal(1.S) & rs2Equal(2.S) }
 
       IntegerOps.rvprobeTestInstructions(
         "0: add x3 x1 x2",
@@ -70,13 +70,13 @@ object PaperTest extends TestSuite:
       object ControlFlow extends RVGenerator with HasRVProbeTest:
         val sets          = isRV64GC()
         def constraints() =
-          instruction(0, isAddi()) { rdEqual(10) & rs1Equal(10) & imm12Equal(1) }
-          instruction(1, isBlt()) { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(2, isBge()) { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(3, isBeq()) { rs1Equal(10) & rs2Equal(11) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(4, isBne()) { rs1Equal(1) & rs2Equal(3) & bimm12hiEqual(0) & bimm12loEqual(0) }
-          instruction(5, isJal()) { rdEqual(1) & jimm20Equal(0) }
-          instruction(6, isJalr()) { rdEqual(0) & rs1Equal(1) & imm12Equal(0) }
+          instruction(0, isAddi()) { rdEqual(10.S) & rs1Equal(10.S) & imm12Equal(1) }
+          instruction(1, isBlt()) { rs1Equal(10.S) & rs2Equal(11.S) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(2, isBge()) { rs1Equal(10.S) & rs2Equal(11.S) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(3, isBeq()) { rs1Equal(10.S) & rs2Equal(11.S) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(4, isBne()) { rs1Equal(1.S) & rs2Equal(3.S) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(5, isJal()) { rdEqual(1.S) & jimm20Equal(0) }
+          instruction(6, isJalr()) { rdEqual(0.S) & rs1Equal(1.S) & imm12Equal(0) }
 
       ControlFlow.rvprobeTestRecipeAsm(
         "addi x10, x10, 1",
@@ -102,17 +102,17 @@ object PaperTest extends TestSuite:
         val sets = isRV64GC()
         def constraints() =
           // sw x1, 0(x2)  — imm12hi=0, imm12lo=0 → combined offset = 0
-          instruction(0, isSw()) { rs2Equal(1) & rs1Equal(2) & imm12hiEqual(0) & imm12loEqual(0) }
+          instruction(0, isSw()) { rs2Equal(1.S) & rs1Equal(2.S) & imm12hiEqual(0) & imm12loEqual(0) }
           // lw x3, 0(x2)
-          instruction(1, isLw()) { rdEqual(3) & rs1Equal(2) & imm12Equal(0) }
+          instruction(1, isLw()) { rdEqual(3.S) & rs1Equal(2.S) & imm12Equal(0) }
           // bne x1, x3, . + 0
-          instruction(2, isBne()) { rs1Equal(1) & rs2Equal(3) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(2, isBne()) { rs1Equal(1.S) & rs2Equal(3.S) & bimm12hiEqual(0) & bimm12loEqual(0) }
           // sb x1, 4(x2)  — imm12hi=0, imm12lo=4 → combined offset = 4
-          instruction(3, isSb()) { rs2Equal(1) & rs1Equal(2) & imm12hiEqual(0) & imm12loEqual(4) }
+          instruction(3, isSb()) { rs2Equal(1.S) & rs1Equal(2.S) & imm12hiEqual(0) & imm12loEqual(4) }
           // lb x4, 4(x2)
-          instruction(4, isLb()) { rdEqual(4) & rs1Equal(2) & imm12Equal(4) }
+          instruction(4, isLb()) { rdEqual(4.S) & rs1Equal(2.S) & imm12Equal(4) }
           // bne x1, x4, . + 0
-          instruction(5, isBne()) { rs1Equal(1) & rs2Equal(4) & bimm12hiEqual(0) & bimm12loEqual(0) }
+          instruction(5, isBne()) { rs1Equal(1.S) & rs2Equal(4.S) & bimm12hiEqual(0) & bimm12loEqual(0) }
 
       MemoryAccess.rvprobeTestRecipeAsm(
         "sw x1, 0(x2)",

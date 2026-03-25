@@ -3,6 +3,7 @@
 package me.jiuyang.rvprobe.scripts
 
 import me.jiuyang.rvprobe.*
+import me.jiuyang.rvprobe.scripts.registerArgNames
 import org.chipsalliance.rvdecoderdb.{Encoding, Instruction, InstructionSet}
 import os.Path
 import java.io.{File, FileWriter}
@@ -157,9 +158,15 @@ val header: String =
   getArgLut().foreach { case (name, arg) =>
     val argName: String = translateToCamelCase(name)
     val argNameLowered = argName.head.toLower + argName.tail
-    w.write(
-      s"def ${argNameLowered}Equal(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} === n.S)\n"
-    )
+    if (registerArgNames.contains(name)) {
+      w.write(
+        s"def ${argNameLowered}Equal(ref: Referable[SInt])(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} === ref)\n"
+      )
+    } else {
+      w.write(
+        s"def ${argNameLowered}Equal(n: Int)(using Arena, Context, Block, Index): ArgConstraint = ArgConstraint(summon[Index].${argNameLowered} === n.S)\n"
+      )
+    }
   }
 
   // hasXxx functions
@@ -182,7 +189,7 @@ val header: String =
 
     w.write(s"def has$argName()(using Arena, Context, Block, Index): ArgConstraint = ${argNameLowered}Range$range")
     if (argName.endsWith("N2")) {
-      w.write(s" & !${argNameLowered}Equal(2)")
+      w.write(s" & !${argNameLowered}Equal(2.S)")
     }
     w.write("\n")
   }

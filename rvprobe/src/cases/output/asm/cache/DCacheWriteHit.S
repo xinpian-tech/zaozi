@@ -3,8 +3,8 @@
 _start:
     la x5, buf
     lw x10, 0(x5)
-    li x11, 0x11223344
-    sw x11, 0(x5)
+    addi x1, x0, 42
+    sw x1, 0(x5)
     lw x12, 0(x5)
 exit:
     li x5, 0x0

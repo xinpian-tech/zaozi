@@ -7,8 +7,8 @@ _start:
     add x7, x6, x22
     add x28, x7, x22
     lw x10, 0(x6)
-    li x11, 0xdeadbeef
-    sw x11, 0(x6)
+    addi x1, x0, 42
+    sw x1, 0(x6)
     lw x10, 0(x7)
     lw x10, 0(x28)
     fence rw, rw

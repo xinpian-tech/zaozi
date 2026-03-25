@@ -3,6 +3,7 @@
 package me.jiuyang.rvprobe.cases.cache
 
 import me.jiuyang.smtlib.default.{*, given}
+import me.jiuyang.smtlib.tpe.FreeReg
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
@@ -18,9 +19,9 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
       la(x5, "buf")
       lw(x10, x5, 0) // pull into cache
-      li(x11, 0x11223344L)
-      sw(x5, x11, 0) // write hit
-      lw(x12, x5, 0) // read back → 0x11223344
+      val i = addi(FreeReg, x0, 42) // rd symbolic, imm12=42
+      sw(x5, instruction(i).rd, 0) // write hit — rs2 = addi's rd
+      lw(x12, x5, 0) // read back
 
       exit()
       initializedWordBuffer("buf", 0x12345678L)
@@ -56,8 +57,8 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
       sameSetAddresses(x5, x22, x6, x7, x28) // A/B/C
 
       lw(x10, x6, 0) // fill A
-      li(x11, 0xdeadbeefL)
-      sw(x6, x11, 0) // dirty A
+      val i = addi(FreeReg, x0, 42) // rd symbolic
+      sw(x6, instruction(i).rd, 0) // dirty A — rs2 = addi's rd
 
       lw(x10, x7, 0)  // fill B
       lw(x10, x28, 0) // fill C → evict A (writeback)

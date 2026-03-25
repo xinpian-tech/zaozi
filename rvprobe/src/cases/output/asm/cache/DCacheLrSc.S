@@ -6,8 +6,8 @@ retry:
     lr.w.aq x10, (x5)
     bnez x10, retry
 
-    addi x11, x0, 1
-    sc.w x12, x11, (x5)
+    addi x1, x0, 1
+    sc.w x12, x1, (x5)
     bnez x12, retry
 
     la x6, shared_data

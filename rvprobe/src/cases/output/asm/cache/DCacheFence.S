@@ -2,13 +2,13 @@
     .globl _start
 _start:
     la x5, buf
-    li x10, 0xcafebabe
-    sw x10, 0(x5)
+    addi x1, x0, 42
+    sw x1, 0(x5)
     fence rw, rw
     lw x11, 0(x5)
     la x6, buf2
-    li x10, 0xdeadcafe
-    sw x10, 0(x6)
+    addi x1, x0, 99
+    sw x1, 0(x6)
     fence.tso
     lw x12, 0(x6)
 exit:
