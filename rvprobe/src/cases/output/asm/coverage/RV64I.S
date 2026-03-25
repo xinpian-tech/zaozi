@@ -182,41 +182,41 @@ sraw x11, x26, x4
     sraw x28, x12, x31
     sraw x29, x1, x9
 
-addiw x31, x24, 2047
-    addiw x24, x11, 2047
-    addiw x9, x20, 2047
-    addiw x23, x21, 2047
-    addiw x22, x8, 2047
-    addiw x15, x23, 2047
-    addiw x28, x18, 2047
-    addiw x28, x28, 2047
-    addiw x16, x19, 2047
-    addiw x21, x16, 2047
-    addiw x19, x14, 2047
-    addiw x17, x12, 2047
-    addiw x13, x6, 2047
-    addiw x18, x2, 2047
-    addiw x24, x7, 2047
-    addiw x25, x13, 2047
-    addiw x5, x3, 2047
-    addiw x30, x10, 2047
-    addiw x11, x2, 2047
-    addiw x10, x5, 2047
-    addiw x14, x9, 2047
+addiw x24, x20, 2047
+    addiw x16, x7, 2047
+    addiw x30, x18, 2047
+    addiw x26, x11, 2047
     addiw x12, x22, 2047
-    addiw x3, x31, 2047
-    addiw x7, x25, 2047
-    addiw x26, x17, 2047
-    addiw x20, x2, 2047
-    addiw x4, x26, 2047
-    addiw x27, x1, 2047
-    addiw x8, x27, 2047
-    addiw x2, x1, 2047
-    addiw x6, x29, 2047
-    addiw x1, x30, 1
-    addiw x31, x1, -2048
-    addiw x26, x4, -1
-    addiw x29, x15, 0
+    addiw x4, x21, 2047
+    addiw x15, x23, 2047
+    addiw x20, x13, 2047
+    addiw x9, x15, 2047
+    addiw x8, x3, 2047
+    addiw x21, x4, 2047
+    addiw x29, x25, 2047
+    addiw x7, x10, 2047
+    addiw x13, x1, 2047
+    addiw x3, x12, 2047
+    addiw x14, x6, 2047
+    addiw x19, x27, 2047
+    addiw x9, x30, 2047
+    addiw x9, x31, 2047
+    addiw x27, x9, 2047
+    addiw x11, x16, 2047
+    addiw x17, x28, 2047
+    addiw x9, x26, 2047
+    addiw x2, x4, 2047
+    addiw x5, x17, 2047
+    addiw x1, x14, 2047
+    addiw x25, x2, 2047
+    addiw x31, x19, 2047
+    addiw x9, x5, 2047
+    addiw x6, x24, 2047
+    addiw x18, x31, 2047
+    addiw x23, x22, 1
+    addiw x22, x1, -2048
+    addiw x28, x8, -1
+    addiw x10, x29, 0
 
 slliw x16, x9, 0
     slliw x4, x17, 0

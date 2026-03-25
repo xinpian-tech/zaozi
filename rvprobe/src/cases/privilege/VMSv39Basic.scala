@@ -18,10 +18,8 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       trapHandler()
       pmpOpenAll()
 
-      // configure page table: identity map for 0x80000000 1GB gigapage
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0xcfL) // V|R|W|X|A|D + PPN
-      sd(x5, x6, 16)                   // pgtbl[2] (VPN[2]=2 for 0x80000000)
+      // identity map 1GB gigapage for 0x80000000
+      mapGigapageIdentity(0xcfL)
 
       enableSv39()
       switchToSMode("s_code")
@@ -50,10 +48,8 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       trapHandler()
       pmpOpenAll()
 
-      // identity map gigapage
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0xcfL)
-      sd(x5, x6, 16)
+      // identity map 1GB gigapage for 0x80000000
+      mapGigapageIdentity(0xcfL)
 
       enableSv39()
       switchToSMode("s_code")

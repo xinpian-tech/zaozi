@@ -120,18 +120,19 @@ cases/
 - **使用两级页表（root→L2 megapage）**：`setupCodeDataPageTable(flags)` 创建 L2[0]（代码兆页，full perms）和 L2[1]（数据兆页，自定义权限），buf 通过 `.balign 0x200000` 放入第二个兆页
 - **INSN_PAGE_FAULT 无法通过 mepc+=4 恢复**：当整个区域不可执行时，mepc+4 仍在同一区域。使用 mscratch 保存恢复地址，trap handler 对 INSN_PAGE_FAULT 改为读取 mscratch 返回 M-mode
 
-### 约束求解扩展方向（页表语义建模）
+### 页表静态验证（PageTableModel）
 
-当前约束系统不建模内存权限，以下 bug 类型只能在运行时发现：
-- 代码页缺少 X 权限（取指失败）
-- 数据页缺少 R/W 权限（load/store 失败）
-- A/D 位未设置导致意外 page fault
+`PageTableModel` 在生成时自动验证代码区域的页表权限，防止 S-mode 代码页缺少 V+X+A 导致取指 fault 死循环。
 
-**扩展思路**：在 Stage 2（参数求解）中增加内存访问约束：
-1. 为每条指令增加 SMT 变量：`accessType`（fetch/load/store）、`targetPage`、`pagePerms`（R/W/X/A/D bitmap）
-2. 通过 `addCrossIndexConstraint` 添加一致性约束：fetch 需要 X，load 需要 R+A，store 需要 W+A+D
-3. 页表配置代码（`setupCodeDataPageTable` 等）可作为约束输入源，声明各区域的权限
-4. 优势：Z3 在生成时即报 UNSAT，而非运行时死循环；可与现有 coverBins/hazard 约束组合
+**工作机制**：
+- `textStartWithTrap()` 创建新的 `PageTableModel` 实例（ThreadLocal，线程安全）
+- `mapGigapageIdentity(flags)` / `setupCodeDataPageTable(flags)` 注册映射到 model
+- `switchToSMode(label)` 自动调用 `model.verifyCodeFetchable(label)` 检查代码区域 V+X+A
+- 未注册映射时（非 privilege 测试）验证为 no-op
+
+**局限性**：仅检查初始页表配置，不追踪运行时 PTE 修改（如 VMSfenceVmaRemap 中的 PTE 更新）。
+
+**未来扩展方向**：对于 `cases/coverage/` 中 SMT 求解的指令，可通过 `addCrossIndexConstraint` 建模内存访问约束（fetch→X，load→R+A，store→W+A+D），使 Z3 在生成时报 UNSAT 而非运行时死循环
 
 ### 目录组织原则
 
@@ -177,4 +178,8 @@ cases/
   - 引入 `setupCodeDataPageTable` / `pageTableDataTwoLevel` 两级页表公共 helper
   - trap handler 增加 mscratch 恢复机制处理 INSN_PAGE_FAULT 死循环
 - [ ] 将 rvprobe 发布为 Maven 包，支持 Chisel 等外部项目直接依赖引入（如 cases/cache 中的参数化方法可直接接受 Chisel 侧的 cache 配置）
-- [ ] 探索在 SMT 约束求解阶段建模页表语义，在生成时而非运行时捕获权限错误（见开发备忘）
+- [x] 探索在 SMT 约束求解阶段建模页表语义，在生成时而非运行时捕获权限错误
+  - 实现 `PageTableModel` 静态验证层：`switchToSMode` 自动检查代码区域 V+X+A
+  - 新增 `mapGigapageIdentity` helper，替代手工 `la/li/sd` 页表配置
+  - 迁移 6 个 gigapage 测试用例使用新 helper，获得自动验证
+  - 8 个 PageTableModel 单元测试覆盖正反例

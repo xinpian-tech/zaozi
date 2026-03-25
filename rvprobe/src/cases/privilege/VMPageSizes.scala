@@ -19,9 +19,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       pmpOpenAll()
 
       // root[2] = leaf PTE for 1GB gigapage at 0x80000000
-      la(x5, "pgtbl_root")
-      li(x6, (0x80000L << 10) | 0xcfL) // V|R|W|X|A|D
-      sd(x5, x6, 16)                   // index 2
+      mapGigapageIdentity(0xcfL, "pgtbl_root")
 
       enableSv39("pgtbl_root")
       switchToSMode("s_code")

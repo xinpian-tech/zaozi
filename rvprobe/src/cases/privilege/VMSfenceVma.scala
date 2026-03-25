@@ -20,9 +20,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       pmpOpenAll()
 
       // identity map gigapage: V|R|W|X|A|D = 0xcf
-      la(x5, "pgtbl")
-      li(x6, (0x80000L << 10) | 0xcfL)
-      sd(x5, x6, 16)
+      mapGigapageIdentity(0xcfL)
 
       enableSv39()
       switchToSMode("s_code_phase1")
