@@ -49,7 +49,7 @@ trait RVGenerator:
   def constraints(): (Arena, Context, Block, Recipe) ?=> Unit // should be implemented by subclass
   val sets: Seq[Recipe ?=> SetConstraint] // should be implemented by subclass
   val name: String = this.getClass.getSimpleName
-  val seed: Int    = scala.util.Random.nextInt(Int.MaxValue)
+  val seed: Int    = 0
 
   // ================== Stage 1: Opcode Solving ==================
 

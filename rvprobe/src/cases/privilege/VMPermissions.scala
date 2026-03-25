@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,8 +16,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMReadOnlyPage extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // Two-level: code megapage (full perms) + data megapage (R-only: V|R|A|D = 0xc3)
@@ -55,8 +55,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMExecuteOnlyPage extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // identity map gigapage: X-only = V|X|A|D = 0xc9
@@ -97,8 +96,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMNoExecutePage extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // Two-level: code megapage (full perms) + data megapage (RW, no X: V|R|W|A|D = 0xc7)

@@ -3,63 +3,6 @@
 _start:
     la x5, trap_handler
     csrrw x0, mtvec, x5
-    csrrs x5, mstatus, x0
-    lui x6, 3
-    or x5, x5, x6
-    csrrw x0, mstatus, x5
-    csrrw x0, fcsr, x0
-    csrrw x0, mscratch, x0
-    addi x5, x0, -1
-    csrrw x0, pmpaddr0, x5
-    addi x5, x0, 31
-    csrrw x0, pmpcfg0, x5
-    j user_code
-
-user_code:
-    li x8, 0x774492720dbedb91
-    fmv.d.x f16, x8
-    li x8, 0x271141afdb5a2f58
-    fmv.d.x f17, x8
-    fround.s f17, f16, dyn
-    jal x1, switch_to_s_mode
-
-    lui x11, 262144
-    ld x12, 0(x11)
-    fsub.s f16, f16, f17, rtz
-    fround.s f17, f16, dyn
-exit:
-    li x5, 0x0
-    slli x5, x5, 1
-    ori x5, x5, 1
-    la x6, tohost
-    sd x5, 0(x6)
-spin:
-    j spin
-
-    .align 2
-switch_to_s_mode:
-    la x5, pgtbl
-    li x6, 0x200000cf
-    sd x6, 16(x5)
-    la x5, pgtbl
-    addi x7, x0, 8
-    slli x7, x7, 60
-    srli x6, x5, 12
-    or x7, x7, x6
-    csrrw x0, satp, x7
-    sfence.vma x0, x0
-    li x5, 0xffffffffffffe7ff
-    csrrs x6, mstatus, x0
-    and x6, x6, x5
-    li x7, 0x800
-    or x6, x6, x7
-    csrrw x0, mstatus, x6
-    csrrw x0, mepc, x1
-    mret
-    .align 2
-exit_s_mode:
-    ecall
-    jalr x0, x1, 0
     j trap_handler_skip
 
     .align 2
@@ -133,6 +76,63 @@ update_mepc:
     csrrw x0, mtval, x0
     mret
 trap_handler_skip:
+    csrrs x5, mstatus, x0
+    lui x6, 3
+    or x5, x5, x6
+    csrrw x0, mstatus, x5
+    csrrw x0, fcsr, x0
+    csrrw x0, mscratch, x0
+    addi x5, x0, -1
+    csrrw x0, pmpaddr0, x5
+    addi x5, x0, 31
+    csrrw x0, pmpcfg0, x5
+    j user_code
+
+user_code:
+    li x8, 0x774492720dbedb91
+    fmv.d.x f16, x8
+    li x8, 0x271141afdb5a2f58
+    fmv.d.x f17, x8
+    fround.s f17, f16, dyn
+    jal x1, switch_to_s_mode
+
+    lui x11, 262144
+    ld x12, 0(x11)
+    fsub.s f16, f16, f17, rtz
+    fround.s f17, f16, dyn
+exit:
+    li x5, 0x0
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin:
+    j spin
+
+    .align 2
+switch_to_s_mode:
+    la x5, pgtbl
+    li x6, 0x200000cf
+    sd x6, 16(x5)
+    la x5, pgtbl
+    addi x7, x0, 8
+    slli x7, x7, 60
+    srli x6, x5, 12
+    or x7, x7, x6
+    csrrw x0, satp, x7
+    sfence.vma x0, x0
+    li x5, 0xffffffffffffe7ff
+    csrrs x6, mstatus, x0
+    and x6, x6, x5
+    li x7, 0x800
+    or x6, x6, x7
+    csrrw x0, mstatus, x6
+    csrrw x0, mepc, x1
+    mret
+    .align 2
+exit_s_mode:
+    ecall
+    jalr x0, x1, 0
     .section .data
     .balign 4096
 pgtbl:

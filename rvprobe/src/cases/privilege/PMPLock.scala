@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -14,8 +15,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPLockMMode extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: NAPOT covering buf, L=1 R-only (cfg=0x99: L=1, A=NAPOT, R=1, W=0, X=0)
       la(x10, "buf")
@@ -59,7 +59,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
 
       // entry0: NAPOT covering buf, L=1 RWX (cfg=0x9f: L+NAPOT+RWX)
       la(x10, "buf")

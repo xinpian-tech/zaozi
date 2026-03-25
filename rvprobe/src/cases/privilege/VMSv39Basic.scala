@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,7 +16,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
       pmpOpenAll()
 
       // identity map 1GB gigapage for 0x80000000
@@ -45,7 +45,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
       pmpOpenAll()
 
       // identity map 1GB gigapage for 0x80000000

@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -54,7 +55,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       j("exit")
 
       fail()
-      trapHandler()
       finish()
       pageTableData()
       section(".data")
@@ -87,7 +87,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
       j("exit")
 
       fail()
-      trapHandler()
       finish()
       pageTableData()
   PrivilegeSv39EcallRoundTrip.emit(outputPath)
@@ -98,7 +97,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
 
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // map only 0x80000000 1GB region; 0x40000000 remains unmapped.
