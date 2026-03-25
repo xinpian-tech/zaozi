@@ -36,46 +36,6 @@ object CacheProbeLib:
   def cacheSetsWithFenceI(): Seq[Recipe ?=> SetConstraint] =
     cacheSets(isRVZICSR(), isRVZIFENCEI())
 
-  /** Emit `.text` section header with `_start` entry point. */
-  def textStart(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.textStart()
-
-  /** Emit the standard HTIF pass-exit sequence then spin forever. */
-  def exit(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.exit()
-
-  /** Emit the `.tohost` section with `tohost` and `fromhost` symbols. */
-  def tohostSection(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.tohostSection()
-
-  /** Convenience helper for simple cache cases where `exit` and `.tohost` are adjacent. */
-  def finish(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.finish()
-
   /** Emit a `.data` section with one 64-byte-aligned buffer.
     *
     * @param name

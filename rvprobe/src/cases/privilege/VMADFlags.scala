@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,8 +16,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMADAccessBit extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // Two-level: code megapage (full perms) + data megapage (A=0: V|R|W|X|D = 0x8f)
@@ -54,8 +54,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMADDirtyBit extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // identity map gigapage with A=1, D=0: V|R|W|X|A (no D) = 0x4f

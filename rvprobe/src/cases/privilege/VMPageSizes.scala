@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,7 +16,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
       pmpOpenAll()
 
       // root[2] = leaf PTE for 1GB gigapage at 0x80000000
@@ -52,7 +52,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
       pmpOpenAll()
 
       // root[2] = non-leaf PTE pointing to pgtbl_l2
@@ -102,7 +101,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
       pmpOpenAll()
 
       // root[2] = non-leaf PTE -> pgtbl_l2

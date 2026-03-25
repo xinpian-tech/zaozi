@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,8 +16,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMSfenceVmaRemap extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // identity map gigapage: V|R|W|X|A|D = 0xcf
@@ -70,8 +70,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object VMSfenceVmaStale extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
       pmpOpenAll()
 
       // Two-level: code megapage (full perms) + data megapage (full perms initially)

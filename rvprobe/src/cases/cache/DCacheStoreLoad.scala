@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
 
 // Sequence M: store-load forwarding — immediate load after store

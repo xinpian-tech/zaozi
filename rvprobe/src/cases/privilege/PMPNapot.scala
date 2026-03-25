@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,7 +16,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
 
       // entry0: NAPOT covering buf region, RWX (cfg=0x1f: A=NAPOT,R,W,X)
       // Use a large NAPOT region to cover buf: pmpaddr = (base >> 2) | (size/2 - 1) >> 2
@@ -58,8 +58,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPNapotDeny extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: NAPOT covering buf, R only (cfg=0x19: A=NAPOT, R=1, W=0, X=0)
       la(x10, "buf")
@@ -107,8 +106,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPNapotOutside extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: NAPOT 4KB covering only code region around _start (.text), RWX
       la(x5, "_start")

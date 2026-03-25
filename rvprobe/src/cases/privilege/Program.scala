@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.CSR
 
@@ -70,7 +71,6 @@ import me.jiuyang.rvprobe.cases.privilege.CSR
       ecall()
       jalr(x0, x1, 0)
 
-      trapHandler()
       pageTableData()
       tohostSection()
   Program.emit(outputPath)

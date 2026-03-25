@@ -61,19 +61,44 @@ object PrivilegeProbeLib:
       _ptModel.set(m)
     m
 
-  /** Emit `.text` + `_start` + install trap handler to mtvec. */
+  /** Emit `.text` + `_start` + install trap handler + (optionally) the handler body.
+    *
+    * @param recordCause
+    *   if true, uses [[trapHandlerWithRecord]] which stores mcause to `trap_cause`; otherwise uses [[trapHandler]]
+    */
   def textStartWithTrap(
-    trapLabel: String = "trap_handler"
+    recordCause: Boolean = false
   )(
     using Arena,
     Context,
     Block,
     Recipe
   ): Unit =
+    val handlerLabel = if recordCause then "trap_handler_rec" else "trap_handler"
     _ptModel.set(new PageTableModel)
     HTIFLib.textStart()
-    la(x5, trapLabel)
+    la(x5, handlerLabel)
     csrrw(x0, x5, CSR.MTVEC)
+    if recordCause then trapHandlerWithRecord() else trapHandler()
+
+  /** Verify that `trap_cause` equals the expected value, branching to `fail` on mismatch.
+    *
+    * Emits: `la x10, resultLabel; ld x11, 0(x10); addi x12, x0, expectedCause; bne x11, x12, "fail"; j "exit"`
+    */
+  def verifyTrapCause(
+    expectedCause: Int,
+    resultLabel:   String = "trap_cause"
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    la(x10, resultLabel)
+    ld(x11, x10, 0)
+    addi(x12, x0, expectedCause)
+    bne(x11, x12, "fail")
+    j("exit")
 
   /** PMP: NAPOT covering entire address space (pmpaddr0=-1, pmpcfg0=0x1f). */
   def pmpOpenAll(
@@ -440,47 +465,6 @@ object PrivilegeProbeLib:
     csrrw(x0, x0, CSR.MTVAL)
     mret()
     label(skipLabel)
-
-  /** Emit the standard HTIF pass-exit sequence then spin forever. */
-  def exit(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.exit()
-
-  /** Emit the standard HTIF fail sequence (non-zero fail code) then spin forever. */
-  def fail(
-    failCode: Long = HTIFLib.DefaultFailCode
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.fail(failCode = failCode)
-
-  /** Emit the `.tohost` section with `tohost` and `fromhost` symbols. */
-  def tohostSection(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.tohostSection()
-
-  /** Convenience helper for simple privilege cases where `exit` and `.tohost` are adjacent. */
-  def finish(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    HTIFLib.finish()
 
   /** Emit a `.data` section with a page-aligned page table buffer.
     *

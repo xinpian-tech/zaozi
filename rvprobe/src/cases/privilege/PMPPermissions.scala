@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -14,8 +15,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPReadOnly extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: NAPOT covering buf, R only (cfg=0x19: L=0, A=NAPOT=11, R=1, W=0, X=0)
       la(x10, "buf")
@@ -62,8 +62,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPWriteExecute extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: NAPOT covering buf, W+X (cfg=0x1e: A=NAPOT, R=0, W=1, X=1) — reserved combo
       la(x10, "buf")
@@ -104,8 +103,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPNoAccess extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: NAPOT covering buf, no permissions (cfg=0x18: A=NAPOT, R=0, W=0, X=0)
       la(x10, "buf")

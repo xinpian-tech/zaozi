@@ -6,6 +6,7 @@ import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.{*, given}
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 import me.jiuyang.rvprobe.cases.privilege.PrivilegeProbeLib.*
 import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
 
@@ -15,7 +16,6 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
       textStartWithTrap()
-      trapHandler()
 
       // entry0: pmpaddr0 = buf_base >> 2 (TOR lower bound)
       la(x10, "buf")
@@ -57,8 +57,7 @@ import me.jiuyang.rvprobe.cases.privilege.{CSR, Cause}
   object PMPTorBoundary extends RVGenerator:
     val sets          = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
     def constraints() =
-      textStartWithTrap("trap_handler_rec")
-      trapHandlerWithRecord()
+      textStartWithTrap(recordCause = true)
 
       // entry0: pmpaddr0 = buf_base >> 2
       la(x10, "buf")
