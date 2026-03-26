@@ -21,3 +21,4 @@ result*
 *.fst
 *.fsdb
 *.log
+program.S
