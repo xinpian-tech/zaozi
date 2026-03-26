@@ -6,13 +6,13 @@ _start:
     add x6, x5, x0
     add x7, x6, x22
     add x28, x7, x22
-    lw x1, 0(x6)
-    addi x5, x0, 42
-    sw x5, 0(x6)
-    lw x2, 0(x7)
+    lw x2, 0(x6)
+    addi x7, x0, 42
+    sw x7, 0(x6)
+    lw x4, 0(x7)
     lw x3, 0(x28)
     fence rw, rw
-    lw x4, 0(x6)
+    lw x1, 0(x6)
 exit:
     li x5, 0x0
     slli x5, x5, 1

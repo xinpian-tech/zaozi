@@ -5,21 +5,21 @@
 Disassembly of section .text:
 
 0000000080000000 <_start>:
-    80000000:	00000097          	auipc	ra,0x0
-    80000004:	08008093          	addi	ra,ra,128 # 80000080 <lock>
+    80000000:	00000197          	auipc	gp,0x0
+    80000004:	08018193          	addi	gp,gp,128 # 80000080 <lock>
 
 0000000080000008 <retry>:
-    80000008:	1400a12f          	lr.w.aq	sp,(ra)
-    8000000c:	fe011ee3          	bnez	sp,80000008 <retry>
-    80000010:	4185                	li	gp,1
-    80000012:	1830a22f          	sc.w	tp,gp,(ra)
-    80000016:	fe0219e3          	bnez	tp,80000008 <retry>
-    8000001a:	00000317          	auipc	t1,0x0
-    8000001e:	0a630313          	addi	t1,t1,166 # 800000c0 <shared_data>
-    80000022:	62b1                	lui	t0,0xc
-    80000024:	eef2829b          	addiw	t0,t0,-273 # beef <_start-0x7fff4111>
-    80000028:	00532023          	sw	t0,0(t1)
-    8000002c:	0000a023          	sw	zero,0(ra)
+    80000008:	1401a22f          	lr.w.aq	tp,(gp)
+    8000000c:	fe021ee3          	bnez	tp,80000008 <retry>
+    80000010:	4085                	li	ra,1
+    80000012:	1811a12f          	sc.w	sp,ra,(gp)
+    80000016:	fe0119e3          	bnez	sp,80000008 <retry>
+    8000001a:	00000397          	auipc	t2,0x0
+    8000001e:	0a638393          	addi	t2,t2,166 # 800000c0 <shared_data>
+    80000022:	6431                	lui	s0,0xc
+    80000024:	eef4041b          	addiw	s0,s0,-273 # beef <_start-0x7fff4111>
+    80000028:	0083a023          	sw	s0,0(t2)
+    8000002c:	0001a023          	sw	zero,0(gp)
     80000030:	0330000f          	fence	rw,rw
 
 0000000080000034 <exit>:

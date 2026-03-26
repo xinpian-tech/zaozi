@@ -1,14 +1,14 @@
     .section ".text"
     .globl _start
 _start:
-    la x5, amo_buf
+    la x1, amo_buf
     li x4, 0x64
-    sw x4, 0(x5)
-    addi x6, x0, 5
-    amoadd.w x1, x6, (x5)
-    li x7, 0xc8
-    amoswap.w x2, x7, (x5)
-    lw x3, 0(x5)
+    sw x4, 0(x1)
+    addi x3, x0, 5
+    amoadd.w x9, x3, (x1)
+    li x8, 0xc8
+    amoswap.w x2, x8, (x1)
+    lw x7, 0(x1)
 exit:
     li x5, 0x0
     slli x5, x5, 1

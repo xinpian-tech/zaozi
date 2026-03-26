@@ -1,13 +1,13 @@
     .section ".text"
     .globl _start
 _start:
-    la x7, buf
-    lw x1, 0(x7)
-    lw x2, 4(x7)
-    lw x3, 8(x7)
-    lw x4, 60(x7)
-    lw x5, 64(x7)
-    lw x6, 68(x7)
+    la x2, buf
+    lw x3, 0(x2)
+    lw x1, 4(x2)
+    lw x7, 8(x2)
+    lw x4, 60(x2)
+    lw x8, 64(x2)
+    lw x9, 68(x2)
 exit:
     li x5, 0x0
     slli x5, x5, 1

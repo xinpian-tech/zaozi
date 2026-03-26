@@ -1,16 +1,16 @@
     .section ".text"
     .globl _start
 _start:
-    la x4, buf
-    addi x3, x0, 42
-    sw x3, 0(x4)
+    la x2, buf
+    addi x7, x0, 42
+    sw x7, 0(x2)
     fence rw, rw
-    lw x1, 0(x4)
-    la x6, buf2
-    addi x5, x0, 99
-    sw x5, 0(x6)
+    lw x8, 0(x2)
+    la x1, buf2
+    addi x4, x0, 99
+    sw x4, 0(x1)
     fence.tso
-    lw x2, 0(x6)
+    lw x3, 0(x1)
 exit:
     li x5, 0x0
     slli x5, x5, 1

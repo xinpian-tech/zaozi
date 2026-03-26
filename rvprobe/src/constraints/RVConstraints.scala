@@ -31,6 +31,11 @@ case class Recipe(val name: String)(using Arena, Context, Block) {
   def registerFreshReg(v: Referable[SInt]): Unit = _freshRegs += v
   def freshRegs(): Seq[Referable[SInt]] = _freshRegs.toSeq
 
+  // Fixed registers declared by fragments via useFixed(). freshRegs must avoid these.
+  private val _fixedRegs = scala.collection.mutable.Set[Int]()
+  def recordFixedReg(ordinal: Int): Unit = _fixedRegs += ordinal
+  def fixedRegs(): Set[Int] = _fixedRegs.toSet
+
   def addStatement(s: Statement): Unit = _statements += s
   def allStatements(): Seq[Statement] = _statements.toSeq
 
