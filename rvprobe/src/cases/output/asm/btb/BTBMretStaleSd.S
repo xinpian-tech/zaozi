@@ -7,9 +7,11 @@ _start:
     csrrw x0, pmpaddr0, x5
     addi x5, x0, 31
     csrrw x0, pmpcfg0, x5
+    la x10, buf
+    li x11, 0xdeadbeef
     jal x1, switch_to_s_mode
 
-    lui x11, 66
+    sd x11, 0(x10)
     j exit
 
 exit:
@@ -128,3 +130,7 @@ tohost:
     .globl fromhost
 fromhost:
     .dword 0x0
+    .section .data
+    .balign 64
+buf:
+    .zero 64
