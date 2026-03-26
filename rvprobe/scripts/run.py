@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-Batch-regenerate rvprobe output artifacts.
+Batch-regenerate rvprobe output artifacts (incremental by default).
 
 Phases:
-  1) Regenerate output assembly (.S) from all @main case generators.
-  2) Rebuild ELF/BIN/OBJDUMP from output assembly (in parallel).
-  3) Optionally run spike on selected ELF test cases.
+  1) Regenerate output assembly (.S) from stale @main case generators.
+  2) Rebuild ELF/BIN/OBJDUMP from stale .S files (in parallel).
+  3) Run spike on all generated ELF files.
+
+Staleness: a case is regenerated if its source .scala file, any *Lib.scala
+in the same directory, or HTIFLib.scala is newer than the output .S/.elf.
+Use --force to regenerate everything.
 
 Examples:
   python3 rvprobe/scripts/run.py
-  python3 rvprobe/scripts/run.py --include 'PrivilegeSv39'
-  python3 rvprobe/scripts/run.py --skip-asm --elf-workers 16
-  python3 rvprobe/scripts/run.py --asm-workers 4 --elf-workers 16
-  python3 rvprobe/scripts/run.py --include 'PMP' --skip-asm --skip-elf \\
-      --run-spike --spike-command "nix shell nixpkgs#spike -c spike"
+  python3 rvprobe/scripts/run.py --force
+  python3 rvprobe/scripts/run.py --include 'BTB' --skip-spike
+  python3 rvprobe/scripts/run.py --skip-asm --skip-elf
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from asm2elf import DEFAULT_LINKER, compile_asm
@@ -50,6 +52,7 @@ _MAIN_RE = re.compile(r"@main\s+def\s+([A-Za-z0-9_]+)\s*\(")
 class CaseMain:
     fqcn: str
     asm_path: Path
+    source_file: Path  # the .scala file containing this @main
 
 
 def discover_cases(cases_root: Path, asm_root: Path) -> list[CaseMain]:
@@ -69,8 +72,70 @@ def discover_cases(cases_root: Path, asm_root: Path) -> list[CaseMain]:
             mains.append(CaseMain(
                 fqcn=f"{pkg}.{name}",
                 asm_path=asm_root / subdir / f"{name}.S",
+                source_file=scala,
             ))
     return mains
+
+
+# ---------------------------------------------------------------------------
+# Staleness detection
+# ---------------------------------------------------------------------------
+def _lib_files(source_file: Path, cases_root: Path) -> list[Path]:
+    """Return Lib files that affect a case: same-dir *Lib.scala + HTIFLib.scala."""
+    libs = sorted(source_file.parent.glob("*Lib.scala"))
+    htif = cases_root / "HTIFLib.scala"
+    if htif.exists() and htif not in libs:
+        libs.append(htif)
+    return libs
+
+
+def _max_mtime(files: list[Path]) -> float:
+    """Return the newest mtime among existing files, or 0."""
+    mtimes = [f.stat().st_mtime for f in files if f.exists()]
+    return max(mtimes) if mtimes else 0.0
+
+
+def _is_asm_stale(case: CaseMain, cases_root: Path) -> bool:
+    """True if the .S output needs regeneration."""
+    if not case.asm_path.exists():
+        return True
+    out_mtime = case.asm_path.stat().st_mtime
+    deps = [case.source_file] + _lib_files(case.source_file, cases_root)
+    return _max_mtime(deps) > out_mtime
+
+
+def _is_elf_stale(case: CaseMain, asm_root: Path, elf_root: Path) -> bool:
+    """True if the .elf output needs regeneration."""
+    elf_path = (elf_root / case.asm_path.relative_to(asm_root)).with_suffix(".elf")
+    if not elf_path.exists():
+        return True
+    if not case.asm_path.exists():
+        return True
+    return case.asm_path.stat().st_mtime > elf_path.stat().st_mtime
+
+
+def _remove_orphans(cases: list[CaseMain], output_root: Path, suffix: str) -> int:
+    """Remove output files that no longer have a matching source case. Returns count."""
+    expected = set()
+    for c in cases:
+        try:
+            rel = c.asm_path.relative_to(ASM_ROOT)
+        except ValueError:
+            continue
+        expected.add(str((output_root / rel).with_suffix(suffix)))
+
+    removed = 0
+    for f in output_root.rglob(f"*{suffix}"):
+        if str(f) not in expected:
+            f.unlink()
+            removed += 1
+            # Also remove companion files (.bin, .objdump for .elf)
+            if suffix == ".elf":
+                for ext in (".bin", ".objdump"):
+                    companion = f.with_suffix(ext)
+                    if companion.exists():
+                        companion.unlink()
+    return removed
 
 
 # ---------------------------------------------------------------------------
@@ -86,10 +151,6 @@ def _run_parallel(
     *,
     stop_on_first_fail: bool = False,
 ) -> list[tuple]:
-    """Run *fn(item)* over *items* with up to *workers* threads.
-
-    Returns a list of (item, error_str) for failures.
-    """
     total = len(items)
     failures: list[tuple] = []
 
@@ -136,14 +197,26 @@ def _mill_run_main(case: CaseMain, workdir: Path) -> None:
         raise RuntimeError((proc.stdout or "") + (proc.stderr or ""))
 
 
-def phase_asm(cases: list[CaseMain], workdir: Path, asm_root: Path, workers: int) -> None:
-    if asm_root.exists():
-        shutil.rmtree(asm_root)
-        print(f"[asm] cleaned {asm_root}")
+def phase_asm(
+    cases: list[CaseMain], workdir: Path, cases_root: Path, asm_root: Path, workers: int, force: bool
+) -> None:
+    # Remove orphaned .S files
+    orphans = _remove_orphans(cases, asm_root, ".S")
+    if orphans:
+        print(f"[asm] removed {orphans} orphaned .S files")
 
-    print(f"[asm] generating {len(cases)} cases (workers={workers})")
+    if force:
+        stale = cases
+    else:
+        stale = [c for c in cases if _is_asm_stale(c, cases_root)]
+
+    if not stale:
+        print(f"[asm] all {len(cases)} cases up to date")
+        return
+
+    print(f"[asm] generating {len(stale)}/{len(cases)} stale cases (workers={workers})")
     failures = _run_parallel(
-        "asm", cases,
+        "asm", stale,
         fn=lambda c: _mill_run_main(c, workdir),
         workers=workers,
         on_ok=lambda i, t, c, _: print(f"[asm][ok] {i}/{t} {c.fqcn}"),
@@ -165,6 +238,7 @@ def phase_elf(
     asm_root: Path,
     elf_root: Path,
     workers: int,
+    force: bool,
     compiler: str,
     objcopy: str,
     objdump: str,
@@ -172,9 +246,18 @@ def phase_elf(
     mabi: str,
     linker_script: Path,
 ) -> None:
-    if elf_root.exists():
-        shutil.rmtree(elf_root)
-        print(f"[elf] cleaned {elf_root}")
+    orphans = _remove_orphans(cases, elf_root, ".elf")
+    if orphans:
+        print(f"[elf] removed {orphans} orphaned .elf files")
+
+    if force:
+        stale = cases
+    else:
+        stale = [c for c in cases if _is_elf_stale(c, asm_root, elf_root)]
+
+    if not stale:
+        print(f"[elf] all {len(cases)} cases up to date")
+        return
 
     def compile_one(case: CaseMain):
         return compile_asm(
@@ -197,9 +280,9 @@ def phase_elf(
             f"{elf.relative_to(elf_root)}, {binf.relative_to(elf_root)}, {obj.relative_to(elf_root)}"
         )
 
-    print(f"[elf] compiling {len(cases)} cases (workers={workers})")
+    print(f"[elf] compiling {len(stale)}/{len(cases)} stale cases (workers={workers})")
     failures = _run_parallel(
-        "elf", cases,
+        "elf", stale,
         fn=compile_one,
         workers=workers,
         on_ok=on_ok,
@@ -274,14 +357,12 @@ def phase_spike(
             rows.append((status, elf_path, case, out))
             print(f"[spike][{status.lower()}] {done}/{len(cases)} {elf_path.relative_to(elf_root)}")
 
-    # Write results file
     if results_file is not None:
         results_file.parent.mkdir(parents=True, exist_ok=True)
         lines = [f"{s}\t{e}\t{c.fqcn}" for s, e, c, _ in sorted(rows, key=lambda r: str(r[1]))]
         results_file.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
         print(f"[spike] wrote results: {results_file}")
 
-    # Summary
     counts: dict[str, int] = {}
     for s, _, _, _ in rows:
         counts[s] = counts.get(s, 0) + 1
@@ -299,7 +380,7 @@ def phase_spike(
 # CLI
 # ---------------------------------------------------------------------------
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Batch regenerate rvprobe output artifacts")
+    ap = argparse.ArgumentParser(description="Batch regenerate rvprobe output artifacts (incremental)")
 
     # Paths
     ap.add_argument("--workdir", default=str(REPO_ROOT))
@@ -314,6 +395,7 @@ def main() -> int:
     ap.add_argument("--skip-asm", action="store_true")
     ap.add_argument("--skip-elf", action="store_true")
     ap.add_argument("--skip-spike", action="store_true")
+    ap.add_argument("--force", action="store_true", help="Regenerate all cases regardless of staleness")
 
     # Parallelism
     cpu = max(1, os.cpu_count() or 1)
@@ -360,7 +442,7 @@ def main() -> int:
 
     # Phase 1: ASM
     if not args.skip_asm:
-        phase_asm(cases, workdir, asm_root, max(1, args.asm_workers))
+        phase_asm(cases, workdir, cases_root, asm_root, max(1, args.asm_workers), args.force)
     else:
         print("[asm] skipped")
 
@@ -369,6 +451,7 @@ def main() -> int:
         phase_elf(
             cases, asm_root, elf_root,
             workers=max(1, args.elf_workers),
+            force=args.force,
             compiler=args.compiler, objcopy=args.objcopy, objdump=args.objdump,
             march=args.march, mabi=args.mabi, linker_script=linker_script,
         )
