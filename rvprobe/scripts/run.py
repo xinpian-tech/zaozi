@@ -198,10 +198,10 @@ def _mill_run_main(case: CaseMain, workdir: Path) -> None:
 
 
 def phase_asm(
-    cases: list[CaseMain], workdir: Path, cases_root: Path, asm_root: Path, workers: int, force: bool
+    cases: list[CaseMain], all_cases: list[CaseMain], workdir: Path, cases_root: Path, asm_root: Path, workers: int, force: bool
 ) -> None:
-    # Remove orphaned .S files
-    orphans = _remove_orphans(cases, asm_root, ".S")
+    # Remove orphaned .S files (based on ALL cases, not filtered subset)
+    orphans = _remove_orphans(all_cases, asm_root, ".S")
     if orphans:
         print(f"[asm] removed {orphans} orphaned .S files")
 
@@ -235,6 +235,7 @@ def phase_asm(
 # ---------------------------------------------------------------------------
 def phase_elf(
     cases: list[CaseMain],
+    all_cases: list[CaseMain],
     asm_root: Path,
     elf_root: Path,
     workers: int,
@@ -246,7 +247,7 @@ def phase_elf(
     mabi: str,
     linker_script: Path,
 ) -> None:
-    orphans = _remove_orphans(cases, elf_root, ".elf")
+    orphans = _remove_orphans(all_cases, elf_root, ".elf")
     if orphans:
         print(f"[elf] removed {orphans} orphaned .elf files")
 
@@ -432,24 +433,25 @@ def main() -> int:
         print(f"linker script not found: {linker_script}", file=sys.stderr)
         return 1
 
-    # Discover and filter cases
+    # Discover all cases (for orphan detection), then filter
+    all_cases = discover_cases(cases_root, asm_root)
     include_re = re.compile(args.include)
-    cases = [c for c in discover_cases(cases_root, asm_root) if include_re.search(c.fqcn)]
+    cases = [c for c in all_cases if include_re.search(c.fqcn)]
     if not cases:
         print(f"no matching cases for --include={args.include}", file=sys.stderr)
         return 1
-    print(f"matched cases: {len(cases)}")
+    print(f"matched cases: {len(cases)}/{len(all_cases)}")
 
     # Phase 1: ASM
     if not args.skip_asm:
-        phase_asm(cases, workdir, cases_root, asm_root, max(1, args.asm_workers), args.force)
+        phase_asm(cases, all_cases, workdir, cases_root, asm_root, max(1, args.asm_workers), args.force)
     else:
         print("[asm] skipped")
 
     # Phase 2: ELF
     if not args.skip_elf:
         phase_elf(
-            cases, asm_root, elf_root,
+            cases, all_cases, asm_root, elf_root,
             workers=max(1, args.elf_workers),
             force=args.force,
             compiler=args.compiler, objcopy=args.objcopy, objdump=args.objdump,
