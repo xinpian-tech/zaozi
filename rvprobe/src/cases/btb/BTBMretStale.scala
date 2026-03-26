@@ -28,15 +28,14 @@ import java.lang.foreign.Arena
 //   2. mret sets PC = X+4 (the branch's fall-through), not a separate label
 //   3. BTB state is NOT invalidated by the mret pipeline flush
 //
-// Variants explore: instruction at fall-through, nop padding, FP context.
+// Variants explore: instruction at fall-through, nop padding, unmapped access.
 // =============================================================================
 
 /** Shared helpers for the mret-stale BTB test variants. */
 object MretStaleLib:
 
-  /** Prologue: trap handler + optional FP enable + PMP open. */
+  /** Prologue: trap handler + PMP open. */
   def prologue(
-    enableFP: Boolean = true
   )(
     using Arena,
     Context,
@@ -46,13 +45,6 @@ object MretStaleLib:
     textStart()
     la(x5, "trap_handler")
     csrrw(x0, x5, CSR.MTVEC)
-    if enableFP then
-      csrrs(x5, x0, CSR.MSTATUS)
-      li(x6, 0x3000L)
-      or(x5, x5, x6)
-      csrrw(x0, x5, CSR.MSTATUS)
-      csrrw(x0, x0, 0x003)
-      csrrw(x0, x0, CSR.MSCRATCH)
     pmpOpenAll()
 
   /** Subroutine: configure Sv39 + mret to ra (= jal+4) in S-mode. */
@@ -100,7 +92,7 @@ object MretStaleLib:
     pageTableData()
     tohostSection()
 
-  /** HTIF exit with value=1 (matching program.S convention). */
+  /** HTIF exit with value=1. */
   def exitPass(
   )(
     using Arena,
@@ -117,26 +109,16 @@ object MretStaleLib:
 
 import MretStaleLib.*
 
-// Variant A: Original bug — FP ops + jal → lui + ld(unmapped) at fall-through.
+// Variant A: lui + ld(unmapped 0x40000000) at fall-through.
+// The ld triggers a page fault — if BTB corrupted mepc, trap handler can't recover.
 @main def BTBMretStaleLuiLd(outputPath: String): Unit =
   object BTBMretStaleLuiLd extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVFZFA(), isRVZICSR(), isRVSYSTEM(), isRVS())
+    val sets = btbSets()
     def constraints() =
       prologue()
-      j("user_code")
-      label("user_code")
-      li(x8, 0x774492720dbedb91L)
-      fmvDX(x16, x8)
-      li(x8, 0x271141afdb5a2f58L)
-      fmvDX(x17, x8)
-      froundS(x17, 7, x16)
-      csrrs(x14, x0, 0x001)
       jal(x1, "switch_to_s_mode")
-      // fall-through in S-mode: BTB may mis-predict lui
       lui(x11, 0x40000)
       ld(x12, x11, 0) // 0x40000000 unmapped → page fault
-      fsubS(x16, 1, x16, x17)
-      froundS(x17, 7, x16)
       exitPass()
       switchToSModeViaRa()
       epilogue()
@@ -145,18 +127,11 @@ import MretStaleLib.*
 // Variant B: lui only (no unmapped ld). Isolates BTB corruption from page fault cascade.
 @main def BTBMretStaleLui(outputPath: String): Unit =
   object BTBMretStaleLui extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVFZFA(), isRVZICSR(), isRVSYSTEM(), isRVS())
+    val sets = btbSets()
     def constraints() =
       prologue()
-      j("user_code")
-      label("user_code")
-      li(x8, 0x774492720dbedb91L)
-      fmvDX(x16, x8)
-      li(x8, 0x271141afdb5a2f58L)
-      fmvDX(x17, x8)
-      froundS(x17, 7, x16)
       jal(x1, "switch_to_s_mode")
-      lui(x11, 0x42) // no unmapped access
+      lui(x11, 0x42)
       j("exit")
       exitPass()
       switchToSModeViaRa()
@@ -166,12 +141,12 @@ import MretStaleLib.*
 // Variant C: addi at fall-through. Tests that bug isn't lui-specific.
 @main def BTBMretStaleAddi(outputPath: String): Unit =
   object BTBMretStaleAddi extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
+    val sets = btbSets()
     def constraints() =
-      prologue(enableFP = false)
+      prologue()
       addi(x10, x0, 100)
       jal(x1, "switch_to_s_mode")
-      addi(x10, x10, 1) // non-branch at fall-through
+      addi(x10, x10, 1)
       j("exit")
       exitPass()
       switchToSModeViaRa()
@@ -181,12 +156,12 @@ import MretStaleLib.*
 // Variant D: ld from mapped address at fall-through. Tests load instructions.
 @main def BTBMretStaleLd(outputPath: String): Unit =
   object BTBMretStaleLd extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
+    val sets = btbSets()
     def constraints() =
-      prologue(enableFP = false)
+      prologue()
       la(x10, "buf")
       jal(x1, "switch_to_s_mode")
-      ld(x11, x10, 0) // mapped address, should succeed
+      ld(x11, x10, 0)
       j("exit")
       exitPass()
       switchToSModeViaRa()
@@ -198,20 +173,14 @@ import MretStaleLib.*
   BTBMretStaleLd.emit(outputPath)
 
 // Variant E: nop padding shifts fall-through to jal+36. Tests BTB index bit sensitivity.
+// If bug only triggers at jal+4, nops should suppress it (confirming exact-PC aliasing).
 @main def BTBMretStaleNopPad(outputPath: String): Unit =
   object BTBMretStaleNopPad extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVFZFA(), isRVZICSR(), isRVSYSTEM(), isRVS())
+    val sets = btbSets()
     def constraints() =
       prologue()
-      j("user_code")
-      label("user_code")
-      li(x8, 0x774492720dbedb91L)
-      fmvDX(x16, x8)
-      li(x8, 0x271141afdb5a2f58L)
-      fmvDX(x17, x8)
-      froundS(x17, 7, x16)
       jal(x1, "switch_to_s_mode")
-      nopSled(8) // shift fall-through to jal+36
+      nopSled(8)
       lui(x11, 0x40000)
       ld(x12, x11, 0)
       j("exit")
@@ -220,16 +189,22 @@ import MretStaleLib.*
       epilogue()
   BTBMretStaleNopPad.emit(outputPath)
 
-// Variant F: minimal — no FP, direct jal → mret → lui. Is FP context needed to trigger?
-@main def BTBMretStaleMinimal(outputPath: String): Unit =
-  object BTBMretStaleMinimal extends RVGenerator:
-    val sets = isRV64GC() ++ Seq(isRVZICSR(), isRVSYSTEM(), isRVS())
+// Variant F: sd at fall-through. Tests store instructions.
+@main def BTBMretStaleSd(outputPath: String): Unit =
+  object BTBMretStaleSd extends RVGenerator:
+    val sets = btbSets()
     def constraints() =
-      prologue(enableFP = false)
+      prologue()
+      la(x10, "buf")
+      li(x11, 0xdeadbeefL)
       jal(x1, "switch_to_s_mode")
-      lui(x11, 0x42)
+      sd(x10, x11, 0)
       j("exit")
       exitPass()
       switchToSModeViaRa()
       epilogue()
-  BTBMretStaleMinimal.emit(outputPath)
+      section(".data")
+      balign(64)
+      label("buf")
+      zero(64)
+  BTBMretStaleSd.emit(outputPath)

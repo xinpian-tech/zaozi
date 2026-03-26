@@ -3,31 +3,14 @@
 _start:
     la x5, trap_handler
     csrrw x0, mtvec, x5
-    csrrs x5, mstatus, x0
-    li x6, 0x3000
-    or x5, x5, x6
-    csrrw x0, mstatus, x5
-    csrrw x0, fcsr, x0
-    csrrw x0, mscratch, x0
     addi x5, x0, -1
     csrrw x0, pmpaddr0, x5
     addi x5, x0, 31
     csrrw x0, pmpcfg0, x5
-    j user_code
-
-user_code:
-    li x8, 0x774492720dbedb91
-    fmv.d.x f16, x8
-    li x8, 0x271141afdb5a2f58
-    fmv.d.x f17, x8
-    fround.s f17, f16, dyn
-    csrrs x14, fflags, x0
     jal x1, switch_to_s_mode
 
     lui x11, 262144
     ld x12, 0(x11)
-    fsub.s f16, f16, f17, rtz
-    fround.s f17, f16, dyn
 exit:
     li x5, 0x1
     la x6, tohost
