@@ -14,12 +14,32 @@ _start:
     j exit
 
 exit:
-    li x5, 0x1
+    li x5, 0x0
+    slli x5, x5, 1
+    ori x5, x5, 1
     la x6, tohost
     sd x5, 0(x6)
 spin:
     j spin
 
+fail:
+    li x5, 0x1
+    slli x5, x5, 1
+    ori x5, x5, 1
+    la x6, tohost
+    sd x5, 0(x6)
+spin_fail:
+    j spin_fail
+
+    .section ".tohost","aw",@progbits
+    .align 6
+    .globl tohost
+tohost:
+    .dword 0x0
+    .align 6
+    .globl fromhost
+fromhost:
+    .dword 0x0
     .align 2
 switch_to_s_mode:
     la x5, pgtbl
@@ -120,15 +140,6 @@ trap_handler_skip:
     .balign 4096
 pgtbl:
     .zero 4096
-    .section ".tohost","aw",@progbits
-    .align 6
-    .globl tohost
-tohost:
-    .dword 0x0
-    .align 6
-    .globl fromhost
-fromhost:
-    .dword 0x0
     .section .data
     .balign 64
 buf:

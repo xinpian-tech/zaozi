@@ -76,7 +76,7 @@ object MretStaleLib:
     csrrw(x0, x1, CSR.MEPC) // mepc = ra = jal + 4
     mret()
 
-  /** Epilogue: exit_s_mode stub + trap handler + page table + tohost. */
+  /** Epilogue: exit_s_mode stub + trap handler + page table. */
   def epilogue(
   )(
     using Arena,
@@ -90,22 +90,6 @@ object MretStaleLib:
     jalr(x0, x1, 0)
     trapHandler("trap_handler")
     pageTableData()
-    tohostSection()
-
-  /** HTIF exit with value=1. */
-  def exitPass(
-  )(
-    using Arena,
-    Context,
-    Block,
-    Recipe
-  ): Unit =
-    label("exit")
-    li(x5, 1L)
-    la(x6, "tohost")
-    sd(x6, x5, 0)
-    label("spin")
-    j("spin")
 
 import MretStaleLib.*
 
@@ -119,7 +103,7 @@ import MretStaleLib.*
       jal(x1, "switch_to_s_mode")
       lui(x11, 0x40000)
       ld(x12, x11, 0) // 0x40000000 unmapped → page fault
-      exitPass()
+      finish()
       switchToSModeViaRa()
       epilogue()
   BTBMretStaleLuiLd.emit(outputPath)
@@ -133,7 +117,7 @@ import MretStaleLib.*
       jal(x1, "switch_to_s_mode")
       lui(x11, 0x42)
       j("exit")
-      exitPass()
+      finish()
       switchToSModeViaRa()
       epilogue()
   BTBMretStaleLui.emit(outputPath)
@@ -148,7 +132,7 @@ import MretStaleLib.*
       jal(x1, "switch_to_s_mode")
       addi(x10, x10, 1)
       j("exit")
-      exitPass()
+      finish()
       switchToSModeViaRa()
       epilogue()
   BTBMretStaleAddi.emit(outputPath)
@@ -163,7 +147,7 @@ import MretStaleLib.*
       jal(x1, "switch_to_s_mode")
       ld(x11, x10, 0)
       j("exit")
-      exitPass()
+      finish()
       switchToSModeViaRa()
       epilogue()
       section(".data")
@@ -184,7 +168,7 @@ import MretStaleLib.*
       lui(x11, 0x40000)
       ld(x12, x11, 0)
       j("exit")
-      exitPass()
+      finish()
       switchToSModeViaRa()
       epilogue()
   BTBMretStaleNopPad.emit(outputPath)
@@ -200,7 +184,7 @@ import MretStaleLib.*
       jal(x1, "switch_to_s_mode")
       sd(x10, x11, 0)
       j("exit")
-      exitPass()
+      finish()
       switchToSModeViaRa()
       epilogue()
       section(".data")
