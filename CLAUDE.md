@@ -63,6 +63,31 @@ Zaozi is a Scala 3 hardware eDSL (rewrite of Chisel concepts) backed by MLIR/CIR
 
 Each module has its own `package.mill` for build config.
 
+## rvprobe: Writing Test Cases with freshReg
+
+When writing test cases in `rvprobe/src/cases/`, use `freshReg()` for **test payload registers** — any register that carries a value between instructions in the test payload. The solver ensures consistent register assignment across all uses and automatic pairwise distinct.
+
+```scala
+val base = freshReg()              // symbolic register variable
+val data = freshReg()              // another — auto distinct from base
+la(base, "buf")                    // rd = base (solver picks e.g. x3)
+addi(data, x0, 42)                // rd = data (solver picks e.g. x2)
+sw(base, data, 0)                 // rs1 = base, rs2 = data
+lw(freshReg(), base, 0)           // rs1 = base, rd = anonymous
+```
+
+**When to use `freshReg()`:**
+- Base address registers (`la` result used in later loads/stores)
+- Data value registers (`li`/`addi` result written by stores)
+- Load result registers referenced by later instructions
+
+**When to keep fixed registers:**
+- x0 (architectural zero)
+- Registers inside library helpers (trap handler, PMP, page table, `timed()`)
+- CSR scratch registers in setup code
+
+**Principle:** if a wrong register choice would silently produce incorrect test behavior, use `freshReg()`. This turns implicit register assumptions into explicit solver constraints.
+
 ## Code Style
 
 - scalafmt v3.9.7: max 120 columns, `align.preset = most`
