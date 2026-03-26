@@ -1,0 +1,58 @@
+
+/root/zaozi/rvprobe/src/cases/output/elf/btb/BTBComposedFpLui.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	00002297          	auipc	t0,0x2
+    80000004:	0a028293          	addi	t0,t0,160 # 800020a0 <trap_handler>
+    80000008:	30529073          	csrw	mtvec,t0
+    8000000c:	52fd                	li	t0,-1
+    8000000e:	3b029073          	csrw	pmpaddr0,t0
+    80000012:	42fd                	li	t0,31
+    80000014:	3a029073          	csrw	pmpcfg0,t0
+    80000018:	00ee9137          	lui	sp,0xee9
+    8000001c:	9251011b          	addiw	sp,sp,-1755 # ee8925 <_start-0x7f1176db>
+    80000020:	013a                	slli	sp,sp,0xe
+    80000022:	90710113          	addi	sp,sp,-1785
+    80000026:	0132                	slli	sp,sp,0xc
+    80000028:	df710113          	addi	sp,sp,-521
+    8000002c:	0136                	slli	sp,sp,0xd
+    8000002e:	b9110113          	addi	sp,sp,-1135
+    80000032:	f2010853          	fmv.d.x	fa6,sp
+    80000036:	02711137          	lui	sp,0x2711
+    8000003a:	41b1011b          	addiw	sp,sp,1051 # 271141b <_start-0x7d8eebe5>
+    8000003e:	0132                	slli	sp,sp,0xc
+    80000040:	fdb10113          	addi	sp,sp,-37
+    80000044:	0132                	slli	sp,sp,0xc
+    80000046:	5a310113          	addi	sp,sp,1443
+    8000004a:	0132                	slli	sp,sp,0xc
+    8000004c:	f5810113          	addi	sp,sp,-168
+    80000050:	f20108d3          	fmv.d.x	fa7,sp
+    80000054:	404878d3          	fround.s	fa7,fa6
+    80000058:	7f1010ef          	jal	80002048 <switch_to_s_mode>
+    8000005c:	000425b7          	lui	a1,0x42
+    80000060:	a009                	j	80000062 <exit>
+
+0000000080000062 <exit>:
+    80000062:	4281                	li	t0,0
+    80000064:	0286                	slli	t0,t0,0x1
+    80000066:	0012e293          	ori	t0,t0,1
+    8000006a:	00002317          	auipc	t1,0x2
+    8000006e:	f9630313          	addi	t1,t1,-106 # 80002000 <tohost>
+    80000072:	00533023          	sd	t0,0(t1)
+
+0000000080000076 <spin>:
+    80000076:	a001                	j	80000076 <spin>
+
+0000000080000078 <fail>:
+    80000078:	4285                	li	t0,1
+    8000007a:	0286                	slli	t0,t0,0x1
+    8000007c:	0012e293          	ori	t0,t0,1
+    80000080:	00002317          	auipc	t1,0x2
+    80000084:	f8030313          	addi	t1,t1,-128 # 80002000 <tohost>
+    80000088:	00533023          	sd	t0,0(t1)
+
+000000008000008c <spin_fail>:
+    8000008c:	a001                	j	8000008c <spin_fail>

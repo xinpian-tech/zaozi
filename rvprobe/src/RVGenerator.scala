@@ -244,7 +244,14 @@ trait RVGenerator:
       j <- (i + 1) until fregs.size
     do smtAssert(fregs(i) =/= fregs(j))
 
-    // 4. Execute cross-index constraints (cover constraints)
+    // 4. freshRegs must not collide with declared fixed registers.
+    val fixed = recipe.fixedRegs()
+    for
+      freg   <- fregs
+      fixOrd <- fixed
+    do smtAssert(freg =/= fixOrd.S)
+
+    // 5. Execute cross-index constraints (cover constraints)
     recipe.executeCrossIndexConstraints()
 
     smtCheck

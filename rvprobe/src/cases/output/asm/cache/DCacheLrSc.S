@@ -1,19 +1,19 @@
     .section ".text"
     .globl _start
 _start:
-    la x1, lock
+    la x3, lock
 retry:
-    lr.w.aq x2, (x1)
-    bnez x2, retry
-
-    addi x3, x0, 1
-    sc.w x4, x3, (x1)
+    lr.w.aq x4, (x3)
     bnez x4, retry
 
-    la x6, shared_data
-    li x5, 0xbeef
-    sw x5, 0(x6)
-    sw x0, 0(x1)
+    addi x1, x0, 1
+    sc.w x2, x1, (x3)
+    bnez x2, retry
+
+    la x7, shared_data
+    li x8, 0xbeef
+    sw x8, 0(x7)
+    sw x0, 0(x3)
     fence rw, rw
 exit:
     li x5, 0x0

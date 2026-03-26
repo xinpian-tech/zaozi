@@ -230,20 +230,66 @@ def crossFields(
     smtAssert(f(summon[Recipe].getIndex(i)) === g(summon[Recipe].getIndex(j)))
   }
 
+// ================== Fragment composition ==================
+
+/** A composable test fragment: a block of DSL code + the fixed registers it uses.
+  *
+  * Fragments declare which hardcoded registers they write to. When composed, the solver ensures all `freshReg()`
+  * variables avoid these fixed registers.
+  *
+  * {{{
+  * val fpStress = Fragment(Set(x16, x17)) { // uses FP regs via fmvDX
+  *   val tmp = freshReg()
+  *   li(tmp, 0x774492720dbedb91L)
+  *   fmvDX(x16, tmp)
+  * }
+  *
+  * val btbPayload = Fragment(Set(x1, x11, x12)) {
+  *   jal(x1, "target")
+  *   lui(x11, 0x40000)
+  *   ld(x12, x11, 0)
+  * }
+  *
+  * // In constraints():
+  * compose(fpStress, btbPayload)  // freshRegs auto-avoid x1, x11, x12, x16, x17
+  * }}}
+  */
+class Fragment(
+  val fixedRegs: Set[Register]
+)(
+  val emit: (Arena, Context, Block, Recipe) ?=> Unit
+)
+
+/** Compose fragments sequentially. Records all fixed registers, then emits all fragment code. */
+def compose(
+  fragments: Fragment*
+)(
+  using Arena,
+  Context,
+  Block,
+  Recipe
+): Unit =
+  val recipe = summon[Recipe]
+  fragments.foreach(_.fixedRegs.foreach(r => recipe.recordFixedReg(r.ordinal)))
+  fragments.foreach(f => f.emit)
+
+/** Declare fixed registers used by subsequent code. freshReg() will avoid these.
+  *
+  * Call before using hardcoded registers to prevent freshReg from being assigned the same physical register.
+  */
+def useFixed(
+  regs: Register*
+)(
+  using Recipe
+): Unit =
+  regs.foreach(r => summon[Recipe].recordFixedReg(r.ordinal))
+
 // ================== Symbolic register variables ==================
 
 /** Create a fresh symbolic register variable constrained to x1–x31.
   *
-  * All fresh registers are automatically constrained to be pairwise distinct. Use the returned variable in multiple
-  * instruction positions — the solver guarantees the same physical register everywhere.
-  *
-  * {{{
-  * val base = freshReg()
-  * val data = freshReg()
-  * la(base, "buf")         // rd = base
-  * addi(data, x0, 42)      // rd = data
-  * sw(base, data, 0)        // rs1 = base, rs2 = data  (auto: base ≠ data)
-  * }}}
+  * Automatically pairwise distinct with all other freshRegs, and distinct from all fixed registers declared via
+  * [[useFixed]] or [[Fragment]].
   */
 def freshReg(
 )(
@@ -268,6 +314,7 @@ def li(
 )(
   using recipe: Recipe
 ): Int =
+  recipe.recordFixedReg(rd.ordinal)
   val idx = recipe.nextIdx()
   recipe.addStatement(Statement.Pseudo("li", s"${rd}, 0x${imm.toHexString}"))
   idx
@@ -299,6 +346,7 @@ def la(
 )(
   using recipe: Recipe
 ): Int =
+  recipe.recordFixedReg(rd.ordinal)
   val idx = recipe.nextIdx()
   recipe.addStatement(Statement.Pseudo("la", s"${rd}, $symbol"))
   idx

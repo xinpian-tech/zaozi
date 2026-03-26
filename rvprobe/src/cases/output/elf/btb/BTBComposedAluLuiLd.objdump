@@ -1,0 +1,43 @@
+
+/root/zaozi/rvprobe/src/cases/output/elf/btb/BTBComposedAluLuiLd.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	00002297          	auipc	t0,0x2
+    80000004:	0a028293          	addi	t0,t0,160 # 800020a0 <trap_handler>
+    80000008:	30529073          	csrw	mtvec,t0
+    8000000c:	52fd                	li	t0,-1
+    8000000e:	3b029073          	csrw	pmpaddr0,t0
+    80000012:	42fd                	li	t0,31
+    80000014:	3a029073          	csrw	pmpcfg0,t0
+    80000018:	06400113          	li	sp,100
+    8000001c:	0c810193          	addi	gp,sp,200
+    80000020:	12c18213          	addi	tp,gp,300
+    80000024:	00418133          	add	sp,gp,tp
+    80000028:	020020ef          	jal	80002048 <switch_to_s_mode>
+    8000002c:	400005b7          	lui	a1,0x40000
+    80000030:	6190                	ld	a2,0(a1)
+
+0000000080000032 <exit>:
+    80000032:	4281                	li	t0,0
+    80000034:	0286                	slli	t0,t0,0x1
+    80000036:	0012e293          	ori	t0,t0,1
+    8000003a:	00002317          	auipc	t1,0x2
+    8000003e:	fc630313          	addi	t1,t1,-58 # 80002000 <tohost>
+    80000042:	00533023          	sd	t0,0(t1)
+
+0000000080000046 <spin>:
+    80000046:	a001                	j	80000046 <spin>
+
+0000000080000048 <fail>:
+    80000048:	4285                	li	t0,1
+    8000004a:	0286                	slli	t0,t0,0x1
+    8000004c:	0012e293          	ori	t0,t0,1
+    80000050:	00002317          	auipc	t1,0x2
+    80000054:	fb030313          	addi	t1,t1,-80 # 80002000 <tohost>
+    80000058:	00533023          	sd	t0,0(t1)
+
+000000008000005c <spin_fail>:
+    8000005c:	a001                	j	8000005c <spin_fail>
