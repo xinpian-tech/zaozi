@@ -415,6 +415,7 @@ def main() -> int:
     # Spike
     ap.add_argument("--spike-command", default="nix shell nixpkgs#spike nixpkgs#dtc -c spike")
     ap.add_argument("--spike-timeout", type=float, default=15.0)
+    ap.add_argument("--spike-exclude", default="", help="Regex: skip matching cases in spike phase")
     ap.add_argument("--spike-log-dir", default="")
     ap.add_argument("--spike-results", default="")
 
@@ -469,8 +470,15 @@ def main() -> int:
         if shutil.which(spike_cmd[0]) is None and "/" not in spike_cmd[0]:
             print(f"spike not found: {spike_cmd[0]}", file=sys.stderr)
             return 1
+        spike_cases = cases
+        if args.spike_exclude:
+            spike_exclude_re = re.compile(args.spike_exclude)
+            spike_cases = [c for c in cases if not spike_exclude_re.search(c.fqcn)]
+            skipped = len(cases) - len(spike_cases)
+            if skipped:
+                print(f"[spike] excluded {skipped} cases via --spike-exclude")
         phase_spike(
-            cases, asm_root, elf_root, workdir,
+            spike_cases, asm_root, elf_root, workdir,
             workers=max(1, args.spike_workers),
             spike_cmd=spike_cmd,
             timeout_sec=max(0.1, args.spike_timeout),

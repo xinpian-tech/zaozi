@@ -54,10 +54,11 @@ import me.jiuyang.rvprobe.cases.cache.CacheProbeLib.*
     def constraints() =
       textStart()
 
-      val data = freshReg()
       la(x5, "buf")
       li(x22, SameSetStrideBytes.toLong)
       sameSetAddresses(x5, x22, x6, x7, x28) // A/B/C — infrastructure regs stay fixed
+      Seq(x6, x7, x28).foreach(r => summon[Recipe].recordFixedReg(r.ordinal))
+      val data = freshReg()
 
       lw(freshReg(), x6, 0) // fill A
       addi(data, x0, 42)
