@@ -27,6 +27,8 @@ mill mill.bsp.BSP/install      # IDE setup (BSP)
 
 Active development is on the **rvprobe** module (RISC-V instruction generation via two-stage SMT constraint solving).
 
+**ICCAD 2026 resubmission** is the current priority. Research ideas, experiment design, and paper reframing notes are tracked in [`IDEA.md`](IDEA.md). Do not modify the rvprobe framework — focus on research and paper writing.
+
 ## Environment Setup
 
 This project uses **Nix Flake** for dependency management. All commands must be run within the Nix development shell using the `nix develop . -c` prefix:
