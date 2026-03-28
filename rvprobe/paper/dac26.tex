@@ -1,0 +1,647 @@
+%%
+%% This is file `sample-sigconf.tex',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% samples.dtx  (with options: `all,proceedings,bibtex,sigconf')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from sample-sigconf.tex.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file samples.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+%%
+%%
+%% Commands for TeXCount
+%TC:macro \cite [option:text,text]
+%TC:macro \citep [option:text,text]
+%TC:macro \citet [option:text,text]
+%TC:envir table 0 1
+%TC:envir table* 0 1
+%TC:envir tabular [ignore] word
+%TC:envir displaymath 0 word
+%TC:envir math 0 word
+%TC:envir comment 0 0
+%%
+%% The first command in your LaTeX source must be the \documentclass
+%% command.
+%%
+%% For submission and review of your manuscript please change the
+%% command to \documentclass[manuscript, screen, review]{acmart}.
+%%
+%% When submitting camera ready or to TAPS, please change the command
+%% to \documentclass[sigconf]{acmart} or whichever template is required
+%% for your publication.
+%%
+%%
+\documentclass[sigconf]{acmart}
+%%
+%% \BibTeX command to typeset BibTeX logo in the docs
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    Bib\TeX}}}
+
+%% Rights management information.  This information is sent to you
+%% when you complete the rights form.  These commands have SAMPLE
+%% values in them; it is your responsibility as an author to replace
+%% the commands and values with those provided to you when you
+%% complete the rights form.
+\setcopyright{acmlicensed}
+\copyrightyear{2026}
+\acmYear{2026}
+\acmDOI{XXXXXXX.XXXXXXX}
+%% These commands are for a PROCEEDINGS abstract or paper.
+\acmConference[DAC '26]{Proceedings of the 63rd Design Automation Conference (DAC ’26)}{July 26-29, 2026}{Long Beach, CA}
+%%
+%%  Uncomment \acmBooktitle if the title of the proceedings is different
+%%  from ``Proceedings of ...''!
+%%
+% \acmBooktitle{Woodstock '18: ACM Symposium on Neural Gaze Detection,
+%  June 03--05, 2018, Woodstock, NY}
+% \acmISBN{978-1-4503-XXXX-X/2018/06}
+
+
+%%
+%% Submission ID.
+%% Use this when submitting an article to a sponsored event. You'll
+%% receive a unique submission ID from the organizers
+%% of the event, and this ID should be used as the parameter to this command.
+%%\acmSubmissionID{123-A56-BU3}
+
+%%
+%% For managing citations, it is recommended to use bibliography
+%% files in BibTeX format.
+%%
+%% You can then either use BibTeX with the ACM-Reference-Format style,
+%% or BibLaTeX with the acmnumeric or acmauthoryear sytles, that include
+%% support for advanced citation of software artefact from the
+%% biblatex-software package, also separately available on CTAN.
+%%
+%% Look at the sample-*-biblatex.tex files for templates showcasing
+%% the biblatex styles.
+%%
+
+%%
+%% The majority of ACM publications use numbered citations and
+%% references.  The command \citestyle{authoryear} switches to the
+%% "author year" style.
+%%
+%% If you are preparing content for an event
+%% sponsored by ACM SIGGRAPH, you must use the "author year" style of
+%% citations and references.
+%% Uncommenting
+%% the next command will enable that style.
+%%\citestyle{acmauthoryear}
+
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{array}        % 提供 m{} 列类型和自定义列
+\usepackage{caption}      % 更好的标题间距控制
+\usepackage{ragged2e}     % 更好的文本对齐（可选）
+\newcolumntype{M}[1]{>{\centering\arraybackslash}m{#1}}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\usepackage{listings}
+\lstset{
+    language=C++, 
+    basicstyle=\ttfamily\small,
+    % keywordstyle=\color{blue},
+    % commentstyle=\color{green},
+    % stringstyle=\color{red},
+    % numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    breaklines=true,
+    commentstyle=\itshape\color{black!50!white}, % 设置注释样式，斜体，浅灰色
+    captionpos=b,
+    columns=flexible,
+    basicstyle=\small\ttfamily\linespread{0.8}\selectfont, % 设置0.8倍行距
+    belowskip=0.5\baselineskip, % 设置列表下方的距离
+    frame=single
+}
+\renewcommand{\lstlistingname}{Code}
+
+%%
+%% end of the preamble, start of the body of the document source.
+\begin{document}
+
+%%
+%% The "title" command has an optional parameter,
+%% allowing the author to define a "short title" to be used in page headers.
+\title{RVProbe: An eDSL-based Framework for Directed Test Generation}
+
+%%
+%% By default, the full list of authors will be used in the page
+%% headers. Often, this list is too long, and will overlap
+%% other information printed in the page headers. This command allows
+%% the author to define a more concise list
+%% of authors' names for this purpose.
+% \renewcommand{\shortauthors}{Trovato et al.}
+
+%%
+%% The abstract is a short summary of the work to be presented in the
+%% article.
+\begin{abstract}
+RISC-V fragmentation hinders verification, as conventional CRV methods lack the extensibility and precision needed for deep corner cases. We propose RVProbe, an extensible Scala 3 embedded DSL (eDSL) framework that complements CRV. RVProbe features (1) semantic-aware constraint abstraction for precise microarchitectural targeting, and (2) compile-time metaprogramming for automatic API generation and automated injection of microarchitectural signals extracted from HDL, adapting seamlessly to fragmented implementations. Evaluation shows RVProbe efficiently closes coverage gaps and identified a confirmed pipeline bug. Its low overhead (under 2s generation time) and superior automation significantly enhance RISC-V verification efficiency and controllability.
+\end{abstract}
+
+% %%
+% %% The code below is generated by the tool at http://dl.acm.org/ccs.cfm.
+% %% Please copy and paste the code instead of the example below.
+% %%
+% \begin{CCSXML}
+% <ccs2012>
+%    <concept>
+%        <concept_id>10010583.10010737.10010744</concept_id>
+%        <concept_desc>Hardware~Functional verification</concept_desc>
+%        <concept_significance>500</concept_significance>
+%    </concept>
+%    <concept>
+%        <concept_id>10010583.10010737.10010742</concept_id>
+%        <concept_desc>Hardware~Simulation and emulation</concept_desc>
+%        <concept_significance>500</concept_significance>
+%    </concept>
+%    <concept>
+%        <concept_id>10010583.10010737.10010747</concept_id>
+%        <concept_desc>Hardware~Coverage metrics</concept_desc>
+%        <concept_significance>500</concept_significance>
+%    </concept>
+%    <concept>
+%        <concept_id>10011007.10011006.10011008</concept_id>
+%        <concept_desc>Software and its engineering~Domain specific languages</concept_desc>
+%        <concept_significance>300</concept_significance>
+%    </concept>
+%    <concept>
+%        <concept_id>10011007.10011074.10011092</concept_id>
+%        <concept_desc>Software and its engineering~Constraint and logic programming</concept_desc>
+%        <concept_significance>300</concept_significance>
+%    </concept>
+% </ccs2012>
+% \end{CCSXML}
+
+% \ccsdesc[500]{Hardware~Functional verification}
+% \ccsdesc[500]{Hardware~Simulation and emulation}
+% \ccsdesc[500]{Hardware~Coverage metrics}
+% \ccsdesc[300]{Software and its engineering~Domain specific languages}
+% \ccsdesc[300]{Software and its engineering~Constraint and logic programming}
+
+
+
+%%
+%% Keywords. The author(s) should pick words that accurately describe
+%% the work being presented. Separate the keywords with commas.
+\keywords{RISC-V, processor verification, eDSL, directed test generation}
+%% A "teaser" image appears between the author and affiliation
+%% information and the body of the document, and typically spans the
+%% page.
+% \begin{teaserfigure}
+%   \includegraphics[width=\textwidth]{sampleteaser}
+%   \caption{Seattle Mariners at Spring Training, 2010.}
+%   \Description{Enjoying the baseball game from the third-base
+%   seats. Ichiro Suzuki preparing to bat.}
+%   \label{fig:teaser}
+% \end{teaserfigure}
+
+% \received{20 February 2007}
+% \received[revised]{12 March 2009}
+% \received[accepted]{5 June 2009}
+
+%%
+%% This command processes the author and affiliation and title
+%% information and builds the first part of the formatted document.
+\maketitle
+
+\section{Introduction}\label{Sec1}
+
+\subsection{Motivation \& Problem Statement}
+
+Functional verification constitutes the primary bottleneck in modern processor design, consuming a substantial portion of the design cycle's cost and time \cite{1}. While the open and modular nature of the RISC-V architecture fosters innovation, it simultaneously leads to an explosion of highly customized implementations. This fragmentation impedes the development of unified verification benchmarks \cite{2}, presenting an urgent challenge: developing efficient, systematic, and scalable verification methodologies tailored to this diverse landscape \cite{17}.
+
+Constrained-Random Verification (CRV), the industry's dominant paradigm \cite{19}, faces significant limitations when addressing RISC-V's unique fragmentation:
+
+\textbf{Low Abstraction Level:} Existing generators typically operate at a low abstraction level. Verification engineers are often required to manually craft complex, low-level constraints or test templates for each new ISA extension. This manual process not only diminishes verification efficiency but also fails to provide a unified, high-level semantic abstraction.
+
+\textbf{Rigid Extensibility and Black-Box Nature:} Mainstream generators often function as ``black boxes'' with rigid constraint syntaxes (e.g., SystemVerilog). This rigidity hinders the programmatic integration of domain knowledge, such as signal mappings extracted from Hardware Description Languages (HDL). Consequently, this leads to two critical deficits: \textit{inefficient corner-case convergence}, where random stimuli struggle to trigger implementation-specific defects; and \textit{limited automation}, where engineers cannot programmatically extend the constraint language to incorporate white-box verification intents.
+
+In summary, existing methodologies lack both the efficiency to reach deep microarchitectural states and the programmatic extensibility required for a scalable eDSL framework.
+
+\subsection{Our Approach and Novelty}
+
+To address these challenges, we propose \textbf{RVProbe}, an instruction-level verification framework for RISC-V built upon an embedded Domain-Specific Language (eDSL). RVProbe empowers verification engineers to describe complex instruction behaviors and verification scenarios declaratively, shifting the verification focus from \textit{``how to generate''} to \textit{``what to verify.''}
+
+Positioned as a highly efficient complement to CRV, RVProbe is specifically designed to target deep corner cases that stochastic methods often miss. Its core innovation relies on an extensible architecture comprising two key features:
+
+\textbf{Semantics-Aware Abstraction Framework}: RVProbe implements a semantics-aware verification paradigm. By systematically encoding ISA semantic models into the eDSL, the framework elevates the abstraction level from instruction syntax (e.g., opcodes) to behavioral outcomes (e.g., arithmetic overflow). This allows engineers to express complex verification intents directly as high-level constraints.
+
+\textbf{Extensible Metaprogramming Architecture}: Unlike rigid constraint languages like SystemVerilog, RVProbe utilizes Scala 3's compile-time metaprogramming. This enables the programmatic extension of the eDSL itself. For instance, we demonstrate the automatic generation of instruction APIs by parsing \texttt{riscv-opcodes} specifications and the automatic injection of white-box testing APIs via HDL analysis, ensuring that the verification environment evolves in sync with the hardware design.
+
+\subsection{Contributions}
+\begin{itemize}
+    \item \textbf{Type-Safe eDSL Design:} We propose a novel eDSL for RISC-V verification that leverages the Scala 3 type system. This design provides compile-time type safety, offering a distinct reliability advantage over dynamic language bindings such as Z3-Python \cite{26}.
+    \item \textbf{Automated Extensibility via Metaprogramming:} We introduce an extension mechanism based on compile-time metaprogramming. By parsing abstract specifications (e.g., \texttt{riscv-opcodes}), this mechanism automates API generation, effectively addressing the challenge of RISC-V fragmentation.
+    \item \textbf{High-Performance Constraint Flow:} We implement an automated constraint generation flow that interacts directly with the MLIR SMT dialect via a Foreign Function Interface (FFI). This in-memory approach eliminates the serialization overhead associated with traditional SMT-LIB2 text-based interfaces.
+\end{itemize}
+
+\section{Related Work}\label{Sec2}
+
+Contemporary processor verification predominantly adheres to the methodology of Coverage-Driven Verification (CDV) \cite{6}. Within this closed-loop framework, Constrained-Random Verification (CRV) has established itself as the de facto standard for stimulus generation \cite{19}. While CRV excels at exploring vast state spaces through randomization, its stochastic nature inherently suffers from diminishing returns when targeting specific, deep microarchitectural states, often leading to coverage stagnation \cite{7}.
+
+\textbf{Instruction Sequence Generators.} Mainstream industrial generators, such as RISCV-DV \cite{9} and Force-RISCV \cite{10}, rely heavily on the CRV paradigm. Despite their maturity, these tools largely depend on SystemVerilog-based constraint solvers and static test templates. This reliance results in two major limitations: (1) \textit{Rigid Extensibility}, where integrating new verification knowledge requires manual modification of complex constraints rather than programmatic API injection; and (2) \textit{Black-Box Operation}, which obscures the correlation between high-level intent and low-level instruction sequences \cite{11, 12}. While some directed testing approaches exist \cite{13}, they often lack a unified semantic framework to address the fragmentation of the RISC-V ISA systematically.
+
+\textbf{Microarchitecture-Aware Verification.} Recent research has explored microarchitecture-aware test generation. Approaches like $\mu$-Spec \cite{14} propose ISA-agnostic description languages to model microarchitectural events. However, in prioritizing generality across different ISAs, these methods often sacrifice deep integration with specific RISC-V semantics, limiting their ability to handle architecture-specific behaviors precisely \cite{15, 16}.
+
+\textbf{SMT and eDSL-based Approaches.} Our work leverages core technologies including Embedded Domain-Specific Languages (eDSLs) \cite{3}, Satisfiability Modulo Theories (SMT) \cite{4}, and Multi-Level IR (MLIR) \cite{5}. Prior work integrating SMT with verification often relies on dynamic language bindings (e.g., Z3-Python). While flexible, these approaches incur significant runtime overhead due to text-based serialization (SMT-LIB2) and lack the compile-time safety required for large-scale verification platforms.
+
+In contrast to these works, RVProbe bridges these gaps by providing a strictly typed, Scala-based eDSL that compiles directly to MLIR. This architecture offers both the high-level abstraction missing in industrial generators and the performance and type safety absent in existing academic SMT tools.
+
+\section{Design and Implementation}\label{Sec3}
+
+This section details the technical architecture of the RVProbe framework, exploring how it constructs an efficient, type-safe transformation path from high-level verification intents to solver-ready constraints.
+
+\subsection{Core Architecture}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{3.1(1).png}}
+\caption{The Layered Architecture of the RVProbe Framework: From User API to SMT Solver.}
+\label{fig:arch}
+\end{figure}
+
+RVProbe adopts a five-layer \textit{Type-Safe Compilation Stack} (Fig. \ref{fig:arch}) designed to bridge the semantic gap between high-level verification intent and low-level constraint solving. Unlike ad-hoc scripting approaches, this architecture enforces strict separation of concerns:
+
+\begin{itemize}
+    \item \textbf{Frontend (Layers 4-3):} A metadata-driven Scala eDSL that prioritizes \textit{expressiveness} and \textit{correctness}. By leveraging the Scala 3 type system, we capture logical errors at compile time rather than solver runtime.
+    \item \textbf{Middle-end (Layer 2-1):} An in-memory IR translation layer. It utilizes MLIR to normalize constraints into a solver-agnostic format, enabling structural optimizations distinct from the backend solving process.
+    \item \textbf{Backend (Layer 0):} The solver interface. It treats the SMT solver as a pluggable execution engine, focusing solely on satisfiability without being burdened by high-level abstraction overheads.
+\end{itemize}
+
+This layered design transforms verification from a runtime interpretation task into a structured compilation pipeline, ensuring both scalability and maintainability.
+
+\begin{table*}[!tbp]
+\centering
+\renewcommand\tabcolsep{6.0pt}
+\captionsetup{font=bf, skip=1em}
+\caption{Overview of RVProbe eDSL Primitives and Verification APIs.}
+\label{tab:api_summary}
+\begin{tabular}{l>{\raggedright\arraybackslash}p{6.5cm}>{\raggedright\arraybackslash}p{6.5cm}}
+\toprule
+\textbf{API} & \textbf{Description} & \textbf{Usage Example} \\
+\midrule
+\texttt{Bool} & Boolean type, fundamental in SMT solving & \texttt{val x: Ref[Bool] = smtValue("x")} \\
+\texttt{SInt} & Signed integer type & \texttt{val y: Ref[SInt] = smtValue("y")} \\
+\midrule
+\texttt{Ref[T]} & Reference to an SMT variable that can be constrained and solved & \texttt{val a: Ref[Bool] = smtValue("a")} \\
+\texttt{Const[T]} & Compile-time constant value & \texttt{val five: Const[SInt] = 5.S} \\
+\midrule
+\texttt{\&} (and) & Logical AND operation & \texttt{x \& y} or \texttt{smtAnd(x, y)} \\
+\texttt{|} (or) & Logical OR operation & \texttt{x | y} or \texttt{smtOr(x, y)} \\
+\texttt{===} & Equality comparison & \texttt{x === y} or \texttt{smtEq(x, y)} \\
+\texttt{+, -, *} & Basic arithmetic operations & \texttt{x + y}, \texttt{x - 5.S}, \texttt{x * y} \\
+\midrule
+\texttt{isRVI()} & Enforces the base RVI instruction set & \texttt{Seq(isRVI())} \\
+\texttt{isRVA()} & Adds support for the atomic extension (A) & \texttt{Seq(isRVI(), isRVA())} \\
+\midrule
+\texttt{instruction(i)} & Specifies the constraint for the $i$-th instruction & \texttt{instruction(0) \{isAddi() \& rdRange(1,5)\}} \\
+\midrule
+\texttt{isAddi()} & Constrains an instruction to be ADDI (add immediate) & \texttt{(0 until 5).foreach \{ i => instruction(i) \{ isAddi() \}\}} \\
+\midrule
+\texttt{rdRange(start, end)} & Restricts the destination register to a given range & \texttt{rdRange(1, 31)}  \\
+\texttt{rs1 === value} & Enforces equality on source register 1 & \texttt{rs1 === 0}  \\
+\midrule
+\texttt{sequence(i, j)} & Defines a constraint context over an instruction sequence from $i$ to $j$ & \texttt{sequence(0, 4).hasRAW()} \\
+\texttt{hasRAW()} & Specifies a Read-After-Write (RAW) data hazard within a sequence & \texttt{(0 until 5).foreach \{ i => sequence(i, i+1).hasRAW()\}} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{SMT Foundation: FFI Integration}\label{Sec3.2}
+
+Traditional SMT integrations typically rely on vendor-specific bindings (e.g., Z3-Java), which treat verification constraints and hardware designs as isolated domains. To overcome this siloed approach, RVProbe constructs a native in-memory interface via FFI to the \textbf{MLIR SMT Dialect} \cite{23}. 
+
+This architecture offers a critical advantage over standard bindings: strategic alignment with the \textbf{CIRCT} (Circuit IR Compilers) ecosystem \cite{27}. By elevating verification constraints to the same Intermediate Representation (IR) as the hardware RTL, RVProbe paves the way for \textbf{RTL-Constraint Co-optimization}. Unlike isolated solvers, this unified IR allows future compiler passes to leverage hardware static analysis—such as propagating RTL constants to prune redundant constraint branches—before the solver is even invoked. Additionally, the dialect acts as a universal frontend, decoupling the verification logic from specific backends (e.g., Z3, CVC5) while eliminating standard serialization overhead.
+
+\subsection{The eDSL Semantic Layer: smtlib}\label{Sec3.3}
+
+While \texttt{mlirlib} provides raw access to the underlying IR, it lacks semantic safety. The \texttt{smtlib} layer bridges this by implementing a strongly-typed eDSL core.
+
+\textbf{Symbolic vs. Concrete Segregation:}
+A critical flaw in dynamic bindings (e.g., Z3-Python) is the ambiguous mixing of host-language integers and symbolic solver variables, often leading to subtle generation bugs. RVProbe enforces a strict type-level distinction:
+\begin{itemize}
+    \item \textbf{\texttt{Const[T]}:} Represents compile-time concrete values (e.g., loop bounds, architectural widths).
+    \item \textbf{\texttt{Ref[T]}:} Represents symbolic variables within the SMT context (e.g., register indices, immediate values).
+\end{itemize}
+
+\textbf{Shift-Left of Logic Errors:}
+Leveraging Scala's type system allows us to catch verification logic errors—such as bit-width mismatches or invalid boolean operations—during the \textit{host compilation phase}. In contrast to dynamic approaches where such errors only manifest deep into the runtime execution, RVProbe offers a ``correct-by-construction'' guarantee for constraint formulation, significantly reducing the debug cycle for complex test scenarios.
+
+\subsection{Automated API Synthesis via Metaprogramming}\label{Sec3.4}
+
+The rapid proliferation of RISC-V extensions makes manual maintenance of constraint libraries (as done in SystemVerilog-based generators) labor-intensive and error-prone. RVProbe addresses this fragmentation through a \textit{Metadata-Driven Synthesis} approach.
+
+We utilize Scala 3's compile-time metaprogramming to treat the official \texttt{riscv-opcodes} specification as the \textbf{Single Source of Truth}. The framework implements a macro system that parses these canonical specifications to synthesize the Instruction-Level API (Layer 4) automatically. 
+
+This mechanism ensures architectural consistency by construction. For instance, when an extension definition is updated in the upstream specification, a simple recompilation of RVProbe automatically propagates these changes into the eDSL, creating new predicates (e.g., \texttt{isAddi()}) and operand constraints (e.g., \texttt{rdRange()}). This effectively decouples the verification infrastructure from specific ISA versions, solving the maintenance bottleneck inherent in fragmented ecosystems.
+
+Consider the definition of the \texttt{addi} instruction:
+\begin{quote}
+\texttt{addi rd rs1 imm12 14..12=0 6..2=0x04 1..0=3}
+\end{quote}
+
+\begin{lstlisting}[caption={Transformation from Metadata to eDSL API}, label=code:macro_example]
+// [Input] Argument Definitions
+// "rd" -> bits 11..7 (5 bits) implies Range [0, 32)
+
+// [Output] Auto-generated Scala 3 code
+// 1. Synthesize Operand Predicates
+def hasRd(): Ref[Bool] = rdRange(0, 32)
+
+// 2. Synthesize Instruction API via composition
+def isAddi(): Ref[Bool] =
+    nameId(239) &  // Encodes unique opcode bits
+    hasRd() &      // Enforces destination register range
+    hasRs1() &     // Enforces source register range
+    hasImm12()     // Enforces immediate value range
+\end{lstlisting}
+
+Code \ref{code:macro_example} demonstrates the transformation output. The macro first generates fundamental operand APIs derived from bit definitions, and then composes them to synthesize the high-level instruction wrapper \texttt{isAddi()}.
+
+
+\subsection{User-Layer API: Layered Abstractions}\label{Sec3.5}
+
+Built atop the \texttt{smtlib} core, RVProbe exposes three layers of abstraction (summarized in Table \ref{tab:api_summary}):
+
+\begin{itemize}
+    \item \textbf{Instruction-Level API:} Encapsulates atomic instruction attributes (e.g., \texttt{isAddi()}, \texttt{rdRange(1, 5)}). These are largely auto-generated (Section 3.4) for ISA consistency.
+    \item \textbf{Sequence-Level API:} Describes relationships between instructions, enabling complex execution flow definition (e.g., \texttt{sequence(0, 1).hasRAW()}).
+    \item \textbf{Test-Level API:} Defines global constraints and test objectives, orchestrating the generation process (e.g., \texttt{test("MyTest", isRV32I())}).
+\end{itemize}
+
+\subsection{eDSL Lowering Workflow}\label{Sec3.6}
+
+The translation from high-level intent to executable instruction sequences follows a five-step compilation workflow:
+
+\textbf{Step 1: eDSL Specification.} The engineer defines the test scenario using the Scala eDSL. Code \ref{code:edsl_script} provides an example of defining a test case for the \texttt{addi} instruction with a specific register range constraint.
+
+\begin{lstlisting}[caption={User eDSL Script Example}, label=code:edsl_script]
+test("AddiTest", isRVI()) {
+  instruction(0) {
+    // Constraints on Instruction 0
+    isAddi() & rdRange(1, 5) 
+  }
+}
+\end{lstlisting}
+
+\textbf{Step 2: eDSL Compilation.} The RVProbe compiler parses the script. High-level predicates like \texttt{isAddi()} and \texttt{rdRange} are translated into intermediate Scala SMT expressions (e.g., \texttt{(nameId === 239) \& (rd > 0) \& (rd < 5)}).
+
+\textbf{Step 3: IR Construction.} The framework invokes the \texttt{mlirlib} API to construct the MLIR SMT Dialect IR in-memory. For instance, the constraints from Code \ref{code:edsl_script} are translated into the MLIR SMT Dialect shown in Code \ref{code:mlir},
+
+\begin{lstlisting}[caption={Simplified MLIR SMT Dialect Generation}, label=code:mlir] 
+"smt.solver"() ({
+    // ... %rd and %is_addi definitions omitted...
+    // 1. Define constants 
+    %c1 = "smt.int.constant"() <{value = 1}> : () -> !smt.int 
+    %c5 = "smt.int.constant"() <{value = 5}> : () -> !smt.int
+    
+    // 2. Compare: rd > 1 AND rd < 5 
+    %gt = "smt.int.cmp"(%rd, %c1) : ... -> !smt.bool 
+    %lt = "smt.int.cmp"(%rd, %c5) : ... -> !smt.bool 
+    %range = "smt.and"(%gt, %lt) : ... -> !smt.bool
+    
+    // 3. Assert: is_addi AND in_range 
+    %valid = "smt.and"(%is_addi, %range) : ... -> !smt.bool 
+    "smt.assert"(%valid) : (!smt.bool) -> () 
+}) : () -> () 
+\end{lstlisting}
+
+\textbf{Step 4: Constraint Generation.} MLIR lowers the SMT Dialect into standard SMT-LIB2 constraints. Consequently, the MLIR from Code \ref{code:mlir} generates the SMT-LIB2 output visible in Code \ref{code:smt_out}, which the SMT solver can process.
+\begin{lstlisting}[caption={Generated SMT-LIB2 Constraints}, label=code:smt_out]
+(declare-const rd_0 Int)
+(declare-const nameId_0 Int)
+; ... constraints omitted ...
+(assert (let ((tmp_2 (< rd_0 5)))
+        (let ((tmp_3 (>= rd_0 1)))
+        (let ((tmp_4 (= nameId_0 239)))
+        tmp_5)))
+(check-sat)
+(get-model)
+\end{lstlisting}
+
+\textbf{Step 5: Model Reconstruction.} Upon a satisfiable result (\texttt{sat}), the SMT solver returns a model (variable assignments). RVProbe parses this model (e.g., extracting \texttt{nameId\_0 = 239}) and maps it back to the concrete instruction binary (e.g., \texttt{addi x5, x0, 0}) for execution on the Design Under Test (DUT).
+
+\section{Evaluation}\label{Sec4}
+
+\subsection{Efficacy in Coverage Closure}
+
+\subsubsection{Objective and Setup}
+This experiment investigates the role of RVProbe in addressing the ``last-mile'' problem in verification, specifically targeting the coverage gaps where stochastic methods falter. We structure the evaluation around two research questions:
+
+\begin{itemize}
+    \item \textbf{RQ1 (Complementarity):} Can RVProbe efficiently resolve functional coverage holes that persist after mainstream CRV tools reach saturation?
+    \item \textbf{RQ2 (Efficiency):} Is the engineering cost of directed generation justifiable compared to the computational expense of prolonged random simulation?
+\end{itemize}
+
+\textbf{Experimental Design:} We employed a two-phase complementary verification flow benchmarked against the \textbf{default functional coverage testplan defined by the Google RISCV-DV framework \cite{9}} on an RV32I core:
+\begin{itemize}
+    \item \textbf{Phase 1 (Baseline Saturation):} We utilized RISCV-DV to generate instruction sequences continuously until the functional coverage metric exhibited saturation (i.e., no new bins covered over a defined window).
+    \item \textbf{Phase 2 (Directed Closure):} We analyzed the remaining uncovered bins—primarily involving specific hazard permutations—and utilized RVProbe's eDSL to formulate directed constraints targeting these voids.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{4.1(1).png}}
+\caption{Functional Coverage Progression: The curve flattens at 80.2\% under random generation (Phase 1) and rises sharply to 97.2\% with RVProbe's directed injection (Phase 2).}
+\label{fig:coverage}
+\end{figure}
+
+\subsubsection{Results and Analysis}
+In Phase 1, the CRV baseline reached a saturation point of 80.2\% functional coverage after generating approximately 22,500 instructions.In Phase 2, we deployed RVProbe to target the identified gaps. As illustrated in Fig. \ref{fig:coverage}, RVProbe required only $\sim$1,000 additional directed instructions to boost the total functional coverage from 80.2\% to 97.2\% (the remaining 2.8\% were manually verified as unreachable states).
+
+This confirms that RVProbe complements this by deterministically reaching corner cases via SMT solving, achieving coverage closure with orders of magnitude fewer cycles than would be required by random iteration alone.
+
+\subsection{White-Box Testing Case Study}
+
+\subsubsection{Objective and Setup} This case study evaluates the framework's capability for ``white-box'' verification, specifically its ability to expose implementation-dependent defects. We aim to demonstrate how RVProbe transforms opaque microarchitectural details into first-class verification constraints, enabling the detection of bugs that are statistically improbable for architecture-agnostic (black-box) generators to trigger.
+
+We selected the T1 open-source RISC-V vector processor \cite{22} as the DUT. The investigation focused on the Vector Extension's decode logic, specifically targeting an internal control signal named \texttt{Reverse}, which dictates the operand routing for reverse-subtraction operations.
+
+\subsubsection{Methodology: The White-Box Workflow} 
+
+We established a three-step workflow to target this implementation-specific behavior:
+
+\textbf{OM-Based Signal Extraction:} The T1 processor is implemented in Chisel \cite{25}, a hardware construction language embedded in Scala, which generates a machine-readable Object Model (OM) \cite{24}. We utilized a custom pass to traverse this OM, characterizing the internal \texttt{Reverse} control signal—defined as \textit{``a microarchitectural steering bit that forces the ALU to swap the minuend and subtrahend operands''}—and identifying that it is asserted exclusively by the Vector Reverse Subtract variants \texttt{VrsubVi} (vector-immediate) and \texttt{VrsubVx} (vector-scalar).
+
+\textbf{Programmatic API Injection:} Leveraging RVProbe's metaprogramming capabilities, we mapped this extracted logic directly into the eDSL. A new predicate, \texttt{isReverse()}, was automatically synthesized. This step crucially promotes an internal RTL signal to a visible constraint in the verification frontend. 
+
+\textbf{Constraint Composition:} We constructed a directed test targeting a specific corner case: the intersection of an architectural hazard (Read-After-Write) and this microarchitectural event. 
+
+\subsubsection{Test Construction and Bug Discovery} Code \ref{code:whitebox} illustrates the composed constraint. The script orchestrates a scenario where a scalar-vector RAW hazard coincides strictly with the assertion of the \texttt{Reverse} signal.
+
+\begin{lstlisting}[caption={Composed White-Box Constraint}, label=code:whitebox] 
+// Step 1: Setup Scalar Load to x10 
+instruction(0) { isLw() & rd === 10 }
+// Step 2: Trigger RAW hazard under specific internal state 
+instruction(1) { // The intersection of Microarch and Arch constraints 
+    isReverse() & // Targets the internal 'Reverse' logic 
+    rs1 === 10 // Enforces architectural RAW dependency 
+} 
+\end{lstlisting}
+
+The SMT solver successfully generated a satisfying sequence (e.g., \texttt{lw x10, ...} followed by \texttt{vrsub.vx v1, v2, x10}). RTL simulation revealed a critical logic error: the T1 pipeline incorrectly flushed the vector instruction. The defect was traced to a corner-case interaction where the scalar data forwarding logic failed to handshake correctly with the \texttt{Reverse} operand routing logic.
+
+This case study validates the composability of RVProbe. By effectively combining high-level architectural constraints with automatically derived microarchitectural details, the framework reconstructed a complex error condition. Traditional black-box CRV would likely miss this defect, as the probability of randomly selecting a \texttt{vrsub} variant \textit{and} simultaneously constructing a RAW hazard on the specific scalar operand is vanishingly small.
+
+\subsection{Performance Profiling and Scalability}
+
+\subsubsection{Objective and Setup}
+
+To assess the runtime overhead introduced by the proposed eDSL architecture, we conducted a comprehensive performance profile. The primary research questions are:
+
+\begin{itemize}
+    \item \textbf{RQ3.1 (Latency):} What is the end-to-end generation latency for typical directed test scenarios?
+    \item \textbf{RQ3.2 (Bottleneck Analysis):} How is the computation time distributed across the eDSL lowering stages?
+\end{itemize}
+
+We measured the average generation time (in milliseconds) over 100 runs on a host workstation equipped with an AMD Ryzen 9 7940HS CPU and 32 GB of RAM, running Arch Linux. The framework operated on OpenJDK 17 with Z3 v4.15 integrated via FFI. The evaluation matrix spans two dimensions:
+
+\begin{itemize}
+    \item \textbf{Sequence Length ($N_{inst}$):} Ranging from 10 to 500 instructions.
+    \item \textbf{Constraint Complexity:} We defined three complexity levels targeting different constraint solver capabilities, as illustrated in Code \ref{code:perf_constraints}:
+    \begin{itemize}
+        \item \textit{L1 (Basic):} Enforces only fundamental instruction type constraints (e.g., \texttt{isAddi()}), imposing minimal load on the solver.
+        \item \textit{L2 (Intra-instruction):} Adds composite constraints on instruction fields, including destination (\texttt{rd}), source (\texttt{rs1}), and immediate values (\texttt{imm12}). This tests the solver's ability to handle bit-vector ranges and boolean combinations within a single instruction context.
+        \item \textit{L3 (Inter-instruction):} Introduces global dependency constraints. Specifically, we utilize \texttt{hasRAW()} to enforce Read-After-Write hazards across adjacent instructions, requiring the solver to construct and resolve a complex dependency graph across the entire sequence.
+    \end{itemize}
+\end{itemize}
+
+\vspace{1em}
+
+\begin{lstlisting}[caption={Benchmark Constraint Definitions across Complexity Levels}, label=code:perf_constraints, language=Scala]
+// [L1] Basic: Single Opcode Constraint
+(0 until nInst).foreach { i => 
+  instruction(i) { 
+    isAddi() 
+  }
+}
+
+// [L2] Intra-Instruction: Field Ranges & Logic
+(0 until nInst).foreach { i =>
+  instruction(i) {
+    isAddi() & rdRange(1, 5) & imm12Range(-100, 100)
+  }
+}
+
+// [L3] Inter-Instruction: Global Hazards
+(0 until nInst).foreach { i =>
+  instruction(i) {
+    isAddi() & rdRange(1, 5) & imm12Range(-100, 100)
+  }
+}
+(0 until nInst - 1).foreach { i =>
+  sequence(i, i+1).hasRAW()
+}
+\end{lstlisting}
+
+\subsubsection{Results and Analysis}
+
+\begin{table}[!tbp]
+\centering
+\renewcommand\tabcolsep{4.5pt}
+\captionsetup{font=bf, skip=0.5em}
+\caption{Performance metrics (in ms) across complexity levels and instruction counts.}
+\label{tab:performance}
+\scalebox{0.95}{
+    \begin{tabular}{cccccc}
+    \toprule
+    \textbf{Complex.} & \textbf{N\_Inst} & \textbf{T\_MLIR} & \textbf{T\_SMT} & \textbf{T\_Z3} & \textbf{T\_Inst} \\
+    \midrule
+    L1 & 10   & 11.8  & 2.7   & 21.5  & 68.2  \\
+    L1 & 50   & 47.6  & 10.1  & 34.1  & 100.4 \\
+    L1 & 100  & 106.8 & 19.6  & 50.2  & 149.4 \\
+    L1 & 200  & 223.0 & 40.5  & 84.6  & 246.7 \\
+    L1 & 500  & 585.8 & 112.5 & 192.7 & 556.6 \\
+    \midrule
+    L2 & 10   & 14.2  & 2.7   & 21.0  & 66.2  \\
+    L2 & 50   & 64.6  & 11.6  & 36.3  & 108.5 \\
+    L2 & 100  & 133.1 & 23.3  & 55.1  & 164.4 \\
+    L2 & 200  & 271.6 & 49.2  & 97.1  & 279.6 \\
+    L2 & 500  & 699.7 & 137.5 & 228.5 & 636.3 \\
+    \midrule
+    L3 & 10   & 17.4  & 2.9   & 21.9  & 66.9  \\
+    L3 & 50   & 69.9  & 12.7  & 40.7  & 113.0 \\
+    L3 & 100  & 143.1 & 25.7  & 64.0  & 171.0 \\
+    L3 & 200  & 289.7 & 53.1  & 114.7 & 292.6 \\
+    L3 & 500  & 740.4 & 153.9 & 356.4 & 684.2 \\
+    \bottomrule
+    \end{tabular}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.5\textwidth]{4.2(2).png}}
+\caption{Latency breakdown and scalability analysis. The stacked bars illustrate the proportion of time spent in MLIR generation ($T_{MLIR}$), SMT lowering ($T_{SMT}$), Z3 solving ($T_{Z3}$), and Instruction parsing ($T_{Inst}$) across varying sequence lengths ($N_{inst}$) and complexities (L1-L3).}
+\label{fig:perf_breakdown}
+\end{figure}
+Table \ref{tab:performance} details the precise latency breakdown, while Fig. \ref{fig:perf_breakdown} visualizes the trends. Analysis covers three dimensions:
+
+\textbf{Impact of Complexity (Horizontal Contrast):} Complexity marginally increases the total time. L3 constraints necessitate constructing a more complex dependency graph in the MLIR stage, resulting in a higher $T_{MLIR}$ (740.4 ms for L3 vs. 585.8 ms for L1 at $N_{inst}=500$). Crucially, the solver time ($T_{Z3}$) remains relatively stable, indicating that the generated constraints are well-optimized across complexity levels.
+
+\textbf{Scalability Trends (Vertical Contrast):} The framework demonstrates a \textit{linear scaling characteristic}. Even in the most demanding configuration (L3, 500 instructions), the total generation time remains under 2 seconds ($\sim$1935 ms). This confirms the proposed FFI-based architecture scales effectively, successfully avoiding the exponential explosions often seen in poorly optimized SMT formulations.
+
+\textbf{Component Distribution (Bottleneck Analysis):} The breakdown reveals that the Model Reconstruction phase ($T_{Inst}$) occupies a significant portion of the total latency. This overhead is primarily attributed to the implementation costs of parsing the raw variable assignments from the SMT model and the string manipulation required to format them into valid assembly syntax. \textbf{Crucially, this overhead exhibits strict linear scalability ($O(N)$).} Unlike the Constraint Solving phase ($T_{Z3}$), which involves solving NP-complete problems and carries the inherent risk of exponential complexity explosion, the reconstruction cost is predictable. Therefore, while $T_{Inst}$ represents a constant implementation artifact, it does not pose a fundamental scalability barrier for complex verification scenarios, where solver efficiency remains the decisive factor.
+
+\section{Conclusion}\label{Sec5}
+
+We introduced \textbf{RVProbe}, a framework leveraging a strictly typed Scala 3 eDSL and in-memory MLIR interface to address RISC-V fragmentation and CRV saturation. This architecture overcomes the safety limitations of dynamic scripting while utilizing compile-time metaprogramming for automated API adaptation. Empirically, RVProbe proved effective as a complement to CRV, boosting functional coverage from 80.2\% to 97.2\% by targeting specific hazard permutations. Moreover, our white-box case study demonstrated the power of constraint composability, exposing a critical pipeline defect in the T1 processor—a scenario statistically improbable for black-box generators. Finally, profiling confirms that the abstraction overhead is strictly controllable, with end-to-end generation latency remaining under 2 seconds. By reconciling high-level semantic abstraction with low-level control, RVProbe provides a robust foundation for verifying customized RISC-V processors.
+
+\begin{thebibliography}{00}
+\bibitem{1} A. Akram and L. Sawalha, "A Survey of Computer Architecture Simulation Techniques and Tools," in IEEE Access, vol. 7, pp. 78120-78145, 2019, doi: 10.1109/ACCESS.2019.2917698.
+\bibitem{2} M. Chupilko, A. Kamkin and A. Protsenko, "Open-Source Validation Suite for RISC-V," 2019 20th International Workshop on Microprocessor/SoC Test, Security and Verification (MTV), Austin, TX, USA, 2019, pp. 7-12, doi: 10.1109/MTV48867.2019.00010.
+\bibitem{17} Tain, C., Patil, S. \& Al-Asaad, H. Survey of Verification of RISC-V Processors. J Electron Test 41, 111–138 (2025). https://doi.org/10.1007/s10836-025-06169-3
+\bibitem{18} Ahmadi-Pour, S., Herdt, V., \& Drechsler, R. (2021). Constrained random verification for RISC-V: overview, evaluation and discussion. In MBMV 2021; 24th Workshop, 1-8, 2021.
+\bibitem{26} de Moura, L., Bjørner, N. (2008). Z3: An Efficient SMT Solver. In: Ramakrishnan, C.R., Rehof, J. (eds) Tools and Algorithms for the Construction and Analysis of Systems. TACAS 2008. Lecture Notes in Computer Science, vol 4963. Springer, Berlin, Heidelberg. https://doi.org/10.1007/978-3-540-78800-3\_24
+\bibitem{6} Shuo Yang, Robert Wille, and Rolf Drechsler. 2014. Determining Cases of Scenarios to Improve Coverage in Simulation-based Verification. In Proceedings of the 27th Symposium on Integrated Circuits and Systems Design (SBCCI '14). Association for Computing Machinery, New York, NY, USA, Article 11, 1–7. https://doi.org/10.1145/2660540.2660979
+\bibitem{7} J. Wang, N. Tan, Y. Zhou, T. Li and J. Xia, "A UVM Verification Platform for RISC-V SoC from Module to System Level," 2020 IEEE 5th International Conference on Integrated Circuits and Microsystems (ICICM), Nanjing, China, 2020, pp. 242-246, doi: 10.1109/ICICM50929.2020.9292250.
+\bibitem{19} N. Kitchen and A. Kuehlmann, "Stimulus generation for constrained random simulation," 2007 IEEE/ACM International Conference on Computer-Aided Design, San Jose, CA, USA, 2007, pp. 258-265, doi: 10.1109/ICCAD.2007.4397275.
+\bibitem{9} Random instruction generator for RISC-V processor verification . [Online]. Available: https://github.com/google/riscv-dv
+\bibitem{10} Instruction Set Generator initially contributed by Futurewei. [Online]. Available: https://github.com/openhwgroup/force-riscv
+\bibitem{11} B. W. Mezger, D. A. Santos, L. Dilillo, C. A. Zeferino and D. R. Melo, "A Survey of the RISC-V Architecture Software Support," in IEEE Access, vol. 10, pp. 51394-51411, 2022, doi: 10.1109/ACCESS.2022.3174125. 
+\bibitem{12} V. Herdt, D. Große and R. Drechsler, "Towards Specification and Testing of RISC-V ISA Compliance*," 2020 Design, Automation \& Test in Europe Conference \& Exhibition (DATE), Grenoble, France, 2020, pp. 995-998, doi: 10.23919/DATE48585.2020.9116193.
+\bibitem{13} T. Lu, A. Liu, B. Xia and P. Liu, "Comprehensive RISC- V Floating-Point Verification: Efficient Coverage Models and Constraint-Based Test Generation," 2025 Design, Automation \& Test in Europe Conference (DATE), Lyon, France, 2025, pp. 1-7, doi: 10.23919/DATE64628.2025.10992760.
+\bibitem{8} N. Bruns, V. Herdt, E. Jentzsch and R. Drechsler, "Cross-Level Processor Verification via Endless Randomized Instruction Stream Generation with Coverage-guided Aging," 2022 Design, Automation \& Test in Europe Conference \& Exhibition (DATE), Antwerp, Belgium, 2022, pp. 1123-1126, doi: 10.23919/DATE54114.2022.9774771.
+\bibitem{14} Yao Hsiao, Dominic P. Mulligan, Nikos Nikoleris, Gustavo Petri, and Caroline Trippel. 2021. Synthesizing Formal Models of Hardware from RTL for Efficient Verification of Memory Model Implementations. In MICRO-54: 54th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO '21). Association for Computing Machinery, New York, NY, USA, 679–694. https://doi.org/10.1145/3466752.3480087
+\bibitem{15} Brian Campbell, Ian Stark, Randomised testing of a microprocessor model using SMT-solver state generation, Science of Computer Programming, Volume 118, 2016, Pages 60-76, ISSN 0167-6423, https://doi.org/10.1016/j.scico.2015.10.012.
+\bibitem{16} Y. Katz, M. Rimon, A. Ziv and G. Shaked, "Learning micro-architectural behaviors to improve stimuli generation quality," 2011 48th ACM/EDAC/IEEE Design Automation Conference (DAC), San Diego, CA, USA, 2011, pp. 848-853.
+\bibitem{3} R. Chen and I. Sander, "Towards Coherent Semantics: A Quantitatively Typed EDSL for Synchronous System Design," 2025 Design, Automation \& Test in Europe Conference (DATE), Lyon, France, 2025, pp. 1-2, doi: 10.23919/DATE64628.2025.10992876.
+\bibitem{4} A. Cimatti, "Application of SMT solvers to hybrid system verification," 2012 Formal Methods in Computer-Aided Design (FMCAD), Cambridge, UK, 2012, pp. 4-4.
+\bibitem{5} Lattner C, Amini M, Bondhugula U, et al. MLIR: A compiler infrastructure for the end of Moore's law[J]. arXiv preprint arXiv:2002.11054, 2020.
+\bibitem{23} Multi-Level IR Compiler Framework. A dialect that models satisfiability modulo theories. [Online]. Available: https://mlir.llvm.org/docs/Dialects/SMT
+\bibitem{21} RISC-V Opcodes. [Online]. Available: https://github.com/riscv/riscv-opcodes
+\bibitem{27} Circuit IR Compilers and Tools. [Online]. Available: https://circt.llvm.org
+\bibitem{22} Jiuyang Liu, Qinjun Li, Yunqian Luo, Hongbin Zhang, Jiongjia Lu, Shupei Fan, Jianhao Ye, Yang Liu, Xiaoyi Liu, Yanqi Yang, Zewen Ye, Yuhang Zeng, Ao Shen, Rui Huang, Wei Cong, Xuecheng Zou, and Mingyu Gao. 2025. Titan-I: An Open-Source, High Performance RISC-V Vector Core. In Proceedings of the 58th IEEE/ACM International Symposium on Microarchitecture (MICRO '25). Association for Computing Machinery, New York, NY, USA, 675–690. https://doi.org/10.1145/3725843.3756059
+\bibitem{25} Jonathan Bachrach, Huy Vo, Brian Richards, Yunsup Lee, Andrew Waterman, Rimas Avižienis, John Wawrzynek, and Krste Asanović. 2012. Chisel: constructing hardware in a Scala embedded language. In Proceedings of the 49th Annual Design Automation Conference (DAC '12). Association for Computing Machinery, New York, NY, USA, 1216–1225. https://doi.org/10.1145/2228360.2228584
+\bibitem{24} Example of accessing data from OM class. [Online]. Available: https://www.chisel-lang.org/docs/cookbooks/objectmodel#example-of-accessing-data-from-om-class
+
+\end{thebibliography}
+
+\end{document}
+\endinput
+%%
+%% End of file `sample-sigconf.tex'.
+
