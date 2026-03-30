@@ -17,43 +17,43 @@ val n = 35
 // ============================================================
 
 object Add extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isAdd())
 
 object Sub extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isSub())
 
 object And extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isAnd())
 
 object Or extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isOr())
 
 object Xor extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isXor())
 
 object Sll extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isSll())
 
 object Srl extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isSrl())
 
 object Sra extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isSra())
 
 object Slt extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isSlt())
 
 object Sltu extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(n, isSltu())
 
 // ============================================================
@@ -61,27 +61,27 @@ object Sltu extends RVGenerator:
 // ============================================================
 
 object Addi extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = iTypeAlu(n, isAddi())
 
 object Andi extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = iTypeAlu(n, isAndi())
 
 object Ori extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = iTypeAlu(n, isOri())
 
 object Xori extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = iTypeAlu(n, isXori())
 
 object Slti extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = iTypeAlu(n, isSlti())
 
 object Sltiu extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = iTypeAlu(n, isSltiu())
 
 // ============================================================
@@ -89,15 +89,15 @@ object Sltiu extends RVGenerator:
 // ============================================================
 
 object Slli extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = shiftImm(n, isSlli())
 
 object Srli extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = shiftImm(n, isSrli())
 
 object Srai extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = shiftImm(n, isSrai())
 
 // ============================================================
@@ -105,11 +105,11 @@ object Srai extends RVGenerator:
 // ============================================================
 
 object Lui extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = uType(n, isLui())
 
 object Auipc extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = uType(n, isAuipc())
 
 // ============================================================

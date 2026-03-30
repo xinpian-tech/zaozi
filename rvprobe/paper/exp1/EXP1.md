@@ -358,7 +358,7 @@ sub, and, or, xor, sll, srl, sra, slt, sltu 结构完全相同，仅替换助记
 以 add 为例（call site，3 行）：
 ```scala
 object Add extends RVGenerator:
-  val sets          = isRV64GC()
+  val sets          = Seq(isRV32I())
   def constraints() = rType(35, isAdd())
 ```
 
