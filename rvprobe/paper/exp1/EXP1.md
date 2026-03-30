@@ -1,4 +1,4 @@
-# Experiment 1: Coverage Hole Closure — RVProbe vs SV Constraints vs Hand-Written Assembly
+# Experiment 1: Coverage Hole Closure — RVProbe vs Hand-Written Assembly
 
 ## Research Question
 
@@ -8,15 +8,11 @@ When riscv-dv (the industry-standard CRV generator) reaches coverage saturation,
 
 DAC26 reviewer #2 批评 "directed tests are created by manually adding constraints, so the increase in coverage is absolutely expected"。这说明仅展示 RVProbe 能填 hole 没有说服力——关键是展示**填 hole 时的约束表达成本差异**。
 
-reviewer #4 批评 "comparison not clear with the state of the art"。用 riscv-dv 作为共同起点，对比三种填 hole 方法，直接回应这一批评。
+reviewer #4 批评 "comparison not clear with the state of the art"。用 riscv-dv 作为共同起点，直接回应这一批评。
 
 ## Hypothesis
 
-riscv-dv 覆盖率饱和后，剩余的 hole 集中在**序列级属性**（hazard 组合）。这类 hole 的根本困难不在于"能不能填"，而在于表达序列级约束的代价：
-
-- **手写汇编**：工程师需要在脑中求解 CSP（hazard 约束同时满足），耗时且易错
-- **SV constraints**：能表达单指令约束，但序列级约束需要 workaround（辅助索引变量、显式等式约束），每种指令格式需要独立的 constraint class
-- **RVProbe**：序列级约束是一等公民（`coverRAW()`, `coverWAR()`, `coverWAW()`, `coverNoHazard()`），求解器一次性保证全部满足
+riscv-dv 覆盖率饱和后，剩余的 hole 集中在**序列级属性**（hazard 组合）。这类 hole 的根本困难不在于"能不能填"，而在于表达序列级约束的代价。
 
 ## Phase 1: riscv-dv Baseline Saturation (Done)
 
@@ -91,7 +87,7 @@ riscv-dv 33 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了
 | OPPOSITE, DIFFERENT | and, or, xor, ori, andi |
 | IDENTICAL, OPPOSITE, DIFFERENT | xori |
 
-总计 **13 个未覆盖 logical similarity bin**。这需要操作数值域约束（rs1 和 rs2 的位模式关系），是指令级属性但需要值域控制。
+总计 **13 个未覆盖 logical similarity bin**。
 
 **类别 C: 零散 hole（不纳入对比）**
 
@@ -100,40 +96,262 @@ riscv-dv 33 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了
 - `rv32i_misc_cg`：ECALL — 需要特权模式支持
 - `csrrw_cg`：WAR/WAW — CSR 指令，不在基本 ALU 指令范围
 
-### Phase 3 目标选定
-
-**聚焦类别 A 的 hazard hole**，原因：
-
-1. **数量大且模式统一**：21 条指令 × 3 种 hazard = 63 个 hole，足以做定量对比
-2. **完美展示序列级约束**：hazard 定义在相邻指令对上，是本质的跨指令属性
-3. **覆盖多种指令格式**：
-   - R-type（10 条）：add, sub, sra, srl, sll, slt, sltu, and, xor, or
-   - I-type ALU（6 条）：addi, slti, sltiu, ori, andi, xori
-   - Shift-imm（3 条）：slli, srli, srai
-   - U-type（2 条）：lui, auipc
-
-4. **riscv-dv 的结构性盲点**：随机生成天然倾向 RAW（后一条指令读前一条写的寄存器很常见），但 WAR（后写前读的寄存器）、WAW（前后写同一寄存器）、NoHazard（完全无依赖）需要刻意构造
-
 ### Hazard 定义（对齐 riscv-dv 的 `hazard_e`）
 
-riscv-dv 中 `gpr_hazard` 的判定逻辑（相邻指令 i 和 i+1）：
+riscv-dv 中 `gpr_hazard` 的判定逻辑（相邻指令 i 和 i+1，hazard 归属于 i+1）：
 
 ```
 RAW_HAZARD:  instr[i].rd ∈ {instr[i+1].rs1, instr[i+1].rs2}
 WAR_HAZARD:  instr[i+1].rd ∈ {instr[i].rs1, instr[i].rs2} ∧ ¬RAW
-WAW_HAZARD:  instr[i].rd == instr[i+1].rd
+WAW_HAZARD:  instr[i].rd == instr[i+1].rd               ∧ ¬RAW ∧ ¬WAR
 NO_HAZARD:   ¬RAW ∧ ¬WAR ∧ ¬WAW
 ```
 
-注意：这里的优先级是 RAW > WAR > WAW > NoHazard（riscv-dv 的实现中 RAW 优先判定）。
+优先级：RAW > WAR > WAW > NoHazard（互斥分类）。
 
-## Phase 3: Three-Way Hole Closure
+## Phase 3: Hole Closure
 
 ### 目标
 
-为每条受影响指令，生成一个短序列（≥4 条同类指令），使得相邻指令对中至少出现一次 WAR_HAZARD、一次 WAW_HAZARD、一次 NO_HAZARD。
+为 21 条指令的每一条，构造指令序列使其 `cp_gpr_hazard` 覆盖 WAR、WAW、NoHazard 三个缺失 bin。
 
-### (a) RVProbe eDSL
+### 手写汇编填补方案
+
+对于每条指令，需要构造 3 对相邻指令对（共 6 条指令），使第二条指令分别被 riscv-dv 分类为 WAR、WAW、NoHazard。
+
+#### R-type（10 条：add, sub, and, or, xor, sll, srl, sra, slt, sltu）
+
+格式：`op rd, rs1, rs2`
+
+以 add 为例：
+
+```asm
+# --- WAR: curr.rd ∈ {prev.rs1, prev.rs2} ∧ ¬RAW ---
+# prev.rd=x1 ∉ {curr.rs1=x7, curr.rs2=x8} → ¬RAW ✓
+# curr.rd=x5 == prev.rs1=x5 → WAR ✓
+    add x1, x5, x6
+    add x5, x7, x8
+
+# --- WAW: prev.rd == curr.rd ∧ ¬RAW ∧ ¬WAR ---
+# prev.rd=x10 ∉ {x13,x14} → ¬RAW ✓
+# curr.rd=x10 ∉ {x11,x12} → ¬WAR ✓
+# prev.rd=x10 == curr.rd=x10 → WAW ✓
+    add x10, x11, x12
+    add x10, x13, x14
+
+# --- NoHazard: ¬RAW ∧ ¬WAR ∧ ¬WAW ---
+# x15 ∉ {x19,x20}, x18 ∉ {x16,x17}, x15≠x18
+    add x15, x16, x17
+    add x18, x19, x20
+```
+
+sub, and, or, xor, sll, srl, sra, slt, sltu 结构完全相同，仅替换助记符：
+
+```asm
+# sub
+    sub x1, x5, x6
+    sub x5, x7, x8          # WAR
+    sub x10, x11, x12
+    sub x10, x13, x14       # WAW
+    sub x15, x16, x17
+    sub x18, x19, x20       # NoHazard
+
+# and
+    and x1, x5, x6
+    and x5, x7, x8          # WAR
+    and x10, x11, x12
+    and x10, x13, x14       # WAW
+    and x15, x16, x17
+    and x18, x19, x20       # NoHazard
+
+# or
+    or x1, x5, x6
+    or x5, x7, x8           # WAR
+    or x10, x11, x12
+    or x10, x13, x14        # WAW
+    or x15, x16, x17
+    or x18, x19, x20        # NoHazard
+
+# xor
+    xor x1, x5, x6
+    xor x5, x7, x8          # WAR
+    xor x10, x11, x12
+    xor x10, x13, x14       # WAW
+    xor x15, x16, x17
+    xor x18, x19, x20       # NoHazard
+
+# sll
+    sll x1, x5, x6
+    sll x5, x7, x8          # WAR
+    sll x10, x11, x12
+    sll x10, x13, x14       # WAW
+    sll x15, x16, x17
+    sll x18, x19, x20       # NoHazard
+
+# srl
+    srl x1, x5, x6
+    srl x5, x7, x8          # WAR
+    srl x10, x11, x12
+    srl x10, x13, x14       # WAW
+    srl x15, x16, x17
+    srl x18, x19, x20       # NoHazard
+
+# sra
+    sra x1, x5, x6
+    sra x5, x7, x8          # WAR
+    sra x10, x11, x12
+    sra x10, x13, x14       # WAW
+    sra x15, x16, x17
+    sra x18, x19, x20       # NoHazard
+
+# slt
+    slt x1, x5, x6
+    slt x5, x7, x8          # WAR
+    slt x10, x11, x12
+    slt x10, x13, x14       # WAW
+    slt x15, x16, x17
+    slt x18, x19, x20       # NoHazard
+
+# sltu
+    sltu x1, x5, x6
+    sltu x5, x7, x8         # WAR
+    sltu x10, x11, x12
+    sltu x10, x13, x14      # WAW
+    sltu x15, x16, x17
+    sltu x18, x19, x20      # NoHazard
+```
+
+**小计**：10 条指令 × 6 行 = **60 条汇编指令**
+
+#### I-type ALU（6 条：addi, andi, ori, xori, slti, sltiu）
+
+格式：`op rd, rs1, imm12`（无 rs2，hazard 只涉及 rd 和 rs1）
+
+```asm
+# addi
+    addi x1, x5, 10
+    addi x5, x7, 20         # WAR: rd=x5==prev.rs1; prev.rd=x1≠rs1=x7 → ¬RAW
+    addi x10, x11, 30
+    addi x10, x13, 40       # WAW: rd=x10==prev.rd; x10≠x13 → ¬RAW; x10≠x11 → ¬WAR
+    addi x15, x16, 50
+    addi x18, x19, 60       # NoHazard
+
+# andi
+    andi x1, x5, 10
+    andi x5, x7, 20         # WAR
+    andi x10, x11, 30
+    andi x10, x13, 40       # WAW
+    andi x15, x16, 50
+    andi x18, x19, 60       # NoHazard
+
+# ori
+    ori x1, x5, 10
+    ori x5, x7, 20          # WAR
+    ori x10, x11, 30
+    ori x10, x13, 40        # WAW
+    ori x15, x16, 50
+    ori x18, x19, 60        # NoHazard
+
+# xori
+    xori x1, x5, 10
+    xori x5, x7, 20         # WAR
+    xori x10, x11, 30
+    xori x10, x13, 40       # WAW
+    xori x15, x16, 50
+    xori x18, x19, 60       # NoHazard
+
+# slti
+    slti x1, x5, 10
+    slti x5, x7, 20         # WAR
+    slti x10, x11, 30
+    slti x10, x13, 40       # WAW
+    slti x15, x16, 50
+    slti x18, x19, 60       # NoHazard
+
+# sltiu
+    sltiu x1, x5, 10
+    sltiu x5, x7, 20        # WAR
+    sltiu x10, x11, 30
+    sltiu x10, x13, 40      # WAW
+    sltiu x15, x16, 50
+    sltiu x18, x19, 60      # NoHazard
+```
+
+**小计**：6 条指令 × 6 行 = **36 条汇编指令**
+
+#### Shift-imm（3 条：slli, srli, srai）
+
+格式：`op rd, rs1, shamt`（寄存器字段与 I-type 相同）
+
+```asm
+# slli
+    slli x1, x5, 1
+    slli x5, x7, 2          # WAR
+    slli x10, x11, 3
+    slli x10, x13, 4        # WAW
+    slli x15, x16, 5
+    slli x18, x19, 6        # NoHazard
+
+# srli
+    srli x1, x5, 1
+    srli x5, x7, 2          # WAR
+    srli x10, x11, 3
+    srli x10, x13, 4        # WAW
+    srli x15, x16, 5
+    srli x18, x19, 6        # NoHazard
+
+# srai
+    srai x1, x5, 1
+    srai x5, x7, 2          # WAR
+    srai x10, x11, 3
+    srai x10, x13, 4        # WAW
+    srai x15, x16, 5
+    srai x18, x19, 6        # NoHazard
+```
+
+**小计**：3 条指令 × 6 行 = **18 条汇编指令**
+
+#### U-type（2 条：lui, auipc）
+
+格式：`op rd, imm20`（**无 rs1, 无 rs2**）
+
+两条 U-type 之间不可能产生 RAW 或 WAR（没有 rs 字段）。要覆盖 WAR，**必须用其他格式指令作前驱**。
+
+```asm
+# lui — WAR 需要前驱指令有 rs 字段
+    addi x1, x5, 0          # helper: rs1=x5
+    lui x5, 0x12345          # WAR: rd=x5==prev.rs1=x5; lui 无 rs → ¬RAW ✓
+
+# lui — WAW 和 NoHazard 可以 lui-lui
+    lui x10, 0xAAAAA
+    lui x10, 0xBBBBB         # WAW: rd=x10==prev.rd=x10; 无 rs → ¬RAW ¬WAR ✓
+    lui x15, 0x11111
+    lui x18, 0x22222         # NoHazard: x15≠x18 ✓
+
+# auipc — 同理
+    addi x2, x6, 0          # helper: rs1=x6
+    auipc x6, 0x12345        # WAR
+    auipc x20, 0xAAAAA
+    auipc x20, 0xBBBBB       # WAW
+    auipc x25, 0x11111
+    auipc x28, 0x22222       # NoHazard
+```
+
+**小计**：2 × 6 行 + 2 个 helper addi = **14 条汇编指令**
+
+**U-type 的关键观察**：WAR 覆盖需要跨格式推理。工程师必须认识到"两条 lui 之间永远不会产生 WAR"，然后手动选择合适的前驱指令类型。这个推理过程是隐式的、格式特定的。
+
+### 手写汇编总计
+
+| 格式 | 指令数 | 汇编行数 | 备注 |
+|------|--------|----------|------|
+| R-type | 10 | 60 | 同格式模板化 |
+| I-type ALU | 6 | 36 | 同上 |
+| Shift-imm | 3 | 18 | 同上 |
+| U-type | 2 | 14 | 需要 2 个 helper 指令 |
+| **合计** | **21** | **128** | |
+
+### RVProbe 对应实现
 
 已有代码，无需额外编写。`CoverageLib` 中的 `rType()`, `iTypeAlu()`, `shiftImm()`, `uType()` 已经包含 `coverWAR()`, `coverWAW()`, `coverNoHazard()` 约束。
 
@@ -144,7 +362,7 @@ object Add extends RVGenerator:
   def constraints() = rType(35, isAdd())
 ```
 
-库函数（`CoverageLib.rType`，23 行，跨 10 条 R-type 指令复用）：
+库函数 `CoverageLib.rType`（23 行，跨 10 条 R-type 指令复用）：
 ```scala
 def rType(n: Int, opcode: ...)(using ...): Unit =
   (0 until n).foreach { i =>
@@ -155,151 +373,43 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
   seq.coverBins(_.rs1, allRegs)
   seq.coverBins(_.rs2, allRegs)
   seq.coverRAW()
-  seq.coverWAR()    // ← 直接表达
-  seq.coverWAW()    // ← 直接表达
-  seq.coverNoHazard() // ← 直接表达
+  seq.coverWAR()
+  seq.coverWAW()
+  seq.coverNoHazard()
 ```
 
-**21 条指令的总 call-site LOC**：21 × 3 = 63 行
-**Library LOC**：~90 行（4 个格式函数，跨所有指令复用）
-**覆盖保证**：SAT = 全部 hazard bin 闭合，零迭代
+**RVProbe 总 LOC**：
+- Call site：21 × 3 = 63 行
+- Library：~90 行（4 个格式函数，复用）
+- 覆盖保证：SAT = 全部 hazard bin 闭合
 
-### (b) SV Constrained-Random
+### 对比
 
-需要为每种指令格式编写 sequence class + hazard 约束。
-
-**难点展示**（以 R-type 为例）：
-
-```systemverilog
-// 问题 1: hazard 约束需要手动指定索引
-rand int unsigned war_idx, waw_idx, nohaz_idx;
-constraint hazard_indices {
-    war_idx   inside {[0:N-2]};
-    waw_idx   inside {[0:N-2]};
-    nohaz_idx inside {[0:N-2]};
-    war_idx != waw_idx; war_idx != nohaz_idx; waw_idx != nohaz_idx;
-}
-
-// 问题 2: 每种 hazard 都要手写等式约束
-constraint war_hazard {
-    (instrs[war_idx].rs1 == instrs[war_idx+1].rd) ||
-    (instrs[war_idx].rs2 == instrs[war_idx+1].rd);
-    instrs[war_idx].rd != instrs[war_idx+1].rs1;  // 排除 RAW
-    instrs[war_idx].rd != instrs[war_idx+1].rs2;
-}
-constraint waw_hazard {
-    instrs[waw_idx].rd == instrs[waw_idx+1].rd;
-}
-constraint no_hazard {
-    instrs[nohaz_idx].rd != instrs[nohaz_idx+1].rs1;
-    instrs[nohaz_idx].rd != instrs[nohaz_idx+1].rs2;
-    instrs[nohaz_idx+1].rd != instrs[nohaz_idx].rs1;
-    instrs[nohaz_idx+1].rd != instrs[nohaz_idx].rs2;
-    instrs[nohaz_idx].rd != instrs[nohaz_idx+1].rd;
-}
-
-// 问题 3: U-type 没有 rs1/rs2，constraint class 完全不同
-// 问题 4: covergroup 只观测不驱动，上面全是额外的 workaround
-```
-
-**每种格式的 SV constraint class**（估算）：
-- R-type：~100 行（3 寄存器 + 4 种 hazard）
-- I-type ALU：~85 行（2 寄存器 + 4 种 hazard）
-- Shift-imm：~80 行（同 I-type 但无 imm 约束）
-- U-type：~60 行（1 寄存器 + WAW/NoHazard，WAR 需要看前一条指令的 rs）
-
-**21 条指令的总 LOC**：4 × ~80 + 21 × ~10（call site）≈ **530 行**
-**覆盖保证**：求解器保证（如果约束写对了），但每种格式需要独立编写和调试
-
-### (c) Hand-Written Assembly
-
-为每条指令手写满足 hazard 覆盖的序列。
-
-**难点展示**（以 add 为例）：
-
-```asm
-# 需要：相邻指令对中出现 WAR, WAW, NoHazard
-# WAW: inst1.rd == inst2.rd
-    add x5, x1, x2      # rd=x5
-    add x5, x3, x4      # rd=x5 → WAW ✓
-# WAR: inst2.rd ∈ {inst1.rs1, inst1.rs2} ∧ ¬RAW
-    add x6, x7, x8      # rs1=x7
-    add x7, x9, x10     # rd=x7 → WAR ✓ (且 x6 ∉ {x9,x10} → ¬RAW)
-# NoHazard: 完全无依赖
-    add x11, x12, x13
-    add x14, x15, x16   # 无交集 → NoHazard ✓
-```
-
-看似简单，但：
-1. 如果同时要求寄存器 bin 覆盖（rd 覆盖 x1..x31），WAW 要求 rd 重复，与 bin 覆盖矛盾 → 需要额外指令补偿
-2. U-type（lui/auipc）只有 rd，WAR 需要判断"前一条指令是否用了本条的 rd 作为 rs" → 工程师必须理解每种格式的 hazard 语义
-3. 写完后需要逐条检查或编写验证脚本
-
-**每条指令最少 4 条 asm**（WAR + WAW + NoHazard 各一对，共 3 对 = 4~6 条）
-**21 条指令的总 asm 行数**：21 × ~6 = **~126 行 asm + ~126 行注释 + 验证脚本**
-**覆盖保证**：无。必须手动验证或编写脚本。
-
-## Metrics
-
-| 度量 | RVProbe | SV Constraints | Hand-Written ASM |
-|------|---------|---------------|-----------------|
-| **Call-site LOC** | 63（21×3） | ~210（21×10） | ~252（21×12 含注释） |
-| **Library/Framework LOC** | ~90（4 个格式函数，复用） | ~320（4 个 constraint class） | 0（无可复用代码） |
-| **总 LOC** | ~153 | ~530 | ~252 + 验证脚本 |
-| **序列级约束** | 原生（`coverWAR()` 一行） | Workaround（辅助变量 + 手写约束） | 脑内求解 |
-| **覆盖保证** | SAT = 闭合 | 求解器保证（如果约束正确） | 无（需手动验证） |
-| **格式适配** | 自动（`hasRd()`/`hasRs1()`） | 每格式独立 class | 每格式独立手写 |
-| **新增指令的边际成本** | 3 行 | ~10 行 + 复用 class | ~12 行 + 重新验证 |
+| 度量 | 手写汇编 | RVProbe |
+|------|---------|---------|
+| **总行数** | 128 行 asm | 63 行 call site + 90 行 library |
+| **覆盖保证** | 无（需人工验证每对的 ¬RAW/¬WAR 条件） | SAT = 闭合 |
+| **格式适配** | U-type 需要手动引入 helper 指令 | `coverWAR()` 自动处理跨格式依赖 |
+| **新增指令** | 6 行 asm + 重新验证 hazard 分类 | 3 行 call site，复用已有 library |
+| **模板化程度** | 同格式可复制粘贴改助记符，但每对仍需验证 | 同格式共享一个库函数 |
 
 ### 关键发现
 
-1. **hole 的本质是序列级的**：riscv-dv 33 万条指令只覆盖了 RAW，WAR/WAW/NoHazard 全部缺失。这不是随机数不够的问题，而是 riscv-dv 的生成策略没有 hazard-aware 的序列级约束。
+1. **hole 的本质是序列级的**：riscv-dv 33 万条指令只覆盖了 RAW，WAR/WAW/NoHazard 全部缺失。这不是随机数不够的问题，而是生成策略没有 hazard-aware 的序列级约束。
 
-2. **三种方法都能填 hole，但代价不同**：
-   - RVProbe：约束即覆盖目标，无翻译损耗
-   - SV：需要将序列级目标手动编码为单指令级约束的组合
-   - 手写：需要在脑中求解 CSP，且无正确性保证
+2. **手写汇编看似简单但有隐患**：
+   - 模板化的 6 行一组可以机械复制，但每对必须验证 hazard 优先级排除条件（¬RAW、¬WAR）
+   - U-type 的 WAR 需要跨格式推理，工程师必须理解"lui 没有 rs 字段所以不会产生 WAR"
+   - 错误是静默的：如果不小心让 WAW 对同时满足 RAW（如 `add x10, x11, x12; add x10, x10, x14`），riscv-dv 会将其分类为 RAW 而非 WAW，hole 仍然未填
 
-3. **可扩展性差异**：新增一条 R-type 指令，RVProbe 加 3 行；SV 复用已有 class 加 ~10 行；手写需要重新构造满足约束的序列（~12 行 + 重新验证）。
-
-## File Plan
-
-```
-rvprobe/paper/exp1/
-├── EXP1.md                          ← 本文件（实验设计 + 结果）
-├── phase1/
-│   └── CoverageReport.txt           ← riscv-dv 覆盖率报告（链接或拷贝）
-├── phase3_rvprobe/
-│   └── → rvprobe/src/cases/coverage/RV32I.scala（已有）
-│   └── → rvprobe/src/cases/coverage/CoverageLib.scala（已有）
-├── phase3_sv/
-│   ├── sv_rtype_hazard.sv           ← R-type hazard closure (新)
-│   ├── sv_itype_hazard.sv           ← I-type ALU hazard closure (新)
-│   ├── sv_shiftimm_hazard.sv        ← Shift-imm hazard closure (新)
-│   └── sv_utype_hazard.sv           ← U-type hazard closure (新)
-├── phase3_handwritten/
-│   ├── handwritten_rtype_hazard.S   ← R-type 手写序列 (新)
-│   ├── handwritten_itype_hazard.S   ← I-type 手写序列 (新)
-│   ├── handwritten_shiftimm_hazard.S← Shift-imm 手写序列 (新)
-│   └── handwritten_utype_hazard.S   ← U-type 手写序列 (新)
-└── legacy/
-    ├── handwritten_add.S            ← (旧版，保留参考)
-    ├── handwritten_addi.S
-    ├── handwritten_sw.S
-    ├── sv_add_coverage.sv
-    ├── sv_addi_coverage.sv
-    ├── sv_sw_coverage.sv
-    ├── verify_add.py
-    ├── verify_addi.py
-    └── verify_sw.py
-```
+3. **RVProbe 消除了手写的两个核心负担**：
+   - 不需要验证 hazard 优先级排除——求解器自动处理
+   - 不需要跨格式推理——`coverWAR()` 根据指令格式自动决定约束哪些字段
 
 ## Status
 
 - [x] Phase 1: riscv-dv 饱和实验完成，334K 指令，覆盖率报告已有
 - [x] Phase 2: Hole 分析完成，确认 21 条指令 × 3 种 hazard = 63 个 hole
-- [x] RVProbe 侧：CoverageLib + RV32I.scala 已有完整实现
-- [ ] Phase 3 SV: 编写 4 个格式的 hazard closure constraint class
-- [ ] Phase 3 手写: 编写 4 个格式的 hazard closure 汇编
-- [ ] LOC 统计与对比表
-- [ ] 旧文件迁移到 legacy/
+- [x] Phase 3: 手写汇编填补方案（128 行）+ RVProbe 对应实现（已有）
+- [ ] 将手写汇编喂给 riscv-dv coverage 工具验证是否真正闭合 hole
+- [ ] RVProbe 生成的汇编同样喂给 riscv-dv coverage 工具验证
