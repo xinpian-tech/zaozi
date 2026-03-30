@@ -1010,7 +1010,7 @@ exit:
     ori  t0, t0, 1
 
     la   t1, tohost
-    sd   t0, 0(t1)
+    sw   t0, 0(t1)
 spin:
     j    spin
 
@@ -1018,8 +1018,8 @@ spin:
     .align 6
     .globl tohost
 tohost:
-    .dword 0
+    .word 0
     .align 6
     .globl fromhost
 fromhost:
-    .dword 0
+    .word 0
