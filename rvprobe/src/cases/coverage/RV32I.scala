@@ -32,11 +32,11 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
   object And extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = rType(n, isAnd())
+    def constraints() = rTypeLogical(n, isAnd(), and)
 
   object Or extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = rType(n, isOr())
+    def constraints() = rTypeLogical(n, isOr(), or)
 
   object Sll extends RVGenerator:
     val sets          = isRV64GC()
@@ -64,7 +64,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
   object Xor extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = rType(n, isXor())
+    def constraints() = rTypeLogical(n, isXor(), xor)
 
   // --- I-type ALU ---
   object Addi extends RVGenerator:
@@ -73,11 +73,11 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
   object Andi extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = iTypeAlu(n, isAndi())
+    def constraints() = iTypeLogical(n, isAndi(), andi)
 
   object Ori extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = iTypeAlu(n, isOri())
+    def constraints() = iTypeLogical(n, isOri(), ori)
 
   object Slti extends RVGenerator:
     val sets          = isRV64GC()
@@ -89,7 +89,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
   object Xori extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = iTypeAlu(n, isXori())
+    def constraints() = iTypeLogical(n, isXori(), xori)
 
   // --- U-type ---
   object Auipc extends RVGenerator:

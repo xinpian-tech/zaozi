@@ -184,22 +184,89 @@ def _utype_hazard_pairs(name):
     return instrs
 
 
+RTYPE_LOGICAL = [
+    riscv_instr_name_t.AND,
+    riscv_instr_name_t.OR,
+    riscv_instr_name_t.XOR,
+]
+
+ITYPE_LOGICAL = [
+    riscv_instr_name_t.ANDI,
+    riscv_instr_name_t.ORI,
+    riscv_instr_name_t.XORI,
+]
+
+
+def _rtype_logical_similarity(name):
+    """Generate instructions covering IDENTICAL, OPPOSITE, DIFFERENT for an R-type logical op.
+
+    Logical similarity in riscv-dv compares rs1_value vs rs2_value via XOR bit count.
+    We use ADDI to load known values, then emit the logical op.
+
+    IDENTICAL: same register for rs1 and rs2 (guaranteed same value)
+    OPPOSITE:  rs1 = 0x55555555, rs2 = 0xAAAAAAAA (all 32 bits differ)
+    DIFFERENT: rs1 = 0, rs2 = 0xFF (8 bits differ, ≥5 threshold)
+
+    This is the same value-setup logic the engineer must manually construct
+    in hand-written assembly. RVProbe's rTypeLogical() automates the pattern
+    with freshReg() for register allocation.
+    """
+    instrs = []
+    r = riscv_reg_t
+
+    # IDENTICAL: use same register for both sources
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S5, rs1=r.ZERO, imm=42))
+    instrs.append(_make_instr(name, rd=r.S6, rs1=r.S5, rs2=r.S5))
+
+    # OPPOSITE: load complementary values
+    # 0x55555555 = 1431655765, 0xAAAAAAAA as signed = -1431655766
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S5, rs1=r.ZERO, imm=0x555))
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S6, rs1=r.ZERO, imm=-1366))
+    instrs.append(_make_instr(name, rd=r.S7, rs1=r.S5, rs2=r.S6))
+
+    # DIFFERENT: ≥5 bits differ
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S5, rs1=r.ZERO, imm=0))
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S6, rs1=r.ZERO, imm=0xFF))
+    instrs.append(_make_instr(name, rd=r.S7, rs1=r.S5, rs2=r.S6))
+
+    return instrs
+
+
+def _itype_logical_similarity(name):
+    """Generate instructions covering IDENTICAL, OPPOSITE, DIFFERENT for an I-type logical op.
+
+    For I-type, riscv-dv compares rs1_value vs sign-extended imm.
+    """
+    instrs = []
+    r = riscv_reg_t
+
+    # IDENTICAL: rs1_value == imm
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S5, rs1=r.ZERO, imm=42))
+    instrs.append(_make_instr(name, rd=r.S6, rs1=r.S5, imm=42))
+
+    # OPPOSITE
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S5, rs1=r.ZERO, imm=0x555))
+    instrs.append(_make_instr(name, rd=r.S6, rs1=r.S5, imm=-1366))
+
+    # DIFFERENT
+    instrs.append(_make_instr(riscv_instr_name_t.ADDI, rd=r.S5, rs1=r.ZERO, imm=0))
+    instrs.append(_make_instr(name, rd=r.S6, rs1=r.S5, imm=0xFF))
+
+    return instrs
+
+
 class riscv_gpr_hazard_instr_stream(riscv_directed_instr_stream):
-    """Directed instruction stream that covers WAR, WAW, and NoHazard for all
-    21 RV32I instructions missing these hazard bins after riscv-dv saturation.
+    """Directed instruction stream that covers:
+    - WAR, WAW, NoHazard for 21 RV32I instructions (63 hazard holes)
+    - IDENTICAL, OPPOSITE, DIFFERENT for 6 logical instructions (13 logical holes)
 
-    This stream generates 128 instructions (21 instructions × 6 lines each,
-    plus 2 ADDI helpers for U-type WAR coverage).
-
-    The implementation explicitly constructs each hazard pair — the same
+    The implementation explicitly constructs each pair/setup — the same
     constraint satisfaction problem that hand-written assembly requires,
     but encoded in Python instead of raw .S.
 
     Compare with RVProbe, where the equivalent is:
-        seq.coverWAR()
-        seq.coverWAW()
-        seq.coverNoHazard()
-    (3 lines, format-agnostic, solver-guaranteed correct)
+        seq.coverWAR(); seq.coverWAW(); seq.coverNoHazard()  // hazard
+        rTypeLogical(n, isAnd(), and)                        // logical
     """
 
     def __init__(self):
@@ -208,6 +275,8 @@ class riscv_gpr_hazard_instr_stream(riscv_directed_instr_stream):
 
     def post_randomize(self):
         self.instr_list = []
+
+        # === Hazard coverage ===
 
         # R-type: 10 instructions × 6 = 60
         for name in RTYPE_INSTRS:
@@ -225,9 +294,19 @@ class riscv_gpr_hazard_instr_stream(riscv_directed_instr_stream):
         for name in UTYPE_INSTRS:
             self.instr_list.extend(_utype_hazard_pairs(name))
 
+        # === Logical similarity coverage ===
+
+        # R-type logical: 3 instructions × 8 = 24
+        for name in RTYPE_LOGICAL:
+            self.instr_list.extend(_rtype_logical_similarity(name))
+
+        # I-type logical: 3 instructions × 6 = 18
+        for name in ITYPE_LOGICAL:
+            self.instr_list.extend(_itype_logical_similarity(name))
+
         # Label first and last instructions
         self.instr_list[0].comment = "Start %s" % self.name
         self.instr_list[-1].comment = "End %s" % self.name
 
-        logging.info("Generated %d instructions for GPR hazard coverage",
+        logging.info("Generated %d instructions for coverage hole closure",
                      len(self.instr_list))
