@@ -23,7 +23,7 @@
 ### 2. 重写 Section 4.1（Exp 1）为三方对比 ⬅ 最高优先级
 - 替换 "Phase 1 random + Phase 2 RVProbe" 叙事
 - 新结构：
-  - Phase 1: riscv-dv 饱和（334K 指令，84.37% avg covergroup score，63 个 hazard hole）
+  - Phase 1: riscv-dv 饱和（224K 指令，83.23% avg covergroup score，63 个 hazard hole）
   - Phase 2: 三种方法填 hole
     - 手写 asm：128 行
     - riscv-dv Python extension：~234 行
@@ -44,6 +44,10 @@
 ### 4. 提升 Section 4.2（T1 Bug）为正式 RQ2
 - 从 "case study" 提升为 RQ2：白盒约束组合能否系统性暴露实现相关缺陷？
 - 补充 CRV 不太可能覆盖的概率估算
+- **新增**：重做 T1 实验——实现一个真实的 T1 测试用例，使用白盒信号注入
+  - [ ] 从 T1 OM 提取白盒信号
+  - [ ] 实现 RVProbe 测试用例
+  - [ ] 跑仿真验证
 - [ ] 完成
 
 ### 5. 重写 Related Work
@@ -58,9 +62,13 @@
 - 更新引用格式
 - [ ] 完成
 
+### 7. 代码匿名化
+- 将代码放到匿名平台上（anonymous GitHub 或类似）
+- [ ] 完成
+
 ## Exp 1 已完成工作
 
-- [x] Phase 1: riscv-dv 饱和实验（334K 指令），覆盖率报告在 `/root/riscv-dv/cov_out_2026-03-28/CoverageReport.txt`
+- [x] Phase 1: riscv-dv 饱和实验（224K 指令），覆盖率报告在 `/root/riscv-dv/cov_out_exp1_rv32i/CoverageReport.txt`
 - [x] Phase 2: Hole 分析 — 21 条指令 × 3 种 hazard = 63 个 hole
 - [x] Phase 3: 三种方法实现
   - 手写汇编：`paper/exp1/handwrite.S`（128 行）
