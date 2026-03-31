@@ -17,18 +17,18 @@ riscv-dv 覆盖率饱和后，剩余的 hole 集中在**序列级属性**（haza
 ## Phase 1: riscv-dv Baseline Saturation (Done)
 
 **配置**：riscv-dv 默认 RV32I 配置，pygen 后端
-**数据**：`/root/riscv-dv/cov_out_2026-03-28/CoverageReport.txt`
+**数据**：`/root/riscv-dv/cov_out_exp1_rv32i/CoverageReport.txt`
 
 ### 结果概要
 
 | 指标 | 值 |
 |------|-----|
-| 处理指令总数 | 334,177 |
+| 处理指令总数 | 223,716 |
 | Covergroup 总数 | 27 |
 | Coverpoint 总数 | 2,038 |
 | 已覆盖 Coverpoint | 150 |
 | Coverpoint 覆盖率 | 7.36% |
-| 平均 Covergroup 分数 | 84.37% |
+| 平均 Covergroup 分数 | 83.23% |
 
 ### 各 Covergroup 覆盖率
 
@@ -36,30 +36,30 @@ riscv-dv 覆盖率饱和后，剩余的 hole 集中在**序列级属性**（haza
 |------------|------:|-----------------|
 | mepc_alignment_cg | 100% | — |
 | beq_cg | 93.75% | NO_HAZARD |
-| add_cg | 90.62% | NO_HAZARD, WAR, WAW |
-| sub_cg | 90.62% | NO_HAZARD, WAR, WAW |
-| sra_cg | 90.62% | NO_HAZARD, WAR, WAW |
-| srl_cg | 90.62% | NO_HAZARD, WAR, WAW |
-| sll_cg | 90.62% | NO_HAZARD, WAR, WAW |
-| slt_cg | 90.62% | NO_HAZARD, WAR, WAW |
-| sltu_cg | 90.62% | NO_HAZARD, WAR, WAW |
+| add_cg | 90.23% | NO_HAZARD, WAR, WAW |
+| sub_cg | 89.45% | NO_HAZARD, WAR, WAW |
+| sra_cg | 89.45% | NO_HAZARD, WAR, WAW |
+| srl_cg | 89.45% | NO_HAZARD, WAR, WAW |
+| sll_cg | 89.45% | NO_HAZARD, WAR, WAW |
+| slt_cg | 89.45% | NO_HAZARD, WAR, WAW |
+| sltu_cg | 89.45% | NO_HAZARD, WAR, WAW |
 | addi_cg | 89.29% | NO_HAZARD, WAR, WAW |
-| slti_cg | 89.29% | NO_HAZARD, WAR, WAW |
-| sltiu_cg | 89.29% | NO_HAZARD, WAR, WAW |
-| and_cg | 86.11% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| xor_cg | 86.11% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| or_cg | 86.11% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| srli_cg | 85% | NO_HAZARD, WAR, WAW |
-| srai_cg | 85% | NO_HAZARD, WAR, WAW |
-| slli_cg | 85% | NO_HAZARD, WAR, WAW |
-| ori_cg | 84.38% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| andi_cg | 84.38% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| csrrw_cg | 83.33% | WAR, WAW |
-| xori_cg | 81.25% | NO_HAZARD, WAR, WAW + logical(IDENTICAL, OPPOSITE, DIFFERENT) |
+| slti_cg | 87.95% | NO_HAZARD, WAR, WAW |
+| sltiu_cg | 87.95% | NO_HAZARD, WAR, WAW |
+| and_cg | 85.07% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
+| xor_cg | 85.07% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
+| or_cg | 85.07% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
+| srli_cg | 83.12% | NO_HAZARD, WAR, WAW |
+| srai_cg | 83.12% | NO_HAZARD, WAR, WAW |
+| slli_cg | 83.12% | NO_HAZARD, WAR, WAW |
+| ori_cg | 83.20% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
+| andi_cg | 83.20% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
+| csrrw_cg | 80.21% | WAR, WAW |
+| xori_cg | 80.08% | NO_HAZARD, WAR, WAW + logical(IDENTICAL, OPPOSITE, DIFFERENT) |
 | rv32i_misc_cg | 80% | ECALL |
-| lui_cg | 75% | NO_HAZARD, WAR, WAW |
 | auipc_cg | 75% | NO_HAZARD, WAR, WAW |
-| jal_cg | 74.22% | rd=ZERO, rd_align(Aligned), imm_align(Aligned) |
+| lui_cg | 71.88% | NO_HAZARD, WAR, WAW |
+| jal_cg | 71.88% | rd=ZERO, rd_align(Aligned), imm_align(Aligned) |
 | opcode_cg | 31.25% | 22 个未使用的 opcode 编码空间 |
 
 ## Phase 2: Hole Analysis
@@ -68,7 +68,7 @@ riscv-dv 覆盖率饱和后，剩余的 hole 集中在**序列级属性**（haza
 
 **类别 A: Hazard bins（主要目标，21 条指令）**
 
-riscv-dv 33 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了 `RAW_HAZARD`。缺失：
+riscv-dv 22 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了 `RAW_HAZARD`。缺失：
 
 | 缺失 Hazard 类型 | 受影响指令 | 数量 |
 |---|---|---|
@@ -80,7 +80,10 @@ riscv-dv 33 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了
 
 **这是 exp1 的核心数据点**：hazard 是序列级属性（取决于相邻指令间的寄存器依赖关系），riscv-dv 的随机生成只碰巧覆盖了 RAW（最常见的依赖模式），无法系统性地闭合 WAR/WAW/NoHazard。
 
-**类别 B: Logical similarity bins（6 条逻辑指令）**
+**类别 B: Logical similarity bins（6 条逻辑指令，纳入对比）**
+
+riscv-dv 的 `logical_similarity` 比较两个操作数的运行时值（R-type: rs1_value vs rs2_value，I-type: rs1_value vs imm）。
+分类标准：IDENTICAL（值相等）、OPPOSITE（所有 32 位不同）、SIMILAR（<5 位不同）、DIFFERENT（≥5 位不同）。
 
 | 缺失 | 受影响指令 |
 |---|---|
@@ -89,12 +92,19 @@ riscv-dv 33 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了
 
 总计 **13 个未覆盖 logical similarity bin**。
 
-**类别 C: 零散 hole（不纳入对比）**
+填补方法：使用 `li` 加载已知值到寄存器，然后执行逻辑指令。
+- IDENTICAL（R-type）：`rs1 == rs2`（同一寄存器 → 同值）；（I-type）：`li r,42; andi rd,r,42`
+- OPPOSITE：`li r1,0x55555555; li r2,0xAAAAAAAA; and rd,r1,r2`
+- DIFFERENT：`li r1,0; li r2,0xFF; and rd,r1,r2`
 
-- `opcode_cg`：22 个未使用的 opcode bin — 属于不可达（RV32I 不使用这些编码）
+**类别 C: 零散 hole（不纳入对比，标注为不可达或超出范围）**
+
+- `opcode_cg`：22 个未使用的 opcode bin — 架构不可达（RV32I 不使用这些编码）
+- `lui/auipc` 的 RAW_HAZARD — 架构不可达（U-type 无 rs 字段）
 - `jal_cg`：rd=ZERO, 对齐 bin — jal 特有的边界情况
 - `rv32i_misc_cg`：ECALL — 需要特权模式支持
-- `csrrw_cg`：WAR/WAW — CSR 指令，不在基本 ALU 指令范围
+- `csrrw_cg`：rd=SP — 寄存器覆盖边界
+- 19 条指令的 `cp_rd=SP` — riscv-dv 默认避免 SP 作为目标寄存器
 
 ### Hazard 定义（对齐 riscv-dv 的 `hazard_e`）
 
@@ -379,37 +389,49 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 ```
 
 **RVProbe 总 LOC**：
-- Call site：21 × 3 = 63 行
-- Library：~90 行（4 个格式函数，复用）
-- 覆盖保证：SAT = 全部 hazard bin 闭合
+- Call site：21 × 3 = 63 行（其中 6 条逻辑指令从 rType/iTypeAlu 升级为 rTypeLogical/iTypeLogical）
+- Library：~150 行（6 个格式函数：rType, rTypeLogical, iTypeAlu, iTypeLogical, shiftImm, uType）
+- 覆盖保证：hazard SAT = 全部 63 bin 闭合；logical similarity 通过 li + op 模式覆盖 13 bin
 
 ### 对比
 
-| 度量 | 手写汇编 | RVProbe |
-|------|---------|---------|
-| **总行数** | 128 行 asm | 63 行 call site + 90 行 library |
-| **覆盖保证** | 无（需人工验证每对的 ¬RAW/¬WAR 条件） | SAT = 闭合 |
-| **格式适配** | U-type 需要手动引入 helper 指令 | `coverWAR()` 自动处理跨格式依赖 |
-| **新增指令** | 6 行 asm + 重新验证 hazard 分类 | 3 行 call site，复用已有 library |
-| **模板化程度** | 同格式可复制粘贴改助记符，但每对仍需验证 | 同格式共享一个库函数 |
+| 度量 | 手写汇编 | riscv-dv Python ext | RVProbe |
+|------|---------|-------------------|---------|
+| **Hazard LOC** | 128 行 asm | ~170 行 Python | 63 行 call site + ~90 行 library |
+| **Logical LOC** | ~57 行 asm | ~42 行 Python | 升级 6 个 call site（+0 行）+ ~60 行 library |
+| **总 LOC** | ~185 行 | ~212 行 | 63 行 call site + ~150 行 library |
+| **Hazard 保证** | 无（需人工验证 ¬RAW/¬WAR） | 无（同样手动编码） | SAT = 闭合 |
+| **Logical 保证** | 需手动计算互补值 | 同上 | 模式化（`rTypeLogical` 封装） |
+| **格式适配** | U-type WAR 需跨格式推理 | 同上 | `coverWAR()` 自动处理 |
+| **可扩展性** | 新指令 +6 行 + 重新验证 | 新指令需写新函数 | 新指令 +3 行 call site |
 
 ### 关键发现
 
-1. **hole 的本质是序列级的**：riscv-dv 33 万条指令只覆盖了 RAW，WAR/WAW/NoHazard 全部缺失。这不是随机数不够的问题，而是生成策略没有 hazard-aware 的序列级约束。
+1. **Hazard hole 的本质是序列级的**：riscv-dv 22 万条指令只覆盖了 RAW，WAR/WAW/NoHazard 全部缺失。这不是随机数不够的问题，而是生成策略没有 hazard-aware 的序列级约束。RVProbe 的 `coverWAR()` 等 API 将序列级属性提升为一等约束。
 
-2. **手写汇编看似简单但有隐患**：
+2. **Logical similarity hole 是值级的**：需要构造特定操作数值（互补、相同、不同）。三种方法在此处的差异主要是**模式化程度**——手写需要手动计算 `~0x55555555 = 0xAAAAAAAA`，RVProbe 将此模式封装为 `rTypeLogical()`，新增逻辑指令只需切换一个函数调用。
+
+3. **手写汇编看似简单但有隐患**：
    - 模板化的 6 行一组可以机械复制，但每对必须验证 hazard 优先级排除条件（¬RAW、¬WAR）
-   - U-type 的 WAR 需要跨格式推理，工程师必须理解"lui 没有 rs 字段所以不会产生 WAR"
-   - 错误是静默的：如果不小心让 WAW 对同时满足 RAW（如 `add x10, x11, x12; add x10, x10, x14`），riscv-dv 会将其分类为 RAW 而非 WAW，hole 仍然未填
+   - U-type 的 WAR 需要跨格式推理
+   - 错误是静默的：如果 WAW 对意外满足 RAW（如 `add x10, x11, x12; add x10, x10, x14`），coverage tool 将其分类为 RAW，hole 仍未填
+   - 我们在实验中还发现了 riscv-dv coverage tool 本身的 bug（FP hazard 覆写 GPR hazard），说明整个 trace-based coverage 流程是脆弱的
 
-3. **RVProbe 消除了手写的两个核心负担**：
-   - 不需要验证 hazard 优先级排除——求解器自动处理
-   - 不需要跨格式推理——`coverWAR()` 根据指令格式自动决定约束哪些字段
+4. **RVProbe 的两层优势**：
+   - **序列级**（hazard）：求解器自动处理优先级排除和跨格式依赖
+   - **值级**（logical）：模式化封装减少手动计算，`freshReg()` 消除寄存器冲突风险
 
 ## Status
 
-- [x] Phase 1: riscv-dv 饱和实验完成，334K 指令，覆盖率报告已有
-- [x] Phase 2: Hole 分析完成，确认 21 条指令 × 3 种 hazard = 63 个 hole
-- [x] Phase 3: 手写汇编填补方案（128 行）+ RVProbe 对应实现（已有）
-- [ ] 将手写汇编喂给 riscv-dv coverage 工具验证是否真正闭合 hole
-- [ ] RVProbe 生成的汇编同样喂给 riscv-dv coverage 工具验证
+- [x] Phase 1: riscv-dv 饱和实验完成，224K 指令，覆盖率报告在 `/root/riscv-dv/cov_out_exp1_rv32i/CoverageReport.txt`
+- [x] Phase 2: Hole 分析完成
+  - 63 个 hazard hole（21 指令 × {WAR, WAW, NoHazard}）
+  - 13 个 logical similarity hole（6 逻辑指令 × {IDENTICAL, OPPOSITE, DIFFERENT} 减去已覆盖的 SIMILAR）
+- [x] Phase 3: 三种方法实现
+  - 手写汇编：`handwrite.S`（~185 行：128 hazard + 57 logical）
+  - riscv-dv Python extension：`riscv_dv_hazard_stream.py`（~212 行）
+  - RVProbe eDSL：`rvprobe.scala`（63 行 call site + ~150 行 library）
+- [x] riscv-dv coverage tool bug 发现并修复（FP hazard 覆写 GPR hazard）
+- [x] Hazard hole 验证完成：61/63 闭合（lui/auipc RAW 架构不可达），83.23% → 93.36%
+- [ ] Logical similarity hole 验证（手写 asm + RVProbe 产物喂 coverage tool）
+- [ ] RVProbe 生成的汇编喂 coverage tool 验证

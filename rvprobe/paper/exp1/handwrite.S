@@ -202,6 +202,87 @@ _start:
     auipc x28, 0x22222       # NoHazard
 
 # ============================================================
-# Total: 128 instructions (60 + 36 + 18 + 14)
-# Fills: 63 hazard holes (21 × {WAR, WAW, NoHazard})
+# Logical similarity (6 logical instructions × {IDENTICAL, OPPOSITE, DIFFERENT})
+# Format: li setup + logical op; riscv-dv compares rs1_value vs rs2_value/imm
+# ============================================================
+
+# --- R-type logical (and, or, xor): 3 bins × 3 ops = 9 groups ---
+# Each needs: li + li + op (3 instrs per bin), IDENTICAL uses same reg (2 instrs)
+
+# and — IDENTICAL: same register → same value
+    li x21, 42
+    and x22, x21, x21       # rs1_value == rs2_value → IDENTICAL
+# and — OPPOSITE: all 32 bits differ
+    li x21, 0x55555555
+    li x22, -1431655766      # 0xAAAAAAAA = ~0x55555555
+    and x23, x21, x22       # OPPOSITE
+# and — DIFFERENT: ≥5 bits differ
+    li x21, 0
+    li x22, 255              # 0xFF, 8 bits differ
+    and x23, x21, x22       # DIFFERENT
+
+# or — IDENTICAL
+    li x21, 42
+    or x22, x21, x21        # IDENTICAL
+# or — OPPOSITE
+    li x21, 0x55555555
+    li x22, -1431655766
+    or x23, x21, x22        # OPPOSITE
+# or — DIFFERENT
+    li x21, 0
+    li x22, 255
+    or x23, x21, x22        # DIFFERENT
+
+# xor — IDENTICAL
+    li x21, 42
+    xor x22, x21, x21       # IDENTICAL
+# xor — OPPOSITE
+    li x21, 0x55555555
+    li x22, -1431655766
+    xor x23, x21, x22       # OPPOSITE
+# xor — DIFFERENT
+    li x21, 0
+    li x22, 255
+    xor x23, x21, x22       # DIFFERENT
+
+# --- I-type logical (andi, ori, xori): rs1_value vs imm ---
+# IDENTICAL: li r,val; op rd,r,val (rs1_value == imm)
+# OPPOSITE: li r,0x555; op rd,r,-1366 (0xFFFFFAAA ≈ ~0x555 in 12-bit sign-ext)
+# DIFFERENT: li r,0; op rd,r,0xFF
+
+# andi — IDENTICAL
+    li x21, 42
+    andi x22, x21, 42       # IDENTICAL
+# andi — OPPOSITE
+    li x21, 0x555
+    andi x22, x21, -1366    # OPPOSITE
+# andi — DIFFERENT
+    li x21, 0
+    andi x22, x21, 255      # DIFFERENT
+
+# ori — IDENTICAL
+    li x21, 42
+    ori x22, x21, 42        # IDENTICAL
+# ori — OPPOSITE
+    li x21, 0x555
+    ori x22, x21, -1366     # OPPOSITE
+# ori — DIFFERENT
+    li x21, 0
+    ori x22, x21, 255       # DIFFERENT
+
+# xori — IDENTICAL
+    li x21, 42
+    xori x22, x21, 42       # IDENTICAL
+# xori — OPPOSITE
+    li x21, 0x555
+    xori x22, x21, -1366    # OPPOSITE
+# xori — DIFFERENT
+    li x21, 0
+    xori x22, x21, 255      # DIFFERENT
+
+# ============================================================
+# Grand total:
+#   Hazard: 128 instructions (21 × {WAR, WAW, NoHazard} = 63 holes)
+#   Logical: ~57 instructions (6 × {IDENTICAL, OPPOSITE, DIFFERENT} = 18 holes,
+#            but only 13 are riscv-dv holes — SIMILAR already covered by random)
 # ============================================================

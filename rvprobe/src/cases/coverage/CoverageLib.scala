@@ -90,6 +90,51 @@ object CoverageLib:
     seq.coverWAW()
     seq.coverNoHazard()
 
+  /** R-type logical instruction coverage: rType + logical similarity (IDENTICAL, OPPOSITE, DIFFERENT).
+    *
+    * Logical similarity is a value-level property measured by riscv-dv: how many bits differ between rs1_value and
+    * rs2_value. Since the SMT solver controls register indices (not runtime values), we use setup `li` instructions to
+    * load known values, then emit the logical op targeting those registers.
+    *
+    *   - IDENTICAL: rs1 == rs2 (same register → same value, 0 bits differ)
+    *   - OPPOSITE: rs1_value == ~rs2_value (all 32 bits differ)
+    *   - DIFFERENT: rs1_value and rs2_value differ by ≥5 bits
+    *
+    * @param n
+    *   number of solver-driven instructions (for hazard/register bin coverage)
+    * @param opcode
+    *   the instruction constraint (e.g. isAnd())
+    * @param asmOp
+    *   the AsmApi function for this instruction (e.g. `and`)
+    */
+  def rTypeLogical(
+    n:     Int,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
+    asmOp: (Referable[SInt], Referable[SInt], Referable[SInt]) => (Arena, Context, Block, Recipe) ?=> Int
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    rType(n, opcode)
+    // IDENTICAL: same register for rs1 and rs2
+    val rIdent = freshReg()
+    li(rIdent, 42)
+    asmOp(freshReg(), rIdent, rIdent)
+    // OPPOSITE: all 32 bits differ
+    val rOppA = freshReg()
+    val rOppB = freshReg()
+    li(rOppA, 0x55555555L)
+    li(rOppB, 0xAAAAAAAAL.toInt.toLong) // = ~0x55555555 sign-extended
+    asmOp(freshReg(), rOppA, rOppB)
+    // DIFFERENT: ≥5 bits differ
+    val rDiffA = freshReg()
+    val rDiffB = freshReg()
+    li(rDiffA, 0L)
+    li(rDiffB, 0xFFL)
+    asmOp(freshReg(), rDiffA, rDiffB)
+
   /** I-type ALU instruction coverage: 2-register + imm12 with register bins, imm boundary bins + hazards.
     *
     * @param n
@@ -119,6 +164,47 @@ object CoverageLib:
     seq.coverWAR()
     seq.coverWAW()
     seq.coverNoHazard()
+
+  /** I-type logical instruction coverage: iTypeAlu + logical similarity (IDENTICAL, OPPOSITE, DIFFERENT).
+    *
+    * For I-type logical ops, riscv-dv compares rs1_value vs imm_value. We use `li` to load a known value into rs1, then
+    * emit the logical op with a matching/complementary immediate.
+    *
+    *   - IDENTICAL: rs1_value == imm (e.g. li r,42; andi rd,r,42)
+    *   - OPPOSITE: all 12 significant bits differ (e.g. li r,0x555; xori rd,r,-1366) — note imm12 is sign-extended to
+    *     XLEN, so "opposite" is approximate within 12-bit range
+    *   - DIFFERENT: ≥5 bits differ (e.g. li r,0; ori rd,r,0xFF)
+    *
+    * @param n
+    *   number of solver-driven instructions
+    * @param opcode
+    *   the instruction constraint (e.g. isAndi())
+    * @param asmOp
+    *   the AsmApi function (e.g. `andi`)
+    */
+  def iTypeLogical(
+    n:     Int,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
+    asmOp: (Referable[SInt], Referable[SInt], Int) => (Arena, Context, Block, Recipe) ?=> Int
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    iTypeAlu(n, opcode)
+    // IDENTICAL: rs1_value == imm
+    val rIdent = freshReg()
+    li(rIdent, 42L)
+    asmOp(freshReg(), rIdent, 42)
+    // OPPOSITE: rs1_value bits all differ from imm (within 12-bit signed range)
+    val rOpp = freshReg()
+    li(rOpp, 0x555L)
+    asmOp(freshReg(), rOpp, -1366) // -1366 = 0xFFFFFAAA sign-extended, ~0x555 in low 12 bits
+    // DIFFERENT: ≥5 bits differ
+    val rDiff = freshReg()
+    li(rDiff, 0L)
+    asmOp(freshReg(), rDiff, 0xFF)
 
   /** Shift-immediate instruction coverage: 2-register (rd, rs1) with register bins + hazards (no imm bins).
     *
