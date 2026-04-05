@@ -204,6 +204,10 @@ object ChainingLib:
   def waw_ALUxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
     waw(reg, isVaddVv(), isVsubVv())
 
+  // --- D3 × C4: WAR, Slow × Fast (divider reads, fast ALU overwrites) ---
+  def war_SlowxFast(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+    war(reg, isVdivVv(), isVaddVv())
+
   // --- D4 × C4: WAW, Slow × Fast ---
   def waw_SlowxFast(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
     waw(reg, isVdivVv(), isVaddVv())
