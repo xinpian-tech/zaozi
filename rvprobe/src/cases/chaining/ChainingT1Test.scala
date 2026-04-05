@@ -27,7 +27,8 @@ import me.jiuyang.rvprobe.cases.chaining.ChainingLib.*
   object D1C2 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = explicitRAW_ALUxLSU()     }
   object D1C3 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = explicitRAW_MaskxALU()    }
   object D1C4 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = explicitRAW_SlowxFast()   }
-  object D1C5 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = explicitRAW_WidenxNormal()}
+  // D1C5 (vwadd widening) skipped: not supported in all T1 configs
+  // object D1C5 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = explicitRAW_WidenxNormal()}
   object D1C7 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = explicitRAW_SlidexStore() }
   object D2C1 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = implicitV0RAW_ALUxALU()   }
   object D3C1 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = war_ALUxALU()             }
@@ -41,7 +42,7 @@ import me.jiuyang.rvprobe.cases.chaining.ChainingLib.*
 
   val cells: Seq[(String, RVGenerator)] = Seq(
     "D1C1" -> D1C1, "D1C2" -> D1C2, "D1C3" -> D1C3, "D1C4" -> D1C4,
-    "D1C5" -> D1C5, "D1C7" -> D1C7, "D2C1" -> D2C1, "D3C1" -> D3C1,
+    "D1C7" -> D1C7, "D2C1" -> D2C1, "D3C1" -> D3C1,
     "D3C2" -> D3C2, "D3C4" -> D3C4, "D3C6" -> D3C6, "D4C1" -> D4C1,
     "D4C2" -> D4C2, "D4C4" -> D4C4, "D5C1" -> D5C1
   )
