@@ -281,8 +281,99 @@ _start:
     xori x22, x21, 255      # DIFFERENT
 
 # ============================================================
-# Grand total:
-#   Hazard: 128 instructions (21 × {WAR, WAW, NoHazard} = 63 holes)
-#   Logical: ~57 instructions (6 × {IDENTICAL, OPPOSITE, DIFFERENT} = 18 holes,
-#            but only 13 are riscv-dv holes — SIMILAR already covered by random)
+# cp_rd=SP (x2) holes — 19 instructions missing rd=SP
+# riscv-dv avoids SP as destination by default.
+# ============================================================
+
+    # R-type: sub, sra, srl, sll, slt, sltu, and, xor, or
+    sub  x2, x5, x6
+    sra  x2, x5, x6
+    srl  x2, x5, x6
+    sll  x2, x5, x6
+    slt  x2, x5, x6
+    sltu x2, x5, x6
+    and  x2, x5, x6
+    xor  x2, x5, x6
+    or   x2, x5, x6
+
+    # I-type: ori, andi, xori, slti, sltiu
+    ori   x2, x5, 10
+    andi  x2, x5, 10
+    xori  x2, x5, 10
+    slti  x2, x5, 10
+    sltiu x2, x5, 10
+
+    # Shift-imm: srli, srai, slli
+    srli x2, x5, 1
+    srai x2, x5, 1
+    slli x2, x5, 1
+
+    # U-type: lui
+    lui  x2, 0x12345
+
+    # CSR: csrrw rd=SP
+    csrrw x2, mscratch, x5
+
+# ============================================================
+# U-type RAW hazard — lui/auipc cp_gpr_hazard=RAW_HAZARD
+# RAW: next instruction reads from lui/auipc's rd.
+# ============================================================
+
+    lui   x5, 0x12345
+    add   x6, x5, x7          # RAW: rs1=x5 == prev.rd=x5
+
+    auipc x8, 0x12345
+    add   x9, x8, x7          # RAW: rs1=x8 == prev.rd=x8
+
+# ============================================================
+# jal holes
+# ============================================================
+
+    # jal_cg.cp_rd=ZERO — j pseudo-instruction
+    j 1f
+1:
+
+    # jal_cg.cp_rd=SP
+    jal x2, 2f
+2:
+
+    # jal_cg.cp_rd_align=Aligned — rd_value bit[1] == 1
+    # The rd_value is the return address (PC+4). If PC is 4-byte aligned,
+    # PC+4 has bit[1]=0 (Not Aligned). We need bit[1]=1, meaning PC+4
+    # must be at a 2-mod-4 address. Use .align 2 then .half to offset.
+    .balign 4
+    .half 0x0001               # c.nop (2-byte), shifts next instr to 2-mod-4
+    jal x1, 3f
+    .balign 4
+3:
+
+    # jal_cg.cp_imm_align=Aligned — imm bit[1] == 1
+    # jal offset must have bit[1]=1, i.e. offset ≡ 2 (mod 4).
+    # Place target 2 bytes after a 4-byte boundary.
+    .balign 4
+    jal x1, 4f
+    .balign 4
+    .half 0x0001               # shift target to 2-mod-4
+4:
+
+# ============================================================
+# Logical similarity — fill remaining OPPOSITE/IDENTICAL holes
+# (ori, andi: OPPOSITE; xori: IDENTICAL)
+# Already covered above in the logical section.
+# ============================================================
+
+# ============================================================
+# rv32i_misc_cg — ECALL
+# ============================================================
+    ecall
+
+# ============================================================
+# Grand total holes addressed:
+#   Hazard WAR/WAW/NoHazard:  63 holes (original)
+#   cp_rd=SP:                 19 holes (sub,sra,...,lui,csrrw)
+#   U-type RAW:                2 holes (lui,auipc)
+#   jal:                       4 holes (rd=ZERO, rd=SP, rd_align, imm_align)
+#   Logical:                   3 holes (ori OPPOSITE, andi OPPOSITE, xori IDENTICAL)
+#   ECALL:                     1 hole
+#   Unreachable:              22 holes (opcode_cg — invalid opcode encodings)
 # ============================================================
