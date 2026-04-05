@@ -836,7 +836,10 @@ trait RVGenerator:
       val s = translateToCamelCase(n); (s.head.toLower + s.tail) + s"_$idx"
     def regVal(n: String):                  String =
       val num    = solved.getOrElse(key(n), BigInt(0))
-      val prefix = if isFpReg(instName, n) then "f" else "x"
+      val prefix =
+        if n.startsWith("v") then "v"
+        else if isFpReg(instName, n) then "f"
+        else "x"
       s"$prefix$num"
     def immVal(n:      String):             String = solved.getOrElse(key(n), BigInt(0)).toString
     def signedImm(n:   String, width: Int): String = signedFieldValue(idx, n, width, solved).toString
@@ -848,7 +851,10 @@ trait RVGenerator:
       val num = solved.getOrElse(key("rm"), BigInt(0)).toInt
       rmNumberToName.getOrElse(num, num.toString)
     def argFmt(n: String):                  String =
-      val prefix = if n.startsWith("r") then "x" else ""
+      val prefix =
+        if n.startsWith("r") then "x"
+        else if n.startsWith("v") && n != "vm" then "v"
+        else ""
       prefix + solved.getOrElse(key(n), BigInt(0)).toString
 
     val hasRd    = names("rd")
@@ -862,6 +868,13 @@ trait RVGenerator:
     val hasJimm  = names("jimm20")
     val hasImm20 = names("imm20")
     val hasShamt = names("shamt") || names("shamtw") || names("shamtd")
+    val hasVd    = names("vd")
+    val hasVs1   = names("vs1")
+    val hasVs2   = names("vs2")
+    val hasVs3   = names("vs3")
+    val hasVm    = names("vm")
+    val hasSimm5 = names("simm5")
+    val hasZimm  = names("zimm11") || names("zimm10")
 
     if instName == "fence.tso" then "fence.tso"
     else if instName == "fence.i" then "fence.i"
@@ -881,7 +894,7 @@ trait RVGenerator:
     else if (!hasRd && !hasRs1 && !hasRs2 && hasJimm)
       // Unconditional jump pseudo (j): jimm only, implicit rd=x0
       s"$instName . + ${immVal("jimm20")}"
-    else if (!hasRd && !hasRs1 && !hasRs2 && !hasJimm)
+    else if (!hasRd && !hasRs1 && !hasRs2 && !hasJimm && !hasVd && !hasVs1 && !hasVs2 && !hasVs3)
       // System / fence instructions that take no register args
       instName
     else if (hasRd && hasRs1 && hasRs2 && !hasImm12 && !hasSplit && !hasRm)
@@ -947,6 +960,42 @@ trait RVGenerator:
     // === FP R-type without rounding mode (fsgnj, fmin, fmax, etc.) ===
     else if (hasRd && hasRs1 && hasRs2 && !hasImm12 && !hasSplit && !hasCsr)
       s"$instName ${regVal("rd")}, ${regVal("rs1")}, ${regVal("rs2")}"
+    // === Vector instructions ===
+    else if (hasVd || hasVs1 || hasVs2 || hasVs3) then
+      val vmSuffix = if hasVm then
+        val vmVal = solved.getOrElse(key("vm"), BigInt(1))
+        if vmVal == 0 then ", v0.t" else ""
+      else ""
+      if hasVd && hasVs2 && hasVs1 && hasVm then
+        // VV-type: vadd.vv vd, vs2, vs1
+        s"$instName ${regVal("vd")}, ${regVal("vs2")}, ${regVal("vs1")}$vmSuffix"
+      else if hasVd && hasVs2 && hasRs1 && hasVm then
+        // VX-type: vadd.vx vd, vs2, rs1
+        s"$instName ${regVal("vd")}, ${regVal("vs2")}, ${regVal("rs1")}$vmSuffix"
+      else if hasVd && hasVs2 && hasSimm5 && hasVm then
+        // VI-type: vadd.vi vd, vs2, simm5
+        s"$instName ${regVal("vd")}, ${regVal("vs2")}, ${signedImm("simm5", 5)}$vmSuffix"
+      else if hasVd && hasRs1 && hasVm && !hasVs2 && !hasVs1 then
+        // Vector load unit-stride: vle.v vd, (rs1)
+        s"$instName ${regVal("vd")}, (${regVal("rs1")})$vmSuffix"
+      else if hasVs3 && hasRs1 && hasVm && !hasVd then
+        // Vector store unit-stride: vse.v vs3, (rs1)
+        s"$instName ${regVal("vs3")}, (${regVal("rs1")})$vmSuffix"
+      else if hasVd && hasVs2 && hasVm && !hasVs1 && !hasRs1 && !hasSimm5 then
+        // Vector unary: vfclass.v vd, vs2 / vsext.vf2 vd, vs2
+        s"$instName ${regVal("vd")}, ${regVal("vs2")}$vmSuffix"
+      else if hasRd && hasVs2 && !hasVd then
+        // Vector to scalar: vmv.x.s rd, vs2
+        s"$instName ${regVal("rd")}, ${regVal("vs2")}"
+      else if hasVd && hasRs1 && hasVs2 && hasVm then
+        // Vector indexed load: vloxei.v vd, (rs1), vs2
+        s"$instName ${regVal("vd")}, (${regVal("rs1")}), ${regVal("vs2")}$vmSuffix"
+      else if hasVs3 && hasRs1 && hasVs2 && hasVm then
+        // Vector indexed store: vsoxei.v vs3, (rs1), vs2
+        s"$instName ${regVal("vs3")}, (${regVal("rs1")}), ${regVal("vs2")}$vmSuffix"
+      else
+        // Vector fallback: positional args with correct prefixes
+        s"$instName ${inst.args.map(a => argFmt(a.name)).mkString(", ")}"
     else
       // Fallback: positional args in rvdecoderdb order
       s"$instName ${inst.args.map(a => argFmt(a.name)).mkString(", ")}"

@@ -21,13 +21,37 @@ import java.lang.foreign.Arena
   * Each cell generates a two-instruction vector sequence that targets a specific chaining hazard scenario. The SMT
   * solver fills in concrete register indices and instruction variants satisfying both the architectural dependency and
   * the microarchitectural execution-unit constraint.
+  *
+  * Every test cell is wrapped with: vsetvli setup (SEW=32, LMUL=1, vl=max) + valid memory buffer so the generated
+  * assembly can run directly on T1 RTL simulation.
   */
 object ChainingLib:
+  /** Vector configuration preamble: set up vtype and a valid memory base address.
+    *
+    * Uses t2 for vl result, t3 for memory base address. SEW=32, LMUL=1 (zimm11 = 0b00000010000 = 0x010 = 16 decimal:
+    * vsew=010 → SEW=32, vlmul=000 → LMUL=1).
+    */
+  private val VectorPreamble =
+    """    # Vector configuration: SEW=32, LMUL=1, vl=max
+       |    li   t2, -1
+       |    vsetvli t2, t2, e32, m1, ta, ma
+       |    # Set up valid memory base in t3
+       |    la   t3, vbuf""".stripMargin
+
+  /** Data section with a buffer for vector load/store. */
+  private val DataSection =
+    """    .section ".data","aw",@progbits
+       |    .align 8
+       |vbuf:
+       |    .zero 256""".stripMargin
+
   private val ChainingPreamble = HTIFLib.asmTextStart()
   private val ChainingEpilogue =
     s"""${HTIFLib.asmExit()}
        |
-       |${HTIFLib.asmTohostSection()}""".stripMargin
+       |${HTIFLib.asmTohostSection()}
+       |
+       |$DataSection""".stripMargin
 
   def writeChainingAsm(
     outputPath: String,
@@ -36,6 +60,8 @@ object ChainingLib:
     val body    = generators.map(_.toRecipeAsm().trim).mkString("\n\n")
     val content =
       s"""$ChainingPreamble
+         |
+         |$VectorPreamble
          |
          |$body
          |
@@ -47,12 +73,8 @@ object ChainingLib:
 
   /** D1: Explicit RAW — A.vd → B.vs2 (B reads what A wrote).
     *
-    * @param reg
-    *   shared vector register index for the dependency
-    * @param opcodeA
-    *   opcode constraint for instruction A (producer)
-    * @param opcodeB
-    *   opcode constraint for instruction B (consumer)
+    * Register selection: vd/vs2 share `reg` for the dependency. Other vector registers avoid v0 (mask) and the shared
+    * register by using explicit ranges.
     */
   def explicitRAW(
     reg:     Int,
@@ -129,9 +151,10 @@ object ChainingLib:
     explicitRAW(reg, isVaddVv(), isVsubVv())
 
   // --- D1 × C2: Explicit RAW, ALU × LSU ---
+  // Uses t3 (memory base) set up in VectorPreamble
   def explicitRAW_ALUxLSU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
     instruction(0, isVaddVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
-    instruction(1, isVle32V())  { vdEqual(reg.S) & vmEqual(1) }
+    instruction(1, isVle32V()) { vdEqual(reg.S) & rs1Range(28, 29) & vmEqual(1) }
 
   // --- D1 × C3: Explicit RAW, ALU × Mask unit ---
   def explicitRAW_MaskxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
@@ -148,7 +171,7 @@ object ChainingLib:
   // --- D1 × C7: Explicit RAW, Slide × Store ---
   def explicitRAW_SlidexStore(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
     instruction(0, isVslidedownVi()) { vdEqual(reg.S) & vs2Range(1, 32) & vmEqual(1) }
-    instruction(1, isVse32V())        { vs2Range(1, 32) & vmEqual(1) }
+    instruction(1, isVse32V())       { vs2Range(1, 32) & rs1Range(28, 29) & vmEqual(1) }
 
   // --- D2 × C1: Implicit v0 mask RAW, ALU × ALU ---
   def implicitV0RAW_ALUxALU()(using Arena, Context, Block, Recipe): Unit =
@@ -156,7 +179,7 @@ object ChainingLib:
 
   // --- D3 × C2: WAR, Store × ALU ---
   def war_StorexALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
-    instruction(0, isVse32V()) { vs2Range(1, 32) & vmEqual(1) }
+    instruction(0, isVse32V()) { vs2Range(1, 32) & rs1Range(28, 29) & vmEqual(1) }
     instruction(1, isVaddVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
 
   // --- D3 × C6: WAR, Gather × ALU ---
@@ -167,7 +190,7 @@ object ChainingLib:
   // --- D4 × C2: WAW, Slow × Load ---
   def waw_SlowxLoad(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
     instruction(0, isVdivVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
-    instruction(1, isVle32V()) { vdEqual(reg.S) & vmEqual(1) }
+    instruction(1, isVle32V()) { vdEqual(reg.S) & rs1Range(28, 29) & vmEqual(1) }
 
   // --- D5 × C1: Implicit v0 WAR, ALU × ALU ---
   def implicitV0WAR_ALUxALU()(using Arena, Context, Block, Recipe): Unit =
