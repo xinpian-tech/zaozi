@@ -26,8 +26,8 @@ import me.jiuyang.rvprobe.cases.chaining.ChainingLib.*
   object ScalarVectorReverse extends RVGenerator:
     val sets: Seq[Recipe ?=> SetConstraint] = Seq(isRVI(), isRVV())
     def constraints() =
-      // Step 1: Scalar load into x10
-      instruction(0, isLw()) { rdRange(10, 11) & rs1Range(1, 32) }
+      // Step 1: Scalar load into x10 (from valid memory address in t3)
+      instruction(0, isLw()) { rdRange(10, 11) & rs1Range(28, 29) }
       // Step 2: Vector reverse-subtract consuming x10 under Reverse signal
       instruction(1, isReverse()) { rs1Range(10, 11) & vdRange(1, 32) & vs2Range(1, 32) & vmEqual(1) }
 
