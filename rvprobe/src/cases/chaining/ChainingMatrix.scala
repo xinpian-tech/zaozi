@@ -92,6 +92,11 @@ import me.jiuyang.rvprobe.cases.chaining.ChainingLib.*
     val sets          = Seq(isRVV())
     def constraints() = waw_SlowxLoad()
 
+  // D3×C4: WAR, Slow × Fast — divider still reading, fast ALU overwrites
+  object D3C4_WAR_SlowxFast extends RVGenerator:
+    val sets          = Seq(isRVV())
+    def constraints() = war_SlowxFast()
+
   // D4×C4: WAW, Slow × Fast — div and add to same vd
   object D4C4_WAW_SlowxFast extends RVGenerator:
     val sets          = Seq(isRVV())
@@ -118,6 +123,7 @@ import me.jiuyang.rvprobe.cases.chaining.ChainingLib.*
     D3C6_WAR_GatherxALU,
     D4C1_WAW_ALUxALU,
     D4C2_WAW_SlowxLoad,
+    D3C4_WAR_SlowxFast,
     D4C4_WAW_SlowxFast,
     D5C1_ImplicitV0WAR_ALUxALU
   )
