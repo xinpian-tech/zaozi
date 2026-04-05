@@ -337,43 +337,26 @@ _start:
     jal x2, 2f
 2:
 
-    # jal_cg.cp_rd_align=Aligned — rd_value bit[1] == 1
-    # The rd_value is the return address (PC+4). If PC is 4-byte aligned,
-    # PC+4 has bit[1]=0 (Not Aligned). We need bit[1]=1, meaning PC+4
-    # must be at a 2-mod-4 address. Use .align 2 then .half to offset.
-    .balign 4
-    .half 0x0001               # c.nop (2-byte), shifts next instr to 2-mod-4
-    jal x1, 3f
-    .balign 4
-3:
+    # jal_cg.cp_rd_align and jal_cg.cp_imm_align:
+    # These require compressed (C) extension or misaligned placement.
+    # Skipped: RV32I without C extension cannot produce 2-mod-4 addresses.
+    # → 2 unreachable holes on pure RV32I.
 
-    # jal_cg.cp_imm_align=Aligned — imm bit[1] == 1
-    # jal offset must have bit[1]=1, i.e. offset ≡ 2 (mod 4).
-    # Place target 2 bytes after a 4-byte boundary.
-    .balign 4
-    jal x1, 4f
-    .balign 4
-    .half 0x0001               # shift target to 2-mod-4
-4:
+    # rv32i_misc_cg.cp_misc=ECALL:
+    # ecall requires a trap handler; spike loops without one.
+    # → 1 hole, requires privilege mode setup (out of scope for directed asm).
 
 # ============================================================
-# Logical similarity — fill remaining OPPOSITE/IDENTICAL holes
-# (ori, andi: OPPOSITE; xori: IDENTICAL)
-# Already covered above in the logical section.
-# ============================================================
-
-# ============================================================
-# rv32i_misc_cg — ECALL
-# ============================================================
-    ecall
-
-# ============================================================
-# Grand total holes addressed:
-#   Hazard WAR/WAW/NoHazard:  63 holes (original)
+# Grand total holes addressed (29 fillable / 51 baseline):
 #   cp_rd=SP:                 19 holes (sub,sra,...,lui,csrrw)
 #   U-type RAW:                2 holes (lui,auipc)
-#   jal:                       4 holes (rd=ZERO, rd=SP, rd_align, imm_align)
+#   jal rd=ZERO, rd=SP:        2 holes
 #   Logical:                   3 holes (ori OPPOSITE, andi OPPOSITE, xori IDENTICAL)
-#   ECALL:                     1 hole
-#   Unreachable:              22 holes (opcode_cg — invalid opcode encodings)
+#                             ---
+#   Total fillable:           26 holes
+#
+# Remaining 25 unfillable:
+#   opcode_cg:                22 holes (invalid opcode encodings)
+#   jal alignment:             2 holes (requires C extension)
+#   ECALL:                     1 hole  (requires trap handler)
 # ============================================================
