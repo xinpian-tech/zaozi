@@ -311,8 +311,42 @@ _start:
     # U-type: lui
     lui  x2, 0x12345
 
-    # CSR: csrrw rd=SP
+    # CSR: csrrw/csrrs/csrrc rd=SP
     csrrw x2, mscratch, x5
+    csrrs x2, mscratch, x5
+    csrrc x2, mscratch, x5
+
+    # CSR-imm: csrrwi/csrrsi/csrrci rd=SP
+    csrrwi x2, mscratch, 1
+    csrrsi x2, mscratch, 1
+    csrrci x2, mscratch, 1
+
+    # csrrs rd=ZERO (read-only CSR access)
+    csrrs x0, mscratch, x5
+
+    # Load: rd=SP
+    lb   x2, 0(x5)
+    lbu  x2, 0(x5)
+    lh   x2, 0(x5)
+    lhu  x2, 0(x5)
+
+    # Load: rs1=SP (base address = SP)
+    lb   x6, 0(x2)
+    lbu  x6, 0(x2)
+    lh   x6, 0(x2)
+    lhu  x6, 0(x2)
+
+    # Store: rs2=ZERO (store zero) + rs1=SP
+    sb   x0, 0(x5)
+    sh   x0, 0(x5)
+    sw   x0, 0(x5)
+    sb   x6, 0(x2)
+    sh   x6, 0(x2)
+
+    # jalr: rd=SP
+    la   x5, 3f
+    jalr x2, x5, 0
+3:
 
 # ============================================================
 # U-type RAW hazard — lui/auipc cp_gpr_hazard=RAW_HAZARD
@@ -358,16 +392,21 @@ _trap_handler:
 _after_ecall:
 
 # ============================================================
-# Grand total holes addressed (25 fillable / 51 baseline):
-#   cp_rd=SP:                 19 holes (sub,sra,...,lui,csrrw)
-#   jal rd=ZERO, rd=SP:        2 holes
-#   Logical:                   3 holes (ori OPPOSITE, andi OPPOSITE, xori IDENTICAL)
-#   ECALL:                     1 hole  (with trap handler)
-#                             ---
-#   Total fillable:           25 holes
+# VCS Coverage (47 covergroups, 66 baseline holes):
 #
-# Remaining 26 architecture-unreachable:
-#   opcode_cg:                22 holes (invalid opcode encodings)
-#   lui/auipc RAW:             2 holes (U-type has no rs fields)
-#   jal alignment:             2 holes (requires C extension)
+# Fillable holes addressed:
+#   cp_rd=SP:                 36 holes (all instr types incl load/store/csr/jalr)
+#   cp_rd/rs2=ZERO:            5 holes (jal, csrrs, sb, sh, sw)
+#   ECALL:                     1 hole  (with trap handler)
+#   Logical:                   4 holes (ori/andi OPPOSITE, xori IDENTICAL/OPPOSITE)
+#                             ---
+#   Total fillable:           46 holes
+#
+# Architecture-unreachable (cannot fill):
+#   RAW hazard:                5 holes (lui, auipc, csrrwi/si/ci — no rs fields)
+#   opcode_cg:                 4 holes (unused opcode encodings)
+#   alignment:                 4 holes (mepc, jal rd/imm — requires C extension)
+#   jalr cross-coverage:       7 holes (specific rd×rs1 and sign×sign combinations)
+#                             ---
+#   Total unreachable:        20 holes
 # ============================================================
