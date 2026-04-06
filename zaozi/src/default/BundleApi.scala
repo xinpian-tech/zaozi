@@ -35,8 +35,4 @@ given [T <: Bundle | ProbeBundle, R <: Referable[T]]: BundleApi[T, R] with
         private[zaozi] val _width = bitcastOp.operation.getResult(0).getType.getBitWidth(true).toInt
       propagate[R, Bits](ref, tpe, bitcastOp.operation)
 
-    def width(
-      using Arena,
-      Context
-    ) = ref.refer.getType.getBitWidth(true).toInt
 end given

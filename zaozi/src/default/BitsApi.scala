@@ -569,11 +569,6 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       InstanceContext
     ): Node[Bool] = bits(idx, idx).asBool
 
-    def width(
-      using Arena,
-      Context
-    ) = ref.refer.getType.getBitWidth(true).toInt
-
     // sugars
     def apply(
       hi: Int,

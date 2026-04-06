@@ -27,6 +27,12 @@ trait Referable[T <: Data] extends Dynamic:
     TypeImpl
   ): Value
 
+  def width(
+    using Arena,
+    Context,
+    TypeImpl
+  ): Int = _tpe.width
+
   /** macro to call [[DynamicSubfield.getRefViaFieldValName]] */
   transparent inline def selectDynamic(name: String):                                  Any = ${ referableSelectDynamic('this, 'name) }
   transparent inline def applyDynamic(name: String)(inline args: Any*):                Any = ${

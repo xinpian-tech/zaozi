@@ -90,8 +90,7 @@ given QueueImpl with
   ): Wire[QueueIO[D]] =
     val fifo    = DwbbFifo.instantiate(
       DwbbFifoParameter(
-        // XXX: any way not to actually create an op?
-        Wire(parameter.gen).tap(x => x.dontCare()).asBits.width,
+        parameter.gen.width,
         parameter.entries,
         parameter.pipe,
         parameter.flow,

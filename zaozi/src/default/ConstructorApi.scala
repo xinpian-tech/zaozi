@@ -46,14 +46,14 @@ given ConstructorApi with
   def AsyncReset(): Reset = new Reset:
     val _isAsync: Boolean = true
 
-  def UInt(width: Width): UInt = new UInt:
-    private[zaozi] val _width: Int = width._width
+  def UInt(tpeWidth: Width): UInt = new UInt:
+    private[zaozi] val _width: Int = tpeWidth._width
 
-  def Bits(width: Width): Bits = new Bits:
-    private[zaozi] val _width: Int = width._width
+  def Bits(tpeWidth: Width): Bits = new Bits:
+    private[zaozi] val _width: Int = tpeWidth._width
 
-  def SInt(width: Width): SInt = new SInt:
-    private[zaozi] val _width: Int = width._width
+  def SInt(tpeWidth: Width): SInt = new SInt:
+    private[zaozi] val _width: Int = tpeWidth._width
 
   def Bool(): Bool = new Object with Bool
 

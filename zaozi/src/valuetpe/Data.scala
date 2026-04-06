@@ -20,6 +20,11 @@ trait Data:
     Context,
     TypeImpl
   ): Type
+  def width(
+    using Arena,
+    Context,
+    TypeImpl
+  ): Int = this.widthImpl
 
 trait Width:
   val _width: Int

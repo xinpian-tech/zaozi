@@ -242,11 +242,11 @@ trait ConstructorApi:
 
   def AsyncReset(): Reset
 
-  def UInt(width: Width): UInt
+  def UInt(tpeWidth: Width): UInt
 
-  def Bits(width: Width): Bits
+  def Bits(tpeWidth: Width): Bits
 
-  def SInt(width: Width): SInt
+  def SInt(tpeWidth: Width): SInt
 
   def Bool(): Bool
 
@@ -880,12 +880,6 @@ trait RefElement[D <: Data, E <: Data, R <: Referable[D], IDX]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Ref[E]
-trait GetWidth[D <: Data, R <: Referable[D]]:
-  extension (ref: R)
-    def width(
-      using Arena,
-      Context
-    ): Int
 trait GetLength[E <: Data, V <: Vec[E], R <: Referable[V]]:
   extension (ref: R)
     def length(
@@ -917,7 +911,6 @@ trait BitsApi[R <: Referable[Bits]]
     with Pad[Bits, Int, Bits, R]
     with ExtractElement[Bits, Bool, R, Int]
     with ExtractRange[Bits, Bits, R, Int]
-    with GetWidth[Bits, R]
 
 trait BoolApi[R <: Referable[Bool]]
     extends AsBits[Bool, R]
@@ -928,7 +921,6 @@ trait BoolApi[R <: Referable[Bool]]
     with Or[Bool, Bool, R]
     with Xor[Bool, Bool, R]
     with Mux[Bool, R]
-    with GetWidth[Bool, R]
 trait UIntApi[R <: Referable[UInt]]
     extends AsBits[UInt, R]
     with Add[UInt, UInt, R]
@@ -944,7 +936,6 @@ trait UIntApi[R <: Referable[UInt]]
     with Neq[UInt, Bool, R]
     with Shl[UInt, Int | Referable[UInt], UInt, R]
     with Shr[UInt, Int | Referable[UInt], UInt, R]
-    with GetWidth[UInt, R]
 trait SIntApi[R <: Referable[SInt]]
     extends AsBits[SInt, R]
     with Add[SInt, SInt, R]
@@ -959,16 +950,14 @@ trait SIntApi[R <: Referable[SInt]]
     with Neq[SInt, Bool, R]
     with Shl[SInt, Int | Referable[UInt], SInt, R]
     with Shr[SInt, Int | Referable[UInt], SInt, R]
-    with GetWidth[SInt, R]
 
-trait BundleApi[T <: Bundle | ProbeBundle, R <: Referable[T]] extends AsBits[T, R] with GetWidth[T, R]
+trait BundleApi[T <: Bundle | ProbeBundle, R <: Referable[T]] extends AsBits[T, R]
 
-trait RecordApi[T <: Record | ProbeRecord, R <: Referable[T]] extends AsBits[T, R] with GetWidth[T, R]
+trait RecordApi[T <: Record | ProbeRecord, R <: Referable[T]] extends AsBits[T, R]
 
 trait VecApi[E <: Data, V <: Vec[E], R <: Referable[V]]
     extends AsBits[V, R]
     with RefElement[V, E, R, Referable[UInt] | Int]
-    with GetWidth[V, R]
     with GetLength[E, V, R]
 
 trait ClockApi[R <: Referable[Clock]]
@@ -1011,42 +1000,42 @@ trait TypeImpl:
     private[zaozi] def ioImpl[T <: Data]:    Wire[T]
     private[zaozi] def probeImpl[T <: Data]: Wire[T]
 
-  extension (ref: Reset)
+  extension (ref:  Reset)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: Clock)
+    ):  Type
+  extension (ref:  Clock)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: UInt)
+    ):  Type
+  extension (ref:  UInt)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: SInt)
+    ):  Type
+  extension (ref:  SInt)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: Bits)
+    ):  Type
+  extension (ref:  Bits)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: Analog)
+    ):  Type
+  extension (ref:  Analog)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: Bool)
+    ):  Type
+  extension (ref:  Bool)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type
-  extension (ref: ProbeBundle)
+    ):  Type
+  extension (ref:  ProbeBundle)
     def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
@@ -1064,7 +1053,7 @@ trait TypeImpl:
     )(
       using sourcecode.Name.Machine
     ):            BundleField[RWProbe[T]]
-  extension (ref: Bundle)
+  extension (ref:  Bundle)
     def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
@@ -1080,7 +1069,7 @@ trait TypeImpl:
     )(
       using sourcecode.Name.Machine
     ):            BundleField[T]
-  extension (ref: ProbeRecord)
+  extension (ref:  ProbeRecord)
     def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
@@ -1096,7 +1085,7 @@ trait TypeImpl:
       tpe:   T,
       layer: LayerTree
     ):            BundleField[RWProbe[T]]
-  extension (ref: Record)
+  extension (ref:  Record)
     def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
@@ -1110,26 +1099,31 @@ trait TypeImpl:
       name: String,
       tpe:  T
     ):            BundleField[T]
-  extension (ref: RProbe[?])
+  extension (ref:  RProbe[?])
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context,
       TypeImpl
-    ): Type
-  extension (ref: RWProbe[?])
+    ):  Type
+  extension (ref:  RWProbe[?])
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context,
       TypeImpl
-    ): Type
-  extension (ref: Vec[?])
+    ):  Type
+  extension (data: Data)
+    private[zaozi] def widthImpl(
+      using Arena,
+      Context
+    ):  Int
+  extension (ref:  Vec[?])
     def elementType: Data
     def count:       Int
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
     ):               Type
-  extension (ref: ProbeBundle)
+  extension (ref:  ProbeBundle)
     private[zaozi] def getRefViaFieldValNameImpl[E <: Data](
       refer:        Value,
       fieldValName: String
@@ -1156,7 +1150,7 @@ trait TypeImpl:
     )(
       using TypeImpl
     ): Option[Ref[E]]
-  extension (ref: Bundle)
+  extension (ref:  Bundle)
     private[zaozi] def getRefViaFieldValNameImpl[E <: Data](
       refer:        Value,
       fieldValName: String

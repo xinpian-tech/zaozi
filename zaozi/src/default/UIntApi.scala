@@ -52,11 +52,6 @@ given [R <: Referable[UInt]]: UIntApi[R] with
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
       propagate[R, Bits](ref, tpe, nodeOp.operation)
 
-    def width(
-      using Arena,
-      Context
-    ) = ref.refer.getType.getBitWidth(true).toInt
-
     def +(
       that: R
     )(

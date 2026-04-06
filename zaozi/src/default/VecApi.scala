@@ -33,11 +33,6 @@ given [E <: Data, V <: Vec[E], R <: Referable[V]]: VecApi[E, V, R] with
         private[zaozi] val _width = bitcastOp.operation.getResult(0).getType.getBitWidth(true).toInt
       propagate[R, Bits](ref, tpe, bitcastOp.operation)
 
-    def width(
-      using Arena,
-      Context
-    ) = ref.refer.getType.getBitWidth(true).toInt
-
     def length(
       using Arena,
       Context
