@@ -328,6 +328,25 @@ val hitVs2: Bool = ((checkOH & maskForVs2) === 0.U || record.bits.gather) && ...
 - WriteCheck 误判 "元素 0 已读完"，允许 vadd 写入 v8[0]
 - 步骤 127 需要读取 v8[0] 时，读到被 vadd 覆写的毒化值（1998 而非 0）
 
+### Offline Sim-Checker 验证（T1 官方差分测试工具）
+
+T1 的 `t1-sim-checker` 工具离线回放 RTL 事件日志，逐笔比对 Spike（参考模型）与 RTL 的 VRF 写入值。
+
+**Pre-fix (097ec761) — FAIL**：
+```
+thread 'main' panicked at t1-sim-checker:
+assertion failed: VrfWrite: 0th byte incorrect
+  (0x2b record != 0xce written)
+  left: 43      (Spike 期望值)
+  right: 206    (RTL 实际写入, 0xCE = 1998 的低字节)
+  issue_idx=5 (vrgather.vv v1, v8, v2), cycle=302
+```
+
+**Post-fix (50986c9d) — PASS**：
+```
+Totally 919 events processed（全部通过，无 assertion failure）
+```
+
 ### RTL 事件日志对比
 
 **Pre-fix**（gather 输出 v1 的最后一组写入 — 应为 {3,2,1,0}）：
@@ -431,6 +450,7 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 | 向量指令汇编��染 | ✅ 修复 |
 | T1 VCS ��真（post-fix, 14格, blastoise） | ✅ 通过，14590 cycles |
 | D3×C6 Gather WAR Chaining Data Corruption | ✅ **pre-fix 44/128 错误, post-fix 0** |
+| Offline sim-checker 差分测试 | ✅ **pre-fix PANIC (byte mismatch), post-fix PASS** |
 | Chaining 开/关对比 | ✅ **同一 RTL: 开=44 错误, 关=0 错误** |
 | Bug 复现脚本 | ✅ `scripts/reproduce-gather-war.sh` |
 
