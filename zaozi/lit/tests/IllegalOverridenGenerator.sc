@@ -19,8 +19,8 @@ class PassthroughLayers(parameter: PassthroughParameter) extends LayerInterface(
   def layers = Seq.empty
 
 class PassthroughIO(parameter: PassthroughParameter) extends HWBundle(parameter):
-  val i = Flipped(UInt(parameter.width.W))
-  val o = Aligned(UInt(parameter.width.W))
+  val i = Flipped(UInt(parameter.width))
+  val o = Aligned(UInt(parameter.width))
 
 class PassthroughProbe(parameter: PassthroughParameter)
     extends DVBundle[PassthroughParameter, PassthroughLayers](parameter)

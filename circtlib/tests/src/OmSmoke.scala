@@ -34,7 +34,7 @@ object OmSmoke extends TestSuite:
       val evaluator  = summon[EvaluatorApi].evaluatorNew(module)
       val gcdClass   = evaluator.instantiate("GCD_Class", summon[EvaluatorApi].basePathGetEmpty)
       val width      = gcdClass
-        .objectGetField(gcdClass.objectGetFieldNames.arrayAttrGetElement((0)).stringAttrGetValue)
+        .objectGetField(gcdClass.objectGetFieldNames.arrayAttrGetElement(0).stringAttrGetValue)
         .objectGetField("width")
 
       width.isPrimitive ==> true

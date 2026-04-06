@@ -242,11 +242,11 @@ trait ConstructorApi:
 
   def AsyncReset(): Reset
 
-  def UInt(tpeWidth: Width): UInt
+  def UInt(width: Int): UInt
 
-  def Bits(tpeWidth: Width): Bits
+  def Bits(width: Int): Bits
 
-  def SInt(tpeWidth: Width): SInt
+  def SInt(width: Int): SInt
 
   def Bool(): Bool
 
@@ -320,39 +320,38 @@ trait ConstructorApi:
   ):   Node[T]
   extension (bigInt: BigInt)
     def U(
-      width: Width
+      width: Int
     )(
       using Arena,
       Context,
       Block,
       sourcecode.File,
       sourcecode.Line
-    ):     Const[UInt]
+    ): Const[UInt]
     def U(
       using Arena,
       Context,
       Block
-    ):     Const[UInt]
+    ): Const[UInt]
     def B(
       using Arena,
       Context,
       Block
-    ):     Const[Bits]
+    ): Const[Bits]
     def S(
-      width: Width
+      width: Int
     )(
       using Arena,
       Context,
       Block,
       sourcecode.File,
       sourcecode.Line
-    ):     Const[SInt]
+    ): Const[SInt]
     def S(
       using Arena,
       Context,
       Block
-    ):     Const[SInt]
-    def W: Width
+    ): Const[SInt]
   extension (bool:   Boolean)
     def B(
       using Arena,

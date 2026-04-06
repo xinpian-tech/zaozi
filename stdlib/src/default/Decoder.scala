@@ -42,10 +42,10 @@ class DecoderLayers(parameter: DecoderParameter) extends LayerInterface(paramete
   def layers = Seq.empty
 
 class DecoderOutput(tables: Seq[TruthTable]) extends Record:
-  tables.map(t => Aligned(t.name, Bits(t.outputBits.W)))
+  tables.map(t => Aligned(t.name, Bits(t.outputBits)))
 
 class DecoderIO(parameter: DecoderParameter) extends HWRecord(parameter):
-  Flipped("instruction", Bits(parameter.pla.inputWidth.W))
+  Flipped("instruction", Bits(parameter.pla.inputWidth))
   Aligned("output", new DecoderOutput(parameter.tables))
 
 extension (decoderIO: Interface[DecoderIO])

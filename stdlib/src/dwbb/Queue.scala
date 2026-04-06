@@ -36,14 +36,14 @@ class DwbbFifoIO(
   val push_req_n   = Flipped(Bool())
   val pop_req_n    = Flipped(Bool())
   val diag_n       = Flipped(Bool())
-  val data_in      = Flipped(Bits(parameter.width.W))
+  val data_in      = Flipped(Bits(parameter.width))
   val empty        = Aligned(Bool())
   val almost_empty = Aligned(Bool())
   val half_full    = Aligned(Bool())
   val almost_full  = Aligned(Bool())
   val full         = Aligned(Bool())
   val error        = Aligned(Bool())
-  val data_out     = Aligned(Bits(parameter.width.W))
+  val data_out     = Aligned(Bits(parameter.width))
 
 class DwbbFifoLayers(parameter: DwbbFifoParameter) extends LayerInterface(parameter):
   def layers = Seq.empty

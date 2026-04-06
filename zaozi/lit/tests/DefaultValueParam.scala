@@ -25,8 +25,8 @@ class TruncateLayers(parameter: TruncateParameter) extends LayerInterface(parame
   def layers = Seq.empty
 
 class TruncateIO(parameter: TruncateParameter) extends HWBundle(parameter):
-  val i = Flipped(UInt(parameter.inputWidth.W))
-  val o = Aligned(UInt(parameter.outputWidth.W))
+  val i = Flipped(UInt(parameter.inputWidth))
+  val o = Aligned(UInt(parameter.outputWidth))
 
 class TruncateProbe(parameter: TruncateParameter) extends DVBundle[TruncateParameter, TruncateLayers](parameter)
 

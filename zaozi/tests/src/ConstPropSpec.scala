@@ -21,20 +21,20 @@ class ConstPropLayers(parameter: ConstPropParameter) extends LayerInterface(para
 
 class ConstPropIO(parameter: ConstPropParameter) extends HWBundle(parameter):
   val syncDomain = Flipped(new SyncDomain)
-  val inBits     = Flipped(Bits(parameter.width.W))
-  val inSInt     = Flipped(SInt(parameter.width.W))
-  val inUInt     = Flipped(UInt(parameter.width.W))
+  val inBits     = Flipped(Bits(parameter.width))
+  val inSInt     = Flipped(SInt(parameter.width))
+  val inUInt     = Flipped(UInt(parameter.width))
   val inBool     = Flipped(Bool())
-  val out        = Aligned(UInt(parameter.width.W))
-  val outSInt    = Aligned(SInt(parameter.width.W))
-  val outBits    = Aligned(Bits(parameter.width.W))
+  val out        = Aligned(UInt(parameter.width))
+  val outSInt    = Aligned(SInt(parameter.width))
+  val outBits    = Aligned(Bits(parameter.width))
   val outBool    = Aligned(Bool())
 
 class ConstPropProbe(parameter: ConstPropParameter) extends DVBundle[ConstPropParameter, ConstPropLayers](parameter)
 
 class SimpleBundle8 extends Bundle:
-  val x = Aligned(Bits(4.W))
-  val y = Aligned(Bits(4.W))
+  val x = Aligned(Bits(4))
+  val y = Aligned(Bits(4))
 
 object ConstPropSpec extends TestSuite:
   val tests = Tests:
@@ -47,7 +47,7 @@ object ConstPropSpec extends TestSuite:
           val io           = summon[Interface[ConstPropIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.U(parameter.width.W).asBits)
+          val reg          = RegInit(0.U(parameter.width).asBits)
           io.outBits := reg
           reg        := io.inBits
           io.out.dontCare()
@@ -67,7 +67,7 @@ object ConstPropSpec extends TestSuite:
           val io           = summon[Interface[ConstPropIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.B(parameter.width.W).asUInt)
+          val reg          = RegInit(0.B(parameter.width).asUInt)
           io.out := reg
           reg    := io.inUInt
           io.outSInt.dontCare()
@@ -87,7 +87,7 @@ object ConstPropSpec extends TestSuite:
           val io           = summon[Interface[ConstPropIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.B(parameter.width.W).asSInt)
+          val reg          = RegInit(0.B(parameter.width).asSInt)
           io.outSInt := reg
           reg        := io.inSInt
           io.out.dontCare()
@@ -127,7 +127,7 @@ object ConstPropSpec extends TestSuite:
           val io           = summon[Interface[ConstPropIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.S(parameter.width.W).asBits)
+          val reg          = RegInit(0.S(parameter.width).asBits)
           io.outBits := reg
           reg        := io.inBits
           io.out.dontCare()
@@ -165,7 +165,7 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io = summon[Interface[ConstPropIO]]
-          val bundleConst: Const[SimpleBundle8] = 0.B(8.W).asBundle(new SimpleBundle8)
+          val bundleConst: Const[SimpleBundle8] = 0.B(8).asBundle(new SimpleBundle8)
           val wire = Wire(new SimpleBundle8)
           wire.x     := bundleConst.x
           wire.y     := bundleConst.y
@@ -184,8 +184,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io = summon[Interface[ConstPropIO]]
-          val vecConst: Const[Vec[Bits]] = 0.B(8.W).asVec(Bits(2.W))
-          val wire = Wire(Vec(4, Bits(2.W)))
+          val vecConst: Const[Vec[Bits]] = 0.B(8).asVec(Bits(2))
+          val wire = Wire(Vec(4, Bits(2)))
           wire(0)    := vecConst(0)
           wire(1)    := vecConst(1)
           wire(2)    := vecConst(2)
@@ -207,7 +207,7 @@ object ConstPropSpec extends TestSuite:
           val io           = summon[Interface[ConstPropIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.U(parameter.width.W).asBits.asSInt)
+          val reg          = RegInit(0.U(parameter.width).asBits.asSInt)
           io.outSInt := reg
           reg        := io.inSInt
           io.out.dontCare()
@@ -228,7 +228,7 @@ object ConstPropSpec extends TestSuite:
           compileError("""
             given Ref[Clock] = io.syncDomain.clock
             given Ref[Reset] = io.syncDomain.reset
-            val wire = Wire(UInt(parameter.width.W))
+            val wire = Wire(UInt(parameter.width))
             val reg = RegInit(wire.asBits)
           """).check(
             "",

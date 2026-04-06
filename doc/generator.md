@@ -73,10 +73,10 @@ class GCDIO(parameter: GCDParameter) extends HWBundle(parameter):
 
 ```scala
 class LayerSpecProbe(parameter: LayerSpecParameter) extends DVBundle[LayerSpecParameter, LayerSpecLayers](parameter):
-  val a0     = ProbeRead(UInt(parameter.width.W), layers("A0"))
-  val a0b0   = ProbeRead(UInt(parameter.width.W), layers("A0")("A0B0"))
-  val a0b0c0 = ProbeRead(UInt(parameter.width.W), layers("A0")("A0B0")("A0B0C0"))
-  val a0b1   = ProbeRead(UInt(parameter.width.W), layers("A0")("A0B1"))
+  val a0     = ProbeRead(UInt(parameter.width), layers("A0"))
+  val a0b0   = ProbeRead(UInt(parameter.width), layers("A0")("A0B0"))
+  val a0b0c0 = ProbeRead(UInt(parameter.width), layers("A0")("A0B0")("A0B0C0"))
+  val a0b1   = ProbeRead(UInt(parameter.width), layers("A0")("A0B1"))
 ```
 
 ## RTL Architecture

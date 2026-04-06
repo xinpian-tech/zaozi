@@ -42,16 +42,16 @@ class LayerSpecLayers(parameter: LayerSpecParameter) extends LayerInterface(para
   )
 
 class LayerSpecIO(parameter: LayerSpecParameter) extends HWBundle(parameter):
-  val a0     = Flipped(UInt(parameter.width.W))
-  val a0b0   = Flipped(UInt(parameter.width.W))
-  val a0b0c0 = Flipped(UInt(parameter.width.W))
-  val a0b1   = Flipped(UInt(parameter.width.W))
+  val a0     = Flipped(UInt(parameter.width))
+  val a0b0   = Flipped(UInt(parameter.width))
+  val a0b0c0 = Flipped(UInt(parameter.width))
+  val a0b1   = Flipped(UInt(parameter.width))
 
 class LayerSpecProbe(parameter: LayerSpecParameter) extends DVBundle[LayerSpecParameter, LayerSpecLayers](parameter):
-  val a0     = ProbeRead(UInt(parameter.width.W), layers("A0"))
-  val a0b0   = ProbeRead(UInt(parameter.width.W), layers("A0")("A0B0"))
-  val a0b0c0 = ProbeRead(UInt(parameter.width.W), layers("A0")("A0B0")("A0B0C0"))
-  val a0b1   = ProbeRead(UInt(parameter.width.W), layers("A0")("A0B1"))
+  val a0     = ProbeRead(UInt(parameter.width), layers("A0"))
+  val a0b0   = ProbeRead(UInt(parameter.width), layers("A0")("A0B0"))
+  val a0b0c0 = ProbeRead(UInt(parameter.width), layers("A0")("A0B0")("A0B0C0"))
+  val a0b1   = ProbeRead(UInt(parameter.width), layers("A0")("A0B1"))
 
 object LayerSpec extends TestSuite:
   val tests = Tests:
@@ -65,19 +65,19 @@ object LayerSpec extends TestSuite:
           val probe = summon[Interface[LayerSpecProbe]]
           layer("A0"):
             // calculation to prevent optimization
-            val a0p = Wire(UInt(parameter.width.W))
+            val a0p = Wire(UInt(parameter.width))
             a0p := (io.a0 + 1.U).asBits.tail(parameter.width).asUInt
             probe.a0 <== a0p
             layer("A0B0"):
-              val a0b0p = Wire(UInt(parameter.width.W))
+              val a0b0p = Wire(UInt(parameter.width))
               a0b0p := (io.a0b0 - 1.U).asBits.tail(parameter.width).asUInt
               probe.a0b0 <== a0b0p
               layer("A0B0C0"):
-                val a0b0c0p = Wire(UInt(parameter.width.W))
+                val a0b0c0p = Wire(UInt(parameter.width))
                 a0b0c0p := (io.a0b0c0 * 3.U).asBits.tail(parameter.width).asUInt
                 probe.a0b0c0 <== a0b0c0p
             layer("A0B1"):
-              val a0b1p = Wire(UInt(parameter.width.W))
+              val a0b1p = Wire(UInt(parameter.width))
               a0b1p := (io.a0b1 << 1).asBits.tail(parameter.width).asUInt
               probe.a0b1 <== a0b1p
 

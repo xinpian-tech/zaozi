@@ -17,13 +17,13 @@ class TypeParamIO[A <: Bundle, B <: Bundle](_a: A, _b: B) extends Bundle:
   val b = Flipped(_b)
 
 class SimpleBundle extends Bundle:
-  val g = Aligned(UInt(32.W))
+  val g = Aligned(UInt(32))
 
 class SimpleBundleA extends Bundle:
-  val a = Aligned(UInt(32.W))
+  val a = Aligned(UInt(32))
 
 class SimpleBundleB extends Bundle:
-  val b = Aligned(UInt(32.W))
+  val b = Aligned(UInt(32))
 
 case class BundleSpecParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[BundleSpecParameter] = upickle.default.macroRW
@@ -32,16 +32,16 @@ class BundleSpecLayers(parameter: BundleSpecParameter) extends LayerInterface(pa
   def layers = Seq.empty
 
 class BundleSpecIO(parameter: BundleSpecParameter) extends HWBundle(parameter):
-  val a = Aligned(UInt(parameter.width.W))
-  val b = Flipped(UInt(parameter.width.W))
+  val a = Aligned(UInt(parameter.width))
+  val b = Flipped(UInt(parameter.width))
   val c = Aligned(new Bundle {
-    val d = Aligned(UInt(parameter.width.W))
+    val d = Aligned(UInt(parameter.width))
   })
   val f = Flipped(new SimpleBundle)
-  val e = UInt(parameter.width.W)
+  val e = UInt(parameter.width)
   val i = parameter.width
   val j = Aligned(new TypeParamIO(new SimpleBundleA, new SimpleBundleB))
-  val k = Option.when(parameter.width >= 16)(Aligned(UInt(parameter.width.W)))
+  val k = Option.when(parameter.width >= 16)(Aligned(UInt(parameter.width)))
 
 class BundleSpecProbe(parameter: BundleSpecParameter) extends DVBundle[BundleSpecParameter, BundleSpecLayers](parameter)
 

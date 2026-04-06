@@ -67,11 +67,11 @@ class GCDLayers(parameter: GCDParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
 class GCDInput(parameter: GCDParameter) extends Bundle:
-  val x: BundleField[UInt] = Aligned(UInt(parameter.width.W))
-  val y: BundleField[UInt] = Aligned(UInt(parameter.width.W))
+  val x: BundleField[UInt] = Aligned(UInt(parameter.width))
+  val y: BundleField[UInt] = Aligned(UInt(parameter.width))
 
 class GCDOutput(parameter: GCDParameter) extends Bundle:
-  val z: BundleField[UInt] = Aligned(UInt(parameter.width.W))
+  val z: BundleField[UInt] = Aligned(UInt(parameter.width))
 
 // GCD-DAG:      module GCD_{{.*}}(
 // GCD-DAG-NEXT:   input         clock,
@@ -100,9 +100,9 @@ class SubtractorLayers(parameter: SubtractorParameter) extends LayerInterface(pa
 class SubtractorIO(
   parameter: SubtractorParameter)
     extends HWBundle(parameter):
-  val a = Flipped(UInt(parameter.width.W))
-  val b = Flipped(UInt(parameter.width.W))
-  val z = Aligned(UInt(parameter.width.W))
+  val a = Flipped(UInt(parameter.width))
+  val b = Flipped(UInt(parameter.width))
+  val z = Aligned(UInt(parameter.width))
 
 class SubtractorProbe(parameter: SubtractorParameter) extends DVBundle[SubtractorParameter, SubtractorLayers](parameter)
 
@@ -124,12 +124,12 @@ class GenXLayers(parameter: GenXParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
 class GenXIO(parameter: GenXParameter) extends HWBundle(parameter):
-  val x          = Flipped(UInt(parameter.width.W))
-  val y          = Flipped(UInt(parameter.width.W))
+  val x          = Flipped(UInt(parameter.width))
+  val y          = Flipped(UInt(parameter.width))
   val inputFire  = Flipped(Bool())
-  val inputValue = Flipped(UInt(parameter.width.W))
+  val inputValue = Flipped(UInt(parameter.width))
   val xGreaterY  = Flipped(Bool())
-  val nextX      = Aligned(UInt(parameter.width.W))
+  val nextX      = Aligned(UInt(parameter.width))
 
 class GenXProbe(parameter: GenXParameter) extends DVBundle[GenXParameter, GenXLayers](parameter)
 
@@ -156,12 +156,12 @@ class GenYLayers(parameter: GenYParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
 class GenYIO(parameter: GenYParameter) extends HWBundle(parameter):
-  val x          = Flipped(UInt(parameter.width.W))
-  val y          = Flipped(UInt(parameter.width.W))
+  val x          = Flipped(UInt(parameter.width))
+  val y          = Flipped(UInt(parameter.width))
   val inputFire  = Flipped(Bool())
-  val inputValue = Flipped(UInt(parameter.width.W))
+  val inputValue = Flipped(UInt(parameter.width))
   val xGreaterY  = Flipped(Bool())
-  val nextY      = Aligned(UInt(parameter.width.W))
+  val nextY      = Aligned(UInt(parameter.width))
 
 class GenYProbe(parameter: GenYParameter) extends DVBundle[GenYParameter, GenYLayers](parameter)
 
@@ -188,8 +188,8 @@ object GCD extends Generator[GCDParameter, GCDLayers, GCDIO, GCDProbe]:
     given Ref[Clock] = io.clock
     given Ref[Reset] = io.reset
 
-    val x           = Reg(UInt(parameter.width.W))
-    val y           = RegInit(0.U(parameter.width.W))
+    val x           = Reg(UInt(parameter.width))
+    val y           = RegInit(0.U(parameter.width))
     val startupFlag = RegInit(false.B)
     val busy        = y =/= 0.U
 

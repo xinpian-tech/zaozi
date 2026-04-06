@@ -20,12 +20,12 @@ class VecSpecLayers(parameter: VecSpecParameter) extends LayerInterface(paramete
   def layers = Seq.empty
 
 class VecSpecIO(parameter: VecSpecParameter) extends HWBundle(parameter):
-  val a        = Flipped(Vec(parameter.vecCount, Bits(parameter.width.W)))
-  val au       = Flipped(Vec(parameter.vecCount, UInt(parameter.width.W)))
-  val idx      = Flipped(UInt(BigInt(parameter.vecCount).bitLength.W))
-  val b        = Aligned(Vec(parameter.vecCount, Bits(parameter.width.W)))
-  val out      = Aligned(Bits(parameter.width.W))
-  val flatuint = Aligned(UInt((parameter.width * parameter.vecCount).W))
+  val a        = Flipped(Vec(parameter.vecCount, Bits(parameter.width)))
+  val au       = Flipped(Vec(parameter.vecCount, UInt(parameter.width)))
+  val idx      = Flipped(UInt(BigInt(parameter.vecCount).bitLength))
+  val b        = Aligned(Vec(parameter.vecCount, Bits(parameter.width)))
+  val out      = Aligned(Bits(parameter.width))
+  val flatuint = Aligned(UInt(parameter.width * parameter.vecCount))
 
 class VecSpecProbe(parameter: VecSpecParameter) extends DVBundle[VecSpecParameter, VecSpecLayers](parameter)
 
@@ -50,7 +50,7 @@ object VecSpec extends TestSuite:
       object AsBits extends Generator[VecSpecParameter, VecSpecLayers, VecSpecIO, VecSpecProbe] with HasVerilogTest:
         def architecture(parameter: VecSpecParameter) =
           val io = summon[Interface[VecSpecIO]]
-          io.b := io.a.asBits.asVec(Bits(parameter.width.W))
+          io.b := io.a.asBits.asVec(Bits(parameter.width))
           io.out.dontCare()
           io.flatuint.dontCare()
       AsBits.verilogTest(VecSpecParameter(8, 4))(

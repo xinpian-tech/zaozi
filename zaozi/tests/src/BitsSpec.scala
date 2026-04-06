@@ -22,14 +22,14 @@ class BitsSpecLayers(parameter: BitsSpecParameter) extends LayerInterface(parame
 class BitsSpecIO(
   parameter: BitsSpecParameter)
     extends HWBundle(parameter):
-  val a          = Flipped(Bits(parameter.width.W))
-  val b          = Flipped(Bits(parameter.width.W))
-  val c          = Flipped(UInt(parameter.width.W))
+  val a          = Flipped(Bits(parameter.width))
+  val b          = Flipped(Bits(parameter.width))
+  val c          = Flipped(UInt(parameter.width))
   val d          = Flipped(Bool())
-  val sint       = Aligned(SInt((parameter.width).W))
-  val uint       = Aligned(UInt((parameter.width).W))
-  val bits       = Aligned(Bits(parameter.width.W))
-  val widenBits  = Aligned(Bits((2 * parameter.width).W))
+  val sint       = Aligned(SInt(parameter.width))
+  val uint       = Aligned(UInt(parameter.width))
+  val bits       = Aligned(Bits(parameter.width))
+  val widenBits  = Aligned(Bits(2 * parameter.width))
   val bool       = Aligned(Bool())
   val clock      = Flipped(Clock())
   val asyncReset = Flipped(AsyncReset())
@@ -37,8 +37,8 @@ class BitsSpecIO(
 class BitsSpecProbe(parameter: BitsSpecParameter) extends DVBundle[BitsSpecParameter, BitsSpecLayers](parameter)
 
 class SimpleBundleC extends Bundle:
-  val x = Aligned(Bits(4.W))
-  val y = Aligned(Bits(4.W))
+  val x = Aligned(Bits(4))
+  val y = Aligned(Bits(4))
 
 object BitsSpec extends TestSuite:
   val tests = Tests:
@@ -318,7 +318,7 @@ object BitsSpec extends TestSuite:
           io.bool.dontCare()
           io.bits.dontCare()
           io.widenBits.dontCare()
-          io.bits := io.a.head(4) ## 0.B(4.W)
+          io.bits := io.a.head(4) ## 0.B(4)
       Head.verilogTest(BitsSpecParameter(8))(
         "assign bits = {a[7:4], 4'h0};"
       )
@@ -333,7 +333,7 @@ object BitsSpec extends TestSuite:
           io.bool.dontCare()
           io.bits.dontCare()
           io.widenBits.dontCare()
-          io.bits := io.a.tail(4) ## 0.B(4.W)
+          io.bits := io.a.tail(4) ## 0.B(4)
       Tail.verilogTest(BitsSpecParameter(8))(
         "assign bits = {a[3:0], 4'h0};"
       )
@@ -500,8 +500,8 @@ object BitsSpec extends TestSuite:
 
           // Define a simple record to cast to
           class SimpleRecord extends Record:
-            val field1 = Aligned("first", Bits(4.W))
-            val field2 = Aligned("second", Bits(4.W))
+            val field1 = Aligned("first", Bits(4))
+            val field2 = Aligned("second", Bits(4))
 
           // Cast an 8-bit value to the record
           val simpleRecordType = new SimpleRecord()
@@ -525,8 +525,8 @@ object BitsSpec extends TestSuite:
           io.widenBits.dontCare()
 
           class SimpleRecord extends Record:
-            val field1 = Aligned("first", Bits(2.W))
-            val field2 = Aligned("second", Bits(2.W))
+            val field1 = Aligned("first", Bits(2))
+            val field2 = Aligned("second", Bits(2))
 
           val simpleRecordType = new SimpleRecord()
           val recordNode       = io.a.asVec(simpleRecordType)

@@ -17,8 +17,8 @@ class PassthroughLayersA(parameter: PassthroughParameterA) extends LayerInterfac
   def layers = Seq.empty
 
 class PassthroughIOA(parameter: PassthroughParameterA) extends HWBundle(parameter):
-  val i = Flipped(UInt(parameter.width.W))
-  val o = Aligned(UInt(parameter.width.W))
+  val i = Flipped(UInt(parameter.width))
+  val o = Aligned(UInt(parameter.width))
 
 class PassthroughProbeA(parameter: PassthroughParameterA)
     extends DVBundle[PassthroughParameterA, PassthroughLayersA](parameter)
@@ -33,8 +33,8 @@ case class PassthroughParameterB(width: Int)() extends Parameter
 class PassthroughLayersB(parameter: PassthroughParameterB) extends LayerInterface(parameter)
 
 class PassthroughIOB(parameter: PassthroughParameterB) extends HWBundle(parameter):
-  val i = Flipped(UInt(parameter.width.W))
-  val o = Aligned(UInt(parameter.width.W))
+  val i = Flipped(UInt(parameter.width))
+  val o = Aligned(UInt(parameter.width))
 
 class PassthroughProbeB(parameter: PassthroughParameterB)
     extends DVBundle[PassthroughParameterB, PassthroughLayersB](parameter)

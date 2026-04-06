@@ -22,14 +22,14 @@ class WidthSpecLayers(parameter: WidthSpecParameter) extends LayerInterface(para
   def layers = Seq.empty
 
 class WidthSpecIO(parameter: WidthSpecParameter) extends HWBundle(parameter):
-  val i = Flipped(UInt(parameter.width.W))
-  val o = Aligned(UInt(parameter.width.W))
+  val i = Flipped(UInt(parameter.width))
+  val o = Aligned(UInt(parameter.width))
 
 class WidthSpecProbe(parameter: WidthSpecParameter) extends DVBundle[WidthSpecParameter, WidthSpecLayers](parameter)
 
 class WidthBundle extends Bundle:
-  val x = Aligned(UInt(4.W))
-  val y = Aligned(SInt(8.W))
+  val x = Aligned(UInt(4))
+  val y = Aligned(SInt(8))
 
 object WidthSpec extends TestSuite:
   private def withContext(body: (Arena, Context) ?=> Unit): Unit =
@@ -44,18 +44,18 @@ object WidthSpec extends TestSuite:
     test("Data"):
       test("UInt"):
         withContext:
-          assert(UInt(8.W).width == 8)
-          assert(UInt(1.W).width == 1)
-          assert(UInt(32.W).width == 32)
+          assert(UInt(8).width == 8)
+          assert(UInt(1).width == 1)
+          assert(UInt(32).width == 32)
 
       test("SInt"):
         withContext:
-          assert(SInt(8.W).width == 8)
-          assert(SInt(16.W).width == 16)
+          assert(SInt(8).width == 8)
+          assert(SInt(16).width == 16)
 
       test("Bits"):
         withContext:
-          assert(Bits(8.W).width == 8)
+          assert(Bits(8).width == 8)
 
       test("Bool"):
         withContext:
@@ -63,31 +63,31 @@ object WidthSpec extends TestSuite:
 
       test("Vec"):
         withContext:
-          assert(Vec(4, UInt(8.W)).width == 32)
-          assert(Vec(2, Bits(3.W)).width == 6)
+          assert(Vec(4, UInt(8)).width == 32)
+          assert(Vec(2, Bits(3)).width == 6)
 
       test("Bundle"):
         withContext:
           val b = new Bundle:
-            val x = Aligned(UInt(4.W))
-            val y = Aligned(UInt(8.W))
+            val x = Aligned(UInt(4))
+            val y = Aligned(UInt(8))
           assert(b.width == 12)
 
       test("Nested Bundle"):
         withContext:
           val inner = new Bundle:
-            val a = Aligned(UInt(4.W))
-            val b = Aligned(UInt(4.W))
+            val a = Aligned(UInt(4))
+            val b = Aligned(UInt(4))
           val outer = new Bundle:
             val x = Aligned(inner)
-            val y = Aligned(UInt(8.W))
+            val y = Aligned(UInt(8))
           assert(outer.width == 16)
 
       test("Vec of Bundle"):
         withContext:
           val b = new Bundle:
-            val a = Aligned(UInt(4.W))
-            val b = Aligned(UInt(4.W))
+            val a = Aligned(UInt(4))
+            val b = Aligned(UInt(4))
           assert(Vec(3, b).width == 24)
 
     test("Referable"):
@@ -98,7 +98,7 @@ object WidthSpec extends TestSuite:
             with HasMlirTest:
           def architecture(parameter: WidthSpecParameter) =
             val io   = summon[Interface[WidthSpecIO]]
-            val wire = Wire(UInt(parameter.width.W))
+            val wire = Wire(UInt(parameter.width))
             assert(wire.width == parameter.width)
             io.o := wire
             wire := io.i
@@ -124,7 +124,7 @@ object WidthSpec extends TestSuite:
             with HasMlirTest:
           def architecture(parameter: WidthSpecParameter) =
             val io      = summon[Interface[WidthSpecIO]]
-            val vecWire = Wire(Vec(4, UInt(parameter.width.W)))
+            val vecWire = Wire(Vec(4, UInt(parameter.width)))
             assert(vecWire.width == 4 * parameter.width)
             io.o := vecWire.asBits.bits(parameter.width - 1, 0).asUInt
             io.i.dontCare()

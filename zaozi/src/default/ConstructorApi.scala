@@ -46,14 +46,20 @@ given ConstructorApi with
   def AsyncReset(): Reset = new Reset:
     val _isAsync: Boolean = true
 
-  def UInt(tpeWidth: Width): UInt = new UInt:
-    private[zaozi] val _width: Int = tpeWidth._width
+  def UInt(_width: Int): UInt =
+    val w = _width
+    new UInt:
+      private[zaozi] val _width: Int = w
 
-  def Bits(tpeWidth: Width): Bits = new Bits:
-    private[zaozi] val _width: Int = tpeWidth._width
+  def Bits(_width: Int): Bits =
+    val w = _width
+    new Bits:
+      private[zaozi] val _width: Int = w
 
-  def SInt(tpeWidth: Width): SInt = new SInt:
-    private[zaozi] val _width: Int = tpeWidth._width
+  def SInt(_width: Int): SInt =
+    val w = _width
+    new SInt:
+      private[zaozi] val _width: Int = w
 
   def Bool(): Bool = new Object with Bool
 
@@ -231,7 +237,7 @@ given ConstructorApi with
 
   extension (bigInt: BigInt)
     def U(
-      width: Width
+      width: Int
     )(
       using Arena,
       Context,
@@ -241,7 +247,7 @@ given ConstructorApi with
     ): Const[UInt] =
       val constOp = summon[ConstantApi].op(
         input = bigInt,
-        width = width._width,
+        width = width,
         signed = false,
         location = locate
       )
@@ -254,9 +260,9 @@ given ConstructorApi with
       using Arena,
       Context,
       Block
-    ): Const[UInt] = bigInt.U(scala.math.max(1, bigInt.bitLength).W)
+    ): Const[UInt] = bigInt.U(scala.math.max(1, bigInt.bitLength))
     def B(
-      width: Width
+      width: Int
     )(
       using Arena,
       Context,
@@ -266,7 +272,7 @@ given ConstructorApi with
     ): Const[Bits] =
       val constOp = summon[ConstantApi].op(
         input = bigInt,
-        width = width._width,
+        width = width,
         signed = false,
         location = locate
       )
@@ -279,9 +285,9 @@ given ConstructorApi with
       using Arena,
       Context,
       Block
-    ): Const[Bits] = bigInt.B(scala.math.max(1, bigInt.bitLength).W)
+    ): Const[Bits] = bigInt.B(scala.math.max(1, bigInt.bitLength))
     def S(
-      width: Width
+      width: Int
     )(
       using Arena,
       Context,
@@ -291,7 +297,7 @@ given ConstructorApi with
     ): Const[SInt] =
       val constOp = summon[ConstantApi].op(
         input = bigInt,
-        width = width._width,
+        width = width,
         signed = true,
         location = locate
       )
@@ -306,9 +312,7 @@ given ConstructorApi with
       Block
     ): Const[SInt] =
       // MSB for sign
-      bigInt.S((bigInt.bitLength + 1).W)
-    def W: Width = new Width:
-      val _width: Int = bigInt.toInt
+      bigInt.S(bigInt.bitLength + 1)
   extension (bool:   Boolean)
     def B(
       using Arena,

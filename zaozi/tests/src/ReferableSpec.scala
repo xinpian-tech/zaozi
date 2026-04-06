@@ -27,8 +27,8 @@ class ReferableSpecLayers(parameter: ReferableSpecParameter) extends LayerInterf
   def layers = Seq.empty
 
 class PassthroughIO(parameter: ReferableSpecParameter) extends HWBundle(parameter):
-  val i = Flipped(UInt(parameter.width.W))
-  val o = Aligned(UInt(parameter.width.W))
+  val i = Flipped(UInt(parameter.width))
+  val o = Aligned(UInt(parameter.width))
 
 class ReferableSpecIO(parameter: ReferableSpecParameter) extends HWBundle(parameter):
   val asyncDomain = Flipped(new AsyncDomain)
@@ -47,7 +47,7 @@ object ReferableSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ReferableSpecParameter) =
           val io   = summon[Interface[ReferableSpecIO]]
-          val wire = Wire(UInt(parameter.width.W))
+          val wire = Wire(UInt(parameter.width))
           io.passthrough.o := wire
           wire             := io.passthrough.i
       WireTest.verilogTest(ReferableSpecParameter(8))(
@@ -62,7 +62,7 @@ object ReferableSpec extends TestSuite:
         def architecture(parameter: ReferableSpecParameter) =
           val io           = summon[Interface[ReferableSpecIO]]
           given Ref[Clock] = io.syncDomain.clock
-          val reg          = Reg(UInt(parameter.width.W))
+          val reg          = Reg(UInt(parameter.width))
           io.passthrough.o := reg
           reg              := io.passthrough.i
       RegisterWithoutReset.verilogTest(ReferableSpecParameter(8))(
@@ -79,7 +79,7 @@ object ReferableSpec extends TestSuite:
           val io           = summon[Interface[ReferableSpecIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.U(parameter.width.W))
+          val reg          = RegInit(0.U(parameter.width))
           io.passthrough.o := reg
           reg              := io.passthrough.i
       RegisterWithSyncReset.verilogTest(ReferableSpecParameter(8))(
@@ -96,7 +96,7 @@ object ReferableSpec extends TestSuite:
           val io           = summon[Interface[ReferableSpecIO]]
           given Ref[Clock] = io.asyncDomain.clock
           given Ref[Reset] = io.asyncDomain.reset
-          val reg          = RegInit(0.U(parameter.width.W))
+          val reg          = RegInit(0.U(parameter.width))
           io.passthrough.o := reg
           reg              := io.passthrough.i
       RegisterWithASyncReset.verilogTest(ReferableSpecParameter(8))(
@@ -123,7 +123,7 @@ object ReferableSpec extends TestSuite:
           with HasCompileErrorTest:
         def architecture(parameter: ReferableSpecParameter) =
           val io = summon[Interface[ReferableSpecIO]]
-          compileError("""val c = 0.U(8.W); c := 0.U(8.W)""").check(
+          compileError("""val c = 0.U(8); c := 0.U(8)""").check(
             "",
             "Type parameter T must be a subtype of DynamicSubfield"
           )

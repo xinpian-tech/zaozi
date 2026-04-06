@@ -15,16 +15,16 @@ import org.llvm.mlir.scalalib.capi.ir.Block
 import me.jiuyang.zaozi.reftpe.Referable
 
 class UnfixedFieldsNumRecord(n: Int, width: Int) extends Record:
-  val inputs  = Seq.tabulate(n)(i => Flipped(s"input_$i", UInt(width.W)))
-  val outputs = Seq.tabulate(n)(i => Aligned(s"output_$i", UInt(width.W)))
+  val inputs  = Seq.tabulate(n)(i => Flipped(s"input_$i", UInt(width)))
+  val outputs = Seq.tabulate(n)(i => Aligned(s"output_$i", UInt(width)))
 
 class SimpleRecord(width: Int) extends Record:
-  val i = Flipped("a", UInt(width.W))
-  val o = Aligned("b", UInt(width.W))
+  val i = Flipped("a", UInt(width))
+  val o = Aligned("b", UInt(width))
 
 class AlignedRecord(width: Int) extends Record:
-  val i = Aligned("a", UInt(width.W))
-  val o = Aligned("b", UInt(width.W))
+  val i = Aligned("a", UInt(width))
+  val o = Aligned("b", UInt(width))
 
 class NestedRecord(width: Int) extends Record:
   val inner = Aligned("inner", new SimpleRecord(width))
@@ -47,12 +47,12 @@ class SimpleRecordIO(parameter: RecordSpecParameter) extends HWBundle(parameter)
 class RecordSpecProbe(parameter: RecordSpecParameter) extends DVBundle[RecordSpecParameter, RecordSpecLayers](parameter)
 
 class RecordAsIO(parameter: RecordSpecParameter) extends HWRecord(parameter):
-  val inputs  = Seq.tabulate(parameter.fieldNum)(i => Flipped(s"input_$i", UInt(parameter.width.W)))
-  val outputs = Seq.tabulate(parameter.fieldNum)(i => Aligned(s"output_$i", UInt(parameter.width.W)))
+  val inputs  = Seq.tabulate(parameter.fieldNum)(i => Flipped(s"input_$i", UInt(parameter.width)))
+  val outputs = Seq.tabulate(parameter.fieldNum)(i => Aligned(s"output_$i", UInt(parameter.width)))
 
 class RecordAsProbe(parameter: RecordSpecParameter) extends DVRecord[RecordSpecParameter, RecordSpecLayers](parameter):
   val probes =
-    Seq.tabulate(parameter.fieldNum)(i => ProbeRead(s"probe_$i", UInt(parameter.width.W), layers("verification")))
+    Seq.tabulate(parameter.fieldNum)(i => ProbeRead(s"probe_$i", UInt(parameter.width), layers("verification")))
 
 object RecordSpec extends TestSuite:
   val tests = Tests:

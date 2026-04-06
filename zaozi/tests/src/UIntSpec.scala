@@ -20,12 +20,12 @@ class UIntSpecLayers(parameter: UIntSpecParameter) extends LayerInterface(parame
   def layers = Seq.empty
 
 class UIntSpecIO(parameter: UIntSpecParameter) extends HWBundle(parameter):
-  val a          = Flipped(UInt(parameter.width.W))
-  val b          = Flipped(UInt(parameter.width.W))
-  val c          = Flipped(UInt(parameter.width.W))
+  val a          = Flipped(UInt(parameter.width))
+  val b          = Flipped(UInt(parameter.width))
+  val c          = Flipped(UInt(parameter.width))
   val d          = Flipped(Bool())
-  val uint       = Aligned(UInt((parameter.width + 1).W))
-  val bits       = Aligned(Bits(parameter.width.W))
+  val uint       = Aligned(UInt(parameter.width + 1))
+  val bits       = Aligned(Bits(parameter.width))
   val bool       = Aligned(Bool())
   val clock      = Flipped(Clock())
   val asyncReset = Flipped(AsyncReset())

@@ -27,7 +27,7 @@ given [T <: Bundle | ProbeBundle, R <: Referable[T]]: BundleApi[T, R] with
     ): Propagated[R, Bits] =
       val bitcastOp = summon[BitCastApi].op(
         input = ref.refer,
-        tpe = Bits(ref.refer.getType.getBitWidth(true).toInt.W).toMlirType,
+        tpe = Bits(ref.refer.getType.getBitWidth(true).toInt).toMlirType,
         location = locate
       )
       bitcastOp.operation.appendToBlock()

@@ -24,20 +24,20 @@ class TypeUtilSyncDomain extends Bundle:
 
 class TypeUtilIO(parameter: TypeUtilParameter) extends HWBundle(parameter):
   val syncDomain = Flipped(new TypeUtilSyncDomain)
-  val inUInt     = Flipped(UInt(parameter.width.W))
-  val inSInt     = Flipped(SInt(parameter.width.W))
-  val inBits     = Flipped(Bits(parameter.width.W))
+  val inUInt     = Flipped(UInt(parameter.width))
+  val inSInt     = Flipped(SInt(parameter.width))
+  val inBits     = Flipped(Bits(parameter.width))
   val inBool     = Flipped(Bool())
-  val out        = Aligned(UInt(parameter.width.W))
-  val outSInt    = Aligned(SInt(parameter.width.W))
-  val outBits    = Aligned(Bits(parameter.width.W))
+  val out        = Aligned(UInt(parameter.width))
+  val outSInt    = Aligned(SInt(parameter.width))
+  val outBits    = Aligned(Bits(parameter.width))
   val outBool    = Aligned(Bool())
 
 class TypeUtilProbe(parameter: TypeUtilParameter) extends DVBundle[TypeUtilParameter, TypeUtilLayers](parameter)
 
 class SimpleBundle4x2 extends Bundle:
-  val x = Aligned(Bits(4.W))
-  val y = Aligned(Bits(4.W))
+  val x = Aligned(Bits(4))
+  val y = Aligned(Bits(4))
 
 object TypeUtilSpec extends TestSuite:
   val tests = Tests:
@@ -103,7 +103,7 @@ object TypeUtilSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: TypeUtilParameter) =
           val io = summon[Interface[TypeUtilIO]]
-          io.out := io.inBits.asType(UInt(parameter.width.W))
+          io.out := io.inBits.asType(UInt(parameter.width))
           io.outSInt.dontCare()
           io.outBits.dontCare()
           io.outBool.dontCare()
@@ -116,7 +116,7 @@ object TypeUtilSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: TypeUtilParameter) =
           val io = summon[Interface[TypeUtilIO]]
-          io.outSInt := io.inBits.asType(SInt(parameter.width.W))
+          io.outSInt := io.inBits.asType(SInt(parameter.width))
           io.out.dontCare()
           io.outBits.dontCare()
           io.outBool.dontCare()
@@ -175,7 +175,7 @@ object TypeUtilSpec extends TestSuite:
           val io           = summon[Interface[TypeUtilIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val constBits: Const[Bits] = 0.U(parameter.width.W).asBits
+          val constBits: Const[Bits] = 0.U(parameter.width).asBits
           val reg = RegInit(constBits)
           io.outBits := reg
           reg        := io.inBits
@@ -196,7 +196,7 @@ object TypeUtilSpec extends TestSuite:
           val io           = summon[Interface[TypeUtilIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val constUInt: Const[UInt] = 0.B(parameter.width.W).asType(UInt(parameter.width.W))
+          val constUInt: Const[UInt] = 0.B(parameter.width).asType(UInt(parameter.width))
           val reg = RegInit(constUInt)
           io.out := reg
           reg    := io.inUInt
@@ -217,7 +217,7 @@ object TypeUtilSpec extends TestSuite:
           val io           = summon[Interface[TypeUtilIO]]
           given Ref[Clock] = io.syncDomain.clock
           given Ref[Reset] = io.syncDomain.reset
-          val reg          = RegInit(0.U(parameter.width.W).asBits.asType(SInt(parameter.width.W)))
+          val reg          = RegInit(0.U(parameter.width).asBits.asType(SInt(parameter.width)))
           io.outSInt := reg
           reg        := io.inSInt
           io.out.dontCare()
@@ -235,7 +235,7 @@ object TypeUtilSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: TypeUtilParameter) =
           val io = summon[Interface[TypeUtilIO]]
-          val bundleConst: Const[SimpleBundle4x2] = 0.B(8.W).asType(new SimpleBundle4x2)
+          val bundleConst: Const[SimpleBundle4x2] = 0.B(8).asType(new SimpleBundle4x2)
           val wire = Wire(new SimpleBundle4x2)
           wire.x     := bundleConst.x
           wire.y     := bundleConst.y

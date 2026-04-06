@@ -20,12 +20,12 @@ class SIntSpecLayers(parameter: SIntSpecParameter) extends LayerInterface(parame
   def layers = Seq.empty
 
 class SIntSpecIO(parameter: SIntSpecParameter) extends HWBundle(parameter):
-  val a          = Flipped(SInt(parameter.width.W))
-  val b          = Flipped(SInt(parameter.width.W))
-  val c          = Flipped(UInt(parameter.width.W))
+  val a          = Flipped(SInt(parameter.width))
+  val b          = Flipped(SInt(parameter.width))
+  val c          = Flipped(UInt(parameter.width))
   val d          = Flipped(Bool())
-  val sint       = Aligned(SInt((parameter.width + 1).W))
-  val bits       = Aligned(Bits(parameter.width.W))
+  val sint       = Aligned(SInt(parameter.width + 1))
+  val bits       = Aligned(Bits(parameter.width))
   val bool       = Aligned(Bool())
   val clock      = Flipped(Clock())
   val asyncReset = Flipped(AsyncReset())

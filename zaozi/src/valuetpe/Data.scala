@@ -26,9 +26,6 @@ trait Data:
     TypeImpl
   ): Int = this.widthImpl
 
-trait Width:
-  val _width: Int
-
 trait Aggregate extends Data:
   this: DynamicSubfield | UntypedDynamicSubfield =>
   private[zaozi] var instantiating = true

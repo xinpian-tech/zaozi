@@ -80,11 +80,11 @@ class GCDLayers(parameter: GCDParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
 class GCDInput(parameter: GCDParameter) extends Bundle:
-  val x: BundleField[UInt] = Aligned(UInt(parameter.width.W))
-  val y: BundleField[UInt] = Aligned(UInt(parameter.width.W))
+  val x: BundleField[UInt] = Aligned(UInt(parameter.width))
+  val y: BundleField[UInt] = Aligned(UInt(parameter.width))
 
 class GCDOutput(parameter: GCDParameter) extends Bundle:
-  val z: BundleField[UInt] = Aligned(UInt(parameter.width.W))
+  val z: BundleField[UInt] = Aligned(UInt(parameter.width))
 
 class GCDIO(parameter: GCDParameter) extends HWBundle(parameter):
   val clock:  BundleField[Clock]                 = Flipped(Clock())
@@ -101,8 +101,8 @@ object GCD extends Generator[GCDParameter, GCDLayers, GCDIO, GCDProbe]:
     given Ref[Clock] = io.clock
     given Ref[Reset] = io.reset
 
-    val x           = Reg(UInt(parameter.width.W))
-    val y           = RegInit(0.U(parameter.width.W))
+    val x           = Reg(UInt(parameter.width))
+    val y           = RegInit(0.U(parameter.width))
     val startupFlag = RegInit(false.B)
     val busy        = y =/= 0.U
 

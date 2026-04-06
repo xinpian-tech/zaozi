@@ -25,7 +25,7 @@ class BitSetSpecLayers(parameter: BitSetSpecParameter) extends LayerInterface(pa
   def layers = Seq.empty
 
 class BitSetSpecIO(parameter: BitSetSpecParameter) extends HWBundle(parameter):
-  val i = Flipped(Bits(parameter.width.W))
+  val i = Flipped(Bits(parameter.width))
   val o = Aligned(Bool())
 
 class BitSetSpecProbe(parameter: BitSetSpecParameter) extends DVBundle[BitSetSpecParameter, BitSetSpecLayers](parameter)

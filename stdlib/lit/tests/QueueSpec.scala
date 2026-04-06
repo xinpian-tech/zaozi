@@ -42,8 +42,8 @@ class QueueSpecIO(parameter: QueueSpecParameter) extends HWBundle(parameter):
     if parameter.useAsyncReset then AsyncReset()
     else Reset()
   )
-  val i     = Flipped(Decoupled(UInt(parameter.width.W)))
-  val o     = Aligned(Decoupled(UInt(parameter.width.W)))
+  val i     = Flipped(Decoupled(UInt(parameter.width)))
+  val o     = Aligned(Decoupled(UInt(parameter.width)))
 
 class QueueSpecProbe(parameter: QueueSpecParameter) extends DVBundle[QueueSpecParameter, QueueSpecLayers](parameter)
 

@@ -19,10 +19,10 @@ class VecUtilsSpecLayers(parameter: VecUtilsSpecParameter) extends LayerInterfac
   def layers = Seq.empty
 
 class VecUtilsSpecIO(parameter: VecUtilsSpecParameter) extends HWBundle(parameter):
-  val a    = Flipped(Vec(parameter.vecCount, Bits(parameter.width.W)))
-  val b    = Aligned(Vec(parameter.vecCount, Bits(parameter.width.W)))
+  val a    = Flipped(Vec(parameter.vecCount, Bits(parameter.width)))
+  val b    = Aligned(Vec(parameter.vecCount, Bits(parameter.width)))
   val cond = Flipped(Bool())
-  val out  = Aligned(Bits((parameter.width * parameter.vecCount).W))
+  val out  = Aligned(Bits(parameter.width * parameter.vecCount))
 
 class VecUtilsSpecProbe(parameter: VecUtilsSpecParameter)
     extends DVBundle[VecUtilsSpecParameter, VecUtilsSpecLayers](parameter)
