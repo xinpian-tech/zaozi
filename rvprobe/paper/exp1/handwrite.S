@@ -343,20 +343,31 @@ _start:
     # → 2 unreachable holes on pure RV32I.
 
     # rv32i_misc_cg.cp_misc=ECALL:
-    # ecall requires a trap handler; spike loops without one.
-    # → 1 hole, requires privilege mode setup (out of scope for directed asm).
+    # Set up minimal trap handler, then ecall.
+    la   x5, _trap_handler
+    csrw mtvec, x5
+    ecall
+    j    _after_ecall
+    .balign 4
+_trap_handler:
+    # Advance mepc past ecall (4 bytes) and return
+    csrr x5, mepc
+    addi x5, x5, 4
+    csrw mepc, x5
+    mret
+_after_ecall:
 
 # ============================================================
-# Grand total holes addressed (29 fillable / 51 baseline):
+# Grand total holes addressed (25 fillable / 51 baseline):
 #   cp_rd=SP:                 19 holes (sub,sra,...,lui,csrrw)
-#   U-type RAW:                2 holes (lui,auipc)
 #   jal rd=ZERO, rd=SP:        2 holes
 #   Logical:                   3 holes (ori OPPOSITE, andi OPPOSITE, xori IDENTICAL)
+#   ECALL:                     1 hole  (with trap handler)
 #                             ---
-#   Total fillable:           26 holes
+#   Total fillable:           25 holes
 #
-# Remaining 25 unfillable:
+# Remaining 26 architecture-unreachable:
 #   opcode_cg:                22 holes (invalid opcode encodings)
+#   lui/auipc RAW:             2 holes (U-type has no rs fields)
 #   jal alignment:             2 holes (requires C extension)
-#   ECALL:                     1 hole  (requires trap handler)
 # ============================================================
