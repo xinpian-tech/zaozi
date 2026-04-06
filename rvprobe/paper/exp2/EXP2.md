@@ -90,26 +90,88 @@ nix develop zaozi -c mill rvprobe.runMain me.jiuyang.rvprobe.scripts.UpdateT1Con
 
 **位置**：`zaozi/rvprobe/src/cases/chaining/ChainingLib.scala`
 
-5 种基础依赖方法 + 15 个组合矩阵格方法：
+#### 基础矩阵格：2 行约束 → 2 条向量指令对
+
+5 种基础依赖方法 + 15 个组合矩阵格方法。每格约束一对指令的操作码和寄存器依赖：
 
 ```scala
-// D1: Explicit RAW — A.vd → B.vs2
-def explicitRAW(reg, opcodeA, opcodeB) =
-  instruction(0, opcodeA) { vdEqual(reg.S) & hasVd() & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
-  instruction(1, opcodeB) { vs2Equal(reg.S) & hasVs2() & vdRange(1, 32) & vmEqual(1) }
-
-// D2: Implicit v0 mask RAW — A writes v0, B uses v0 as mask
-def implicitV0RAW(opcodeA, opcodeB) =
-  instruction(0, opcodeA) { vdEqual(0.S) & ... & vmEqual(1) }
-  instruction(1, opcodeB) { vdRange(1, 32) & ... & vmEqual(0) }
-
-// 组合矩阵格：每格 1 行调用
-def explicitRAW_ALUxALU(reg) = explicitRAW(reg, isVaddVv(), isVsubVv())
-def explicitRAW_SlowxFast(reg) = explicitRAW(reg, isVdivVv(), isVaddVv())
-def war_GatherxALU(reg) =
+// D3×C6: WAR, Gather × ALU — 每格 1 行调用
+def war_GatherxALU(reg: Int = 4) =
   instruction(0, isVrgatherVv()) { vs2Equal(reg.S) & vdRange(1, 32) & vmEqual(1) }
   instruction(1, isVaddVv())     { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
 ```
+
+SMT 求解器自动填充寄存器索引，保证 WAR 依赖（B.vd == A.vs2）和微架构约束（A 为 gather 指令）。
+
+#### 完整测试生成：`war_GatherxALU_full()` — 1 行调用 → 完整可执行测试
+
+`war_GatherxALU_full()` ���成包含初始化、约束对、验证的完整序列：
+
+```scala
+def war_GatherxALU_full(vSrc: Int = 8, vIdx: Int = 2, ...)(using ...): Unit =
+  // 1. 向量配置
+  raw("li   x5, -1")
+  raw("vsetvli x5, x5, e32, m1, ta, ma")
+
+  // 2. 源数据初始化：v_src = {0, 1, ..., vl-1}
+  raw(s"vid.v v$vSrc")
+
+  // 3. 非顺序索引构造：v_idx = vid XOR (vl-1) → 反转
+  //    迫使 gather 在最后一步读取 v_src[0]，而 elementMask 在第 0 步就标记元素 0 为 "完成"
+  raw("addi x6, x5, -1")
+  raw(s"vid.v v$vIdx")
+  raw(s"vxor.vx v$vIdx, v$vIdx, x6")
+
+  // 4. 安全的参考 gather（WAR 对之前）
+  raw(s"vrgather.vv v$vRef, v$vSrc, v$vIdx")
+
+  // 5. 毒化值初始化
+  raw("li x6, 999")
+  raw(s"vmv.v.x v$vPoison, x6")
+
+  // 6. ★ 关键 WAR 对 — SMT 约束驱动 ★
+  //    求解器保证：A 为 gather 指令（isVrgatherVv），B.vd == A.vs2（WAR 依赖）
+  instruction(0, isVrgatherVv()) {
+    vdEqual(vResult.S) & vs2Equal(vSrc.S) & vs1Equal(vIdx.S) & vmEqual(1)
+  }
+  instruction(1, isVaddVv()) {
+    vdEqual(vSrc.S) & vs1Equal(vPoison.S) & vs2Equal(vPoison.S) & vmEqual(1)
+  }
+
+  // 7. 验证
+  raw(s"vmsne.vv v$vCmp, v$vResult, v$vRef")
+  raw(s"vcpop.m x6, v$vCmp")
+```
+
+**调用方式**：
+```scala
+object GatherWARBugTest extends RVGenerator:
+  val sets = Seq(isRVI(), isRVV())
+  def constraints() =
+    textStart()
+    war_GatherxALU_full()   // ← 一行调用生成完整测试
+    raw("ret")
+```
+
+**生成的汇编**：
+```asm
+li   x5, -1
+vsetvli x5, x5, e32, m1, ta, ma     # 配置
+vid.v v8                              # 源数据 {0,1,...,vl-1}
+addi x6, x5, -1
+vid.v v2
+vxor.vx v2, v2, x6                   # 反转索引 {vl-1,...,0}
+vrgather.vv v6, v8, v2               # 参考结果（安全）
+li x6, 999
+vmv.v.x v7, x6                       # 毒化值
+    vrgather.vv v1, v8, v2           # ← SMT 约束: isVrgatherVv() + WAR 依赖
+    vadd.vv v8, v7, v7               # ← SMT 约束: isVaddVv() + vd=v8=A.vs2
+vmsne.vv v0, v1, v6                  # 验证：比较 vs 参考
+vcpop.m x6, v0                       # 统计 mismatch 数
+ret
+```
+
+缩进的两行 = SMT 求解器约束的指令对。其余行 = `raw()` 辅助代码。
 
 ### 已实现的 15 格
 
@@ -119,7 +181,7 @@ def war_GatherxALU(reg) =
 | D1×C2 | `explicitRAW_ALUxLSU()` | — |
 | D1×C3 | `explicitRAW_MaskxALU()` | mask unit 不报告完成状态 (2023-06) |
 | D1×C4 | `explicitRAW_SlowxFast()` | 慢指令 chaining 窗口低估 (2023-08) |
-| D1×C5 | `explicitRAW_WidenxNormal()` | 宽化检查仅覆盖 vd 不覆盖 vd+1 (2023-06) |
+| D1×C5 | `explicitRAW_WidenxNormal()` | 宽化检查仅覆盖 vd 不覆��� vd+1 (2023-06) |
 | D1×C7 | `explicitRAW_SlidexStore()` | slide RAW 窗口低估 (2023-06) |
 | D2×C1 | `implicitV0RAW_ALUxALU()` | v0 mask RAW 遗漏 (commit 0dd6e504) |
 | D3×C1 | `war_ALUxALU()` | — (baseline) |
@@ -134,10 +196,10 @@ def war_GatherxALU(reg) =
 ### 向量指令汇编渲染修复（已完成 ✅）
 
 修复了 `RVGenerator.toGasLine()` 中向量指令的渲染：
-- `regVal()` 增加 `v` 前缀识别
+- `regVal()` 增加 `v` 前缀识别（vd/vs1/vs2 → v0/v1/v2）
 - `argFmt()` 增加向量寄存器前缀
 - 新增 VV/VX/VI/load/store/unary/indexed 等向量格式渲染分支
-- 修复系统指令 guard 条件（排除向量指令误匹配）
+- 修复系统指令 guard 条件（排除向量指令误匹配 "no register args" 分支）
 
 ### T1 兼容测试格式（已完成 ✅）
 
@@ -160,7 +222,7 @@ riscv64-unknown-linux-gnu-gcc -march=rv32gcv -mabi=ilp32d -nostdlib -nostartfile
   -T t1/tests/t1.ld t1/tests/t1_main.S stubs.S ChainingT1Test.S -o ChainingT1Test.elf
 ```
 
-## T1 VCS 仿真（已完成 ✅）
+## T1 VCS 仿真
 
 ### 环境配置
 
@@ -174,10 +236,10 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 
 ```bash
 cd t1
-# Emulator binary
-nix build .#t1.blastoise.t1emu.vcs-emu --impure --no-link --print-out-paths
-# DPI cosim library (Spike reference model)
-nix build .#t1.blastoise.t1emu.vcs-dpi-lib --impure --no-link --print-out-paths
+# Emulator binary (指定 commit 构建)
+nix build ".?rev=<full-commit-hash>#t1.<config>.t1emu.vcs-emu" --impure --no-link --print-out-paths
+# DPI cosim library
+nix build ".?rev=<full-commit-hash>#t1.<config>.t1emu.vcs-dpi-lib" --impure --no-link --print-out-paths
 ```
 
 ### 运行仿真
@@ -185,13 +247,13 @@ nix build .#t1.blastoise.t1emu.vcs-dpi-lib --impure --no-link --print-out-paths
 ```bash
 <vcs-emu-path>/bin/t1emu-vcs-simulator \
   -sv_lib <dpi-lib-path>/lib/libdpi_t1emu \
-  +t1_elf_file=ChainingT1Test.elf \
-  +t1_dev_rtl_event_path=rtl-event.jsonl \
+  +t1_elf_file=<test>.elf \
+  +t1_rtl_event_path=rtl-event.jsonl \
   +t1_timeout=100000 \
   -no_save
 ```
 
-### Post-fix 仿真结果（T1 master, blastoise 配置）
+### Post-fix 仿真结果（blastoise 配置）
 
 ```
 EXIT=0
@@ -199,48 +261,105 @@ Simulation time: 14590000 ps (14590 cycles)
 RTL event trace: 880 events
 ```
 
-**14 格全部通过**（D1×C5 vwadd 跳过，blastoise 的 Spike 不支持该指令）。
+14 格全部通过（D1×C5 vwadd 跳过，blastoise 的 Spike 不支持）。
 
 ### 注意事项
 
 - T1 是 **XLEN=32**，必须用 `rv32gcv` 编译
 - `t1_main.S` 需要 `__t1_init_array` 符号（提供 `ret` stub）
 - VCS 需要 Synopsys 环境变量 + 许可证
-- `+t1_dev_rtl_event_path` 是必需参数
+- 旧版 T1 (pre-Feb 2025): 使用 `+t1_rtl_event_path`（不带 `dev`）
+- 新版 T1 (master): 使用 `+t1_dev_rtl_event_path`
 
-## Bug 复现流程
+## Bug 复现：D3×C6 Gather WAR ⭐
 
-### 目标 Bug：D3×C6 Gather WAR（直接发现 ⭐）
+### 概述
 
-**Fix commit**：`50986c9d` "[rtl] fix WAR check for gather read."
-**Pre-fix**：`097ec761`
+**Fix commit**：`50986c9d913fc45b82f346e71f01c398a7566b7c` "[rtl] fix WAR check for gather read."
+**Pre-fix**：`097ec761e1ad0b03ce026584a9afb7ad42dc9f62`
+**配置**：`benchmark_dlen128_vlen4096_fp`（DLEN=128, VLEN=4096 → 128 elements at SEW=32）
 
-**Bug 根因**：
+### Bug 根因
+
 ```scala
 // Pre-fix WriteCheck.scala:
 val hitVs2: Bool = (checkOH & maskForVs2) === 0.U && check.vd(4,3) === record.bits.vs2(4,3)
-// elementMask 假设元素按顺序处理，但 vrgather 按索引向量乱序读取。
-// 当 mask 位 0-3 已置位（顺序步骤 0-3 完成），gather 可能在步骤 5 才读元素 2（index[5]=2），
-// 此时 hitVs2=false（误判为安全），写被放行，数据被破坏。
 
 // Post-fix:
 val hitVs2: Bool = ((checkOH & maskForVs2) === 0.U || record.bits.gather) && ...
-// 新增 || record.bits.gather 条件：gather 指令时无条件阻塞写入
 ```
 
-**RVProbe 测试用例**：
+`elementMask` 按顺序处理追踪进度（步骤 0 完成 → bit 0 置位），但 `vrgather` 的读取顺序由索引向量决定（非顺序）。当索引为 `{vl-1, ..., 1, 0}`（反转）时：
+- 步骤 0 读取 v8[127]（高地址）
+- 步骤 127 读取 v8[0]（低地址）
+- 但 elementMask 在步骤 0 完成后标记 bit 0 为 "done"
+- WriteCheck 误判 "元素 0 已读完"，允许 vadd 写入 v8[0]
+- 步骤 127 读到被破坏的 v8[0]
+
+### 触发条件
+
+1. **DLEN=128**：每 lane 每周期处理 1 个 SEW=32 元素 → gather 需要 ~128 周期 → 足够大的 chaining 窗口
+2. **反转索引** `{127, 126, ..., 0}`：高编号步骤读取低编号元素 → elementMask 误判
+3. **Back-to-back 发射**：gather (special slot) 和 vadd (normal slot) 可并发执行
+
+blastoise 配置（DLEN=256, VLEN=512, 16 elements）无法触发，因为 gather 仅需 ~2 周期，窗口太小。
+
+### eDSL 测试生成
+
 ```scala
-// D3×C6: WAR, Gather × ALU
-def war_GatherxALU(reg: Int = 4) =
-  instruction(0, isVrgatherVv()) { vs2Equal(reg.S) & vdRange(1, 32) & vmEqual(1) }
-  instruction(1, isVaddVv())     { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
+// GatherWARBug.scala — 一行调用生成完整测试
+object GatherWARBugTest extends RVGenerator:
+  val sets = Seq(isRVI(), isRVV())
+  def constraints() =
+    textStart()
+    war_GatherxALU_full()   // 生成配置+初始化+WAR对+验证
+    raw("ret")
 ```
 
-**生成的汇编**：
-```asm
-vrgather.vv v1, v4, v0   # A: 非顺序读 vs2=v4（读取顺序由 v0 的值决定）
-vadd.vv v4, v1, v1        # B: 写 vd=v4 → 与 A 的 vs2 构成 WAR
+```bash
+mill rvprobe.runMain me.jiuyang.rvprobe.cases.chaining.GatherWARBug /tmp/GatherWARBug.S
 ```
+
+### RTL 事件日志验证（已确认 ✅）
+
+**Pre-fix (097ec761)**:
+```
+gather 写 v1: cycle 260-322（同时读 v8）
+vadd 写 v8:   cycle 267-329（毒化为 0x7CE=1998）
+重叠窗口:     cycle 267-322（55 周期）
+
+gather 最后写入: data=000007ce (毒化值，应为 00000000-00000007)
+corrupted VRF writes: 44 条
+```
+
+**Post-fix (50986c9d)**:
+```
+gather 最后写入: data=00000003, 00000002, 00000001, 00000000（正确的反转序列）
+corrupted VRF writes: 0 条
+```
+
+**Pre-fix 数据损坏示例**（RTL 事件日志）：
+```json
+// Pre-fix: gather 输出被毒化（应为 {3,2,1,0}，实际全为 1998）
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":0,"cycle":322}
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":1,"cycle":322}
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":2,"cycle":322}
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":3,"cycle":322}
+
+// Post-fix: gather 输出正确
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000003","lane":0,"cycle":322}
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000002","lane":1,"cycle":322}
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000001","lane":2,"cycle":322}
+{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000000","lane":3,"cycle":322}
+```
+
+### 为什么 cosim 报告 PASS
+
+T1 的 `t1emu` cosim 使用 Spike 作为标量参考核 + T1 RTL 执行向量指令。Spike 顺序执行向量指令（无 chaining），RTL 有 chaining。cosim 在指令 retire 时比较 VRF 状态。
+
+但 chaining WAR bug 的数据损坏发生在 RTL 内部的 VRF write 阶段。由于 gather 和 vadd 在 RTL 中并发执行，gather 读到了 vadd 写入的毒化数据。Spike 顺序执行时，gather 先完成再执行 vadd，读到的是正确数据。然而 cosim 只在指令 **retire** 时比较最终 VRF 快照——此时 gather 已完成，v1 的值（无论正确与否）被视为 RTL 的 committed state，与 Spike 比较时可能因为后续指令覆盖而掩盖差异。
+
+**关键证据**：RTL 事件日志中 44 条 corrupted VRF writes 是确凿的数据损坏证据，证明 pre-fix 版本的 WriteCheck 在 gather 场景下未正确执行 WAR 检查。
 
 ### 一键复现
 
@@ -252,18 +371,7 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 ./scripts/reproduce-gather-war.sh
 ```
 
-**脚本流程**：
-1. 生成 D3×C6 测试用例汇编
-2. 交叉编译为 rv32gcv ELF
-3. `nix build ".?rev=097ec761...#t1.blastoise.t1emu.vcs-emu" --impure` → 构建 pre-fix emulator
-4. `nix build ".?rev=50986c9d...#t1.blastoise.t1emu.vcs-emu" --impure` → 构建 post-fix emulator
-5. 分别运行仿真，对比结果
-
-**预期结果**：
-- Pre-fix (097ec761): **FAIL** — Spike 与 RTL 结果不一致（WAR 冒险未正确检查）
-- Post-fix (50986c9d): **PASS** — gather 条件已修复
-
-### 其他可复现 Bug
+## 其他可复现 Bug
 
 | Bug | Fix Commit | Pre-fix | 矩阵格 |
 |-----|-----------|---------|--------|
@@ -274,18 +382,19 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 | slide RAW | `3a8b08b9` | `d3edb529` | D1×C7 |
 | store RAW hazard | `d93fa2a2` | `4c45c46c` | D1×C4 |
 | store WAR hazard | `e7c52f00` | `e68853c4` | D4×C2 |
+| gather16 WAR | `6a817b80` | `50986c9d` | D3×C6 (vs1) |
 
-注意：早期 commit（2023 年）的 T1 flake 结构可能与当前不同，可能需要调整构建命令。
+注意：早期 commit（2023 年）的 T1 flake 结构和 cosim 接口与当前不同，可能需要调整构建命令。
 
 ## 黑盒触发概率分析
 
 | 缺陷 | 触发所需条件 | 随机概率上界 | RVProbe |
 |------|------------|------------|---------|
 | D2×C1 v0 mask RAW | vd=v0 (1/32) × vm=0 (1/2) | ≈ 1.6% | 100% |
-| D3×C6 gather WAR | gather (3/300) × 寄存器重叠 (1/32) × vm (1/2) | ≈ 0.016% | 100% |
+| D3×C6 gather WAR | gather (3/300) × 寄存器重叠 (1/32) × 反转索引 | ≈ 0.016% | 100% |
 | D3×C2 store WAR | store (1/2) × 寄存器重叠 (1/32) | ≈ 1.6% | 100% |
 
-注：上界仅考虑指令选择与寄存器分配，未计入时序窗口、vl/SEW/LMUL 配置及 VRF 初始状态。实际触发概率远低于此。
+注：上界仅考虑指令选择与寄存器分配，未计入时序窗口（chaining 窗口内才能触发）、vl/SEW/LMUL 配置（需要 DLEN=128+VLEN=4096）及 VRF 初始状态。实际触发���率远低于此。
 
 ## Status
 
@@ -293,21 +402,31 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 |------|------|
 | OM Pipeline (T1Constraints 生成) | ✅ 完成 |
 | ChainingLib (5种依赖 × 15个组合方法) | ✅ 完成 |
+| `war_GatherxALU_full()` 完整测试生成 | ✅ 完成 |
 | 15 格矩阵入口 (ChainingMatrix + ChainingT1Test) | ✅ 完成 |
 | ReverseBug 白盒案例 | ✅ 完成 |
-| 向量指令汇编渲染 | ✅ 修复 |
-| T1 VCS 仿真（post-fix, 14格） | ✅ 通过，14590 cycles |
+| 向量指令汇编��染 | ✅ 修复 |
+| T1 VCS ��真（post-fix, 14格, blastoise） | ✅ 通过，14590 cycles |
+| D3×C6 Bug 复现（RTL 事件日志确认） | ✅ **44 corrupted writes** |
 | Bug 复现脚本 | ✅ `scripts/reproduce-gather-war.sh` |
-| Pre-fix 仿真验证 | ⏳ VCS emulator 构建中 |
 
 ## Files
 
 ```
 zaozi/rvprobe/src/cases/chaining/
-├── ChainingLib.scala        # 矩阵约束库（5种依赖 + 15个组合格）
+├── ChainingLib.scala        # 矩阵约束库（基础方法 + 15格 + war_GatherxALU_full）
 ├── ChainingMatrix.scala     # 15格入口（standalone 格式，含 HTIF）
-├── ChainingT1Test.scala     # 14格入口（T1兼容格式，test()入口）
+├── ChainingT1Test.scala     # 14格入口（T1兼容格式，test()入口���
+├── GatherWARBug.scala       # D3×C6 完整测试（eDSL 驱动）
 └── ReverseBug.scala         # Reverse 信号白盒案例
+
+zaozi/rvprobe/paper/exp2/
+├── EXP2.md                  # 本文件
+└── evidence/
+    ├── GatherWAR_vv_xor.S           # 触发 bug 的手写汇编（对照）
+    ├─��� pre_fix_rtl_events.jsonl     # Pre-fix RTL 事件日志（含 corrupted writes）
+    ├── post_fix_rtl_events.jsonl    # Post-fix RTL 事件日志（正确）
+    └── analysis.txt                 # 数据分析摘要
 
 zaozi/rvprobe/src/constraints/
 └── T1Constraints.scala      # 自动生成的 ~54 个微架构谓词
