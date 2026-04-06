@@ -140,56 +140,6 @@ object PerfBenchmark extends TestSuite {
     )
   }
 
-  case class AblationResult(
-    complexity: String,
-    nInst:      Int,
-    oldTotalMs: Double,
-    newTotalMs: Double
-  ) {
-    def speedup: Double = oldTotalMs / newTotalMs
-  }
-
-  def ablation(complexity: String, nInst: Int, warmup: Int = 2, iterations: Int = 5): AblationResult = {
-    def makeGen(): RVGenerator = complexity match
-      case "L1" => makeL1(nInst)
-      case "L2" => makeL2(nInst)
-      case "L3" => makeL3(nInst)
-
-    // Warmup both paths
-    (0 until warmup).foreach { _ =>
-      val g1 = makeGen()
-      g1.toOpcodeZ3Output()
-      val g2           = makeGen()
-      val (opcodes, _) = g2.solveOpcodes()
-      g2.solveArgs(opcodes)
-    }
-
-    // Measure old path: SMTLIB export + z3 subprocess
-    var sumOld = 0.0
-    (0 until iterations).foreach { _ =>
-      val g  = makeGen()
-      val t0 = System.nanoTime()
-      g.toOpcodeZ3Output()
-      g.toArgZ3Output()
-      val t1 = System.nanoTime()
-      sumOld += (t1 - t0).toDouble / 1e6
-    }
-
-    // Measure new path: in-memory FFI
-    var sumNew = 0.0
-    (0 until iterations).foreach { _ =>
-      val g            = makeGen()
-      val t0           = System.nanoTime()
-      val (opcodes, _) = g.solveOpcodes()
-      val args         = g.solveArgs(opcodes)
-      g.assembleInstructions(opcodes, args)
-      val t1 = System.nanoTime()
-      sumNew += (t1 - t0).toDouble / 1e6
-    }
-
-    AblationResult(complexity, nInst, sumOld / iterations, sumNew / iterations)
-  }
-
   val tests = Tests {
     test("exp3b_scalability") {
       val complexities = Seq("L1", "L2", "L3")
@@ -276,35 +226,5 @@ object PerfBenchmark extends TestSuite {
       println(s"\nCSV written to: $csvPath")
     }
 
-    test("exp3c_ablation") {
-      // Global warmup
-      (0 until 3).foreach { _ =>
-        val g = makeL1(50)
-        g.toOpcodeZ3Output()
-        val g2           = makeL1(50)
-        val (opcodes, _) = g2.solveOpcodes()
-        g2.solveArgs(opcodes)
-      }
-
-      val complexities = Seq("L1", "L2", "L3")
-      val sizes        = Seq(10, 50, 100, 200, 500)
-
-      println("complexity,nInst,old_total_ms,new_total_ms,speedup")
-      val results = for {
-        c <- complexities
-        n <- sizes
-      } yield {
-        val r = ablation(c, n)
-        println(f"${r.complexity},${r.nInst},${r.oldTotalMs}%.1f,${r.newTotalMs}%.1f,${r.speedup}%.2f")
-        r
-      }
-
-      // Write CSV
-      val csvPath = os.pwd / "exp3c_ablation.csv"
-      val lines   = "complexity,nInst,old_total_ms,new_total_ms,speedup" +:
-        results.map(r => f"${r.complexity},${r.nInst},${r.oldTotalMs}%.1f,${r.newTotalMs}%.1f,${r.speedup}%.2f")
-      os.write.over(csvPath, lines.mkString("\n") + "\n")
-      println(s"\nCSV written to: $csvPath")
-    }
   }
 }
