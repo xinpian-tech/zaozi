@@ -1,0 +1,18 @@
+Pre-fix corrupted gather writes:
+44
+Post-fix corrupted gather writes:
+0
+
+Pre-fix gather last 5 writes:
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":30,"mask":"f","data":"000007ce","lane":3,"cycle":                 320}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"000007ce","lane":0,"cycle":                 322}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"000007ce","lane":1,"cycle":                 322}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"000007ce","lane":2,"cycle":                 322}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"000007ce","lane":3,"cycle":                 322}
+
+Post-fix gather last 5 writes:
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":30,"mask":"f","data":"00000004","lane":3,"cycle":                 320}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"00000003","lane":0,"cycle":                 322}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"00000002","lane":1,"cycle":                 322}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"00000001","lane":2,"cycle":                 322}
+{"event":"VrfWrite","issue_idx":5,"vd": 1,"offset":31,"mask":"f","data":"00000000","lane":3,"cycle":                 322}
