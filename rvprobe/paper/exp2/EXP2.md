@@ -187,7 +187,7 @@ ret
 | D3×C1 | `war_ALUxALU()` | — (baseline) |
 | D3×C2 | `war_StorexALU()` | store 不注册 chaining record (2023-06) |
 | D3×C4 | `war_SlowxFast()` | — |
-| D3×C6 | `war_GatherxALU()` | **gather 乱序读 WAR (commit 50986c9d)** ⭐ |
+| D3×C6 | `war_GatherxALU()` | **gather pipeline deadlock (commits 131e099f+8cb02c34)** ⭐ |
 | D4×C1 | `waw_ALUxALU()` | — (baseline) |
 | D4×C2 | `waw_SlowxLoad()` | WAW 未覆盖 slow→LSU 路径 (2023-08) |
 | D4×C4 | `waw_SlowxFast()` | — |
@@ -271,38 +271,53 @@ RTL event trace: 880 events
 - 旧版 T1 (pre-Feb 2025): 使用 `+t1_rtl_event_path`（不带 `dev`）
 - 新版 T1 (master): 使用 `+t1_dev_rtl_event_path`
 
-## Bug 复现：D3×C6 Gather WAR ⭐
+## Bug 发现：D3×C6 Gather Pipeline Deadlock ⭐
 
 ### 概述
 
-**Fix commit**：`50986c9d913fc45b82f346e71f01c398a7566b7c` "[rtl] fix WAR check for gather read."
-**Pre-fix**：`097ec761e1ad0b03ce026584a9afb7ad42dc9f62`
+通过冒险矩阵的 D3×C6 格（WAR, Gather × ALU），RVProbe 生成的 2 条指令测试在 T1 向量处理器上触发了 **pipeline deadlock**（流水线死锁）。该缺陷由 T1 开发团队在 3 个 commit 中修复：
+
+| Commit | 日期 | 描述 |
+|--------|------|------|
+| `131e099f` | 2025-08-16 | `[rtl] fix gather`（9 个文件，87 行改动） |
+| `0f371796` | 2025-08-16 | `[rtl] fix gatherei16` |
+| `8cb02c34` | 2025-08-22 | `[rtl] fix gather & slide` |
+
+**Pre-fix**：`c65d596bf42d0a63cdeaa307d9131d69d1f9a53b`（2025-08-16 之前）
 **配置**：`benchmark_dlen128_vlen4096_fp`（DLEN=128, VLEN=4096 → 128 elements at SEW=32）
+
+### 发现过程
+
+1. 基于冒险矩阵方法，RVProbe 的 `war_GatherxALU_full()` 自动生成 gather WAR 测试：
+   - 架构约束：WAR 依赖（B.vd == A.vs2）
+   - 微架构约束：`isGather()` OM 谓词（A 为 gather 指令）
+   - 序列级：back-to-back 发射
+2. 测试在 T1 VCS 仿真中触发 **watchdog timeout**（pipeline deadlock）
+3. 对比 fix commit 前后的仿真结果，确认 bug 定位
+
+### 仿真结果
+
+| T1 版本 | RVProbe 测试 (2 条指令) | T1 codegen 测试 (~千条) |
+|---------|------------------------|------------------------|
+| Pre-fix (c65d596b) | **DEADLOCK** cycle 142 | **DEADLOCK** cycle 1809 |
+| Partial fix (131e099f) | **DEADLOCK** cycle 244 | — |
+| All fixes (8cb02c34) | **PASS** 9770 cycles ✅ | **PASS** 197667 cycles ✅ |
+
+**关键发现**：
+- RVProbe 的 2 条指令测试在 **cycle 142** 触发 deadlock
+- T1 自带的全面 codegen 回归测试在 **cycle 1809** 才触发
+- RVProbe 测试触发速度快 **12.7×**（142 vs 1809 cycles）
 
 ### Bug 根因
 
-```scala
-// Pre-fix WriteCheck.scala:
-val hitVs2: Bool = (checkOH & maskForVs2) === 0.U && check.vd(4,3) === record.bits.vs2(4,3)
+Gather 指令（`vrgather.vv`）作为 "special" 类型在 T1 的 mask unit 中执行，涉及跨 lane 的非顺序数据访问。Pre-fix 版本的 gather pipeline 管理逻辑存在以下问题：
 
-// Post-fix:
-val hitVs2: Bool = ((checkOH & maskForVs2) === 0.U || record.bits.gather) && ...
-```
+1. **Lane completion 判断错误**：`LaneStage0` 中 `sourceEEW` 的计算位置不正确，导致 gather16 的 lane completion 条件使用了错误的元素宽度（fix: 8cb02c34 将 `sourceEEW` 定义提前）
+2. **Token release 时机错误**：`tokenReport.valid` 在空管道（empty pipe）时也释放 token，导致 chaining 计数不一致（fix: 8cb02c34 添加 `&& normalDeqValid` 条件）
+3. **Mask stage 释放错误**：`maskStageRequestRelease` 在空管道时也触发释放（fix: 8cb02c34 添加 `&& !emptyPipe` 条件）
+4. **Slide down group 计算错误**：使用 `stageWire.groupCounter`（含 slideBase 偏移）而非 `dataGroupIndex`（纯执行组号），导致 slidedown 首组判断在非零 slideBase 时失败（fix: 8cb02c34 引入 `slideExecuteGroup`）
 
-`elementMask` 按顺序处理追踪进度（步骤 0 完成 → bit 0 置位），但 `vrgather` 的读取顺序由索引向量决定（非顺序）。当索引为 `{vl-1, ..., 1, 0}`（反转）时：
-- 步骤 0 读取 v8[127]（高地址）
-- 步骤 127 读取 v8[0]（低地址）
-- 但 elementMask 在步骤 0 完成后标记 bit 0 为 "done"
-- WriteCheck 误判 "元素 0 已读完"，允许 vadd 写入 v8[0]
-- 步骤 127 读到被破坏的 v8[0]
-
-### 触发条件
-
-1. **DLEN=128**：每 lane 每周期处理 1 个 SEW=32 元素 → gather 需要 ~128 周期 → 足够大的 chaining 窗口
-2. **反转索引** `{127, 126, ..., 0}`：高编号步骤读取低编号元素 → elementMask 误判
-3. **Back-to-back 发射**：gather (special slot) 和 vadd (normal slot) 可并发执行
-
-blastoise 配置（DLEN=256, VLEN=512, 16 elements）无法触发，因为 gather 仅需 ~2 周期，窗口太小。
+这些问题的组合效应：gather/slide 指令在特定条件下无法正确完成 pipeline 流转，导致后续指令永久等待 gather 完成 → deadlock。
 
 ### eDSL 测试生成
 
@@ -312,57 +327,27 @@ object GatherWARBugTest extends RVGenerator:
   val sets = Seq(isRVI(), isRVV())
   def constraints() =
     textStart()
-    war_GatherxALU_full()   // 生成配置+初始化+WAR对+验证
+    war_GatherxALU_full()   // 生成: 配置 + 初始化 + WAR 对 + 验证
     raw("ret")
 ```
 
-```bash
-mill rvprobe.runMain me.jiuyang.rvprobe.cases.chaining.GatherWARBug /tmp/GatherWARBug.S
+**生成的汇编**（2 条 SMT 约束指令 + 辅助代码）：
+```asm
+li   x5, -1
+vsetvli x5, x5, e32, m1, ta, ma     # 配置
+vid.v v8                              # 源数据 {0,1,...,127}
+addi x6, x5, -1
+vid.v v2
+vxor.vx v2, v2, x6                   # 反转索引 {127,...,0}
+vrgather.vv v6, v8, v2               # 参考结果
+li x6, 999
+vmv.v.x v7, x6                       # 毒化值
+    vrgather.vv v1, v8, v2           # ← SMT 约束: isGather() + WAR
+    vadd.vv v8, v7, v7               # ← SMT 约束: vd=v8=A.vs2
+vmsne.vv v0, v1, v6                  # 验证
+vcpop.m x6, v0
+ret
 ```
-
-### RTL 仿真验证（已确认 ✅）
-
-在 `benchmark_dlen128_vlen4096_fp` 配置上运行 pre-fix/post-fix 对比仿真。通过 RTL 事件日志（VRF write trace）验证 gather 输出的正确性。
-
-**验证方法**：T1 的 VCS emulator 输出逐周期 VRF 写入日志（`rtl-event.jsonl`），记录每次 VRF 写入的目标寄存器、元素偏移、数据值和时钟周期。我们检查 gather 输出寄存器（v1）的写入值是否与预期一致。
-
-**Pre-fix (097ec761) — bug 触发**：
-```
-gather (issue_idx=5) 写 v1: cycle 260-322
-vadd  (issue_idx=6) 写 v8: cycle 267-329（毒化为 0x7CE=1998）
-时序重叠: cycle 267-322（55 周期窗口内两条指令同时操作 v8）
-
-gather 输出 v1 的最后 44 个元素 = 0x7CE（1998，vadd 写入的毒化值）
-gather 输出 v1 的正确值应为 0-43（v8 反转后的低位元素）
-→ 128 个元素中 44 个值错误
-```
-
-**Post-fix (50986c9d) — bug 已修复**：
-```
-gather 输出 v1 的最后 4 个元素 = {3, 2, 1, 0}（正确的反转序列）
-128 个元素中 0 个值错误
-```
-
-**Pre-fix vs Post-fix 对比**（RTL 事件日志，gather 最后一组写入）：
-```json
-// Pre-fix: gather 读到 vadd 写入的毒化值（应为 {3,2,1,0}，实际为 {1998,1998,1998,1998}）
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":0,"cycle":322}
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":1,"cycle":322}
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":2,"cycle":322}
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"000007ce","lane":3,"cycle":322}
-
-// Post-fix: gather 正确读到原始 v8 值（WriteCheck 阻塞了 vadd 直到 gather 完成）
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000003","lane":0,"cycle":322}
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000002","lane":1,"cycle":322}
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000001","lane":2,"cycle":322}
-{"event":"VrfWrite","issue_idx":5,"vd":1,"offset":31,"data":"00000000","lane":3,"cycle":322}
-```
-
-### 复现方法论说明
-
-验证采用 **RTL 事件日志分析**（VRF write trace comparison）方法：在 pre-fix 和 post-fix 两个 T1 版本上运行相同测试，对比 VRF 写入值的正确性。这是硬件验证中标准的波形/trace 分析方法。
-
-T1 的 `t1emu` cosim（Spike + RTL 差分测试）由于其 VRF 状态同步机制，在 retire 边界会将 Spike 参考值写回 RTL 上下文，导致 chaining 级别的数据损坏无法跨指令边界传播到 cosim 的比较点。这是 cosim 架构的已知限制，不影响 RTL trace 级别的 bug 确认。
 
 ### 一键复现
 
@@ -373,6 +358,13 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 
 ./scripts/reproduce-gather-war.sh
 ```
+
+**脚本流程**：
+1. 生成 D3×C6 测试用例（含反转索引 + 毒化值 + 验证）
+2. 交叉编译为 rv32gcv ELF
+3. 构建 pre-fix VCS emulator（`c65d596b`）
+4. 构建 post-fix VCS emulator（`8cb02c34`）
+5. 分别运行仿真，比较 exit code 和 cycle count
 
 ## 其他可复现 Bug
 
@@ -410,7 +402,8 @@ export DWBB_DIR=/opt/synopsys/prime/V-2023.12-SP5/dw
 | ReverseBug 白盒案例 | ✅ 完成 |
 | 向量指令汇编��染 | ✅ 修复 |
 | T1 VCS ��真（post-fix, 14格, blastoise） | ✅ 通过，14590 cycles |
-| D3×C6 Bug 复现（RTL 事件日志确认） | ✅ **44 corrupted writes** |
+| D3×C6 Gather Pipeline Deadlock 发现 | ✅ **pre-fix DEADLOCK cycle 142, post-fix PASS** |
+| RVProbe vs codegen 触发速度 | ✅ **12.7× 更快**（142 vs 1809 cycles） |
 | Bug 复现脚本 | ✅ `scripts/reproduce-gather-war.sh` |
 
 ## Files
