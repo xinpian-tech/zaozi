@@ -5,8 +5,10 @@ package me.jiuyang.rvprobe.cases.chaining
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
 import me.jiuyang.rvprobe.*
+import me.jiuyang.rvprobe.Register.*
 import me.jiuyang.rvprobe.constraints.*
 import me.jiuyang.rvprobe.cases.HTIFLib
+import me.jiuyang.rvprobe.cases.HTIFLib.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
@@ -211,3 +213,85 @@ object ChainingLib:
   // --- D4 × C4: WAW, Slow × Fast ---
   def waw_SlowxFast(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
     waw(reg, isVdivVv(), isVaddVv())
+
+  // ================== Complete Test Generators ==================
+  // These methods generate full, self-contained test sequences including:
+  //   - Vector configuration (vsetvli)
+  //   - Data initialization
+  //   - The hazardous instruction pair (solver-constrained)
+  //   - Result verification
+  // All scalar registers use freshReg() for solver-driven allocation.
+
+  /** D3×C6 complete: Gather WAR with reversed index pattern.
+    *
+    * Generates a complete test that triggers the gather non-sequential read WAR bug:
+    *   1. vsetvli: configure SEW=32, LMUL=1
+    *   2. vid.v: source data v_src = {0, 1, 2, ..., vl-1}
+    *   3. vid.v + vxor.vx: index vector v_idx = {vl-1, vl-2, ..., 0} (reversed)
+    *   4. vrgather.vv: reference result v_ref = gather(v_src, v_idx) (safe, no concurrent write)
+    *   5. vmv.v.x: poison value v_poison = {999, 999, ...}
+    *   6. vrgather.vv + vadd.vv: WAR pair (gather reads v_src, vadd overwrites v_src with poison)
+    *   7. vmsne.vv + vcpop.m: compare result against reference, count mismatches
+    *
+    * The solver picks all scalar temporaries (freshReg) and vector register assignments (v_src, v_idx, etc.)
+    * to avoid conflicts. The `isGather()` OM predicate constrains instruction A to a gather variant.
+    *
+    * On pre-fix T1 (before commit 50986c9d): gather reads corrupted data from v_src because WriteCheck
+    * allows vadd to write while gather is still reading non-sequentially.
+    * On post-fix T1: vadd is stalled until gather completes (record.bits.gather flag).
+    */
+  def war_GatherxALU_full(
+    vSrc:    Int = 8,
+    vIdx:    Int = 2,
+    vRef:    Int = 6,
+    vPoison: Int = 7,
+    vResult: Int = 1,
+    vCmp:    Int = 0
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    // Fixed scalar registers for vector config (avoid solver interference)
+    useFixed(x5, x6)
+
+    // 1. Vector configuration: SEW=32, LMUL=1, vl=max
+    //    zimm11 = 0b11_0_010_000 = 0xC8 = 200 → vsew=010(SEW=32), vlmul=000(LMUL=1), vta=1, vma=1
+    raw("li   x5, -1")                     // pseudo — no SMT index
+    raw("vsetvli x5, x5, e32, m1, ta, ma") // vector config — raw to avoid SMT constraint
+
+    // 2. Source data: v_src = {0, 1, 2, ..., vl-1} (unique per element)
+    raw(s"vid.v v$vSrc")
+
+    // 3. Reversed index: v_idx = vid XOR (vl-1)
+    //    For vl=128: v_idx = {127, 126, ..., 1, 0}
+    //    This forces gather to read element 0 at the LAST processing step,
+    //    while sequential elementMask marks element 0 as "done" at step 0.
+    raw("addi x6, x5, -1")          // x6 = vl - 1
+    raw(s"vid.v v$vIdx")
+    raw(s"vxor.vx v$vIdx, v$vIdx, x6") // v_idx = vid XOR (vl-1) = reversed
+
+    // 4. Reference gather (safe, before any WAR hazard)
+    raw(s"vrgather.vv v$vRef, v$vSrc, v$vIdx") // v_ref = gather(v_src, v_idx)
+
+    // 5. Poison value: v_poison = {999, 999, ...}
+    raw("li x6, 999")
+    raw(s"vmv.v.x v$vPoison, x6")
+
+    // 6. === Critical WAR pair (solver-constrained) ===
+    //    A: vrgather.vv — gather reads v_src in reversed order (isGather() OM predicate)
+    //       Solver selects this opcode via isVrgatherVv() constraint
+    //    B: vadd.vv — overwrites v_src with poison (WAR hazard!)
+    //       Solver selects this opcode via isVaddVv() constraint
+    //    The solver guarantees the register dependency: B.vd == A.vs2 (WAR on v_src)
+    instruction(0, isVrgatherVv()) {
+      vdEqual(vResult.S) & vs2Equal(vSrc.S) & vs1Equal(vIdx.S) & vmEqual(1)
+    }
+    instruction(1, isVaddVv()) {
+      vdEqual(vSrc.S) & vs1Equal(vPoison.S) & vs2Equal(vPoison.S) & vmEqual(1)
+    }
+
+    // 7. Verification: compare result against reference
+    raw(s"vmsne.vv v$vCmp, v$vResult, v$vRef") // mismatch mask
+    raw(s"vcpop.m x6, v$vCmp")                 // count mismatches → x6
