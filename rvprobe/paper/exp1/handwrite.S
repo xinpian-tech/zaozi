@@ -324,24 +324,34 @@ _start:
     # csrrs rd=ZERO (read-only CSR access)
     csrrs x0, mscratch, x5
 
+    # Load/Store need a valid memory address
+    la   x3, _scratch_buf
+
     # Load: rd=SP
-    lb   x2, 0(x5)
-    lbu  x2, 0(x5)
-    lh   x2, 0(x5)
-    lhu  x2, 0(x5)
+    lb   x2, 0(x3)
+    lbu  x2, 0(x3)
+    lh   x2, 0(x3)
+    lhu  x2, 0(x3)
 
-    # Load: rs1=SP (base address = SP)
+    # Load: rs1=SP — use SP as base (save/restore SP)
+    mv   x4, x2           # save SP
+    mv   x2, x3           # SP = scratch buf
     lb   x6, 0(x2)
-    lbu  x6, 0(x2)
-    lh   x6, 0(x2)
-    lhu  x6, 0(x2)
+    lbu  x6, 1(x2)
+    lh   x6, 2(x2)
+    lhu  x6, 4(x2)
+    mv   x2, x4           # restore SP
 
-    # Store: rs2=ZERO (store zero) + rs1=SP
-    sb   x0, 0(x5)
-    sh   x0, 0(x5)
-    sw   x0, 0(x5)
-    sb   x6, 0(x2)
-    sh   x6, 0(x2)
+    # Store: rs2=ZERO (store zero value)
+    sb   x0, 0(x3)
+    sh   x0, 2(x3)
+    sw   x0, 4(x3)
+    # Store: rs1=SP
+    mv   x4, x2
+    mv   x2, x3
+    sb   x6, 8(x2)
+    sh   x6, 10(x2)
+    mv   x2, x4
 
     # jalr: rd=SP
     la   x5, 3f
@@ -410,3 +420,8 @@ _after_ecall:
 #                             ---
 #   Total unreachable:        20 holes
 # ============================================================
+
+    .data
+    .balign 16
+_scratch_buf:
+    .fill 64, 1, 0
