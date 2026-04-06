@@ -1,110 +1,108 @@
-# Experiment 1: Coverage Hole Closure — RVProbe vs Hand-Written Assembly
+# Experiment 1: Closing CRV Structural Blind Spots
 
 ## Research Question
 
-When riscv-dv (the industry-standard CRV generator) reaches coverage saturation, how do different directed methods compare in closing the remaining holes?
+When riscv-dv (the industry-standard CRV generator) reaches coverage saturation, what **structural blind spots** remain, and how do different directed methods compare in closing them?
 
 ## Motivation
 
-DAC26 reviewer #2 批评 "directed tests are created by manually adding constraints, so the increase in coverage is absolutely expected"。这说明仅展示 RVProbe 能填 hole 没有说服力——关键是展示**填 hole 时的约束表达成本差异**。
+CRV 生成器在达到覆盖率饱和后，剩余的覆盖空洞并非随机采样不足导致，而是**工具设计决策**造成的结构性盲区：
+- 寄存器分配策略（避免 SP 作为目标寄存器）
+- 指令格式限制（U-type 无 rs 字段导致 hazard 模型不匹配）
+- 覆盖模型与 ISA 规范的对齐偏差（opcode 编码空间、alignment bin）
 
-reviewer #4 批评 "comparison not clear with the state of the art"。用 riscv-dv 作为共同起点，直接回应这一批评。
+这些盲区不会随指令数量增加而自然消失——即使 riscv-dv 自带了 `riscv_hazard_instr_stream` 等定向流来覆盖 hazard bin，仍有 30 个非 opcode 空洞残留。
 
-## Hypothesis
+DAC26 reviewer #2 批评 "directed tests are created by manually adding constraints, so the increase in coverage is absolutely expected"。我们的回应：关键不是"能不能填"，而是**识别盲区的系统性**和**填补时的约束表达成本差异**。
 
-riscv-dv 覆盖率饱和后，剩余的 hole 集中在**序列级属性**（hazard 组合）。这类 hole 的根本困难不在于"能不能填"，而在于表达序列级约束的代价。
+reviewer #4 批评 "comparison not clear with the state of the art"。用 riscv-dv 作为共同起点，三方对比闭合同一组盲区的 LOC、正确性保证和可扩展性。
 
-## Phase 1: riscv-dv Baseline Saturation (Done)
+## Key Observation
 
-**配置**：riscv-dv 默认 RV32I 配置，pygen 后端
-**数据**：`/root/riscv-dv/cov_out_exp1_rv32i/CoverageReport.txt`
+riscv-dv 的 `riscv_hazard_instr_stream` 本质上是嵌入在 CRV 框架中的定向 hazard 生成器。这说明**即使是 CRV 工具也承认纯随机不够，需要定向补充**。但 riscv-dv 只为 hazard 写了定向流，没有为其他结构性盲区（rd=SP、logical similarity、ECALL 等）做同样的工作。
+
+## Phase 1: riscv-dv Baseline Saturation
+
+**配置**：riscv-dv 默认 RV32I 配置，VCS + spike，`--start_seed 0`，`PYTHONHASHSEED=0`
+**数据**：`riscv-dv/cov_out_exp1_rv32i/CoverageReport.txt`
 
 ### 结果概要
 
 | 指标 | 值 |
 |------|-----|
-| 处理指令总数 | 223,716 |
+| 处理指令总数 | 429,028 |
 | Covergroup 总数 | 27 |
 | Coverpoint 总数 | 2,038 |
 | 已覆盖 Coverpoint | 150 |
-| Coverpoint 覆盖率 | 7.36% |
-| 平均 Covergroup 分数 | 83.23% |
+| 平均 Covergroup 分数 | 94.30% |
+| 总 Unhit Bins | 52 |
+| 其中 opcode 不可达 | 22 |
+| 结构性盲区 | 30 |
 
-### 各 Covergroup 覆盖率
+### 各 Covergroup 覆盖率（< 100% 的部分）
 
-| Covergroup | Score | 缺失 Coverpoint |
-|------------|------:|-----------------|
-| mepc_alignment_cg | 100% | — |
-| beq_cg | 93.75% | NO_HAZARD |
-| add_cg | 90.23% | NO_HAZARD, WAR, WAW |
-| sub_cg | 89.45% | NO_HAZARD, WAR, WAW |
-| sra_cg | 89.45% | NO_HAZARD, WAR, WAW |
-| srl_cg | 89.45% | NO_HAZARD, WAR, WAW |
-| sll_cg | 89.45% | NO_HAZARD, WAR, WAW |
-| slt_cg | 89.45% | NO_HAZARD, WAR, WAW |
-| sltu_cg | 89.45% | NO_HAZARD, WAR, WAW |
-| addi_cg | 89.29% | NO_HAZARD, WAR, WAW |
-| slti_cg | 87.95% | NO_HAZARD, WAR, WAW |
-| sltiu_cg | 87.95% | NO_HAZARD, WAR, WAW |
-| and_cg | 85.07% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| xor_cg | 85.07% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| or_cg | 85.07% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| srli_cg | 83.12% | NO_HAZARD, WAR, WAW |
-| srai_cg | 83.12% | NO_HAZARD, WAR, WAW |
-| slli_cg | 83.12% | NO_HAZARD, WAR, WAW |
-| ori_cg | 83.20% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| andi_cg | 83.20% | NO_HAZARD, WAR, WAW + logical(OPPOSITE, DIFFERENT) |
-| csrrw_cg | 80.21% | WAR, WAW |
-| xori_cg | 80.08% | NO_HAZARD, WAR, WAW + logical(IDENTICAL, OPPOSITE, DIFFERENT) |
-| rv32i_misc_cg | 80% | ECALL |
-| auipc_cg | 75% | NO_HAZARD, WAR, WAW |
-| lui_cg | 71.88% | NO_HAZARD, WAR, WAW |
-| jal_cg | 71.88% | rd=ZERO, rd_align(Aligned), imm_align(Aligned) |
-| opcode_cg | 31.25% | 22 个未使用的 opcode 编码空间 |
+| Covergroup | Score | 结构性盲区 |
+|------------|------:|-----------|
+| opcode_cg | 31.25% | 22 个未使用的 opcode 编码（架构不可达） |
+| jal_cg | 75.00% | rd=ZERO, rd=SP, rd_align, imm_align |
+| lui_cg | 91.67% | rd=SP, gpr_hazard=RAW |
+| auipc_cg | 91.67% | gpr_hazard=RAW |
+| rv32i_misc_cg | 80.00% | ECALL |
+| csrrw_cg | 98.96% | rd=SP |
+| ori/andi_cg | 96.48% | rd=SP, logical=OPPOSITE |
+| xori_cg | 96.48% | rd=SP, logical=IDENTICAL/OPPOSITE |
+| sub/sra/srl/sll/slt/sltu_cg | 96.88% | rd=SP |
+| and/xor/or_cg | 99.65% | rd=SP |
+| srli/srai/slli_cg | 99.38% | rd=SP |
+| slti/sltiu_cg | 99.55% | rd=SP |
 
-## Phase 2: Hole Analysis
+注：add/addi/beq/mepc_alignment 等 covergroup 已达 100%。所有 hazard bin（WAR/WAW/NoHazard/RAW）在 429K 指令后均已覆盖，因为 riscv-dv 自带 `riscv_hazard_instr_stream` 定向流。
 
-### Hole 分类
+## Phase 2: Structural Blind Spot Analysis
 
-**类别 A: Hazard bins（主要目标，21 条指令）**
+### 分类
 
-riscv-dv 22 万条指令后，几乎所有指令的 `cp_gpr_hazard` 只命中了 `RAW_HAZARD`。缺失：
+riscv-dv 饱和后的 30 个非 opcode hole 可分为以下结构性盲区类别：
 
-| 缺失 Hazard 类型 | 受影响指令 | 数量 |
-|---|---|---|
-| NO_HAZARD | add, sub, sra, srl, sll, slt, sltu, addi, slti, sltiu, and, xor, or, ori, andi, xori, srli, srai, slli, lui, auipc | 21 |
-| WAR_HAZARD | 同上 + csrrw | 22 |
-| WAW_HAZARD | 同上 + csrrw | 22 |
+**类别 A: 寄存器分配策略盲区（19 bins）— cp_rd=SP**
 
-总计 **65 个未覆盖 hazard bin**。
+riscv-dv 默认避免将 SP（x2）用作目标寄存器，以防止破坏栈指针。这导致 19 条指令的 `cp_rd = riscv_reg_t.SP` bin 未覆盖。
 
-**这是 exp1 的核心数据点**：hazard 是序列级属性（取决于相邻指令间的寄存器依赖关系），riscv-dv 的随机生成只碰巧覆盖了 RAW（最常见的依赖模式），无法系统性地闭合 WAR/WAW/NoHazard。
+受影响指令：sub, sra, srl, sll, slt, sltu, and, xor, or, ori, andi, xori, slti, sltiu, srli, srai, slli, lui, csrrw
 
-**类别 B: Logical similarity bins（6 条逻辑指令，纳入对比）**
+**这是最大的盲区类别**，占非 opcode hole 的 63%。本质上是工具的安全策略（保护 SP）与覆盖完备性之间的矛盾。
 
-riscv-dv 的 `logical_similarity` 比较两个操作数的运行时值（R-type: rs1_value vs rs2_value，I-type: rs1_value vs imm）。
-分类标准：IDENTICAL（值相等）、OPPOSITE（所有 32 位不同）、SIMILAR（<5 位不同）、DIFFERENT（≥5 位不同）。
+**类别 B: 覆盖模型与 ISA 规范错位（2 bins）— U-type RAW**
 
-| 缺失 | 受影响指令 |
-|---|---|
-| OPPOSITE, DIFFERENT | and, or, xor, ori, andi |
-| IDENTICAL, OPPOSITE, DIFFERENT | xori |
+| Unhit Bin | 说明 |
+|-----------|------|
+| lui_cg.cp_gpr_hazard = RAW_HAZARD | U-type 无 rs1/rs2 字段 |
+| auipc_cg.cp_gpr_hazard = RAW_HAZARD | 同上 |
 
-总计 **13 个未覆盖 logical similarity bin**。
+riscv-dv 的 hazard 判定：RAW 要求 `instr[i].rs1 == instr[i-1].rd`。但 lui/auipc 的 `has_rs1 = false`，RAW 条件永远不满足。这是覆盖模型为没有源寄存器的指令定义了不可达的 hazard bin。
 
-填补方法：使用 `li` 加载已知值到寄存器，然后执行逻辑指令。
-- IDENTICAL（R-type）：`rs1 == rs2`（同一寄存器 → 同值）；（I-type）：`li r,42; andi rd,r,42`
-- OPPOSITE：`li r1,0x55555555; li r2,0xAAAAAAAA; and rd,r1,r2`
-- DIFFERENT：`li r1,0; li r2,0xFF; and rd,r1,r2`
+**类别 C: 值级约束盲区（4 bins）— logical similarity**
 
-**类别 C: 零散 hole（不纳入对比，标注为不可达或超出范围）**
+| Unhit Bin | 说明 |
+|-----------|------|
+| ori_cg.cp_logical = OPPOSITE | rs1_value 与 imm 所有 32 位都不同 |
+| andi_cg.cp_logical = OPPOSITE | 同上 |
+| xori_cg.cp_logical = IDENTICAL | rs1_value == sign-extended imm |
+| xori_cg.cp_logical = OPPOSITE | 同上（OPPOSITE） |
 
-- `opcode_cg`：22 个未使用的 opcode bin — 架构不可达（RV32I 不使用这些编码）
-- `lui/auipc` 的 RAW_HAZARD — 架构不可达（U-type 无 rs 字段）
-- `jal_cg`：rd=ZERO, 对齐 bin — jal 特有的边界情况
-- `rv32i_misc_cg`：ECALL — 需要特权模式支持
-- `csrrw_cg`：rd=SP — 寄存器覆盖边界
-- 19 条指令的 `cp_rd=SP` — riscv-dv 默认避免 SP 作为目标寄存器
+这些 bin 需要构造特定操作数值关系。riscv-dv 的随机值分配在 429K 指令后仍未碰巧产生恰好 32 位全不同的操作数对。
+
+注：实验中发现 riscv-dv 的 `get_logical_similarity()` 存在 bug——`bin()` 对负数返回 `'-0b1'` 导致 OPPOSITE 永远不匹配。已修复。但修复后 coverage tool 仍无法从 spike trace 重建 rs1_value，导致这些 bin 在 pyflow 后端下不可观测。
+
+**类别 D: 边界情况盲区（5 bins）**
+
+| Unhit Bin | 说明 |
+|-----------|------|
+| jal_cg.cp_rd = ZERO | j 伪指令（rd=x0） |
+| jal_cg.cp_rd = SP | jal x2, offset |
+| jal_cg.cp_rd_align = Aligned | 需要 C 扩展产生 2-mod-4 地址 |
+| jal_cg.cp_imm_align = Aligned | 同上 |
+| rv32i_misc_cg.cp_misc = ECALL | coverage tool 未解析 ecall |
 
 ### Hazard 定义（对齐 riscv-dv 的 `hazard_e`）
 
@@ -407,19 +405,24 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 
 ### 关键发现
 
-1. **Hazard hole 的本质是序列级的**：riscv-dv 22 万条指令只覆盖了 RAW，WAR/WAW/NoHazard 全部缺失。这不是随机数不够的问题，而是生成策略没有 hazard-aware 的序列级约束。RVProbe 的 `coverWAR()` 等 API 将序列级属性提升为一等约束。
+1. **CRV 结构性盲区的本质是工具设计决策**：riscv-dv 429K 指令后，hazard bin 全部覆盖（因为自带 `riscv_hazard_instr_stream` 定向流），但 rd=SP 的 19 个 bin 全部缺失。这不是随机采样不足，而是工具**策略性避免 SP 寄存器**的结果。这类盲区不会随指令数量增加而自然消失。
 
-2. **Logical similarity hole 是值级的**：需要构造特定操作数值（互补、相同、不同）。三种方法在此处的差异主要是**模式化程度**——手写需要手动计算 `~0x55555555 = 0xAAAAAAAA`，RVProbe 将此模式封装为 `rTypeLogical()`，新增逻辑指令只需切换一个函数调用。
+2. **riscv-dv 自身已证明纯随机不够**：`riscv_hazard_instr_stream` 本质上是嵌入在 CRV 框架中的手写定向流。riscv-dv 团队为 hazard 写了定向生成器，但没有为 rd=SP、logical similarity、ECALL 等做同样的工作。
 
-3. **手写汇编看似简单但有隐患**：
-   - 模板化的 6 行一组可以机械复制，但每对必须验证 hazard 优先级排除条件（¬RAW、¬WAR）
-   - U-type 的 WAR 需要跨格式推理
-   - 错误是静默的：如果 WAW 对意外满足 RAW（如 `add x10, x11, x12; add x10, x10, x14`），coverage tool 将其分类为 RAW，hole 仍未填
-   - 我们在实验中还发现了 riscv-dv coverage tool 本身的 bug（FP hazard 覆写 GPR hazard），说明整个 trace-based coverage 流程是脆弱的
+3. **手写汇编能闭合盲区但有局限**：
+   - rd=SP 的 19 个 bin 可以通过 `op x2, ...` 机械覆盖
+   - 但每条指令都需要手动选择 SP 作为目标寄存器，且需要考虑是否会破坏程序运行状态
+   - U-type 和 jal 的边界情况需要格式特定的推理
 
-4. **RVProbe 的两层优势**：
-   - **序列级**（hazard）：求解器自动处理优先级排除和跨格式依赖
-   - **值级**（logical）：模式化封装减少手动计算，`freshReg()` 消除寄存器冲突风险
+4. **RVProbe 的 `freshReg()` 自动覆盖 SP**：
+   - RVProbe 的寄存器约束求解器在 `rdRange(1, 32)` 下自动包含 SP
+   - 不需要显式指定 SP——solver 会系统性地覆盖所有寄存器
+   - `coverWAR()`/`coverWAW()` 等 API 仍然有效（虽然 baseline 已覆盖 hazard，但 RVProbe 的序列级约束能力是通用的）
+
+5. **Coverage tool 本身存在 bug**：
+   - `get_logical_similarity()` 的 `bin()` 负数处理错误（已修复）
+   - pyflow 后端无法从 spike trace 重建 rs1_value（logical bin 不可观测）
+   - ECALL 指令在 trace 中存在但 coverage tool 未解析
 
 ## Verified Results (VCS + pyflow, deterministic seed 0, PYTHONHASHSEED=0)
 
