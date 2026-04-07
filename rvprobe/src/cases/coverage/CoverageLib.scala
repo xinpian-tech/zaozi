@@ -19,7 +19,24 @@ import java.lang.foreign.Arena
   */
 object CoverageLib:
   private val CoverageSectionSeparator = "\n\n"
-  private val BaremetalPreamble        = HTIFLib.asmTextStart()
+  // Trap handler that skips faulting instruction (4 bytes for non-compressed).
+  // Needed because solver-generated code may trash ra/sp or access invalid addresses.
+  private val TrapHandler =
+    """
+      |    # Set up trap handler to skip faulting instructions
+      |    la   t0, _skip_trap_handler
+      |    csrw mtvec, t0
+      |    j    _after_trap_handler
+      |    .balign 4
+      |_skip_trap_handler:
+      |    csrr t0, mepc
+      |    addi t0, t0, 4
+      |    csrw mepc, t0
+      |    mret
+      |_after_trap_handler:
+      |""".stripMargin
+
+  private val BaremetalPreamble        = HTIFLib.asmTextStart() + TrapHandler
   private val ScratchBuf =
     """
       |    .data
