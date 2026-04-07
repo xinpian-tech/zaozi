@@ -1578,6 +1578,26 @@ mv x31, x3
     sw x30, 0(x30)
     sw x31, 0(x11)
 
+mv x1, x2
+la x2, _scratch_buf
+lb  x3, 0(x2)
+lbu x3, 1(x2)
+lh  x3, 2(x2)
+lhu x3, 4(x2)
+lw  x3, 8(x2)
+sb x3, 16(x2)
+sh x3, 18(x2)
+mv x2, x1
+la x3, 1f
+jalr x2, x3, 0
+1:
+csrrw x2, mscratch, x3
+csrrs x2, mscratch, x3
+csrrc x2, mscratch, x3
+csrrwi x2, mscratch, 1
+csrrsi x2, mscratch, 1
+csrrci x2, mscratch, 1
+
 exit:
     li   t0, 0
     slli t0, t0, 1
