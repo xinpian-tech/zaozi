@@ -317,17 +317,18 @@ object CoverageLib:
     Block,
     Recipe
   ): Unit =
-    // Initialize all registers with a valid address so loads don't fault
-    raw("la x1, _scratch_buf")
-    (2 to 31).foreach { r => raw(s"mv x$r, x1") }
+    // Initialize registers x3-x31 with a valid address so loads don't fault.
+    // x1(ra) and x2(sp) are preserved to avoid breaking return/stack.
+    raw("la x3, _scratch_buf")
+    (4 to 31).foreach { r => raw(s"mv x$r, x3") }
     (0 until n).foreach { i =>
       instruction(i, opcode) {
-        rdRange(1, 32) & rs1Range(1, 32)
+        rdRange(1, 32) & rs1Range(3, 32) // rs1 >= x3 (valid address)
       }
     }
     val seq = sequence(0, n)
     seq.coverBins(_.rd, allRegs)
-    seq.coverBins(_.rs1, allRegs)
+    seq.coverBins(_.rs1, (3 until 32).map(_.S))
     seq.coverRAW()
     seq.coverNoHazard()
 
@@ -347,17 +348,17 @@ object CoverageLib:
     Block,
     Recipe
   ): Unit =
-    // Initialize all registers with a valid address so stores don't fault
-    raw("la x1, _scratch_buf")
-    (2 to 31).foreach { r => raw(s"mv x$r, x1") }
+    // Initialize registers x3-x31 with a valid address so stores don't fault.
+    raw("la x3, _scratch_buf")
+    (4 to 31).foreach { r => raw(s"mv x$r, x3") }
     (0 until n).foreach { i =>
       instruction(i, opcode) {
-        rs1Range(1, 32) & rs2Range(0, 32) // rs2 includes x0 (ZERO) for store-zero coverage
+        rs1Range(3, 32) & rs2Range(0, 32) // rs1 >= x3 (valid), rs2 includes x0 (ZERO)
       }
     }
     val seq = sequence(0, n)
-    seq.coverBins(_.rs1, allRegs)
-    seq.coverBins(_.rs2, (0 until 32).map(_.S)) // include x0
+    seq.coverBins(_.rs1, (3 until 32).map(_.S))
+    seq.coverBins(_.rs2, (0 until 32).map(_.S))
     seq.coverNoHazard()
 
   /** JALR instruction coverage: rd + rs1 register bins + hazards.
