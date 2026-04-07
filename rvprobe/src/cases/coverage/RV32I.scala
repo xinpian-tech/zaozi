@@ -193,9 +193,45 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
       raw("csrrsi x2, mscratch, 1")
       raw("csrrci x2, mscratch, 1")
 
-  // CSR-immediate (csrrwi/csrrsi/csrrci) disabled:
-  // RVProbe asm renderer doesn't emit the uimm operand correctly for CSR-imm format.
-  // These 3 covergroups' SP holes are covered by handwrite.S instead.
+      // csrrs rd=ZERO
+      raw("csrrs x0, mscratch, x0")
+
+      // JAL rd=SP + rd=ZERO
+      raw("jal x2, jal_sp_rv")
+      raw("jal_sp_rv:")
+      raw("j jal_zero_rv")
+      raw("jal_zero_rv:")
+
+      // Store rs2=ZERO
+      raw("la x3, _scratch_buf")
+      raw("sb x0, 48(x3)")
+      raw("sh x0, 50(x3)")
+      raw("sw x0, 52(x3)")
+
+      // JALR rd=S3/S4/S10/S11 (missing rd regs)
+      raw("la x5, jalr_s3_rv")
+      raw("jalr x19, x5, 0")
+      raw("jalr_s3_rv:")
+      raw("la x5, jalr_s4_rv")
+      raw("jalr x20, x5, 0")
+      raw("jalr_s4_rv:")
+      raw("la x5, jalr_s10_rv")
+      raw("jalr x26, x5, 0")
+      raw("jalr_s10_rv:")
+      raw("la x5, jalr_s11_rv")
+      raw("jalr x27, x5, 0")
+      raw("jalr_s11_rv:")
+
+      // JALR cross: rd=ra,rs1=t1 and rd=t1,rs1=ra
+      raw("la x6, jalr_ra_t1_rv")
+      raw("jalr x1, x6, 0")
+      raw("jalr_ra_t1_rv:")
+      raw("la x1, jalr_t1_ra_rv")
+      raw("jalr x6, x1, 0")
+      raw("jalr_t1_ra_rv:")
+
+      // ECALL
+      raw("ecall")
 
   writeCoverageAsm(
     outputPath,

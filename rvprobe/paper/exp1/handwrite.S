@@ -246,39 +246,38 @@ _start:
     xor x23, x21, x22       # DIFFERENT
 
 # --- I-type logical (andi, ori, xori): rs1_value vs imm ---
-# IDENTICAL: li r,val; op rd,r,val (rs1_value == imm)
-# OPPOSITE: li r,0x555; op rd,r,-1366 (0xFFFFFAAA ≈ ~0x555 in 12-bit sign-ext)
-# DIFFERENT: li r,0; op rd,r,0xFF
+# Use UNIQUE registers per test to avoid value conflicts (freshReg principle).
+# Each li+op pair must be immediately adjacent with no intervening instructions.
 
-# andi — IDENTICAL
-    li x21, 42
-    andi x22, x21, 42       # IDENTICAL
-# andi — OPPOSITE
-    li x21, 0x555
-    andi x22, x21, -1366    # OPPOSITE
-# andi — DIFFERENT
-    li x21, 0
-    andi x22, x21, 255      # DIFFERENT
+# andi — IDENTICAL (use x25/x26)
+    li x25, 42
+    andi x26, x25, 42       # rs1_val=42, imm=42 → IDENTICAL
+# andi — OPPOSITE (use x27/x28)
+    li x27, 0x555
+    andi x28, x27, -1366    # rs1_val=0x555, imm=0xFFFFFAAA → XOR=0xFFFFFFFF → OPPOSITE
+# andi — DIFFERENT (use x29/x30)
+    li x29, 0
+    andi x30, x29, 255      # DIFFERENT
 
-# ori — IDENTICAL
-    li x21, 42
-    ori x22, x21, 42        # IDENTICAL
-# ori — OPPOSITE
-    li x21, 0x555
-    ori x22, x21, -1366     # OPPOSITE
-# ori — DIFFERENT
-    li x21, 0
-    ori x22, x21, 255       # DIFFERENT
+# ori — IDENTICAL (use x25/x26, ok to reuse after andi section is done)
+    li x25, 42
+    ori x26, x25, 42        # IDENTICAL
+# ori — OPPOSITE (use x27/x28)
+    li x27, 0x555
+    ori x28, x27, -1366     # OPPOSITE
+# ori — DIFFERENT (use x29/x30)
+    li x29, 0
+    ori x30, x29, 255       # DIFFERENT
 
-# xori — IDENTICAL
-    li x21, 42
-    xori x22, x21, 42       # IDENTICAL
-# xori — OPPOSITE
-    li x21, 0x555
-    xori x22, x21, -1366    # OPPOSITE
-# xori — DIFFERENT
-    li x21, 0
-    xori x22, x21, 255      # DIFFERENT
+# xori — IDENTICAL (use x25/x26)
+    li x25, 42
+    xori x26, x25, 42       # IDENTICAL
+# xori — OPPOSITE (use x27/x28)
+    li x27, 0x555
+    xori x28, x27, -1366    # OPPOSITE
+# xori — DIFFERENT (use x29/x30)
+    li x29, 0
+    xori x30, x29, 255      # DIFFERENT
 
 # ============================================================
 # cp_rd=SP (x2) holes — 19 instructions missing rd=SP
@@ -342,21 +341,43 @@ _start:
     lhu  x6, 4(x2)
     mv   x2, x4           # restore SP
 
-    # Store: rs2=ZERO (store zero value)
-    sb   x0, 0(x3)
-    sh   x0, 2(x3)
-    sw   x0, 4(x3)
+    # Store: rs2=ZERO (store zero value) — separate section for clear coverage
+    sb   x0, 32(x3)
+    sh   x0, 34(x3)
+    sw   x0, 36(x3)
     # Store: rs1=SP
     mv   x4, x2
     mv   x2, x3
-    sb   x6, 8(x2)
-    sh   x6, 10(x2)
+    sb   x6, 40(x2)
+    sh   x6, 42(x2)
+    sw   x6, 44(x2)
     mv   x2, x4
+    # csrrs rd=ZERO (explicit, separate from above)
+    csrrs x0, mscratch, x0
 
-    # jalr: rd=SP
-    la   x5, 3f
-    jalr x2, x5, 0
-3:
+    # jalr: rd=SP and other missing rd registers
+    la   x5, jalr_sp
+    jalr x2, x5, 0       # rd=SP
+jalr_sp:
+    la   x5, jalr_s3
+    jalr x19, x5, 0      # rd=S3
+jalr_s3:
+    la   x5, jalr_s4
+    jalr x20, x5, 0      # rd=S4
+jalr_s4:
+    la   x5, jalr_s10
+    jalr x26, x5, 0      # rd=S10
+jalr_s10:
+    la   x5, jalr_s11
+    jalr x27, x5, 0      # rd=S11
+jalr_s11:
+    # jalr cross-coverage: rd=ra,rs1=t1 and rd=t1,rs1=ra
+    la   x6, jalr_ra_t1
+    jalr x1, x6, 0       # rd=ra, rs1=t1
+jalr_ra_t1:
+    la   x1, jalr_t1_ra
+    jalr x6, x1, 0       # rd=t1, rs1=ra
+jalr_t1_ra:
 
 # ============================================================
 # U-type RAW hazard — lui/auipc cp_gpr_hazard=RAW_HAZARD
@@ -407,18 +428,19 @@ _after_ecall:
 # Fillable holes addressed:
 #   cp_rd=SP:                 36 holes (all instr types incl load/store/csr/jalr)
 #   cp_rd/rs2=ZERO:            5 holes (jal, csrrs, sb, sh, sw)
+#   jalr cp_rd:                6 holes (SP, S3, S4, S10, S11 + cross ra/t1)
 #   ECALL:                     1 hole  (with trap handler)
 #   Logical:                   4 holes (ori/andi OPPOSITE, xori IDENTICAL/OPPOSITE)
 #                             ---
-#   Total fillable:           46 holes
+#   Total fillable:           52 holes
 #
 # Architecture-unreachable (cannot fill):
 #   RAW hazard:                5 holes (lui, auipc, csrrwi/si/ci — no rs fields)
 #   opcode_cg:                 4 holes (unused opcode encodings)
-#   alignment:                 4 holes (mepc, jal rd/imm — requires C extension)
-#   jalr cross-coverage:       7 holes (specific rd×rs1 and sign×sign combinations)
+#   alignment:                 3 holes (mepc + jal rd/imm — requires C extension)
+#   jalr alignment/cross:      2 holes (specific alignment combinations)
 #                             ---
-#   Total unreachable:        20 holes
+#   Total unreachable:        14 holes
 # ============================================================
 
     .data
