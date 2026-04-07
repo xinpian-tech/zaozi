@@ -177,31 +177,30 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
   // C extension: compressed instructions
   // ============================================================
 
-  // c.add rd, rs2 — R-type compressed (rd = rd + rs2)
+  // c.add rd, rs2 — use raw() because asm renderer doesn't handle c.add format
   object CAdd extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isCAdd()) { rdRange(1, 32) & rs2Range(1, 32) }
+      // c.add rd=SP with each rs2
+      (1 to 31).foreach { r =>
+        raw(s"c.add x2, x$r")
       }
-      val seq = sequence(0, n)
-      seq.coverBins(_.rd, allRegs)
-      seq.coverBins(_.rs2, allRegs)
-      seq.coverRAW()
-      seq.coverWAR()
-      seq.coverWAW()
-      seq.coverNoHazard()
+      // c.add each rd with a fixed rs2
+      (1 to 31).foreach { r =>
+        raw(s"c.add x$r, x5")
+      }
 
-  // c.mv rd, rs2 — rd = rs2
+  // c.mv rd, rs2 — use raw() because asm renderer doesn't handle c.mv format
   object CMv extends RVGenerator:
     val sets          = isRV64GC()
     def constraints() =
-      (0 until n).foreach { i =>
-        instruction(i, isCMv()) { rdRange(1, 32) & rs2Range(1, 32) }
+      // Enumerate key registers for c.mv rd=SP coverage
+      (1 to 31).foreach { r =>
+        raw(s"c.mv x2, x$r")   // rd=SP with each rs2
       }
-      val seq = sequence(0, n)
-      seq.coverBins(_.rd, allRegs)
-      seq.coverBins(_.rs2, allRegs)
+      (1 to 31).foreach { r =>
+        raw(s"c.mv x$r, x5")   // each rd with a fixed rs2
+      }
 
   // c.jr rs1 — jump to rs1 (rd=x0 implicit)
   // Use raw() because c.jr changes control flow
