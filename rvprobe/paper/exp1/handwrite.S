@@ -246,36 +246,43 @@ _start:
     xor x23, x21, x22       # DIFFERENT
 
 # --- I-type logical (andi, ori, xori): rs1_value vs imm ---
-# Use UNIQUE registers per test to avoid value conflicts (freshReg principle).
-# Each li+op pair must be immediately adjacent with no intervening instructions.
+# Flush register state before each logical test to ensure VCS coverage model
+# picks up the correct rs1_value across trace file boundaries.
+# Without this, baseline trace register state can leak into the directed test.
 
-# andi — IDENTICAL (use x25/x26)
-    li x25, 42
+# andi — IDENTICAL
+    li x25, 0               # flush
+    li x25, 42              # set known value
     andi x26, x25, 42       # rs1_val=42, imm=42 → IDENTICAL
-# andi — OPPOSITE (use x27/x28)
+# andi — OPPOSITE
+    li x27, 0
     li x27, 0x555
-    andi x28, x27, -1366    # rs1_val=0x555, imm=0xFFFFFAAA → XOR=0xFFFFFFFF → OPPOSITE
-# andi — DIFFERENT (use x29/x30)
+    andi x28, x27, -1366    # rs1_val=0x555, imm=0xFFFFFAAA → OPPOSITE
+# andi — DIFFERENT
     li x29, 0
     andi x30, x29, 255      # DIFFERENT
 
-# ori — IDENTICAL (use x25/x26, ok to reuse after andi section is done)
+# ori — IDENTICAL
+    li x25, 0
     li x25, 42
     ori x26, x25, 42        # IDENTICAL
-# ori — OPPOSITE (use x27/x28)
+# ori — OPPOSITE
+    li x27, 0
     li x27, 0x555
     ori x28, x27, -1366     # OPPOSITE
-# ori — DIFFERENT (use x29/x30)
+# ori — DIFFERENT
     li x29, 0
     ori x30, x29, 255       # DIFFERENT
 
-# xori — IDENTICAL (use x25/x26)
+# xori — IDENTICAL
+    li x25, 0
     li x25, 42
     xori x26, x25, 42       # IDENTICAL
-# xori — OPPOSITE (use x27/x28)
+# xori — OPPOSITE
+    li x27, 0
     li x27, 0x555
     xori x28, x27, -1366    # OPPOSITE
-# xori — DIFFERENT (use x29/x30)
+# xori — DIFFERENT
     li x29, 0
     xori x30, x29, 255      # DIFFERENT
 
