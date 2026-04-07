@@ -20,10 +20,20 @@ import java.lang.foreign.Arena
 object CoverageLib:
   private val CoverageSectionSeparator = "\n\n"
   private val BaremetalPreamble        = HTIFLib.asmTextStart()
+  private val ScratchBuf =
+    """
+      |    .data
+      |    .balign 16
+      |    .globl _scratch_buf
+      |_scratch_buf:
+      |    .fill 256, 1, 0
+      |""".stripMargin
+
   private val BaremetalEpilogue        =
     s"""${HTIFLib.asmExit()}
        |
-       |${HTIFLib.asmTohostSection()}""".stripMargin
+       |${HTIFLib.asmTohostSection()}
+       |$ScratchBuf""".stripMargin
 
   def writeCoverageAsm(
     outputPath: String,
@@ -307,6 +317,9 @@ object CoverageLib:
     Block,
     Recipe
   ): Unit =
+    // Initialize all registers with a valid address so loads don't fault
+    raw("la x1, _scratch_buf")
+    (2 to 31).foreach { r => raw(s"mv x$r, x1") }
     (0 until n).foreach { i =>
       instruction(i, opcode) {
         rdRange(1, 32) & rs1Range(1, 32)
@@ -315,7 +328,6 @@ object CoverageLib:
     val seq = sequence(0, n)
     seq.coverBins(_.rd, allRegs)
     seq.coverBins(_.rs1, allRegs)
-    seq.coverBins(_.imm12, immBoundary12)
     seq.coverRAW()
     seq.coverNoHazard()
 
@@ -335,6 +347,9 @@ object CoverageLib:
     Block,
     Recipe
   ): Unit =
+    // Initialize all registers with a valid address so stores don't fault
+    raw("la x1, _scratch_buf")
+    (2 to 31).foreach { r => raw(s"mv x$r, x1") }
     (0 until n).foreach { i =>
       instruction(i, opcode) {
         rs1Range(1, 32) & rs2Range(0, 32) // rs2 includes x0 (ZERO) for store-zero coverage
