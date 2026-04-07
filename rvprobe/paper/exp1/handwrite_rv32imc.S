@@ -233,19 +233,20 @@ _after_trap:
     c.slli x5, 1
     add    x6, x5, x7  # RAW: rs1=x5 == prev c.slli rd=x5
 
-# c_lw hazard: RAW + WAR
-    c.lw   x8, 0(x3)   # x3 must point to valid memory
-    add    x9, x8, x7  # RAW: rs1=x8 == prev c.lw rd=x8
-    c.lw   x10, 0(x3)
-    c.sw   x11, 0(x10) # uses x10 as addr after c.lw wrote it → coverage
+# c_lw hazard: RAW + WAR (c.lw/c.sw use x8-x15 for both rd/rs1/rs2)
+    mv     x8, x3       # x8 = scratch_buf (valid base for c.lw/c.sw)
+    c.lw   x9, 0(x8)    # RAW setup: rd=x9
+    add    x10, x9, x7  # RAW: rs1=x9 == prev c.lw rd=x9
+    c.lw   x10, 0(x8)
+    c.sw   x11, 0(x10)  # uses x10 as addr after c.lw wrote it
 
 # c_sw hazard: WAR + WAW
-    c.sw   x8, 0(x3)
-    c.lw   x3, 0(x3)   # WAR: c.lw rd=x3 overwrites c.sw's rs1
+    c.sw   x9, 0(x8)
+    c.lw   x8, 0(x8)    # WAR: c.lw rd=x8 overwrites c.sw's rs1=x8
 
 # c_addi4spn hazard: WAR
     c.addi4spn x8, x2, 4   # rd ∈ x8-x15
-    add    x2, x8, x0      # WAR: next.rd=x2 is not in prev's source, but this covers hazard
+    add    x2, x8, x0      # WAR
 
 # c_addi16sp hazard: WAR
     c.addi16sp x2, 16
