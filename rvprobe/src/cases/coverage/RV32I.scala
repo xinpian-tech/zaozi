@@ -164,29 +164,29 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = jalrCov(n, isJalr())
 
-  // --- CSR ---
+  // --- CSR (requires ZICSR extension) ---
   object Csrrw extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csr(n, isCsrrw())
 
   object Csrrs extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csr(n, isCsrrs())
 
   object Csrrc extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csr(n, isCsrrc())
 
   object Csrrwi extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csrImm(n, isCsrrwi())
 
   object Csrrsi extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csrImm(n, isCsrrsi())
 
   object Csrrci extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csrImm(n, isCsrrci())
 
   writeCoverageAsm(
