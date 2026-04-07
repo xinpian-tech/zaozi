@@ -350,7 +350,7 @@ object CoverageLib:
     * JALR is I-type but used for jumps. rd=x0 means discard return address,
     * rd=x2 (SP) is a key coverage target.
     */
-  def jalr(
+  def jalrCov(
     n:      Int,
     opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
   )(

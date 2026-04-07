@@ -162,7 +162,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
   // --- JALR ---
   object Jalr extends RVGenerator:
     val sets          = isRV64GC()
-    def constraints() = jalr(n, isJalr())
+    def constraints() = jalrCov(n, isJalr())
 
   // --- CSR ---
   object Csrrw extends RVGenerator:
