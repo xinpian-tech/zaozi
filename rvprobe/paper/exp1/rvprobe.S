@@ -1046,6 +1046,546 @@ xori x30, x30, 2047
     li x6, 0x0
     xori x3, x6, 255
 
+lb x16, 2047(x19)
+    lb x28, 2047(x8)
+    lb x18, 2047(x18)
+    lb x20, 2047(x19)
+    lb x24, 2047(x3)
+    lb x24, 2047(x4)
+    lb x20, 2047(x11)
+    lb x21, 2047(x21)
+    lb x31, 2047(x29)
+    lb x24, 2047(x1)
+    lb x23, 2047(x25)
+    lb x6, 2047(x7)
+    lb x2, 2047(x17)
+    lb x26, 2047(x22)
+    lb x12, 2047(x27)
+    lb x22, 2047(x14)
+    lb x30, 2047(x16)
+    lb x15, 2047(x10)
+    lb x15, 2047(x2)
+    lb x29, 2047(x24)
+    lb x1, 2047(x19)
+    lb x14, 2047(x9)
+    lb x25, 2047(x30)
+    lb x5, 2047(x23)
+    lb x8, 2047(x6)
+    lb x10, 2047(x5)
+    lb x3, 2047(x13)
+    lb x9, 2047(x20)
+    lb x4, 2047(x26)
+    lb x13, 2047(x15)
+    lb x19, 2047(x31)
+    lb x7, 1(x12)
+    lb x11, -2048(x28)
+    lb x27, -1(x19)
+    lb x17, 0(x27)
+
+lbu x16, 2047(x19)
+    lbu x28, 2047(x8)
+    lbu x18, 2047(x18)
+    lbu x20, 2047(x19)
+    lbu x24, 2047(x3)
+    lbu x24, 2047(x4)
+    lbu x20, 2047(x11)
+    lbu x21, 2047(x21)
+    lbu x31, 2047(x29)
+    lbu x24, 2047(x1)
+    lbu x23, 2047(x25)
+    lbu x6, 2047(x7)
+    lbu x2, 2047(x17)
+    lbu x26, 2047(x22)
+    lbu x12, 2047(x27)
+    lbu x22, 2047(x14)
+    lbu x30, 2047(x16)
+    lbu x15, 2047(x10)
+    lbu x15, 2047(x2)
+    lbu x29, 2047(x24)
+    lbu x1, 2047(x19)
+    lbu x14, 2047(x9)
+    lbu x25, 2047(x30)
+    lbu x5, 2047(x23)
+    lbu x8, 2047(x6)
+    lbu x10, 2047(x5)
+    lbu x3, 2047(x13)
+    lbu x9, 2047(x20)
+    lbu x4, 2047(x26)
+    lbu x13, 2047(x15)
+    lbu x19, 2047(x31)
+    lbu x7, 1(x12)
+    lbu x11, -2048(x28)
+    lbu x27, -1(x19)
+    lbu x17, 0(x27)
+
+lh x16, 2047(x19)
+    lh x28, 2047(x8)
+    lh x18, 2047(x18)
+    lh x20, 2047(x19)
+    lh x24, 2047(x3)
+    lh x24, 2047(x4)
+    lh x20, 2047(x11)
+    lh x21, 2047(x21)
+    lh x31, 2047(x29)
+    lh x24, 2047(x1)
+    lh x23, 2047(x25)
+    lh x6, 2047(x7)
+    lh x2, 2047(x17)
+    lh x26, 2047(x22)
+    lh x12, 2047(x27)
+    lh x22, 2047(x14)
+    lh x30, 2047(x16)
+    lh x15, 2047(x10)
+    lh x15, 2047(x2)
+    lh x29, 2047(x24)
+    lh x1, 2047(x19)
+    lh x14, 2047(x9)
+    lh x25, 2047(x30)
+    lh x5, 2047(x23)
+    lh x8, 2047(x6)
+    lh x10, 2047(x5)
+    lh x3, 2047(x13)
+    lh x9, 2047(x20)
+    lh x4, 2047(x26)
+    lh x13, 2047(x15)
+    lh x19, 2047(x31)
+    lh x7, 1(x12)
+    lh x11, -2048(x28)
+    lh x27, -1(x19)
+    lh x17, 0(x27)
+
+lhu x16, 2047(x19)
+    lhu x28, 2047(x8)
+    lhu x18, 2047(x18)
+    lhu x20, 2047(x19)
+    lhu x24, 2047(x3)
+    lhu x24, 2047(x4)
+    lhu x20, 2047(x11)
+    lhu x21, 2047(x21)
+    lhu x31, 2047(x29)
+    lhu x24, 2047(x1)
+    lhu x23, 2047(x25)
+    lhu x6, 2047(x7)
+    lhu x2, 2047(x17)
+    lhu x26, 2047(x22)
+    lhu x12, 2047(x27)
+    lhu x22, 2047(x14)
+    lhu x30, 2047(x16)
+    lhu x15, 2047(x10)
+    lhu x15, 2047(x2)
+    lhu x29, 2047(x24)
+    lhu x1, 2047(x19)
+    lhu x14, 2047(x9)
+    lhu x25, 2047(x30)
+    lhu x5, 2047(x23)
+    lhu x8, 2047(x6)
+    lhu x10, 2047(x5)
+    lhu x3, 2047(x13)
+    lhu x9, 2047(x20)
+    lhu x4, 2047(x26)
+    lhu x13, 2047(x15)
+    lhu x19, 2047(x31)
+    lhu x7, 1(x12)
+    lhu x11, -2048(x28)
+    lhu x27, -1(x19)
+    lhu x17, 0(x27)
+
+lw x16, 2047(x19)
+    lw x28, 2047(x8)
+    lw x18, 2047(x18)
+    lw x20, 2047(x19)
+    lw x24, 2047(x3)
+    lw x24, 2047(x4)
+    lw x20, 2047(x11)
+    lw x21, 2047(x21)
+    lw x31, 2047(x29)
+    lw x24, 2047(x1)
+    lw x23, 2047(x25)
+    lw x6, 2047(x7)
+    lw x2, 2047(x17)
+    lw x26, 2047(x22)
+    lw x12, 2047(x27)
+    lw x22, 2047(x14)
+    lw x30, 2047(x16)
+    lw x15, 2047(x10)
+    lw x15, 2047(x2)
+    lw x29, 2047(x24)
+    lw x1, 2047(x19)
+    lw x14, 2047(x9)
+    lw x25, 2047(x30)
+    lw x5, 2047(x23)
+    lw x8, 2047(x6)
+    lw x10, 2047(x5)
+    lw x3, 2047(x13)
+    lw x9, 2047(x20)
+    lw x4, 2047(x26)
+    lw x13, 2047(x15)
+    lw x19, 2047(x31)
+    lw x7, 1(x12)
+    lw x11, -2048(x28)
+    lw x27, -1(x19)
+    lw x17, 0(x27)
+
+sb x16, 0(x26)
+    sb x9, 0(x21)
+    sb x0, 0(x7)
+    sb x4, 0(x9)
+    sb x5, 0(x24)
+    sb x0, 0(x1)
+    sb x6, 0(x17)
+    sb x1, 0(x3)
+    sb x4, 0(x20)
+    sb x12, 0(x28)
+    sb x10, 0(x11)
+    sb x0, 0(x2)
+    sb x7, 0(x12)
+    sb x3, 0(x19)
+    sb x11, 0(x16)
+    sb x2, 0(x22)
+    sb x13, 0(x1)
+    sb x8, 0(x25)
+    sb x14, 0(x14)
+    sb x15, 0(x1)
+    sb x17, 0(x10)
+    sb x18, 0(x4)
+    sb x19, 0(x6)
+    sb x20, 0(x13)
+    sb x21, 0(x29)
+    sb x22, 0(x27)
+    sb x23, 0(x31)
+    sb x24, 0(x30)
+    sb x25, 0(x5)
+    sb x26, 0(x15)
+    sb x27, 0(x18)
+    sb x28, 0(x8)
+    sb x29, 0(x23)
+    sb x30, 0(x1)
+    sb x31, 0(x1)
+
+sh x16, 0(x26)
+    sh x9, 0(x21)
+    sh x0, 0(x7)
+    sh x4, 0(x9)
+    sh x5, 0(x24)
+    sh x0, 0(x1)
+    sh x6, 0(x17)
+    sh x1, 0(x3)
+    sh x4, 0(x20)
+    sh x12, 0(x28)
+    sh x10, 0(x11)
+    sh x0, 0(x2)
+    sh x7, 0(x12)
+    sh x3, 0(x19)
+    sh x11, 0(x16)
+    sh x2, 0(x22)
+    sh x13, 0(x1)
+    sh x8, 0(x25)
+    sh x14, 0(x14)
+    sh x15, 0(x1)
+    sh x17, 0(x10)
+    sh x18, 0(x4)
+    sh x19, 0(x6)
+    sh x20, 0(x13)
+    sh x21, 0(x29)
+    sh x22, 0(x27)
+    sh x23, 0(x31)
+    sh x24, 0(x30)
+    sh x25, 0(x5)
+    sh x26, 0(x15)
+    sh x27, 0(x18)
+    sh x28, 0(x8)
+    sh x29, 0(x23)
+    sh x30, 0(x1)
+    sh x31, 0(x1)
+
+sw x16, 0(x26)
+    sw x9, 0(x21)
+    sw x0, 0(x7)
+    sw x4, 0(x9)
+    sw x5, 0(x24)
+    sw x0, 0(x1)
+    sw x6, 0(x17)
+    sw x1, 0(x3)
+    sw x4, 0(x20)
+    sw x12, 0(x28)
+    sw x10, 0(x11)
+    sw x0, 0(x2)
+    sw x7, 0(x12)
+    sw x3, 0(x19)
+    sw x11, 0(x16)
+    sw x2, 0(x22)
+    sw x13, 0(x1)
+    sw x8, 0(x25)
+    sw x14, 0(x14)
+    sw x15, 0(x1)
+    sw x17, 0(x10)
+    sw x18, 0(x4)
+    sw x19, 0(x6)
+    sw x20, 0(x13)
+    sw x21, 0(x29)
+    sw x22, 0(x27)
+    sw x23, 0(x31)
+    sw x24, 0(x30)
+    sw x25, 0(x5)
+    sw x26, 0(x15)
+    sw x27, 0(x18)
+    sw x28, 0(x8)
+    sw x29, 0(x23)
+    sw x30, 0(x1)
+    sw x31, 0(x1)
+
+jalr x10, x21, 0
+    jalr x27, x12, 0
+    jalr x25, x8, 0
+    jalr x18, x10, 0
+    jalr x30, x14, 0
+    jalr x2, x31, 0
+    jalr x4, x1, 0
+    jalr x24, x16, 0
+    jalr x8, x31, 0
+    jalr x27, x27, 0
+    jalr x26, x25, 0
+    jalr x14, x19, 0
+    jalr x6, x15, 0
+    jalr x23, x9, 0
+    jalr x12, x6, 0
+    jalr x20, x20, 0
+    jalr x20, x18, 0
+    jalr x31, x17, 0
+    jalr x17, x4, 0
+    jalr x19, x23, 0
+    jalr x16, x24, 0
+    jalr x22, x2, 0
+    jalr x15, x28, 0
+    jalr x3, x29, 0
+    jalr x28, x11, 0
+    jalr x21, x30, 0
+    jalr x0, x22, 0
+    jalr x13, x22, 0
+    jalr x9, x22, 0
+    jalr x1, x29, 0
+    jalr x7, x5, 0
+    jalr x29, x3, 0
+    jalr x26, x13, 0
+    jalr x5, x26, 0
+    jalr x11, x7, 0
+
+csrrw x10, ustatus, x21
+    csrrw x27, ustatus, x12
+    csrrw x25, ustatus, x8
+    csrrw x18, ustatus, x10
+    csrrw x30, ustatus, x14
+    csrrw x2, ustatus, x31
+    csrrw x4, ustatus, x1
+    csrrw x24, ustatus, x16
+    csrrw x8, ustatus, x31
+    csrrw x27, ustatus, x27
+    csrrw x26, ustatus, x25
+    csrrw x14, ustatus, x19
+    csrrw x6, ustatus, x15
+    csrrw x23, ustatus, x9
+    csrrw x12, ustatus, x6
+    csrrw x20, ustatus, x20
+    csrrw x20, ustatus, x18
+    csrrw x31, ustatus, x17
+    csrrw x17, ustatus, x4
+    csrrw x19, ustatus, x23
+    csrrw x16, ustatus, x24
+    csrrw x22, ustatus, x2
+    csrrw x15, ustatus, x28
+    csrrw x3, ustatus, x29
+    csrrw x28, ustatus, x11
+    csrrw x21, ustatus, x30
+    csrrw x0, ustatus, x22
+    csrrw x13, ustatus, x22
+    csrrw x9, ustatus, x22
+    csrrw x1, ustatus, x29
+    csrrw x7, ustatus, x5
+    csrrw x29, ustatus, x3
+    csrrw x26, ustatus, x13
+    csrrw x5, ustatus, x26
+    csrrw x11, ustatus, x7
+
+csrrs x10, ustatus, x21
+    csrrs x27, ustatus, x12
+    csrrs x25, ustatus, x8
+    csrrs x18, ustatus, x10
+    csrrs x30, ustatus, x14
+    csrrs x2, ustatus, x31
+    csrrs x4, ustatus, x1
+    csrrs x24, ustatus, x16
+    csrrs x8, ustatus, x31
+    csrrs x27, ustatus, x27
+    csrrs x26, ustatus, x25
+    csrrs x14, ustatus, x19
+    csrrs x6, ustatus, x15
+    csrrs x23, ustatus, x9
+    csrrs x12, ustatus, x6
+    csrrs x20, ustatus, x20
+    csrrs x20, ustatus, x18
+    csrrs x31, ustatus, x17
+    csrrs x17, ustatus, x4
+    csrrs x19, ustatus, x23
+    csrrs x16, ustatus, x24
+    csrrs x22, ustatus, x2
+    csrrs x15, ustatus, x28
+    csrrs x3, ustatus, x29
+    csrrs x28, ustatus, x11
+    csrrs x21, ustatus, x30
+    csrrs x0, ustatus, x22
+    csrrs x13, ustatus, x22
+    csrrs x9, ustatus, x22
+    csrrs x1, ustatus, x29
+    csrrs x7, ustatus, x5
+    csrrs x29, ustatus, x3
+    csrrs x26, ustatus, x13
+    csrrs x5, ustatus, x26
+    csrrs x11, ustatus, x7
+
+csrrc x10, ustatus, x21
+    csrrc x27, ustatus, x12
+    csrrc x25, ustatus, x8
+    csrrc x18, ustatus, x10
+    csrrc x30, ustatus, x14
+    csrrc x2, ustatus, x31
+    csrrc x4, ustatus, x1
+    csrrc x24, ustatus, x16
+    csrrc x8, ustatus, x31
+    csrrc x27, ustatus, x27
+    csrrc x26, ustatus, x25
+    csrrc x14, ustatus, x19
+    csrrc x6, ustatus, x15
+    csrrc x23, ustatus, x9
+    csrrc x12, ustatus, x6
+    csrrc x20, ustatus, x20
+    csrrc x20, ustatus, x18
+    csrrc x31, ustatus, x17
+    csrrc x17, ustatus, x4
+    csrrc x19, ustatus, x23
+    csrrc x16, ustatus, x24
+    csrrc x22, ustatus, x2
+    csrrc x15, ustatus, x28
+    csrrc x3, ustatus, x29
+    csrrc x28, ustatus, x11
+    csrrc x21, ustatus, x30
+    csrrc x0, ustatus, x22
+    csrrc x13, ustatus, x22
+    csrrc x9, ustatus, x22
+    csrrc x1, ustatus, x29
+    csrrc x7, ustatus, x5
+    csrrc x29, ustatus, x3
+    csrrc x26, ustatus, x13
+    csrrc x5, ustatus, x26
+    csrrc x11, ustatus, x7
+
+csrrwi x27, ustatus
+    csrrwi x6, ustatus
+    csrrwi x18, ustatus
+    csrrwi x17, ustatus
+    csrrwi x2, ustatus
+    csrrwi x5, ustatus
+    csrrwi x4, ustatus
+    csrrwi x29, ustatus
+    csrrwi x16, ustatus
+    csrrwi x13, ustatus
+    csrrwi x9, ustatus
+    csrrwi x28, ustatus
+    csrrwi x26, ustatus
+    csrrwi x23, ustatus
+    csrrwi x0, ustatus
+    csrrwi x3, ustatus
+    csrrwi x10, ustatus
+    csrrwi x8, ustatus
+    csrrwi x15, ustatus
+    csrrwi x11, ustatus
+    csrrwi x24, ustatus
+    csrrwi x12, ustatus
+    csrrwi x31, ustatus
+    csrrwi x25, ustatus
+    csrrwi x7, ustatus
+    csrrwi x27, ustatus
+    csrrwi x19, ustatus
+    csrrwi x14, ustatus
+    csrrwi x1, ustatus
+    csrrwi x22, ustatus
+    csrrwi x21, ustatus
+    csrrwi x20, ustatus
+    csrrwi x31, ustatus
+    csrrwi x30, ustatus
+    csrrwi x30, ustatus
+
+csrrsi x27, ustatus
+    csrrsi x6, ustatus
+    csrrsi x18, ustatus
+    csrrsi x17, ustatus
+    csrrsi x2, ustatus
+    csrrsi x5, ustatus
+    csrrsi x4, ustatus
+    csrrsi x29, ustatus
+    csrrsi x16, ustatus
+    csrrsi x13, ustatus
+    csrrsi x9, ustatus
+    csrrsi x28, ustatus
+    csrrsi x26, ustatus
+    csrrsi x23, ustatus
+    csrrsi x0, ustatus
+    csrrsi x3, ustatus
+    csrrsi x10, ustatus
+    csrrsi x8, ustatus
+    csrrsi x15, ustatus
+    csrrsi x11, ustatus
+    csrrsi x24, ustatus
+    csrrsi x12, ustatus
+    csrrsi x31, ustatus
+    csrrsi x25, ustatus
+    csrrsi x7, ustatus
+    csrrsi x27, ustatus
+    csrrsi x19, ustatus
+    csrrsi x14, ustatus
+    csrrsi x1, ustatus
+    csrrsi x22, ustatus
+    csrrsi x21, ustatus
+    csrrsi x20, ustatus
+    csrrsi x31, ustatus
+    csrrsi x30, ustatus
+    csrrsi x30, ustatus
+
+csrrci x27, ustatus
+    csrrci x6, ustatus
+    csrrci x18, ustatus
+    csrrci x17, ustatus
+    csrrci x2, ustatus
+    csrrci x5, ustatus
+    csrrci x4, ustatus
+    csrrci x29, ustatus
+    csrrci x16, ustatus
+    csrrci x13, ustatus
+    csrrci x9, ustatus
+    csrrci x28, ustatus
+    csrrci x26, ustatus
+    csrrci x23, ustatus
+    csrrci x0, ustatus
+    csrrci x3, ustatus
+    csrrci x10, ustatus
+    csrrci x8, ustatus
+    csrrci x15, ustatus
+    csrrci x11, ustatus
+    csrrci x24, ustatus
+    csrrci x12, ustatus
+    csrrci x31, ustatus
+    csrrci x25, ustatus
+    csrrci x7, ustatus
+    csrrci x27, ustatus
+    csrrci x19, ustatus
+    csrrci x14, ustatus
+    csrrci x1, ustatus
+    csrrci x22, ustatus
+    csrrci x21, ustatus
+    csrrci x20, ustatus
+    csrrci x31, ustatus
+    csrrci x30, ustatus
+    csrrci x30, ustatus
+
 exit:
     li   t0, 0
     slli t0, t0, 1

@@ -177,17 +177,9 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC() :+ isRVZICSR()
     def constraints() = csr(n, isCsrrc())
 
-  object Csrrwi extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() = csrImm(n, isCsrrwi())
-
-  object Csrrsi extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() = csrImm(n, isCsrrsi())
-
-  object Csrrci extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() = csrImm(n, isCsrrci())
+  // CSR-immediate (csrrwi/csrrsi/csrrci) disabled:
+  // RVProbe asm renderer doesn't emit the uimm operand correctly for CSR-imm format.
+  // These 3 covergroups' SP holes are covered by handwrite.S instead.
 
   writeCoverageAsm(
     outputPath,
@@ -232,8 +224,5 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     // CSR
     Csrrw,
     Csrrs,
-    Csrrc,
-    Csrrwi,
-    Csrrsi,
-    Csrrci
+    Csrrc
   )
