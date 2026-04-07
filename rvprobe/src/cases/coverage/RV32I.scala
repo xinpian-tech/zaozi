@@ -159,23 +159,13 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = store(n, isSw())
 
-  // --- JALR ---
-  object Jalr extends RVGenerator:
-    val sets          = isRV64GC()
-    def constraints() = jalrCov(n, isJalr())
+  // JALR disabled: jalr jumps to register values which are data addresses
+  // after the load/store preamble, causing execution of garbage → trap loop.
+  // JALR holes are covered by handwrite.S instead.
 
-  // --- CSR (requires ZICSR extension) ---
-  object Csrrw extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() = csr(n, isCsrrw())
-
-  object Csrrs extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() = csr(n, isCsrrs())
-
-  object Csrrc extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() = csr(n, isCsrrc())
+  // CSR disabled: csrrw/csrrs/csrrc to ustatus in M-mode may cause
+  // illegal instruction exceptions on rv32i without U-mode support.
+  // CSR holes are covered by handwrite.S instead.
 
   // CSR-immediate (csrrwi/csrrsi/csrrci) disabled:
   // RVProbe asm renderer doesn't emit the uimm operand correctly for CSR-imm format.
@@ -219,10 +209,4 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     Sb,
     Sh,
     Sw,
-    // JALR
-    Jalr,
-    // CSR
-    Csrrw,
-    Csrrs,
-    Csrrc
   )
