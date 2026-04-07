@@ -1620,77 +1620,131 @@ remu x11, x26, x4
     remu x28, x12, x31
     remu x29, x1, x9
 
-c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
-    c.add
+c.add x2, x1
+c.add x2, x2
+c.add x2, x3
+c.add x2, x4
+c.add x2, x5
+c.add x2, x6
+c.add x2, x7
+c.add x2, x8
+c.add x2, x9
+c.add x2, x10
+c.add x2, x11
+c.add x2, x12
+c.add x2, x13
+c.add x2, x14
+c.add x2, x15
+c.add x2, x16
+c.add x2, x17
+c.add x2, x18
+c.add x2, x19
+c.add x2, x20
+c.add x2, x21
+c.add x2, x22
+c.add x2, x23
+c.add x2, x24
+c.add x2, x25
+c.add x2, x26
+c.add x2, x27
+c.add x2, x28
+c.add x2, x29
+c.add x2, x30
+c.add x2, x31
+c.add x1, x5
+c.add x2, x5
+c.add x3, x5
+c.add x4, x5
+c.add x5, x5
+c.add x6, x5
+c.add x7, x5
+c.add x8, x5
+c.add x9, x5
+c.add x10, x5
+c.add x11, x5
+c.add x12, x5
+c.add x13, x5
+c.add x14, x5
+c.add x15, x5
+c.add x16, x5
+c.add x17, x5
+c.add x18, x5
+c.add x19, x5
+c.add x20, x5
+c.add x21, x5
+c.add x22, x5
+c.add x23, x5
+c.add x24, x5
+c.add x25, x5
+c.add x26, x5
+c.add x27, x5
+c.add x28, x5
+c.add x29, x5
+c.add x30, x5
+c.add x31, x5
 
-c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
-    c.mv
+c.mv x2, x1
+c.mv x2, x2
+c.mv x2, x3
+c.mv x2, x4
+c.mv x2, x5
+c.mv x2, x6
+c.mv x2, x7
+c.mv x2, x8
+c.mv x2, x9
+c.mv x2, x10
+c.mv x2, x11
+c.mv x2, x12
+c.mv x2, x13
+c.mv x2, x14
+c.mv x2, x15
+c.mv x2, x16
+c.mv x2, x17
+c.mv x2, x18
+c.mv x2, x19
+c.mv x2, x20
+c.mv x2, x21
+c.mv x2, x22
+c.mv x2, x23
+c.mv x2, x24
+c.mv x2, x25
+c.mv x2, x26
+c.mv x2, x27
+c.mv x2, x28
+c.mv x2, x29
+c.mv x2, x30
+c.mv x2, x31
+c.mv x1, x5
+c.mv x2, x5
+c.mv x3, x5
+c.mv x4, x5
+c.mv x5, x5
+c.mv x6, x5
+c.mv x7, x5
+c.mv x8, x5
+c.mv x9, x5
+c.mv x10, x5
+c.mv x11, x5
+c.mv x12, x5
+c.mv x13, x5
+c.mv x14, x5
+c.mv x15, x5
+c.mv x16, x5
+c.mv x17, x5
+c.mv x18, x5
+c.mv x19, x5
+c.mv x20, x5
+c.mv x21, x5
+c.mv x22, x5
+c.mv x23, x5
+c.mv x24, x5
+c.mv x25, x5
+c.mv x26, x5
+c.mv x27, x5
+c.mv x28, x5
+c.mv x29, x5
+c.mv x30, x5
+c.mv x31, x5
 
 la x5, cjr_rv_1
 mv x1, x5
