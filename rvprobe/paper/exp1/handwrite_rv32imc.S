@@ -197,60 +197,121 @@ _after_trap:
 # c_mv rd=SP:   c.mv x2, x5
     c.mv x2, x5
 
-# c.jr with various rs1 (covering missing regs)
-    la   x5, 4f
-    mv   x1, x5     # ra
-    mv   x3, x5     # gp
-    mv   x6, x5     # t1 (=x6? no, t0=x5, t1=x6)
+# c.jr with all missing rs1 registers
+.macro cjr_reg reg, label
+    la   x5, \label
+    mv   \reg, x5
+    c.jr \reg
+\label:
+.endm
+    cjr_reg x1,  cjr_ra
+    cjr_reg x3,  cjr_gp
+    cjr_reg x2,  cjr_sp
+    cjr_reg x4,  cjr_tp
+    cjr_reg x5,  cjr_t0
+    cjr_reg x7,  cjr_t2
+    cjr_reg x8,  cjr_s0
+    cjr_reg x9,  cjr_s1
+    cjr_reg x14, cjr_a4
+    cjr_reg x16, cjr_a6
+    cjr_reg x19, cjr_s3
+    cjr_reg x21, cjr_s5
+    cjr_reg x23, cjr_s7
+    cjr_reg x24, cjr_s8
+    cjr_reg x27, cjr_s11
+    cjr_reg x28, cjr_t3
+    cjr_reg x30, cjr_t5
+    cjr_reg x31, cjr_t6
 
-    # c.jr needs rs1 to be a valid code address
-    c.jr x1          # ra
-4:
-    la   x5, 5f
-    mv   x3, x5
-    c.jr x3          # gp
-5:
-    la   x5, 6f
-    mv   x2, x5
-    c.jr x2          # sp
-6:
-    la   x5, 7f
-    mv   x4, x5
-    c.jr x4          # tp
-7:
+# c.jalr with all missing rs1 registers
+.macro cjalr_reg reg, label
+    la   x5, \label
+    mv   \reg, x5
+    c.jalr \reg
+\label:
+.endm
+    cjalr_reg x2,  cjalr_sp
+    cjalr_reg x3,  cjalr_gp
+    cjalr_reg x12, cjalr_a2
+    cjalr_reg x13, cjalr_a3
+    cjalr_reg x16, cjalr_a6
+    cjalr_reg x18, cjalr_s2
+    cjalr_reg x20, cjalr_s4
+    cjalr_reg x21, cjalr_s5
+    cjalr_reg x23, cjalr_s7
+    cjalr_reg x26, cjalr_s10
+    cjalr_reg x30, cjalr_t5
 
-# c.jalr with various rs1
-    la   x5, 8f
-    mv   x3, x5
-    c.jalr x3        # gp
-8:
-    la   x5, 9f
-    mv   x2, x5
-    c.jalr x2        # sp
-9:
+# jalr with missing rd registers
+.macro jalr_rd rd_reg, label
+    la   x5, \label
+    jalr \rd_reg, x5, 0
+\label:
+.endm
+    jalr_rd x3,  jalr_gp
+    jalr_rd x5,  jalr_t0
+    jalr_rd x7,  jalr_t2
+    jalr_rd x8,  jalr_s0
+    jalr_rd x12, jalr_a2
+    jalr_rd x13, jalr_a3
+    jalr_rd x14, jalr_a4
+    jalr_rd x15, jalr_a5
+    jalr_rd x19, jalr_s3
+    jalr_rd x26, jalr_s10
+    jalr_rd x27, jalr_s11
+    jalr_rd x31, jalr_t6
+
+# jalr cross-coverage: specific rd×rs1 pairs
+    la   x6, jalr_cross1
+    jalr x1, x6, 0      # rd=ra, rs1=t1 → [ra][t1] cross
+jalr_cross1:
+    la   x1, jalr_cross2
+    jalr x6, x1, 0      # rd=t1, rs1=ra → [t1][ra] cross
+jalr_cross2:
 
 # c_slli hazard: RAW
     c.slli x5, 1
     add    x6, x5, x7  # RAW: rs1=x5 == prev c.slli rd=x5
 
-# c_lw hazard: RAW + WAR (c.lw/c.sw use x8-x15 for both rd/rs1/rs2)
-    mv     x8, x3       # x8 = scratch_buf (valid base for c.lw/c.sw)
+# c_lw hazard: RAW + WAR
+    mv     x8, x3       # x8 = scratch_buf (valid base)
     c.lw   x9, 0(x8)    # RAW setup: rd=x9
     add    x10, x9, x7  # RAW: rs1=x9 == prev c.lw rd=x9
+    # c_lw WAR: next instr writes to c.lw's base register
     c.lw   x10, 0(x8)
-    c.sw   x11, 0(x10)  # uses x10 as addr after c.lw wrote it
+    add    x8, x10, x0  # WAR: rd=x8 == prev c.lw rs1=x8
 
 # c_sw hazard: WAR + WAW
+    mv     x8, x3
     c.sw   x9, 0(x8)
-    c.lw   x8, 0(x8)    # WAR: c.lw rd=x8 overwrites c.sw's rs1=x8
+    add    x8, x9, x0   # WAR: rd=x8 overwrites c.sw's rs1=x8
+    mv     x8, x3
+    c.sw   x9, 0(x8)
+    c.sw   x10, 0(x8)   # WAW: same offset, same base
 
 # c_addi4spn hazard: WAR
-    c.addi4spn x8, x2, 4   # rd ∈ x8-x15
-    add    x2, x8, x0      # WAR
+    c.addi4spn x8, x2, 4
+    mv     x2, x8        # WAR: rd=x2(sp) == c.addi4spn implicit src
 
 # c_addi16sp hazard: WAR
     c.addi16sp x2, 16
-    add    x5, x2, x0      # uses x2 after c.addi16sp
+    mv     x5, x2        # WAR: uses x2 after c.addi16sp wrote it
+    c.addi16sp x2, -16   # restore SP
+
+# Additional rd=SP for sw and lw
+    mv     x4, x2
+    mv     x2, x3
+    sw     x6, 0(x2)     # sw rs1=SP
+    lw     x2, 0(x3)     # lw rd=SP
+    mv     x2, x4
+
+# Additional rd/rs2=ZERO
+    j      jal_zero       # jal rd=ZERO
+jal_zero:
+    csrrs  x0, mscratch, x5  # csrrs rd=ZERO
+    sb     x0, 20(x3)    # sb rs2=ZERO
+    sh     x0, 22(x3)    # sh rs2=ZERO
+    sw     x0, 24(x3)    # sw rs2=ZERO
 
 # ECALL
     ecall
