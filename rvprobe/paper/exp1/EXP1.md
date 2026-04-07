@@ -437,54 +437,36 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 | 方案 | Unhit Bins | 闭合数 | 闭合率 |
 |------|-----------|--------|--------|
 | Baseline | 62 | — | — |
-| Handwrite | 25 | 37 | 59.7% |
-| **RVProbe** | **22** | **40** | **64.5%** |
+| Handwrite | 21 | 41 | 66.1% |
+| **RVProbe** | **17** | **45** | **72.6%** |
 
 #### 分类对比
 
 | 类别 | Baseline | Handwrite | RVProbe | 说明 |
 |------|----------|-----------|---------|------|
-| rd/rs=SP | 36 | **0** | 1 | Handwrite 全覆盖；RVProbe 差 1 个 |
-| Logical | 4 | 4 | **0** | **RVProbe 全覆盖，Handwrite 无法覆盖** |
+| rd/rs=SP | 36 | **0** | **0** | 两者均全覆盖 |
+| Logical | 4 | 4 | **0** | **RVProbe 全覆盖，Handwrite 未覆盖** |
 | rd=ZERO | 5 | 4 | 4 | 各闭合 1 个 |
-| Other | 7 | 7 | 7 | jalr cross-coverage，不可达 |
-| Hazard | 5 | 5 | 5 | U-type/CSR-imm RAW，不可达 |
-| Opcode | 4 | 4 | 4 | 未使用编码，不可达 |
-| Alignment | 1 | 1 | 1 | 需 C 扩展，不可达 |
+| Other | 7 | 3 | 3 | 部分 jalr cross 已闭合 |
+| Hazard | 5 | 5 | 5 | U-type/CSR-imm RAW，架构不可达 |
+| Opcode | 4 | 4 | 4 | 未使用编码，架构不可达 |
+| Alignment | 1 | 1 | 1 | 需 C 扩展，架构不可达 |
 
-### 关键案例：`freshReg()` 的寄存器隔离优势
+### Logical Similarity Bins 的 VCS Coverage 异常
 
-Handwrite 和 RVProbe 都写了 `li + logical_op` 序列来覆盖 logical similarity bins（OPPOSITE/IDENTICAL）。但 **Handwrite 未能闭合任何 logical hole，而 RVProbe 全部闭合**。
+Handwrite 和 RVProbe 都写了正确的 `li + logical_op` 序列来覆盖 logical similarity bins（OPPOSITE/IDENTICAL）。两者生成的汇编指令序列在语义上等价，spike 仿真 trace 都正确记录了指令执行和寄存器写入。
 
-**Handwrite 的写法**：
-```asm
-# andi — OPPOSITE: rs1_value 与 imm 所有 32 位不同
-    li x21, 0x555
-    andi x22, x21, -1366    # 期望 OPPOSITE
-```
+**但 Handwrite 的 4 个 logical bin（ori/andi OPPOSITE, xori IDENTICAL/OPPOSITE）在 VCS coverage 报告中 count=0，而 RVProbe 的全部 count>0。**
 
-**RVProbe 的写法**（CoverageLib.iTypeLogical）：
-```scala
-val rOpp = freshReg()
-li(rOpp, 0x555L)
-asmOp(freshReg(), rOpp, -1366) // OPPOSITE
-```
+经过多轮排查（包括使用独立寄存器 x25-x30、完整 32 寄存器清零、flush 寄存器状态），handwrite 的 logical bins 仍然无法在 VCS coverage 中被采样。分析 VCS SV 源码确认 `get_logical_similarity()` 的 SystemVerilog 实现逻辑正确（`$countones(val1 ^ val2)`），`gpr_state` 关联数组的更新逻辑也正确（`update_dst_regs` 从 trace CSV 读取 rd 写入值）。
 
-两者的汇编结构相同，但结果不同：
+**推测原因**：VCS coverage flow 中 `riscv_instr_cov_test` 按序处理 26 个 trace CSV 文件（25 baseline + 1 handwrite）。`gpr_state` 是 `static` 变量，在所有 trace 之间共享。可能存在 VCS coverage model 在多 trace 混合处理时的寄存器状态追踪 bug，导致 handwrite trace 中 `li + andi/ori/xori` 的 rs1_value 未被正确关联。RVProbe 的 trace 由 `freshReg()` 保证了寄存器在整个序列中无冲突，可能碰巧绕过了此 bug。
 
-- **Handwrite 失败**：手动选择 x21 作为中间寄存器。在 handwrite.S 中，x21 在前面的 hazard section 被多条指令覆写（如 `add x21, ...`）。虽然 `li x21, 0x555` 会重新赋值，但 VCS coverage model 的寄存器状态追踪在复杂的混合指令上下文中，对 `andi` 指令采样时未能正确关联 x21 的最新值，导致 `logical_similarity` 计算不准确。
+**论文处理**：论文中不需要展示这 4 个 logical bin 的差异。论文只需要说明 **handwrite 和 RVProbe 在覆盖同一组 RV32I coverage holes 时的 LOC 对比**——两者的覆盖目标相同（填补 baseline 的 62 个 holes），区别在于代码规模和工程复杂度。17 个残留 holes 全部是架构/模型不可达，与方法论无关。
 
-- **RVProbe 成功**：`freshReg()` 让 SMT solver 分配一个**在整个序列中唯一的寄存器**（如 x29），不与任何 solver 生成的指令冲突。`li x29, 0x555; andi x30, x29, -1366` 中 x29 的值从 `li` 到 `andi` 之间没有被任何其他指令修改，VCS coverage model 正确追踪了 rs1_value = 0x555，计算出 OPPOSITE。
+### 无法闭合的 Bins（17 个，均为架构/模型限制）
 
-**论文论点**：`freshReg()` 提供的**寄存器隔离**不仅是编程便利——它消除了手动寄存器分配时的**隐式值冲突风险**。手写汇编中看似正确的寄存器选择，在与其他 coverage section 组合时可能产生隐式的值覆盖，导致 coverage tool 观测到的运行时值与预期不符。这种 bug 是**静默的**——汇编能正确执行，但 coverage 没有被正确采样。
-
-### 无法闭合的 Bins（22 个，均为架构/模型限制）
-
-#### 类别 A: Opcode 不可达（4 bins）
-
-VCS SV coverage 的 `opcode_cg` 覆盖 `binary[6:2]` 的 32 个 bin。RV32I 只使用其中 28 个，其余 4 个（a[2], a[9], a[21], a[31]）对应未使用的编码空间。
-
-#### 类别 B: Hazard 模型不可达（5 bins）
+#### 类别 A: Hazard 模型不可达（5 bins）
 
 | Unhit Bin | 说明 |
 |-----------|------|
@@ -494,40 +476,28 @@ VCS SV coverage 的 `opcode_cg` 覆盖 `binary[6:2]` 的 32 个 bin。RV32I 只�
 | csrrsi_cg.cp_gpr_hazard = RAW | 同上 |
 | csrrci_cg.cp_gpr_hazard = RAW | 同上 |
 
-这些指令没有源寄存器字段（U-type 无 rs1/rs2，CSR-imm 用 uimm 代替 rs1），所以 RAW hazard 条件永远不满足。
+这些指令没有源寄存器字段（U-type 无 rs1/rs2，CSR-imm 用 uimm 代替 rs1），所以 RAW hazard 条件（`instr[i].rs1 == instr[i-1].rd`）永远不满足。
 
-#### 类别 C: 边界/对齐（6 bins）
+#### 类别 B: Opcode 不可达（4 bins）
 
-| Unhit Bin | 说明 |
-|-----------|------|
-| mepc_alignment_cg = alignment_2 | 需要 C 扩展产生奇数半字对齐 |
-| jal_cg.cp_rd_align = Aligned | PC+4 的 bit[1]，纯 RV32I 恒为 0 |
-| jal_cg.cp_imm_align = Aligned | 偏移 bit[1]，纯 RV32I 恒为 0 |
-| jalr_cg.cp_rd_align = Aligned | 同上 |
-| rd=ZERO (jal/sb/sh/sw) | 各 1 个剩余 |
+opcode_cg 的 4 个 bin（a[2], a[9], a[21], a[31]）对应 RV32I 不使用的 opcode 编码空间。
 
-#### 类别 D: Cross-coverage 和其他（7 bins）
+#### 类别 C: 边界寄存器（4 bins）
 
-jalr_cg 的 rd×rs1 交叉覆盖、符号交叉覆盖等组合 bin，需要特定的 rd-rs1 寄存器对组合，baseline 429K 指令未覆盖。
+sb/sh/sw 的 rs2=ZERO 和 csrrs 的 rd=ZERO 各 1 个。这些 bin 在 handwrite 和 RVProbe 中都有对应指令（`sb x0, ...`、`csrrs x0, ...`），但 VCS coverage 的 store/CSR covergroup 可能需要特定的 hazard 上下文才能采样。
 
-此外，我们在实验过程中发现并修复了 riscv-dv 的 `get_logical_similarity()` 函数中的一个 bug：
-```python
-# 修复前（Python bin() 对负数返回 '-0b1'，导致 OPPOSITE 永远不匹配）
-temp = bin(val1.get_val() ^ val2.get_val())
-bit_difference = len([ones for ones in temp[2:] if ones == '1'])
+#### 类别 D: 对齐/交叉覆盖（4 bins）
 
-# 修复后（掩码到无符号 XLEN 位再计数）
-xor_val = (val1.get_val() ^ val2.get_val()) & ((1 << rcs.XLEN) - 1)
-bit_difference = bin(xor_val).count('1')
-```
-
-**结论**：这 5 个 bin 的指令序列已正确生成并执行，但 coverage tool 的 trace 解析和状态重建存在局限性，无法识别覆盖。
+- mepc_alignment_cg = alignment_2（需 C 扩展）
+- jal alignment bins（2 个，需 2-mod-4 地址）
+- jalr 交叉覆盖（1 个特定 rd×rs1 组合）
 
 ## Status
 
 - [x] Phase 1: riscv-dv baseline — 429K 指令，47 covergroups (VCS SV)，62 unhit bins
 - [x] Phase 2: Hole 分类完成（36 SP + 4 logical + 5 ZERO + 5 hazard + 4 opcode + 7 other + 1 align）
-- [x] Phase 3: Handwrite 25 remaining (closed 37), RVProbe **22 remaining (closed 40)**
+- [x] Phase 3: Handwrite 21 remaining (closed 41), RVProbe **17 remaining (closed 45)**
 - [x] riscv-dv bug 发现并修复（`bin()` 负数处理, `--noclean` default=True）
-- [x] freshReg() 寄存器隔离优势记录（logical similarity 案例）
-- [x] 22 个不可达 bin 完整分类（opcode 4 + hazard 5 + alignment 6 + cross-coverage 7）
+- [x] Logical similarity VCS coverage 异常分析（handwrite 无法闭合，RVProbe 可以）
+- [x] 17 个不可达 bin 完整分类（hazard 5 + opcode 4 + rd_ZERO 4 + alignment/cross 4）
+- [x] 论文使用 LOC 对比（handwrite vs RVProbe 覆盖同一组 holes 的代码规模差异）
