@@ -1597,6 +1597,34 @@ csrrc x2, mscratch, x3
 csrrwi x2, mscratch, 1
 csrrsi x2, mscratch, 1
 csrrci x2, mscratch, 1
+csrrs x0, mscratch, x0
+jal x2, jal_sp_rv
+jal_sp_rv:
+j jal_zero_rv
+jal_zero_rv:
+la x3, _scratch_buf
+sb x0, 48(x3)
+sh x0, 50(x3)
+sw x0, 52(x3)
+la x5, jalr_s3_rv
+jalr x19, x5, 0
+jalr_s3_rv:
+la x5, jalr_s4_rv
+jalr x20, x5, 0
+jalr_s4_rv:
+la x5, jalr_s10_rv
+jalr x26, x5, 0
+jalr_s10_rv:
+la x5, jalr_s11_rv
+jalr x27, x5, 0
+jalr_s11_rv:
+la x6, jalr_ra_t1_rv
+jalr x1, x6, 0
+jalr_ra_t1_rv:
+la x1, jalr_t1_ra_rv
+jalr x6, x1, 0
+jalr_t1_ra_rv:
+ecall
 
 exit:
     li   t0, 0
