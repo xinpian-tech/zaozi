@@ -159,13 +159,39 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = store(n, isSw())
 
-  // JALR disabled: jalr jumps to register values which are data addresses
-  // after the load/store preamble, causing execution of garbage → trap loop.
-  // JALR holes are covered by handwrite.S instead.
+  // Supplementary raw instructions for holes that solver generators can't safely cover:
+  //   - JALR/CSR/CSR-imm rd=SP (control flow / privilege issues)
+  //   - Load/Store rs1=SP (need SP temporarily set to valid address)
+  object SpHolePatch extends RVGenerator:
+    val sets          = isRV64GC() :+ isRVZICSR()
+    def constraints() =
+      // Load rs1=SP: temporarily set SP to scratch_buf
+      raw("mv x1, x2")              // save SP in ra
+      raw("la x2, _scratch_buf")    // SP = valid address
+      raw("lb  x3, 0(x2)")
+      raw("lbu x3, 1(x2)")
+      raw("lh  x3, 2(x2)")
+      raw("lhu x3, 4(x2)")
+      raw("lw  x3, 8(x2)")
+      // Store rs1=SP
+      raw("sb x3, 16(x2)")
+      raw("sh x3, 18(x2)")
+      raw("mv x2, x1")              // restore SP
 
-  // CSR disabled: csrrw/csrrs/csrrc to ustatus in M-mode may cause
-  // illegal instruction exceptions on rv32i without U-mode support.
-  // CSR holes are covered by handwrite.S instead.
+      // JALR rd=SP
+      raw("la x3, 1f")
+      raw("jalr x2, x3, 0")
+      raw("1:")
+
+      // CSR rd=SP (use mscratch, safe in M-mode)
+      raw("csrrw x2, mscratch, x3")
+      raw("csrrs x2, mscratch, x3")
+      raw("csrrc x2, mscratch, x3")
+
+      // CSR-imm rd=SP
+      raw("csrrwi x2, mscratch, 1")
+      raw("csrrsi x2, mscratch, 1")
+      raw("csrrci x2, mscratch, 1")
 
   // CSR-immediate (csrrwi/csrrsi/csrrci) disabled:
   // RVProbe asm renderer doesn't emit the uimm operand correctly for CSR-imm format.
@@ -209,4 +235,6 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     Sb,
     Sh,
     Sw,
+    // Supplementary raw instructions for SP/JALR/CSR holes
+    SpHolePatch
   )

@@ -1,6 +1,18 @@
     .section ".text"
     .globl _start
 _start:
+    # Set up trap handler to skip faulting instructions
+    la   t0, _skip_trap_handler
+    csrw mtvec, t0
+    j    _after_trap_handler
+    .balign 4
+_skip_trap_handler:
+    csrr t0, mepc
+    addi t0, t0, 4
+    csrw mepc, t0
+    mret
+_after_trap_handler:
+
 
 slli x16, x9, 0
     slli x4, x17, 0
