@@ -1046,187 +1046,373 @@ xori x30, x30, 2047
     li x6, 0x0
     xori x3, x6, 255
 
-lb x16, 2047(x19)
-    lb x28, 2047(x8)
-    lb x18, 2047(x18)
-    lb x20, 2047(x19)
-    lb x24, 2047(x3)
-    lb x24, 2047(x4)
-    lb x20, 2047(x11)
-    lb x21, 2047(x21)
-    lb x31, 2047(x29)
-    lb x24, 2047(x1)
-    lb x23, 2047(x25)
-    lb x6, 2047(x7)
-    lb x2, 2047(x17)
-    lb x26, 2047(x22)
-    lb x12, 2047(x27)
-    lb x22, 2047(x14)
-    lb x30, 2047(x16)
-    lb x15, 2047(x10)
-    lb x15, 2047(x2)
-    lb x29, 2047(x24)
-    lb x1, 2047(x19)
-    lb x14, 2047(x9)
-    lb x25, 2047(x30)
-    lb x5, 2047(x23)
-    lb x8, 2047(x6)
-    lb x10, 2047(x5)
-    lb x3, 2047(x13)
-    lb x9, 2047(x20)
-    lb x4, 2047(x26)
-    lb x13, 2047(x15)
-    lb x19, 2047(x31)
-    lb x7, 1(x12)
-    lb x11, -2048(x28)
-    lb x27, -1(x19)
-    lb x17, 0(x27)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    lb x26, 0(x4)
+    lb x1, 0(x25)
+    lb x4, 0(x10)
+    lb x13, 0(x31)
+    lb x10, 0(x29)
+    lb x28, 0(x7)
+    lb x2, 0(x20)
+    lb x1, 0(x18)
+    lb x18, 0(x5)
+    lb x7, 0(x19)
+    lb x29, 0(x13)
+    lb x25, 0(x22)
+    lb x27, 0(x15)
+    lb x21, 0(x27)
+    lb x22, 0(x26)
+    lb x14, 0(x24)
+    lb x9, 0(x12)
+    lb x16, 0(x27)
+    lb x24, 0(x21)
+    lb x11, 0(x1)
+    lb x12, 0(x16)
+    lb x1, 0(x17)
+    lb x17, 0(x8)
+    lb x31, 0(x30)
+    lb x5, 0(x23)
+    lb x1, 0(x24)
+    lb x23, 0(x6)
+    lb x15, 0(x24)
+    lb x20, 0(x11)
+    lb x8, 0(x24)
+    lb x19, 0(x28)
+    lb x11, 0(x9)
+    lb x3, 0(x3)
+    lb x6, 0(x14)
+    lb x30, 0(x2)
 
-lbu x16, 2047(x19)
-    lbu x28, 2047(x8)
-    lbu x18, 2047(x18)
-    lbu x20, 2047(x19)
-    lbu x24, 2047(x3)
-    lbu x24, 2047(x4)
-    lbu x20, 2047(x11)
-    lbu x21, 2047(x21)
-    lbu x31, 2047(x29)
-    lbu x24, 2047(x1)
-    lbu x23, 2047(x25)
-    lbu x6, 2047(x7)
-    lbu x2, 2047(x17)
-    lbu x26, 2047(x22)
-    lbu x12, 2047(x27)
-    lbu x22, 2047(x14)
-    lbu x30, 2047(x16)
-    lbu x15, 2047(x10)
-    lbu x15, 2047(x2)
-    lbu x29, 2047(x24)
-    lbu x1, 2047(x19)
-    lbu x14, 2047(x9)
-    lbu x25, 2047(x30)
-    lbu x5, 2047(x23)
-    lbu x8, 2047(x6)
-    lbu x10, 2047(x5)
-    lbu x3, 2047(x13)
-    lbu x9, 2047(x20)
-    lbu x4, 2047(x26)
-    lbu x13, 2047(x15)
-    lbu x19, 2047(x31)
-    lbu x7, 1(x12)
-    lbu x11, -2048(x28)
-    lbu x27, -1(x19)
-    lbu x17, 0(x27)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    lbu x26, 0(x4)
+    lbu x1, 0(x25)
+    lbu x4, 0(x10)
+    lbu x13, 0(x31)
+    lbu x10, 0(x29)
+    lbu x28, 0(x7)
+    lbu x2, 0(x20)
+    lbu x1, 0(x18)
+    lbu x18, 0(x5)
+    lbu x7, 0(x19)
+    lbu x29, 0(x13)
+    lbu x25, 0(x22)
+    lbu x27, 0(x15)
+    lbu x21, 0(x27)
+    lbu x22, 0(x26)
+    lbu x14, 0(x24)
+    lbu x9, 0(x12)
+    lbu x16, 0(x27)
+    lbu x24, 0(x21)
+    lbu x11, 0(x1)
+    lbu x12, 0(x16)
+    lbu x1, 0(x17)
+    lbu x17, 0(x8)
+    lbu x31, 0(x30)
+    lbu x5, 0(x23)
+    lbu x1, 0(x24)
+    lbu x23, 0(x6)
+    lbu x15, 0(x24)
+    lbu x20, 0(x11)
+    lbu x8, 0(x24)
+    lbu x19, 0(x28)
+    lbu x11, 0(x9)
+    lbu x3, 0(x3)
+    lbu x6, 0(x14)
+    lbu x30, 0(x2)
 
-lh x16, 2047(x19)
-    lh x28, 2047(x8)
-    lh x18, 2047(x18)
-    lh x20, 2047(x19)
-    lh x24, 2047(x3)
-    lh x24, 2047(x4)
-    lh x20, 2047(x11)
-    lh x21, 2047(x21)
-    lh x31, 2047(x29)
-    lh x24, 2047(x1)
-    lh x23, 2047(x25)
-    lh x6, 2047(x7)
-    lh x2, 2047(x17)
-    lh x26, 2047(x22)
-    lh x12, 2047(x27)
-    lh x22, 2047(x14)
-    lh x30, 2047(x16)
-    lh x15, 2047(x10)
-    lh x15, 2047(x2)
-    lh x29, 2047(x24)
-    lh x1, 2047(x19)
-    lh x14, 2047(x9)
-    lh x25, 2047(x30)
-    lh x5, 2047(x23)
-    lh x8, 2047(x6)
-    lh x10, 2047(x5)
-    lh x3, 2047(x13)
-    lh x9, 2047(x20)
-    lh x4, 2047(x26)
-    lh x13, 2047(x15)
-    lh x19, 2047(x31)
-    lh x7, 1(x12)
-    lh x11, -2048(x28)
-    lh x27, -1(x19)
-    lh x17, 0(x27)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    lh x26, 0(x4)
+    lh x1, 0(x25)
+    lh x4, 0(x10)
+    lh x13, 0(x31)
+    lh x10, 0(x29)
+    lh x28, 0(x7)
+    lh x2, 0(x20)
+    lh x1, 0(x18)
+    lh x18, 0(x5)
+    lh x7, 0(x19)
+    lh x29, 0(x13)
+    lh x25, 0(x22)
+    lh x27, 0(x15)
+    lh x21, 0(x27)
+    lh x22, 0(x26)
+    lh x14, 0(x24)
+    lh x9, 0(x12)
+    lh x16, 0(x27)
+    lh x24, 0(x21)
+    lh x11, 0(x1)
+    lh x12, 0(x16)
+    lh x1, 0(x17)
+    lh x17, 0(x8)
+    lh x31, 0(x30)
+    lh x5, 0(x23)
+    lh x1, 0(x24)
+    lh x23, 0(x6)
+    lh x15, 0(x24)
+    lh x20, 0(x11)
+    lh x8, 0(x24)
+    lh x19, 0(x28)
+    lh x11, 0(x9)
+    lh x3, 0(x3)
+    lh x6, 0(x14)
+    lh x30, 0(x2)
 
-lhu x16, 2047(x19)
-    lhu x28, 2047(x8)
-    lhu x18, 2047(x18)
-    lhu x20, 2047(x19)
-    lhu x24, 2047(x3)
-    lhu x24, 2047(x4)
-    lhu x20, 2047(x11)
-    lhu x21, 2047(x21)
-    lhu x31, 2047(x29)
-    lhu x24, 2047(x1)
-    lhu x23, 2047(x25)
-    lhu x6, 2047(x7)
-    lhu x2, 2047(x17)
-    lhu x26, 2047(x22)
-    lhu x12, 2047(x27)
-    lhu x22, 2047(x14)
-    lhu x30, 2047(x16)
-    lhu x15, 2047(x10)
-    lhu x15, 2047(x2)
-    lhu x29, 2047(x24)
-    lhu x1, 2047(x19)
-    lhu x14, 2047(x9)
-    lhu x25, 2047(x30)
-    lhu x5, 2047(x23)
-    lhu x8, 2047(x6)
-    lhu x10, 2047(x5)
-    lhu x3, 2047(x13)
-    lhu x9, 2047(x20)
-    lhu x4, 2047(x26)
-    lhu x13, 2047(x15)
-    lhu x19, 2047(x31)
-    lhu x7, 1(x12)
-    lhu x11, -2048(x28)
-    lhu x27, -1(x19)
-    lhu x17, 0(x27)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    lhu x26, 0(x4)
+    lhu x1, 0(x25)
+    lhu x4, 0(x10)
+    lhu x13, 0(x31)
+    lhu x10, 0(x29)
+    lhu x28, 0(x7)
+    lhu x2, 0(x20)
+    lhu x1, 0(x18)
+    lhu x18, 0(x5)
+    lhu x7, 0(x19)
+    lhu x29, 0(x13)
+    lhu x25, 0(x22)
+    lhu x27, 0(x15)
+    lhu x21, 0(x27)
+    lhu x22, 0(x26)
+    lhu x14, 0(x24)
+    lhu x9, 0(x12)
+    lhu x16, 0(x27)
+    lhu x24, 0(x21)
+    lhu x11, 0(x1)
+    lhu x12, 0(x16)
+    lhu x1, 0(x17)
+    lhu x17, 0(x8)
+    lhu x31, 0(x30)
+    lhu x5, 0(x23)
+    lhu x1, 0(x24)
+    lhu x23, 0(x6)
+    lhu x15, 0(x24)
+    lhu x20, 0(x11)
+    lhu x8, 0(x24)
+    lhu x19, 0(x28)
+    lhu x11, 0(x9)
+    lhu x3, 0(x3)
+    lhu x6, 0(x14)
+    lhu x30, 0(x2)
 
-lw x16, 2047(x19)
-    lw x28, 2047(x8)
-    lw x18, 2047(x18)
-    lw x20, 2047(x19)
-    lw x24, 2047(x3)
-    lw x24, 2047(x4)
-    lw x20, 2047(x11)
-    lw x21, 2047(x21)
-    lw x31, 2047(x29)
-    lw x24, 2047(x1)
-    lw x23, 2047(x25)
-    lw x6, 2047(x7)
-    lw x2, 2047(x17)
-    lw x26, 2047(x22)
-    lw x12, 2047(x27)
-    lw x22, 2047(x14)
-    lw x30, 2047(x16)
-    lw x15, 2047(x10)
-    lw x15, 2047(x2)
-    lw x29, 2047(x24)
-    lw x1, 2047(x19)
-    lw x14, 2047(x9)
-    lw x25, 2047(x30)
-    lw x5, 2047(x23)
-    lw x8, 2047(x6)
-    lw x10, 2047(x5)
-    lw x3, 2047(x13)
-    lw x9, 2047(x20)
-    lw x4, 2047(x26)
-    lw x13, 2047(x15)
-    lw x19, 2047(x31)
-    lw x7, 1(x12)
-    lw x11, -2048(x28)
-    lw x27, -1(x19)
-    lw x17, 0(x27)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    lw x26, 0(x4)
+    lw x1, 0(x25)
+    lw x4, 0(x10)
+    lw x13, 0(x31)
+    lw x10, 0(x29)
+    lw x28, 0(x7)
+    lw x2, 0(x20)
+    lw x1, 0(x18)
+    lw x18, 0(x5)
+    lw x7, 0(x19)
+    lw x29, 0(x13)
+    lw x25, 0(x22)
+    lw x27, 0(x15)
+    lw x21, 0(x27)
+    lw x22, 0(x26)
+    lw x14, 0(x24)
+    lw x9, 0(x12)
+    lw x16, 0(x27)
+    lw x24, 0(x21)
+    lw x11, 0(x1)
+    lw x12, 0(x16)
+    lw x1, 0(x17)
+    lw x17, 0(x8)
+    lw x31, 0(x30)
+    lw x5, 0(x23)
+    lw x1, 0(x24)
+    lw x23, 0(x6)
+    lw x15, 0(x24)
+    lw x20, 0(x11)
+    lw x8, 0(x24)
+    lw x19, 0(x28)
+    lw x11, 0(x9)
+    lw x3, 0(x3)
+    lw x6, 0(x14)
+    lw x30, 0(x2)
 
-sb x16, 0(x26)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    sb x16, 0(x26)
     sb x9, 0(x21)
     sb x0, 0(x7)
     sb x4, 0(x9)
@@ -1262,7 +1448,38 @@ sb x16, 0(x26)
     sb x30, 0(x1)
     sb x31, 0(x1)
 
-sh x16, 0(x26)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    sh x16, 0(x26)
     sh x9, 0(x21)
     sh x0, 0(x7)
     sh x4, 0(x9)
@@ -1298,7 +1515,38 @@ sh x16, 0(x26)
     sh x30, 0(x1)
     sh x31, 0(x1)
 
-sw x16, 0(x26)
+la x1, _scratch_buf
+mv x2, x1
+mv x3, x1
+mv x4, x1
+mv x5, x1
+mv x6, x1
+mv x7, x1
+mv x8, x1
+mv x9, x1
+mv x10, x1
+mv x11, x1
+mv x12, x1
+mv x13, x1
+mv x14, x1
+mv x15, x1
+mv x16, x1
+mv x17, x1
+mv x18, x1
+mv x19, x1
+mv x20, x1
+mv x21, x1
+mv x22, x1
+mv x23, x1
+mv x24, x1
+mv x25, x1
+mv x26, x1
+mv x27, x1
+mv x28, x1
+mv x29, x1
+mv x30, x1
+mv x31, x1
+    sw x16, 0(x26)
     sw x9, 0(x21)
     sw x0, 0(x7)
     sw x4, 0(x9)
@@ -1497,3 +1745,10 @@ tohost:
     .globl fromhost
 fromhost:
     .dword 0
+
+    .data
+    .balign 16
+    .globl _scratch_buf
+_scratch_buf:
+    .fill 256, 1, 0
+
