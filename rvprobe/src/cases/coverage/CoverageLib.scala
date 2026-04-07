@@ -337,10 +337,90 @@ object CoverageLib:
   ): Unit =
     (0 until n).foreach { i =>
       instruction(i, opcode) {
-        rs1Range(1, 32) & rs2Range(1, 32)
+        rs1Range(1, 32) & rs2Range(0, 32) // rs2 includes x0 (ZERO) for store-zero coverage
       }
     }
     val seq = sequence(0, n)
     seq.coverBins(_.rs1, allRegs)
-    seq.coverBins(_.rs2, allRegs)
+    seq.coverBins(_.rs2, (0 until 32).map(_.S)) // include x0
+    seq.coverNoHazard()
+
+  /** JALR instruction coverage: rd + rs1 register bins + hazards.
+    *
+    * JALR is I-type but used for jumps. rd=x0 means discard return address,
+    * rd=x2 (SP) is a key coverage target.
+    */
+  def jalr(
+    n:      Int,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    (0 until n).foreach { i =>
+      instruction(i, opcode) {
+        rdRange(0, 32) & rs1Range(1, 32) // rd includes x0 for j-type pseudo-instructions
+      }
+    }
+    val seq = sequence(0, n)
+    seq.coverBins(_.rd, (0 until 32).map(_.S)) // include x0
+    seq.coverBins(_.rs1, allRegs)
+    seq.coverRAW()
+    seq.coverWAR()
+    seq.coverWAW()
+    seq.coverNoHazard()
+
+  /** CSR instruction coverage: rd + rs1 register bins + hazards.
+    *
+    * CSR instructions (csrrw, csrrs, csrrc) have rd and rs1 fields.
+    * rd=x0 means read-only, rd=SP is a key coverage target.
+    */
+  def csr(
+    n:      Int,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    (0 until n).foreach { i =>
+      instruction(i, opcode) {
+        rdRange(0, 32) & rs1Range(1, 32)
+      }
+    }
+    val seq = sequence(0, n)
+    seq.coverBins(_.rd, (0 until 32).map(_.S)) // include x0
+    seq.coverBins(_.rs1, allRegs)
+    seq.coverRAW()
+    seq.coverWAR()
+    seq.coverWAW()
+    seq.coverNoHazard()
+
+  /** CSR-immediate instruction coverage: rd register bins + hazards.
+    *
+    * CSR-immediate instructions (csrrwi, csrrsi, csrrci) have rd field only.
+    * rd=SP is a key coverage target.
+    */
+  def csrImm(
+    n:      Int,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
+    (0 until n).foreach { i =>
+      instruction(i, opcode) {
+        rdRange(0, 32)
+      }
+    }
+    val seq = sequence(0, n)
+    seq.coverBins(_.rd, (0 until 32).map(_.S))
+    seq.coverRAW()
+    seq.coverWAR()
+    seq.coverWAW()
     seq.coverNoHazard()

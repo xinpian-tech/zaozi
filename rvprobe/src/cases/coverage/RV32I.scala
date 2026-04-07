@@ -125,6 +125,70 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = branch(n, isBne())
 
+  // --- Load ---
+  object Lb extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = load(n, isLb())
+
+  object Lbu extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = load(n, isLbu())
+
+  object Lh extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = load(n, isLh())
+
+  object Lhu extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = load(n, isLhu())
+
+  object Lw extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = load(n, isLw())
+
+  // --- Store ---
+  object Sb extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = store(n, isSb())
+
+  object Sh extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = store(n, isSh())
+
+  object Sw extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = store(n, isSw())
+
+  // --- JALR ---
+  object Jalr extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = jalr(n, isJalr())
+
+  // --- CSR ---
+  object Csrrw extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = csr(n, isCsrrw())
+
+  object Csrrs extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = csr(n, isCsrrs())
+
+  object Csrrc extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = csr(n, isCsrrc())
+
+  object Csrrwi extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = csrImm(n, isCsrrwi())
+
+  object Csrrsi extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = csrImm(n, isCsrrsi())
+
+  object Csrrci extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = csrImm(n, isCsrrci())
+
   writeCoverageAsm(
     outputPath,
     Slli,
@@ -153,5 +217,23 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     Srl,
     Sub,
     Xor,
-    Xori
+    Xori,
+    // Load/Store
+    Lb,
+    Lbu,
+    Lh,
+    Lhu,
+    Lw,
+    Sb,
+    Sh,
+    Sw,
+    // JALR
+    Jalr,
+    // CSR
+    Csrrw,
+    Csrrs,
+    Csrrc,
+    Csrrwi,
+    Csrrsi,
+    Csrrci
   )
