@@ -246,10 +246,19 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
       raw("sw x3, 20(x2)")
       raw("mv x2, x1")
 
-      // JALR rd=SP + various rd
-      raw("la x3, jalr_sp_rv")
-      raw("jalr x2, x3, 0")
-      raw("jalr_sp_rv:")
+      // JALR rd coverage: enumerate all 32 rd registers
+      (0 to 31).foreach { r =>
+        raw(s"la x5, jalr_rd${r}_rv")
+        raw(s"jalr x$r, x5, 0")
+        raw(s"jalr_rd${r}_rv:")
+      }
+      // JALR cross: rd=ra,rs1=t1 and rd=t1,rs1=ra
+      raw("la x6, jalr_ra_t1_rv2")
+      raw("jalr x1, x6, 0")
+      raw("jalr_ra_t1_rv2:")
+      raw("la x1, jalr_t1_ra_rv2")
+      raw("jalr x6, x1, 0")
+      raw("jalr_t1_ra_rv2:")
 
       // CSR rd=SP
       raw("csrrw x2, mscratch, x3")
