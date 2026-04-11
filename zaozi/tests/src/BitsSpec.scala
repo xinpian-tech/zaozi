@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
-import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
+import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, ContextApi}
 
 import java.lang.foreign.Arena
 import utest.*
@@ -234,6 +234,68 @@ object BitsSpec extends TestSuite:
           io.widenBits.dontCare()
           io.widenBits := io.a ## io.b
       Cat.verilogTest(BitsSpecParameter(8))(
+        "assign widenBits = {a, b};"
+      )
+
+    test("Mixed Ref and Node Bool operators"):
+      @generator
+      object MixedRefAndNodeBool
+          extends Generator[BitsSpecParameter, BitsSpecLayers, BitsSpecIO, BitsSpecProbe]
+          with HasVerilogTest:
+        def andGeneric[R <: Referable[Bool]](
+          ref:  R,
+          node: Node[Bool]
+        )(
+          using And[Bool, Bool, R, Referable[Bool]],
+          Arena,
+          Context,
+          Block,
+          sourcecode.File,
+          sourcecode.Line,
+          sourcecode.Name.Machine,
+          InstanceContext
+        ): Node[Bool] =
+          ref & node
+
+        def architecture(parameter: BitsSpecParameter) =
+          val io = summon[Interface[BitsSpecIO]]
+          io.sint.dontCare()
+          io.uint.dontCare()
+          io.bool := andGeneric(io.d, Node(io.d))
+          io.bits.dontCare()
+          io.widenBits.dontCare()
+      MixedRefAndNodeBool.verilogTest(BitsSpecParameter(8))(
+        "assign bool = d;"
+      )
+
+    test("Mixed Referable Bits operators"):
+      @generator
+      object MixedReferableBits
+          extends Generator[BitsSpecParameter, BitsSpecLayers, BitsSpecIO, BitsSpecProbe]
+          with HasVerilogTest:
+        def catGeneric[R <: Referable[Bits]](
+          ref:  R,
+          node: Node[Bits]
+        )(
+          using Cat[Bits, R, Referable[Bits]],
+          Arena,
+          Context,
+          Block,
+          sourcecode.File,
+          sourcecode.Line,
+          sourcecode.Name.Machine,
+          InstanceContext
+        ): Node[Bits] =
+          ref ## node
+
+        def architecture(parameter: BitsSpecParameter) =
+          val io = summon[Interface[BitsSpecIO]]
+          io.sint.dontCare()
+          io.uint.dontCare()
+          io.bool.dontCare()
+          io.bits.dontCare()
+          io.widenBits := catGeneric(io.a, Node(io.b))
+      MixedReferableBits.verilogTest(BitsSpecParameter(8))(
         "assign widenBits = {a, b};"
       )
 

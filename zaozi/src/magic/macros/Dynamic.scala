@@ -201,7 +201,8 @@ def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
         case idx +: Nil      =>
           Select
             .unique(
-              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_BitsApi_R")).appliedToType(rType),
+              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_BitsApi_LHS_RHS"))
+                .appliedToTypes(List(rType, rType)),
               // apply() is just the syntax sugar of bit/bits...
               "bit"
             )
@@ -211,7 +212,8 @@ def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
         case hi +: lo +: Nil =>
           Select
             .unique(
-              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_BitsApi_R")).appliedToType(rType),
+              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_BitsApi_LHS_RHS"))
+                .appliedToTypes(List(rType, rType)),
               "bits"
             )
             .appliedTo(fieldValueTerm)

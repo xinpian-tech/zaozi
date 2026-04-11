@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
-import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
+import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, ContextApi}
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
 import utest.*
 
@@ -56,6 +56,51 @@ object UIntSpec extends TestSuite:
           io.bits.dontCare()
       Plus.verilogTest(UIntSpecParameter(8))(
         "assign uint = {1'h0, a} + {1'h0, b};"
+      )
+
+    test("Mixed Referable UInt operators"):
+      @generator
+      object MixedReferableUInt
+          extends Generator[UIntSpecParameter, UIntSpecLayers, UIntSpecIO, UIntSpecProbe]
+          with HasVerilogTest:
+        def addGeneric[R <: Referable[UInt]](
+          ref:  R,
+          node: Node[UInt]
+        )(
+          using Add[UInt, UInt, R, Referable[UInt]],
+          Arena,
+          Context,
+          Block,
+          sourcecode.File,
+          sourcecode.Line,
+          sourcecode.Name.Machine,
+          InstanceContext
+        ): Node[UInt] =
+          ref + node
+
+        def eqGeneric[R <: Referable[UInt]](
+          ref:   R,
+          const: Const[UInt]
+        )(
+          using Eq[UInt, Bool, R, Referable[UInt]],
+          Arena,
+          Context,
+          Block,
+          sourcecode.File,
+          sourcecode.Line,
+          sourcecode.Name.Machine,
+          InstanceContext
+        ): Node[Bool] =
+          ref === const
+
+        def architecture(parameter: UIntSpecParameter) =
+          val io = summon[Interface[UIntSpecIO]]
+          io.uint := addGeneric(io.a, Node(io.b))
+          io.bool := eqGeneric(Node(io.a), 0.U(parameter.width))
+          io.bits.dontCare()
+      MixedReferableUInt.verilogTest(UIntSpecParameter(8))(
+        "assign uint = {1'h0, a} + {1'h0, b};",
+        "assign bool = a == 8'h0;"
       )
 
     test("-"):

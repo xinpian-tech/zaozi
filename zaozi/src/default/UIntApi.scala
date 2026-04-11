@@ -30,8 +30,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [R <: Referable[UInt]]: UIntApi[R] with
-  extension (ref: R)
+given [LHS <: Referable[UInt], RHS <: Referable[UInt]]: UIntApi[LHS, RHS] with
+  extension (ref: LHS)
     def asBits(
       using Arena,
       Context,
@@ -40,7 +40,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, Bits] =
+    ): Propagated[LHS, Bits] =
       val nodeOp = summon[NodeApi].op(
         name = valName,
         location = locate,
@@ -50,10 +50,10 @@ given [R <: Referable[UInt]]: UIntApi[R] with
       nodeOp.operation.appendToBlock()
       val tpe    = new Bits:
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-      propagate[R, Bits](ref, tpe, nodeOp.operation)
+      propagate[LHS, Bits](ref, tpe, nodeOp.operation)
 
     def +(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -77,7 +77,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
     def -(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -101,7 +101,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
     def *(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -125,7 +125,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
     def /(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -149,7 +149,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
     def %(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -173,7 +173,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
     def <(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -196,7 +196,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
     def <=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -220,7 +220,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def >(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -244,7 +244,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def >=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -268,7 +268,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def ===(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -292,7 +292,7 @@ given [R <: Referable[UInt]]: UIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def =/=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,

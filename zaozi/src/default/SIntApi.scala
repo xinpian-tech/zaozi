@@ -31,8 +31,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [R <: Referable[SInt]]: SIntApi[R] with
-  extension (ref: R)
+given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
+  extension (ref: LHS)
     def asBits(
       using Arena,
       Context,
@@ -41,7 +41,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, Bits] =
+    ): Propagated[LHS, Bits] =
       val op0    = summon[AsUIntPrimApi].op(ref.refer, locate)
       op0.operation.appendToBlock()
       val nodeOp = summon[NodeApi].op(
@@ -53,10 +53,10 @@ given [R <: Referable[SInt]]: SIntApi[R] with
       nodeOp.operation.appendToBlock()
       val tpe    = new Bits:
         private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
-      propagate[R, Bits](ref, tpe, nodeOp.operation)
+      propagate[LHS, Bits](ref, tpe, nodeOp.operation)
 
     def +(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -81,7 +81,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def -(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -106,7 +106,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def *(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -131,7 +131,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def /(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -156,7 +156,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def %(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -181,7 +181,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def <(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -205,7 +205,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def <=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -229,7 +229,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def >(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -253,7 +253,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def >=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -277,7 +277,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def ===(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -301,7 +301,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def =/=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,

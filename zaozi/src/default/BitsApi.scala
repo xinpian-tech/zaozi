@@ -39,8 +39,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [R <: Referable[Bits]]: BitsApi[R] with
-  extension (ref: R)
+given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
+  extension (ref: LHS)
     def asSInt(
       using Arena,
       Context,
@@ -49,7 +49,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, SInt] =
+    ): Propagated[LHS, SInt] =
       val op0    = summon[AsSIntPrimApi].op(ref.refer, locate)
       op0.operation.appendToBlock()
       val nodeOp = summon[NodeApi].op(
@@ -61,7 +61,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       nodeOp.operation.appendToBlock()
       val tpe    = new SInt:
         private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
-      propagate[R, SInt](ref, tpe, nodeOp.operation)
+      propagate[LHS, SInt](ref, tpe, nodeOp.operation)
     def asUInt(
       using Arena,
       Context,
@@ -70,7 +70,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, UInt] =
+    ): Propagated[LHS, UInt] =
       val nodeOp = summon[NodeApi].op(
         name = valName,
         location = locate,
@@ -80,7 +80,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       nodeOp.operation.appendToBlock()
       val tpe    = new UInt:
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-      propagate[R, UInt](ref, tpe, nodeOp.operation)
+      propagate[LHS, UInt](ref, tpe, nodeOp.operation)
     def asBool(
       using Arena,
       Context,
@@ -89,7 +89,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, Bool] =
+    ): Propagated[LHS, Bool] =
       val nodeOp = summon[NodeApi].op(
         name = valName,
         location = locate,
@@ -102,7 +102,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         s"Cannot convert ${summon[sourcecode.Name.Machine]}: Bits(${width}) to Bool"
       )
       nodeOp.operation.appendToBlock()
-      propagate[R, Bool](ref, new Object with Bool, nodeOp.operation)
+      propagate[LHS, Bool](ref, new Object with Bool, nodeOp.operation)
     def asBundle[T <: Bundle](
       tpe: T
     )(
@@ -113,14 +113,14 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, T] =
+    ): Propagated[LHS, T] =
       val bitcastOp = summon[BitCastApi].op(
         input = ref.refer,
         tpe = tpe.toMlirType,
         location = locate
       )
       bitcastOp.operation.appendToBlock()
-      propagate[R, T](ref, tpe, bitcastOp.operation)
+      propagate[LHS, T](ref, tpe, bitcastOp.operation)
     def asRecord[T <: Record](
       tpe: T
     )(
@@ -131,14 +131,14 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, T] =
+    ): Propagated[LHS, T] =
       val bitcastOp = summon[BitCastApi].op(
         input = ref.refer,
         tpe = tpe.toMlirType,
         location = locate
       )
       bitcastOp.operation.appendToBlock()
-      propagate[R, T](ref, tpe, bitcastOp.operation)
+      propagate[LHS, T](ref, tpe, bitcastOp.operation)
     def asVec[E <: Data](
       tpe: E
     )(
@@ -149,7 +149,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Propagated[R, Vec[E]] =
+    ): Propagated[LHS, Vec[E]] =
       val srcWidth  = ref.refer.getType.getBitWidth(true).toInt
       val dstWidth  = tpe.toMlirType.getBitWidth(true).toInt
       require(
@@ -164,7 +164,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         location = locate
       )
       bitcastOp.operation.appendToBlock()
-      propagate[R, Vec[E]](ref, Vec[E](count, tpe), bitcastOp.operation)
+      propagate[LHS, Vec[E]](ref, Vec[E](count, tpe), bitcastOp.operation)
     def unary_~(
       using Arena,
       Context,
@@ -255,7 +255,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def ===(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -278,7 +278,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
     def =/=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -301,7 +301,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
     def &(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -325,7 +325,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
     def |(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -350,7 +350,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def ^(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -375,7 +375,7 @@ given [R <: Referable[Bits]]: BitsApi[R] with
         val _operation: Operation = nodeOp.operation
 
     def ##(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,

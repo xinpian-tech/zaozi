@@ -564,10 +564,10 @@ trait XorR[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Add[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Add[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def +(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -577,10 +577,10 @@ trait Add[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Sub[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Sub[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def -(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -590,10 +590,10 @@ trait Sub[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Mul[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Mul[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def *(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -603,10 +603,10 @@ trait Mul[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Div[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Div[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def /(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -616,10 +616,10 @@ trait Div[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Rem[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Rem[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def %(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -629,10 +629,10 @@ trait Rem[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Lt[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Lt[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def <(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -642,10 +642,10 @@ trait Lt[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Leq[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Leq[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def <=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -655,10 +655,10 @@ trait Leq[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Gt[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Gt[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def >(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -668,10 +668,10 @@ trait Gt[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Geq[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Geq[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def >=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -681,10 +681,10 @@ trait Geq[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Eq[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Eq[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def ===(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -694,10 +694,10 @@ trait Eq[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Neq[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Neq[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def =/=(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -707,10 +707,10 @@ trait Neq[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait And[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait And[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def &(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -720,10 +720,10 @@ trait And[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Or[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Or[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def |(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -733,10 +733,10 @@ trait Or[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Xor[D <: Data, RET <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Xor[D <: Data, RET <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def ^(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -746,10 +746,10 @@ trait Xor[D <: Data, RET <: Data, R <: Referable[D]]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
-trait Cat[D <: Data, R <: Referable[D]]:
-  extension (ref: R)
+trait Cat[D <: Data, LHS <: Referable[D], RHS <: Referable[D]]:
+  extension (ref: LHS)
     def ##(
-      that: R
+      that: RHS
     )(
       using Arena,
       Context,
@@ -886,69 +886,69 @@ trait GetLength[E <: Data, V <: Vec[E], R <: Referable[V]]:
       Context
     ): Int
 
-trait BitsApi[R <: Referable[Bits]]
-    extends AsSInt[Bits, R]
-    with AsUInt[Bits, R]
-    with AsBool[Bits, R]
-    with AsBundle[Bits, R]
-    with AsRecord[Bits, R]
-    with AsVec[Bits, R]
-    with Not[Bits, Bits, R]
-    with AndR[Bits, Bool, R]
-    with OrR[Bits, Bool, R]
-    with XorR[Bits, Bool, R]
-    with Eq[Bits, Bool, R]
-    with Neq[Bits, Bool, R]
-    with And[Bits, Bits, R]
-    with Or[Bits, Bits, R]
-    with Xor[Bits, Bits, R]
-    with Cat[Bits, R]
-    with Shl[Bits, Int | Referable[UInt], Bits, R]
-    with Shr[Bits, Int | Referable[UInt], Bits, R]
-    with Head[Bits, Int, Bits, R]
-    with Tail[Bits, Int, Bits, R]
-    with Pad[Bits, Int, Bits, R]
-    with ExtractElement[Bits, Bool, R, Int]
-    with ExtractRange[Bits, Bits, R, Int]
+trait BitsApi[LHS <: Referable[Bits], RHS <: Referable[Bits]]
+    extends AsSInt[Bits, LHS]
+    with AsUInt[Bits, LHS]
+    with AsBool[Bits, LHS]
+    with AsBundle[Bits, LHS]
+    with AsRecord[Bits, LHS]
+    with AsVec[Bits, LHS]
+    with Not[Bits, Bits, LHS]
+    with AndR[Bits, Bool, LHS]
+    with OrR[Bits, Bool, LHS]
+    with XorR[Bits, Bool, LHS]
+    with Eq[Bits, Bool, LHS, RHS]
+    with Neq[Bits, Bool, LHS, RHS]
+    with And[Bits, Bits, LHS, RHS]
+    with Or[Bits, Bits, LHS, RHS]
+    with Xor[Bits, Bits, LHS, RHS]
+    with Cat[Bits, LHS, RHS]
+    with Shl[Bits, Int | Referable[UInt], Bits, LHS]
+    with Shr[Bits, Int | Referable[UInt], Bits, LHS]
+    with Head[Bits, Int, Bits, LHS]
+    with Tail[Bits, Int, Bits, LHS]
+    with Pad[Bits, Int, Bits, LHS]
+    with ExtractElement[Bits, Bool, LHS, Int]
+    with ExtractRange[Bits, Bits, LHS, Int]
 
-trait BoolApi[R <: Referable[Bool]]
-    extends AsBits[Bool, R]
-    with Neg[Bool, Bool, R]
-    with Eq[Bool, Bool, R]
-    with Neq[Bool, Bool, R]
-    with And[Bool, Bool, R]
-    with Or[Bool, Bool, R]
-    with Xor[Bool, Bool, R]
-    with Mux[Bool, R]
-trait UIntApi[R <: Referable[UInt]]
-    extends AsBits[UInt, R]
-    with Add[UInt, UInt, R]
-    with Sub[UInt, UInt, R]
-    with Mul[UInt, UInt, R]
-    with Div[UInt, UInt, R]
-    with Rem[UInt, UInt, R]
-    with Lt[UInt, Bool, R]
-    with Leq[UInt, Bool, R]
-    with Gt[UInt, Bool, R]
-    with Geq[UInt, Bool, R]
-    with Eq[UInt, Bool, R]
-    with Neq[UInt, Bool, R]
-    with Shl[UInt, Int | Referable[UInt], UInt, R]
-    with Shr[UInt, Int | Referable[UInt], UInt, R]
-trait SIntApi[R <: Referable[SInt]]
-    extends AsBits[SInt, R]
-    with Add[SInt, SInt, R]
-    with Sub[SInt, SInt, R]
-    with Mul[SInt, SInt, R]
-    with Div[SInt, SInt, R]
-    with Rem[SInt, SInt, R]
-    with Lt[SInt, Bool, R]
-    with Leq[SInt, Bool, R]
-    with Gt[SInt, Bool, R]
-    with Geq[SInt, Bool, R]
-    with Neq[SInt, Bool, R]
-    with Shl[SInt, Int | Referable[UInt], SInt, R]
-    with Shr[SInt, Int | Referable[UInt], SInt, R]
+trait BoolApi[LHS <: Referable[Bool], RHS <: Referable[Bool]]
+    extends AsBits[Bool, LHS]
+    with Neg[Bool, Bool, LHS]
+    with Eq[Bool, Bool, LHS, RHS]
+    with Neq[Bool, Bool, LHS, RHS]
+    with And[Bool, Bool, LHS, RHS]
+    with Or[Bool, Bool, LHS, RHS]
+    with Xor[Bool, Bool, LHS, RHS]
+    with Mux[Bool, LHS]
+trait UIntApi[LHS <: Referable[UInt], RHS <: Referable[UInt]]
+    extends AsBits[UInt, LHS]
+    with Add[UInt, UInt, LHS, RHS]
+    with Sub[UInt, UInt, LHS, RHS]
+    with Mul[UInt, UInt, LHS, RHS]
+    with Div[UInt, UInt, LHS, RHS]
+    with Rem[UInt, UInt, LHS, RHS]
+    with Lt[UInt, Bool, LHS, RHS]
+    with Leq[UInt, Bool, LHS, RHS]
+    with Gt[UInt, Bool, LHS, RHS]
+    with Geq[UInt, Bool, LHS, RHS]
+    with Eq[UInt, Bool, LHS, RHS]
+    with Neq[UInt, Bool, LHS, RHS]
+    with Shl[UInt, Int | Referable[UInt], UInt, LHS]
+    with Shr[UInt, Int | Referable[UInt], UInt, LHS]
+trait SIntApi[LHS <: Referable[SInt], RHS <: Referable[SInt]]
+    extends AsBits[SInt, LHS]
+    with Add[SInt, SInt, LHS, RHS]
+    with Sub[SInt, SInt, LHS, RHS]
+    with Mul[SInt, SInt, LHS, RHS]
+    with Div[SInt, SInt, LHS, RHS]
+    with Rem[SInt, SInt, LHS, RHS]
+    with Lt[SInt, Bool, LHS, RHS]
+    with Leq[SInt, Bool, LHS, RHS]
+    with Gt[SInt, Bool, LHS, RHS]
+    with Geq[SInt, Bool, LHS, RHS]
+    with Neq[SInt, Bool, LHS, RHS]
+    with Shl[SInt, Int | Referable[UInt], SInt, LHS]
+    with Shr[SInt, Int | Referable[UInt], SInt, LHS]
 
 trait BundleApi[T <: Bundle | ProbeBundle, R <: Referable[T]] extends AsBits[T, R]
 

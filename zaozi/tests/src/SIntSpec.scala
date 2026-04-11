@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
-import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
+import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, ContextApi}
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
 import utest.*
 
@@ -56,6 +56,51 @@ object SIntSpec extends TestSuite:
           io.bits.dontCare()
       Plus.verilogTest(SIntSpecParameter(8))(
         "assign sint = {a[7], a} + {b[7], b};"
+      )
+
+    test("Mixed Referable SInt operators"):
+      @generator
+      object MixedReferableSInt
+          extends Generator[SIntSpecParameter, SIntSpecLayers, SIntSpecIO, SIntSpecProbe]
+          with HasVerilogTest:
+        def subGeneric[R <: Referable[SInt]](
+          ref:  R,
+          node: Node[SInt]
+        )(
+          using Sub[SInt, SInt, R, Referable[SInt]],
+          Arena,
+          Context,
+          Block,
+          sourcecode.File,
+          sourcecode.Line,
+          sourcecode.Name.Machine,
+          InstanceContext
+        ): Node[SInt] =
+          ref - node
+
+        def geqGeneric[R <: Referable[SInt]](
+          ref:   R,
+          const: Const[SInt]
+        )(
+          using Geq[SInt, Bool, R, Referable[SInt]],
+          Arena,
+          Context,
+          Block,
+          sourcecode.File,
+          sourcecode.Line,
+          sourcecode.Name.Machine,
+          InstanceContext
+        ): Node[Bool] =
+          ref >= const
+
+        def architecture(parameter: SIntSpecParameter) =
+          val io = summon[Interface[SIntSpecIO]]
+          io.sint := subGeneric(io.a, Node(io.b))
+          io.bool := geqGeneric(Node(io.a), 0.S(parameter.width))
+          io.bits.dontCare()
+      MixedReferableSInt.verilogTest(SIntSpecParameter(8))(
+        "assign sint = {a[7], a} - {b[7], b};",
+        "assign bool = $signed(a) > -8'sh1;"
       )
 
     test("-"):
