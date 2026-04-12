@@ -159,79 +159,12 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = store(n, isSw())
 
-  // Supplementary raw instructions for holes that solver generators can't safely cover:
-  //   - JALR/CSR/CSR-imm rd=SP (control flow / privilege issues)
-  //   - Load/Store rs1=SP (need SP temporarily set to valid address)
-  object SpHolePatch extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() =
-      // Load rs1=SP: temporarily set SP to scratch_buf
-      raw("mv x1, x2")              // save SP in ra
-      raw("la x2, _scratch_buf")    // SP = valid address
-      raw("lb  x3, 0(x2)")
-      raw("lbu x3, 1(x2)")
-      raw("lh  x3, 2(x2)")
-      raw("lhu x3, 4(x2)")
-      raw("lw  x3, 8(x2)")
-      // Store rs1=SP
-      raw("sb x3, 16(x2)")
-      raw("sh x3, 18(x2)")
-      raw("mv x2, x1")              // restore SP
-
-      // JALR rd=SP
-      raw("la x3, 1f")
-      raw("jalr x2, x3, 0")
-      raw("1:")
-
-      // CSR rd=SP (use mscratch, safe in M-mode)
-      raw("csrrw x2, mscratch, x3")
-      raw("csrrs x2, mscratch, x3")
-      raw("csrrc x2, mscratch, x3")
-
-      // CSR-imm rd=SP
-      raw("csrrwi x2, mscratch, 1")
-      raw("csrrsi x2, mscratch, 1")
-      raw("csrrci x2, mscratch, 1")
-
-      // csrrs rd=ZERO
-      raw("csrrs x0, mscratch, x0")
-
-      // JAL rd=SP + rd=ZERO
-      raw("jal x2, jal_sp_rv")
-      raw("jal_sp_rv:")
-      raw("j jal_zero_rv")
-      raw("jal_zero_rv:")
-
-      // Store rs2=ZERO
-      raw("la x3, _scratch_buf")
-      raw("sb x0, 48(x3)")
-      raw("sh x0, 50(x3)")
-      raw("sw x0, 52(x3)")
-
-      // JALR rd=S3/S4/S10/S11 (missing rd regs)
-      raw("la x5, jalr_s3_rv")
-      raw("jalr x19, x5, 0")
-      raw("jalr_s3_rv:")
-      raw("la x5, jalr_s4_rv")
-      raw("jalr x20, x5, 0")
-      raw("jalr_s4_rv:")
-      raw("la x5, jalr_s10_rv")
-      raw("jalr x26, x5, 0")
-      raw("jalr_s10_rv:")
-      raw("la x5, jalr_s11_rv")
-      raw("jalr x27, x5, 0")
-      raw("jalr_s11_rv:")
-
-      // JALR cross: rd=ra,rs1=t1 and rd=t1,rs1=ra
-      raw("la x6, jalr_ra_t1_rv")
-      raw("jalr x1, x6, 0")
-      raw("jalr_ra_t1_rv:")
-      raw("la x1, jalr_t1_ra_rv")
-      raw("jalr x6, x1, 0")
-      raw("jalr_t1_ra_rv:")
-
-      // ECALL
-      raw("ecall")
+  // NOTE: No SpHolePatch (raw() handwrite-in-disguise).
+  // RVProbe's value is in solver-driven generators above.
+  // Holes requiring manual asm (JALR/CSR/ECALL/store-ZERO) are
+  // covered by handwrite.S. The LOC comparison should be:
+  //   RVProbe solver-driven LOC vs handwrite total LOC
+  //   for the SAME coverage target (rd/rs register bins + hazard + logical).
 
   writeCoverageAsm(
     outputPath,
@@ -270,7 +203,5 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     Lw,
     Sb,
     Sh,
-    Sw,
-    // Supplementary raw instructions for SP/JALR/CSR holes
-    SpHolePatch
+    Sw
   )
