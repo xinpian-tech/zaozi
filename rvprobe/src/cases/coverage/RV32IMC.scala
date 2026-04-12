@@ -228,66 +228,9 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
         raw(s"cjalr_rv_$r:")
       }
 
-  // Supplementary raw instructions for SP/ZERO/CSR holes
-  object SpHolePatch extends RVGenerator:
-    val sets          = isRV64GC() :+ isRVZICSR()
-    def constraints() =
-      // Load rs1=SP
-      raw("mv x1, x2")
-      raw("la x2, _scratch_buf")
-      raw("lb  x3, 0(x2)")
-      raw("lbu x3, 1(x2)")
-      raw("lh  x3, 2(x2)")
-      raw("lhu x3, 4(x2)")
-      raw("lw  x3, 8(x2)")
-      // Store rs1=SP
-      raw("sb x3, 16(x2)")
-      raw("sh x3, 18(x2)")
-      raw("sw x3, 20(x2)")
-      raw("mv x2, x1")
-
-      // JALR rd coverage: enumerate all 32 rd registers
-      (0 to 31).foreach { r =>
-        raw(s"la x5, jalr_rd${r}_rv")
-        raw(s"jalr x$r, x5, 0")
-        raw(s"jalr_rd${r}_rv:")
-      }
-      // JALR cross: rd=ra,rs1=t1 and rd=t1,rs1=ra
-      raw("la x6, jalr_ra_t1_rv2")
-      raw("jalr x1, x6, 0")
-      raw("jalr_ra_t1_rv2:")
-      raw("la x1, jalr_t1_ra_rv2")
-      raw("jalr x6, x1, 0")
-      raw("jalr_t1_ra_rv2:")
-
-      // CSR rd=SP
-      raw("csrrw x2, mscratch, x3")
-      raw("csrrs x2, mscratch, x3")
-      raw("csrrc x2, mscratch, x3")
-      raw("csrrwi x2, mscratch, 1")
-      raw("csrrsi x2, mscratch, 1")
-      raw("csrrci x2, mscratch, 1")
-      raw("csrrs x0, mscratch, x3")  // rd=ZERO
-
-      // jal rd=ZERO + rd=SP
-      raw("j 1f")
-      raw("1:")
-      raw("jal x2, 2f")
-      raw("2:")
-
-      // Store rs2=ZERO
-      raw("la x3, _scratch_buf")
-      raw("sb x0, 32(x3)")
-      raw("sh x0, 34(x3)")
-      raw("sw x0, 36(x3)")
-
-      // ECALL with trap handler
-      raw("ecall")
-
-      // rem DIV_OVERFLOW
-      raw("li x5, 0x80000000")
-      raw("li x6, -1")
-      raw("rem x7, x5, x6")
+  // NOTE: No SpHolePatch. RVProbe's value is solver-driven generators.
+  // Holes requiring manual asm (JALR/CSR/ECALL/store-ZERO/rem-overflow)
+  // are covered by handwrite only. Compare LOC, not hole counts.
 
   writeCoverageAsm(
     outputPath,
@@ -300,7 +243,5 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     // M extension
     Mul, Mulh, Mulhu, Mulhsu, Div, Divu, Rem, Remu,
     // C extension
-    CAdd, CMv, CJr, CJalr,
-    // SP/ZERO/CSR patches
-    SpHolePatch
+    CAdd, CMv, CJr, CJalr
   )
