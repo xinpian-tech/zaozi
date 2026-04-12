@@ -2007,9 +2007,108 @@ sb x3, 16(x2)
 sh x3, 18(x2)
 sw x3, 20(x2)
 mv x2, x1
-la x3, jalr_sp_rv
-jalr x2, x3, 0
-jalr_sp_rv:
+la x5, jalr_rd0_rv
+jalr x0, x5, 0
+jalr_rd0_rv:
+la x5, jalr_rd1_rv
+jalr x1, x5, 0
+jalr_rd1_rv:
+la x5, jalr_rd2_rv
+jalr x2, x5, 0
+jalr_rd2_rv:
+la x5, jalr_rd3_rv
+jalr x3, x5, 0
+jalr_rd3_rv:
+la x5, jalr_rd4_rv
+jalr x4, x5, 0
+jalr_rd4_rv:
+la x5, jalr_rd5_rv
+jalr x5, x5, 0
+jalr_rd5_rv:
+la x5, jalr_rd6_rv
+jalr x6, x5, 0
+jalr_rd6_rv:
+la x5, jalr_rd7_rv
+jalr x7, x5, 0
+jalr_rd7_rv:
+la x5, jalr_rd8_rv
+jalr x8, x5, 0
+jalr_rd8_rv:
+la x5, jalr_rd9_rv
+jalr x9, x5, 0
+jalr_rd9_rv:
+la x5, jalr_rd10_rv
+jalr x10, x5, 0
+jalr_rd10_rv:
+la x5, jalr_rd11_rv
+jalr x11, x5, 0
+jalr_rd11_rv:
+la x5, jalr_rd12_rv
+jalr x12, x5, 0
+jalr_rd12_rv:
+la x5, jalr_rd13_rv
+jalr x13, x5, 0
+jalr_rd13_rv:
+la x5, jalr_rd14_rv
+jalr x14, x5, 0
+jalr_rd14_rv:
+la x5, jalr_rd15_rv
+jalr x15, x5, 0
+jalr_rd15_rv:
+la x5, jalr_rd16_rv
+jalr x16, x5, 0
+jalr_rd16_rv:
+la x5, jalr_rd17_rv
+jalr x17, x5, 0
+jalr_rd17_rv:
+la x5, jalr_rd18_rv
+jalr x18, x5, 0
+jalr_rd18_rv:
+la x5, jalr_rd19_rv
+jalr x19, x5, 0
+jalr_rd19_rv:
+la x5, jalr_rd20_rv
+jalr x20, x5, 0
+jalr_rd20_rv:
+la x5, jalr_rd21_rv
+jalr x21, x5, 0
+jalr_rd21_rv:
+la x5, jalr_rd22_rv
+jalr x22, x5, 0
+jalr_rd22_rv:
+la x5, jalr_rd23_rv
+jalr x23, x5, 0
+jalr_rd23_rv:
+la x5, jalr_rd24_rv
+jalr x24, x5, 0
+jalr_rd24_rv:
+la x5, jalr_rd25_rv
+jalr x25, x5, 0
+jalr_rd25_rv:
+la x5, jalr_rd26_rv
+jalr x26, x5, 0
+jalr_rd26_rv:
+la x5, jalr_rd27_rv
+jalr x27, x5, 0
+jalr_rd27_rv:
+la x5, jalr_rd28_rv
+jalr x28, x5, 0
+jalr_rd28_rv:
+la x5, jalr_rd29_rv
+jalr x29, x5, 0
+jalr_rd29_rv:
+la x5, jalr_rd30_rv
+jalr x30, x5, 0
+jalr_rd30_rv:
+la x5, jalr_rd31_rv
+jalr x31, x5, 0
+jalr_rd31_rv:
+la x6, jalr_ra_t1_rv2
+jalr x1, x6, 0
+jalr_ra_t1_rv2:
+la x1, jalr_t1_ra_rv2
+jalr x6, x1, 0
+jalr_t1_ra_rv2:
 csrrw x2, mscratch, x3
 csrrs x2, mscratch, x3
 csrrc x2, mscratch, x3
