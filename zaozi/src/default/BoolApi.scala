@@ -22,8 +22,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [LHS <: Referable[Bool], RHS <: Referable[Bool]]: BoolApi[LHS, RHS] with
-  extension (ref: LHS)
+given BoolApi with
+  extension [LHS <: Referable[Bool]](ref: LHS)
     def unary_!(
       using Arena,
       Context,
@@ -66,7 +66,7 @@ given [LHS <: Referable[Bool], RHS <: Referable[Bool]]: BoolApi[LHS, RHS] with
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
       propagate[LHS, Bits](ref, tpe, nodeOp.operation)
 
-    def ===(
+    def ===[RHS <: Referable[Bool]](
       that: RHS
     )(
       using Arena,
@@ -90,7 +90,7 @@ given [LHS <: Referable[Bool], RHS <: Referable[Bool]]: BoolApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def =/=(
+    def =/=[RHS <: Referable[Bool]](
       that: RHS
     )(
       using Arena,
@@ -114,7 +114,7 @@ given [LHS <: Referable[Bool], RHS <: Referable[Bool]]: BoolApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def &(
+    def &[RHS <: Referable[Bool]](
       that: RHS
     )(
       using Arena,
@@ -138,7 +138,7 @@ given [LHS <: Referable[Bool], RHS <: Referable[Bool]]: BoolApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def |(
+    def |[RHS <: Referable[Bool]](
       that: RHS
     )(
       using Arena,
@@ -162,7 +162,7 @@ given [LHS <: Referable[Bool], RHS <: Referable[Bool]]: BoolApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def ^(
+    def ^[RHS <: Referable[Bool]](
       that: RHS
     )(
       using Arena,

@@ -12,8 +12,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [E <: Data, V <: Vec[E], R <: Referable[V]]: VecApi[E, V, R] with
-  extension (ref: R)
+given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
+  extension [R <: Referable[V]](ref: R)
     def asBits(
       using Arena,
       Context,

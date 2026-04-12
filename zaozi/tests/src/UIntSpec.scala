@@ -67,7 +67,7 @@ object UIntSpec extends TestSuite:
           ref:  R,
           node: Node[UInt]
         )(
-          using Add[UInt, UInt, R, Referable[UInt]],
+          using Add[UInt, UInt],
           Arena,
           Context,
           Block,
@@ -82,7 +82,7 @@ object UIntSpec extends TestSuite:
           ref:   R,
           const: Const[UInt]
         )(
-          using Eq[UInt, Bool, R, Referable[UInt]],
+          using Eq[UInt, Bool],
           Arena,
           Context,
           Block,

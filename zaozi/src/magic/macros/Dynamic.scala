@@ -165,6 +165,17 @@ private def getTypeParameters(
 
   (rType, vTypeOpt, eTypeOpt)
 
+private def summonTypeclassTerm(
+  using q:  Quotes
+)(typeRepr: q.reflect.TypeRepr
+): q.reflect.Term =
+  import q.reflect.*
+
+  Implicits.search(typeRepr) match
+    case success: ImplicitSearchSuccess => success.tree
+    case failure: ImplicitSearchFailure =>
+      report.errorAndAbort(s"Cannot summon ${typeRepr.show}: ${failure.explanation}")
+
 def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
   using Quotes
 )(ref:       Expr[me.jiuyang.zaozi.reftpe.Referable[T]],
@@ -184,38 +195,30 @@ def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
   // If we have more than one apply() method, we can dispatch them here based on the args type.
   val applyCallTerm = getTypeParameters(fieldValueExpr) match
     case (rType, Some(vType), Some(eType)) =>
+      val vecApiTerm = summonTypeclassTerm(TypeRepr.of[me.jiuyang.zaozi.VecApi].appliedTo(List(eType, vType)))
       args match
         case idx +: Nil =>
           Select
-            .unique(
-              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_VecApi_E_V_R"))
-                .appliedToTypes(List(eType, vType, rType)),
-              "ref"
-            )
+            .unique(vecApiTerm, "ref")
+            .appliedToTypes(List(rType))
             .appliedTo(fieldValueTerm)
             .appliedTo(idx)
             .appliedToArgs(contextualArgs)
         case _          => report.errorAndAbort(s"Expected 1 args, but got ${args.length}")
     case (rType, None, None)               =>
+      val bitsApiTerm = summonTypeclassTerm(TypeRepr.of[me.jiuyang.zaozi.BitsApi])
       args match
         case idx +: Nil      =>
           Select
-            .unique(
-              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_BitsApi_LHS_RHS"))
-                .appliedToTypes(List(rType, rType)),
-              // apply() is just the syntax sugar of bit/bits...
-              "bit"
-            )
+            .unique(bitsApiTerm, "bit")
+            .appliedToTypes(List(rType))
             .appliedTo(fieldValueTerm)
             .appliedTo(idx)
             .appliedToArgs(contextualArgs)
         case hi +: lo +: Nil =>
           Select
-            .unique(
-              Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_BitsApi_LHS_RHS"))
-                .appliedToTypes(List(rType, rType)),
-              "bits"
-            )
+            .unique(bitsApiTerm, "bits")
+            .appliedToTypes(List(rType))
             .appliedTo(fieldValueTerm)
             .appliedToArgs(List(hi, lo))
             .appliedToArgs(contextualArgs)

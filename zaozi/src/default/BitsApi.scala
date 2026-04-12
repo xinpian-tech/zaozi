@@ -39,8 +39,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
-  extension (ref: LHS)
+given BitsApi with
+  extension [LHS <: Referable[Bits]](ref: LHS)
     def asSInt(
       using Arena,
       Context,
@@ -254,7 +254,7 @@ given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def ===(
+    def ===[RHS <: Referable[Bits]](
       that: RHS
     )(
       using Arena,
@@ -277,7 +277,7 @@ given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
       new Node[Bool]:
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
-    def =/=(
+    def =/=[RHS <: Referable[Bits]](
       that: RHS
     )(
       using Arena,
@@ -300,7 +300,7 @@ given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
       new Node[Bool]:
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
-    def &(
+    def &[RHS <: Referable[Bits]](
       that: RHS
     )(
       using Arena,
@@ -324,7 +324,7 @@ given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
         val _tpe:       Bits      = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
-    def |(
+    def |[RHS <: Referable[Bits]](
       that: RHS
     )(
       using Arena,
@@ -349,7 +349,7 @@ given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def ^(
+    def ^[RHS <: Referable[Bits]](
       that: RHS
     )(
       using Arena,
@@ -374,7 +374,7 @@ given [LHS <: Referable[Bits], RHS <: Referable[Bits]]: BitsApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def ##(
+    def ##[RHS <: Referable[Bits]](
       that: RHS
     )(
       using Arena,

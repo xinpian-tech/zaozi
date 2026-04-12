@@ -31,8 +31,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
-given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
-  extension (ref: LHS)
+given SIntApi with
+  extension [LHS <: Referable[SInt]](ref: LHS)
     def asBits(
       using Arena,
       Context,
@@ -55,7 +55,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
         private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
       propagate[LHS, Bits](ref, tpe, nodeOp.operation)
 
-    def +(
+    def +[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -80,7 +80,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def -(
+    def -[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -105,7 +105,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def *(
+    def *[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -130,7 +130,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def /(
+    def /[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -155,7 +155,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def %(
+    def %[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -180,7 +180,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _operation: Operation = nodeOp.operation
 
-    def <(
+    def <[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -204,7 +204,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def <=(
+    def <=[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -228,7 +228,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def >(
+    def >[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -252,7 +252,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def >=(
+    def >=[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -276,7 +276,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def ===(
+    def ===[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,
@@ -300,7 +300,7 @@ given [LHS <: Referable[SInt], RHS <: Referable[SInt]]: SIntApi[LHS, RHS] with
         val _tpe:       Bool      = new Object with Bool
         val _operation: Operation = nodeOp.operation
 
-    def =/=(
+    def =/=[RHS <: Referable[SInt]](
       that: RHS
     )(
       using Arena,

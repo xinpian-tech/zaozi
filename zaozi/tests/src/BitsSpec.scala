@@ -246,7 +246,7 @@ object BitsSpec extends TestSuite:
           ref:  R,
           node: Node[Bool]
         )(
-          using And[Bool, Bool, R, Referable[Bool]],
+          using And[Bool, Bool],
           Arena,
           Context,
           Block,
@@ -277,7 +277,7 @@ object BitsSpec extends TestSuite:
           ref:  R,
           node: Node[Bits]
         )(
-          using Cat[Bits, R, Referable[Bits]],
+          using Cat[Bits],
           Arena,
           Context,
           Block,

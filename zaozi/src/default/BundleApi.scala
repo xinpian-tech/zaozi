@@ -14,8 +14,8 @@ import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
 import java.lang.foreign.Arena
 
-given [T <: Bundle | ProbeBundle, R <: Referable[T]]: BundleApi[T, R] with
-  extension (ref: R)
+given [T <: Bundle | ProbeBundle]: BundleApi[T] with
+  extension [R <: Referable[T]](ref: R)
     def asBits(
       using Arena,
       Context,

@@ -67,7 +67,7 @@ object SIntSpec extends TestSuite:
           ref:  R,
           node: Node[SInt]
         )(
-          using Sub[SInt, SInt, R, Referable[SInt]],
+          using Sub[SInt, SInt],
           Arena,
           Context,
           Block,
@@ -82,7 +82,7 @@ object SIntSpec extends TestSuite:
           ref:   R,
           const: Const[SInt]
         )(
-          using Geq[SInt, Bool, R, Referable[SInt]],
+          using Geq[SInt, Bool],
           Arena,
           Context,
           Block,

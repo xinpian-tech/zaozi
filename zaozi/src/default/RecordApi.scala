@@ -14,8 +14,8 @@ import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
 import java.lang.foreign.Arena
 
-given [T <: Record | ProbeRecord, R <: Referable[T]]: RecordApi[T, R] with
-  extension (ref: R)
+given [T <: Record | ProbeRecord]: RecordApi[T] with
+  extension [R <: Referable[T]](ref: R)
     def asBits(
       using Arena,
       Context,

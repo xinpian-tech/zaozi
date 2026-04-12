@@ -22,7 +22,7 @@ given VecUtilsApi with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext,
-      VecApi[E, V, R]
+      VecApi[E, V]
     ): IndexedSeq[Ref[E]] =
       new IndexedSeq[Ref[E]]:
         def length:          Int    = ref.length

@@ -23,13 +23,13 @@ given TypeUtilsApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Propagated[R, Bits] = (ref.getType match
-      case _: Bool   => summon[AsBits[Bool, Referable[Bool]]].asBits(ref.asInstanceOf[Referable[Bool]])
-      case _: Bundle => summon[AsBits[Bundle, Referable[Bundle]]].asBits(ref.asInstanceOf[Referable[Bundle]])
-      case _: Record => summon[AsBits[Record, Referable[Record]]].asBits(ref.asInstanceOf[Referable[Record]])
-      case _: SInt   => summon[AsBits[SInt, Referable[SInt]]].asBits(ref.asInstanceOf[Referable[SInt]])
-      case _: UInt   => summon[AsBits[UInt, Referable[UInt]]].asBits(ref.asInstanceOf[Referable[UInt]])
+      case _: Bool   => summon[AsBits[Bool]].asBits(ref.asInstanceOf[Referable[Bool]])
+      case _: Bundle => summon[AsBits[Bundle]].asBits(ref.asInstanceOf[Referable[Bundle]])
+      case _: Record => summon[AsBits[Record]].asBits(ref.asInstanceOf[Referable[Record]])
+      case _: SInt   => summon[AsBits[SInt]].asBits(ref.asInstanceOf[Referable[SInt]])
+      case _: UInt   => summon[AsBits[UInt]].asBits(ref.asInstanceOf[Referable[UInt]])
       case _: Vec[?] =>
-        summon[AsBits[Vec[Bool], Referable[Vec[Bool]]]].asBits(
+        summon[AsBits[Vec[Bool]]].asBits(
           // we don't care about the type parameter of Vec here
           ref.asInstanceOf[Referable[Vec[Bool]]]
         )

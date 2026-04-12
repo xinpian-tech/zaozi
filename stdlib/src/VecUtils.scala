@@ -22,7 +22,7 @@ trait VecUtilsApi:
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext,
-      VecApi[E, V, R]
+      VecApi[E, V]
     ): IndexedSeq[Ref[E]]
 
   extension [E <: Data](seq: Seq[Referable[E]])
