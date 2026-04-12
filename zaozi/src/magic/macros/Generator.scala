@@ -201,7 +201,14 @@ class generator extends MacroAnnotation:
               case '[tParam] =>
                 Some(
                   Select
-                    .unique(Ref(Symbol.requiredModule("me.jiuyang.zaozi.default.given_GeneratorApi")), "mainImpl")
+                    .unique(
+                      Expr
+                        .summon[me.jiuyang.zaozi.GeneratorApi]
+                        .getOrElse:
+                          report.errorAndAbort("No given instance of me.jiuyang.zaozi.GeneratorApi was found")
+                        .asTerm,
+                      "mainImpl"
+                    )
                     .appliedToTypeTrees(List(tptParam, tptL, tptI, tptP))
                     .appliedTo(This(objSym))
                     .appliedTo(argss.head.head.asExpr.asTerm)
