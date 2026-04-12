@@ -1578,54 +1578,6 @@ mv x31, x3
     sw x30, 0(x30)
     sw x31, 0(x11)
 
-mv x1, x2
-la x2, _scratch_buf
-lb  x3, 0(x2)
-lbu x3, 1(x2)
-lh  x3, 2(x2)
-lhu x3, 4(x2)
-lw  x3, 8(x2)
-sb x3, 16(x2)
-sh x3, 18(x2)
-mv x2, x1
-la x3, 1f
-jalr x2, x3, 0
-1:
-csrrw x2, mscratch, x3
-csrrs x2, mscratch, x3
-csrrc x2, mscratch, x3
-csrrwi x2, mscratch, 1
-csrrsi x2, mscratch, 1
-csrrci x2, mscratch, 1
-csrrs x0, mscratch, x0
-jal x2, jal_sp_rv
-jal_sp_rv:
-j jal_zero_rv
-jal_zero_rv:
-la x3, _scratch_buf
-sb x0, 48(x3)
-sh x0, 50(x3)
-sw x0, 52(x3)
-la x5, jalr_s3_rv
-jalr x19, x5, 0
-jalr_s3_rv:
-la x5, jalr_s4_rv
-jalr x20, x5, 0
-jalr_s4_rv:
-la x5, jalr_s10_rv
-jalr x26, x5, 0
-jalr_s10_rv:
-la x5, jalr_s11_rv
-jalr x27, x5, 0
-jalr_s11_rv:
-la x6, jalr_ra_t1_rv
-jalr x1, x6, 0
-jalr_ra_t1_rv:
-la x1, jalr_t1_ra_rv
-jalr x6, x1, 0
-jalr_t1_ra_rv:
-ecall
-
 exit:
     li   t0, 0
     slli t0, t0, 1
