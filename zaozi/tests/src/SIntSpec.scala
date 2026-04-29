@@ -120,7 +120,7 @@ object SIntSpec extends TestSuite:
       object Times extends Generator[SIntSpecParameter, SIntSpecLayers, SIntSpecIO, SIntSpecProbe] with HasVerilogTest:
         def architecture(parameter: SIntSpecParameter) =
           val io = summon[Interface[SIntSpecIO]]
-          io.sint := ((io.a * io.b).asBits >> parameter.width).asSInt
+          io.sint := (io.a * io.b).asBits.head(parameter.width).asSInt
           io.bool.dontCare()
           io.bits.dontCare()
       Times.verilogTest(SIntSpecParameter(8))(
@@ -268,8 +268,10 @@ object SIntSpec extends TestSuite:
           extends Generator[SIntSpecParameter, SIntSpecLayers, SIntSpecIO, SIntSpecProbe]
           with HasVerilogTest:
         def architecture(parameter: SIntSpecParameter) =
-          val io = summon[Interface[SIntSpecIO]]
-          io.sint := io.a >> 4
+          val io      = summon[Interface[SIntSpecIO]]
+          val shifted = io.a >> 4
+          assert(shifted.width == parameter.width)
+          io.sint := shifted
           io.bool.dontCare()
           io.bits.dontCare()
       ShiftRightInt.verilogTest(SIntSpecParameter(8))(
@@ -282,11 +284,13 @@ object SIntSpec extends TestSuite:
           extends Generator[SIntSpecParameter, SIntSpecLayers, SIntSpecIO, SIntSpecProbe]
           with HasVerilogTest:
         def architecture(parameter: SIntSpecParameter) =
-          val io = summon[Interface[SIntSpecIO]]
-          io.sint := io.a >> io.c
+          val io      = summon[Interface[SIntSpecIO]]
+          val shifted = io.a >> io.c
+          assert(shifted.width == parameter.width)
+          io.sint := shifted
           io.bool.dontCare()
           io.bits.dontCare()
       ShiftRightUInt.verilogTest(SIntSpecParameter(8))(
-        "wire [7:0] _GEN_0 = $unsigned($signed($signed(a) >>> c));",
-        "assign sint = {_GEN_0[7], _GEN_0};"
+        "wire [7:0] shifted = $unsigned($signed($signed(a) >>> c));",
+        "assign sint = {shifted[7], shifted};"
       )

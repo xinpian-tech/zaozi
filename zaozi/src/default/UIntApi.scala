@@ -20,6 +20,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   MulPrimApi,
   NEQPrimApi,
   NodeApi,
+  PadPrimApi,
   RemPrimApi,
   ShlPrimApi,
   ShrPrimApi,
@@ -362,9 +363,13 @@ given UIntApi with
         nameKind = FirrtlNameKind.Interesting,
         input = that match
           case that: Int             =>
-            val op0 = summon[ShrPrimApi].op(ref.refer, that, locate)
+            val input         = ref.refer
+            val originalWidth = input.getType.getBitWidth(true).toInt
+            val op0           = summon[ShrPrimApi].op(input, that, locate)
             op0.operation.appendToBlock()
-            op0.result
+            val op1           = summon[PadPrimApi].op(op0.result, originalWidth, locate)
+            op1.operation.appendToBlock()
+            op1.result
           case that: Referable[UInt] =>
             val op0 = summon[DShrPrimApi].op(ref.refer, that.refer, locate)
             op0.operation.appendToBlock()

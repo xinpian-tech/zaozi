@@ -10,6 +10,8 @@
 .opencode/
 .scala-build/
 __pycache__/
+.codex
+.humanize/
 
 out/
 result*

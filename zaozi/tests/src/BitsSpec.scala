@@ -342,13 +342,15 @@ object BitsSpec extends TestSuite:
           extends Generator[BitsSpecParameter, BitsSpecLayers, BitsSpecIO, BitsSpecProbe]
           with HasVerilogTest:
         def architecture(parameter: BitsSpecParameter) =
-          val io = summon[Interface[BitsSpecIO]]
+          val io      = summon[Interface[BitsSpecIO]]
+          val shifted = io.a >> 4
+          assert(shifted.width == parameter.width)
           io.sint.dontCare()
           io.uint.dontCare()
           io.bool.dontCare()
           io.bits.dontCare()
           io.widenBits.dontCare()
-          io.bits := io.a >> 4
+          io.bits := shifted
       ShiftRightInt.verilogTest(BitsSpecParameter(8))(
         "assign bits = {4'h0, a[7:4]};"
       )
@@ -359,13 +361,15 @@ object BitsSpec extends TestSuite:
           extends Generator[BitsSpecParameter, BitsSpecLayers, BitsSpecIO, BitsSpecProbe]
           with HasVerilogTest:
         def architecture(parameter: BitsSpecParameter) =
-          val io = summon[Interface[BitsSpecIO]]
+          val io      = summon[Interface[BitsSpecIO]]
+          val shifted = io.a >> io.c
+          assert(shifted.width == parameter.width)
           io.sint.dontCare()
           io.uint.dontCare()
           io.bool.dontCare()
           io.bits.dontCare()
           io.widenBits.dontCare()
-          io.bits := io.a >> io.c
+          io.bits := shifted
       ShiftRightUInt.verilogTest(BitsSpecParameter(8))(
         "assign bits = a >> c;"
       )

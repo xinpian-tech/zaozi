@@ -270,8 +270,10 @@ object UIntSpec extends TestSuite:
           extends Generator[UIntSpecParameter, UIntSpecLayers, UIntSpecIO, UIntSpecProbe]
           with HasVerilogTest:
         def architecture(parameter: UIntSpecParameter) =
-          val io = summon[Interface[UIntSpecIO]]
-          io.uint := io.a >> 4
+          val io      = summon[Interface[UIntSpecIO]]
+          val shifted = io.a >> 4
+          assert(shifted.width == parameter.width)
+          io.uint := shifted
           io.bool.dontCare()
           io.bits.dontCare()
       RightShiftInt.verilogTest(UIntSpecParameter(8))(
@@ -284,8 +286,10 @@ object UIntSpec extends TestSuite:
           extends Generator[UIntSpecParameter, UIntSpecLayers, UIntSpecIO, UIntSpecProbe]
           with HasVerilogTest:
         def architecture(parameter: UIntSpecParameter) =
-          val io = summon[Interface[UIntSpecIO]]
-          io.uint := io.a >> io.b
+          val io      = summon[Interface[UIntSpecIO]]
+          val shifted = io.a >> io.b
+          assert(shifted.width == parameter.width)
+          io.uint := shifted
           io.bool.dontCare()
           io.bits.dontCare()
       RightShiftUInt.verilogTest(UIntSpecParameter(8))(
