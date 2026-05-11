@@ -271,6 +271,30 @@ trait ConstructorApi:
       Context
     ): Unit
 
+  extension (layer: LayerTree) def apply(name: String): LayerTree
+
+  extension (layers: Seq[LayerTree]) def apply(name: String): LayerTree
+
+  def layer(
+    layerName: String
+  )(body:      (
+      Arena,
+      Context,
+      Block,
+      LayerTree,
+      Seq[LayerTree],
+      sourcecode.File,
+      sourcecode.Line
+    ) ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    Seq[LayerTree],
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
   def Wire[T <: Data](
     refType: T
   )(
