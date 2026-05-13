@@ -8,8 +8,16 @@ import me.jiuyang.rvprobe.constraints.*
 import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
 // RV32I base integer instruction coverage (27 instructions)
-// Run with: mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I
-@main def RV32I(outputPath: String = "rvprobe/src/cases/output/asm/coverage/RV32I.S"): Unit =
+// Run core:
+//   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I
+// Run core with custom output:
+//   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_core.S false
+// Run RVProbe+patch:
+//   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_patch.S true
+@main def RV32I(
+  outputPath:                    String  = "rvprobe/src/cases/output/asm/coverage/RV32I.S",
+  includeCoverageModelPatches:   Boolean = false
+): Unit =
   val n = 35
 
   // --- Shift-immediate ---
@@ -159,15 +167,15 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = store(n, isSw())
 
-  // NOTE: No SpHolePatch (raw() handwrite-in-disguise).
-  // RVProbe's value is in solver-driven generators above.
-  // Holes requiring manual asm (JALR/CSR/ECALL/store-ZERO) are
-  // covered by handwrite.S. The LOC comparison should be:
-  //   RVProbe solver-driven LOC vs handwrite total LOC
-  //   for the SAME coverage target (rd/rs register bins + hazard + logical).
+  object CoverageModelPatches extends RVGenerator:
+    val sets          = isRV64GC()
+    def constraints() = rv32iCoverageModelPatches()
 
-  writeCoverageAsm(
-    outputPath,
+  // Keep this generator separate from the solver-driven coverage objects above.
+  // It supports the RVProbe+patch experiment for VCS coverage-model bins
+  // (SP/ZERO/JAL/JALR/CSR/ECALL) and should be reported separately from RVProbe-core.
+
+  val coreGenerators = Seq(
     Slli,
     Srai,
     Srli,
@@ -205,3 +213,5 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     Sh,
     Sw
   )
+  val generators = if includeCoverageModelPatches then coreGenerators :+ CoverageModelPatches else coreGenerators
+  writeCoverageAsm(outputPath, generators*)
