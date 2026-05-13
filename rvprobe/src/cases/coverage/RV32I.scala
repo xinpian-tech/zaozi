@@ -7,16 +7,20 @@ import me.jiuyang.rvprobe.*
 import me.jiuyang.rvprobe.constraints.*
 import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
-// RV32I base integer instruction coverage (27 instructions)
-// Run core:
+// RV32I base integer instruction coverage (27 instructions).
+//
+// Emits the union of (a) solver-driven sequence/value generators (rType /
+// iTypeAlu / iTypeLogical / shiftImm / load / store / branch / uType) and
+// (b) the rv32iCoverageModelPatches() raw-asm helper that closes
+// coverage-model-specific bins (rd=SP / rs2=ZERO / JAL/JALR rd cross /
+// CSR rd / ECALL) which fall outside the sequence-level abstraction.
+// Together they form "RVProbe at its best" for the Handwrite-vs-RVProbe
+// binary comparison in exp1.
+//
 //   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I
-// Run core with custom output:
-//   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_core.S false
-// Run RVProbe+patch:
-//   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_patch.S true
+//   mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I.S
 @main def RV32I(
-  outputPath:                    String  = "rvprobe/src/cases/output/asm/coverage/RV32I.S",
-  includeCoverageModelPatches:   Boolean = false
+  outputPath: String = "rvprobe/src/cases/output/asm/coverage/RV32I.S"
 ): Unit =
   val n = 35
 
@@ -171,11 +175,10 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     val sets          = isRV64GC()
     def constraints() = rv32iCoverageModelPatches()
 
-  // Keep this generator separate from the solver-driven coverage objects above.
-  // It supports the RVProbe+patch experiment for VCS coverage-model bins
-  // (SP/ZERO/JAL/JALR/CSR/ECALL) and should be reported separately from RVProbe-core.
-
-  val coreGenerators = Seq(
+  // Solver-driven sequence/value generators come first; the coverage-model
+  // raw-asm patches (CoverageModelPatches) are appended last so they run after
+  // all solver-emitted instructions and benefit from the same trap handler.
+  val generators = Seq(
     Slli,
     Srai,
     Srli,
@@ -211,7 +214,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
     Lw,
     Sb,
     Sh,
-    Sw
+    Sw,
+    CoverageModelPatches
   )
-  val generators = if includeCoverageModelPatches then coreGenerators :+ CoverageModelPatches else coreGenerators
   writeCoverageAsm(outputPath, generators*)

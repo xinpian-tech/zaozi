@@ -371,10 +371,6 @@ _start:
     lhu  x6, 4(x2)
     mv   x2, x4           # restore SP
 
-    # Store: rs2=ZERO (store zero value) — separate section for clear coverage
-    sb   x0, 32(x3)
-    sh   x0, 34(x3)
-    sw   x0, 36(x3)
     # Store: rs1=SP
     mv   x4, x2
     mv   x2, x3
@@ -441,6 +437,15 @@ jalr_t1_ra:
     # Set up minimal trap handler, then ecall.
     la   x5, _trap_handler
     csrw mtvec, x5
+
+    # Store cp_rs2=ZERO via base=x0 — must precede ECALL because riscv-dv's
+    # spike_log_to_trace_csv.py stops parsing at the first ECALL, so any patch
+    # placed after it is invisible to the cover model. The trap handler
+    # installed above absorbs the resulting store_access_fault on address 0.
+    sb   x3, 0(x0)
+    sh   x3, 0(x0)
+    sw   x3, 0(x0)
+
     ecall
     j    _after_ecall
     .balign 4
@@ -453,22 +458,28 @@ _trap_handler:
 _after_ecall:
 
 # ============================================================
-# VCS Coverage (47 covergroups, 66 baseline holes):
+# VCS Coverage (47 covergroups, 64 baseline holes):
 #
-# Fillable holes addressed:
+# Fillable holes addressed (Cells I+II in the paper taxonomy):
 #   cp_rd=SP:                 36 holes (all instr types incl load/store/csr/jalr)
-#   cp_rd/rs2=ZERO:            5 holes (jal, csrrs, sb, sh, sw)
+#   jal cp_rd=ZERO:            1 hole  (`j` pseudo)
+#   sb/sh/sw cp_rs2=ZERO:      3 holes (base=x0 stores, trap-recovered)
 #   jalr cp_rd:                6 holes (SP, S3, S4, S10, S11 + cross ra/t1)
 #   ECALL:                     1 hole  (with trap handler)
-#   Logical:                   4 holes (ori/andi OPPOSITE, xori IDENTICAL/OPPOSITE)
 #                             ---
-#   Total fillable:           52 holes
+#   Total fillable:           47 holes
 #
-# Architecture-unreachable (cannot fill):
-#   RAW hazard:                5 holes (lui, auipc, csrrwi/si/ci — no rs fields)
-#   opcode_cg:                 4 holes (unused opcode encodings)
-#   alignment:                 3 holes (mepc + jal rd/imm — requires C extension)
-#   jalr alignment/cross:      2 holes (specific alignment combinations)
+# Cell-III holes (closable but require value-relation reasoning):
+#   andi/ori/xori OPPOSITE     3 holes (rs1[31:0] ⊕ imm = 0xFFFFFFFF)
+#   xori IDENTICAL             1 hole  (rs1 == imm)
+#   → Handwrite leaves these to RVProbe's SMT solver.
+#
+# Architecture- or framework-unreachable (Cell IV residual):
+#   RAW hazard on no-rs1 ops:  5 holes (lui, auipc, csrrwi/si/ci)
+#   opcode_cg unused slots:    4 holes (atomic/FP/vector opcodes outside RV32I)
+#   alignment[1]:              3 holes (mepc + jal rd/imm — needs C extension)
+#   jalr alignment cross:      1 hole  (specific cp_imm_align/rs1_align cross)
+#   csrrs cp_rs1=ZERO:         1 hole  (`csrr` alias drops back to csrrs in cov.py)
 #                             ---
 #   Total unreachable:        14 holes
 # ============================================================

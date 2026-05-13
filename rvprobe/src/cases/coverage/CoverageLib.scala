@@ -518,9 +518,12 @@ object CoverageLib:
         |    sh   x6, 42(x2)
         |    sw   x6, 44(x2)
         |    mv   x2, x4
-        |    sb   x0, 32(x3)
-        |    sh   x0, 34(x3)
-        |    sw   x0, 36(x3)
+        |    # cp_rs2=ZERO via base=x0 (riscv-dv covergroup parses base register
+        |    # as its `rs2` field, so x0-as-base hits the bin). The CoverageLib
+        |    # preamble's _skip_trap_handler absorbs the resulting access fault.
+        |    sb   x3, 0(x0)
+        |    sh   x3, 0(x0)
+        |    sw   x3, 0(x0)
         |
         |    # JAL/JALR coverage-model bins
         |    la   x5, rvprobe_patch_jalr_sp
