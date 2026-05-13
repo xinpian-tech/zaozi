@@ -244,8 +244,8 @@ RVProbe L2@500 = 338ms vs riscv-dv VCS@500 = 280ms，差距仅 ~20%。考虑到 
 zaozi/rvprobe/tests/src/PerfBenchmark.scala    # exp3a + exp3b benchmarks
 zaozi/rvprobe/paper/exp3/EXP3.md               # 本文档
 riscv-dv/paper/exp3/plot_detailed_results.py   # 可视化脚本
-riscv-dv/paper/exp3/exp3a_real_workloads.csv   # 真实工作负载数据
-riscv-dv/paper/exp3/exp3b_scalability.csv      # 可扩展性数据
-riscv-dv/paper/exp3/performance_results.csv    # 可扩展性数据（兼容旧格式）
+reports/exp3/exp3a_real_workloads.csv          # 真实工作负载数据
+reports/exp3/exp3b_scalability.csv             # 可扩展性数据
+reports/exp3/performance_results.csv           # 可扩展性数据（兼容旧格式）
 scripts/run-exp3.sh                            # 自动化运行脚本
 ```
