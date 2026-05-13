@@ -426,7 +426,7 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 
 ## Verified Results (VCS SV Coverage, 47 covergroups, deterministic seed 0)
 
-> Source of truth: `paper/data/exp1_summary.csv` (2026-05-12). The older 62-hole/45-closure numbers below were retired because they came from an intermediate coverage report and are not used by `paper/iccd26.md`.
+> Source of truth: `paper/data/exp1_summary.csv` (2026-05-13). The older 62-hole intermediate coverage report was retired and is not used by `paper/iccd26.md`.
 
 ### Baseline（riscv-dv 饱和）
 
@@ -441,6 +441,7 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 | Baseline | 95.67% | 64 | 0 | 64 | 0.0% |
 | Handwrite | 96.32% | 64 | 41 | 23 | 64.1% |
 | RVProbe | 96.18% | 64 | 27 | 37 | 42.2% |
+| RVProbe+patch | 96.59% | 64 | 45 | 19 | 70.3% |
 
 ### 为什么 RVProbe-core 闭合数少于 Handwrite
 
@@ -454,9 +455,9 @@ RVProbe-core 当前是 **sequence-level generator**：`rvprobe.scala` 主要覆�
 mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_patch.S true
 ```
 
-在重新跑 VCS coverage 之前，论文仍应使用表中的 RVProbe-core 数据（27/64），不能把 patch 路径的预期效果写成实测结果。
+VCS coverage 已重新跑完，RVProbe+patch 实测闭合 45/64，剩余 19，覆盖率 96.59%。论文应将该路径作为单独的 coverage-model patch 变体报告，而不是并入 RVProbe-core 的 27/64 核心序列级结果。
 
-论文处理：RQ1 不应声称 RVProbe 闭合更多 holes，也不应声称达到 handwrite 相同覆盖率。RQ1 应聚焦于 **对已知序列级覆盖目标，RVProbe 用更少代码表达核心跨指令关系，并由 SMT 检查排斥条件**。Handwrite 的更高闭合数用于说明 coverage-model patch 能力强，但需要更多人工编码。
+论文处理：RQ1 不应只用 RVProbe+patch 声称“RVProbe 核心闭合更多 holes”。RQ1 应聚焦于 **对已知序列级覆盖目标，RVProbe-core 用更少代码表达核心跨指令关系，并由 SMT 检查排斥条件**。RVProbe+patch 的更高闭合数用于说明 coverage-model patch 可以被同一生成路径承载，但这部分属于模型特定补丁，不是核心序列级抽象贡献。
 
 ### RVProbe+patch 方案
 
@@ -468,7 +469,7 @@ mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_patch.S 
 - JAL/JALR patches: 发射 label + `jalr` 特定 rd/rs1 组合。
 - ECALL patch: 插入 trap handler 并执行 `ecall`。
 
-这样做预期能提高 RVProbe 的闭合数，但论文中必须诚实标注这些是 "coverage-model patches"，不能把它们当作序列级约束抽象的核心贡献。否则会把 RQ1 稀释成“谁抄 coverage report 补丁更全”。
+这样做实测将 RVProbe 闭合数从 27/64 提升到 45/64，但论文中必须诚实标注这些是 "coverage-model patches"，不能把它们当作序列级约束抽象的核心贡献。否则会把 RQ1 稀释成“谁抄 coverage report 补丁更全”。
 
 ### 当前无法/不应作为 RVProbe 核心能力声称的 Bins
 
@@ -490,7 +491,7 @@ opcode_cg 的 4 个 bin（a[2], a[9], a[21], a[31]）对应 RV32I 不使用的 o
 
 #### 类别 C: 边界寄存器 / coverage-model patch
 
-`rd=SP`、`rs1=SP`、`rs2=ZERO`、JAL/JALR 特定交叉等 bin 可以通过显式补丁闭合。Handwrite 已覆盖其中一部分；RVProbe-core 不纳入这些 raw patches，`RVProbe+patch` 则已可生成对应补丁，等待 VCS coverage 重跑确认闭合数。
+`rd=SP`、`rs1=SP`、`rs2=ZERO`、JAL/JALR 特定交叉等 bin 可以通过显式补丁闭合。Handwrite 已覆盖其中一部分；RVProbe-core 不纳入这些 raw patches，`RVProbe+patch` 已通过 VCS coverage 确认可将剩余 bin 降至 19。
 
 #### 类别 D: 对齐/交叉覆盖
 
@@ -506,4 +507,4 @@ opcode_cg 的 4 个 bin（a[2], a[9], a[21], a[31]）对应 RV32I 不使用的 o
 - [x] 论文使用二方对比：handwrite 覆盖更多模型特定 bin；RVProbe 用更少代码表达核心序列级关系
 - [x] 新增 RVProbe+patch coverage-model patch generator（默认 RVProbe-core 不追加）
 - [x] 本地验证：`rvprobe.compile`、core/patch ASM 生成、RISC-V gcc 汇编检查、`rvprobe.tests`
-- [ ] 重新跑 VCS coverage，确认 RVProbe+patch 的实测 closed/remaining
+- [x] 重新跑 VCS coverage：RVProbe+patch remaining 19 (closed 45)
