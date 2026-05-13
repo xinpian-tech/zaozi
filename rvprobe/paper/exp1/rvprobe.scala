@@ -114,6 +114,14 @@ object Auipc extends RVGenerator:
   def constraints() = uType(n, isAuipc())
 
 // ============================================================
+// Coverage-model patches (reported separately as RVProbe+patch)
+// ============================================================
+
+object CoverageModelPatches extends RVGenerator:
+  val sets          = Seq(isRV32I())
+  def constraints() = rv32iCoverageModelPatches()
+
+// ============================================================
 // Shared library functions (CoverageLib.scala)
 //
 // def rType(n, opcode) =
@@ -153,4 +161,9 @@ object Auipc extends RVGenerator:
 // Coverage guarantee:
 //   - Hazard: SAT = all 63 bins closed (solver-guaranteed)
 //   - Logical: setup li + op covers IDENTICAL/OPPOSITE/DIFFERENT (13 holes)
+//
+// RVProbe+patch:
+//   - CoverageModelPatches emits SP/ZERO/JAL/JALR/CSR/ECALL scratch-buffer patches.
+//   - These patches are coverage-model-specific and are reported separately
+//     from RVProbe-core in the paper.
 // ============================================================

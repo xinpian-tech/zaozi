@@ -457,3 +457,105 @@ object CoverageLib:
     seq.coverWAR()
     seq.coverWAW()
     seq.coverNoHazard()
+
+  /** RV32I VCS coverage-model patches.
+    *
+    * These are intentionally separated from the solver-driven coverage helpers above. They mirror the hand-written
+    * coverage-report patches for bins that are mostly about a specific coverage model or test harness convention
+    * (SP/ZERO bins, scratch-buffer load/store setup, JAL/JALR label cases, CSR bins, ECALL). They are useful for a
+    * "RVProbe+patch" experiment, but should not be counted as the core sequence-level abstraction contribution.
+    */
+  def rv32iCoverageModelPatches(
+  )(
+    using Recipe
+  ): Unit =
+    raw(
+      """
+        |    # RVProbe+patch: coverage-model-specific RV32I holes
+        |    # rd=SP (x2) bins
+        |    sub  x2, x5, x6
+        |    sra  x2, x5, x6
+        |    srl  x2, x5, x6
+        |    sll  x2, x5, x6
+        |    slt  x2, x5, x6
+        |    sltu x2, x5, x6
+        |    and  x2, x5, x6
+        |    xor  x2, x5, x6
+        |    or   x2, x5, x6
+        |    ori   x2, x5, 10
+        |    andi  x2, x5, 10
+        |    xori  x2, x5, 10
+        |    slti  x2, x5, 10
+        |    sltiu x2, x5, 10
+        |    srli x2, x5, 1
+        |    srai x2, x5, 1
+        |    slli x2, x5, 1
+        |    lui  x2, 0x12345
+        |
+        |    # CSR rd bins
+        |    csrrw  x2, mscratch, x5
+        |    csrrs  x2, mscratch, x5
+        |    csrrc  x2, mscratch, x5
+        |    csrrwi x2, mscratch, 1
+        |    csrrsi x2, mscratch, 1
+        |    csrrci x2, mscratch, 1
+        |    csrrs  x0, mscratch, x5
+        |    csrrs  x0, mscratch, x0
+        |
+        |    # Load/store SP/ZERO bins; _scratch_buf is emitted by CoverageLib epilogue.
+        |    la   x3, _scratch_buf
+        |    lb   x2, 0(x3)
+        |    lbu  x2, 0(x3)
+        |    lh   x2, 0(x3)
+        |    lhu  x2, 0(x3)
+        |    mv   x4, x2
+        |    mv   x2, x3
+        |    lb   x6, 0(x2)
+        |    lbu  x6, 1(x2)
+        |    lh   x6, 2(x2)
+        |    lhu  x6, 4(x2)
+        |    sb   x6, 40(x2)
+        |    sh   x6, 42(x2)
+        |    sw   x6, 44(x2)
+        |    mv   x2, x4
+        |    sb   x0, 32(x3)
+        |    sh   x0, 34(x3)
+        |    sw   x0, 36(x3)
+        |
+        |    # JAL/JALR coverage-model bins
+        |    la   x5, rvprobe_patch_jalr_sp
+        |    jalr x2, x5, 0
+        |rvprobe_patch_jalr_sp:
+        |    la   x5, rvprobe_patch_jalr_s3
+        |    jalr x19, x5, 0
+        |rvprobe_patch_jalr_s3:
+        |    la   x5, rvprobe_patch_jalr_s4
+        |    jalr x20, x5, 0
+        |rvprobe_patch_jalr_s4:
+        |    la   x5, rvprobe_patch_jalr_s10
+        |    jalr x26, x5, 0
+        |rvprobe_patch_jalr_s10:
+        |    la   x5, rvprobe_patch_jalr_s11
+        |    jalr x27, x5, 0
+        |rvprobe_patch_jalr_s11:
+        |    la   x6, rvprobe_patch_jalr_ra_t1
+        |    jalr x1, x6, 0
+        |rvprobe_patch_jalr_ra_t1:
+        |    la   x1, rvprobe_patch_jalr_t1_ra
+        |    jalr x6, x1, 0
+        |rvprobe_patch_jalr_t1_ra:
+        |    j rvprobe_patch_jal_zero
+        |rvprobe_patch_jal_zero:
+        |    jal x2, rvprobe_patch_jal_sp
+        |rvprobe_patch_jal_sp:
+        |
+        |    # ECALL is safe here because writeCoverageAsm installs a skip-trap handler.
+        |    ecall
+        |
+        |    # U-type producer followed by consumer, for coverage models that sample the consumer RAW.
+        |    lui   x5, 0x12345
+        |    add   x6, x5, x7
+        |    auipc x8, 0x12345
+        |    add   x9, x8, x7
+        |""".stripMargin
+    )

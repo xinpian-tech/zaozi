@@ -15,7 +15,7 @@ CRV 生成器在达到覆盖率饱和后，剩余的覆盖空洞并非随机采�
 
 DAC26 reviewer #2 批评 "directed tests are created by manually adding constraints, so the increase in coverage is absolutely expected"。我们的回应：关键不是"能不能填"，而是**识别盲区的系统性**和**填补时的约束表达成本差异**。
 
-reviewer #4 批评 "comparison not clear with the state of the art"。用 riscv-dv 作为共同起点，三方对比闭合同一组盲区的 LOC、正确性保证和可扩展性。
+reviewer #4 批评 "comparison not clear with the state of the art"。用 riscv-dv 作为共同起点，对比手写汇编与 RVProbe 闭合同一组盲区时的 LOC、正确性保证和可扩展性。
 
 ## Key Observation
 
@@ -426,45 +426,51 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 
 ## Verified Results (VCS SV Coverage, 47 covergroups, deterministic seed 0)
 
+> Source of truth: `paper/data/exp1_summary.csv` (2026-05-12). The older 62-hole/45-closure numbers below were retired because they came from an intermediate coverage report and are not used by `paper/iccd26.md`.
+
 ### Baseline（riscv-dv 饱和）
 
-- 429,028 条指令，47 个 covergroup（VCS SystemVerilog coverage）
+- 47 个 covergroup（VCS SystemVerilog coverage）
 - Total Coverage Score: 95.67%
-- **62 个 unhit bins**
+- **64 个 unhit bins**
 
 ### Hole Closure
 
-| 方案 | Unhit Bins | 闭合数 | 闭合率 |
-|------|-----------|--------|--------|
-| Baseline | 62 | — | — |
-| Handwrite | 21 | 41 | 66.1% |
-| **RVProbe** | **17** | **45** | **72.6%** |
+| 方案 | Score | Total Holes | Closed | Remaining | Closure |
+|------|------:|------------:|-------:|----------:|--------:|
+| Baseline | 95.67% | 64 | 0 | 64 | 0.0% |
+| Handwrite | 96.32% | 64 | 41 | 23 | 64.1% |
+| RVProbe | 96.18% | 64 | 27 | 37 | 42.2% |
 
-#### 分类对比
+### 为什么 RVProbe-core 闭合数少于 Handwrite
 
-| 类别 | Baseline | Handwrite | RVProbe | 说明 |
-|------|----------|-----------|---------|------|
-| rd/rs=SP | 36 | **0** | **0** | 两者均全覆盖 |
-| Logical | 4 | 4 | **0** | **RVProbe 全覆盖，Handwrite 未覆盖** |
-| rd=ZERO | 5 | 4 | 4 | 各闭合 1 个 |
-| Other | 7 | 3 | 3 | 部分 jalr cross 已闭合 |
-| Hazard | 5 | 5 | 5 | U-type/CSR-imm RAW，架构不可达 |
-| Opcode | 4 | 4 | 4 | 未使用编码，架构不可达 |
-| Alignment | 1 | 1 | 1 | 需 C 扩展，架构不可达 |
+Handwrite 当前是 **coverage-report patch**：它直接针对 VCS coverage report 中的剩余 bin 写补丁，包括 `rd=SP`、load/store scratch-buffer、CSR、JAL/JALR、ECALL/trap handler 等模型特定用例。因此 handwrite 闭合数更高。
 
-### Logical Similarity Bins 的 VCS Coverage 异常
+RVProbe-core 当前是 **sequence-level generator**：`rvprobe.scala` 主要覆盖 21 条普通 RV32I 指令的 R/I/shift/U 格式生成器和 logical pattern，重点展示 `coverWAR()`/`coverWAW()`/`coverNoHazard()` 这类序列级约束的表达成本和求解器保证。它不包含 handwrite 中那些 coverage-model 特化补丁（JAL/JALR/CSR/ECALL/store-ZERO 等），所以总闭合数低于 handwrite。
 
-Handwrite 和 RVProbe 都写了正确的 `li + logical_op` 序列来覆盖 logical similarity bins（OPPOSITE/IDENTICAL）。两者生成的汇编指令序列在语义上等价，spike 仿真 trace 都正确记录了指令执行和寄存器写入。
+`RVProbe+patch` 已作为独立路径加入：`CoverageLib.rv32iCoverageModelPatches()` 发射 SP/ZERO/JAL/JALR/CSR/ECALL/scratch-buffer 补丁，`RV32I` 入口通过第二个参数选择是否追加这些补丁。生成命令为：
 
-**但 Handwrite 的 4 个 logical bin（ori/andi OPPOSITE, xori IDENTICAL/OPPOSITE）在 VCS coverage 报告中 count=0，而 RVProbe 的全部 count>0。**
+```bash
+mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_patch.S true
+```
 
-经过多轮排查（包括使用独立寄存器 x25-x30、完整 32 寄存器清零、flush 寄存器状态），handwrite 的 logical bins 仍然无法在 VCS coverage 中被采样。分析 VCS SV 源码确认 `get_logical_similarity()` 的 SystemVerilog 实现逻辑正确（`$countones(val1 ^ val2)`），`gpr_state` 关联数组的更新逻辑也正确（`update_dst_regs` 从 trace CSV 读取 rd 写入值）。
+在重新跑 VCS coverage 之前，论文仍应使用表中的 RVProbe-core 数据（27/64），不能把 patch 路径的预期效果写成实测结果。
 
-**推测原因**：VCS coverage flow 中 `riscv_instr_cov_test` 按序处理 26 个 trace CSV 文件（25 baseline + 1 handwrite）。`gpr_state` 是 `static` 变量，在所有 trace 之间共享。可能存在 VCS coverage model 在多 trace 混合处理时的寄存器状态追踪 bug，导致 handwrite trace 中 `li + andi/ori/xori` 的 rs1_value 未被正确关联。RVProbe 的 trace 由 `freshReg()` 保证了寄存器在整个序列中无冲突，可能碰巧绕过了此 bug。
+论文处理：RQ1 不应声称 RVProbe 闭合更多 holes，也不应声称达到 handwrite 相同覆盖率。RQ1 应聚焦于 **对已知序列级覆盖目标，RVProbe 用更少代码表达核心跨指令关系，并由 SMT 检查排斥条件**。Handwrite 的更高闭合数用于说明 coverage-model patch 能力强，但需要更多人工编码。
 
-**论文处理**：论文中不需要展示这 4 个 logical bin 的差异。论文只需要说明 **handwrite 和 RVProbe 在覆盖同一组 RV32I coverage holes 时的 LOC 对比**——两者的覆盖目标相同（填补 baseline 的 62 个 holes），区别在于代码规模和工程复杂度。17 个残留 holes 全部是架构/模型不可达，与方法论无关。
+### RVProbe+patch 方案
 
-### 无法闭合的 Bins（17 个，均为架构/模型限制）
+为了让 RVProbe 的覆盖数量向 handwrite 对齐，已新增一组 RVProbe/raw-ASM hybrid patch，而不是把这些模型特定用例混入现有序列级 generator：
+
+- `rd=SP` / `rs1=SP` / `rs2=ZERO` patches: 用 eDSL/AsmApi 显式发射 `x2`/`x0` 相关指令。
+- Load/store patches: 使用 `_scratch_buf` 并保存/恢复 SP。
+- CSR patches: 覆盖 `csrrw/csrrs/csrrc` 与 CSR-immediate 的 rd bins。
+- JAL/JALR patches: 发射 label + `jalr` 特定 rd/rs1 组合。
+- ECALL patch: 插入 trap handler 并执行 `ecall`。
+
+这样做预期能提高 RVProbe 的闭合数，但论文中必须诚实标注这些是 "coverage-model patches"，不能把它们当作序列级约束抽象的核心贡献。否则会把 RQ1 稀释成“谁抄 coverage report 补丁更全”。
+
+### 当前无法/不应作为 RVProbe 核心能力声称的 Bins
 
 #### 类别 A: Hazard 模型不可达（5 bins）
 
@@ -482,11 +488,11 @@ Handwrite 和 RVProbe 都写了正确的 `li + logical_op` 序列来覆盖 logic
 
 opcode_cg 的 4 个 bin（a[2], a[9], a[21], a[31]）对应 RV32I 不使用的 opcode 编码空间。
 
-#### 类别 C: 边界寄存器（4 bins）
+#### 类别 C: 边界寄存器 / coverage-model patch
 
-sb/sh/sw 的 rs2=ZERO 和 csrrs 的 rd=ZERO 各 1 个。这些 bin 在 handwrite 和 RVProbe 中都有对应指令（`sb x0, ...`、`csrrs x0, ...`），但 VCS coverage 的 store/CSR covergroup 可能需要特定的 hazard 上下文才能采样。
+`rd=SP`、`rs1=SP`、`rs2=ZERO`、JAL/JALR 特定交叉等 bin 可以通过显式补丁闭合。Handwrite 已覆盖其中一部分；RVProbe-core 不纳入这些 raw patches，`RVProbe+patch` 则已可生成对应补丁，等待 VCS coverage 重跑确认闭合数。
 
-#### 类别 D: 对齐/交叉覆盖（4 bins）
+#### 类别 D: 对齐/交叉覆盖
 
 - mepc_alignment_cg = alignment_2（需 C 扩展）
 - jal alignment bins（2 个，需 2-mod-4 地址）
@@ -494,10 +500,10 @@ sb/sh/sw 的 rs2=ZERO 和 csrrs 的 rd=ZERO 各 1 个。这些 bin 在 handwrite
 
 ## Status
 
-- [x] Phase 1: riscv-dv baseline — 429K 指令，47 covergroups (VCS SV)，62 unhit bins
-- [x] Phase 2: Hole 分类完成（36 SP + 4 logical + 5 ZERO + 5 hazard + 4 opcode + 7 other + 1 align）
-- [x] Phase 3: Handwrite 21 remaining (closed 41), RVProbe **17 remaining (closed 45)**
-- [x] riscv-dv bug 发现并修复（`bin()` 负数处理, `--noclean` default=True）
-- [x] Logical similarity VCS coverage 异常分析（handwrite 无法闭合，RVProbe 可以）
-- [x] 17 个不可达 bin 完整分类（hazard 5 + opcode 4 + rd_ZERO 4 + alignment/cross 4）
-- [x] 论文使用 LOC 对比（handwrite vs RVProbe 覆盖同一组 holes 的代码规模差异）
+- [x] Phase 1: riscv-dv baseline — 47 covergroups (VCS SV)，64 unhit bins
+- [x] Phase 2: Hole closure 汇总与 `paper/data/exp1_summary.csv` 对齐
+- [x] Phase 3: Handwrite remaining 23 (closed 41), RVProbe remaining 37 (closed 27)
+- [x] 论文使用二方对比：handwrite 覆盖更多模型特定 bin；RVProbe 用更少代码表达核心序列级关系
+- [x] 新增 RVProbe+patch coverage-model patch generator（默认 RVProbe-core 不追加）
+- [x] 本地验证：`rvprobe.compile`、core/patch ASM 生成、RISC-V gcc 汇编检查、`rvprobe.tests`
+- [ ] 重新跑 VCS coverage，确认 RVProbe+patch 的实测 closed/remaining
