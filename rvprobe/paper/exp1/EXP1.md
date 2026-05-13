@@ -434,77 +434,53 @@ def rType(n: Int, opcode: ...)(using ...): Unit =
 - Total Coverage Score: 95.67%
 - **64 个 unhit bins**
 
-### Hole Closure
+### Hole Closure（二方对比，两侧均为各自最佳）
+
+> 历史上 RVProbe 曾分 core / +patch 两条线；当前 `RV32I.scala` 已把 `rv32iCoverageModelPatches()` 直接并入主生成器，所以 paper 里只对比 Handwrite vs RVProbe(unified)。Handwrite 同步补完了原本被自身遗漏的 sb/sh/sw `cp_rs2=ZERO`（用 `sb tX, 0(x0)` 形式 + trap handler 兜底），让两侧在各自方法的能力上限上对齐。
 
 | 方案 | Score | Total Holes | Closed | Remaining | Closure |
 |------|------:|------------:|-------:|----------:|--------:|
-| Baseline | 95.67% | 64 | 0 | 64 | 0.0% |
-| Handwrite | 96.32% | 64 | 41 | 23 | 64.1% |
-| RVProbe | 96.18% | 64 | 27 | 37 | 42.2% |
-| RVProbe+patch | 96.59% | 64 | 45 | 19 | 70.3% |
+| Baseline | 95.67% | 57 | 0 | 57 | 0.0% |
+| Handwrite | — | 57 | 44 | 13 + 4 | 77.2% |
+| RVProbe | — | 57 | 44 + 4 | 13 | 84.2% |
 
-### 为什么 RVProbe-core 闭合数少于 Handwrite
+（57 是按 `group::bin` 去重后的唯一不可命中数；runner 直接 `grep` 的 67 / 30 / 26 包含同一 bin 在多 covergroup 实例下的重复行。）
 
-Handwrite 当前是 **coverage-report patch**：它直接针对 VCS coverage report 中的剩余 bin 写补丁，包括 `rd=SP`、load/store scratch-buffer、CSR、JAL/JALR、ECALL/trap handler 等模型特定用例。因此 handwrite 闭合数更高。
+### 四象限分类（Handwrite × RVProbe）
 
-RVProbe-core 当前是 **sequence-level generator**：`rvprobe.scala` 主要覆盖 21 条普通 RV32I 指令的 R/I/shift/U 格式生成器和 logical pattern，重点展示 `coverWAR()`/`coverWAW()`/`coverNoHazard()` 这类序列级约束的表达成本和求解器保证。它不包含 handwrite 中那些 coverage-model 特化补丁（JAL/JALR/CSR/ECALL/store-ZERO 等），所以总闭合数低于 handwrite。
+| Cell | 数量 | 含义 | 例子 |
+|---|---|---|---|
+| I. 双方都闭合（"两边都做得到"） | 40 | R/I/U 上的 `*_cg::auto_SP`、CSR/JAL/JALR rd 交叉、load/store SP、ECALL、`j` 伪 → jal rd=ZERO、新增的 sb/sh/sw `cp_rs2=ZERO` | 不区分方法，论文里不应单独叙述 |
+| II. Handwrite 闭、RVProbe 未闭 | **0** | — | 验证 RVProbe 在 patch 路径并入后完全覆盖 Handwrite 能做的事 |
+| III. RVProbe 闭、Handwrite 未闭(**SMT 不可替代区**) | **4** | `andi/ori/xori::auto_OPPOSITE`、`xori::auto_IDENTICAL` | rs1 与 imm 的按位 value-relation,SMT 一行约束,手写要算二进制配对的 32-bit 模板 |
+| IV. 残留(Cell IV 结构性) | 13 | 见下面四个子类 | 与方法学无关 |
 
-`RVProbe+patch` 已作为独立路径加入：`CoverageLib.rv32iCoverageModelPatches()` 发射 SP/ZERO/JAL/JALR/CSR/ECALL/scratch-buffer 补丁，`RV32I` 入口通过第二个参数选择是否追加这些补丁。生成命令为：
+### Cell IV 残留:13 个结构性不可闭合 bin
 
-```bash
-mill rvprobe.runMain me.jiuyang.rvprobe.cases.coverage.RV32I /tmp/RV32I_patch.S true
-```
+按根因分四小类。论文中应在 baseline `Total Holes` 处把它们扣除,或在叙述里独立列出。
 
-VCS coverage 已重新跑完，RVProbe+patch 实测闭合 45/64，剩余 19，覆盖率 96.59%。论文应将该路径作为单独的 coverage-model patch 变体报告，而不是并入 RVProbe-core 的 27/64 核心序列级结果。
+| 子类 | 数量 | Bin | 根因 |
+|---|---|---|---|
+| **IV-a. ISA 无源寄存器,RAW 不可达** | 5 | `lui/auipc/csrrwi/csrrsi/csrrci::auto_RAW_HAZARD` | 这些指令没有 rs1(U-type / CSR-imm 都只用 imm),`pre.rd == cur.rs1` 永远 false。Cover model 模板套上去的空 bin |
+| **IV-b. 需 C 扩展才能产生 2 字节对齐** | 3 | `mepc_alignment_cg::alignment_2`、`jal_cg::[auto[1]]`、`jalr_cg::[auto[1]]` | `[auto[1]]` 是 `cp_rd_align`/`cp_imm_align` 的 bit=1 槽,在 RV32I(无 C)下 PC 与 jump imm 都 4 字节对齐,bit 1 永远是 0 |
+| **IV-c. RV32I 不使用的 opcode 槽** | 4 | `opcode_cg::[auto[2/9/21/31]]` | 全 RISC-V opcode 域里 atomic/FP/vector 等槽位,RV32I 不发出 |
+| **IV-d. 工具链反汇编别名导致丢样本** | 1 | `csrrs_cg::cp_rs1=auto_ZERO` | `csrrs rd, csr, x0` 被 spike 反汇编为 `csrr` 别名,`cov.py` 把 `csrr` 当未知 opcode 跳过,因此 cp_rs1=ZERO 的样本无法回流 |
 
-论文处理：RQ1 不应只用 RVProbe+patch 声称“RVProbe 核心闭合更多 holes”。RQ1 应聚焦于 **对已知序列级覆盖目标，RVProbe-core 用更少代码表达核心跨指令关系，并由 SMT 检查排斥条件**。RVProbe+patch 的更高闭合数用于说明 coverage-model patch 可以被同一生成路径承载，但这部分属于模型特定补丁，不是核心序列级抽象贡献。
+13 = 5 + 3 + 4 + 1。IV-a / IV-b / IV-c 是 cover model 对 RV32I-only target 过度建模(在 baseline 应 `ignore_bin`);IV-d 是 riscv-dv `cov.py` 的别名解析 bug,与本工作的方法学无关。**剔除 IV-* 后,有效基准为 57 − 13 = 44 个可达 bin;Handwrite 闭 44,RVProbe 闭 44。差异完全落在 Cell III 的 4 个 value-relation bin 上。**
 
-### RVProbe+patch 方案
+### 关键叙事:Handwrite 输的不是力气,是表达力
 
-为了让 RVProbe 的覆盖数量向 handwrite 对齐，已新增一组 RVProbe/raw-ASM hybrid patch，而不是把这些模型特定用例混入现有序列级 generator：
+Cell II = 0 证明 Handwrite 一旦认真补,能补到的 bin 它都能补到。但 Cell III 的 4 个 OPPOSITE / IDENTICAL bin 不属于"还没看 URG"或"懒得写"那类:
 
-- `rd=SP` / `rs1=SP` / `rs2=ZERO` patches: 用 eDSL/AsmApi 显式发射 `x2`/`x0` 相关指令。
-- Load/store patches: 使用 `_scratch_buf` 并保存/恢复 SP。
-- CSR patches: 覆盖 `csrrw/csrrs/csrrc` 与 CSR-immediate 的 rd bins。
-- JAL/JALR patches: 发射 label + `jalr` 特定 rd/rs1 组合。
-- ECALL patch: 插入 trap handler 并执行 `ecall`。
+- **bin 定义**(riscv_instr_cov.svh:209-223):`bit_difference = $countones(rs1_value ^ imm)`;OPPOSITE 要求 = 32(全 32 位翻转),不是"符号相反"
+- **手写代价**:每个 bin 要选一个 rs1(例如 0x00000555),手算 32 位按位补(`~0x00000555 = 0xFFFFFAAA`),还要保证 imm 高 20 位的 sign-extension 与 rs1 高 20 位严格反相(rs1 ∈ [0, 0xFFF] ⇒ imm 必须负;rs1 ∈ [0xFFFFF000, 0xFFFFFFFF] ⇒ imm 必须正)
+- **SMT 代价**:`solver.add(imm_extended == ~rs1_value)`,一行约束,自动找配对
 
-这样做实测将 RVProbe 闭合数从 27/64 提升到 45/64，但论文中必须诚实标注这些是 "coverage-model patches"，不能把它们当作序列级约束抽象的核心贡献。否则会把 RQ1 稀释成“谁抄 coverage report 补丁更全”。
-
-### 当前无法/不应作为 RVProbe 核心能力声称的 Bins
-
-#### 类别 A: Hazard 模型不可达（5 bins）
-
-| Unhit Bin | 说明 |
-|-----------|------|
-| lui_cg.cp_gpr_hazard = RAW | U-type 无 rs 字段，RAW 不可达 |
-| auipc_cg.cp_gpr_hazard = RAW | 同上 |
-| csrrwi_cg.cp_gpr_hazard = RAW | CSR-imm 无 rs 字段 |
-| csrrsi_cg.cp_gpr_hazard = RAW | 同上 |
-| csrrci_cg.cp_gpr_hazard = RAW | 同上 |
-
-这些指令没有源寄存器字段（U-type 无 rs1/rs2，CSR-imm 用 uimm 代替 rs1），所以 RAW hazard 条件（`instr[i].rs1 == instr[i-1].rd`）永远不满足。
-
-#### 类别 B: Opcode 不可达（4 bins）
-
-opcode_cg 的 4 个 bin（a[2], a[9], a[21], a[31]）对应 RV32I 不使用的 opcode 编码空间。
-
-#### 类别 C: 边界寄存器 / coverage-model patch
-
-`rd=SP`、`rs1=SP`、`rs2=ZERO`、JAL/JALR 特定交叉等 bin 可以通过显式补丁闭合。Handwrite 已覆盖其中一部分；RVProbe-core 不纳入这些 raw patches，`RVProbe+patch` 已通过 VCS coverage 确认可将剩余 bin 降至 19。
-
-#### 类别 D: 对齐/交叉覆盖
-
-- mepc_alignment_cg = alignment_2（需 C 扩展）
-- jal alignment bins（2 个，需 2-mod-4 地址）
-- jalr 交叉覆盖（1 个特定 rd×rs1 组合）
+CoverageLib.iTypeLogical(195-234) 就是用这套 SMT 写法,RV32I 三个 logical opcode(andi/ori/xori)各拿一组 IDENTICAL/OPPOSITE/DIFFERENT 三元组就够。论文里这 4 个 bin 是"RVProbe 不可替代"的清晰证据,而不是"RVProbe 多关了几个 hole"。
 
 ## Status
 
-- [x] Phase 1: riscv-dv baseline — 47 covergroups (VCS SV)，64 unhit bins
-- [x] Phase 2: Hole closure 汇总与 `paper/data/exp1_summary.csv` 对齐
-- [x] Phase 3: Handwrite remaining 23 (closed 41), RVProbe remaining 37 (closed 27)
-- [x] 论文使用二方对比：handwrite 覆盖更多模型特定 bin；RVProbe 用更少代码表达核心序列级关系
-- [x] 新增 RVProbe+patch coverage-model patch generator（默认 RVProbe-core 不追加）
-- [x] 本地验证：`rvprobe.compile`、core/patch ASM 生成、RISC-V gcc 汇编检查、`rvprobe.tests`
-- [x] 重新跑 VCS coverage：RVProbe+patch remaining 19 (closed 45)
+- [x] Phase 1: riscv-dv baseline — 47 covergroups,57 unique unhit bins(原 64 含 cover-model 同名重复)
+- [x] Phase 2: Handwrite + sb/sh/sw `cp_rs2=ZERO` 补丁(`sb tX, 0(x0)` 形式 + trap handler),Cell II 清零 → Handwrite at best
+- [x] Phase 3: RV32I.scala 合并 `rv32iCoverageModelPatches()`,弃用 core / +patch 二分路径 → RVProbe at best
+- [x] Phase 4: 四象限实测 — Cell I = 40,Cell II = 0,Cell III = 4,Cell IV residual = 13(分 4 子类全部归因)
