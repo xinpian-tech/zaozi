@@ -13,8 +13,9 @@ development in linux or darwin.
 For the development reason, e.g. swap to a debug version of CIRCT, or don't
 want to use nix for development. You need to prepare such dependencies:
 - [mill](https://mill-build.org) for build system in env.
-- [JDK 21](https://openjdk.org/projects/jdk/21/) for setup Java environment, 
-  zaozi only support the latest stable JDK version.
+- [JDK 25](https://openjdk.org/projects/jdk/25/) for setup Java environment.
+  zaozi compiles with `--release 25` (classfile major version 69), so JDK 25
+  is the minimum runtime and the only supported development JDK.
 - [jextract](https://github.com/openjdk/jextract) provided by `JEXTRACT_INSTALL_PATH`
 - [CIRCT](https://github.com/llvm/circt/) provided by `CIRCT_INSTALL_PATH`
 - [MLIR](https://github.com/llvm/circt/) provided by `MLIR_INSTALL_PATH`,
