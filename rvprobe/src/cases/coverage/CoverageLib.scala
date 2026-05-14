@@ -103,12 +103,13 @@ object CoverageLib:
     Block,
     Recipe
   ): Unit =
-    (0 until n).foreach { i =>
-      instruction(i, opcode) {
+    val start = summon[Recipe].peekNextIdx()
+    (0 until n).foreach { _ =>
+      inst(opcode) {
         rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
       }
     }
-    val seq = sequence(0, n)
+    val seq = sequence(start, start + n)
     seq.coverBins(_.rd, allRegs)
     seq.coverBins(_.rs1, allRegs)
     seq.coverBins(_.rs2, allRegs)
