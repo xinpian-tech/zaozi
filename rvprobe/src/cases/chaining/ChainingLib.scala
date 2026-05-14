@@ -80,8 +80,8 @@ object ChainingLib:
     */
   def explicitRAW(
     reg:     Int,
-    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
-    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
+    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -93,8 +93,8 @@ object ChainingLib:
 
   /** D2: Implicit v0 mask RAW — A writes v0, B uses v0 as implicit mask (vm=0). */
   def implicitV0RAW(
-    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
-    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
+    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -107,8 +107,8 @@ object ChainingLib:
   /** D3: WAR — A reads vs2, B writes the same register as vd. */
   def war(
     reg:     Int,
-    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
-    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
+    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -121,8 +121,8 @@ object ChainingLib:
   /** D4: WAW — A.vd == B.vd (both write the same register). */
   def waw(
     reg:     Int,
-    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
-    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
+    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -134,8 +134,8 @@ object ChainingLib:
 
   /** D5: Implicit WAR — A uses v0 as mask (vm=0), B writes v0 as vd. */
   def implicitV0WAR(
-    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
-    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcodeA: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
+    opcodeB: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,

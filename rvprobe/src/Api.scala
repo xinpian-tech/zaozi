@@ -16,7 +16,7 @@ import java.lang.foreign.Arena
 // the corresponding isXxx() function.  The compiler automatically summons
 // SpecFor[T]; if no explicit given exists, the low-priority noSpec instance
 // is used and no additional constraint is injected.
-def instruction[T <: InstConstraint](
+def instruction[T <: OpcodeConstraint](
   idx:         Int,
   opcode:      Index ?=> T
 )(
