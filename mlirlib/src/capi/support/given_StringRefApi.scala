@@ -13,8 +13,8 @@ given StringRefApi with
     inline def sizeOf:        Int           = MlirStringRef.sizeof().toInt
     inline def toBytes:       Array[Byte]   =
       MlirStringRef
-        .data$get(stringRef.segment)
-        .asSlice(0, MlirStringRef.length$get(stringRef.segment))
+        .data(stringRef.segment)
+        .asSlice(0, MlirStringRef.length(stringRef.segment))
         .toArray(java.lang.foreign.ValueLayout.JAVA_BYTE)
     inline def toScalaString: String        = String(toBytes)
   extension (string:    String)
@@ -34,8 +34,8 @@ given StringRefApi with
       buffer.copyFrom(MemorySegment.ofArray(bytes))
       StringRef(mlirStringRefCreateFromCString(arena, buffer))
       val stringRef = MlirStringRef.allocate(arena)
-      MlirStringRef.data$set(stringRef, buffer)
-      MlirStringRef.length$set(stringRef, bytes.length)
+      MlirStringRef.data(stringRef, buffer)
+      MlirStringRef.length(stringRef, bytes.length)
       StringRef(stringRef)
 end given
 
@@ -46,7 +46,13 @@ given StringCallbackApi with
     ): StringCallback =
       StringCallback(
         MlirStringCallback.allocate(
-          (message: MemorySegment, userData: MemorySegment) => stringCallBack(StringRef(message).toScalaString),
+          (message: MemorySegment, userData: MemorySegment) =>
+            try stringCallBack(StringRef(message).toScalaString)
+            catch
+              case t: Throwable =>
+                System.err.println(s"[zaozi:upcall:string-callback] ${t.getClass.getName}: ${t.getMessage}")
+                t.printStackTrace(System.err)
+          ,
           arena
         )
       )
@@ -56,7 +62,13 @@ given StringCallbackApi with
     ): StringCallback =
       StringCallback(
         MlirStringCallback.allocate(
-          (message: MemorySegment, userData: MemorySegment) => bytesCallBack(StringRef(message).toBytes),
+          (message: MemorySegment, userData: MemorySegment) =>
+            try bytesCallBack(StringRef(message).toBytes)
+            catch
+              case t: Throwable =>
+                System.err.println(s"[zaozi:upcall:bytes-callback] ${t.getClass.getName}: ${t.getMessage}")
+                t.printStackTrace(System.err)
+          ,
           arena
         )
       )

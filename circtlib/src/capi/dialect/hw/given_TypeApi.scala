@@ -16,6 +16,7 @@ import org.llvm.circt.CAPI.{
   hwModuleTypeGetNumOutputs,
   hwModuleTypeGetOutputName,
   hwModuleTypeGetOutputType,
+  hwModuleTypeGetPort,
   hwParamIntTypeGet,
   hwParamIntTypeGetWidthAttr,
   hwStructTypeGet,
@@ -93,6 +94,18 @@ given TypeApi with
     )(
       using arena: Arena
     ): Type = Type(hwModuleTypeGetOutputType(arena, tpe.segment, index))
+    // Decodes the HWModuleType port at `index` in declaration order (the
+    // unified order across inputs + outputs). The returned HWModulePort
+    // exposes `portName` (MlirAttribute, typically a StringAttr), `portType`
+    // (MlirType segment), and `portDirection` (0=input, 1=output, 2=inout).
+    def moduleTypeGetPort(
+      index:       Int
+    )(
+      using arena: Arena
+    ): HWModulePort =
+      val portSegment = org.llvm.circt.HWModulePort.allocate(arena)
+      hwModuleTypeGetPort(tpe.segment, index, portSegment)
+      HWModulePort(portSegment)
   def paramIntTypeGet(
     attribute:   Attribute
   )(

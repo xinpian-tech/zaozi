@@ -53,21 +53,23 @@ trait HasMlirTest:
     parameter: this.TPARAM
   )(predicate: String => Boolean
   ): Unit =
-    given Arena      = Arena.ofConfined()
-    given Context    = summon[ContextApi].contextCreate
-    summon[FirrtlDialectApi].loadDialect
-    given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-    summon[Circuit].appendToModule()
-    self.module(parameter).appendToCircuit()
-    validateCircuit()
+    val arena = Arena.ofConfined()
+    try
+      given Arena      = arena
+      given Context    = summon[ContextApi].contextCreate
+      summon[FirrtlDialectApi].loadDialect
+      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
+      summon[Circuit].appendToModule()
+      self.module(parameter).appendToCircuit()
+      validateCircuit()
 
-    val out = new StringBuilder
-    summon[MlirModule].getOperation.print(out ++= _)
-    summon[Context].destroy()
-    summon[Arena].close()
+      val out = new StringBuilder
+      summon[MlirModule].getOperation.print(out ++= _)
+      summon[Context].destroy()
 
-    assert(predicate(out.toString))
+      assert(predicate(out.toString))
+    finally arena.close()
 
   def mlirTest(
     parameter:  this.TPARAM
@@ -82,21 +84,23 @@ trait HasFirrtlTest:
     parameter: this.TPARAM
   )(predicate: String => Boolean
   ): Unit =
-    given Arena      = Arena.ofConfined()
-    given Context    = summon[ContextApi].contextCreate
-    summon[FirrtlDialectApi].loadDialect
-    given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-    summon[Circuit].appendToModule()
-    self.module(parameter).appendToCircuit()
+    val arena = Arena.ofConfined()
+    try
+      given Arena      = arena
+      given Context    = summon[ContextApi].contextCreate
+      summon[FirrtlDialectApi].loadDialect
+      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
+      summon[Circuit].appendToModule()
+      self.module(parameter).appendToCircuit()
 
-    validateCircuit()
-    val out = new StringBuilder
-    summon[MlirModule].exportFIRRTL(out ++= _)
-    summon[Context].destroy()
-    summon[Arena].close()
+      validateCircuit()
+      val out = new StringBuilder
+      summon[MlirModule].exportFIRRTL(out ++= _)
+      summon[Context].destroy()
 
-    assert(predicate(out.toString))
+      assert(predicate(out.toString))
+    finally arena.close()
 
   def firrtlTest(
     parameter:  this.TPARAM
@@ -111,34 +115,36 @@ trait HasVerilogTest:
     parameter: this.TPARAM
   )(predicate: String => Boolean
   ): Unit =
-    given Arena          = Arena.ofConfined()
-    given Context        = summon[ContextApi].contextCreate
-    summon[FirrtlDialectApi].loadDialect
-    summon[SvDialectApi].loadDialect
-    summon[EmitDialectApi].loadDialect
-    given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
+    val arena = Arena.ofConfined()
+    try
+      given Arena          = arena
+      given Context        = summon[ContextApi].contextCreate
+      summon[FirrtlDialectApi].loadDialect
+      summon[SvDialectApi].loadDialect
+      summon[EmitDialectApi].loadDialect
+      given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
 
-    given PassManager  = summon[PassManagerApi].passManagerCreate
-    val out            = new StringBuilder
-    val firtoolOptions = summon[FirtoolOptions]
+      given PassManager  = summon[PassManagerApi].passManagerCreate
+      val out            = new StringBuilder
+      val firtoolOptions = summon[FirtoolOptions]
 
-    summon[PassManager].preprocessTransforms(firtoolOptions)
-    summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
-    summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
-    summon[PassManager].hwToSV(firtoolOptions)
-    // TODO: we need a pass for export verilog on a MLIRModule, not it export empty string.
-    summon[PassManager].exportVerilog(firtoolOptions, out ++= _)
+      summon[PassManager].preprocessTransforms(firtoolOptions)
+      summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
+      summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
+      summon[PassManager].hwToSV(firtoolOptions)
+      // TODO: we need a pass for export verilog on a MLIRModule, not it export empty string.
+      summon[PassManager].exportVerilog(firtoolOptions, out ++= _)
 
-    given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-    summon[Circuit].appendToModule()
-    self.module(parameter).appendToCircuit()
-    validateCircuit()
-    summon[PassManager].runOnOp(summon[MlirModule].getOperation)
-    summon[Context].destroy()
-    summon[Arena].close()
+      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
+      summon[Circuit].appendToModule()
+      self.module(parameter).appendToCircuit()
+      validateCircuit()
+      summon[PassManager].runOnOp(summon[MlirModule].getOperation)
+      summon[Context].destroy()
 
-    assert(predicate(out.toString))
+      assert(predicate(out.toString))
+    finally arena.close()
 
   def verilogTest(
     parameter:  this.TPARAM
@@ -152,16 +158,18 @@ trait HasCompileErrorTest:
   def compileErrorTest(
     parameter: this.TPARAM
   ) =
-    given Arena      = Arena.ofConfined()
-    given Context    = summon[ContextApi].contextCreate
-    summon[FirrtlDialectApi].loadDialect
-    given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-    summon[Circuit].appendToModule()
-    self.module(parameter).appendToCircuit()
+    val arena = Arena.ofConfined()
+    try
+      given Arena      = arena
+      given Context    = summon[ContextApi].contextCreate
+      summon[FirrtlDialectApi].loadDialect
+      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
+      summon[Circuit].appendToModule()
+      self.module(parameter).appendToCircuit()
 
-    summon[Context].destroy()
-    summon[Arena].close()
+      summon[Context].destroy()
+    finally arena.close()
 
 def xfail(reason: String)(body: => Any): Unit =
   val unexpectedlyPassed =

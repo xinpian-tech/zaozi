@@ -314,7 +314,14 @@ given OperationWalkCallbackApi with
     ): OperationWalkCallback =
       OperationWalkCallback(
         MlirOperationWalkCallback.allocate(
-          (operation: MemorySegment, userData: MemorySegment) => operationCallBack(Operation(operation)).toNative,
+          (operation: MemorySegment, userData: MemorySegment) =>
+            try operationCallBack(Operation(operation)).toNative
+            catch
+              case t: Throwable =>
+                System.err.println(s"[zaozi:upcall:operation-walk] ${t.getClass.getName}: ${t.getMessage}")
+                t.printStackTrace(System.err)
+                WalkResultEnum.Interrupt.toNative
+          ,
           arena
         )
       )

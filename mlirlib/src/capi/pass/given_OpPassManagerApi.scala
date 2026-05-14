@@ -22,7 +22,11 @@ given OpPassManagerApi with
     )(
       using arena:   Arena
     ): OpPassManager =
-      OpPassManager(mlirOpPassManagerGetNestedUnder(arena, passManager.segment, operationName.toStringRef.segment))
+      OpPassManager(
+        mlirOpPassManagerGetNestedUnder(arena, passManager.segment, operationName.toStringRef.segment),
+        passManager._callbackArenas,
+        passManager._ownedPasses
+      )
     inline def addPipeline(
       pipelineElements: String,
       callback:         String => Unit
@@ -54,7 +58,11 @@ given OpPassManagerApi with
     )
     inline def addOwnedPass(
       pass: Pass
-    ): Unit = mlirOpPassManagerAddOwnedPass(opPassManager.segment, pass.segment)
+    ): Unit =
+      mlirOpPassManagerAddOwnedPass(opPassManager.segment, pass.segment)
+      val a = pass._callbackArena
+      if a != null then opPassManager._callbackArenas.add(a)
+      opPassManager._ownedPasses.add(pass)
     inline def printPassPipeline(
       callback:    String => Unit
     )(

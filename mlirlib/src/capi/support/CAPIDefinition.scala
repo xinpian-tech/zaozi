@@ -60,7 +60,10 @@ trait StringCallbackApi extends HasSegment[StringCallback]:
 end StringCallbackApi
 
 class LogicalResult(val _segment: MemorySegment)
-trait LogicalResultApi extends HasSegment[LogicalResult] with HasSizeOf[LogicalResult]
+trait LogicalResultApi extends HasSegment[LogicalResult] with HasSizeOf[LogicalResult]:
+  extension (logicalResult: LogicalResult)
+    inline def succeeded: Boolean
+    inline def failed:    Boolean
 
 class LlvmThreadPool(val _segment: MemorySegment)
 trait LlvmThreadPoolApi extends HasSegment[LlvmThreadPool] with HasSizeOf[LlvmThreadPool]:

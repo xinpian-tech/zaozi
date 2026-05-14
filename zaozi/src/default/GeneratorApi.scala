@@ -212,14 +212,16 @@ given GeneratorApi:
     )(
       using upickle.default.Reader[PARAM]
     ) =
-      given Arena   = Arena.ofConfined()
-      given Context = summon[ContextApi].contextCreate
-      summon[FirrtlDialectApi].loadDialect
+      val arena = Arena.ofConfined()
+      try
+        given Arena   = arena
+        given Context = summon[ContextApi].contextCreate
+        summon[FirrtlDialectApi].loadDialect
 
-      generator.dumpMlirbc(upickle.default.read(os.read(configFile)))
+        generator.dumpMlirbc(upickle.default.read(os.read(configFile)))
 
-      summon[Context].destroy()
-      summon[Arena].close()
+        summon[Context].destroy()
+      finally arena.close()
 
     def mainImpl(
       args: Array[String]

@@ -19,16 +19,16 @@ given FirrtlBundleFieldApi with
     context:     Context
   ): FirrtlBundleField =
     val buffer = FIRRTLBundleField.allocate(arena)
-    FIRRTLBundleField.name$slice(buffer).copyFrom(name.identifierGet.segment)
-    FIRRTLBundleField.isFlip$set(buffer, isFlip)
-    FIRRTLBundleField.type$slice(buffer).copyFrom(tpe.segment)
+    FIRRTLBundleField.name(buffer).copyFrom(name.identifierGet.segment)
+    FIRRTLBundleField.isFlip(buffer, isFlip)
+    FIRRTLBundleField.`type`(buffer).copyFrom(tpe.segment)
     FirrtlBundleField(buffer)
   extension (firrtlBundleField: FirrtlBundleField)
     inline def getName(
       using arena: Arena
-    ): String = Identifier(FIRRTLBundleField.name$slice(firrtlBundleField.segment)).str
-    inline def getIsFlip: Boolean = FIRRTLBundleField.isFlip$get(firrtlBundleField.segment)
-    inline def getType:   Type    = Type(FIRRTLBundleField.type$slice(firrtlBundleField.segment))
+    ): String = Identifier(FIRRTLBundleField.name(firrtlBundleField.segment)).str
+    inline def getIsFlip: Boolean = FIRRTLBundleField.isFlip(firrtlBundleField.segment)
+    inline def getType:   Type    = Type(FIRRTLBundleField.`type`(firrtlBundleField.segment))
 
     inline def segment: MemorySegment = firrtlBundleField._segment
     inline def sizeOf:  Int           = FIRRTLBundleField.sizeof().toInt
@@ -44,9 +44,9 @@ given FirrtlClassElementApi with
     context:     Context
   ): FirrtlClassElement =
     val buffer = FIRRTLClassElement.allocate(arena)
-    FIRRTLClassElement.name$slice(buffer).copyFrom(name.identifierGet.segment)
-    FIRRTLClassElement.direction$set(buffer, direction.toNative)
-    FIRRTLClassElement.type$slice(buffer).copyFrom(tpe.segment)
+    FIRRTLClassElement.name(buffer).copyFrom(name.identifierGet.segment)
+    FIRRTLClassElement.direction(buffer, direction.toNative)
+    FIRRTLClassElement.`type`(buffer).copyFrom(tpe.segment)
     FirrtlClassElement(buffer)
   extension (firrtlClassElement: FirrtlClassElement)
     inline def segment: MemorySegment = firrtlClassElement._segment
