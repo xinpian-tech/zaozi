@@ -186,8 +186,8 @@ object ChainingLib:
 
   // --- D3 × C6: WAR, Gather × ALU ---
   def war_GatherxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
-    instruction(0, isVrgatherVv()) { vs2Equal(reg.S) & vdRange(1, 32) & vmEqual(1) }
-    instruction(1, isVaddVv())     { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
+    inst(isVrgatherVv()) { vs2Equal(reg.S) & vdRange(1, 32) & vmEqual(1) }
+    inst(isVaddVv())     { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
 
   // --- D4 × C2: WAW, Slow × Load ---
   def waw_SlowxLoad(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =

@@ -61,6 +61,22 @@ def instruction[T <: OpcodeConstraint](
   idx
 }
 
+// create an instruction with auto-allocated index. Same shape as the
+// explicit-idx overload above but the framework picks the next index
+// via Recipe.nextIdx() (the same path li/la already use). Use this
+// form when the caller does not need to refer to the index later.
+// Renamed to `inst` (rather than overloading `instruction`) because
+// Scala 3's overload-disambiguation eagerly applies context-function
+// arguments to compute their type, which fails when the call site
+// has no Index in scope.
+def inst[T <: OpcodeConstraint](
+  opcode: Index ?=> T
+)(
+  using Arena, Context, Block, Recipe, SpecFor[T]
+)(
+  params: Index ?=> ArgConstraint
+): Int = instruction(summon[Recipe].nextIdx(), opcode)(params)
+
 // get an instruction with given index
 def instruction(
   idx: Int
