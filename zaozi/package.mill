@@ -9,10 +9,10 @@ import mill.scalalib.scalafmt._
 import contrib.jmh.JmhModule
 import os.Path
 
-import build.{circtlib, v, LitModule, ZaoziPublishModule}
+import build.{circtlib, v, LitModule, ZaoziPublishModule, ZaoziScalaModule}
 import build.testlib
 
-object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode)
   def moduleDeps   = Seq(circtlib)
@@ -22,7 +22,18 @@ object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule
     super.scalacOptions() ++ Seq("-Xprint-suspension", "-experimental", "-Xcheck-macros")
   )
 
-  object lit extends ScalaModule with ScalafmtModule {
+  // JEP 454: the published `elaborator.jar` assembly carries the
+  // `Enable-Native-Access: ALL-UNNAMED` manifest attribute so a future
+  // `java -jar elaborator.jar` launcher does not need to pass
+  // `--enable-native-access=ALL-UNNAMED` on the command line. The current
+  // lit-test consumers go through scala-cli `--extra-jars=...`, where the
+  // launcher flag is set explicitly; the manifest attribute is the load-
+  // bearing element for any future stand-alone `java -jar` invocation.
+  override def manifest: T[mill.util.JarManifest] = Task(
+    super.manifest().add("Enable-Native-Access" -> "ALL-UNNAMED")
+  )
+
+  object lit extends ZaoziScalaModule with ScalafmtModule {
     def scalaVersion = Task(v.scala)
     def moduleDeps   = Seq(m)
     override def forkArgs: T[Seq[String]] = Task(
@@ -40,7 +51,7 @@ object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule
     }
   }
 
-  object benchmark extends ScalaModule with JmhModule {
+  object benchmark extends ZaoziScalaModule with JmhModule {
 
     def scalaVersion   = Task(v.scala)
     def moduleDeps     = Seq(tests)
@@ -72,6 +83,27 @@ object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule
     def mvnDeps    = Seq(v.utest)
     def moduleDeps = Seq(testlib)
 
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+
+  // Native-access probe assembly. A tiny `MainNativeProbe` does one FFM
+  // round-trip (MLIR context create + destroy) under an `Arena.ofConfined`.
+  // The probe assembly carries `Enable-Native-Access: ALL-UNNAMED` in its
+  // manifest, so the positive run
+  //   java --illegal-native-access=deny -jar <probe.jar>
+  // exits 0 without the launcher passing `--enable-native-access=...`. The
+  // negative variant (manifest attribute stripped) fails with
+  // `IllegalCallerException`, proving the manifest attribute is the load-
+  // bearing element rather than runtime native-access being granted by default.
+  object nativeAccessProbe extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion                           = Task(v.scala)
+    def moduleDeps                             = Seq(m)
+    override def mainClass:    T[Option[String]] = Task(Some("me.jiuyang.zaozi.probe.MainNativeProbe"))
+    override def manifest:     T[mill.util.JarManifest] = Task(
+      super.manifest().add("Enable-Native-Access" -> "ALL-UNNAMED")
+    )
     override def forkArgs: T[Seq[String]] = Task(
       super.forkArgs() ++ circtlib.forkArgs()
     )

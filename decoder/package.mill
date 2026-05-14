@@ -7,9 +7,9 @@ import mill.scalalib._
 import mill.scalalib.TestModule.Utest
 import mill.scalalib.scalafmt._
 
-import build.{v, ZaoziPublishModule}
+import build.{v, ZaoziPublishModule, ZaoziScalaModule}
 
-object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule {
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule {
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle)
 

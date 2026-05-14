@@ -75,21 +75,26 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ nixd ];
+          nativeBuildInputs = with pkgs; [ nixd jdk25 ];
           env = with pkgs; {
             CIRCT_INSTALL_PATH = circt-install;
             MLIR_INSTALL_PATH = mlir-install;
-            JEXTRACT_INSTALL_PATH = jextract-21;
+            JEXTRACT_INSTALL_PATH = jextract;
+            LIBC_INCLUDE_PATH = "${stdenv.cc.libc.dev}/include";
             LIT_INSTALL_PATH = lit;
             SCALA_CLI_INSTALL_PATH = scala-cli;
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
           };
-          # pass to jextract
-          # Jextract splits the header class into multiple classes, which are combined via extending
-          # Due to https://github.com/scala/bug/issues/9272 we cannot access static fields in superclass headers, we work around this by not splitting the header
-          # https://github.com/openjdk/jextract/blob/8730fcf05c229d035b0db52ee6bd82622e9d03e9/src/main/java/org/openjdk/jextract/impl/ToplevelBuilder.java#L54
+          # -Djextract.decls.per.header=65535 is scoped to the jextract
+          # subprocess via PanamaModule.jextractEnv in build.mill, so it no
+          # longer leaks into mill, scalac, or every test/lit fork.
+          #
+          # -Xss32m stays in the global JAVA_TOOL_OPTIONS because scalac's
+          # JavaParser deep-recurses through the 95K-line single-class CAPI.java
+          # the jextract.decls.per.header property forces jextract to emit;
+          # without it scalac throws StackOverflowError in pullOutFirstConstr.
           shellHook = ''
-            export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS --enable-preview -Djextract.decls.per.header=65535"
+            export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Xss32m"
           '';
         };
       }

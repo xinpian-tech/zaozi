@@ -8,9 +8,9 @@ import mill.scalalib._
 import mill.scalalib.scalafmt._
 import os.Path
 
-import build.{circtlib, v, zaozi}
+import build.{circtlib, v, zaozi, ZaoziScalaModule}
 
-object `package` extends ScalaModule with ScalafmtModule { m =>
+object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
   def scalaVersion = Task(v.scala)
   def moduleDeps   = Seq(zaozi)
   def mvnDeps      = Seq(v.utest)

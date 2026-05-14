@@ -5,9 +5,10 @@
 , stdenv
 , makeWrapper
 , mill
+, jdk25
 , circt-install
 , mlir-install
-, jextract-21
+, jextract
 , lit
 , scala-cli
 , add-determinism
@@ -34,6 +35,8 @@ let
           ./../../decoder
           ./../../zaozi
           ./../../smtlib
+          ./../../stdlib
+          ./../../testlib
           ./../../rvdecoderdb
           ./../../omlib
         ];
@@ -54,10 +57,10 @@ let
 
     nativeBuildInputs = [
       mill
-      mill.jre
+      jdk25
       circt-install
       mlir-install
-      jextract-21
+      jextract
       lit
       scala-cli
       add-determinism
@@ -75,9 +78,15 @@ let
 
     env.CIRCT_INSTALL_PATH = circt-install;
     env.MLIR_INSTALL_PATH = mlir-install;
-    env.JEXTRACT_INSTALL_PATH = jextract-21;
+    env.JEXTRACT_INSTALL_PATH = jextract;
+    env.LIBC_INCLUDE_PATH = "${stdenv.cc.libc.dev}/include";
     env.LIT_INSTALL_PATH = lit;
-    env.JAVA_TOOL_OPTIONS = "--enable-preview -Djextract.decls.per.header=65535";
+    # -Djextract.decls.per.header=65535 is scoped to PanamaModule's jextract
+    # subprocess (see build.mill jextractEnv). -Xss32m stays global because
+    # scalac's JavaParser deep-recurses through the 95K-line single-class
+    # CAPI.java the jextract.decls.per.header property forces jextract to
+    # emit; without -Xss32m scalac throws StackOverflowError.
+    env.JAVA_TOOL_OPTIONS = "-Xss32m";
 
     outputs = [ "out" ];
 

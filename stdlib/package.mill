@@ -8,10 +8,10 @@ import mill.scalalib._
 import mill.scalalib.scalafmt._
 import os.Path
 
-import build.{circtlib, decoder, v, zaozi, LitModule, ZaoziPublishModule}
+import build.{circtlib, decoder, v, zaozi, LitModule, ZaoziPublishModule, ZaoziScalaModule}
 import build.testlib
 
-object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
   def moduleDeps   = Seq(zaozi, decoder)
 
@@ -21,7 +21,7 @@ object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule
     super.forkArgs() ++ circtlib.forkArgs()
   )
 
-  object lit extends ScalaModule with ScalafmtModule {
+  object lit extends ZaoziScalaModule with ScalafmtModule {
     def scalaVersion = Task(v.scala)
     def moduleDeps   = Seq(m)
     override def forkArgs: T[Seq[String]] = Task(

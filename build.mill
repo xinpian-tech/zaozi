@@ -15,7 +15,7 @@ import contrib.jmh.JmhModule
 import os.Path
 
 object v {
-  val scala      = "3.6.2"
+  val scala      = "3.7.4"
   val mainargs   = mvn"com.lihaoyi::mainargs:0.7.6"
   val oslib      = mvn"com.lihaoyi::os-lib:0.11.3"
   val upickle    = mvn"com.lihaoyi::upickle:4.0.2"
@@ -24,6 +24,12 @@ object v {
   val fastparse  = mvn"com.lihaoyi::fastparse:3.1.1"
   val pprint     = mvn"com.lihaoyi::pprint:0.9.0"
   val jmh        = "1.35"
+}
+
+trait ZaoziScalaModule extends ScalaModule {
+  override def scalacOptions: T[Seq[String]] = Task(
+    super.scalacOptions() ++ Seq("-java-output-version", "25")
+  )
 }
 
 trait ZaoziPublishModule extends PublishModule {
@@ -53,14 +59,27 @@ trait PanamaModule extends JavaModule {
     ""
   )
 
+  // System C headers (e.g. <stdint.h>) needed by libclang when parsing project
+  // headers. Provided by the Nix dev shell via LIBC_INCLUDE_PATH.
+  def libcIncludePath: T[os.Path] = Task.Input(
+    os.Path(Task.env.getOrElse("LIBC_INCLUDE_PATH", "LIBC_INCLUDE_PATH not found, you are not in the nix env?"))
+  )
+
+  // jextract triggers scala/bug#9272's static-inheritance scalac stack
+  // overflow when its header class is split into multiple files. Pass
+  // -Djextract.decls.per.header=65535 to the jextract subprocess.
+  private def jextractEnv: Map[String, String] =
+    Map("JAVA_TOOL_OPTIONS" -> "-Djextract.decls.per.header=65535")
+
   // API to regenerate all C-API from headers
   def dumpIncludes(): Command[Unit] = Task.Command {
     val f = os.temp()
     os.proc(
       Seq(jextractBinary().toString, header().path.toString)
+        ++ Seq("-I", libcIncludePath().toString)
         ++ includePaths().flatMap(p => Seq("-I", p.path.toString))
         ++ Seq("--dump-includes", f.toString)
-    ).call()
+    ).call(env = jextractEnv)
 
     includeFiles().foreach { file =>
       os.remove(file.path)
@@ -87,11 +106,12 @@ trait PanamaModule extends JavaModule {
       // @formatter:off
       os.proc(
         Seq(jextractBinary().toString, header().path.toString)
+          ++ Seq("-I", libcIncludePath().toString)
           ++ includePaths().flatMap(p => Seq("-I", p.path.toString))
           ++ Seq(
           "-t", target(),
           "--header-class-name", headerClassName(),
-          "--source",
+          "--use-system-load-library",
           "--output", Task.dest.toString
         ) ++ includeFunctions().flatMap(f => Seq("--include-function", f)) ++
           includeConstants().flatMap(f => Seq("--include-constant", f)) ++
@@ -100,18 +120,18 @@ trait PanamaModule extends JavaModule {
           includeUnions().flatMap(f => Seq("--include-union", f)) ++
           includeVars().flatMap(f => Seq("--include-var", f)) ++
           linkLibraries().flatMap(l => Seq("-l", l))
-      ).call(Task.dest)
+      ).call(Task.dest, env = jextractEnv)
       // @formatter:on
       Seq(PathRef(Task.dest))
     }
   }
 
   override def javacOptions: T[Seq[String]] = Task(
-    super.javacOptions() ++ Seq("--enable-preview", "--release", "21")
+    super.javacOptions() ++ Seq("--release", "25")
   )
 
   override def forkArgs: T[Seq[String]] = Task(
-    super.forkArgs() ++ Seq("--enable-native-access=ALL-UNNAMED", "--enable-preview")
+    super.forkArgs() ++ Seq("--enable-native-access=ALL-UNNAMED")
       ++ Some(s"-Djava.library.path=${libraryPaths().map(_.path).distinct.mkString(":")}")
   )
 
@@ -194,6 +214,12 @@ trait LitModule extends Module {
   def javaHome:        T[os.Path]
   def litDir:          T[os.Path]
   def litConfigIn:     T[PathRef]
+  def javaOpts:        T[Seq[String]] = Task(
+    Seq(
+      "--java-opt=--enable-native-access=ALL-UNNAMED",
+      s"--java-opt=-Djava.library.path=${javaLibraryPath().mkString(":")}"
+    )
+  )
   def litConfig:       T[PathRef] = Task {
     os.write(
       Task.dest / "lit.site.cfg.py",
@@ -202,6 +228,7 @@ trait LitModule extends Module {
         .replaceAll("@RUN_CLASSPATH@", runClasspath().mkString(","))
         .replaceAll("@JAVA_HOME@", javaHome().toString)
         .replaceAll("@JAVA_LIBRARY_PATH@", javaLibraryPath().mkString(","))
+        .replaceAll("@JAVA_OPTS@", javaOpts().mkString(","))
         .replaceAll("@LIT_DIR@", litDir().toString)
     )
     PathRef(Task.dest)

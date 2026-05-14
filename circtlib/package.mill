@@ -7,9 +7,9 @@ import mill.scalalib._
 import mill.scalalib.TestModule.Utest
 import mill.scalalib.scalafmt._
 
-import build.{mlirlib, v, PanamaModule, ZaoziPublishModule}
+import build.{mlirlib, v, PanamaModule, ZaoziPublishModule, ZaoziScalaModule}
 
-object `package` extends ScalaModule with ScalafmtModule with PanamaModule with ZaoziPublishModule {
+object `package` extends ZaoziScalaModule with ScalafmtModule with PanamaModule with ZaoziPublishModule {
   outer =>
   def scalaVersion = Task(v.scala)
   def moduleDeps   = Seq(mlirlib)
@@ -26,6 +26,13 @@ object `package` extends ScalaModule with ScalafmtModule with PanamaModule with 
       os.write.over(file.path, (license ++ lines).mkString("\n"))
     }
   }
+
+  override def includeFunctions = Task(super.includeFunctions() ++ mlirlib.includeFunctions())
+  override def includeStructs   = Task(super.includeStructs()   ++ mlirlib.includeStructs())
+  override def includeTypedefs  = Task(super.includeTypedefs()  ++ mlirlib.includeTypedefs())
+  override def includeConstants = Task(super.includeConstants() ++ mlirlib.includeConstants())
+  override def includeUnions    = Task(super.includeUnions()    ++ mlirlib.includeUnions())
+  override def includeVars      = Task(super.includeVars()      ++ mlirlib.includeVars())
 
   def includeConstantsFile = Task.Source(moduleDir / "capi" / "includeConstants.txt")
 
@@ -61,7 +68,7 @@ object `package` extends ScalaModule with ScalafmtModule with PanamaModule with 
 
   def libraryPaths = Task(Seq(mlirlib.mlirInstallPath() / "lib", circtInstallPath() / "lib").map(PathRef(_)))
 
-  object tests extends ScalaModule with ScalafmtModule with Utest {
+  object tests extends ZaoziScalaModule with ScalafmtModule with Utest {
     override def forkArgs: T[Seq[String]] = outer.forkArgs
 
     override def moduleDeps = Seq(outer, mlirlib)
