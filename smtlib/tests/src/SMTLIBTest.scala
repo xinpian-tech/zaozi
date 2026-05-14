@@ -17,64 +17,68 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, ContextApi, LocationApi, 
 import java.lang.foreign.Arena
 
 def smtTest(checkLines: String*)(body: (Arena, Context, Block) ?=> Unit): Unit =
-  given Arena   = Arena.ofConfined()
-  given Context = summon[ContextApi].contextCreate
-  summon[SmtDialect].loadDialect()
-  summon[FuncDialect].loadDialect()
+  val arena = Arena.ofConfined()
+  try
+    given Arena   = arena
+    given Context = summon[ContextApi].contextCreate
+    summon[SmtDialect].loadDialect()
+    summon[FuncDialect].loadDialect()
 
-  // Then based on the module to construct the Func.func .
-  given Module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-  given Func   = summon[FuncApi].op("func")
-  given Block  = summon[Func].block
-  summon[Func].appendToModule()
+    // Then based on the module to construct the Func.func .
+    given Module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    given Func   = summon[FuncApi].op("func")
+    given Block  = summon[Func].block
+    summon[Func].appendToModule()
 
-  body
+    body
 
-  // dump mlir
-  val out = new StringBuilder
-  summon[Module].exportSMTLIB(out ++= _)
-  summon[Context].destroy()
-  summon[Arena].close()
+    // dump mlir
+    val out = new StringBuilder
+    summon[Module].exportSMTLIB(out ++= _)
+    summon[Context].destroy()
 
-  // check the output
-  if (checkLines.isEmpty)
-    assert(out.toString == "Nothing To Check")
-  else checkLines.foreach(l => assert(out.toString.contains(l)))
+    // check the output
+    if (checkLines.isEmpty)
+      assert(out.toString == "Nothing To Check")
+    else checkLines.foreach(l => assert(out.toString.contains(l)))
+  finally arena.close()
 
 def smtZ3Test(checkLines: String*)(body: (Arena, Context, Block) ?=> Unit): Z3Result =
-  given Arena   = Arena.ofConfined()
-  given Context = summon[ContextApi].contextCreate
-  summon[SmtDialect].loadDialect()
-  summon[FuncDialect].loadDialect()
+  val arena = Arena.ofConfined()
+  try
+    given Arena   = arena
+    given Context = summon[ContextApi].contextCreate
+    summon[SmtDialect].loadDialect()
+    summon[FuncDialect].loadDialect()
 
-  // Then based on the module to construct the Func.func .
-  given Module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-  given Func   = summon[FuncApi].op("func")
-  given Block  = summon[Func].block
-  summon[Func].appendToModule()
+    // Then based on the module to construct the Func.func .
+    given Module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    given Func   = summon[FuncApi].op("func")
+    given Block  = summon[Func].block
+    summon[Func].appendToModule()
 
-  solver {
-    body
-    smtCheck
-  }
+    solver {
+      body
+      smtCheck
+    }
 
-  val out = new StringBuilder
-  summon[Module].exportSMTLIB(out ++= _)
-  summon[Context].destroy()
-  summon[Arena].close()
+    val out = new StringBuilder
+    summon[Module].exportSMTLIB(out ++= _)
+    summon[Context].destroy()
 
-  // check the output
-  if (checkLines.isEmpty)
-    assert(out.toString == "Nothing To Check")
-  else checkLines.foreach(l => assert(out.toString.contains(l)))
+    // check the output
+    if (checkLines.isEmpty)
+      assert(out.toString == "Nothing To Check")
+    else checkLines.foreach(l => assert(out.toString.contains(l)))
 
-  val smt = out.toString.replace("(reset)", "(get-model)")
+    val smt = out.toString.replace("(reset)", "(get-model)")
 
-  val z3Output = os
-    .proc("z3", "-in", "-t:1000")
-    .call(
-      stdin = smt,
-      check = false // ignore the error message when `unknown` or `unsat`
-    )
+    val z3Output = os
+      .proc("z3", "-in", "-t:1000")
+      .call(
+        stdin = smt,
+        check = false // ignore the error message when `unknown` or `unsat`
+      )
 
-  parseZ3Output(z3Output.out.text())
+    parseZ3Output(z3Output.out.text())
+  finally arena.close()

@@ -33,12 +33,14 @@ class WidthBundle extends Bundle:
 
 object WidthSpec extends TestSuite:
   private def withContext(body: (Arena, Context) ?=> Unit): Unit =
-    given Arena   = Arena.ofConfined()
-    given Context = summon[ContextApi].contextCreate
-    summon[FirrtlDialectApi].loadDialect
-    body
-    summon[Context].destroy()
-    summon[Arena].close()
+    val arena = Arena.ofConfined()
+    try
+      given Arena   = arena
+      given Context = summon[ContextApi].contextCreate
+      summon[FirrtlDialectApi].loadDialect
+      body
+      summon[Context].destroy()
+    finally arena.close()
 
   val tests = Tests:
     test("Data"):

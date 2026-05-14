@@ -16,12 +16,32 @@ import java.lang.foreign.Arena
 import org.llvm.mlir.scalalib.capi.ir.given
 
 object SMTSmoke extends TestSuite:
+  // Per-leaf arena + Context lifecycle via utest beforeEach/afterEach hooks.
+  // utest's macro rejects `test()` nested in `try/finally`, so the hook
+  // pattern is the only way to make the cleanup exception-safe without
+  // restructuring every leaf body.
+  private var currentArena:   Arena   = null
+  private var currentContext: Context = null
+
+  override def utestBeforeEach(path: Seq[String]): Unit =
+    currentArena = Arena.ofConfined()
+    currentContext = null
+
+  override def utestAfterEach(path: Seq[String]): Unit =
+    val c = currentContext
+    val a = currentArena
+    currentContext = null
+    currentArena = null
+    try if c != null then c.destroy()
+    finally if a != null then a.close()
+
   val tests: Tests = Tests:
     test("Load Panama Context"):
-      val arena   = Arena.ofConfined()
-      given Arena = arena
+      given Arena = currentArena
       test("Load Dialect"):
-        given Context       = summon[ContextApi].contextCreate
+        val context         = summon[ContextApi].contextCreate
+        currentContext = context
+        given Context       = context
         summon[SmtDialect].loadDialect()
         summon[FuncDialect].loadDialect()
         val unknownLocation = summon[LocationApi].locationUnknownGet

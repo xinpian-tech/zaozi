@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Yuhang Zeng <unlsycn@unlsycn.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" --java-opt="--enable-native-access=ALL-UNNAMED" --java-opt="--enable-preview" --java-opt="-Djava.library.path=%JAVALIBRARYPATH" --main-class DwbbFifoTop %s --
+// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class DwbbFifoTop %s --
 // RUN: %{test} config %t.json --width 16 --useAsyncReset false
 // RUN: %{test} design %t.json
 // RUN: firld *.mlirbc --base-circuit DwbbFifoTop_2a94835e --no-mangle | firtool --format=mlir | FileCheck %s

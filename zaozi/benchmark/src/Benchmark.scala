@@ -144,16 +144,18 @@ class ZaoziBenchmark {
   @Threads(value = 1)
   def ZaoziGCDTest(blackHole: Blackhole): Unit =
     val parameter = GCDParameter(32, false)
-    given Arena   = Arena.ofConfined()
-    given Context = summon[ContextApi].contextCreate
-    summon[FirrtlDialectApi].loadDialect
+    val arena     = Arena.ofConfined()
+    try
+      given Arena   = arena
+      given Context = summon[ContextApi].contextCreate
+      summon[FirrtlDialectApi].loadDialect
 
-    given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    given Circuit    = summon[CircuitApi].op(GCD.moduleName(parameter))
-    summon[Circuit].appendToModule()
-    GCD.module(parameter).appendToCircuit()
-    validateCircuit()
+      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      given Circuit    = summon[CircuitApi].op(GCD.moduleName(parameter))
+      summon[Circuit].appendToModule()
+      GCD.module(parameter).appendToCircuit()
+      validateCircuit()
 
-    summon[Context].destroy()
-    summon[Arena].close()
+      summon[Context].destroy()
+    finally arena.close()
 }
