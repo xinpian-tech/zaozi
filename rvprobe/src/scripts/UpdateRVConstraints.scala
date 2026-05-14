@@ -212,11 +212,11 @@ val header: String =
       w.write(s"opaque type $typeName <: InstConstraint = InstConstraint\n")
       w.write(s"object $typeName { def apply(r: InstConstraint): $typeName = r }\n")
       w.write(
-        s"def is${name}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(InstConstraint($nameIdExpr & ${setsExpr}))\n"
+        s"def is${name}()(using Arena, Context, Block, Index, Recipe): $typeName = $typeName(OpcodeConstraint($nameIdExpr & ${setsExpr}))\n"
       )
     } else {
       w.write(
-        s"def is${name}()(using Arena, Context, Block, Index, Recipe): InstConstraint = InstConstraint($nameIdExpr & ${setsExpr})\n"
+        s"def is${name}()(using Arena, Context, Block, Index, Recipe): OpcodeConstraint = OpcodeConstraint($nameIdExpr & ${setsExpr})\n"
       )
     }
   }

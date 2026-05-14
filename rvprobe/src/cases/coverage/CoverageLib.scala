@@ -96,7 +96,7 @@ object CoverageLib:
     */
   def rType(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -136,7 +136,7 @@ object CoverageLib:
     */
   def rTypeLogical(
     n:     Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
     asmOp: (Referable[SInt], Referable[SInt], Referable[SInt]) => (Arena, Context, Block, Recipe) ?=> Int
   )(
     using Arena,
@@ -171,7 +171,7 @@ object CoverageLib:
     */
   def iTypeAlu(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -211,7 +211,7 @@ object CoverageLib:
     */
   def iTypeLogical(
     n:     Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
     asmOp: (Referable[SInt], Referable[SInt], Int) => (Arena, Context, Block, Recipe) ?=> Int
   )(
     using Arena,
@@ -239,7 +239,7 @@ object CoverageLib:
     */
   def shiftImm(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -265,7 +265,7 @@ object CoverageLib:
     */
   def uType(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -296,7 +296,7 @@ object CoverageLib:
     */
   def branch(
     n:             Int,
-    opcode:        (Arena, Context, Block, Index, Recipe) ?=> InstConstraint,
+    opcode:        (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
     prologueCount: Int = 5
   )(
     using Arena,
@@ -327,7 +327,7 @@ object CoverageLib:
     */
   def load(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -358,7 +358,7 @@ object CoverageLib:
     */
   def store(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -385,7 +385,7 @@ object CoverageLib:
     */
   def jalrCov(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -412,7 +412,7 @@ object CoverageLib:
     */
   def csr(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,
@@ -439,7 +439,7 @@ object CoverageLib:
     */
   def csrImm(
     n:      Int,
-    opcode: (Arena, Context, Block, Index, Recipe) ?=> InstConstraint
+    opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint
   )(
     using Arena,
     Context,

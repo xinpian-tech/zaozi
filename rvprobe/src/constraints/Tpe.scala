@@ -228,7 +228,7 @@ extension (self: ArgConstraint)
 
 // SpecFor[T] — typeclass that associates spec-mandated arg constraints with a
 // specific instruction opaque type T (e.g. IsFence, IsAddi, …).
-trait SpecFor[T <: InstConstraint]:
+trait SpecFor[T <: OpcodeConstraint]:
   def spec(
     using Arena,
     Context,
@@ -239,7 +239,7 @@ trait SpecFor[T <: InstConstraint]:
 // When no explicit given is provided for a type T, the low-priority
 // `noSpec` instance is used and no additional constraint is injected.
 object SpecFor:
-  given noSpec[T <: InstConstraint]: SpecFor[T] with
+  given noSpec[T <: OpcodeConstraint]: SpecFor[T] with
     def spec(
       using Arena,
       Context,
