@@ -109,7 +109,7 @@ object EewTest extends TestSuite:
       // vs2 EMUL = (32/8) × 1 = 4
       assert(Emul.compute(OperandRole.Vs2, s, e, p, indexedEew).map(_.asWholeRegisters) == Right(4))
 
-    test("vluxei32.v rejects when XLEN=32 and indexedEew=32 would push EMUL out of spec"):
+    test("vluxei32.v rejects when LMUL=M4 pushes index EMUL out of spec"):
       val e          = env(Sew.Sew8, Lmul.M4, vlen = 128, xlen = 64)
       val s          = Schema.VdRs1mVs2Vm
       val p          = OperandWidthProfile.default
@@ -125,10 +125,40 @@ object EewTest extends TestSuite:
       val p = OperandWidthProfile.default
       assert(RegisterFootprint.of(OperandRole.Vs3, s, e, p, nfields = 2) == Right(2))
 
-    test("vsseg8e32.v at LMUL=M2 would need 16 registers — rejected at NfieldsValidator level"):
+    test("default-profile segmented case: LMUL=M4 + nfields=3 -> Left (12 > 8)"):
+      val e = env(Sew.Sew32, Lmul.M4)
+      val s = Schema.Vs3Rs1mVm
+      val p = OperandWidthProfile.default
+      val r = RegisterFootprint.of(OperandRole.Vs3, s, e, p, nfields = 3)
+      assert(r.isLeft)
+      r.left.toOption.foreach { msg =>
+        assert(msg.contains("NFIELDS"))
+        assert(msg.contains("EMUL"))
+        assert(msg.contains("8-register limit"))
+      }
+
+    test("profile-derived overflow: SEW=32, LMUL=M4, profile(Vd->By2), nfields=2 -> Left (2 x 8 = 16)"):
+      val e = env(Sew.Sew32, Lmul.M4)
+      val s = Schema.VdVs2Vs1Vm
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.By2))
+      // Base LMUL=4 alone with nfields=2 would say 4*2=8 (legal), but
+      // computed EMUL with widening is 8, footprint 8*2=16, illegal.
+      val r = RegisterFootprint.of(OperandRole.Vd, s, e, p, nfields = 2)
+      assert(r.isLeft)
+      r.left.toOption.foreach { msg =>
+        assert(msg.contains("NFIELDS"))
+        assert(msg.contains("EMUL"))
+        assert(msg.contains("8-register limit"))
+      }
+
+    test("vsseg case at LMUL=M2 hits exact 8-register limit at nfields=4"):
       val e = env(Sew.Sew32, Lmul.M2)
-      assert(NfieldsValidator.check(e, 8).isLeft)
-      assert(NfieldsValidator.check(e, 4).isRight) // 4*2=8 at the limit
+      val s = Schema.Vs3Rs1mVm
+      val p = OperandWidthProfile.default
+      assert(RegisterFootprint.of(OperandRole.Vs3, s, e, p, nfields = 4) == Right(8))
+      // and trips over at nfields = 5
+      val tooMany = RegisterFootprint.of(OperandRole.Vs3, s, e, p, nfields = 5)
+      assert(tooMany.isLeft)
 
     // ---- Validation: invalid EEW/EMUL combinations ----
 
@@ -209,15 +239,23 @@ object EewTest extends TestSuite:
       val s = Schema.VdVs2Vs1Vm
       assert(RegisterFootprint.of(OperandRole.Vd, s, e) == Right(1))
 
-    // ---- NFIELDS validator ----
+    // ---- NFIELDS validator (role/profile-aware) ----
 
     test("NfieldsValidator rejects nfields < 1 or > 8"):
       val e = env(Sew.Sew32, Lmul.M1)
-      assert(NfieldsValidator.check(e, 0).isLeft)
-      assert(NfieldsValidator.check(e, 9).isLeft)
-      assert(NfieldsValidator.check(e, -1).isLeft)
+      val s = Schema.Vs3Rs1mVm
+      assert(NfieldsValidator.check(OperandRole.Vs3, s, e, nfields = 0).isLeft)
+      assert(NfieldsValidator.check(OperandRole.Vs3, s, e, nfields = 9).isLeft)
+      assert(NfieldsValidator.check(OperandRole.Vs3, s, e, nfields = -1).isLeft)
 
-    test("NfieldsValidator rejects NFIELDS × LMUL > 8"):
+    test("NfieldsValidator rejects NFIELDS x EMUL > 8 at base LMUL"):
       val e = env(Sew.Sew32, Lmul.M4)
-      assert(NfieldsValidator.check(e, 4).isLeft)
-      assert(NfieldsValidator.check(e, 2).isRight) // 2*4=8 at the limit
+      val s = Schema.Vs3Rs1mVm
+      assert(NfieldsValidator.check(OperandRole.Vs3, s, e, nfields = 4).isLeft)
+      assert(NfieldsValidator.check(OperandRole.Vs3, s, e, nfields = 2).isRight) // 2*4=8 at the limit
+
+    test("NfieldsValidator rejects when widening pushes computed EMUL over limit"):
+      val e = env(Sew.Sew32, Lmul.M4)
+      val s = Schema.VdVs2Vs1Vm
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.By2))
+      assert(NfieldsValidator.check(OperandRole.Vd, s, e, p, nfields = 2).isLeft)

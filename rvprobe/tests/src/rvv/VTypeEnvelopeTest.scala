@@ -79,8 +79,8 @@ object VTypeEnvelopeTest extends TestSuite:
       assert(a.hashCode == b.hashCode)
 
     test("VTypeEnvelope is not a case class (no synthesized copy method)"):
-      // Codex AC-5 requirement: structural copy must not be available
-      // since the smart constructor is the only validated construction path.
+      // Smart constructor is the only validated construction path; structural
+      // copy/Mirror.Product machinery would bypass it.
       val methods = classOf[VTypeEnvelope].getMethods.map(_.getName).toSet
       assert(!methods.contains("copy"))
       assert(!methods.contains("productElement"))

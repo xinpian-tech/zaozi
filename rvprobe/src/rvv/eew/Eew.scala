@@ -187,6 +187,8 @@ object Emul:
       case Left(m)  => throw new IllegalArgumentException(m)
 
 object RegisterFootprint:
+  private val MaxRegisters: Int = 8
+
   def of(
     role:       OperandRole,
     schema:     Schema,
@@ -201,11 +203,23 @@ object RegisterFootprint:
         case OperandClass.VectorElementSew                                   =>
           if profile.maskDest && schema.destRole.contains(role) then Right(1)
           else
-            Emul.compute(role, schema, env, profile, indexedEew).map { emul =>
-              emul.asWholeRegisters * nfields
+            Emul.compute(role, schema, env, profile, indexedEew).flatMap { emul =>
+              val emulWhole = emul.asWholeRegisters
+              val footprint = emulWhole * nfields
+              if footprint > MaxRegisters then
+                Left(
+                  s"NFIELDS x EMUL exceeds 8-register limit: nfields=$nfields, " +
+                    s"emul=$emulWhole, footprint=$footprint for role=$role schema=$schema")
+              else Right(footprint)
             }
         case OperandClass.VectorElementIndex                                 =>
-          Emul.compute(role, schema, env, profile, indexedEew).map(_.asWholeRegisters)
+          Emul.compute(role, schema, env, profile, indexedEew).flatMap { emul =>
+            val emulWhole = emul.asWholeRegisters
+            if emulWhole > MaxRegisters then
+              Left(
+                s"indexed EMUL exceeds 8-register limit: emul=$emulWhole for role=$role schema=$schema")
+            else Right(emulWhole)
+          }
         case OperandClass.Mask | OperandClass.GroupedMask                    => Right(1)
         case _                                                               => Right(0)
 
@@ -222,11 +236,16 @@ object RegisterFootprint:
       case Left(m)  => throw new IllegalArgumentException(m)
 
 object NfieldsValidator:
-  def check(env: VTypeEnvelope, nfields: Int): Either[String, Unit] =
-    if nfields < 1 || nfields > 8 then Left(s"NFIELDS must be in [1,8], got $nfields")
-    else
-      val lmulWhole =
-        if env.vtype.lmul.denominator == 1 then env.vtype.lmul.numerator else 1
-      if nfields * lmulWhole > 8 then
-        Left(s"NFIELDS × EMUL > 8: nfields=$nfields lmul=$lmulWhole")
-      else Right(())
+  /** Role/profile-aware NFIELDS validation. Uses `Emul.compute` so the
+   *  check sees the *computed* EMUL (including widening / indexed EEW
+   *  / mask-destination), not just the base LMUL.
+   */
+  def check(
+    role:       OperandRole,
+    schema:     Schema,
+    env:        VTypeEnvelope,
+    profile:    OperandWidthProfile = OperandWidthProfile.default,
+    indexedEew: Option[Int]         = None,
+    nfields:    Int                 = 1
+  ): Either[String, Unit] =
+    RegisterFootprint.of(role, schema, env, profile, indexedEew, nfields).map(_ => ())
