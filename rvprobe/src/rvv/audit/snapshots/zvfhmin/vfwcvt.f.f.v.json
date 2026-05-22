@@ -1,0 +1,35 @@
+{
+  "extension": "zvfhmin",
+  "name": "vfwcvt.f.f.v",
+  "format": "vd,vs2,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "7ac51f91a326bc01178066079e0f24f8b14ce9ffeacc2af8082eb3b4c60efa95",
+  "litOnlyCount": 0,
+  "tests": {
+    "sew16": [
+      {
+        "raw": ["0xffff"],
+        "valuePreds": [["AllOnes(Sew16)","MinusOne","MaxUnsigned(Sew16)"]],
+        "tuplePreds": ["AllAllOnes(Sew16)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xfffe"],
+        "valuePreds": [["SmallSigned(-2)"]],
+        "tuplePreds": ["AllSame(65534,all operands = 0xfffe)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x2"],
+        "valuePreds": [["SmallSigned(2)"]],
+        "tuplePreds": ["AllSame(2,all operands = 0x2)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

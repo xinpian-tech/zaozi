@@ -1,0 +1,51 @@
+{
+  "extension": "v",
+  "name": "vzext.vf8",
+  "format": "vd,vs2,vm/3",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "610ee1752e1af02f087649acb61b44471a77a571068a932e78dee1a46673268f",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1"],
+        "valuePreds": [["One"]],
+        "tuplePreds": ["AllSame(1,all operands = 0x1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7f"],
+        "valuePreds": [["MaxSigned(Sew8)"]],
+        "tuplePreds": ["AllSame(127,all operands = 0x7f)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xfe"],
+        "valuePreds": [["SmallSigned(-2)"]],
+        "tuplePreds": ["AllSame(254,all operands = 0xfe)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xff"],
+        "valuePreds": [["AllOnes(Sew8)","MinusOne","MaxUnsigned(Sew8)"]],
+        "tuplePreds": ["AllAllOnes(Sew8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew8": [
+    ]
+  }
+}

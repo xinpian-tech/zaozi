@@ -1,0 +1,66 @@
+{
+  "extension": "v",
+  "name": "vfmv.s.f",
+  "format": "vd,fs1",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "2682dd8787d21635f64265b0ffa25fb877acf6cc8aec5b6d1921813f5c385302",
+  "litOnlyCount": 0,
+  "tests": {
+    "fsew16": [
+      {
+        "raw": ["42.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(42.0,curated decimal literal: 42.0)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(42.0,curated decimal literal: 42.0))"]
+      }
+    ],
+    "fsew32": [
+      {
+        "raw": ["42.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(42.0,curated decimal literal: 42.0)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(42.0,curated decimal literal: 42.0))"]
+      }
+    ],
+    "fsew64": [
+      {
+        "raw": ["42.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(42.0,curated decimal literal: 42.0)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(42.0,curated decimal literal: 42.0))"]
+      }
+    ],
+    "sew16": [
+      {
+        "raw": ["42.0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["42.0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["42.0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "extension": "v",
+  "name": "vmv2r.v",
+  "format": "vd,vs2",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "e4c55c8b8dab72e3096fe332c3df75bb90d1d538816b5406962dc0716aec4c2b",
+  "litOnlyCount": 0,
+  "tests": {
+  }
+}

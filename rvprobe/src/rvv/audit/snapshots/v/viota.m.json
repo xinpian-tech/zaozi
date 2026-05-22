@@ -1,0 +1,12 @@
+{
+  "extension": "v",
+  "name": "viota.m",
+  "format": "vd,vs2,vm/2",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "339352bd667f89d56e26df98f788a803921de5bb2e10b4963e7b03e9f806be05",
+  "litOnlyCount": 0,
+  "tests": {
+  }
+}

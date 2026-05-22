@@ -1,0 +1,12 @@
+{
+  "extension": "v",
+  "name": "vmsif.m",
+  "format": "vd,vs2,vm/2",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "c0dc5d4a3c7a34e4b9b1c077d20d2e3b34594c63480477eeede7741563ce498a",
+  "litOnlyCount": 0,
+  "tests": {
+  }
+}

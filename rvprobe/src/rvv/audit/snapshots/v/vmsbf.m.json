@@ -1,0 +1,12 @@
+{
+  "extension": "v",
+  "name": "vmsbf.m",
+  "format": "vd,vs2,vm/2",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "84b7903bc4f43d2a9edb97a1d8e6dbda49b9b5d0111cf9a0edea3a1c237dc09e",
+  "litOnlyCount": 0,
+  "tests": {
+  }
+}

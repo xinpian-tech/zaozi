@@ -1,0 +1,65 @@
+{
+  "extension": "v",
+  "name": "vlseg2e16ff.v",
+  "format": "vd,(rs1),vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "6692330fb6c6d80bc2f78c14960f427815255db9bf6bf107b3d24a096b4c13f0",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1"],
+        "valuePreds": [["One"]],
+        "tuplePreds": ["AllSame(1,all operands = 0x1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x2"],
+        "valuePreds": [["SmallSigned(2)"]],
+        "tuplePreds": ["AllSame(2,all operands = 0x2)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xf"],
+        "valuePreds": [["SmallSigned(15)"]],
+        "tuplePreds": ["AllSame(15,all operands = 0xf)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew16": [
+      {
+        "raw": ["0x7fff"],
+        "valuePreds": [["MaxSigned(Sew16)"]],
+        "tuplePreds": ["AllSame(32767,all operands = 0x7fff)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xfff8"],
+        "valuePreds": [["SmallSigned(-8)"]],
+        "tuplePreds": ["AllSame(65528,all operands = 0xfff8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffff"],
+        "valuePreds": [["AllOnes(Sew16)","MinusOne","MaxUnsigned(Sew16)"]],
+        "tuplePreds": ["AllAllOnes(Sew16)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

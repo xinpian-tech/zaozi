@@ -1,0 +1,444 @@
+{
+  "extension": "v",
+  "name": "vfsgnj.vv",
+  "format": "vd,vs2,vs1,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "ceb5c82d7471c2a672c4a5fd65f6d2b7a1102aa6962d631b5c245304412e1b9f",
+  "litOnlyCount": 0,
+  "tests": {
+    "fsew16": [
+      {
+        "raw": ["1.0","1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["FpDecimal(1.0,unity)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["1.0","-1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["FpDecimal(-1.0,negative unity)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["1.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["NegZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(1.0,unity),NegZero)"]
+      },
+      {
+        "raw": ["1.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["PosZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(1.0,unity),PosZero)"]
+      },
+      {
+        "raw": ["-1.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["NegZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(-1.0,negative unity),NegZero)"]
+      },
+      {
+        "raw": ["-1.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["PosZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(-1.0,negative unity),PosZero)"]
+      },
+      {
+        "raw": ["-0.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["NegZero"],["PosZero"]],
+        "fpTuplePreds": ["MixedSignZeros"]
+      },
+      {
+        "raw": ["0.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["NegZero"]],
+        "fpTuplePreds": ["MixedSignZeros"]
+      },
+      {
+        "raw": ["-3.14159265","0.0001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-3.14159265,curated decimal literal: -3.14159265)"],["FpDecimal(0.0001,curated decimal literal: 0.0001)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["-3.14159265","-0.0001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-3.14159265,curated decimal literal: -3.14159265)"],["FpDecimal(-0.0001,curated decimal literal: -0.0001)"]],
+        "fpTuplePreds": ["NormalPair"]
+      }
+    ],
+    "fsew32": [
+      {
+        "raw": ["1.0","1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["FpDecimal(1.0,unity)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["1.0","-1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["FpDecimal(-1.0,negative unity)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["1.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["NegZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(1.0,unity),NegZero)"]
+      },
+      {
+        "raw": ["1.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["PosZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(1.0,unity),PosZero)"]
+      },
+      {
+        "raw": ["-1.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["NegZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(-1.0,negative unity),NegZero)"]
+      },
+      {
+        "raw": ["-1.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["PosZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(-1.0,negative unity),PosZero)"]
+      },
+      {
+        "raw": ["-0.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["NegZero"],["PosZero"]],
+        "fpTuplePreds": ["MixedSignZeros"]
+      },
+      {
+        "raw": ["0.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["NegZero"]],
+        "fpTuplePreds": ["MixedSignZeros"]
+      },
+      {
+        "raw": ["-3.14159265","0.0001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-3.14159265,curated decimal literal: -3.14159265)"],["FpDecimal(0.0001,curated decimal literal: 0.0001)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["-3.14159265","-0.0001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-3.14159265,curated decimal literal: -3.14159265)"],["FpDecimal(-0.0001,curated decimal literal: -0.0001)"]],
+        "fpTuplePreds": ["NormalPair"]
+      }
+    ],
+    "fsew64": [
+      {
+        "raw": ["1.0","1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["FpDecimal(1.0,unity)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["1.0","-1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["FpDecimal(-1.0,negative unity)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["1.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["NegZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(1.0,unity),NegZero)"]
+      },
+      {
+        "raw": ["1.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(1.0,unity)"],["PosZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(1.0,unity),PosZero)"]
+      },
+      {
+        "raw": ["-1.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["NegZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(-1.0,negative unity),NegZero)"]
+      },
+      {
+        "raw": ["-1.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["PosZero"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(-1.0,negative unity),PosZero)"]
+      },
+      {
+        "raw": ["-0.0","0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["NegZero"],["PosZero"]],
+        "fpTuplePreds": ["MixedSignZeros"]
+      },
+      {
+        "raw": ["0.0","-0.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["NegZero"]],
+        "fpTuplePreds": ["MixedSignZeros"]
+      },
+      {
+        "raw": ["-3.14159265","0.0001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-3.14159265,curated decimal literal: -3.14159265)"],["FpDecimal(0.0001,curated decimal literal: 0.0001)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["-3.14159265","-0.0001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-3.14159265,curated decimal literal: -3.14159265)"],["FpDecimal(-0.0001,curated decimal literal: -0.0001)"]],
+        "fpTuplePreds": ["NormalPair"]
+      }
+    ],
+    "sew16": [
+      {
+        "raw": ["1.0","1.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","-1.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-0.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-3.14159265","0.0001"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-3.14159265","-0.0001"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["1.0","1.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","-1.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-0.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-3.14159265","0.0001"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-3.14159265","-0.0001"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["1.0","1.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","-1.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["1.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-0.0","0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","-0.0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-3.14159265","0.0001"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-3.14159265","-0.0001"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

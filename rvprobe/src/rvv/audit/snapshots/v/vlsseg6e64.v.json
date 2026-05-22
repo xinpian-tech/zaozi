@@ -1,0 +1,65 @@
+{
+  "extension": "v",
+  "name": "vlsseg6e64.v",
+  "format": "vd,(rs1),rs2,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "d7e33e48a3ee4339bea515fc195a14bb19474db2c4a2e9f8627e3430ce96c89a",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1"],
+        "valuePreds": [["One"]],
+        "tuplePreds": ["AllSame(1,all operands = 0x1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x2"],
+        "valuePreds": [["SmallSigned(2)"]],
+        "tuplePreds": ["AllSame(2,all operands = 0x2)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xf"],
+        "valuePreds": [["SmallSigned(15)"]],
+        "tuplePreds": ["AllSame(15,all operands = 0xf)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["0x7fffffffffffffff"],
+        "valuePreds": [["MaxSigned(Sew64)"]],
+        "tuplePreds": ["AllSame(9223372036854775807,all operands = 0x7fffffffffffffff)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xfffffffffffffff8"],
+        "valuePreds": [["SmallSigned(-8)"]],
+        "tuplePreds": ["AllSame(18446744073709551608,all operands = 0xfffffffffffffff8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffffffffffff"],
+        "valuePreds": [["AllOnes(Sew64)","MinusOne","MaxUnsigned(Sew64)"]],
+        "tuplePreds": ["AllAllOnes(Sew64)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "extension": "v",
+  "name": "vsetivli",
+  "format": "vsetivli",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "bdee14407f810dbba987e8d7a21d8b74ac238e2e8bf08a55efb0e22ef05831ca",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0","0x0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1","0x1"],
+        "valuePreds": [["One"],["One"]],
+        "tuplePreds": ["AllSame(1,all operands = 0x1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x3","0x3"],
+        "valuePreds": [["SmallSigned(3)"],["SmallSigned(3)"]],
+        "tuplePreds": ["AllSame(3,all operands = 0x3)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,528 @@
+{
+  "extension": "v",
+  "name": "vfwnmsac.vf",
+  "format": "vd,fs1,vs2,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "c02203878fcc531baac2fe33732a0c99908a7bee2dbbd30b5e0ba3719e02d531",
+  "litOnlyCount": 0,
+  "tests": {
+    "fsew16": [
+      {
+        "raw": ["0.0","2.5","1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["FpDecimal(2.5,common positive >1 with .5 fraction)"],["FpDecimal(1.0,unity)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: PosZero,FpDecimal(2.5,common positive >1 with .5 fraction),FpDecimal(1.0,unity))"]
+      },
+      {
+        "raw": ["-1.0","-1235.1","1.1"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction)"],["FpDecimal(1.1,near-unity positive with non-terminating binary fraction)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.002","3.14159265","0.00000001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["FpDecimal(3.14159265,approximate pi (precision boundary))"],["FpDecimal(0.00000001,tiny positive (denormalization boundary))"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.0","1.1","-1235.1"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["FpDecimal(1.1,near-unity positive with non-terminating binary fraction)"],["FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: PosZero,FpDecimal(1.1,near-unity positive with non-terminating binary fraction),FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction))"]
+      },
+      {
+        "raw": ["-1.0","-1.0","-2.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["FpDecimal(-1.0,negative unity)"],["FpDecimal(-2.0,negative even integer)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.002","nan","-nan"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["Nan"],["NegNan"]],
+        "fpTuplePreds": ["NaNPair"]
+      },
+      {
+        "raw": ["0.0","inf","-inf"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["PosInf"],["NegInf"]],
+        "fpTuplePreds": ["InfPair"]
+      },
+      {
+        "raw": ["-1.0","quiet_nan","signaling_nan"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["QuietNan"],["SignalingNan"]],
+        "fpTuplePreds": ["QuietVsSignalingNan"]
+      },
+      {
+        "raw": ["0.002","smallest_nonzero_float","largest_subnormal_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["SmallestNonzero"],["LargestSubnormal"]],
+        "fpTuplePreds": ["SubnormalBoundary"]
+      },
+      {
+        "raw": ["0.0","smallest_normal_float","max_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["SmallestNormal"],["MaxFinite"]],
+        "fpTuplePreds": ["NormalBoundary"]
+      },
+      {
+        "raw": ["-1.0","-smallest_nonzero_float","-largest_subnormal_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["NegSmallestNonzero"],["NegLargestSubnormal"]],
+        "fpTuplePreds": ["SubnormalBoundary"]
+      },
+      {
+        "raw": ["0.002","-smallest_normal_float","-max_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["NegSmallestNormal"],["NegMaxFinite"]],
+        "fpTuplePreds": ["NormalBoundary"]
+      }
+    ],
+    "fsew32": [
+      {
+        "raw": ["0.0","2.5","1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["FpDecimal(2.5,common positive >1 with .5 fraction)"],["FpDecimal(1.0,unity)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: PosZero,FpDecimal(2.5,common positive >1 with .5 fraction),FpDecimal(1.0,unity))"]
+      },
+      {
+        "raw": ["-1.0","-1235.1","1.1"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction)"],["FpDecimal(1.1,near-unity positive with non-terminating binary fraction)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.002","3.14159265","0.00000001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["FpDecimal(3.14159265,approximate pi (precision boundary))"],["FpDecimal(0.00000001,tiny positive (denormalization boundary))"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.0","1.1","-1235.1"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["FpDecimal(1.1,near-unity positive with non-terminating binary fraction)"],["FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: PosZero,FpDecimal(1.1,near-unity positive with non-terminating binary fraction),FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction))"]
+      },
+      {
+        "raw": ["-1.0","-1.0","-2.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["FpDecimal(-1.0,negative unity)"],["FpDecimal(-2.0,negative even integer)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.002","nan","-nan"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["Nan"],["NegNan"]],
+        "fpTuplePreds": ["NaNPair"]
+      },
+      {
+        "raw": ["0.0","inf","-inf"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["PosInf"],["NegInf"]],
+        "fpTuplePreds": ["InfPair"]
+      },
+      {
+        "raw": ["-1.0","quiet_nan","signaling_nan"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["QuietNan"],["SignalingNan"]],
+        "fpTuplePreds": ["QuietVsSignalingNan"]
+      },
+      {
+        "raw": ["0.002","smallest_nonzero_float","largest_subnormal_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["SmallestNonzero"],["LargestSubnormal"]],
+        "fpTuplePreds": ["SubnormalBoundary"]
+      },
+      {
+        "raw": ["0.0","smallest_normal_float","max_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["SmallestNormal"],["MaxFinite"]],
+        "fpTuplePreds": ["NormalBoundary"]
+      },
+      {
+        "raw": ["-1.0","-smallest_nonzero_float","-largest_subnormal_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["NegSmallestNonzero"],["NegLargestSubnormal"]],
+        "fpTuplePreds": ["SubnormalBoundary"]
+      },
+      {
+        "raw": ["0.002","-smallest_normal_float","-max_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["NegSmallestNormal"],["NegMaxFinite"]],
+        "fpTuplePreds": ["NormalBoundary"]
+      }
+    ],
+    "fsew64": [
+      {
+        "raw": ["0.0","2.5","1.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["FpDecimal(2.5,common positive >1 with .5 fraction)"],["FpDecimal(1.0,unity)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: PosZero,FpDecimal(2.5,common positive >1 with .5 fraction),FpDecimal(1.0,unity))"]
+      },
+      {
+        "raw": ["-1.0","-1235.1","1.1"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction)"],["FpDecimal(1.1,near-unity positive with non-terminating binary fraction)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.002","3.14159265","0.00000001"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["FpDecimal(3.14159265,approximate pi (precision boundary))"],["FpDecimal(0.00000001,tiny positive (denormalization boundary))"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.0","1.1","-1235.1"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["FpDecimal(1.1,near-unity positive with non-terminating binary fraction)"],["FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction)"]],
+        "fpTuplePreds": ["Lit(unclassified FP tuple: PosZero,FpDecimal(1.1,near-unity positive with non-terminating binary fraction),FpDecimal(-1235.1,arbitrary negative magnitude with .1 fraction))"]
+      },
+      {
+        "raw": ["-1.0","-1.0","-2.0"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["FpDecimal(-1.0,negative unity)"],["FpDecimal(-2.0,negative even integer)"]],
+        "fpTuplePreds": ["NormalPair"]
+      },
+      {
+        "raw": ["0.002","nan","-nan"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["Nan"],["NegNan"]],
+        "fpTuplePreds": ["NaNPair"]
+      },
+      {
+        "raw": ["0.0","inf","-inf"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["PosInf"],["NegInf"]],
+        "fpTuplePreds": ["InfPair"]
+      },
+      {
+        "raw": ["-1.0","quiet_nan","signaling_nan"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["QuietNan"],["SignalingNan"]],
+        "fpTuplePreds": ["QuietVsSignalingNan"]
+      },
+      {
+        "raw": ["0.002","smallest_nonzero_float","largest_subnormal_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["SmallestNonzero"],["LargestSubnormal"]],
+        "fpTuplePreds": ["SubnormalBoundary"]
+      },
+      {
+        "raw": ["0.0","smallest_normal_float","max_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["PosZero"],["SmallestNormal"],["MaxFinite"]],
+        "fpTuplePreds": ["NormalBoundary"]
+      },
+      {
+        "raw": ["-1.0","-smallest_nonzero_float","-largest_subnormal_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(-1.0,negative unity)"],["NegSmallestNonzero"],["NegLargestSubnormal"]],
+        "fpTuplePreds": ["SubnormalBoundary"]
+      },
+      {
+        "raw": ["0.002","-smallest_normal_float","-max_float"],
+        "valuePreds": [],
+        "tuplePreds": [],
+        "fpValuePreds": [["FpDecimal(0.002,small positive with non-terminating binary fraction)"],["NegSmallestNormal"],["NegMaxFinite"]],
+        "fpTuplePreds": ["NormalBoundary"]
+      }
+    ],
+    "sew16": [
+      {
+        "raw": ["0.0","2.5","1.0"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-1235.1","1.1"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","3.14159265","0.00000001"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","1.1","-1235.1"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-1.0","-2.0"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","nan","-nan"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","inf","-inf"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","quiet_nan","signaling_nan"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","smallest_nonzero_float","largest_subnormal_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","smallest_normal_float","max_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-smallest_nonzero_float","-largest_subnormal_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","-smallest_normal_float","-max_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["0.0","2.5","1.0"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-1235.1","1.1"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","3.14159265","0.00000001"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","1.1","-1235.1"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-1.0","-2.0"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","nan","-nan"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","inf","-inf"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","quiet_nan","signaling_nan"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","smallest_nonzero_float","largest_subnormal_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","smallest_normal_float","max_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-smallest_nonzero_float","-largest_subnormal_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","-smallest_normal_float","-max_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["0.0","2.5","1.0"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-1235.1","1.1"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","3.14159265","0.00000001"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","1.1","-1235.1"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-1.0","-2.0"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","nan","-nan"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","inf","-inf"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","quiet_nan","signaling_nan"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","smallest_nonzero_float","largest_subnormal_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.0","smallest_normal_float","max_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["-1.0","-smallest_nonzero_float","-largest_subnormal_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0.002","-smallest_normal_float","-max_float"],
+        "valuePreds": [["Zero"],["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "extension": "v",
+  "name": "vmv.x.s",
+  "format": "rd,vs2",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "6bd904054059100c0b5ed10c85226acce78bfde01e3a1eb3477cbc0aa08d8fc8",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+    ],
+    "sew16": [
+      {
+        "raw": ["0xffd6"],
+        "valuePreds": [["Lit(65494,unclassified literal at sew=16: 0xffd6)"]],
+        "tuplePreds": ["AllSame(65494,all operands = 0xffd6)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["0xffffffd6"],
+        "valuePreds": [["Lit(4294967254,unclassified literal at sew=32: 0xffffffd6)"]],
+        "tuplePreds": ["AllSame(4294967254,all operands = 0xffffffd6)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["0xffffffffffffffd6"],
+        "valuePreds": [["Lit(18446744073709551574,unclassified literal at sew=64: 0xffffffffffffffd6)"]],
+        "tuplePreds": ["AllSame(18446744073709551574,all operands = 0xffffffffffffffd6)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew8": [
+      {
+        "raw": ["0xd6"],
+        "valuePreds": [["Lit(214,unclassified literal at sew=8: 0xd6)"]],
+        "tuplePreds": ["AllSame(214,all operands = 0xd6)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "extension": "v",
+  "name": "vmorn.mm",
+  "format": "vd,vs2,vs1",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "baf2efd7952b8e5cfa1f14f56f9b38125d26d4317b21a2448b0bc3852d46ec1f",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0xff","0x0f"],
+        "valuePreds": [["AllOnes(Sew8)","MinusOne","MaxUnsigned(Sew8)"],["SmallSigned(15)"]],
+        "tuplePreds": ["Lit(List(255, 15),unclassified row at sew=8: List(0xff, 0xf))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x00","0x0f"],
+        "valuePreds": [["Zero"],["SmallSigned(15)"]],
+        "tuplePreds": ["ZeroPlusSmall(15)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x0f","0xf0"],
+        "valuePreds": [["SmallSigned(15)"],["SmallSigned(-16)"]],
+        "tuplePreds": ["Lit(List(15, 240),unclassified row at sew=8: List(0xf, 0xf0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xf0","0x0f"],
+        "valuePreds": [["SmallSigned(-16)"],["SmallSigned(15)"]],
+        "tuplePreds": ["Lit(List(240, 15),unclassified row at sew=8: List(0xf0, 0xf))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xf0","0xf0"],
+        "valuePreds": [["SmallSigned(-16)"],["SmallSigned(-16)"]],
+        "tuplePreds": ["AllSame(240,all operands = 0xf0)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

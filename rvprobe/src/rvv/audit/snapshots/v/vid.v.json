@@ -1,0 +1,14 @@
+{
+  "extension": "v",
+  "name": "vid.v",
+  "format": "vd,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "195aa0f7444b06842b3195b52f3b88f04472b9613e2305f8f6049919bf6ffad1",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "extension": "v",
+  "name": "vfrec7.v",
+  "format": "vd,vs2,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "67ae243bbd31a5c1a0d84988bef8b1ef5eb019497a12a25b31a6e9dc944144b8",
+  "litOnlyCount": 0,
+  "tests": {
+    "sew16": [
+      {
+        "raw": ["0x4248"],
+        "valuePreds": [["Lit(16968,unclassified literal at sew=16: 0x4248)"]],
+        "tuplePreds": ["AllSame(16968,all operands = 0x4248)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["0x40490fda"],
+        "valuePreds": [["Lit(1078530010,unclassified literal at sew=32: 0x40490fda)"]],
+        "tuplePreds": ["AllSame(1078530010,all operands = 0x40490fda)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["0x400921fb40000000"],
+        "valuePreds": [["Lit(4614256656212033536,unclassified literal at sew=64: 0x400921fb40000000)"]],
+        "tuplePreds": ["AllSame(4614256656212033536,all operands = 0x400921fb40000000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,260 @@
+{
+  "extension": "v",
+  "name": "vmaxu.vv",
+  "format": "vd,vs2,vs1,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "1621ffb1c6c04762a62f4407359884e17ce5c70b6951f123a97cc858e441f1aa",
+  "litOnlyCount": 5,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0","0x0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1","0x2"],
+        "valuePreds": [["One"],["SmallSigned(2)"]],
+        "tuplePreds": ["Lit(List(1, 2),unclassified row at sew=8: List(0x1, 0x2))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x3","0xf"],
+        "valuePreds": [["SmallSigned(3)"],["SmallSigned(15)"]],
+        "tuplePreds": ["Lit(List(3, 15),unclassified row at sew=8: List(0x3, 0xf))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew16": [
+      {
+        "raw": ["0xfff8","0x0000"],
+        "valuePreds": [["SmallSigned(-8)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xff80","0xfff8"],
+        "valuePreds": [["Lit(65408,unclassified literal at sew=16: 0xff80)"],["SmallSigned(-8)"]],
+        "tuplePreds": ["Lit(List(65408, 65528),unclassified row at sew=16: List(0xff80, 0xfff8))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7fff","0x0000"],
+        "valuePreds": [["MaxSigned(Sew16)"],["Zero"]],
+        "tuplePreds": ["Lit(List(32767, 0),unclassified row at sew=16: List(0x7fff, 0x0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7fff","0x07ff"],
+        "valuePreds": [["MaxSigned(Sew16)"],["Lit(2047,unclassified literal at sew=16: 0x7ff)"]],
+        "tuplePreds": ["Lit(List(32767, 2047),unclassified row at sew=16: List(0x7fff, 0x7ff))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7fff","0x0001"],
+        "valuePreds": [["MaxSigned(Sew16)"],["One"]],
+        "tuplePreds": ["Lit(List(32767, 1),unclassified row at sew=16: List(0x7fff, 0x1))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffff","0x0000"],
+        "valuePreds": [["AllOnes(Sew16)","MinusOne","MaxUnsigned(Sew16)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffff","0xffff"],
+        "valuePreds": [["AllOnes(Sew16)","MinusOne","MaxUnsigned(Sew16)"],["AllOnes(Sew16)","MinusOne","MaxUnsigned(Sew16)"]],
+        "tuplePreds": ["AllAllOnes(Sew16)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["0xfffffff8","0x00000000"],
+        "valuePreds": [["SmallSigned(-8)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffff80","0xfffffff8"],
+        "valuePreds": [["Lit(4294967168,unclassified literal at sew=32: 0xffffff80)"],["SmallSigned(-8)"]],
+        "tuplePreds": ["Lit(List(4294967168, 4294967288),unclassified row at sew=32: List(0xffffff80, 0xfffffff8))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x00007fff","0x00000000"],
+        "valuePreds": [["Lit(32767,unclassified literal at sew=32: 0x7fff)"],["Zero"]],
+        "tuplePreds": ["Lit(List(32767, 0),unclassified row at sew=32: List(0x7fff, 0x0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x00007fff","0x000007ff"],
+        "valuePreds": [["Lit(32767,unclassified literal at sew=32: 0x7fff)"],["Lit(2047,unclassified literal at sew=32: 0x7ff)"]],
+        "tuplePreds": ["Lit(List(32767, 2047),unclassified row at sew=32: List(0x7fff, 0x7ff))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x00007fff","0x00000001"],
+        "valuePreds": [["Lit(32767,unclassified literal at sew=32: 0x7fff)"],["One"]],
+        "tuplePreds": ["Lit(List(32767, 1),unclassified row at sew=32: List(0x7fff, 0x1))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffff","0x00000000"],
+        "valuePreds": [["AllOnes(Sew32)","MinusOne","MaxUnsigned(Sew32)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffff","0xffffffff"],
+        "valuePreds": [["AllOnes(Sew32)","MinusOne","MaxUnsigned(Sew32)"],["AllOnes(Sew32)","MinusOne","MaxUnsigned(Sew32)"]],
+        "tuplePreds": ["AllAllOnes(Sew32)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew64": [
+      {
+        "raw": ["0xffffffffffff8000","0x0000000000000000"],
+        "valuePreds": [["Lit(18446744073709518848,unclassified literal at sew=64: 0xffffffffffff8000)"],["Zero"]],
+        "tuplePreds": ["Lit(List(18446744073709518848, 0),unclassified row at sew=64: List(0xffffffffffff8000, 0x0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffff80000000","0x0000000000000000"],
+        "valuePreds": [["Lit(18446744071562067968,unclassified literal at sew=64: 0xffffffff80000000)"],["Zero"]],
+        "tuplePreds": ["Lit(List(18446744071562067968, 0),unclassified row at sew=64: List(0xffffffff80000000, 0x0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffff80000000","0xffffffffffff8000"],
+        "valuePreds": [["Lit(18446744071562067968,unclassified literal at sew=64: 0xffffffff80000000)"],["Lit(18446744073709518848,unclassified literal at sew=64: 0xffffffffffff8000)"]],
+        "tuplePreds": ["Lit(List(18446744071562067968, 18446744073709518848),unclassified row at sew=64: List(0xffffffff80000000, 0xffffffffffff8000))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x0000000000007fff","0x0000000000000000"],
+        "valuePreds": [["Lit(32767,unclassified literal at sew=64: 0x7fff)"],["Zero"]],
+        "tuplePreds": ["Lit(List(32767, 0),unclassified row at sew=64: List(0x7fff, 0x0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x000000007fffffff","0x0000000000007fff"],
+        "valuePreds": [["Lit(2147483647,unclassified literal at sew=64: 0x7fffffff)"],["Lit(32767,unclassified literal at sew=64: 0x7fff)"]],
+        "tuplePreds": ["Lit(List(2147483647, 32767),unclassified row at sew=64: List(0x7fffffff, 0x7fff))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffff80000000","0x0000000000007fff"],
+        "valuePreds": [["Lit(18446744071562067968,unclassified literal at sew=64: 0xffffffff80000000)"],["Lit(32767,unclassified literal at sew=64: 0x7fff)"]],
+        "tuplePreds": ["Lit(List(18446744071562067968, 32767),unclassified row at sew=64: List(0xffffffff80000000, 0x7fff))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x000000007fffffff","0xffffffffffff8000"],
+        "valuePreds": [["Lit(2147483647,unclassified literal at sew=64: 0x7fffffff)"],["Lit(18446744073709518848,unclassified literal at sew=64: 0xffffffffffff8000)"]],
+        "tuplePreds": ["Lit(List(2147483647, 18446744073709518848),unclassified row at sew=64: List(0x7fffffff, 0xffffffffffff8000))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffffffffffff","0x0000000000000001"],
+        "valuePreds": [["AllOnes(Sew64)","MinusOne","MaxUnsigned(Sew64)"],["One"]],
+        "tuplePreds": ["Lit(List(18446744073709551615, 1),unclassified row at sew=64: List(0xffffffffffffffff, 0x1))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffffffffffff","0x0000000000000000"],
+        "valuePreds": [["AllOnes(Sew64)","MinusOne","MaxUnsigned(Sew64)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xffffffffffffffff","0xffffffffffffffff"],
+        "valuePreds": [["AllOnes(Sew64)","MinusOne","MaxUnsigned(Sew64)"],["AllOnes(Sew64)","MinusOne","MaxUnsigned(Sew64)"]],
+        "tuplePreds": ["AllAllOnes(Sew64)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew8": [
+      {
+        "raw": ["0xf8","0x00"],
+        "valuePreds": [["SmallSigned(-8)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xf8","0x08"],
+        "valuePreds": [["SmallSigned(-8)"],["SmallSigned(8)"]],
+        "tuplePreds": ["Lit(List(248, 8),unclassified row at sew=8: List(0xf8, 0x8))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7f","0x00"],
+        "valuePreds": [["MaxSigned(Sew8)"],["Zero"]],
+        "tuplePreds": ["Lit(List(127, 0),unclassified row at sew=8: List(0x7f, 0x0))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7f","0x07"],
+        "valuePreds": [["MaxSigned(Sew8)"],["SmallSigned(7)"]],
+        "tuplePreds": ["Lit(List(127, 7),unclassified row at sew=8: List(0x7f, 0x7))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x7f","0x01"],
+        "valuePreds": [["MaxSigned(Sew8)"],["One"]],
+        "tuplePreds": ["Lit(List(127, 1),unclassified row at sew=8: List(0x7f, 0x1))"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xff","0x00"],
+        "valuePreds": [["AllOnes(Sew8)","MinusOne","MaxUnsigned(Sew8)"],["Zero"]],
+        "tuplePreds": ["ZeroPlusSmall(-1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xff","0xff"],
+        "valuePreds": [["AllOnes(Sew8)","MinusOne","MaxUnsigned(Sew8)"],["AllOnes(Sew8)","MinusOne","MaxUnsigned(Sew8)"]],
+        "tuplePreds": ["AllAllOnes(Sew8)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

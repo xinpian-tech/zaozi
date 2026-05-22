@@ -1,0 +1,35 @@
+{
+  "extension": "v",
+  "name": "vsetvli",
+  "format": "vsetvli",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "ffd55695d66973c416367c906fe2dfd04edeab1e93af43cd6d5a57339d4e028a",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0","0x0"],
+        "valuePreds": [["Zero"],["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1","0x1"],
+        "valuePreds": [["One"],["One"]],
+        "tuplePreds": ["AllSame(1,all operands = 0x1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x3","0x3"],
+        "valuePreds": [["SmallSigned(3)"],["SmallSigned(3)"]],
+        "tuplePreds": ["AllSame(3,all operands = 0x3)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

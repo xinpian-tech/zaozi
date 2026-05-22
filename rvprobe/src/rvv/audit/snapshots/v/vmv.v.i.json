@@ -1,0 +1,42 @@
+{
+  "extension": "v",
+  "name": "vmv.v.i",
+  "format": "vd,imm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "fc62bcbf3a17960544a76150ee9f8353f75c86995f6d411d2c774ea7fcc085b1",
+  "litOnlyCount": 0,
+  "tests": {
+    "base": [
+      {
+        "raw": ["0x0"],
+        "valuePreds": [["Zero"]],
+        "tuplePreds": ["AllZero"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1"],
+        "valuePreds": [["One"]],
+        "tuplePreds": ["AllSame(1,all operands = 0x1)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x3"],
+        "valuePreds": [["SmallSigned(3)"]],
+        "tuplePreds": ["AllSame(3,all operands = 0x3)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x1f"],
+        "valuePreds": [["Lit(31,unclassified literal at sew=8: 0x1f)"]],
+        "tuplePreds": ["AllSame(31,all operands = 0x1f)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}

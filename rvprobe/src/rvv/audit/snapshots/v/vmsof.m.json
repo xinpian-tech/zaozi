@@ -1,0 +1,12 @@
+{
+  "extension": "v",
+  "name": "vmsof.m",
+  "format": "vd,vs2,vm/2",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "a59eda51a9286afaba9c267144f9778718d1390e3248b07833cd37825b6440ce",
+  "litOnlyCount": 0,
+  "tests": {
+  }
+}

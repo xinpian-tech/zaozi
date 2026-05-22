@@ -1,0 +1,30 @@
+{
+  "extension": "v",
+  "name": "vfwcvt.xu.f.v",
+  "format": "vd,vs2,vm",
+  "vxrm": false,
+  "vxsat": false,
+  "notestfloat3": false,
+  "contentHash": "d97f0f42ab3bd8d5d7137fcbf6647789df01272a165cdc00de52ca302b35ea17",
+  "litOnlyCount": 0,
+  "tests": {
+    "sew16": [
+      {
+        "raw": ["0x7e00"],
+        "valuePreds": [["Lit(32256,unclassified literal at sew=16: 0x7e00)"]],
+        "tuplePreds": ["AllSame(32256,all operands = 0x7e00)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ],
+    "sew32": [
+      {
+        "raw": ["0x7fc00000"],
+        "valuePreds": [["Lit(2143289344,unclassified literal at sew=32: 0x7fc00000)"]],
+        "tuplePreds": ["AllSame(2143289344,all operands = 0x7fc00000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      }
+    ]
+  }
+}
