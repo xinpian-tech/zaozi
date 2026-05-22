@@ -55,11 +55,56 @@ object TomlIntent:
       val vxsat        = vxsatRe.findFirstMatchIn(content).exists(_.group(1) == "true")
       val notestfloat3 = ntfRe.findFirstMatchIn(content).exists(_.group(1) == "true")
 
-      val tests = LegalKeys.flatMap { key =>
-        extractArray(content, key).map(key -> _)
-      }.toMap
+      // Structural validation (Codex round-5: fail-loud on malformed/incomplete tomls).
+      val errors = List.newBuilder[String]
+      if name.isEmpty then errors += s"missing or empty `name` field"
+      if format.isEmpty then errors += s"missing or empty `format` field"
 
-      Right(TomlSpec(extDir, name, format, vxrm, vxsat, notestfloat3, tests, hash))
+      val (tests, parseErrs) = extractTestsKeys(content)
+      parseErrs.foreach(errors += _)
+
+      val errList = errors.result()
+      if errList.nonEmpty then Left(errList.mkString("; "))
+      else Right(TomlSpec(extDir, name, format, vxrm, vxsat, notestfloat3, tests, hash))
+
+  /** Extract every `<key> = [ ... ]` assignment from the (comment-
+   *  stripped) content, anchored at line/key boundaries so `sew16`
+   *  cannot collide with the `fsew16` / `bf16sew16` substrings.
+   *  Returns the parsed `tests` map and any structural errors
+   *  encountered (unknown key, duplicate key, unmatched bracket).
+   */
+  private def extractTestsKeys(content: String): (Map[String, List[List[String]]], List[String]) =
+    val keyAssignRe = """(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*\[""".r
+    val tests       = scala.collection.mutable.LinkedHashMap.empty[String, List[List[String]]]
+    val errors      = List.newBuilder[String]
+    for m <- keyAssignRe.findAllMatchIn(content) do
+      val key      = m.group(1)
+      // Only consider tests-section keys; skip top-level scalar metadata
+      // (name/format/vxrm/etc are matched separately and don't have `[`).
+      val isTestsKey = LegalKeys.contains(key)
+      val isTopLevelArray =
+        // Heuristic: top-level scalars are not preceded by `[` (which only
+        // appears in `[tests]` section header). For our toml shape, ALL test
+        // arrays use `[`, so isTestsKey above is the right gate.
+        false
+      if isTestsKey then
+        val openBracket = content.indexOf('[', m.end - 1)
+        if openBracket < 0 then errors += s"key `$key` has no opening `[`"
+        else
+          val close = findMatchingBracket(content, openBracket)
+          if close < 0 then errors += s"key `$key` has unmatched brackets"
+          else
+            val body = content.substring(openBracket + 1, close)
+            if tests.contains(key) then errors += s"duplicate test key `$key`"
+            else tests(key) = parseRows(body)
+      else if !isTopLevelMetadataKey(key) then
+        errors += s"unknown key `$key` in tests section"
+    (tests.toMap, errors.result())
+
+  private val TopLevelMetadataKeys: Set[String] =
+    Set("name", "format", "vxrm", "vxsat", "notestfloat3")
+
+  private def isTopLevelMetadataKey(key: String): Boolean = TopLevelMetadataKeys.contains(key)
 
   /** Strip `# ... \n` comments outside quoted strings. TOML supports `#`
    *  comments anywhere on a line except inside string literals. This
@@ -93,36 +138,21 @@ object TomlIntent:
         i += 1
     sb.toString
 
-  /** Extract a `<key> = [ ... ]` array from the file content, returning
-   *  it as a list of rows, where each row is a list of raw value tokens
-   *  (with quotes stripped where applicable).
-   */
-  private def extractArray(content: String, key: String): Option[List[List[String]]] =
-    val anchor = s"$key ="
-    val idx    = content.indexOf(anchor)
-    if idx < 0 then None
-    else
-      val openBracket = content.indexOf('[', idx)
-      if openBracket < 0 then None
-      else
-        val close = findMatchingBracket(content, openBracket)
-        if close < 0 then None
-        else
-          val body = content.substring(openBracket + 1, close)
-          Some(parseRows(body))
-
   private def findMatchingBracket(content: String, openIdx: Int): Int =
-    var depth     = 1
-    var i         = openIdx + 1
-    var inString  = false
-    var prevChar  = ' '
+    var depth    = 1
+    var i        = openIdx + 1
+    var inString = false
+    var escaped  = false
     while i < content.length && depth > 0 do
       val c = content.charAt(i)
-      if c == '"' && prevChar != '\\' then inString = !inString
-      else if !inString then
-        if c == '[' then depth += 1
+      if inString then
+        if escaped then escaped = false
+        else if c == '\\' then escaped = true
+        else if c == '"' then inString = false
+      else
+        if c == '"' then inString = true
+        else if c == '[' then depth += 1
         else if c == ']' then depth -= 1
-      prevChar = c
       i += 1
     if depth == 0 then i - 1 else -1
 

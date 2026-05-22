@@ -34,33 +34,6 @@
         "fpValuePreds": [["FpDecimal(42.0,curated decimal literal: 42.0)"]],
         "fpTuplePreds": ["Lit(unclassified FP tuple: FpDecimal(42.0,curated decimal literal: 42.0))"]
       }
-    ],
-    "sew16": [
-      {
-        "raw": ["42.0"],
-        "valuePreds": [["Zero"]],
-        "tuplePreds": ["AllZero"],
-        "fpValuePreds": [],
-        "fpTuplePreds": []
-      }
-    ],
-    "sew32": [
-      {
-        "raw": ["42.0"],
-        "valuePreds": [["Zero"]],
-        "tuplePreds": ["AllZero"],
-        "fpValuePreds": [],
-        "fpTuplePreds": []
-      }
-    ],
-    "sew64": [
-      {
-        "raw": ["42.0"],
-        "valuePreds": [["Zero"]],
-        "tuplePreds": ["AllZero"],
-        "fpValuePreds": [],
-        "fpTuplePreds": []
-      }
     ]
   }
 }

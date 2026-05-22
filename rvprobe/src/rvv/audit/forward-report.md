@@ -3,7 +3,7 @@
 Generated from upstream `riscv-vector-tests/configs/`. Per AC-3, `Lit(BigInt, rationale)` and `FpLit(literal, rationale)` are valid classifications. The metrics below are *informational*: they show how much curator intent the named vocabulary captures vs. how much falls through to Lit. Unclassified-and-unwaived count is 0 by construction.
 
 - Tomls scanned: 676
-- Total literal rows: 14950
+- Total literal rows: 12359
 - Rows where every classification is Lit (`litOnlyCount`): 775 across 165 tomls
 - Element cells classified as `ValuePred.Lit`: 4150
 - Element cells classified as `FpValuePred.FpLit`: 0

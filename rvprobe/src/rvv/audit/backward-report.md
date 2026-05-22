@@ -6,9 +6,8 @@ Each predicate's hit count across upstream tomls. AC-4 requires every non-`Lit`,
 
 | Predicate | Hits |
 |---|---|
-| `Zero` | 9254 |
 | `Lit` | 7969 |
-| `AllZero` | 3192 |
+| `Zero` | 3205 |
 | `AllOnes` | 3101 |
 | `MaxUnsigned` | 3101 |
 | `MinusOne` | 3101 |
@@ -21,6 +20,7 @@ Each predicate's hit count across upstream tomls. AC-4 requires every non-`Lit`,
 | `ZeroPlusSmall` | 1030 |
 | `NormalPair` | 926 |
 | `ShiftBySewOrAbove` | 796 |
+| `AllZero` | 601 |
 | `SubnormalBoundary` | 404 |
 | `NormalBoundary` | 392 |
 | `PosZero` | 364 |

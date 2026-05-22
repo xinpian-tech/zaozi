@@ -146,3 +146,42 @@ object TomlIntentTest extends TestSuite:
       val out   = TomlIntent.stripTomlComments(input)
       assert(out.contains("\"with#hash\"")) // # inside string is preserved
       assert(!out.contains("this is a comment")) // # comment is stripped
+
+    test("vfadd.vv parses only fsew* keys (Codex r5 key-collision regression)"):
+      val configsRoot = findAncestorWith("riscv-vector-tests/configs")
+        .map(_.resolve("riscv-vector-tests/configs"))
+      if configsRoot.isDefined && Files.isDirectory(configsRoot.get) then
+        val file = configsRoot.get.resolve("v").resolve("vfadd.vv.toml")
+        val spec = TomlIntent.parse("v", file).toOption.get
+        // vfadd.vv is FP-only: only fsew16/fsew32/fsew64 in upstream.
+        // The round-4/5 substring matcher fired sew16 inside fsew16 and
+        // populated spurious integer rows. This regression locks the fix.
+        assert(spec.tests.keySet == Set("fsew16", "fsew32", "fsew64"))
+      else
+        println("[TomlIntentTest] upstream configs/ unavailable; skipping vfadd.vv key regression")
+
+    test("corpus key counts match upstream exactly (Codex r5 invariant)"):
+      val configsRoot = findAncestorWith("riscv-vector-tests/configs")
+        .map(_.resolve("riscv-vector-tests/configs"))
+      if configsRoot.isDefined && Files.isDirectory(configsRoot.get) then
+        val walk = TomlIntent.walkConfigs(configsRoot.get)
+        assert(walk.errors.isEmpty)
+        val keyCounts = scala.collection.mutable.Map.empty[String, Int].withDefaultValue(0)
+        walk.specs.foreach { s =>
+          s.tests.keys.foreach(k => keyCounts(k) += 1)
+        }
+        // Per Codex's round-5 review (exact upstream key counts via
+        // `rg '^\s*(base|sew*|fsew*|bf16sew*)\s*='`):
+        assert(keyCounts("base") == 561)
+        assert(keyCounts("sew8") == 293)
+        assert(keyCounts("sew16") == 302)
+        assert(keyCounts("sew32") == 329)
+        assert(keyCounts("sew64") == 298)
+        assert(keyCounts("fsew16") == 76)
+        assert(keyCounts("fsew32") == 77)
+        assert(keyCounts("fsew64") == 73)
+        assert(keyCounts("bf16sew16") == 3)
+        val total = keyCounts.values.sum
+        assert(total == 2012)
+      else
+        println("[TomlIntentTest] upstream configs/ unavailable; skipping corpus key-count regression")
