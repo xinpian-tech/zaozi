@@ -31,6 +31,11 @@ enum Schema(
   val category:     SchemaCategory,
   val operandRoles: List[OperandRole]):
 
+  def indexedSlot: Option[OperandRole] = this match
+    case Schema.VdRs1mVs2Vm | Schema.Vs3Rs1mVs2Vm => Some(OperandRole.Vs2)
+    case _                                        => None
+
+
   case Vsetvl
     extends Schema("vsetvl", SchemaCategory.Vsetvl, List(OperandRole.Rd, OperandRole.Rs1, OperandRole.Rs2))
   case Vsetvli
@@ -188,3 +193,8 @@ object Schema:
   def byFormatString(s: String): Option[Schema] = all.find(_.formatString == s)
 
   def ofCategory(c: SchemaCategory): List[Schema] = all.filter(_.category == c)
+
+  def lookup(formatString: String): Either[String, Schema] =
+    byFormatString(formatString) match
+      case Some(s) => Right(s)
+      case None    => Left(s"unknown RVV schema format: $formatString")
