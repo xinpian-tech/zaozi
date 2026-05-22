@@ -27,7 +27,11 @@ mill mill.bsp.BSP/install      # IDE setup (BSP)
 
 Active development is on the **rvprobe** module (RISC-V instruction generation via two-stage SMT constraint solving).
 
-**ICCAD 2026 resubmission** is the current priority. Research ideas, experiment design, and paper reframing notes are tracked in [`IDEA.md`](IDEA.md). Do not modify the rvprobe framework — focus on research and paper writing.
+**ICCAD 2026 paper work is complete** (submission target: 2026-06-05 AOE). Project focus has now shifted to **migrating `riscv-vector-tests/` (Go, ksco) onto the rvprobe Scala eDSL**, on branch `dev`. The migration plan, acceptance criteria, milestones, and pending decisions live in [`rvprobe/plan-migrate-rvv-tests.md`](rvprobe/plan-migrate-rvv-tests.md) (1146 lines, 18 ACs, 19 tasks across 13 milestones). The design draft that the plan was generated from is at [`rvprobe/migrate-rvv-tests-draft.md`](rvprobe/migrate-rvv-tests-draft.md).
+
+Implementation work is tracked under the RLCR loop at `.humanize/rlcr/`. New code under `rvprobe/src/rvv/` is in-scope; the existing rvprobe framework (constraints/, RVGenerator.scala, AsmApi.scala, etc.) is treated as a reusable base — extend or compose with it rather than rewriting.
+
+Research ideas, experiment design, and paper-side notes remain in [`IDEA.md`](IDEA.md) and [`rvprobe/paper/`](rvprobe/paper/).
 
 ## Environment Setup
 
