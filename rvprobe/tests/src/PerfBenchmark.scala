@@ -143,7 +143,7 @@ object PerfBenchmark extends TestSuite {
   val tests = Tests {
     test("exp3b_scalability") {
       val complexities = Seq("L1", "L2", "L3")
-      val sizes        = Seq(10, 50, 100, 200, 500)
+      val sizes        = Seq(10, 50, 100, 200, 500, 1000, 2000)
 
       // Global warmup to eliminate JVM cold-start bias
       println("Warming up JVM...")

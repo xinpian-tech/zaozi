@@ -824,7 +824,243 @@ trait RVGenerator:
       case "rs2" | "rs3" => true
       case _             => false
 
+  /** Reconstruct semantic immediate / register for RV32C (and RV64C) compressed instructions and emit GAS-syntax line.
+    *
+    * Returns Some(line) when the instruction is a known compressed format; None otherwise (caller falls through).
+    *
+    * Field-to-semantic bit mapping follows RISC-V ISA Manual Vol.1 RV32C: register fields rd_p / rs1_p / rs2_p /
+    * rd_rs1_p are SMT-encoded in 8..15 (actual register number), all other prime/non-prime register fields are SMT
+    * values in 0..31. Each split-immediate field is reshuffled per its instruction-specific bit layout, then
+    * sign-extended where applicable.
+    */
+  private def toCompressedGasLine(
+    idx:    Int,
+    inst:   org.chipsalliance.rvdecoderdb.Instruction,
+    solved: Map[String, BigInt]
+  ): Option[String] = {
+    val instName = inst.name
+    if !instName.startsWith("c.") then return None
+
+    // SMT vars for compressed-instruction fields are declared with snake_case
+    // names plus an index suffix (e.g. "c_rs2_n0_3"), not the camelCase form
+    // used by the legacy register renderer. Use the raw name directly.
+    def key(n: String): String  = s"${n}_$idx"
+    def has(n: String): Boolean = solved.contains(key(n))
+    def raw(n: String): Int     = solved.getOrElse(key(n), BigInt(0)).toInt
+    def reg(n: String): String  = s"x${raw(n)}"
+    def maskField(n: String, width: Int): Int =
+      raw(n) & ((1 << width) - 1)
+    def bit(v: Int, i: Int): Int = (v >> i) & 1
+    def signExt(v: Int, width: Int): Int =
+      if ((v >> (width - 1)) & 1) == 1 then v | -(1 << width) else v
+
+    // c.li / c.addi / c.andi / c.nop : imm[5] from *hi, imm[4:0] from *lo
+    def imm6(loArg: String, hiArg: String): Int = {
+      val lo = maskField(loArg, 5)
+      val hi = maskField(hiArg, 1)
+      signExt((hi << 5) | lo, 6)
+    }
+
+    // c.addi16sp: nzimm[9] = bit12, nzimm[8:7|6|5|4] = inst[4:3|5|2|6]
+    // cNzimm10lo at [6:2]: bit0=inst[2]=nzimm[5], bit1=inst[3]=nzimm[7], bit2=inst[4]=nzimm[8],
+    //                     bit3=inst[5]=nzimm[6], bit4=inst[6]=nzimm[4]
+    // cNzimm10hi at [12]:  bit0=nzimm[9]
+    def addi16spImm: Int = {
+      val lo = maskField("c_nzimm10lo", 5)
+      val hi = maskField("c_nzimm10hi", 1)
+      val v  = (hi << 9) | (bit(lo, 2) << 8) | (bit(lo, 1) << 7) |
+        (bit(lo, 3) << 6) | (bit(lo, 0) << 5) | (bit(lo, 4) << 4)
+      signExt(v, 10)
+    }
+
+    // c.addi4spn: nzuimm[5:4|9:6|2|3] in cNzuimm10 (8 bits at inst[12:5])
+    // field bit 0=inst[5]=nzuimm[3], bit 1=inst[6]=nzuimm[2], bit 2=inst[7]=nzuimm[6],
+    // bit 3=inst[8]=nzuimm[7],       bit 4=inst[9]=nzuimm[8], bit 5=inst[10]=nzuimm[9],
+    // bit 6=inst[11]=nzuimm[4],      bit 7=inst[12]=nzuimm[5]
+    def addi4spnImm: Int = {
+      val f = maskField("c_nzuimm10", 8)
+      (bit(f, 7) << 5) | (bit(f, 6) << 4) | (bit(f, 5) << 9) | (bit(f, 4) << 8) |
+        (bit(f, 3) << 7) | (bit(f, 2) << 6) | (bit(f, 1) << 2) | (bit(f, 0) << 3)
+    }
+
+    // c.lw / c.sw: uimm[5:3] from cUimm7hi (inst[12:10], 3 bits)
+    //              uimm[6]   from cUimm7lo bit 0 (inst[5])
+    //              uimm[2]   from cUimm7lo bit 1 (inst[6])
+    def lwSwImm: Int = {
+      val hi = maskField("c_uimm7hi", 3)
+      val lo = maskField("c_uimm7lo", 2)
+      (hi << 3) | (bit(lo, 1) << 2) | (bit(lo, 0) << 6)
+    }
+
+    // c.lwsp: uimm[5] from cUimm8sphi (inst[12]),
+    //         uimm[7:6|4:2] from cUimm8splo (inst[6:2])
+    // lo bit 0=inst[2]=uimm[6], bit 1=inst[3]=uimm[7], bit 2=inst[4]=uimm[2],
+    // bit 3=inst[5]=uimm[3],    bit 4=inst[6]=uimm[4]
+    def lwspImm: Int = {
+      val hi = maskField("c_uimm8sphi", 1)
+      val lo = maskField("c_uimm8splo", 5)
+      (hi << 5) | (bit(lo, 4) << 4) | (bit(lo, 3) << 3) | (bit(lo, 2) << 2) |
+        (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+    }
+
+    // c.swsp: uimm[5:2|7:6] in cUimm8spS (6 bits at inst[12:7])
+    // field bit 0=inst[7]=uimm[6], bit 1=inst[8]=uimm[7], bit 2=inst[9]=uimm[2],
+    // bit 3=inst[10]=uimm[3],      bit 4=inst[11]=uimm[4], bit 5=inst[12]=uimm[5]
+    def swspImm: Int = {
+      val f = maskField("c_uimm8sp_s", 6)
+      (bit(f, 5) << 5) | (bit(f, 4) << 4) | (bit(f, 3) << 3) | (bit(f, 2) << 2) |
+        (bit(f, 1) << 7) | (bit(f, 0) << 6)
+    }
+
+    // c.beqz / c.bnez: imm[8|4:3|7:6|2:1|5]
+    // cBimm9hi at inst[12:10]: bit 0=inst[10]=imm[3], bit 1=inst[11]=imm[4], bit 2=inst[12]=imm[8]
+    // cBimm9lo at inst[6:2]:  bit 0=inst[2]=imm[5], bit 1=inst[3]=imm[1], bit 2=inst[4]=imm[2],
+    //                         bit 3=inst[5]=imm[6], bit 4=inst[6]=imm[7]
+    def branchImm: Int = {
+      val hi = maskField("c_bimm9hi", 3)
+      val lo = maskField("c_bimm9lo", 5)
+      val v  = (bit(hi, 2) << 8) | (bit(hi, 1) << 4) | (bit(hi, 0) << 3) |
+        (bit(lo, 4) << 7) | (bit(lo, 3) << 6) | (bit(lo, 2) << 2) | (bit(lo, 1) << 1) |
+        (bit(lo, 0) << 5)
+      signExt(v, 9)
+    }
+
+    // c.j / c.jal: imm[11|4|9:8|10|6|7|3:1|5] in cImm12 (11 bits at inst[12:2])
+    // field bit 0=inst[2]=imm[5], bit 1=inst[3]=imm[1], bit 2=inst[4]=imm[2], bit 3=inst[5]=imm[3],
+    // bit 4=inst[6]=imm[7], bit 5=inst[7]=imm[6], bit 6=inst[8]=imm[10], bit 7=inst[9]=imm[8],
+    // bit 8=inst[10]=imm[9], bit 9=inst[11]=imm[4], bit 10=inst[12]=imm[11]
+    def jImm: Int = {
+      val f = maskField("c_imm12", 11)
+      val v = (bit(f, 10) << 11) | (bit(f, 9) << 4) | (bit(f, 8) << 9) | (bit(f, 7) << 8) |
+        (bit(f, 6) << 10) | (bit(f, 5) << 6) | (bit(f, 4) << 7) | (bit(f, 3) << 3) |
+        (bit(f, 2) << 2) | (bit(f, 1) << 1) | (bit(f, 0) << 5)
+      signExt(v, 12)
+    }
+
+    // c.slli (CI): shamt = (hi<<5) | lo, where hi must be 0 for RV32.
+    // c.srli / c.srai (CB): same layout when using cNzuimm6lo/cNzuimm6hi; alt form uses cNzuimm5.
+    def shamtFrom(loArg: String, hiArg: String): Int = {
+      val lo = maskField(loArg, 5)
+      val hi = if has(hiArg) then maskField(hiArg, 1) else 0
+      (hi << 5) | lo
+    }
+    def shamtSr: Int =
+      if has("c_nzuimm5") then maskField("c_nzuimm5", 5)
+      else shamtFrom("c_nzuimm6lo", "c_nzuimm6hi")
+
+    val line: Option[String] = instName match {
+      // === CR format (no immediate) ===
+      case "c.add"    => Some(s"c.add ${reg("rd_rs1_n0")}, ${reg("c_rs2_n0")}")
+      case "c.mv"     => Some(s"c.mv ${reg("rd_n0")}, ${reg("c_rs2_n0")}")
+      case "c.jr"     => Some(s"c.jr ${reg("rs1_n0")}")
+      case "c.jalr"   => Some(s"c.jalr ${reg("c_rs1_n0")}")
+      case "c.ebreak" => Some("c.ebreak")
+      case "c.nop"    => Some("c.nop")
+
+      // === CI format ===
+      case "c.li"  => Some(s"c.li ${reg("rd_n0")}, ${imm6("c_imm6lo", "c_imm6hi")}")
+      case "c.lui" => Some(s"c.lui ${reg("rd_n2")}, ${imm6("c_nzimm18lo", "c_nzimm18hi")}")
+      case "c.addi" =>
+        Some(s"c.addi ${reg("rd_rs1_n0")}, ${imm6("c_nzimm6lo", "c_nzimm6hi")}")
+      case "c.addiw" =>
+        Some(s"c.addiw ${reg("rd_rs1_n0")}, ${imm6("c_imm6lo", "c_imm6hi")}")
+      case "c.addi16sp" => Some(s"c.addi16sp sp, $addi16spImm")
+      case "c.slli"     => Some(s"c.slli ${reg("rd_rs1_n0")}, ${shamtFrom("c_nzuimm6lo", "c_nzuimm6hi")}")
+      case "c.lwsp"     => Some(s"c.lwsp ${reg("rd_n0")}, $lwspImm(sp)")
+      case "c.ldsp"     =>
+        val hi = maskField("c_uimm9sphi", 1); val lo = maskField("c_uimm9splo", 5)
+        // c.ldsp: uimm[5] hi; lo bit0=inst[2]=uimm[6], bit1=inst[3]=uimm[7], bit2=inst[4]=uimm[8],
+        //                  bit3=inst[5]=uimm[3],       bit4=inst[6]=uimm[4]
+        // Wait — c.ldsp is RV64-only; offsets multiples of 8.
+        // Actually standard says c.ldsp encoding: imm[5|4:3|8:6]. inst[12]=imm[5], inst[6:5]=imm[4:3],
+        // inst[4:2]=imm[8:6]. So lo bit0=inst[2]=imm[6], bit1=inst[3]=imm[7], bit2=inst[4]=imm[8],
+        // bit3=inst[5]=imm[3], bit4=inst[6]=imm[4].
+        val v  = (hi << 5) | (bit(lo, 4) << 4) | (bit(lo, 3) << 3) |
+          (bit(lo, 2) << 8) | (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+        Some(s"c.ldsp ${reg("rd_n0")}, $v(sp)")
+      case "c.flwsp"    => Some(s"c.flwsp f${raw("rd")}, $lwspImm(sp)")
+      case "c.fldsp"    =>
+        val hi = maskField("c_uimm9sphi", 1); val lo = maskField("c_uimm9splo", 5)
+        val v  = (hi << 5) | (bit(lo, 4) << 4) | (bit(lo, 3) << 3) |
+          (bit(lo, 2) << 8) | (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+        Some(s"c.fldsp f${raw("rd")}, $v(sp)")
+
+      // === CSS format (stack store) ===
+      case "c.swsp"  => Some(s"c.swsp ${reg("c_rs2")}, $swspImm(sp)")
+      case "c.sdsp"  =>
+        val f = maskField("c_uimm9sp_s", 6)
+        // c.sdsp: uimm[5:3|8:6]; field bit0=inst[7]=uimm[6], bit1=inst[8]=uimm[7],
+        //                       bit2=inst[9]=uimm[8], bit3=inst[10]=uimm[3], bit4=inst[11]=uimm[4],
+        //                       bit5=inst[12]=uimm[5].
+        val v = (bit(f, 5) << 5) | (bit(f, 4) << 4) | (bit(f, 3) << 3) |
+          (bit(f, 2) << 8) | (bit(f, 1) << 7) | (bit(f, 0) << 6)
+        Some(s"c.sdsp ${reg("c_rs2")}, $v(sp)")
+      case "c.fswsp" => Some(s"c.fswsp f${raw("c_rs2")}, $swspImm(sp)")
+      case "c.fsdsp" =>
+        val f = maskField("c_uimm9sp_s", 6)
+        val v = (bit(f, 5) << 5) | (bit(f, 4) << 4) | (bit(f, 3) << 3) |
+          (bit(f, 2) << 8) | (bit(f, 1) << 7) | (bit(f, 0) << 6)
+        Some(s"c.fsdsp f${raw("c_rs2")}, $v(sp)")
+
+      // === CIW format ===
+      case "c.addi4spn" => Some(s"c.addi4spn ${reg("rd_p")}, sp, $addi4spnImm")
+
+      // === CL / CS format ===
+      case "c.lw"  => Some(s"c.lw ${reg("rd_p")}, $lwSwImm(${reg("rs1_p")})")
+      case "c.sw"  => Some(s"c.sw ${reg("rs2_p")}, $lwSwImm(${reg("rs1_p")})")
+      case "c.ld"  =>
+        val hi = maskField("c_uimm8hi", 3); val lo = maskField("c_uimm8lo", 2)
+        // c.ld: uimm[5:3|7:6]; hi[2:0]=inst[12:10]=uimm[5:3], lo[1:0]=inst[6:5]=uimm[7:6]
+        val v  = (hi << 3) | (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+        Some(s"c.ld ${reg("rd_p")}, $v(${reg("rs1_p")})")
+      case "c.sd"  =>
+        val hi = maskField("c_uimm8hi", 3); val lo = maskField("c_uimm8lo", 2)
+        val v  = (hi << 3) | (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+        Some(s"c.sd ${reg("rs2_p")}, $v(${reg("rs1_p")})")
+      case "c.flw" => Some(s"c.flw f${raw("rd_p")}, $lwSwImm(${reg("rs1_p")})")
+      case "c.fsw" => Some(s"c.fsw f${raw("rs2_p")}, $lwSwImm(${reg("rs1_p")})")
+      case "c.fld" =>
+        val hi = maskField("c_uimm8hi", 3); val lo = maskField("c_uimm8lo", 2)
+        val v  = (hi << 3) | (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+        Some(s"c.fld f${raw("rd_p")}, $v(${reg("rs1_p")})")
+      case "c.fsd" =>
+        val hi = maskField("c_uimm8hi", 3); val lo = maskField("c_uimm8lo", 2)
+        val v  = (hi << 3) | (bit(lo, 1) << 7) | (bit(lo, 0) << 6)
+        Some(s"c.fsd f${raw("rs2_p")}, $v(${reg("rs1_p")})")
+
+      // === CA format (3-bit prime regs, R-type-like) ===
+      case "c.and"  => Some(s"c.and ${reg("rd_rs1_p")}, ${reg("rs2_p")}")
+      case "c.or"   => Some(s"c.or ${reg("rd_rs1_p")}, ${reg("rs2_p")}")
+      case "c.xor"  => Some(s"c.xor ${reg("rd_rs1_p")}, ${reg("rs2_p")}")
+      case "c.sub"  => Some(s"c.sub ${reg("rd_rs1_p")}, ${reg("rs2_p")}")
+      case "c.addw" => Some(s"c.addw ${reg("rd_rs1_p")}, ${reg("rs2_p")}")
+      case "c.subw" => Some(s"c.subw ${reg("rd_rs1_p")}, ${reg("rs2_p")}")
+
+      // === CB format ===
+      case "c.beqz" => Some(s"c.beqz ${reg("rs1_p")}, . + $branchImm")
+      case "c.bnez" => Some(s"c.bnez ${reg("rs1_p")}, . + $branchImm")
+      case "c.andi" => Some(s"c.andi ${reg("rd_rs1_p")}, ${imm6("c_imm6lo", "c_imm6hi")}")
+      case "c.srli" => Some(s"c.srli ${reg("rd_rs1_p")}, $shamtSr")
+      case "c.srai" => Some(s"c.srai ${reg("rd_rs1_p")}, $shamtSr")
+
+      // === CJ format ===
+      case "c.j"   => Some(s"c.j . + $jImm")
+      case "c.jal" => Some(s"c.jal . + $jImm")
+
+      case _ => None
+    }
+    line
+  }
+
   private def toGasLine(
+    idx:    Int,
+    inst:   org.chipsalliance.rvdecoderdb.Instruction,
+    solved: Map[String, BigInt]
+  ): String = toCompressedGasLine(idx, inst, solved) match
+    case Some(line) => line
+    case None       => toGasLineLegacy(idx, inst, solved)
+
+  private def toGasLineLegacy(
     idx:    Int,
     inst:   org.chipsalliance.rvdecoderdb.Instruction,
     solved: Map[String, BigInt]

@@ -202,24 +202,34 @@ object HTIFLib:
        |    .globl $entryLabel
        |$entryLabel:""".stripMargin
 
-  /** String template for pass-exit sequence using HTIF encoding. */
+  /** String template for pass-exit sequence using HTIF encoding.
+    *
+    * @param xlen
+    *   `64` (default) emits a doubleword store; `32` emits a word store so the assembly is valid on RV32 targets.
+    */
   def asmExit(
     exitLabel: String = "exit",
     codeReg:   String = "t0",
     tohostReg: String = "t1",
-    spinLabel: String = "spin"
+    spinLabel: String = "spin",
+    xlen:      Int = 64
   ): String =
+    val storeOp = if xlen == 32 then "sw" else "sd"
     s"""$exitLabel:
        |    li   $codeReg, 0
        |    slli $codeReg, $codeReg, 1
        |    ori  $codeReg, $codeReg, 1
        |
        |    la   $tohostReg, tohost
-       |    sd   $codeReg, 0($tohostReg)
+       |    $storeOp   $codeReg, 0($tohostReg)
        |$spinLabel:
        |    j    $spinLabel""".stripMargin
 
-  /** String template for `.tohost` section. */
+  /** String template for `.tohost` section.
+    *
+    * For RV32 targets, the tohost cell remains 8 bytes wide (the HTIF contract is XLEN-independent) but a 32-bit store
+    * only updates the low half. The assembler will accept `.dword` on RV32 too, so the section emits 8 bytes regardless.
+    */
   def asmTohostSection(): String =
     """    .section ".tohost","aw",@progbits
       |    .align 6

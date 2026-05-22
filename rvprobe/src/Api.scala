@@ -131,6 +131,16 @@ def isRV64GC(
 ): Seq[Recipe ?=> SetConstraint] =
   isRV64G() :+ isRVC()
 
+def isRV32IMC(
+): Seq[Recipe ?=> SetConstraint] =
+  Seq(
+    isRVI(),
+    isRVM(),
+    isRVC(),
+    isRV32I(),
+    isRV32C()
+  )
+
 // ================== Assembly Directive & Label DSL ==================
 
 def label(
