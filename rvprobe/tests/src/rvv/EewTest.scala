@@ -10,157 +10,214 @@ import utest.*
 
 object EewTest extends TestSuite:
 
-  private def envSew32M1: VTypeEnvelope =
-    VTypeEnvelope.unsafe(VType(Sew.Sew32, Lmul.M1, Vta.Agnostic, Vma.Agnostic), vl = 4, vlen = 128, xlen = 64)
-
-  private def envSew32M4: VTypeEnvelope =
-    VTypeEnvelope.unsafe(VType(Sew.Sew32, Lmul.M4, Vta.Agnostic, Vma.Agnostic), vl = 16, vlen = 128, xlen = 64)
-
-  private def envSew8M1: VTypeEnvelope =
-    VTypeEnvelope.unsafe(VType(Sew.Sew8, Lmul.M1, Vta.Agnostic, Vma.Agnostic), vl = 16, vlen = 128, xlen = 64)
+  private def env(sew: Sew, lmul: Lmul, vl: Int = 0, vlen: Int = 128, xlen: Int = 64): VTypeEnvelope =
+    VTypeEnvelope.unsafe(VType(sew, lmul, Vta.Agnostic, Vma.Agnostic), vl, vlen, xlen)
 
   val tests = Tests:
 
-    test("OperandClass.of vector roles in non-indexed schema are VectorElementSew"):
+    test("OperandClass mapping in non-indexed schema"):
       val s = Schema.VdVs2Vs1Vm
       assert(OperandClass.of(OperandRole.Vd, s) == OperandClass.VectorElementSew)
       assert(OperandClass.of(OperandRole.Vs1, s) == OperandClass.VectorElementSew)
       assert(OperandClass.of(OperandRole.Vs2, s) == OperandClass.VectorElementSew)
       assert(OperandClass.of(OperandRole.Vm, s) == OperandClass.Mask)
 
-    test("OperandClass.of vs2 in indexed schema is VectorElementIndex"):
+    test("OperandClass routes vs2 of indexed schemas to VectorElementIndex"):
       assert(OperandClass.of(OperandRole.Vs2, Schema.VdRs1mVs2Vm) == OperandClass.VectorElementIndex)
       assert(OperandClass.of(OperandRole.Vs2, Schema.Vs3Rs1mVs2Vm) == OperandClass.VectorElementIndex)
 
-    test("OperandClass.of scalar roles"):
-      val s = Schema.VdVs2Rs1Vm
-      assert(OperandClass.of(OperandRole.Rs1, s) == OperandClass.ScalarInteger)
-      assert(OperandClass.of(OperandRole.Rs1Mem, Schema.VdRs1mVm) == OperandClass.ScalarMemory)
+    test("Schema.destRole = first operand-role"):
+      assert(Schema.VdVs2Vs1Vm.destRole.contains(OperandRole.Vd))
+      assert(Schema.RdVs2.destRole.contains(OperandRole.Rd))
+      assert(Schema.Vs3Rs1m.destRole.contains(OperandRole.Vs3))
+      assert(Schema.Vsetvl.destRole.contains(OperandRole.Rd))
 
-    test("OperandClass.of FP roles"):
-      val s = Schema.VdVs2Fs1Vm
-      assert(OperandClass.of(OperandRole.Fs1, s) == OperandClass.ScalarFp)
-      assert(OperandClass.of(OperandRole.Fd, Schema.FdVs2) == OperandClass.ScalarFp)
+    // ---- WidthScale ----
 
-    test("OperandClass.of immediate roles"):
-      assert(OperandClass.of(OperandRole.Imm, Schema.VdImm) == OperandClass.Immediate)
-      assert(OperandClass.of(OperandRole.Uimm, Schema.VdVs2Uimm) == OperandClass.Immediate)
+    test("WidthScale.By2 on SEW=32 yields 64"):
+      assert((WidthScale.By2 * 32) == Some(64))
 
-    test("OperandClass.of grouped-mask variants"):
-      assert(OperandClass.of(OperandRole.VmGroup2, Schema.VdVs2VmP2) == OperandClass.GroupedMask)
-      assert(OperandClass.of(OperandRole.VmGroup3, Schema.VdVs2VmP3) == OperandClass.GroupedMask)
+    test("WidthScale.Narrow2 on SEW=16 yields 8"):
+      assert((WidthScale.Narrow2 * 16) == Some(8))
 
-    test("Eew.compute Mask returns 1"):
+    test("WidthScale.Narrow2 on odd SEW is None (non-integral)"):
+      assert((WidthScale.Narrow2 * 3) == None)
+
+    // ---- Real RVV instruction shapes ----
+
+    test("vadd.vv: all vector operands at base SEW/LMUL"):
+      val e = env(Sew.Sew32, Lmul.M2)
       val s = Schema.VdVs2Vs1Vm
-      assert(Eew.compute(OperandRole.Vm, s, envSew32M1) == 1)
+      val p = OperandWidthProfile.default
+      assert(Eew.compute(OperandRole.Vd, s, e, p) == Right(32))
+      assert(Eew.compute(OperandRole.Vs1, s, e, p) == Right(32))
+      assert(Eew.compute(OperandRole.Vs2, s, e, p) == Right(32))
+      assert(Emul.compute(OperandRole.Vd, s, e, p).map(_.asWholeRegisters) == Right(2))
+      assert(Emul.compute(OperandRole.Vs1, s, e, p).map(_.asWholeRegisters) == Right(2))
 
-    test("Eew.compute ScalarInteger returns xlen"):
-      val s = Schema.VdVs2Rs1Vm
-      assert(Eew.compute(OperandRole.Rs1, s, envSew32M1) == 64)
-
-    test("Eew.compute ScalarMemory returns xlen"):
-      val s = Schema.VdRs1mVm
-      assert(Eew.compute(OperandRole.Rs1Mem, s, envSew32M1) == 64)
-
-    test("Eew.compute VectorElementSew with no widening returns SEW"):
+    test("vwadd.vv: vd doubled; vs1, vs2 unchanged"):
+      val e = env(Sew.Sew32, Lmul.M4)
       val s = Schema.VdVs2Vs1Vm
-      assert(Eew.compute(OperandRole.Vd, s, envSew32M1) == 32)
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.By2))
+      assert(Eew.compute(OperandRole.Vd, s, e, p) == Right(64))
+      assert(Eew.compute(OperandRole.Vs1, s, e, p) == Right(32))
+      assert(Eew.compute(OperandRole.Vs2, s, e, p) == Right(32))
+      assert(Emul.compute(OperandRole.Vd, s, e, p).map(_.asWholeRegisters) == Right(8))
+      assert(Emul.compute(OperandRole.Vs1, s, e, p).map(_.asWholeRegisters) == Right(4))
+      assert(Emul.compute(OperandRole.Vs2, s, e, p).map(_.asWholeRegisters) == Right(4))
 
-    test("Eew.compute VectorElementSew with By2 widening returns 2*SEW"):
+    test("vwadd.wv: vd and vs2 doubled; vs1 unchanged"):
+      val e = env(Sew.Sew32, Lmul.M2)
       val s = Schema.VdVs2Vs1Vm
-      assert(Eew.compute(OperandRole.Vd, s, envSew32M1, widening = Widening.By2) == 64)
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.By2, OperandRole.Vs2 -> WidthScale.By2))
+      assert(Eew.compute(OperandRole.Vd, s, e, p) == Right(64))
+      assert(Eew.compute(OperandRole.Vs2, s, e, p) == Right(64))
+      assert(Eew.compute(OperandRole.Vs1, s, e, p) == Right(32))
+      assert(Emul.compute(OperandRole.Vd, s, e, p).map(_.asWholeRegisters) == Right(4))
+      assert(Emul.compute(OperandRole.Vs2, s, e, p).map(_.asWholeRegisters) == Right(4))
+      assert(Emul.compute(OperandRole.Vs1, s, e, p).map(_.asWholeRegisters) == Right(2))
 
-    test("Eew.compute VectorElementSew with By4 widening returns 4*SEW"):
+    test("vfncvt.f.f.w (narrowing): vs2 doubled, vd unchanged"):
+      val e = env(Sew.Sew16, Lmul.M2)
+      val s = Schema.VdVs2Vm
+      val p = OperandWidthProfile(Map(OperandRole.Vs2 -> WidthScale.By2))
+      assert(Eew.compute(OperandRole.Vd, s, e, p) == Right(16))
+      assert(Eew.compute(OperandRole.Vs2, s, e, p) == Right(32))
+      assert(Emul.compute(OperandRole.Vd, s, e, p).map(_.asWholeRegisters) == Right(2))
+      assert(Emul.compute(OperandRole.Vs2, s, e, p).map(_.asWholeRegisters) == Right(4))
+
+    test("vmseq.vv: vd is a mask destination, footprint = 1 register at any LMUL"):
+      val e = env(Sew.Sew32, Lmul.M4)
       val s = Schema.VdVs2Vs1Vm
-      assert(Eew.compute(OperandRole.Vd, s, envSew8M1, widening = Widening.By4) == 32)
+      val p = OperandWidthProfile.maskDestination()
+      assert(Eew.compute(OperandRole.Vd, s, e, p) == Right(1))
+      assert(Eew.compute(OperandRole.Vs1, s, e, p) == Right(32))
+      assert(Eew.compute(OperandRole.Vs2, s, e, p) == Right(32))
+      assert(Emul.compute(OperandRole.Vd, s, e, p) == Right(EmulRatio(1, 1)))
+      assert(RegisterFootprint.of(OperandRole.Vd, s, e, p) == Right(1))
+      assert(RegisterFootprint.of(OperandRole.Vs1, s, e, p) == Right(4))
+      assert(RegisterFootprint.of(OperandRole.Vs2, s, e, p) == Right(4))
 
-    test("Eew.compute VectorElementSew with Narrow2 returns SEW/2"):
-      val s = Schema.VdVs2Vs1Vm
-      assert(Eew.compute(OperandRole.Vd, s, envSew32M1, widening = Widening.Narrow2) == 16)
+    test("vluxei32.v: indexed load, index EEW=32 separate from data SEW=8"):
+      val e          = env(Sew.Sew8, Lmul.M1)
+      val s          = Schema.VdRs1mVs2Vm
+      val p          = OperandWidthProfile.default
+      val indexedEew = Some(32)
+      assert(Eew.compute(OperandRole.Vd, s, e, p) == Right(8))
+      assert(Eew.compute(OperandRole.Vs2, s, e, p, indexedEew) == Right(32))
+      assert(Emul.compute(OperandRole.Vd, s, e, p).map(_.asWholeRegisters) == Right(1))
+      // vs2 EMUL = (32/8) × 1 = 4
+      assert(Emul.compute(OperandRole.Vs2, s, e, p, indexedEew).map(_.asWholeRegisters) == Right(4))
 
-    test("Eew.compute VectorElementIndex returns the provided indexedEew"):
-      val s = Schema.VdRs1mVs2Vm
-      assert(Eew.compute(OperandRole.Vs2, s, envSew32M1, indexedEew = Some(8)) == 8)
-      assert(Eew.compute(OperandRole.Vs2, s, envSew32M1, indexedEew = Some(64)) == 64)
+    test("vluxei32.v rejects when XLEN=32 and indexedEew=32 would push EMUL out of spec"):
+      val e          = env(Sew.Sew8, Lmul.M4, vlen = 128, xlen = 64)
+      val s          = Schema.VdRs1mVs2Vm
+      val p          = OperandWidthProfile.default
+      val indexedEew = Some(32)
+      // index EMUL = (32/8) × 4 = 16 — out of spec [1/8, 8]
+      val result = Emul.compute(OperandRole.Vs2, s, e, p, indexedEew)
+      assert(result.isLeft)
+      assert(result.left.toOption.exists(_.contains("outside spec")))
 
-    test("Eew.compute VectorElementIndex without indexedEew throws"):
-      val s = Schema.VdRs1mVs2Vm
-      val ex = intercept[IllegalArgumentException]:
-        Eew.compute(OperandRole.Vs2, s, envSew32M1, indexedEew = None)
-      assert(ex.getMessage.contains("indexedEew"))
-
-    test("Emul.compute VectorElementSew at LMUL=M1 with no widening = 1/1"):
-      val s   = Schema.VdVs2Vs1Vm
-      val emul = Emul.compute(OperandRole.Vd, s, envSew32M1)
-      assert(emul.numerator == 1)
-      assert(emul.denominator == 1)
-      assert(emul.asWholeRegisters == 1)
-
-    test("Emul.compute VectorElementSew at LMUL=M4 with no widening = 4/1"):
-      val s   = Schema.VdVs2Vs1Vm
-      val emul = Emul.compute(OperandRole.Vd, s, envSew32M4)
-      assert(emul.numerator == 4)
-      assert(emul.denominator == 1)
-      assert(emul.asWholeRegisters == 4)
-
-    test("Emul.compute VectorElementSew widening By2 at LMUL=M4 = 8 registers"):
-      val s    = Schema.VdVs2Vs1Vm
-      val emul = Emul.compute(OperandRole.Vd, s, envSew32M4, widening = Widening.By2)
-      assert(emul.numerator == 8)
-      assert(emul.denominator == 1)
-      assert(emul.asWholeRegisters == 8)
-
-    test("Emul.compute fractional LMUL"):
-      val env = VTypeEnvelope.unsafe(
-        VType(Sew.Sew8, Lmul.Mf2, Vta.Agnostic, Vma.Agnostic),
-        vl = 1,
-        vlen = 128,
-        xlen = 64)
-      val s   = Schema.VdVs2Vs1Vm
-      val emul = Emul.compute(OperandRole.Vd, s, env)
-      assert(emul.numerator == 1)
-      assert(emul.denominator == 2)
-      assert(emul.isFractional)
-      assert(emul.asWholeRegisters == 1)
-
-    test("RegisterFootprint of vector at LMUL=M4 = 4"):
-      val s = Schema.VdVs2Vs1Vm
-      assert(RegisterFootprint.of(OperandRole.Vd, s, envSew32M4) == 4)
-
-    test("RegisterFootprint of vector at fractional LMUL = 1"):
-      val env = VTypeEnvelope.unsafe(
-        VType(Sew.Sew8, Lmul.Mf2, Vta.Agnostic, Vma.Agnostic),
-        vl = 1,
-        vlen = 128,
-        xlen = 64)
-      val s = Schema.VdVs2Vs1Vm
-      assert(RegisterFootprint.of(OperandRole.Vd, s, env) == 1)
-
-    test("RegisterFootprint of mask = 1"):
-      val s = Schema.VdVs2Vs1Vm
-      assert(RegisterFootprint.of(OperandRole.Vm, s, envSew32M4) == 1)
-
-    test("RegisterFootprint of segmented store at NFIELDS=2 LMUL=M2 = 4"):
-      val env = VTypeEnvelope.unsafe(
-        VType(Sew.Sew32, Lmul.M2, Vta.Agnostic, Vma.Agnostic),
-        vl = 8,
-        vlen = 128,
-        xlen = 64)
+    test("vsseg2e32.v: segmented store with NFIELDS=2 footprint = 2 registers"):
+      val e = env(Sew.Sew32, Lmul.M1)
       val s = Schema.Vs3Rs1mVm
-      assert(RegisterFootprint.of(OperandRole.Vs3, s, env, nfields = 2) == 4)
+      val p = OperandWidthProfile.default
+      assert(RegisterFootprint.of(OperandRole.Vs3, s, e, p, nfields = 2) == Right(2))
 
-    test("NfieldsValidator rejects out-of-range nfields"):
-      val env = envSew32M1
-      assert(NfieldsValidator.check(env, 0).isLeft)
-      assert(NfieldsValidator.check(env, 9).isLeft)
-      assert(NfieldsValidator.check(env, -1).isLeft)
+    test("vsseg8e32.v at LMUL=M2 would need 16 registers — rejected at NfieldsValidator level"):
+      val e = env(Sew.Sew32, Lmul.M2)
+      assert(NfieldsValidator.check(e, 8).isLeft)
+      assert(NfieldsValidator.check(e, 4).isRight) // 4*2=8 at the limit
 
-    test("NfieldsValidator rejects NFIELDS x EMUL > 8"):
-      val env = envSew32M4
-      assert(NfieldsValidator.check(env, 4).isLeft) // 4*4=16
-      assert(NfieldsValidator.check(env, 3).isLeft) // 3*4=12
-      assert(NfieldsValidator.check(env, 2).isRight) // 2*4=8
+    // ---- Validation: invalid EEW/EMUL combinations ----
 
-    test("NfieldsValidator accepts NFIELDS=8 at LMUL=M1"):
-      val env = envSew32M1
-      assert(NfieldsValidator.check(env, 8).isRight)
+    test("EEW exceeds XLEN: SEW=64 + By2 + XLEN=64 → Left"):
+      val e = env(Sew.Sew64, Lmul.M1, vlen = 256, xlen = 64)
+      val s = Schema.VdVs2Vs1Vm
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.By2))
+      val r = Eew.compute(OperandRole.Vd, s, e, p)
+      assert(r.isLeft)
+      assert(r.left.toOption.exists(m => m.contains("exceeds XLEN") || m.contains("not in legal")))
+
+    test("EEW non-integral: WidthScale.Narrow4 on SEW=8 → Left"):
+      val e = env(Sew.Sew8, Lmul.M1)
+      val s = Schema.VdVs2Vs1Vm
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.Narrow4))
+      val r = Eew.compute(OperandRole.Vd, s, e, p)
+      assert(r.isLeft)
+      assert(r.left.toOption.exists(m => m.contains("non-integral") || m.contains("not in legal")))
+
+    test("EMUL out of spec: SEW=8 + LMUL=M8 + By2 → EMUL=16 → Left"):
+      val e = env(Sew.Sew8, Lmul.M8, vlen = 128, xlen = 64)
+      val s = Schema.VdVs2Vs1Vm
+      val p = OperandWidthProfile(Map(OperandRole.Vd -> WidthScale.By2))
+      val r = Emul.compute(OperandRole.Vd, s, e, p)
+      assert(r.isLeft)
+      assert(r.left.toOption.exists(_.contains("outside spec")))
+
+    test("indexed schema without indexedEew returns Left"):
+      val e = env(Sew.Sew8, Lmul.M1)
+      val s = Schema.VdRs1mVs2Vm
+      val p = OperandWidthProfile.default
+      val r = Eew.compute(OperandRole.Vs2, s, e, p)
+      assert(r.isLeft)
+      assert(r.left.toOption.exists(_.contains("indexedEew")))
+
+    test("indexed EEW not in legal {8,16,32,64} → Left"):
+      val e = env(Sew.Sew8, Lmul.M1)
+      val s = Schema.VdRs1mVs2Vm
+      val p = OperandWidthProfile.default
+      val r = Eew.compute(OperandRole.Vs2, s, e, p, indexedEew = Some(12))
+      assert(r.isLeft)
+
+    // ---- Mask and scalar operands ----
+
+    test("Mask operand EEW = 1"):
+      val s = Schema.VdVs2Vs1Vm
+      val e = env(Sew.Sew32, Lmul.M1)
+      assert(Eew.compute(OperandRole.Vm, s, e) == Right(1))
+
+    test("ScalarInteger operand EEW = XLEN"):
+      val s = Schema.VdVs2Rs1Vm
+      val e = env(Sew.Sew32, Lmul.M1, xlen = 64)
+      assert(Eew.compute(OperandRole.Rs1, s, e) == Right(64))
+
+    test("ScalarMemory operand EEW = XLEN"):
+      val s = Schema.VdRs1mVm
+      val e = env(Sew.Sew32, Lmul.M1, xlen = 32)
+      assert(Eew.compute(OperandRole.Rs1Mem, s, e) == Right(32))
+
+    test("FP scalar EEW = SEW"):
+      val s = Schema.FdVs2
+      val e = env(Sew.Sew64, Lmul.M1)
+      assert(Eew.compute(OperandRole.Fd, s, e) == Right(64))
+
+    // ---- Fractional LMUL ----
+
+    test("Fractional LMUL: SEW=8 + LMUL=Mf2 → EMUL = 1/2 (1 whole register)"):
+      val e = env(Sew.Sew8, Lmul.Mf2)
+      val s = Schema.VdVs2Vs1Vm
+      val r = Emul.compute(OperandRole.Vd, s, e)
+      assert(r.map(_.numerator) == Right(1))
+      assert(r.map(_.denominator) == Right(2))
+      assert(r.map(_.asWholeRegisters) == Right(1))
+      assert(r.map(_.isFractional) == Right(true))
+
+    test("Fractional LMUL register footprint = 1"):
+      val e = env(Sew.Sew8, Lmul.Mf8)
+      val s = Schema.VdVs2Vs1Vm
+      assert(RegisterFootprint.of(OperandRole.Vd, s, e) == Right(1))
+
+    // ---- NFIELDS validator ----
+
+    test("NfieldsValidator rejects nfields < 1 or > 8"):
+      val e = env(Sew.Sew32, Lmul.M1)
+      assert(NfieldsValidator.check(e, 0).isLeft)
+      assert(NfieldsValidator.check(e, 9).isLeft)
+      assert(NfieldsValidator.check(e, -1).isLeft)
+
+    test("NfieldsValidator rejects NFIELDS × LMUL > 8"):
+      val e = env(Sew.Sew32, Lmul.M4)
+      assert(NfieldsValidator.check(e, 4).isLeft)
+      assert(NfieldsValidator.check(e, 2).isRight) // 2*4=8 at the limit

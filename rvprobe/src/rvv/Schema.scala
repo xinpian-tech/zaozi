@@ -35,6 +35,12 @@ enum Schema(
     case Schema.VdRs1mVs2Vm | Schema.Vs3Rs1mVs2Vm => Some(OperandRole.Vs2)
     case _                                        => None
 
+  /** Destination operand role (head of operandRoles by convention).
+   *  Used by OperandWidthProfile.maskDest to know which role's EEW
+   *  collapses to 1 bit for mask-producing instructions like vmseq.vv.
+   */
+  def destRole: Option[OperandRole] = operandRoles.headOption
+
 
   case Vsetvl
     extends Schema("vsetvl", SchemaCategory.Vsetvl, List(OperandRole.Rd, OperandRole.Rs1, OperandRole.Rs2))
