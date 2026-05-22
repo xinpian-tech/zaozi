@@ -116,13 +116,33 @@ object TomlIntentTest extends TestSuite:
       val configsRoot = findAncestorWith("riscv-vector-tests/configs")
         .map(_.resolve("riscv-vector-tests/configs"))
       if configsRoot.isDefined && Files.isDirectory(configsRoot.get) then
-        val specs = TomlIntent.walkConfigs(configsRoot.get)
-        assert(specs.size == 676)
-        val snaps = specs.map(TomlIntent.classify)
-        // AC-3: by construction every row classifies (Lit fallback). The
-        // litOnlyCount metric is informational.
+        val walk = TomlIntent.walkConfigs(configsRoot.get)
+        assert(walk.errors.isEmpty)
+        assert(walk.specs.size == 676)
+        val snaps      = walk.specs.map(TomlIntent.classify)
         val backReport = TomlIntent.renderBackwardReport(snaps)
         // AC-4: backward report says all named non-escape predicates are exercised
         assert(backReport.contains("All named predicates are exercised"))
       else
         println("[TomlIntentTest] upstream configs/ unavailable; skipping end-to-end test")
+
+    test("vfcvt.xu.f.v parses 12 rows per SEW after comment stripping (Codex r4 regression)"):
+      val configsRoot = findAncestorWith("riscv-vector-tests/configs")
+        .map(_.resolve("riscv-vector-tests/configs"))
+      if configsRoot.isDefined && Files.isDirectory(configsRoot.get) then
+        val file = configsRoot.get.resolve("v").resolve("vfcvt.xu.f.v.toml")
+        val spec = TomlIntent.parse("v", file).toOption.get
+        // Upstream toml has 12 rows per fsew{16,32,64} array, each row
+        // followed by an inline `# ...` comment. The round-4 parser
+        // truncated at the first comment, keeping only 1 row per array.
+        assert(spec.tests.get("sew16").map(_.size) == Some(12))
+        assert(spec.tests.get("sew32").map(_.size) == Some(12))
+        assert(spec.tests.get("sew64").map(_.size) == Some(12))
+      else
+        println("[TomlIntentTest] upstream configs/ unavailable; skipping comment-stripping test")
+
+    test("stripTomlComments preserves quoted hashes"):
+      val input = """key = "with#hash"\n# this is a comment\nother = 1\n"""
+      val out   = TomlIntent.stripTomlComments(input)
+      assert(out.contains("\"with#hash\"")) // # inside string is preserved
+      assert(!out.contains("this is a comment")) // # comment is stripped

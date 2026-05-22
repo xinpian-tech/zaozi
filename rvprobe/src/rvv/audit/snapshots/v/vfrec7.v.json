@@ -15,6 +15,34 @@
         "tuplePreds": ["AllSame(16968,all operands = 0x4248)"],
         "fpValuePreds": [],
         "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x70e2"],
+        "valuePreds": [["Lit(28898,unclassified literal at sew=16: 0x70e2)"]],
+        "tuplePreds": ["AllSame(28898,all operands = 0x70e2)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xbc00"],
+        "valuePreds": [["Lit(48128,unclassified literal at sew=16: 0xbc00)"]],
+        "tuplePreds": ["AllSame(48128,all operands = 0xbc00)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x5958"],
+        "valuePreds": [["Lit(22872,unclassified literal at sew=16: 0x5958)"]],
+        "tuplePreds": ["AllSame(22872,all operands = 0x5958)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x0002"],
+        "valuePreds": [["SmallSigned(2)"]],
+        "tuplePreds": ["AllSame(2,all operands = 0x2)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
       }
     ],
     "sew32": [
@@ -24,6 +52,34 @@
         "tuplePreds": ["AllSame(1078530010,all operands = 0x40490fda)"],
         "fpValuePreds": [],
         "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x461c4000"],
+        "valuePreds": [["Lit(1176256512,unclassified literal at sew=32: 0x461c4000)"]],
+        "tuplePreds": ["AllSame(1176256512,all operands = 0x461c4000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xbf800000"],
+        "valuePreds": [["Lit(3212836864,unclassified literal at sew=32: 0xbf800000)"]],
+        "tuplePreds": ["AllSame(3212836864,all operands = 0xbf800000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x432b0000"],
+        "valuePreds": [["Lit(1126891520,unclassified literal at sew=32: 0x432b0000)"]],
+        "tuplePreds": ["AllSame(1126891520,all operands = 0x432b0000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x342ca6fe"],
+        "valuePreds": [["Lit(875341566,unclassified literal at sew=32: 0x342ca6fe)"]],
+        "tuplePreds": ["AllSame(875341566,all operands = 0x342ca6fe)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
       }
     ],
     "sew64": [
@@ -31,6 +87,34 @@
         "raw": ["0x400921fb40000000"],
         "valuePreds": [["Lit(4614256656212033536,unclassified literal at sew=64: 0x400921fb40000000)"]],
         "tuplePreds": ["AllSame(4614256656212033536,all operands = 0x400921fb40000000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x40c3880000000000"],
+        "valuePreds": [["Lit(4666723172467343360,unclassified literal at sew=64: 0x40c3880000000000)"]],
+        "tuplePreds": ["AllSame(4666723172467343360,all operands = 0x40c3880000000000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0xbff0000000000000"],
+        "valuePreds": [["Lit(13830554455654793216,unclassified literal at sew=64: 0xbff0000000000000)"]],
+        "tuplePreds": ["AllSame(13830554455654793216,all operands = 0xbff0000000000000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x4065600000000000"],
+        "valuePreds": [["Lit(4640220544191430656,unclassified literal at sew=64: 0x4065600000000000)"]],
+        "tuplePreds": ["AllSame(4640220544191430656,all operands = 0x4065600000000000)"],
+        "fpValuePreds": [],
+        "fpTuplePreds": []
+      },
+      {
+        "raw": ["0x3e8594dfc0000000"],
+        "valuePreds": [["Lit(4505170690973892608,unclassified literal at sew=64: 0x3e8594dfc0000000)"]],
+        "tuplePreds": ["AllSame(4505170690973892608,all operands = 0x3e8594dfc0000000)"],
         "fpValuePreds": [],
         "fpTuplePreds": []
       }

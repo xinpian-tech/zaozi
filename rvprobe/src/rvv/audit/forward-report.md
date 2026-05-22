@@ -1,15 +1,18 @@
 # Forward Audit Report (AC-3)
 
-Generated from upstream `riscv-vector-tests/configs/`. Per AC-3, `Lit(BigInt, rationale)` is a valid classification; a high Lit-only-row count is a signal of room to grow the vocabulary, not an AC-3 violation. Unclassified-and-unwaived count is 0 by construction (every row matches at least one predicate, falling back to Lit).
+Generated from upstream `riscv-vector-tests/configs/`. Per AC-3, `Lit(BigInt, rationale)` and `FpLit(literal, rationale)` are valid classifications. The metrics below are *informational*: they show how much curator intent the named vocabulary captures vs. how much falls through to Lit. Unclassified-and-unwaived count is 0 by construction.
 
 - Tomls scanned: 676
-- Total literal rows: 14573
-- Tomls with at least one Lit-only row: 165
-- Total Lit-only rows (curator intent not captured by named predicate): 775
+- Total literal rows: 14950
+- Rows where every classification is Lit (`litOnlyCount`): 775 across 165 tomls
+- Element cells classified as `ValuePred.Lit`: 4150
+- Element cells classified as `FpValuePred.FpLit`: 0
+- Rows with at least one `TuplePred.Lit`: 3592
+- Rows with at least one `FpTuplePred.Lit`: 227
 
-## Per-toml Lit-only count (descending)
+## Per-toml lit-only row count (descending)
 
-| Toml | Lit-only rows |
+| Toml | lit-only rows |
 |---|---|
 | v/vdiv.vv | 7 |
 | v/vdiv.vx | 7 |
