@@ -36,7 +36,12 @@ final case class RvvInsn(
    */
   indexedEew:      Option[Int]                     = None,
   /** Optional NFIELDS for segmented load/store schemas. */
-  nfields:         Int                             = 1)
+  nfields:         Int                             = 1,
+  /** Per AC-2: source TOML path under upstream
+   *  `riscv-vector-tests/configs/<ext>/<name>.toml`. Empty for
+   *  hand-authored declarations (none currently).
+   */
+  sourceToml:      String                          = "")
 
 object RvvInsn:
   /** Stable disambiguator: (extension, name). Two upstream tomls with

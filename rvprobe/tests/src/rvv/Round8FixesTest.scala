@@ -151,11 +151,17 @@ object Round8FixesTest extends TestSuite:
       val variants = cs.map(_.insn).toSet
       assert(variants == Set("vsetvli", "vsetivli", "vsetvl"))
 
-    test("Codex r7 #5: VsetvlTests.renderTestS for vsetvli emits well-formed .S"):
+    test("Codex r7 #5 + r8 #4: VsetvlTests.renderTestS uses scalar CSR TEST_CASE, not vector magic"):
       val s = VsetvlTests.renderTestS("vsetvli", vlen = 256, xlen = 64, envMacro = "RVTEST_RV64UV")
       assert(s.contains("RVTEST_CODE_BEGIN"))
       assert(s.contains("vsetvli"))
-      assert(s.contains(".word 0x"))
+      // pspike doesn't read vl/vtype CSRs; the dedicated codepath emits
+      // scalar TEST_CASE rows comparing csrr a3, vl / csrr a4, vtype
+      // against expected values. No vector magic word.
+      assert(s.contains("csrr a3, vl"))
+      assert(s.contains("csrr a4, vtype"))
+      assert(s.contains("TEST_CASE("))
+      assert(!s.contains(".word 0x")) // explicit: NO vector magic word
       assert(s.contains("TEST_PASSFAIL"))
 
     // ---- Codex r7 #6: Driver real emission (not placeholder) ----

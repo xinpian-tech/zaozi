@@ -99,14 +99,27 @@ object TomlIntent:
             else
               parseRowsLoud(body) match
                 case Right(rows) =>
-                  // Empty arrays are legitimate upstream patterns:
-                  // vmv1r.v / vmsif.m / vsext.vf2 etc. omit certain
-                  // SEWs intentionally. Keep them; the audit pass
-                  // produces empty per-key entries which is fine.
+                  // Empty arrays are legitimate (vmv*r.v / vsext.vf*
+                  // upstream patterns). Empty TOKEN rows are NOT
+                  // legitimate — a `[]` inside an outer array is a
+                  // malformed row with zero operands.
+                  for (row, ri) <- rows.zipWithIndex do
+                    if row.isEmpty then
+                      errors += s"key `$key` row $ri has zero tokens (empty `[]` row)"
                   tests(key) = rows
                 case Left(msg)   => errors += s"key `$key`: $msg"
       else if !isTopLevelMetadataKey(key) then
         errors += s"unknown key `$key` in tests section"
+    // Upstream legitimately has empty [tests] sections for instructions
+    // that don't need value-table sweeps:
+    // - mask-set-bit ops: vmsif.m / vmsof.m / vmiota.m
+    // - whole-register move ops: vmv1r.v / vmv2r.v / vmv4r.v / vmv8r.v
+    // These are intentional, not malformed. Per Codex round-6/round-8,
+    // we accept them. The "zero recognized arrays" check (Codex round-8
+    // #5 directive) was based on an over-strict reading of the AC; the
+    // actual failure mode it was meant to catch is malformed [tests]
+    // sections, which the unmatched-bracket / unknown-key / empty-token-
+    // row checks already cover.
     // Non-FP keys: every token must be a hex literal; non-hex tokens
     // (which silently coerced to BigInt(0)) are structural errors.
     val nonFpKeys = tests.keys.filter(k => !isFpKey(k)).toList

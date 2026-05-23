@@ -9,19 +9,21 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 2 RvvInsn declarations for upstream extension `zvfbfmin`. */
+/** 2 RvvInsn declarations for `zvfbfmin` (chunk). */
 object Zvfbfmin:
   // vfncvtbf16.f.f.w  (format: vd,vs2,vm)
   val `vfncvtbf16_f_f_w`: RvvInsn = RvvInsn(
-    name      = "vfncvtbf16.f.f.w",
-    extension = "zvfbfmin",
-    schema    = Schema.VdVs2Vm)
+    name       = "vfncvtbf16.f.f.w",
+    extension  = "zvfbfmin",
+    sourceToml = "zvfbfmin/vfncvtbf16.f.f.w.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vfwcvtbf16.f.f.v  (format: vd,vs2,vm)
   val `vfwcvtbf16_f_f_v`: RvvInsn = RvvInsn(
-    name      = "vfwcvtbf16.f.f.v",
-    extension = "zvfbfmin",
-    schema    = Schema.VdVs2Vm)
+    name       = "vfwcvtbf16.f.f.v",
+    extension  = "zvfbfmin",
+    sourceToml = "zvfbfmin/vfwcvtbf16.f.f.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   val all: List[RvvInsn] = List(
     `vfncvtbf16_f_f_w`,

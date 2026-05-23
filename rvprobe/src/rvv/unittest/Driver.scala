@@ -249,13 +249,39 @@ object Driver:
           s"la a1, $vs2Label",
           s"vle${sew.bits}.v v16, (a1)")
         val insnAsm = formatInsnAsm(insn)
-        blocks += TestSEmit.TestBlock(
-          envelope    = env,
-          vectorGroup = 8,
-          vxsat       = insn.vxsat,
-          insnAsm     = insnAsm,
-          setupAsm    = setup,
-          dataLabel   = None)
+
+        // Compute result-EEW and result-EMUL whole-register count.
+        // Round-9 Codex fix: widening (vwadd.vv at LMUL=4) has dest
+        // EMUL=8, NOT base LMUL=4. Mask-producing (vmseq.vv) has
+        // resultEEW=1 and resultEMUL=1 register.
+        val (resultEew, resultWR) =
+          if insn.widthProfile.maskDest then (1, 1)
+          else
+            val vdScale = insn.widthProfile.scaleOf(OperandRole.Vd)
+            val (rewN, rewD) = (vdScale.numerator, vdScale.denominator)
+            val rEew = sew.bits * rewN / rewD
+            val baseWR = MagicInstrEmit.wholeRegisterCount(lmul)
+            // resultWR = max(baseWR × scale, 1)
+            val rWR    = math.max(baseWR * rewN / rewD, 1)
+            (rEew, rWR.min(8))
+
+        // Skip combinations where the result EEW exceeds XLEN (=ELEN):
+        // upstream's gen-time filter excludes these too (insn_g.go's
+        // VLEN/SEW/LMUL combination table), and vsetvli cannot encode
+        // SEW>64. mask-dest (resultEew=1) and non-widening
+        // (resultEew=sew.bits) always survive.
+        val resultEewLegal = resultEew == 1 || resultEew <= cli.xlen
+        if resultEewLegal then
+          blocks += TestSEmit.TestBlock(
+            envelope             = env,
+            vectorGroup          = 8,
+            vxsat                = insn.vxsat,
+            insnAsm              = insnAsm,
+            setupAsm             = setup,
+            dataLabel            = None,
+            resultEew            = resultEew,
+            resultGroup          = 8,
+            resultWholeRegisters = resultWR)
       }
 
     renderWithLabels(insn.name, envMacro, blocks.result(), allTestData.toVector, labels.result())

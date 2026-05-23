@@ -22,14 +22,31 @@ object TestSEmit:
   /** A single (predicate × SEW × LMUL) iteration in the per-instruction
    *  test sequence. Caller computes the operand witness vectors via
    *  ElemValueLowering and passes them here.
+   *
+   *  pspike contract (round-9 fix): after `insnAsm` executes, the
+   *  emitter MUST store the result register group to `resultdata` and
+   *  leave `a0` pointing at `resultdata` BEFORE the magic word.
+   *  pspike's injected `TEST_CASE` rows read from `0(a0)` and
+   *  increment, so without the store they read uninitialized memory.
+   *
+   *  - `resultEew`: bits per element of the result vector group (SEW
+   *    for non-widening, 2×SEW for widening, 1 for mask-producing).
+   *  - `resultGroup`: vector register index where the result lands.
+   *    Magic word's `vector_group` field carries this.
+   *  - `resultWholeRegisters`: whole-register count for the result
+   *    group (1/2/4/8) — what pspike reads from `rs2[4:1]`. For
+   *    widening at LMUL=4, this is 8 (dest EMUL), not 4 (base LMUL).
    */
   final case class TestBlock(
-    envelope:    VTypeEnvelope,
-    vectorGroup: Int,
-    vxsat:       Boolean,
-    insnAsm:     String,                    // e.g., "vadd.vv v8, v16, v24"
-    setupAsm:    List[String] = Nil,        // any pre-instruction setup (li, vmv.v.x, etc)
-    dataLabel:   Option[String] = None      // memory label for load/store
+    envelope:             VTypeEnvelope,
+    vectorGroup:          Int,
+    vxsat:                Boolean,
+    insnAsm:              String,                    // e.g., "vadd.vv v8, v16, v24"
+    setupAsm:             List[String] = Nil,        // any pre-instruction setup
+    dataLabel:            Option[String] = None,     // memory label for load/store
+    resultEew:            Int          = 32,         // result element bits
+    resultGroup:          Int          = 8,          // dest vector register
+    resultWholeRegisters: Int          = 1           // for magic rs2[4:1]
   )
 
   /** Render the full `.S` file as a String. `envName` chooses the
@@ -66,17 +83,28 @@ object TestSEmit:
       sb.append("\n")
 
     blocks.zipWithIndex.foreach { case (b, idx) =>
-      sb.append(s"  # ---- block $idx (group=${b.vectorGroup}, lmul=${b.envelope.vtype.lmul}, sew=${b.envelope.vtype.sewBits}) ----\n")
+      sb.append(s"  # ---- block $idx (group=${b.vectorGroup}, lmul=${b.envelope.vtype.lmul}, sew=${b.envelope.vtype.sewBits}, resultEEW=${b.resultEew}, resultWR=${b.resultWholeRegisters}) ----\n")
       // Setup phase
       b.setupAsm.foreach(line => sb.append(s"  $line\n"))
       b.dataLabel.foreach(label =>
         sb.append(s"  la a1, $label\n"))
-      // Re-issue vsetvli for this block's envelope (in case it changed)
+      // Re-issue vsetvli for this block's envelope
       sb.append(s"  ${vsetvliAsm(b.envelope)}\n")
       // The instruction under test
       sb.append(s"  ${b.insnAsm}\n")
-      // Magic word — pspike injects expected values after this
-      sb.append(s"  ${MagicInstrEmit.emitAsm(b.vectorGroup, b.envelope.vtype.lmul, b.vxsat)}\n")
+      // pspike resultdata contract (round-9 fix): point a0 at
+      // resultdata, store the result register group, then magic.
+      sb.append(s"  la a0, resultdata\n")
+      // Re-set vtype for the result store: result has EEW=resultEew,
+      // which may differ from the instruction's SEW under widening.
+      if b.resultEew != b.envelope.vtype.sewBits then
+        sb.append(s"  ${vsetvliAsmForEew(b.envelope, b.resultEew)}\n")
+      sb.append(s"  vse${b.resultEew}.v v${b.resultGroup}, (a0)\n")
+      // Restore vtype for next block / pspike injection.
+      sb.append(s"  ${vsetvliAsm(b.envelope)}\n")
+      // Magic word — pspike injects expected TEST_CASE rows after this.
+      // rs2[4:1] = result whole-register count (NOT base LMUL).
+      sb.append(s"  ${MagicInstrEmit.emitAsmWithCount(b.vectorGroup, b.resultWholeRegisters, b.vxsat)}\n")
       sb.append("\n")
     }
 
@@ -95,27 +123,36 @@ object TestSEmit:
     sb.append("\nRVTEST_DATA_END\n")
     sb.toString
 
-  /** Emit a vsetvli that materializes the given envelope. Uses x5 as
-   *  rs1 (avl source) and x6 as rd; the test harness zero-initialized
-   *  these before this point.
-   */
+  /** Emit a vsetvli that materializes the given envelope. */
   def vsetvliAsm(env: VTypeEnvelope): String =
-    val sew = env.vtype.sewBits match
-      case 8  => "e8"
-      case 16 => "e16"
-      case 32 => "e32"
-      case 64 => "e64"
-    val lmul = env.vtype.lmul match
-      case Lmul.M1  => "m1"
-      case Lmul.M2  => "m2"
-      case Lmul.M4  => "m4"
-      case Lmul.M8  => "m8"
-      case Lmul.Mf2 => "mf2"
-      case Lmul.Mf4 => "mf4"
-      case Lmul.Mf8 => "mf8"
-    val vta = "ta"
-    val vma = "ma"
-    s"vsetvli x5, x0, $sew,$lmul,$vta,$vma"
+    val sew  = sewToken(env.vtype.sewBits)
+    val lmul = lmulToken(env.vtype.lmul)
+    s"vsetvli x5, x0, $sew,$lmul,ta,ma"
+
+  /** Emit a vsetvli for the result store: keeps LMUL but overrides
+   *  SEW to the result-EEW (used after widening / narrowing to match
+   *  the destination register-group element width).
+   */
+  def vsetvliAsmForEew(env: VTypeEnvelope, resultEew: Int): String =
+    val sew  = sewToken(resultEew)
+    val lmul = lmulToken(env.vtype.lmul)
+    s"vsetvli x5, x0, $sew,$lmul,ta,ma"
+
+  private def sewToken(bits: Int): String = bits match
+    case 8  => "e8"
+    case 16 => "e16"
+    case 32 => "e32"
+    case 64 => "e64"
+    case n  => throw new IllegalArgumentException(s"unsupported SEW: $n")
+
+  private def lmulToken(l: Lmul): String = l match
+    case Lmul.M1  => "m1"
+    case Lmul.M2  => "m2"
+    case Lmul.M4  => "m4"
+    case Lmul.M8  => "m8"
+    case Lmul.Mf2 => "mf2"
+    case Lmul.Mf4 => "mf4"
+    case Lmul.Mf8 => "mf8"
 
   /** Choose the RVTEST_*UV* macro for a given (xlen, march-has-v)
    *  combination. Matches upstream Makefile's `EXT_V` branching.

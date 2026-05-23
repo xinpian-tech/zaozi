@@ -9,73 +9,84 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 11 RvvInsn declarations for upstream extension `zvkned`. */
+/** 11 RvvInsn declarations for `zvkned` (chunk). */
 object Zvkned:
   // vaesdf.vs  (format: vd,vs2)
   val `vaesdf_vs`: RvvInsn = RvvInsn(
-    name      = "vaesdf.vs",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesdf.vs",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesdf.vs.toml",
+    schema     = Schema.VdVs2)
 
   // vaesdf.vv  (format: vd,vs2)
   val `vaesdf_vv`: RvvInsn = RvvInsn(
-    name      = "vaesdf.vv",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesdf.vv",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesdf.vv.toml",
+    schema     = Schema.VdVs2)
 
   // vaesdm.vs  (format: vd,vs2)
   val `vaesdm_vs`: RvvInsn = RvvInsn(
-    name      = "vaesdm.vs",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesdm.vs",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesdm.vs.toml",
+    schema     = Schema.VdVs2)
 
   // vaesdm.vv  (format: vd,vs2)
   val `vaesdm_vv`: RvvInsn = RvvInsn(
-    name      = "vaesdm.vv",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesdm.vv",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesdm.vv.toml",
+    schema     = Schema.VdVs2)
 
   // vaesef.vs  (format: vd,vs2)
   val `vaesef_vs`: RvvInsn = RvvInsn(
-    name      = "vaesef.vs",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesef.vs",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesef.vs.toml",
+    schema     = Schema.VdVs2)
 
   // vaesef.vv  (format: vd,vs2)
   val `vaesef_vv`: RvvInsn = RvvInsn(
-    name      = "vaesef.vv",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesef.vv",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesef.vv.toml",
+    schema     = Schema.VdVs2)
 
   // vaesem.vs  (format: vd,vs2)
   val `vaesem_vs`: RvvInsn = RvvInsn(
-    name      = "vaesem.vs",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesem.vs",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesem.vs.toml",
+    schema     = Schema.VdVs2)
 
   // vaesem.vv  (format: vd,vs2)
   val `vaesem_vv`: RvvInsn = RvvInsn(
-    name      = "vaesem.vv",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesem.vv",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesem.vv.toml",
+    schema     = Schema.VdVs2)
 
   // vaeskf1.vi  (format: vd,vs2,uimm)
   val `vaeskf1_vi`: RvvInsn = RvvInsn(
-    name      = "vaeskf1.vi",
-    extension = "zvkned",
-    schema    = Schema.VdVs2Uimm)
+    name       = "vaeskf1.vi",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaeskf1.vi.toml",
+    schema     = Schema.VdVs2Uimm)
 
   // vaeskf2.vi  (format: vd,vs2,uimm)
   val `vaeskf2_vi`: RvvInsn = RvvInsn(
-    name      = "vaeskf2.vi",
-    extension = "zvkned",
-    schema    = Schema.VdVs2Uimm)
+    name       = "vaeskf2.vi",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaeskf2.vi.toml",
+    schema     = Schema.VdVs2Uimm)
 
   // vaesz.vs  (format: vd,vs2)
   val `vaesz_vs`: RvvInsn = RvvInsn(
-    name      = "vaesz.vs",
-    extension = "zvkned",
-    schema    = Schema.VdVs2)
+    name       = "vaesz.vs",
+    extension  = "zvkned",
+    sourceToml = "zvkned/vaesz.vs.toml",
+    schema     = Schema.VdVs2)
 
   val all: List[RvvInsn] = List(
     `vaesdf_vs`,

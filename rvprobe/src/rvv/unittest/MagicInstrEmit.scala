@@ -69,6 +69,25 @@ object MagicInstrEmit:
     val w = encode(vectorGroup, lmul, vxsat)
     f".word 0x$w%08x"
 
+  /** Encode with an explicit whole-register count. Used by TestSEmit
+   *  when the result group's EMUL differs from the base LMUL
+   *  (widening / narrowing). Per upstream insn_vdvs2vs1vm.go:87,
+   *  `gMagicInsn(vd, vdEMUL1)` passes `max(LMUL × vdSize, 1)`.
+   */
+  def encodeWithCount(vectorGroup: Int, wholeRegisters: Int, vxsat: Boolean): Int =
+    require(vectorGroup >= 0 && vectorGroup < 32,
+      s"vectorGroup must be in [0,31], got $vectorGroup")
+    require(Set(1, 2, 4, 8).contains(wholeRegisters),
+      s"wholeRegisters must be in {1,2,4,8}, got $wholeRegisters")
+    val rs1Field  = (vectorGroup & 0x1f) << 15
+    val vxsatBit  = (if vxsat then 1 else 0) << 20
+    val lmulBits  = (wholeRegisters & 0xf) << 21
+    Opcode | rs1Field | vxsatBit | lmulBits
+
+  def emitAsmWithCount(vectorGroup: Int, wholeRegisters: Int, vxsat: Boolean): String =
+    val w = encodeWithCount(vectorGroup, wholeRegisters, vxsat)
+    f".word 0x$w%08x"
+
   /** Per the upstream gMagicInsn contract, the rs2[4:1] field carries
    *  the whole-register count (1, 2, 4, or 8) — `max(lmul, 1)` where
    *  fractional LMULs collapse to 1.

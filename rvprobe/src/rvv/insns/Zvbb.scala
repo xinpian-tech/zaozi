@@ -9,103 +9,119 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 16 RvvInsn declarations for upstream extension `zvbb`. */
+/** 16 RvvInsn declarations for `zvbb` (chunk). */
 object Zvbb:
   // vandn.vv  (format: vd,vs2,vs1,vm)
   val `vandn_vv`: RvvInsn = RvvInsn(
-    name      = "vandn.vv",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vs1Vm)
+    name       = "vandn.vv",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vandn.vv.toml",
+    schema     = Schema.VdVs2Vs1Vm)
 
   // vandn.vx  (format: vd,vs2,rs1,vm)
   val `vandn_vx`: RvvInsn = RvvInsn(
-    name      = "vandn.vx",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Rs1Vm)
+    name       = "vandn.vx",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vandn.vx.toml",
+    schema     = Schema.VdVs2Rs1Vm)
 
   // vbrev.v  (format: vd,vs2,vm)
   val `vbrev_v`: RvvInsn = RvvInsn(
-    name      = "vbrev.v",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vm)
+    name       = "vbrev.v",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vbrev.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vbrev8.v  (format: vd,vs2,vm)
   val `vbrev8_v`: RvvInsn = RvvInsn(
-    name      = "vbrev8.v",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vm)
+    name       = "vbrev8.v",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vbrev8.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vclz.v  (format: vd,vs2,vm)
   val `vclz_v`: RvvInsn = RvvInsn(
-    name      = "vclz.v",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vm)
+    name       = "vclz.v",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vclz.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vcpop.v  (format: vd,vs2,vm)
   val `vcpop_v`: RvvInsn = RvvInsn(
-    name      = "vcpop.v",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vm)
+    name       = "vcpop.v",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vcpop.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vctz.v  (format: vd,vs2,vm)
   val `vctz_v`: RvvInsn = RvvInsn(
-    name      = "vctz.v",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vm)
+    name       = "vctz.v",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vctz.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vrev8.v  (format: vd,vs2,vm)
   val `vrev8_v`: RvvInsn = RvvInsn(
-    name      = "vrev8.v",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vm)
+    name       = "vrev8.v",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vrev8.v.toml",
+    schema     = Schema.VdVs2Vm)
 
   // vrol.vv  (format: vd,vs2,vs1,vm)
   val `vrol_vv`: RvvInsn = RvvInsn(
-    name      = "vrol.vv",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vs1Vm)
+    name       = "vrol.vv",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vrol.vv.toml",
+    schema     = Schema.VdVs2Vs1Vm)
 
   // vrol.vx  (format: vd,vs2,rs1,vm)
   val `vrol_vx`: RvvInsn = RvvInsn(
-    name      = "vrol.vx",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Rs1Vm)
+    name       = "vrol.vx",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vrol.vx.toml",
+    schema     = Schema.VdVs2Rs1Vm)
 
   // vror.vi  (format: vd,vs2,uimm,vm)
   val `vror_vi`: RvvInsn = RvvInsn(
-    name      = "vror.vi",
-    extension = "zvbb",
-    schema    = Schema.VdVs2UimmVm)
+    name       = "vror.vi",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vror.vi.toml",
+    schema     = Schema.VdVs2UimmVm)
 
   // vror.vv  (format: vd,vs2,vs1,vm)
   val `vror_vv`: RvvInsn = RvvInsn(
-    name      = "vror.vv",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vs1Vm)
+    name       = "vror.vv",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vror.vv.toml",
+    schema     = Schema.VdVs2Vs1Vm)
 
   // vror.vx  (format: vd,vs2,rs1,vm)
   val `vror_vx`: RvvInsn = RvvInsn(
-    name      = "vror.vx",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Rs1Vm)
+    name       = "vror.vx",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vror.vx.toml",
+    schema     = Schema.VdVs2Rs1Vm)
 
   // vwsll.vi  (format: vd,vs2,uimm,vm)
   val `vwsll_vi`: RvvInsn = RvvInsn(
-    name      = "vwsll.vi",
-    extension = "zvbb",
-    schema    = Schema.VdVs2UimmVm)
+    name       = "vwsll.vi",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vwsll.vi.toml",
+    schema     = Schema.VdVs2UimmVm)
 
   // vwsll.vv  (format: vd,vs2,vs1,vm)
   val `vwsll_vv`: RvvInsn = RvvInsn(
-    name      = "vwsll.vv",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Vs1Vm)
+    name       = "vwsll.vv",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vwsll.vv.toml",
+    schema     = Schema.VdVs2Vs1Vm)
 
   // vwsll.vx  (format: vd,vs2,rs1,vm)
   val `vwsll_vx`: RvvInsn = RvvInsn(
-    name      = "vwsll.vx",
-    extension = "zvbb",
-    schema    = Schema.VdVs2Rs1Vm)
+    name       = "vwsll.vx",
+    extension  = "zvbb",
+    sourceToml = "zvbb/vwsll.vx.toml",
+    schema     = Schema.VdVs2Rs1Vm)
 
   val all: List[RvvInsn] = List(
     `vandn_vv`,

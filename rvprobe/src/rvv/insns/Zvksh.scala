@@ -9,19 +9,21 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 2 RvvInsn declarations for upstream extension `zvksh`. */
+/** 2 RvvInsn declarations for `zvksh` (chunk). */
 object Zvksh:
   // vsm3c.vi  (format: vd,vs2,uimm)
   val `vsm3c_vi`: RvvInsn = RvvInsn(
-    name      = "vsm3c.vi",
-    extension = "zvksh",
-    schema    = Schema.VdVs2Uimm)
+    name       = "vsm3c.vi",
+    extension  = "zvksh",
+    sourceToml = "zvksh/vsm3c.vi.toml",
+    schema     = Schema.VdVs2Uimm)
 
   // vsm3me.vv  (format: vd,vs2,vs1)
   val `vsm3me_vv`: RvvInsn = RvvInsn(
-    name      = "vsm3me.vv",
-    extension = "zvksh",
-    schema    = Schema.VdVs2Vs1)
+    name       = "vsm3me.vv",
+    extension  = "zvksh",
+    sourceToml = "zvksh/vsm3me.vv.toml",
+    schema     = Schema.VdVs2Vs1)
 
   val all: List[RvvInsn] = List(
     `vsm3c_vi`,

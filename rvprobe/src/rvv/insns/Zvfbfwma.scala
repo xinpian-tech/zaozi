@@ -9,19 +9,21 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 2 RvvInsn declarations for upstream extension `zvfbfwma`. */
+/** 2 RvvInsn declarations for `zvfbfwma` (chunk). */
 object Zvfbfwma:
   // vfwmaccbf16.vf  (format: vd,fs1,vs2,vm)
   val `vfwmaccbf16_vf`: RvvInsn = RvvInsn(
-    name      = "vfwmaccbf16.vf",
-    extension = "zvfbfwma",
-    schema    = Schema.VdFs1Vs2Vm)
+    name       = "vfwmaccbf16.vf",
+    extension  = "zvfbfwma",
+    sourceToml = "zvfbfwma/vfwmaccbf16.vf.toml",
+    schema     = Schema.VdFs1Vs2Vm)
 
   // vfwmaccbf16.vv  (format: vd,vs1,vs2,vm)
   val `vfwmaccbf16_vv`: RvvInsn = RvvInsn(
-    name      = "vfwmaccbf16.vv",
-    extension = "zvfbfwma",
-    schema    = Schema.VdVs1Vs2Vm)
+    name       = "vfwmaccbf16.vv",
+    extension  = "zvfbfwma",
+    sourceToml = "zvfbfwma/vfwmaccbf16.vv.toml",
+    schema     = Schema.VdVs1Vs2Vm)
 
   val all: List[RvvInsn] = List(
     `vfwmaccbf16_vf`,

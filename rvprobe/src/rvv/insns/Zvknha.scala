@@ -9,25 +9,28 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 3 RvvInsn declarations for upstream extension `zvknha`. */
+/** 3 RvvInsn declarations for `zvknha` (chunk). */
 object Zvknha:
   // vsha2ch.vv  (format: vd,vs2,vs1)
   val `vsha2ch_vv`: RvvInsn = RvvInsn(
-    name      = "vsha2ch.vv",
-    extension = "zvknha",
-    schema    = Schema.VdVs2Vs1)
+    name       = "vsha2ch.vv",
+    extension  = "zvknha",
+    sourceToml = "zvknha/vsha2ch.vv.toml",
+    schema     = Schema.VdVs2Vs1)
 
   // vsha2cl.vv  (format: vd,vs2,vs1)
   val `vsha2cl_vv`: RvvInsn = RvvInsn(
-    name      = "vsha2cl.vv",
-    extension = "zvknha",
-    schema    = Schema.VdVs2Vs1)
+    name       = "vsha2cl.vv",
+    extension  = "zvknha",
+    sourceToml = "zvknha/vsha2cl.vv.toml",
+    schema     = Schema.VdVs2Vs1)
 
   // vsha2ms.vv  (format: vd,vs2,vs1)
   val `vsha2ms_vv`: RvvInsn = RvvInsn(
-    name      = "vsha2ms.vv",
-    extension = "zvknha",
-    schema    = Schema.VdVs2Vs1)
+    name       = "vsha2ms.vv",
+    extension  = "zvknha",
+    sourceToml = "zvknha/vsha2ms.vv.toml",
+    schema     = Schema.VdVs2Vs1)
 
   val all: List[RvvInsn] = List(
     `vsha2ch_vv`,

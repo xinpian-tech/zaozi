@@ -9,31 +9,35 @@ package me.jiuyang.rvprobe.rvv.insns
 import me.jiuyang.rvprobe.rvv.Schema
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
-/** 4 RvvInsn declarations for upstream extension `zvbc`. */
+/** 4 RvvInsn declarations for `zvbc` (chunk). */
 object Zvbc:
   // vclmul.vv  (format: vd,vs2,vs1,vm)
   val `vclmul_vv`: RvvInsn = RvvInsn(
-    name      = "vclmul.vv",
-    extension = "zvbc",
-    schema    = Schema.VdVs2Vs1Vm)
+    name       = "vclmul.vv",
+    extension  = "zvbc",
+    sourceToml = "zvbc/vclmul.vv.toml",
+    schema     = Schema.VdVs2Vs1Vm)
 
   // vclmul.vx  (format: vd,vs2,rs1,vm)
   val `vclmul_vx`: RvvInsn = RvvInsn(
-    name      = "vclmul.vx",
-    extension = "zvbc",
-    schema    = Schema.VdVs2Rs1Vm)
+    name       = "vclmul.vx",
+    extension  = "zvbc",
+    sourceToml = "zvbc/vclmul.vx.toml",
+    schema     = Schema.VdVs2Rs1Vm)
 
   // vclmulh.vv  (format: vd,vs2,vs1,vm)
   val `vclmulh_vv`: RvvInsn = RvvInsn(
-    name      = "vclmulh.vv",
-    extension = "zvbc",
-    schema    = Schema.VdVs2Vs1Vm)
+    name       = "vclmulh.vv",
+    extension  = "zvbc",
+    sourceToml = "zvbc/vclmulh.vv.toml",
+    schema     = Schema.VdVs2Vs1Vm)
 
   // vclmulh.vx  (format: vd,vs2,rs1,vm)
   val `vclmulh_vx`: RvvInsn = RvvInsn(
-    name      = "vclmulh.vx",
-    extension = "zvbc",
-    schema    = Schema.VdVs2Rs1Vm)
+    name       = "vclmulh.vx",
+    extension  = "zvbc",
+    sourceToml = "zvbc/vclmulh.vx.toml",
+    schema     = Schema.VdVs2Rs1Vm)
 
   val all: List[RvvInsn] = List(
     `vclmul_vv`,

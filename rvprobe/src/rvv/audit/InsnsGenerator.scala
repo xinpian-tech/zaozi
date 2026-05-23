@@ -86,9 +86,10 @@ object InsnsGenerator:
     val vName      = info.name.replace('.', '_').replace('-', '_')
     sb.append(s"  // ${info.name}  (format: ${info.format})\n")
     sb.append(s"  val `$vName`: RvvInsn = RvvInsn(\n")
-    sb.append(s"""    name      = "${info.name}",\n""")
-    sb.append(s"""    extension = "${info.extension}",\n""")
-    sb.append(s"    schema    = Schema.$schemaName")
+    sb.append(s"""    name       = "${info.name}",\n""")
+    sb.append(s"""    extension  = "${info.extension}",\n""")
+    sb.append(s"""    sourceToml = "${info.extension}/${info.name}.toml",\n""")
+    sb.append(s"    schema     = Schema.$schemaName")
     indexedEewFor(info.name).foreach(e => sb.append(s",\n    indexedEew = Some($e)"))
     val nf = nfieldsFor(info.name)
     if nf > 1 then sb.append(s",\n    nfields = $nf")
@@ -98,9 +99,28 @@ object InsnsGenerator:
     sb.append(")\n\n")
     sb.toString
 
-  /** Render the full extension-specific Scala source file. */
-  def renderExtensionFile(extName: String, insns: List[GenInfo]): String =
-    val objectName = extName.capitalize
+  /** Render an extension-specific Scala source file.
+   *
+   *  Three modes:
+   *  - `chunkSuffix=None, allChunks=None`: single-file mode for small
+   *    extensions (one file with declarations + `all` list).
+   *  - `chunkSuffix=Some(idx), allChunks=None`: per-chunk file
+   *    (`<Ext>0.scala`, `<Ext>1.scala`, ...) carrying its slice of
+   *    declarations + `chunkAll` list.
+   *  - `chunkSuffix=None, allChunks=Some(n)`: top-level aggregator
+   *    (`<Ext>.scala`) that concatenates `<Ext>0.chunkAll ++ ... ++
+   *    <Ext>(n-1).chunkAll` into `all`.
+   */
+  def renderExtensionFile(
+    extName:     String,
+    insns:       List[GenInfo],
+    chunkSuffix: Option[Int],
+    allChunks:   Option[Int]
+  ): String =
+    val baseObj = extName.capitalize
+    val objName = chunkSuffix match
+      case Some(n) => s"$baseObj$n"
+      case None    => baseObj
     val sb = new StringBuilder
     sb.append("// SPDX-License-Identifier: Apache-2.0\n")
     sb.append("// SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>\n")
@@ -109,21 +129,44 @@ object InsnsGenerator:
     sb.append("// Do not edit by hand. Regenerate via:\n")
     sb.append("//   mill rvprobe.runMain me.jiuyang.rvprobe.rvv.audit.regenerateInsns\n")
     sb.append("package me.jiuyang.rvprobe.rvv.insns\n\n")
-    sb.append("import me.jiuyang.rvprobe.rvv.Schema\n")
-    sb.append("import me.jiuyang.rvprobe.rvv.unittest.RvvInsn\n\n")
-    sb.append(s"/** ${insns.size} RvvInsn declarations for upstream extension `$extName`. */\n")
-    sb.append(s"object $objectName:\n")
-    for info <- insns.sortBy(_.name) do sb.append(renderInsn(info))
-    sb.append(s"  val all: List[RvvInsn] = List(\n")
-    sb.append(insns.sortBy(_.name).map { info =>
-      val v = info.name.replace('.', '_').replace('-', '_')
-      s"    `$v`"
-    }.mkString(",\n"))
-    sb.append("\n  )\n")
+    allChunks match
+      case Some(_) =>
+        sb.append("import me.jiuyang.rvprobe.rvv.unittest.RvvInsn\n\n")
+      case None    =>
+        sb.append("import me.jiuyang.rvprobe.rvv.Schema\n")
+        sb.append("import me.jiuyang.rvprobe.rvv.unittest.RvvInsn\n\n")
+    allChunks match
+      case Some(n) =>
+        // Aggregator object
+        sb.append(s"/** Aggregator for extension `$extName` (${n} chunks). */\n")
+        sb.append(s"object $baseObj:\n")
+        sb.append(s"  val all: List[RvvInsn] =\n")
+        val refs = (0 until n).map(i => s"$baseObj$i.chunkAll")
+        sb.append("    " + refs.mkString(" ++\n    ") + "\n")
+      case None    =>
+        sb.append(s"/** ${insns.size} RvvInsn declarations for `$extName` (chunk${chunkSuffix.map(i => s" $i").getOrElse("")}). */\n")
+        sb.append(s"object $objName:\n")
+        for info <- insns do sb.append(renderInsn(info))
+        val listVal = if chunkSuffix.isDefined then "chunkAll" else "all"
+        sb.append(s"  val $listVal: List[RvvInsn] = List(\n")
+        sb.append(insns.map { info =>
+          val v = info.name.replace('.', '_').replace('-', '_')
+          s"    `$v`"
+        }.mkString(",\n"))
+        sb.append("\n  )\n")
     sb.toString
 
-  /** Walk the audit snapshots tree, group by extension, render one
-   *  Scala file per extension under `outDir`.
+  /** Maximum number of RvvInsn declarations per generated Scala file.
+   *  JVM's per-method bytecode limit (64 KB) constrains the static
+   *  initializer; with `sourceToml` added per declaration we need
+   *  smaller chunks. 100 keeps each `<clinit>` well under the limit
+   *  while keeping the file count manageable.
+   */
+  private val ChunkSize: Int = 100
+
+  /** Walk the audit snapshots tree, group by extension, render
+   *  per-extension Scala files (chunked when an extension's insn
+   *  count exceeds ChunkSize) under `outDir`.
    */
   def regenerate(snapshotsRoot: Path, outDir: Path): List[(String, Int)] =
     import scala.jdk.CollectionConverters.*
@@ -137,10 +180,25 @@ object InsnsGenerator:
     Files.createDirectories(outDir)
     val results = List.newBuilder[(String, Int)]
     byExt.toList.sortBy(_._1).foreach { case (ext, insns) =>
-      val content = renderExtensionFile(ext, insns)
-      val file    = outDir.resolve(s"${ext.capitalize}.scala")
-      Files.write(file, content.getBytes(StandardCharsets.UTF_8))
-      results += (ext -> insns.size)
+      val sorted = insns.sortBy(_.name)
+      if sorted.size <= ChunkSize then
+        // Single file for small extensions.
+        val content = renderExtensionFile(ext, sorted, chunkSuffix = None, allChunks = None)
+        Files.write(outDir.resolve(s"${ext.capitalize}.scala"),
+                    content.getBytes(StandardCharsets.UTF_8))
+      else
+        // Chunk into <Ext>0.scala, <Ext>1.scala, ... and a top-level
+        // <Ext>.scala aggregator.
+        val chunks = sorted.grouped(ChunkSize).toList.zipWithIndex
+        for (chunk, idx) <- chunks do
+          val content = renderExtensionFile(ext, chunk, chunkSuffix = Some(idx), allChunks = None)
+          Files.write(outDir.resolve(s"${ext.capitalize}$idx.scala"),
+                      content.getBytes(StandardCharsets.UTF_8))
+        val aggregator = renderExtensionFile(
+          ext, Nil, chunkSuffix = None, allChunks = Some(chunks.size))
+        Files.write(outDir.resolve(s"${ext.capitalize}.scala"),
+                    aggregator.getBytes(StandardCharsets.UTF_8))
+      results += (ext -> sorted.size)
     }
     // Emit the central RvvInsnRegistryGenerated.scala aggregating all.
     val regContent = renderRegistry(byExt.keys.toList.sorted)
