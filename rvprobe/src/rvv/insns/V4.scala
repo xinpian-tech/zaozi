@@ -409,196 +409,252 @@ object V4:
     name       = "vsoxseg2ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg2ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 2)
 
   // vsoxseg2ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg2ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg2ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg2ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 2)
 
   // vsoxseg2ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg2ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg2ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg2ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 2)
 
   // vsoxseg2ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg2ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg2ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg2ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 2)
 
   // vsoxseg3ei16.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg3ei16_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg3ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg3ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 3)
 
   // vsoxseg3ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg3ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg3ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg3ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 3)
 
   // vsoxseg3ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg3ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg3ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg3ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 3)
 
   // vsoxseg3ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg3ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg3ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg3ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 3)
 
   // vsoxseg4ei16.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg4ei16_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg4ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg4ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 4)
 
   // vsoxseg4ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg4ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg4ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg4ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 4)
 
   // vsoxseg4ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg4ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg4ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg4ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 4)
 
   // vsoxseg4ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg4ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg4ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg4ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 4)
 
   // vsoxseg5ei16.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg5ei16_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg5ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg5ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 5)
 
   // vsoxseg5ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg5ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg5ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg5ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 5)
 
   // vsoxseg5ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg5ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg5ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg5ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 5)
 
   // vsoxseg5ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg5ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg5ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg5ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 5)
 
   // vsoxseg6ei16.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg6ei16_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg6ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg6ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 6)
 
   // vsoxseg6ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg6ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg6ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg6ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 6)
 
   // vsoxseg6ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg6ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg6ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg6ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 6)
 
   // vsoxseg6ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg6ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg6ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg6ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 6)
 
   // vsoxseg7ei16.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg7ei16_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg7ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg7ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 7)
 
   // vsoxseg7ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg7ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg7ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg7ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 7)
 
   // vsoxseg7ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg7ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg7ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg7ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 7)
 
   // vsoxseg7ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg7ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg7ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg7ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 7)
 
   // vsoxseg8ei16.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg8ei16_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg8ei16.v",
     extension  = "v",
     sourceToml = "v/vsoxseg8ei16.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(16),
+    nfields = 8)
 
   // vsoxseg8ei32.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg8ei32_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg8ei32.v",
     extension  = "v",
     sourceToml = "v/vsoxseg8ei32.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(32),
+    nfields = 8)
 
   // vsoxseg8ei64.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg8ei64_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg8ei64.v",
     extension  = "v",
     sourceToml = "v/vsoxseg8ei64.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(64),
+    nfields = 8)
 
   // vsoxseg8ei8.v  (format: vs3,(rs1),vs2,vm)
   val `vsoxseg8ei8_v`: RvvInsn = RvvInsn(
     name       = "vsoxseg8ei8.v",
     extension  = "v",
     sourceToml = "v/vsoxseg8ei8.v.toml",
-    schema     = Schema.Vs3Rs1mVs2Vm)
+    schema     = Schema.Vs3Rs1mVs2Vm,
+    indexedEew = Some(8),
+    nfields = 8)
 
   // vsra.vi  (format: vd,vs2,uimm,vm)
   val `vsra_vi`: RvvInsn = RvvInsn(

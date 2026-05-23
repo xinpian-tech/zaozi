@@ -57,20 +57,46 @@ object InsnsGenerator:
   def schemaEnumName(format: String): Option[String] =
     Schema.byFormatString(format).map(_.toString)
 
-  /** Infer indexedEew from instruction name for indexed load/store. */
+  /** Infer indexedEew from instruction name for indexed load/store +
+   *  segmented indexed variants. Recognizes:
+   *    vluxei<n>.v, vloxei<n>.v       (unit indexed load)
+   *    vsuxei<n>.v, vsoxei<n>.v       (unit indexed store)
+   *    vluxseg<f>ei<n>.v, vloxseg<f>ei<n>.v (segmented indexed load)
+   *    vsuxseg<f>ei<n>.v, vsoxseg<f>ei<n>.v (segmented indexed store)
+   *
+   *  Codex r13 #3: round-13 regex `vlsseg\d*ei` matched strided
+   *  segmented (which has no indexedEew); the segmented-indexed forms
+   *  (`vluxseg2ei32`, etc.) were missed entirely.
+   */
   def indexedEewFor(name: String): Option[Int] =
-    val rx = """(?:vluxei|vloxei|vsuxei|vsoxei|vlsseg\d*ei|vssseg\d*ei)(\d+)""".r
+    val rx = """(?:vluxei|vloxei|vsuxei|vsoxei|vluxseg\d+ei|vloxseg\d+ei|vsuxseg\d+ei|vsoxseg\d+ei)(\d+)""".r
     rx.findFirstMatchIn(name).map(_.group(1).toInt)
 
-  /** Infer NFIELDS from segmented load/store name (vlseg2e32 -> 2). */
+  /** Infer NFIELDS from segmented load/store name. Recognizes:
+   *    vlseg<f>e<m>.v, vsseg<f>e<m>.v       (unit-stride segmented)
+   *    vlsseg<f>e<m>.v, vssseg<f>e<m>.v     (strided segmented)
+   *    vluxseg<f>ei<m>.v, vloxseg<f>ei<m>.v (indexed-unordered segmented load)
+   *    vsuxseg<f>ei<m>.v, vsoxseg<f>ei<m>.v (indexed-unordered segmented store)
+   *
+   *  Codex r13 #3 + #4: round-13 regex caught only some of these; the
+   *  segmented indexed and strided segmented forms returned 1 when
+   *  they should have returned the field count from the name.
+   */
   def nfieldsFor(name: String): Int =
-    val rx = """v(?:l|s)(?:s|u|o)?xeg?(\d)e\d+""".r
-    rx.findFirstMatchIn(name) match
-      case Some(m) => m.group(1).toInt
-      case None    =>
-        // simpler vlsegNeM/vssegNeM pattern
-        val rx2 = """v(?:l|s)seg(\d)e\d+""".r
-        rx2.findFirstMatchIn(name).map(_.group(1).toInt).getOrElse(1)
+    // Pattern 1: vlseg<N>e<M> or vsseg<N>e<M> (unit-stride).
+    val rxUnit = """^v(?:l|s)seg(\d+)e\d+""".r
+    rxUnit.findFirstMatchIn(name).map(_.group(1).toInt)
+      .orElse {
+        // Pattern 2: vlsseg<N>e<M> or vssseg<N>e<M> (strided).
+        val rxStr = """^v(?:l|s)sseg(\d+)e\d+""".r
+        rxStr.findFirstMatchIn(name).map(_.group(1).toInt)
+      }
+      .orElse {
+        // Pattern 3: vluxseg/vloxseg/vsuxseg/vsoxseg <N>ei<M> (indexed).
+        val rxIdx = """^v(?:l|s)(?:u|o)xseg(\d+)ei\d+""".r
+        rxIdx.findFirstMatchIn(name).map(_.group(1).toInt)
+      }
+      .getOrElse(1)
 
   /** Infer the widthProfile from the instruction name pattern.
    *  Codex round-9 #1: without this inference, real generated

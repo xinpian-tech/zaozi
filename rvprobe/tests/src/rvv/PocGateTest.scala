@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.tests.rvv
 
-import me.jiuyang.rvprobe.rvv.unittest.{Driver, RvvInsn, RvvInsnRegistry, TestSEmit}
+import me.jiuyang.rvprobe.rvv.unittest.{Driver, RvvInsn, RvvInsnRegistry, TestSEmit, Testfloat3Driver}
 
 import java.nio.file.Files
 
@@ -102,6 +102,22 @@ object PocGateTest extends TestSuite:
               if frmCount < 5 then
                 println(s"[PocGateTest] FAIL: $name has $frmCount csrwi frm, need ≥5")
               assert(frmCount >= 5)
+              // Codex r13 #1 (HIGH): if the file contains the
+              // xorshift-fallback sentinel, the emission was NOT
+              // testfloat3-driven. Per DEC-4 and AC-10, FP POCs require
+              // real testfloat3 operands. The gate prints an
+              // "advisory: AC-10/AC-16 unavailable" warning by default
+              // (so dev tests stay green), and fails strictly when
+              // `RVPROBE_REQUIRE_TESTFLOAT3=true` is set (CI gating
+              // mode where AC-16 must reflect real availability).
+              val isXorshift = content.contains(Driver.FpXorshiftFallbackMarker)
+              val strict     = sys.env.get("RVPROBE_REQUIRE_TESTFLOAT3").contains("true")
+              if isXorshift then
+                println(s"[PocGateTest] ADVISORY (AC-10/AC-16 unavailable for $name): emitted via xorshift fallback because testfloat_gen is not on PATH.")
+                println(s"  To declare AC-16 POC-ready, install Berkeley TestFloat-3 and set RVPROBE_TESTFLOAT_GEN.")
+                println(s"  Set RVPROBE_REQUIRE_TESTFLOAT3=true to make this an assertion failure in CI.")
+              if strict then
+                assert(!isXorshift) // strict mode: AC-16 must be POC-complete
 
     test("AC-16: PocGate rejects `# TODO` comment-only instruction bodies"):
       // Synthetic .S whose only mention of `vfadd.vv` is in a TODO

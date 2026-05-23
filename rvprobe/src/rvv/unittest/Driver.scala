@@ -206,10 +206,18 @@ object Driver:
       case Schema.Vs3Rs1mVm      =>
         if insn.nfields > 1 then emitSegmentedStore(insn, cli, envMacro)
         else emitUnitStrideStore(insn, cli, envMacro)
-      case Schema.VdRs1mRs2Vm    => emitStridedLoad(insn, cli, envMacro)
-      case Schema.Vs3Rs1mRs2Vm   => emitStridedStore(insn, cli, envMacro)
-      case Schema.VdRs1mVs2Vm    => emitIndexedLoad(insn, cli, envMacro)
-      case Schema.Vs3Rs1mVs2Vm   => emitIndexedStore(insn, cli, envMacro)
+      case Schema.VdRs1mRs2Vm    =>
+        if insn.nfields > 1 then emitSegmentedStridedLoad(insn, cli, envMacro)
+        else emitStridedLoad(insn, cli, envMacro)
+      case Schema.Vs3Rs1mRs2Vm   =>
+        if insn.nfields > 1 then emitSegmentedStridedStore(insn, cli, envMacro)
+        else emitStridedStore(insn, cli, envMacro)
+      case Schema.VdRs1mVs2Vm    =>
+        if insn.nfields > 1 then emitSegmentedIndexedLoad(insn, cli, envMacro)
+        else emitIndexedLoad(insn, cli, envMacro)
+      case Schema.Vs3Rs1mVs2Vm   =>
+        if insn.nfields > 1 then emitSegmentedIndexedStore(insn, cli, envMacro)
+        else emitIndexedStore(insn, cli, envMacro)
       case _                     => emitStructuralPlaceholder(insn, cli, envMacro)
 
   /** FP-instruction predicate: `vf*` or `vmf*` excluding `vfirst*`
@@ -265,10 +273,18 @@ object Driver:
    *  A `# TODO testfloat_gen` comment is still emitted above the FRM
    *  setup so reviewers can see this is the degraded path.
    */
+  /** Sentinel marker line emitted at the top of any FP `.S` produced
+   *  via the xorshift fallback. PocGateTest uses this marker to refuse
+   *  to count xorshift-fallback files as AC-10/AC-16 POC evidence
+   *  (Codex r13 #1).
+   */
+  val FpXorshiftFallbackMarker: String =
+    "# RVPROBE_FP_XORSHIFT_FALLBACK testfloat3 binary unavailable"
+
   private def emitFpFallback(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew     = inferFpSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val perFrmBytesPerOp = 4 * (sew.bits / 8) * 2 // 4 elements × 2 operands
     val allData = collection.mutable.ArrayBuffer.empty[Byte]
@@ -281,7 +297,8 @@ object Driver:
       val label = s"fp_fallback_${frmName.toLowerCase}_data"
       labels += (label -> allData.size)
       allData ++= operandBytes
-      val setup = List(
+      val markerLine = if idx == 0 then List(FpXorshiftFallbackMarker) else Nil
+      val setup = markerLine ++ List(
         s"# TODO testfloat_gen unavailable; xorshift-operand fallback for FRM=$frmName",
         s"csrwi frm, $frmRm",
         s"la a1, $label",
@@ -328,7 +345,7 @@ object Driver:
     frmResults:  List[(String, Either[String, Array[Byte]])]
   ): String =
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val allData = collection.mutable.ArrayBuffer.empty[Byte]
     val labels  = List.newBuilder[(String, Int)]
@@ -416,7 +433,7 @@ object Driver:
     for (sew, sewIdx) <- sews.zipWithIndex
         (lmul, lmulIdx) <- lmuls.zipWithIndex
     do
-      val envRes = VTypeEnvelope(VType(sew, lmul, Vta.Agnostic, Vma.Agnostic),
+      val envRes = VTypeEnvelope(VType(sew, lmul, Vta.Undisturbed, Vma.Undisturbed),
                                   vl = 4, vlen = cli.vlen, xlen = cli.xlen)
       envRes.foreach { env =>
         val vs1Vec = ElemValueLowering.buildVector(canonical, sew, env.maxElements min 4)
@@ -477,7 +494,7 @@ object Driver:
   private def emitUnitStrideLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -504,7 +521,7 @@ object Driver:
   private def emitUnitStrideStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -550,7 +567,7 @@ object Driver:
     val dataEmul = 1 // LMUL=M1 → 1 whole register per field
     require(nfields * dataEmul <= 8, s"NFIELDS × EMUL > 8: nfields=$nfields dataEmul=$dataEmul")
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -596,7 +613,7 @@ object Driver:
   private def emitStridedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -626,7 +643,7 @@ object Driver:
   private def emitStridedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
-      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -682,7 +699,7 @@ object Driver:
     val IdxLayout(indexSew, indexEmul, dataEmul, vdReg, vs2Reg) =
       computeIndexedLayout(indexEew, dataSew, lmul, nfields)
     val env = VTypeEnvelope.unsafe(
-      VType(dataSew, lmul, Vta.Agnostic, Vma.Agnostic),
+      VType(dataSew, lmul, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -718,7 +735,7 @@ object Driver:
     val IdxLayout(indexSew, indexEmul, dataEmul, vs3Reg, vs2Reg) =
       computeIndexedLayout(indexEew, dataSew, lmul, nfields)
     val env = VTypeEnvelope.unsafe(
-      VType(dataSew, lmul, Vta.Agnostic, Vma.Agnostic),
+      VType(dataSew, lmul, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -817,7 +834,7 @@ object Driver:
     require(nfields * dataEmul <= 8,
       s"NFIELDS * EMUL > 8: nfields=$nfields dataEmul=$dataEmul")
     val env = VTypeEnvelope.unsafe(
-      VType(sew, lmul, Vta.Agnostic, Vma.Agnostic),
+      VType(sew, lmul, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val canonical = List(
       me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
@@ -845,6 +862,209 @@ object Driver:
     renderWithLabels(insn.name, envMacro, List(block),
       srcAll.toVector, List("segld_src" -> 0))
 
+  /** Segmented strided load (`vlsseg<nf>e<eew>.v vd, (rs1), rs2`).
+   *  Codex r13 #4: previously fell through to emitStridedLoad,
+   *  dropping NFIELDS entirely.
+   */
+  private def emitSegmentedStridedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val sew     = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
+    val nfields = insn.nfields
+    val dataEmul = 1 // LMUL=M1
+    require(nfields * dataEmul <= 8,
+      s"NFIELDS * EMUL > 8: nfields=$nfields dataEmul=$dataEmul")
+    val env = VTypeEnvelope.unsafe(
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
+    val perFieldBytes = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 16), sew)
+    // Stride = NFIELDS × element-size (interleaved per-field layout).
+    val stride = (sew.bits / 8) * nfields
+    val setup = List(
+      "la a1, segst_src",
+      s"li a2, $stride")
+    val insnAsm = s"${insn.name} v8, (a1), a2"
+    val block   = TestSEmit.TestBlock(
+      env, 8, false, insnAsm,
+      setupAsm             = setup,
+      dataLabel            = None,
+      resultEew            = sew.bits,
+      resultGroup          = 8,
+      resultWholeRegisters = nfields * dataEmul)
+    renderWithLabels(insn.name, envMacro, List(block),
+      perFieldBytes.toVector, List("segst_src" -> 0))
+
+  /** Segmented strided store (`vssseg<nf>e<eew>.v vs3, (rs1), rs2`).
+   *  Codex r13 #4: dispatched via nfields > 1.
+   */
+  private def emitSegmentedStridedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val sew     = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
+    val nfields = insn.nfields
+    val dataEmul = 1
+    require(nfields * dataEmul <= 8,
+      s"NFIELDS * EMUL > 8: nfields=$nfields dataEmul=$dataEmul")
+    val env = VTypeEnvelope.unsafe(
+      VType(sew, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
+    val perFieldBytes = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
+    val srcAll       = Array.fill[Byte](perFieldBytes.length * nfields)(0.toByte)
+    for f <- 0 until nfields do
+      System.arraycopy(perFieldBytes, 0, srcAll, f * perFieldBytes.length, perFieldBytes.length)
+    val dstZero = Array.fill[Byte](perFieldBytes.length * nfields * 2)(0.toByte) // 2x for stride
+    val stride  = (sew.bits / 8) * nfields
+    // Pre-load NFIELDS source register groups from contiguous src,
+    // then execute segmented strided store, then reload via matching
+    // segmented strided load for memory verification.
+    val setupB = List.newBuilder[String]
+    setupB += "la a1, segsst_src"
+    for f <- 0 until nfields do
+      setupB += s"vle${sew.bits}.v v${8 + f}, (a1)"
+      setupB += s"addi a1, a1, ${perFieldBytes.length}"
+    setupB += "la a1, segsst_dst"
+    setupB += s"li a2, $stride"
+    val insnAsm = s"${insn.name} v8, (a1), a2"
+    // Reload via matching strided segmented load for memory witness.
+    val reloadName = insn.name.replace("vssseg", "vlsseg")
+    val postInsn = List(
+      "la a1, segsst_dst",
+      s"li a2, $stride",
+      s"$reloadName v8, (a1), a2")
+    val block = TestSEmit.TestBlock(
+      env, 8, false, insnAsm,
+      setupAsm             = setupB.result(),
+      dataLabel            = None,
+      resultEew            = sew.bits,
+      resultGroup          = 8,
+      resultWholeRegisters = nfields * dataEmul,
+      postInsn             = postInsn)
+    val labels = List("segsst_src" -> 0, "segsst_dst" -> srcAll.length)
+    renderWithLabels(insn.name, envMacro, List(block),
+      (srcAll ++ dstZero).toVector, labels)
+
+  /** Segmented indexed load (`vluxseg<nf>ei<m>.v vd, (rs1), vs2`).
+   *  Codex r13 #5: one TestBlock per field (each field's register
+   *  group gets its own result store + magic word), matching upstream
+   *  `insn_vdrs1mvs2vm.go:59-63`.
+   */
+  private def emitSegmentedIndexedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val indexEew = insn.indexedEew.getOrElse(32)
+    val dataSew  = Sew.Sew32
+    val lmul     = Lmul.M1
+    val nfields  = insn.nfields
+    val IdxLayout(indexSew, indexEmul, dataEmul, vdReg, vs2Reg) =
+      computeIndexedLayout(indexEew, dataSew, lmul, nfields)
+    val env = VTypeEnvelope.unsafe(
+      VType(dataSew, lmul, Vta.Undisturbed, Vma.Undisturbed),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(dataSew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(dataSew))
+    val dataBytes = vec2bytes(
+      ElemValueLowering.buildVector(canonical, dataSew, 16 * nfields), dataSew)
+    val indices    = Vector(BigInt(0), BigInt(4), BigInt(8), BigInt(12))
+    val indexBytes = vec2bytes(indices, indexSew)
+    val sharedSetup = List(
+      "la a1, segidx_idx",
+      s"vle$indexEew.v v$vs2Reg, (a1)",
+      "la a1, segidx_data")
+    val insnAsm = s"${insn.name} v$vdReg, (a1), v$vs2Reg"
+    // One block per field: each field's register group (vdReg + f * dataEmul)
+    // gets its own result store + magic word so pspike injects per-field
+    // expected-row sequences.
+    val blocks = (0 until nfields).map { f =>
+      val fieldReg = vdReg + f * dataEmul
+      val setup    = if f == 0 then sharedSetup else Nil
+      val asm      = if f == 0 then insnAsm
+                     else s"# field $f result store"
+      TestSEmit.TestBlock(
+        env, fieldReg, false, asm,
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = dataSew.bits,
+        resultGroup          = fieldReg,
+        resultWholeRegisters = dataEmul)
+    }.toList
+    val labels  = List("segidx_data" -> 0, "segidx_idx" -> dataBytes.size)
+    val allData = (dataBytes ++ indexBytes).toVector
+    renderWithLabels(insn.name, envMacro, blocks, allData, labels)
+
+  /** Segmented indexed store (`vsuxseg<nf>ei<m>.v vs3, (rs1), vs2`).
+   *  Pre-loads NFIELDS source register groups, executes the segmented
+   *  indexed store, reloads via matching segmented indexed load for
+   *  memory witness. One result store + magic per field.
+   */
+  private def emitSegmentedIndexedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val indexEew = insn.indexedEew.getOrElse(32)
+    val dataSew  = Sew.Sew32
+    val lmul     = Lmul.M1
+    val nfields  = insn.nfields
+    val IdxLayout(indexSew, indexEmul, dataEmul, vs3Reg, vs2Reg) =
+      computeIndexedLayout(indexEew, dataSew, lmul, nfields)
+    val env = VTypeEnvelope.unsafe(
+      VType(dataSew, lmul, Vta.Undisturbed, Vma.Undisturbed),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(dataSew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(dataSew))
+    val perFieldBytes = vec2bytes(
+      ElemValueLowering.buildVector(canonical, dataSew, 4), dataSew)
+    val indices    = Vector(BigInt(0), BigInt(4), BigInt(8), BigInt(12))
+    val indexBytes = vec2bytes(indices, indexSew)
+    val srcAll     = Array.fill[Byte](perFieldBytes.length * nfields)(0.toByte)
+    for f <- 0 until nfields do
+      System.arraycopy(perFieldBytes, 0, srcAll, f * perFieldBytes.length, perFieldBytes.length)
+    val dstZero    = Array.fill[Byte](perFieldBytes.length * nfields * 4)(0.toByte) // sparse
+    val setupB = List.newBuilder[String]
+    setupB += "la a1, segixs_src"
+    for f <- 0 until nfields do
+      setupB += s"vle${dataSew.bits}.v v${vs3Reg + f * dataEmul}, (a1)"
+      setupB += s"addi a1, a1, ${perFieldBytes.length}"
+    setupB += "la a1, segixs_idx"
+    setupB += s"vle$indexEew.v v$vs2Reg, (a1)"
+    setupB += "la a1, segixs_dst"
+    val insnAsm = s"${insn.name} v$vs3Reg, (a1), v$vs2Reg"
+    // Reload via matching segmented indexed load.
+    val reloadName = insn.name.replace("vsuxseg", "vluxseg")
+                                .replace("vsoxseg", "vloxseg")
+    val postInsn = List(
+      "la a1, segixs_dst",
+      s"$reloadName v$vs3Reg, (a1), v$vs2Reg")
+    // One block per field for result-store + magic, mirroring the
+    // segmented indexed load path.
+    val blocks = (0 until nfields).map { f =>
+      val fieldReg = vs3Reg + f * dataEmul
+      val setup    = if f == 0 then setupB.result() else Nil
+      val post     = if f == 0 then postInsn else Nil
+      val asm      = if f == 0 then insnAsm
+                     else s"# field $f result store"
+      TestSEmit.TestBlock(
+        env, fieldReg, false, asm,
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = dataSew.bits,
+        resultGroup          = fieldReg,
+        resultWholeRegisters = dataEmul,
+        postInsn             = post)
+    }.toList
+    val labels = List(
+      "segixs_src" -> 0,
+      "segixs_idx" -> srcAll.length,
+      "segixs_dst" -> (srcAll.length + indexBytes.size))
+    val allData = (srcAll ++ indexBytes ++ dstZero).toVector
+    renderWithLabels(insn.name, envMacro, blocks, allData, labels)
+
   /** Structural placeholder for FP schemas (pending testfloat3
    *  subprocess wiring) and other unsupported shapes. Marked with
    *  `# TODO` so AC-16 / Codex review can tell "POC-ready" from
@@ -852,7 +1072,7 @@ object Driver:
    */
   private def emitStructuralPlaceholder(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val env = VTypeEnvelope.unsafe(
-      VType(Sew.Sew32, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      VType(Sew.Sew32, Lmul.M1, Vta.Undisturbed, Vma.Undisturbed),
       vl = 4, vlen = cli.vlen, xlen = cli.xlen)
     val block = TestSEmit.TestBlock(
       envelope    = env,
