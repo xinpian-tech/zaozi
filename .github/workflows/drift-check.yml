@@ -25,15 +25,26 @@ jobs:
       - name: Checkout zaozi
         uses: actions/checkout@v4
 
-      - name: Checkout upstream riscv-vector-tests
+      - name: Checkout upstream riscv-vector-tests (PINNED COMMIT)
         uses: actions/checkout@v4
         with:
           repository: chipsalliance/riscv-vector-tests
           path: riscv-vector-tests
-          # Pin to a specific upstream ref; bumps require a human-
-          # reviewed predicate diff per the 3-commit refresh workflow.
-          # Update this ref alongside any audit/snapshots regeneration.
-          ref: main
+          # AC-15 requires a pinned upstream commit hash (NOT a moving
+          # branch). The 3-commit refresh workflow bumps this hash
+          # alongside audit/snapshots regeneration + human-reviewed
+          # predicate diff. Tracking a moving branch would make CI
+          # status depend on upstream changes unrelated to the pin.
+          #
+          # Bump procedure:
+          #   1. Update this hash to the desired upstream commit.
+          #   2. Run: mill rvprobe.runMain ...writeAuditFixtures \
+          #          rvprobe/src/rvv/audit
+          #   3. Run: mill rvprobe.runMain ...regenerateInsns \
+          #          rvprobe/src/rvv/insns
+          #   4. Human-review the predicate diff and commit all four
+          #      changes together (workflow, snapshots, reports, insns).
+          ref: 5acff36b6a87a36c6ff9bc4ad0b1a16cdfe7df8a
 
       - name: Install Nix
         uses: cachix/install-nix-action@v25

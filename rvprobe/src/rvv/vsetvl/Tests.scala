@@ -132,9 +132,15 @@ object Tests:
     xlen:       Int,
     expectVill: Boolean
   ): VsetvlCase =
-    val vlExpected      = expectedVl(avl, vt, vlen, expectVill)
-    val vtypeImm        = vtypeImmediate(vt)
-    val vtypeWithVill   = if expectVill then vtypeImm | (1L << (xlen - 1)) else vtypeImm
+    val vlExpected = expectedVl(avl, vt, vlen, expectVill)
+    val vtypeImm   = vtypeImmediate(vt)
+    // Codex r11 #8: on vill, hardware clears the low vtype bits and
+    // only the vill bit (msb) is set. Upstream insn_vsetvl.go:56-59
+    // matches against `1 << (XLEN - 1)`. The Round 10 `vtypeImm | vill`
+    // expectation was wrong.
+    val vtypeWithVill =
+      if expectVill then 1L << (xlen - 1)
+      else vtypeImm
     VsetvlCase(insn, avl, vt, expectVill, vlExpected, vtypeWithVill)
 
   /** Render the complete `.S` file for one vsetvl* variant's sweep.

@@ -17,6 +17,7 @@ object Zvfbfmin:
     name       = "vfncvtbf16.f.f.w",
     extension  = "zvfbfmin",
     sourceToml = "zvfbfmin/vfncvtbf16.f.f.w.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvtbf16.f.f.v  (format: vd,vs2,vm)

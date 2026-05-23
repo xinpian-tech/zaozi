@@ -121,7 +121,6 @@ object V6:
     name       = "vwredsum.vs",
     extension  = "v",
     sourceToml = "v/vwredsum.vs.toml",
-    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vwredsumu.vs  (format: vd,vs2,vs1,vm)
@@ -129,7 +128,6 @@ object V6:
     name       = "vwredsumu.vs",
     extension  = "v",
     sourceToml = "v/vwredsumu.vs.toml",
-    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vwsub.vv  (format: vd,vs2,vs1,vm)

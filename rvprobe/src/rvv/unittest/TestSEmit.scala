@@ -42,11 +42,18 @@ object TestSEmit:
     vectorGroup:          Int,
     vxsat:                Boolean,
     insnAsm:              String,                    // e.g., "vadd.vv v8, v16, v24"
-    setupAsm:             List[String] = Nil,        // any pre-instruction setup
+    setupAsm:             List[String] = Nil,        // pre-instruction setup
     dataLabel:            Option[String] = None,     // memory label for load/store
     resultEew:            Int          = 32,         // result element bits
     resultGroup:          Int          = 8,          // dest vector register
-    resultWholeRegisters: Int          = 1           // for magic rs2[4:1]
+    resultWholeRegisters: Int          = 1,          // for magic rs2[4:1]
+    /** Post-instruction setup: emitted AFTER the instruction-under-
+     *  test but BEFORE the resultdata store + magic word. Used by
+     *  store-family emitters to reload from the dst label so the
+     *  resultdata store captures the actual stored bytes, not the
+     *  original source vector.
+     */
+    postInsn:             List[String] = Nil
   )
 
   /** Render the full `.S` file as a String. `envName` chooses the
@@ -92,6 +99,9 @@ object TestSEmit:
       sb.append(s"  ${vsetvliAsm(b.envelope)}\n")
       // The instruction under test
       sb.append(s"  ${b.insnAsm}\n")
+      // Post-instruction setup (Codex r11 #2: store paths reload from
+      // dst label here so the resultdata store captures stored bytes).
+      b.postInsn.foreach(line => sb.append(s"  $line\n"))
       // pspike resultdata contract (round-9 fix): point a0 at
       // resultdata, store the result register group, then magic.
       sb.append(s"  la a0, resultdata\n")
@@ -128,8 +138,23 @@ object TestSEmit:
     sb.append("\nRVTEST_DATA_END\n")
     sb.toString
 
-  /** Emit a vsetvli that materializes the given envelope. */
+  /** Emit a `vsetvli` that materializes the given envelope, using
+   *  `env.vl` as the requested AVL (not VLMAX). Codex round-11 #1:
+   *  using `x0` here means "request max-vl", which doesn't match the
+   *  envelope's declared vl. Emits a `li t0, vl` setup line followed
+   *  by the vsetvli with t0 as rs1. Returns a multi-line string
+   *  (caller splits if needed).
+   */
   def vsetvliAsm(env: VTypeEnvelope): String =
+    val sew  = sewToken(env.vtype.sewBits)
+    val lmul = lmulToken(env.vtype.lmul)
+    s"li t0, ${env.vl}\n  vsetvli x5, t0, $sew,$lmul,ta,ma"
+
+  /** Emit a `vsetvli x5, x0, ...` requesting VLMAX. Used only for
+   *  result-store setup where we want to store all elements of the
+   *  result register group, not just the original envelope's vl.
+   */
+  def vsetvliAsmVlmax(env: VTypeEnvelope): String =
     val sew  = sewToken(env.vtype.sewBits)
     val lmul = lmulToken(env.vtype.lmul)
     s"vsetvli x5, x0, $sew,$lmul,ta,ma"
@@ -137,7 +162,8 @@ object TestSEmit:
   /** Emit a vsetvli for the result store, taking BOTH the result-EEW
    *  and the result whole-register count. Picks an LMUL that matches
    *  the result group footprint so the `vse<eew>.v` stores exactly the
-   *  right number of registers.
+   *  right number of registers. AVL = x0 (VLMAX) is appropriate here
+   *  because we want to store the full register group footprint.
    *
    *  Mask destination (resultEew=1) routes through `vsm.v` (mask
    *  store, no vsetvli swap needed); callers should detect resultEew

@@ -100,18 +100,23 @@ object InsnsGenerator:
     if isMask then
       "    widthProfile = OperandWidthProfile.maskDestination(),"
     else
-      // Widening: vd is doubled. Patterns: vw* (widening), vqdot*
-      // (quadrupling). For vw*.wv the source vs2 is also doubled.
-      val isWideningVd  = n.startsWith("vw") || n.startsWith("vfw")
-      val isWideningVs2 = isWideningVd && n.endsWith(".wv") || n.endsWith(".wx") ||
-        n.endsWith(".wf")
-      // Narrowing: dest is narrower. vn*.wv / vn*.wi etc.
+      // Codex r11 #6a: narrowing patterns include vfncvt.*.w (ends in
+      // `.w` not `.wv`/`.wx` etc) and BF16 vfncvtbf16.*.w. Extend the
+      // narrowing detector.
       val isNarrowingVd = (n.startsWith("vn") || n.startsWith("vfn")) &&
-        (n.endsWith(".wv") || n.endsWith(".wx") || n.endsWith(".wi") || n.endsWith(".wf"))
+        (n.endsWith(".wv") || n.endsWith(".wx") || n.endsWith(".wi") ||
+         n.endsWith(".wf") || n.endsWith(".w"))
+      // Codex r11 #6b: widening reductions (vw*red* / vfw*red*) double
+      // the dest EEW but KEEP base LMUL EMUL (single result register).
+      // Exclude them from the By2 widening rule; the OperandWidthProfile
+      // model would otherwise also double the EMUL, giving the wrong
+      // register footprint.
+      val isWideningReduction = (n.startsWith("vwred") || n.startsWith("vfwred"))
+      val isWideningVd  = (n.startsWith("vw") || n.startsWith("vfw")) && !isWideningReduction
+      val isWideningVs2 = isWideningVd && (n.endsWith(".wv") || n.endsWith(".wx") ||
+        n.endsWith(".wf"))
       if isNarrowingVd then
-        // vnclip.wv, vnsrl.wv, vfncvt.* etc: vs2 is wide, vd is narrow.
-        // Modeled as: source vs2 = By2 (relative to the narrower SEW
-        // base), dest = base SEW.
+        // vnclip.wv, vnsrl.wv, vfncvt.f.f.w etc: vs2 is wide, vd is narrow.
         """    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),"""
       else if isWideningVs2 then
         // vwadd.wv, vwsub.wv: both vd and vs2 are wider than vs1.

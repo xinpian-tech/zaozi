@@ -89,7 +89,6 @@ object V1:
     name       = "vfwredosum.vs",
     extension  = "v",
     sourceToml = "v/vfwredosum.vs.toml",
-    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vfwredusum.vs  (format: vd,vs2,vs1,vm)
@@ -97,7 +96,6 @@ object V1:
     name       = "vfwredusum.vs",
     extension  = "v",
     sourceToml = "v/vfwredusum.vs.toml",
-    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm,
     notestfloat3 = true)
 

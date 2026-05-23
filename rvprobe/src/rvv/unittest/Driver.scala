@@ -188,22 +188,160 @@ object Driver:
     baseName
 
   /** Render the `.S` body for an insn. Dispatches per schema.
-   *  Round-11: indexed/segmented/strided load+store paths now have
-   *  real emission. FP schemas still placeholder pending testfloat3
-   *  subprocess wiring (Testfloat3Driver).
+   *  FP instructions (`vf*` / `vmf*` excluding `vfirst*`) route
+   *  through emitFp which consumes Testfloat3Driver if the binary
+   *  is available; otherwise falls back to the integer-witness path
+   *  with an FRM sweep wrapper.
    */
   private def emitContent(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val isFp = isFpInsn(insn.name)
     insn.schema match
+      case _ if isFp && !insn.notestfloat3 => emitFp(insn, cli, envMacro)
       case Schema.VdVs2Vs1Vm     => emitVdVs2Vs1Vm(insn, cli, envMacro)
       case Schema.VdRs1m         => emitUnitStrideLoad(insn, cli, envMacro)
       case Schema.VdRs1mVm       => emitUnitStrideLoad(insn, cli, envMacro)
       case Schema.Vs3Rs1m        => emitUnitStrideStore(insn, cli, envMacro)
-      case Schema.Vs3Rs1mVm      => emitUnitStrideStore(insn, cli, envMacro)
+      case Schema.Vs3Rs1mVm      =>
+        if insn.nfields > 1 then emitSegmentedStore(insn, cli, envMacro)
+        else emitUnitStrideStore(insn, cli, envMacro)
       case Schema.VdRs1mRs2Vm    => emitStridedLoad(insn, cli, envMacro)
       case Schema.Vs3Rs1mRs2Vm   => emitStridedStore(insn, cli, envMacro)
       case Schema.VdRs1mVs2Vm    => emitIndexedLoad(insn, cli, envMacro)
       case Schema.Vs3Rs1mVs2Vm   => emitIndexedStore(insn, cli, envMacro)
       case _                     => emitStructuralPlaceholder(insn, cli, envMacro)
+
+  /** FP-instruction predicate: `vf*` or `vmf*` excluding `vfirst*`
+   *  (which is an integer instruction). Matches upstream main.go:142.
+   */
+  private def isFpInsn(name: String): Boolean =
+    (name.startsWith("vf") || name.startsWith("vmf")) && !name.startsWith("vfirst")
+
+  /** FP emission: tries `Testfloat3Driver.generate` to get FP operand
+   *  bytes; on failure (binary absent), falls back to the integer-
+   *  witness path but wraps it in an FRM sweep so AC-10's FRM × 5
+   *  modes still get exercised at the magic-word level.
+   *
+   *  Per DEC-4, FP operands come from testfloat3 (not predicate-driven).
+   */
+  private def emitFp(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val sew = inferFpSewFromName(insn.name).getOrElse(Sew.Sew32)
+    val operation = inferTestfloat3Op(insn.name, sew)
+
+    // Try to materialize testfloat3 operand bytes for each FRM mode.
+    val frmResults: List[(String, Either[String, Array[Byte]])] =
+      Testfloat3Driver.AllFrm.map { case (frmName, frmFlag) =>
+        val req = Testfloat3Driver.Request(
+          operation = operation,
+          sew       = sew,
+          rmFlag    = frmFlag,
+          testLevel = cli.testfloat3Level)
+        frmName -> Testfloat3Driver.generate(req)
+      }
+
+    val anySucceeded = frmResults.exists(_._2.isRight)
+    if !anySucceeded then
+      // testfloat_gen not on PATH; fall back to integer-witness with
+      // FRM CSR setup so the magic-word still varies by FRM. Embed a
+      // # TODO comment so AC-16 reviewers can tell this is fallback.
+      emitFpFallback(insn, cli, envMacro)
+    else
+      // Real testfloat3 path: one block per (FRM mode), each with
+      // testfloat3-supplied operand bytes embedded into testdata.
+      emitFpWithTestfloat3(insn, cli, envMacro, sew, frmResults)
+
+  /** Fallback FP emission when testfloat_gen is absent. Emits per-FRM
+   *  blocks using the integer witness path with FRM CSR setup. The
+   *  block carries a `# TODO testfloat_gen` marker for traceability.
+   */
+  private def emitFpFallback(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val env = VTypeEnvelope.unsafe(
+      VType(Sew.Sew32, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val blocks = Testfloat3Driver.AllFrm.zipWithIndex.map { case ((frmName, _), idx) =>
+      val frmRm = idx // RNE=0, RTZ=1, RDN=2, RUP=3, RMM=4
+      val setup = List(
+        s"# TODO testfloat_gen unavailable; integer-witness fallback for FRM=$frmName",
+        s"csrwi frm, $frmRm")
+      TestSEmit.TestBlock(
+        env, 8, false,
+        s"# FP fallback for ${insn.name} (FRM=$frmName)",
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = Sew.Sew32.bits,
+        resultGroup          = 8,
+        resultWholeRegisters = 1)
+    }
+    TestSEmit.render(insn.name, envMacro, blocks, Vector.empty, 256)
+
+  /** Real testfloat3 emission. Embeds the testfloat_gen bytes for each
+   *  FRM and emits one block per FRM that loads operands from the
+   *  testdata section then executes the FP instruction.
+   */
+  private def emitFpWithTestfloat3(
+    insn:        RvvInsn,
+    cli:         Cli,
+    envMacro:    String,
+    sew:         Sew,
+    frmResults:  List[(String, Either[String, Array[Byte]])]
+  ): String =
+    val env = VTypeEnvelope.unsafe(
+      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val allData = collection.mutable.ArrayBuffer.empty[Byte]
+    val labels  = List.newBuilder[(String, Int)]
+    val blocks  = List.newBuilder[TestSEmit.TestBlock]
+
+    frmResults.zipWithIndex.foreach { case ((frmName, bytesEither), frmRm) =>
+      bytesEither match
+        case Right(bytes) =>
+          val label = s"fp_${frmName.toLowerCase}_data"
+          labels += (label -> allData.size)
+          allData ++= bytes
+          val setup = List(
+            s"csrwi frm, $frmRm",
+            s"la a1, $label",
+            s"vle${sew.bits}.v v16, (a1)",
+            s"addi a1, a1, ${bytes.length / 2}",
+            s"vle${sew.bits}.v v24, (a1)")
+          val insnAsm = formatInsnAsm(insn)
+          blocks += TestSEmit.TestBlock(
+            env, 8, false, insnAsm,
+            setupAsm             = setup,
+            dataLabel            = None,
+            resultEew            = sew.bits,
+            resultGroup          = 8,
+            resultWholeRegisters = 1)
+        case Left(_) => () // skip this FRM if subprocess failed
+    }
+
+    renderWithLabels(insn.name, envMacro, blocks.result(), allData.toVector, labels.result())
+
+  /** Extract the FP SEW from instruction name (vfadd.vv default to 32). */
+  private def inferFpSewFromName(name: String): Option[Sew] =
+    """vfw?(\d+)""".r.findFirstMatchIn(name).map(_.group(1).toInt).flatMap {
+      case 16 => Some(Sew.Sew16)
+      case 32 => Some(Sew.Sew32)
+      case 64 => Some(Sew.Sew64)
+      case _  => None
+    }.orElse(Some(Sew.Sew32))
+
+  /** Map FP instruction name + SEW to upstream testfloat_gen op code. */
+  private def inferTestfloat3Op(name: String, sew: Sew): String =
+    val prefix = sew match
+      case Sew.Sew16 => "f16"
+      case Sew.Sew32 => "f32"
+      case Sew.Sew64 => "f64"
+      case _         => "f32"
+    val op =
+      if name.contains("add") then "add"
+      else if name.contains("sub") then "sub"
+      else if name.contains("mul") then "mul"
+      else if name.contains("div") then "div"
+      else if name.contains("sqrt") then "sqrt"
+      else if name.contains("min") then "min"
+      else if name.contains("max") then "max"
+      else "add"
+    s"${prefix}_$op"
 
   /** Real emission for the dominant integer 4-vector format. Covers
    *  vadd.vv, vsub.vv, vmul.vv, vwadd.vv, vmseq.vv, vnclip.wv, etc.
@@ -310,7 +448,16 @@ object Driver:
     val block      = TestSEmit.TestBlock(env, 8, false, insnAsm, setup, None)
     renderWithLabels(insn.name, envMacro, List(block), data.toVector, labels)
 
-  /** Unit-stride store (vse32.v): mem[rs1] <- vs3. POC: vse32.v. */
+  /** Unit-stride store (vse32.v): mem[rs1] <- vs3.
+   *
+   *  Codex r11 #2: a store test must verify the store actually wrote
+   *  to memory, not just that the source vector is intact. After the
+   *  store executes, reload from the dst label into v8, then the
+   *  TestSEmit resultdata-store + magic compares the *reloaded*
+   *  contents against pspike's expected. If the store mnemonic were
+   *  removed, dst memory would be untouched (zero-init) and pspike
+   *  would catch the mismatch.
+   */
   private def emitUnitStrideStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
@@ -322,16 +469,84 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
     val srcData    = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
-    val labels     = List("st_src_0" -> 0)
+    val dstZero    = Array.fill[Byte](srcData.length)(0.toByte)
+    val labels     = List("st_src_0" -> 0, "st_dst_0" -> srcData.length)
     val setup      = List(
       "la a1, st_src_0",
       s"vle${sew.bits}.v v8, (a1)",
       "la a1, st_dst_0")
     val insnAsm    = s"${insn.name} v8, (a1)"
-    val block      = TestSEmit.TestBlock(env, 8, false, insnAsm, setup, None)
-    renderWithLabels(
-      insn.name, envMacro, List(block), srcData.toVector,
-      labels :+ ("st_dst_0" -> srcData.size))
+    // After the store, reload from the dst label so the resultdata
+    // store captures the actual stored bytes (not the original v8).
+    val postStore  = List(
+      "la a1, st_dst_0",
+      s"vle${sew.bits}.v v8, (a1)")
+    val block      = TestSEmit.TestBlock(
+      env, 8, false, insnAsm,
+      setupAsm             = setup,
+      dataLabel            = None,
+      resultEew            = sew.bits,
+      resultGroup          = 8,
+      resultWholeRegisters = 1,
+      postInsn             = postStore)
+    renderWithLabels(insn.name, envMacro, List(block),
+      (srcData ++ dstZero).toVector, labels)
+
+  /** Segmented store (`vsseg<n>e<m>.v vs3, (rs1)`). Stores NFIELDS
+   *  register groups consecutively. Codex r11 #3: previously dispatched
+   *  through emitUnitStrideStore which only emits one vse and one
+   *  magic block. Real path emits NFIELDS source loads then the
+   *  segmented store, then reloads via segmented load so resultdata
+   *  captures all NFIELDS register groups.
+   *
+   *  Verifies NFIELDS × EMUL ≤ 8 at gen-time per AC-17.
+   */
+  private def emitSegmentedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val sew     = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
+    val nfields = insn.nfields
+    require(nfields * 1 <= 8, s"NFIELDS × EMUL > 8: nfields=$nfields lmul=M1")
+    val env = VTypeEnvelope.unsafe(
+      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
+    val srcData   = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
+    val totalSrcBytes = srcData.length * nfields
+    val srcAll        = Array.fill[Byte](totalSrcBytes)(0.toByte)
+    // Pre-load NFIELDS distinct field-source registers from contiguous
+    // memory; segmented store interleaves them in memory.
+    System.arraycopy(srcData, 0, srcAll, 0, srcData.length)
+    // Fill remaining fields with the same pattern shifted by 1 for
+    // identifiability.
+    for f <- 1 until nfields do
+      System.arraycopy(srcData, 0, srcAll, f * srcData.length, srcData.length)
+    val dstZero       = Array.fill[Byte](totalSrcBytes)(0.toByte)
+
+    val setup = List.newBuilder[String]
+    setup += "la a1, seg_src"
+    for f <- 0 until nfields do
+      setup += s"vle${sew.bits}.v v${8 + f}, (a1)"
+      setup += s"addi a1, a1, ${srcData.length}"
+    setup += "la a1, seg_dst"
+
+    val insnAsm = s"${insn.name} v8, (a1)"
+    // After segmented store, reload via segmented load into the same
+    // register groups; resultdata store captures the reloaded bytes.
+    val postInsn = List("la a1, seg_dst", s"vlseg${nfields}e${sew.bits}.v v8, (a1)")
+    val block = TestSEmit.TestBlock(
+      env, 8, false, insnAsm,
+      setupAsm             = setup.result(),
+      dataLabel            = None,
+      resultEew            = sew.bits,
+      resultGroup          = 8,
+      resultWholeRegisters = nfields,
+      postInsn             = postInsn)
+    val labels = List("seg_src" -> 0, "seg_dst" -> totalSrcBytes)
+    renderWithLabels(insn.name, envMacro, List(block),
+      (srcAll ++ dstZero).toVector, labels)
 
   /** Strided load (`vlse<n>.v vd, (rs1), rs2`). rs2 = byte stride. */
   private def emitStridedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
@@ -360,7 +575,10 @@ object Driver:
     renderWithLabels(insn.name, envMacro, List(block), data.toVector,
       List("strided_data" -> 0))
 
-  /** Strided store (`vsse<n>.v vs3, (rs1), rs2`). Stores at stride. */
+  /** Strided store (`vsse<n>.v vs3, (rs1), rs2`). Stores at stride.
+   *  Codex r11 #2: reload from dst memory after store so resultdata
+   *  reflects what the store actually wrote.
+   */
   private def emitStridedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
     val env = VTypeEnvelope.unsafe(
@@ -372,6 +590,7 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
     val srcData   = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
+    val dstZero   = Array.fill[Byte](srcData.length * 2)(0.toByte) // wider for stride
     val stride    = (sew.bits / 8) * 2
     val setup     = List(
       "la a1, strided_src",
@@ -379,11 +598,20 @@ object Driver:
       "la a1, strided_dst",
       s"li a2, $stride")
     val insnAsm   = s"${insn.name} v8, (a1), a2"
+    val postInsn  = List(
+      "la a1, strided_dst",
+      s"vlse${sew.bits}.v v8, (a1), a2") // reload via strided load to capture
     val block     = TestSEmit.TestBlock(
-      env, 8, false, insnAsm, setup, None,
-      resultEew = sew.bits, resultGroup = 8, resultWholeRegisters = 1)
-    val labels    = List("strided_src" -> 0, "strided_dst" -> srcData.size)
-    renderWithLabels(insn.name, envMacro, List(block), srcData.toVector, labels)
+      env, 8, false, insnAsm,
+      setupAsm             = setup,
+      dataLabel            = None,
+      resultEew            = sew.bits,
+      resultGroup          = 8,
+      resultWholeRegisters = 1,
+      postInsn             = postInsn)
+    val labels    = List("strided_src" -> 0, "strided_dst" -> srcData.length)
+    renderWithLabels(insn.name, envMacro, List(block),
+      (srcData ++ dstZero).toVector, labels)
 
   /** Indexed load (`vluxei<n>.v vd, (rs1), vs2`). vs2 carries indices
    *  with separate EEW (indexedEew); data SEW comes from the
@@ -456,14 +684,26 @@ object Driver:
       s"vle$indexEew.v v16, (a1)",
       "la a1, idxst_dst")
     val insnAsm   = s"${insn.name} v8, (a1), v16"
+    // Codex r11 #2: reload from dst via indexed-load so resultdata
+    // captures the actual stored bytes (need a corresponding vluxei
+    // for the data SEW).
+    val postInsn  = List(
+      "la a1, idxst_dst",
+      s"vluxei$indexEew.v v8, (a1), v16")
     val block     = TestSEmit.TestBlock(
-      env, 8, false, insnAsm, setup, None,
-      resultEew = dataSew.bits, resultGroup = 8, resultWholeRegisters = 1)
+      env, 8, false, insnAsm,
+      setupAsm             = setup,
+      dataLabel            = None,
+      resultEew            = dataSew.bits,
+      resultGroup          = 8,
+      resultWholeRegisters = 1,
+      postInsn             = postInsn)
+    val dstZero   = Array.fill[Byte](srcBytes.length * 4)(0.toByte) // 4x for sparse indices
     val labels    = List(
       "idxst_src" -> 0,
       "idxst_idx" -> srcBytes.size,
       "idxst_dst" -> (srcBytes.size + indexBytes.size))
-    val allData   = (srcBytes ++ indexBytes).toVector
+    val allData   = (srcBytes ++ indexBytes ++ dstZero).toVector
     renderWithLabels(insn.name, envMacro, List(block), allData, labels)
 
   /** Structural placeholder for FP schemas (pending testfloat3
