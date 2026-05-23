@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
+#
+# Drop-in replacement for the upstream
+# `riscv-vector-tests/build/generator` binary (Go). Invoked by the
+# upstream Makefile via the DEC-3 single-line generator-path swap:
+#
+#   GENERATOR := /path/to/zaozi/rvprobe/scripts/rvprobe-driver
+#
+# Forwards all upstream-compatible flags to the Scala driver via
+# `mill rvprobe.runMain me.jiuyang.rvprobe.rvv.unittest.driverMain`.
+#
+# Supported flags (mirrors upstream main.go):
+#   -VLEN <int> -XLEN <int> -split <int> -integer -pattern <re>
+#   -stage1output <dir> -testfloat3level {1|2} -repeat <n> -march <str>
+#   -configs <dir>   # DEC-5: silently ignored under rvprobe
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ZAOZI_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+cd "$ZAOZI_ROOT"
+exec nix develop . -c mill rvprobe.runMain \
+  me.jiuyang.rvprobe.rvv.unittest.driverMain -- "$@"
