@@ -474,6 +474,36 @@ object Smoke extends TestSuite:
               test("SInt"):
                 summon[TailPrimApi].op(sint1.result, 0, unknownLocation).operation.appendToBlock()
 
+            test("VerifAssertIntrinsic"):
+              summon[VerifAssertIntrinsicApi]
+                .op(bool1.result, bool1.result, "assert1", unknownLocation)
+                .operation
+                .appendToBlock()
+
+            test("VerifAssumeIntrinsic"):
+              summon[VerifAssumeIntrinsicApi]
+                .op(bool1.result, bool1.result, "assume1", unknownLocation)
+                .operation
+                .appendToBlock()
+
+            test("VerifCoverIntrinsic"):
+              summon[VerifCoverIntrinsicApi]
+                .op(bool1.result, bool1.result, "cover1", unknownLocation)
+                .operation
+                .appendToBlock()
+
+            test("VerifEnsureIntrinsic"):
+              summon[VerifEnsureIntrinsicApi]
+                .op(bool1.result, bool1.result, "ensure1", unknownLocation)
+                .operation
+                .appendToBlock()
+
+            test("VerifRequireIntrinsic"):
+              summon[VerifRequireIntrinsicApi]
+                .op(bool1.result, bool1.result, "require1", unknownLocation)
+                .operation
+                .appendToBlock()
+
             test("XorPrimApi"):
               test("UInt"):
                 summon[XorPrimApi].op(uint1.result, uint2.result, unknownLocation).operation.appendToBlock()
