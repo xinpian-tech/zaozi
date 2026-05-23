@@ -7,6 +7,7 @@
 package me.jiuyang.rvprobe.rvv.insns
 
 import me.jiuyang.rvprobe.rvv.Schema
+import me.jiuyang.rvprobe.rvv.eew.OperandWidthProfile
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
 /** 100 RvvInsn declarations for `v` (chunk 2). */
@@ -726,6 +727,7 @@ object V2:
     name       = "vmadc.vi",
     extension  = "v",
     sourceToml = "v/vmadc.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Imm)
 
   // vmadc.vim  (format: vd,vs2,imm,v0)
@@ -733,6 +735,7 @@ object V2:
     name       = "vmadc.vim",
     extension  = "v",
     sourceToml = "v/vmadc.vim.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmV0)
 
   // vmadc.vv  (format: vd,vs2,vs1)
@@ -740,6 +743,7 @@ object V2:
     name       = "vmadc.vv",
     extension  = "v",
     sourceToml = "v/vmadc.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmadc.vvm  (format: vd,vs2,vs1,v0)
@@ -747,6 +751,7 @@ object V2:
     name       = "vmadc.vvm",
     extension  = "v",
     sourceToml = "v/vmadc.vvm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1V0)
 
   val chunkAll: List[RvvInsn] = List(

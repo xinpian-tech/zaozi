@@ -154,26 +154,33 @@ object Tests:
     var testNum = 3 // start above the upstream-reserved TEST_CASE(2,...)
     cs.zipWithIndex.foreach { case (c, idx) =>
       sb.append(s"  # ---- block $idx: ${c.insn} ${avlAsm(c.avl)}  expect_vill=${c.expectVill} ----\n")
-      // Materialize AVL operand into a register if needed.
+      // Materialize AVL operand into a scalar register for vsetvli/vsetvl.
+      // vsetivli takes a 5-bit immediate, so no register needed for that.
+      // Round-10 fix: previously vsetvli with AvlSource.Imm emitted rs1=x0,
+      // ignoring the immediate value entirely.
       c.avl match
         case AvlSource.ScalarReg(reg, v) =>
           sb.append(s"  li $reg, $v\n")
+        case AvlSource.Imm(v) if c.insn == "vsetvli" =>
+          sb.append(s"  li t0, $v\n")
         case _ => ()
       // Materialize vtype operand for `vsetvl` (which reads it from rs2).
       if c.insn == "vsetvl" then
         sb.append(s"  li a2, ${c.expectVtypeBits & ((1L << 11) - 1)}\n")
       // Execute the instruction.
       sb.append(s"  ${formatVsetvlInsn(c)}\n")
-      // Read post-execution CSRs into scalars.
-      sb.append(s"  csrr a3, vl\n")
+      // Round-10 fix: upstream insn_vsetvli.go:59 checks vstart, vtype,
+      // and vl. We do the same.
+      sb.append(s"  csrr a3, vstart\n")
       sb.append(s"  csrr a4, vtype\n")
+      sb.append(s"  csrr a5, vl\n")
       // TEST_CASE rows compare against expected values.
-      sb.append(f"  TEST_CASE($testNum%d, a3, 0x${c.expectVl}%x)\n")
+      // vstart is always 0 after a non-trapping instruction.
+      sb.append(f"  TEST_CASE($testNum%d, a3, 0x0)\n")
       testNum += 1
-      // For vtype: mask off the unused high bits then compare. The
-      // assertion uses a scratch register so TEST_CASE doesn't
-      // accidentally reorder around the csrr.
       sb.append(f"  TEST_CASE($testNum%d, a4, 0x${c.expectVtypeBits}%x)\n")
+      testNum += 1
+      sb.append(f"  TEST_CASE($testNum%d, a5, 0x${c.expectVl}%x)\n")
       testNum += 1
       sb.append("\n")
     }
@@ -213,8 +220,11 @@ object Tests:
 
     c.insn match
       case "vsetvli"  =>
+        // Round-10 fix: AvlSource.Imm for vsetvli now references the t0
+        // register pre-loaded with the immediate, not x0 (which would
+        // request "max vl").
         val avlReg = c.avl match
-          case AvlSource.Imm(_)            => "x0"
+          case AvlSource.Imm(_)            => "t0"
           case AvlSource.ScalarReg(r, _)   => r
           case AvlSource.ZeroZero          => "x0"
         val rd     = c.avl match

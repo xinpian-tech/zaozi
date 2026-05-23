@@ -72,12 +72,58 @@ object InsnsGenerator:
         val rx2 = """v(?:l|s)seg(\d)e\d+""".r
         rx2.findFirstMatchIn(name).map(_.group(1).toInt).getOrElse(1)
 
+  /** Infer the widthProfile from the instruction name pattern.
+   *  Codex round-9 #1: without this inference, real generated
+   *  declarations for `vwadd.vv`, `vmseq.vv`, `vnclip.wv` etc. ship
+   *  with `OperandWidthProfile.default`, and Driver computes base-
+   *  width results for them.
+   *
+   *  Returns the Scala source string for the `widthProfile = ...`
+   *  field, or empty if the default profile suffices.
+   */
+  def widthProfileFor(name: String): String =
+    val n = name.toLowerCase
+    // Mask-producing comparisons: vd is a mask destination
+    val isMask =
+      n.startsWith("vmseq") || n.startsWith("vmsne") ||
+        n.startsWith("vmslt") || n.startsWith("vmsltu") ||
+        n.startsWith("vmsle") || n.startsWith("vmsleu") ||
+        n.startsWith("vmsgt") || n.startsWith("vmsgtu") ||
+        n.startsWith("vmsge") || n.startsWith("vmsgeu") ||
+        n.startsWith("vmfeq") || n.startsWith("vmfne") ||
+        n.startsWith("vmflt") || n.startsWith("vmfle") ||
+        n.startsWith("vmfgt") || n.startsWith("vmfge") ||
+        n.startsWith("vmadc") || n.startsWith("vmsbc") ||
+        n.startsWith("vmand") || n.startsWith("vmor") || n.startsWith("vmxor") ||
+        n.startsWith("vmnand") || n.startsWith("vmnor") || n.startsWith("vmxnor") ||
+        n.startsWith("vmandn") || n.startsWith("vmorn")
+    if isMask then
+      "    widthProfile = OperandWidthProfile.maskDestination(),"
+    else
+      // Widening: vd is doubled. Patterns: vw* (widening), vqdot*
+      // (quadrupling). For vw*.wv the source vs2 is also doubled.
+      val isWideningVd  = n.startsWith("vw") || n.startsWith("vfw")
+      val isWideningVs2 = isWideningVd && n.endsWith(".wv") || n.endsWith(".wx") ||
+        n.endsWith(".wf")
+      // Narrowing: dest is narrower. vn*.wv / vn*.wi etc.
+      val isNarrowingVd = (n.startsWith("vn") || n.startsWith("vfn")) &&
+        (n.endsWith(".wv") || n.endsWith(".wx") || n.endsWith(".wi") || n.endsWith(".wf"))
+      if isNarrowingVd then
+        // vnclip.wv, vnsrl.wv, vfncvt.* etc: vs2 is wide, vd is narrow.
+        // Modeled as: source vs2 = By2 (relative to the narrower SEW
+        // base), dest = base SEW.
+        """    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),"""
+      else if isWideningVs2 then
+        // vwadd.wv, vwsub.wv: both vd and vs2 are wider than vs1.
+        """    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2, me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),"""
+      else if isWideningVd then
+        // vwadd.vv, vwsub.vv, vwmul.vv, vfwadd.vv etc: only vd wider.
+        """    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),"""
+      else ""
+
   /** Render an RvvInsn declaration for a single info entry. */
   def renderInsn(info: GenInfo): String =
     val schemaName = schemaEnumName(info.format).getOrElse {
-      // Codex round-7 MEDIUM #8: fail-loudly on unknown formats.
-      // A silent default to VdVs2Vs1Vm would mask schema-family
-      // mismatches when upstream adds a new format string.
       throw new IllegalStateException(
         s"InsnsGenerator: unknown schema format `${info.format}` for ${info.extension}/${info.name}. " +
           s"Either Schema.scala is missing a sealed-family entry, or the audit snapshot is stale.")
@@ -89,6 +135,8 @@ object InsnsGenerator:
     sb.append(s"""    name       = "${info.name}",\n""")
     sb.append(s"""    extension  = "${info.extension}",\n""")
     sb.append(s"""    sourceToml = "${info.extension}/${info.name}.toml",\n""")
+    val wp = widthProfileFor(info.name)
+    if wp.nonEmpty then sb.append(wp).append("\n")
     sb.append(s"    schema     = Schema.$schemaName")
     indexedEewFor(info.name).foreach(e => sb.append(s",\n    indexedEew = Some($e)"))
     val nf = nfieldsFor(info.name)
@@ -134,6 +182,7 @@ object InsnsGenerator:
         sb.append("import me.jiuyang.rvprobe.rvv.unittest.RvvInsn\n\n")
       case None    =>
         sb.append("import me.jiuyang.rvprobe.rvv.Schema\n")
+        sb.append("import me.jiuyang.rvprobe.rvv.eew.OperandWidthProfile\n")
         sb.append("import me.jiuyang.rvprobe.rvv.unittest.RvvInsn\n\n")
     allChunks match
       case Some(n) =>

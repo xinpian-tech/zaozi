@@ -7,6 +7,7 @@
 package me.jiuyang.rvprobe.rvv.insns
 
 import me.jiuyang.rvprobe.rvv.Schema
+import me.jiuyang.rvprobe.rvv.eew.OperandWidthProfile
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
 /** 100 RvvInsn declarations for `v` (chunk 3). */
@@ -16,6 +17,7 @@ object V3:
     name       = "vmadc.vx",
     extension  = "v",
     sourceToml = "v/vmadc.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1)
 
   // vmadc.vxm  (format: vd,vs2,rs1,v0)
@@ -23,6 +25,7 @@ object V3:
     name       = "vmadc.vxm",
     extension  = "v",
     sourceToml = "v/vmadc.vxm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1V0)
 
   // vmadd.vv  (format: vd,vs1,vs2,vm)
@@ -44,6 +47,7 @@ object V3:
     name       = "vmand.mm",
     extension  = "v",
     sourceToml = "v/vmand.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmandn.mm  (format: vd,vs2,vs1)
@@ -51,6 +55,7 @@ object V3:
     name       = "vmandn.mm",
     extension  = "v",
     sourceToml = "v/vmandn.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmax.vv  (format: vd,vs2,vs1,vm)
@@ -107,6 +112,7 @@ object V3:
     name       = "vmfeq.vf",
     extension  = "v",
     sourceToml = "v/vmfeq.vf.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vmfeq.vv  (format: vd,vs2,vs1,vm)
@@ -114,6 +120,7 @@ object V3:
     name       = "vmfeq.vv",
     extension  = "v",
     sourceToml = "v/vmfeq.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmfge.vf  (format: vd,vs2,fs1,vm)
@@ -121,6 +128,7 @@ object V3:
     name       = "vmfge.vf",
     extension  = "v",
     sourceToml = "v/vmfge.vf.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vmfgt.vf  (format: vd,vs2,fs1,vm)
@@ -128,6 +136,7 @@ object V3:
     name       = "vmfgt.vf",
     extension  = "v",
     sourceToml = "v/vmfgt.vf.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vmfle.vf  (format: vd,vs2,fs1,vm)
@@ -135,6 +144,7 @@ object V3:
     name       = "vmfle.vf",
     extension  = "v",
     sourceToml = "v/vmfle.vf.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vmfle.vv  (format: vd,vs2,vs1,vm)
@@ -142,6 +152,7 @@ object V3:
     name       = "vmfle.vv",
     extension  = "v",
     sourceToml = "v/vmfle.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmflt.vf  (format: vd,vs2,fs1,vm)
@@ -149,6 +160,7 @@ object V3:
     name       = "vmflt.vf",
     extension  = "v",
     sourceToml = "v/vmflt.vf.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vmflt.vv  (format: vd,vs2,vs1,vm)
@@ -156,6 +168,7 @@ object V3:
     name       = "vmflt.vv",
     extension  = "v",
     sourceToml = "v/vmflt.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmfne.vf  (format: vd,vs2,fs1,vm)
@@ -163,6 +176,7 @@ object V3:
     name       = "vmfne.vf",
     extension  = "v",
     sourceToml = "v/vmfne.vf.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vmfne.vv  (format: vd,vs2,vs1,vm)
@@ -170,6 +184,7 @@ object V3:
     name       = "vmfne.vv",
     extension  = "v",
     sourceToml = "v/vmfne.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmin.vv  (format: vd,vs2,vs1,vm)
@@ -205,6 +220,7 @@ object V3:
     name       = "vmnand.mm",
     extension  = "v",
     sourceToml = "v/vmnand.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmnor.mm  (format: vd,vs2,vs1)
@@ -212,6 +228,7 @@ object V3:
     name       = "vmnor.mm",
     extension  = "v",
     sourceToml = "v/vmnor.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmor.mm  (format: vd,vs2,vs1)
@@ -219,6 +236,7 @@ object V3:
     name       = "vmor.mm",
     extension  = "v",
     sourceToml = "v/vmor.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmorn.mm  (format: vd,vs2,vs1)
@@ -226,6 +244,7 @@ object V3:
     name       = "vmorn.mm",
     extension  = "v",
     sourceToml = "v/vmorn.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmsbc.vv  (format: vd,vs2,vs1)
@@ -233,6 +252,7 @@ object V3:
     name       = "vmsbc.vv",
     extension  = "v",
     sourceToml = "v/vmsbc.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmsbc.vvm  (format: vd,vs2,vs1,v0)
@@ -240,6 +260,7 @@ object V3:
     name       = "vmsbc.vvm",
     extension  = "v",
     sourceToml = "v/vmsbc.vvm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1V0)
 
   // vmsbc.vx  (format: vd,vs2,rs1)
@@ -247,6 +268,7 @@ object V3:
     name       = "vmsbc.vx",
     extension  = "v",
     sourceToml = "v/vmsbc.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1)
 
   // vmsbc.vxm  (format: vd,vs2,rs1,v0)
@@ -254,6 +276,7 @@ object V3:
     name       = "vmsbc.vxm",
     extension  = "v",
     sourceToml = "v/vmsbc.vxm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1V0)
 
   // vmsbf.m  (format: vd,vs2,vm/2)
@@ -268,6 +291,7 @@ object V3:
     name       = "vmseq.vi",
     extension  = "v",
     sourceToml = "v/vmseq.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmVm)
 
   // vmseq.vv  (format: vd,vs2,vs1,vm)
@@ -275,6 +299,7 @@ object V3:
     name       = "vmseq.vv",
     extension  = "v",
     sourceToml = "v/vmseq.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmseq.vx  (format: vd,vs2,rs1,vm)
@@ -282,6 +307,7 @@ object V3:
     name       = "vmseq.vx",
     extension  = "v",
     sourceToml = "v/vmseq.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsgt.vi  (format: vd,vs2,imm,vm)
@@ -289,6 +315,7 @@ object V3:
     name       = "vmsgt.vi",
     extension  = "v",
     sourceToml = "v/vmsgt.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmVm)
 
   // vmsgt.vv  (format: vd,vs2,vs1,vm)
@@ -296,6 +323,7 @@ object V3:
     name       = "vmsgt.vv",
     extension  = "v",
     sourceToml = "v/vmsgt.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmsgt.vx  (format: vd,vs2,rs1,vm)
@@ -303,6 +331,7 @@ object V3:
     name       = "vmsgt.vx",
     extension  = "v",
     sourceToml = "v/vmsgt.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsgtu.vi  (format: vd,vs2,imm,vm)
@@ -310,6 +339,7 @@ object V3:
     name       = "vmsgtu.vi",
     extension  = "v",
     sourceToml = "v/vmsgtu.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmVm)
 
   // vmsgtu.vv  (format: vd,vs2,vs1,vm)
@@ -317,6 +347,7 @@ object V3:
     name       = "vmsgtu.vv",
     extension  = "v",
     sourceToml = "v/vmsgtu.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmsgtu.vx  (format: vd,vs2,rs1,vm)
@@ -324,6 +355,7 @@ object V3:
     name       = "vmsgtu.vx",
     extension  = "v",
     sourceToml = "v/vmsgtu.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsif.m  (format: vd,vs2,vm/2)
@@ -338,6 +370,7 @@ object V3:
     name       = "vmsle.vi",
     extension  = "v",
     sourceToml = "v/vmsle.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmVm)
 
   // vmsle.vv  (format: vd,vs2,vs1,vm)
@@ -345,6 +378,7 @@ object V3:
     name       = "vmsle.vv",
     extension  = "v",
     sourceToml = "v/vmsle.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmsle.vx  (format: vd,vs2,rs1,vm)
@@ -352,6 +386,7 @@ object V3:
     name       = "vmsle.vx",
     extension  = "v",
     sourceToml = "v/vmsle.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsleu.vi  (format: vd,vs2,imm,vm)
@@ -359,6 +394,7 @@ object V3:
     name       = "vmsleu.vi",
     extension  = "v",
     sourceToml = "v/vmsleu.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmVm)
 
   // vmsleu.vv  (format: vd,vs2,vs1,vm)
@@ -366,6 +402,7 @@ object V3:
     name       = "vmsleu.vv",
     extension  = "v",
     sourceToml = "v/vmsleu.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmsleu.vx  (format: vd,vs2,rs1,vm)
@@ -373,6 +410,7 @@ object V3:
     name       = "vmsleu.vx",
     extension  = "v",
     sourceToml = "v/vmsleu.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmslt.vv  (format: vd,vs2,vs1,vm)
@@ -380,6 +418,7 @@ object V3:
     name       = "vmslt.vv",
     extension  = "v",
     sourceToml = "v/vmslt.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmslt.vx  (format: vd,vs2,rs1,vm)
@@ -387,6 +426,7 @@ object V3:
     name       = "vmslt.vx",
     extension  = "v",
     sourceToml = "v/vmslt.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsltu.vv  (format: vd,vs2,vs1,vm)
@@ -394,6 +434,7 @@ object V3:
     name       = "vmsltu.vv",
     extension  = "v",
     sourceToml = "v/vmsltu.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmsltu.vx  (format: vd,vs2,rs1,vm)
@@ -401,6 +442,7 @@ object V3:
     name       = "vmsltu.vx",
     extension  = "v",
     sourceToml = "v/vmsltu.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsne.vi  (format: vd,vs2,imm,vm)
@@ -408,6 +450,7 @@ object V3:
     name       = "vmsne.vi",
     extension  = "v",
     sourceToml = "v/vmsne.vi.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2ImmVm)
 
   // vmsne.vv  (format: vd,vs2,vs1,vm)
@@ -415,6 +458,7 @@ object V3:
     name       = "vmsne.vv",
     extension  = "v",
     sourceToml = "v/vmsne.vv.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vmsne.vx  (format: vd,vs2,rs1,vm)
@@ -422,6 +466,7 @@ object V3:
     name       = "vmsne.vx",
     extension  = "v",
     sourceToml = "v/vmsne.vx.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vmsof.m  (format: vd,vs2,vm/2)
@@ -555,6 +600,7 @@ object V3:
     name       = "vmxnor.mm",
     extension  = "v",
     sourceToml = "v/vmxnor.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vmxor.mm  (format: vd,vs2,vs1)
@@ -562,6 +608,7 @@ object V3:
     name       = "vmxor.mm",
     extension  = "v",
     sourceToml = "v/vmxor.mm.toml",
+    widthProfile = OperandWidthProfile.maskDestination(),
     schema     = Schema.VdVs2Vs1)
 
   // vnclip.wi  (format: vd,vs2,uimm,vm)
@@ -569,6 +616,7 @@ object V3:
     name       = "vnclip.wi",
     extension  = "v",
     sourceToml = "v/vnclip.wi.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2UimmVm,
     vxrm = true,
     vxsat = true)
@@ -578,6 +626,7 @@ object V3:
     name       = "vnclip.wv",
     extension  = "v",
     sourceToml = "v/vnclip.wv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm,
     vxrm = true,
     vxsat = true)
@@ -587,6 +636,7 @@ object V3:
     name       = "vnclip.wx",
     extension  = "v",
     sourceToml = "v/vnclip.wx.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Rs1Vm,
     vxrm = true,
     vxsat = true)
@@ -596,6 +646,7 @@ object V3:
     name       = "vnclipu.wi",
     extension  = "v",
     sourceToml = "v/vnclipu.wi.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2UimmVm,
     vxrm = true,
     vxsat = true)
@@ -605,6 +656,7 @@ object V3:
     name       = "vnclipu.wv",
     extension  = "v",
     sourceToml = "v/vnclipu.wv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm,
     vxrm = true,
     vxsat = true)
@@ -614,6 +666,7 @@ object V3:
     name       = "vnclipu.wx",
     extension  = "v",
     sourceToml = "v/vnclipu.wx.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Rs1Vm,
     vxrm = true,
     vxsat = true)
@@ -651,6 +704,7 @@ object V3:
     name       = "vnsra.wi",
     extension  = "v",
     sourceToml = "v/vnsra.wi.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2UimmVm)
 
   // vnsra.wv  (format: vd,vs2,vs1,vm)
@@ -658,6 +712,7 @@ object V3:
     name       = "vnsra.wv",
     extension  = "v",
     sourceToml = "v/vnsra.wv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vnsra.wx  (format: vd,vs2,rs1,vm)
@@ -665,6 +720,7 @@ object V3:
     name       = "vnsra.wx",
     extension  = "v",
     sourceToml = "v/vnsra.wx.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vnsrl.wi  (format: vd,vs2,uimm,vm)
@@ -672,6 +728,7 @@ object V3:
     name       = "vnsrl.wi",
     extension  = "v",
     sourceToml = "v/vnsrl.wi.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2UimmVm)
 
   // vnsrl.wv  (format: vd,vs2,vs1,vm)
@@ -679,6 +736,7 @@ object V3:
     name       = "vnsrl.wv",
     extension  = "v",
     sourceToml = "v/vnsrl.wv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vnsrl.wx  (format: vd,vs2,rs1,vm)
@@ -686,6 +744,7 @@ object V3:
     name       = "vnsrl.wx",
     extension  = "v",
     sourceToml = "v/vnsrl.wx.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Rs1Vm)
 
   // vor.vi  (format: vd,vs2,imm,vm)

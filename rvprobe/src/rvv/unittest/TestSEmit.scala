@@ -95,15 +95,20 @@ object TestSEmit:
       // pspike resultdata contract (round-9 fix): point a0 at
       // resultdata, store the result register group, then magic.
       sb.append(s"  la a0, resultdata\n")
-      // Re-set vtype for the result store: result has EEW=resultEew,
-      // which may differ from the instruction's SEW under widening.
-      if b.resultEew != b.envelope.vtype.sewBits then
-        sb.append(s"  ${vsetvliAsmForEew(b.envelope, b.resultEew)}\n")
-      sb.append(s"  vse${b.resultEew}.v v${b.resultGroup}, (a0)\n")
+      if b.resultEew == 1 then
+        // Mask result: use vsm.v (mask store), no vsetvli swap.
+        sb.append(s"  vsm.v v${b.resultGroup}, (a0)\n")
+      else
+        // Vector data result: swap vsetvli to result-EEW + result-EMUL
+        // (round-10 fix: previously used base LMUL, losing widening footprint).
+        if b.resultEew != b.envelope.vtype.sewBits ||
+          MagicInstrEmit.wholeRegisterCount(b.envelope.vtype.lmul) != b.resultWholeRegisters
+        then
+          sb.append(s"  ${vsetvliAsmForResult(b.resultEew, b.resultWholeRegisters)}\n")
+        sb.append(s"  vse${b.resultEew}.v v${b.resultGroup}, (a0)\n")
       // Restore vtype for next block / pspike injection.
       sb.append(s"  ${vsetvliAsm(b.envelope)}\n")
       // Magic word — pspike injects expected TEST_CASE rows after this.
-      // rs2[4:1] = result whole-register count (NOT base LMUL).
       sb.append(s"  ${MagicInstrEmit.emitAsmWithCount(b.vectorGroup, b.resultWholeRegisters, b.vxsat)}\n")
       sb.append("\n")
     }
@@ -129,14 +134,32 @@ object TestSEmit:
     val lmul = lmulToken(env.vtype.lmul)
     s"vsetvli x5, x0, $sew,$lmul,ta,ma"
 
-  /** Emit a vsetvli for the result store: keeps LMUL but overrides
-   *  SEW to the result-EEW (used after widening / narrowing to match
-   *  the destination register-group element width).
+  /** Emit a vsetvli for the result store, taking BOTH the result-EEW
+   *  and the result whole-register count. Picks an LMUL that matches
+   *  the result group footprint so the `vse<eew>.v` stores exactly the
+   *  right number of registers.
+   *
+   *  Mask destination (resultEew=1) routes through `vsm.v` (mask
+   *  store, no vsetvli swap needed); callers should detect resultEew
+   *  == 1 and skip vsetvli + use `vsm.v` instead.
    */
-  def vsetvliAsmForEew(env: VTypeEnvelope, resultEew: Int): String =
+  def vsetvliAsmForResult(resultEew: Int, resultWholeRegisters: Int): String =
+    require(resultEew != 1, "vsetvli is not used for mask result; use vsm.v instead")
     val sew  = sewToken(resultEew)
-    val lmul = lmulToken(env.vtype.lmul)
+    val lmul = lmulTokenForWholeRegisters(resultWholeRegisters)
     s"vsetvli x5, x0, $sew,$lmul,ta,ma"
+
+  /** Pick an LMUL token (m1/m2/m4/m8) that exposes exactly the given
+   *  number of whole registers. Fractional LMULs collapse to m1
+   *  (single register; the actual element count is determined by VL).
+   */
+  def lmulTokenForWholeRegisters(n: Int): String = n match
+    case 1 => "m1"
+    case 2 => "m2"
+    case 4 => "m4"
+    case 8 => "m8"
+    case other =>
+      throw new IllegalArgumentException(s"whole-register count must be in {1,2,4,8}, got $other")
 
   private def sewToken(bits: Int): String = bits match
     case 8  => "e8"

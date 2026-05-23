@@ -7,6 +7,7 @@
 package me.jiuyang.rvprobe.rvv.insns
 
 import me.jiuyang.rvprobe.rvv.Schema
+import me.jiuyang.rvprobe.rvv.eew.OperandWidthProfile
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
 /** 2 RvvInsn declarations for `zvfbfwma` (chunk). */
@@ -16,6 +17,7 @@ object Zvfbfwma:
     name       = "vfwmaccbf16.vf",
     extension  = "zvfbfwma",
     sourceToml = "zvfbfwma/vfwmaccbf16.vf.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdFs1Vs2Vm)
 
   // vfwmaccbf16.vv  (format: vd,vs1,vs2,vm)
@@ -23,6 +25,7 @@ object Zvfbfwma:
     name       = "vfwmaccbf16.vv",
     extension  = "zvfbfwma",
     sourceToml = "zvfbfwma/vfwmaccbf16.vv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs1Vs2Vm)
 
   val all: List[RvvInsn] = List(

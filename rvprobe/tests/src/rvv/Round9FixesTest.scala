@@ -105,10 +105,11 @@ object Round9FixesTest extends TestSuite:
 
     // ---- Codex r8 #4: vsetvl scalar CSR check (no magic word) ----
 
-    test("Codex r8 #4: vsetvl/Tests emits scalar TEST_CASE for vl + vtype"):
+    test("Codex r8 #4 + r10: vsetvl/Tests emits scalar TEST_CASE for vstart + vtype + vl"):
       val s = VsetvlTests.renderTestS("vsetvli", vlen = 256, xlen = 64, envMacro = "RVTEST_RV64UV")
-      assert(s.contains("csrr a3, vl"))
+      assert(s.contains("csrr a3, vstart"))
       assert(s.contains("csrr a4, vtype"))
+      assert(s.contains("csrr a5, vl"))
       assert(s.contains("TEST_CASE("))
       assert(!s.contains(".word 0x"))
 

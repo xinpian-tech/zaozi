@@ -7,6 +7,7 @@
 package me.jiuyang.rvprobe.rvv.insns
 
 import me.jiuyang.rvprobe.rvv.Schema
+import me.jiuyang.rvprobe.rvv.eew.OperandWidthProfile
 import me.jiuyang.rvprobe.rvv.unittest.RvvInsn
 
 /** 100 RvvInsn declarations for `v` (chunk 0). */
@@ -641,6 +642,7 @@ object V0:
     name       = "vfwadd.vf",
     extension  = "v",
     sourceToml = "v/vfwadd.vf.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vfwadd.vv  (format: vd,vs2,vs1,vm)
@@ -648,6 +650,7 @@ object V0:
     name       = "vfwadd.vv",
     extension  = "v",
     sourceToml = "v/vfwadd.vv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vfwadd.wf  (format: vd,vs2,fs1,vm)
@@ -655,6 +658,7 @@ object V0:
     name       = "vfwadd.wf",
     extension  = "v",
     sourceToml = "v/vfwadd.wf.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2, me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Fs1Vm)
 
   // vfwadd.wv  (format: vd,vs2,vs1,vm)
@@ -662,6 +666,7 @@ object V0:
     name       = "vfwadd.wv",
     extension  = "v",
     sourceToml = "v/vfwadd.wv.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2, me.jiuyang.rvprobe.rvv.OperandRole.Vs2 -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vs1Vm)
 
   // vfwcvt.f.f.v  (format: vd,vs2,vm)
@@ -669,6 +674,7 @@ object V0:
     name       = "vfwcvt.f.f.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.f.f.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvt.f.x.v  (format: vd,vs2,vm)
@@ -676,6 +682,7 @@ object V0:
     name       = "vfwcvt.f.x.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.f.x.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvt.f.xu.v  (format: vd,vs2,vm)
@@ -683,6 +690,7 @@ object V0:
     name       = "vfwcvt.f.xu.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.f.xu.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvt.rtz.x.f.v  (format: vd,vs2,vm)
@@ -690,6 +698,7 @@ object V0:
     name       = "vfwcvt.rtz.x.f.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.rtz.x.f.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvt.rtz.xu.f.v  (format: vd,vs2,vm)
@@ -697,6 +706,7 @@ object V0:
     name       = "vfwcvt.rtz.xu.f.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.rtz.xu.f.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvt.x.f.v  (format: vd,vs2,vm)
@@ -704,6 +714,7 @@ object V0:
     name       = "vfwcvt.x.f.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.x.f.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwcvt.xu.f.v  (format: vd,vs2,vm)
@@ -711,6 +722,7 @@ object V0:
     name       = "vfwcvt.xu.f.v",
     extension  = "v",
     sourceToml = "v/vfwcvt.xu.f.v.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdVs2Vm)
 
   // vfwmacc.vf  (format: vd,fs1,vs2,vm)
@@ -718,6 +730,7 @@ object V0:
     name       = "vfwmacc.vf",
     extension  = "v",
     sourceToml = "v/vfwmacc.vf.toml",
+    widthProfile = OperandWidthProfile(Map(me.jiuyang.rvprobe.rvv.OperandRole.Vd -> me.jiuyang.rvprobe.rvv.eew.WidthScale.By2)),
     schema     = Schema.VdFs1Vs2Vm)
 
   val chunkAll: List[RvvInsn] = List(
