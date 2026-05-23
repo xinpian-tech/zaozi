@@ -851,11 +851,14 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
-    val perFieldBytes = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
+    val elemBytes     = sew.bits / 8
+    val perFieldBytes = vec2bytes(
+      ElemValueLowering.buildVector(canonical, sew, math.max(4, env.vl)), sew)
     val totalBytes    = perFieldBytes.length * nfields
-    // Interleaved layout: segmented load reads NFIELDS interleaved
-    // fields from one memory region. Build NFIELDS distinct patterns
-    // by shifting per field.
+    // Unit-stride segmented load reads vl * nfields * elemBytes bytes
+    // from contiguous memory (Codex r15 sizing audit).
+    require(totalBytes >= env.vl * nfields * elemBytes,
+      s"segmented load source too small: got $totalBytes, need ${env.vl * nfields * elemBytes}")
     val srcAll = Array.fill[Byte](totalBytes)(0.toByte)
     for f <- 0 until nfields do
       System.arraycopy(perFieldBytes, 0, srcAll, f * perFieldBytes.length, perFieldBytes.length)
@@ -898,9 +901,20 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
-    val perFieldBytes = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 16), sew)
+    val elemBytes = sew.bits / 8
     // Stride = NFIELDS × element-size (interleaved per-field layout).
-    val stride = (sew.bits / 8) * nfields
+    val stride = elemBytes * nfields
+    // Codex r15 #1: strided segmented load reads through
+    // (vl - 1) * stride + nfields * elemBytes = vl * nfields * elemBytes
+    // bytes. Round-15 used a fixed 16-element buffer which is too small
+    // for vlsseg5e32.v (need 80, got 64), vlsseg8e64.v (need 256, got
+    // 128), etc. Allocate exactly what the SUT reads.
+    val requiredBytes = env.vl * nfields * elemBytes
+    val numElems      = math.max(16, env.vl * nfields)
+    val perFieldBytes = vec2bytes(
+      ElemValueLowering.buildVector(canonical, sew, numElems), sew)
+    require(perFieldBytes.length >= requiredBytes,
+      s"strided segmented source buffer too small: got ${perFieldBytes.length}, need $requiredBytes")
     val setup0 = List(
       "la a1, segst_src",
       s"li a2, $stride")
@@ -939,12 +953,20 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
-    val perFieldBytes = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
+    val elemBytes = sew.bits / 8
+    val perFieldBytes = vec2bytes(
+      ElemValueLowering.buildVector(canonical, sew, math.max(4, env.vl)), sew)
     val srcAll       = Array.fill[Byte](perFieldBytes.length * nfields)(0.toByte)
     for f <- 0 until nfields do
       System.arraycopy(perFieldBytes, 0, srcAll, f * perFieldBytes.length, perFieldBytes.length)
-    val dstZero = Array.fill[Byte](perFieldBytes.length * nfields * 2)(0.toByte) // 2x for stride
-    val stride  = (sew.bits / 8) * nfields
+    val stride      = elemBytes * nfields
+    // Codex r15 sizing audit: dst must hold (vl - 1) * stride + nfields *
+    // elemBytes = vl * nfields * elemBytes bytes. Round-15 used a 2x
+    // perFieldBytes.length * nfields buffer (= 8 * nfields * elemBytes
+    // for vl=4) which happened to be enough, but a vl=8 future change
+    // would underflow. Size from envelope.vl explicitly.
+    val dstBytes = env.vl * stride
+    val dstZero  = Array.fill[Byte](math.max(perFieldBytes.length * nfields * 2, dstBytes))(0.toByte)
     // Pre-load NFIELDS source register groups from contiguous src,
     // then execute segmented strided store, then reload via matching
     // segmented strided load for memory verification.

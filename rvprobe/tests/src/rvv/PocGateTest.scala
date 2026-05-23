@@ -3,6 +3,7 @@
 package me.jiuyang.rvprobe.tests.rvv
 
 import me.jiuyang.rvprobe.rvv.unittest.{Driver, RvvInsn, RvvInsnRegistry, TestSEmit, Testfloat3Driver}
+import me.jiuyang.rvprobe.rvv.vsetvl.Tests as VsetvlTests
 
 import java.nio.file.Files
 
@@ -53,6 +54,33 @@ object PocGateTest extends TestSuite:
       // instruction declaration; the test below confirms presence.
       val vsetvli = RvvInsnRegistry.all.find(_.name == "vsetvli")
       assert(vsetvli.isDefined)
+
+    test("AC-16: vsetvli POC rendered via vsetvl.Tests.renderTestS"):
+      // Codex r15 blocking #2: round-15 only checked registry presence
+      // for vsetvli. Round-16 actually renders the CSR-checking test
+      // body via vsetvl.Tests.renderTestS and asserts on structural
+      // hallmarks: VSETVL mnemonic present, CSR reads (vstart/vtype/vl)
+      // present, TEST_CASE rows emitted.
+      val s = VsetvlTests.renderTestS(
+        insn     = "vsetvli",
+        vlen     = 256,
+        xlen     = 64,
+        envMacro = "RVTEST_RV64UV")
+      assert(s.nonEmpty)
+      assert(s.contains("RVTEST_CODE_BEGIN"))
+      assert(s.contains("RVTEST_CODE_END"))
+      // The instruction-under-test mnemonic appears as a real .S line.
+      val mnemonicPresent = s.split("\n").exists { line =>
+        val t = line.trim
+        !t.startsWith("#") && t.startsWith("vsetvli ")
+      }
+      assert(mnemonicPresent)
+      // CSR reads: vstart, vtype, vl.
+      assert(s.contains("csrr a3, vstart"))
+      assert(s.contains("csrr a4, vtype"))
+      assert(s.contains("csrr a5, vl"))
+      // At least one TEST_CASE row (the vstart=0 check).
+      assert(s.split("\n").exists(_.trim.startsWith("TEST_CASE(")))
 
     test("AC-16: emit each POC insn through Driver, verify file structure + mnemonic + FP FRM sweep"):
       val tmpDir = Files.createTempDirectory("rvprobe-poc-").toAbsolutePath
