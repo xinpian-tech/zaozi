@@ -19,7 +19,12 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   FirrtlConvention,
   FirrtlNameKind
 }
+import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi as given_LTLDialectApi, DialectApi as LTLDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.sv.given_DialectApi as SvDialectApi
+import org.llvm.circt.scalalib.capi.dialect.verif.{
+  given_DialectApi as given_VerifDialectApi,
+  DialectApi as VerifDialectApi
+}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.given
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_CircuitApi,
@@ -217,6 +222,8 @@ given GeneratorApi:
         given Arena   = arena
         given Context = summon[ContextApi].contextCreate
         summon[FirrtlDialectApi].loadDialect
+        summon[LTLDialectApi].loadDialect
+        summon[VerifDialectApi].loadDialect
 
         generator.dumpMlirbc(upickle.default.read(os.read(configFile)))
 
