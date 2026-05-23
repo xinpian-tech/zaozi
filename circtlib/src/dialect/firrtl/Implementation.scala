@@ -1894,6 +1894,151 @@ given TailPrimApi with
 
 end given
 
+given VerifAssertIntrinsicApi with
+  def op(
+    property:    Value,
+    enable:      Value,
+    label:       String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifAssertIntrinsic =
+    VerifAssertIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.assert",
+        location = location,
+        operands = Seq(property, enable),
+        namedAttributes =
+          val namedAttributeApi = summon[NamedAttributeApi]
+          Seq(
+            // ::mlir::StringAttr
+            namedAttributeApi.namedAttributeGet("label".identifierGet, label.stringAttrGet)
+          )
+        ,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: VerifAssertIntrinsic) def operation: Operation = ref._operation
+
+end given
+
+given VerifAssumeIntrinsicApi with
+  def op(
+    property:    Value,
+    enable:      Value,
+    label:       String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifAssumeIntrinsic =
+    VerifAssumeIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.assume",
+        location = location,
+        operands = Seq(property, enable),
+        namedAttributes =
+          val namedAttributeApi = summon[NamedAttributeApi]
+          Seq(
+            // ::mlir::StringAttr
+            namedAttributeApi.namedAttributeGet("label".identifierGet, label.stringAttrGet)
+          )
+        ,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: VerifAssumeIntrinsic) def operation: Operation = ref._operation
+
+end given
+
+given VerifCoverIntrinsicApi with
+  def op(
+    property:    Value,
+    enable:      Value,
+    label:       String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifCoverIntrinsic =
+    VerifCoverIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.cover",
+        location = location,
+        operands = Seq(property, enable),
+        namedAttributes =
+          val namedAttributeApi = summon[NamedAttributeApi]
+          Seq(
+            // ::mlir::StringAttr
+            namedAttributeApi.namedAttributeGet("label".identifierGet, label.stringAttrGet)
+          )
+        ,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: VerifCoverIntrinsic) def operation: Operation = ref._operation
+
+end given
+
+given VerifEnsureIntrinsicApi with
+  def op(
+    property:    Value,
+    enable:      Value,
+    label:       String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifEnsureIntrinsic =
+    VerifEnsureIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.ensure",
+        location = location,
+        operands = Seq(property, enable),
+        namedAttributes =
+          val namedAttributeApi = summon[NamedAttributeApi]
+          Seq(
+            // ::mlir::StringAttr
+            namedAttributeApi.namedAttributeGet("label".identifierGet, label.stringAttrGet)
+          )
+        ,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: VerifEnsureIntrinsic) def operation: Operation = ref._operation
+
+end given
+
+given VerifRequireIntrinsicApi with
+  def op(
+    property:    Value,
+    enable:      Value,
+    label:       String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifRequireIntrinsic =
+    VerifRequireIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.require",
+        location = location,
+        operands = Seq(property, enable),
+        namedAttributes =
+          val namedAttributeApi = summon[NamedAttributeApi]
+          Seq(
+            // ::mlir::StringAttr
+            namedAttributeApi.namedAttributeGet("label".identifierGet, label.stringAttrGet)
+          )
+        ,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: VerifRequireIntrinsic) def operation: Operation = ref._operation
+
+end given
+
 given XorPrimApi with
   def op(
     lhs:         Value,
