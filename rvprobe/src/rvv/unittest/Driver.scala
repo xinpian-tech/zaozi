@@ -187,17 +187,23 @@ object Driver:
     Files.write(outDir.resolve(fileName), content.getBytes(StandardCharsets.UTF_8))
     baseName
 
-  /** Render the `.S` body for an insn. Dispatches per schema. The
-   *  POC-relevant schemas use real assembly; the rest emit a
-   *  structural placeholder so AC-16 / fan-out can distinguish
-   *  "POC-ready" from "fan-out-pending" instructions.
+  /** Render the `.S` body for an insn. Dispatches per schema.
+   *  Round-11: indexed/segmented/strided load+store paths now have
+   *  real emission. FP schemas still placeholder pending testfloat3
+   *  subprocess wiring (Testfloat3Driver).
    */
   private def emitContent(insn: RvvInsn, cli: Cli, envMacro: String): String =
     insn.schema match
-      case Schema.VdVs2Vs1Vm                => emitVdVs2Vs1Vm(insn, cli, envMacro)
-      case Schema.VdRs1mVm                  => emitUnitStrideLoad(insn, cli, envMacro)
-      case Schema.Vs3Rs1mVm                 => emitUnitStrideStore(insn, cli, envMacro)
-      case _                                => emitStructuralPlaceholder(insn, cli, envMacro)
+      case Schema.VdVs2Vs1Vm     => emitVdVs2Vs1Vm(insn, cli, envMacro)
+      case Schema.VdRs1m         => emitUnitStrideLoad(insn, cli, envMacro)
+      case Schema.VdRs1mVm       => emitUnitStrideLoad(insn, cli, envMacro)
+      case Schema.Vs3Rs1m        => emitUnitStrideStore(insn, cli, envMacro)
+      case Schema.Vs3Rs1mVm      => emitUnitStrideStore(insn, cli, envMacro)
+      case Schema.VdRs1mRs2Vm    => emitStridedLoad(insn, cli, envMacro)
+      case Schema.Vs3Rs1mRs2Vm   => emitStridedStore(insn, cli, envMacro)
+      case Schema.VdRs1mVs2Vm    => emitIndexedLoad(insn, cli, envMacro)
+      case Schema.Vs3Rs1mVs2Vm   => emitIndexedStore(insn, cli, envMacro)
+      case _                     => emitStructuralPlaceholder(insn, cli, envMacro)
 
   /** Real emission for the dominant integer 4-vector format. Covers
    *  vadd.vv, vsub.vv, vmul.vv, vwadd.vv, vmseq.vv, vnclip.wv, etc.
@@ -327,10 +333,143 @@ object Driver:
       insn.name, envMacro, List(block), srcData.toVector,
       labels :+ ("st_dst_0" -> srcData.size))
 
-  /** Structural placeholder for schemas not yet wired with real
-   *  emission (strided / indexed / segmented / FP / vsetvl-as-insn).
-   *  Marked with a TODO comment so AC-16 / Codex review can tell
-   *  "POC-ready" from "fan-out-pending".
+  /** Strided load (`vlse<n>.v vd, (rs1), rs2`). rs2 = byte stride. */
+  private def emitStridedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
+    val env = VTypeEnvelope.unsafe(
+      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
+    // Reserve 16 elements worth of memory; stride = 2 × element size
+    // so we read elements at indices 0, 2, 4, 6, ...
+    val elemBytes = sew.bits / 8
+    val padded    = ElemValueLowering.buildVector(canonical, sew, 16)
+    val data      = vec2bytes(padded, sew)
+    val stride    = elemBytes * 2
+    val setup     = List(
+      "la a1, strided_data",
+      s"li a2, $stride")
+    val insnAsm   = s"${insn.name} v8, (a1), a2"
+    val block     = TestSEmit.TestBlock(
+      env, 8, false, insnAsm, setup, None,
+      resultEew = sew.bits, resultGroup = 8, resultWholeRegisters = 1)
+    renderWithLabels(insn.name, envMacro, List(block), data.toVector,
+      List("strided_data" -> 0))
+
+  /** Strided store (`vsse<n>.v vs3, (rs1), rs2`). Stores at stride. */
+  private def emitStridedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
+    val env = VTypeEnvelope.unsafe(
+      VType(sew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
+    val srcData   = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
+    val stride    = (sew.bits / 8) * 2
+    val setup     = List(
+      "la a1, strided_src",
+      s"vle${sew.bits}.v v8, (a1)",
+      "la a1, strided_dst",
+      s"li a2, $stride")
+    val insnAsm   = s"${insn.name} v8, (a1), a2"
+    val block     = TestSEmit.TestBlock(
+      env, 8, false, insnAsm, setup, None,
+      resultEew = sew.bits, resultGroup = 8, resultWholeRegisters = 1)
+    val labels    = List("strided_src" -> 0, "strided_dst" -> srcData.size)
+    renderWithLabels(insn.name, envMacro, List(block), srcData.toVector, labels)
+
+  /** Indexed load (`vluxei<n>.v vd, (rs1), vs2`). vs2 carries indices
+   *  with separate EEW (indexedEew); data SEW comes from the
+   *  envelope. Per AC-17 / Codex round-1: index EMUL must stay
+   *  within [1/8, 8].
+   */
+  private def emitIndexedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val indexEew = insn.indexedEew.getOrElse(32)
+    val dataSew  = Sew.Sew32
+    val env = VTypeEnvelope.unsafe(
+      VType(dataSew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(dataSew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(dataSew))
+    val dataBytes = vec2bytes(
+      ElemValueLowering.buildVector(canonical, dataSew, 16), dataSew)
+    // Index vector: 4 indices that point at the data buffer at
+    // strides chosen to be in-range (0, 4, 8, 12 in byte offsets for
+    // 4 SEW=32 elements).
+    val indexSew  = indexEew match
+      case 8  => Sew.Sew8
+      case 16 => Sew.Sew16
+      case 32 => Sew.Sew32
+      case 64 => Sew.Sew64
+      case n  => throw new IllegalArgumentException(s"unsupported indexed EEW: $n")
+    val indices   = Vector(BigInt(0), BigInt(4), BigInt(8), BigInt(12))
+    val indexBytes = vec2bytes(indices, indexSew)
+    val setup     = List(
+      "la a1, indexed_idx",
+      s"vle$indexEew.v v16, (a1)",
+      "la a1, indexed_data")
+    val insnAsm   = s"${insn.name} v8, (a1), v16"
+    val block     = TestSEmit.TestBlock(
+      env, 8, false, insnAsm, setup, None,
+      resultEew = dataSew.bits, resultGroup = 8, resultWholeRegisters = 1)
+    val labels    = List("indexed_data" -> 0, "indexed_idx" -> dataBytes.size)
+    val allData   = (dataBytes ++ indexBytes).toVector
+    renderWithLabels(insn.name, envMacro, List(block), allData, labels)
+
+  /** Indexed store (`vsuxei<n>.v vs3, (rs1), vs2`). Same as indexed
+   *  load but writes vs3 to memory at vs2-indexed offsets.
+   */
+  private def emitIndexedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
+    val indexEew = insn.indexedEew.getOrElse(32)
+    val dataSew  = Sew.Sew32
+    val env = VTypeEnvelope.unsafe(
+      VType(dataSew, Lmul.M1, Vta.Agnostic, Vma.Agnostic),
+      vl = 4, vlen = cli.vlen, xlen = cli.xlen)
+    val canonical = List(
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.Zero,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(dataSew),
+      me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(dataSew))
+    val srcBytes  = vec2bytes(ElemValueLowering.buildVector(canonical, dataSew, 4), dataSew)
+    val indexSew  = indexEew match
+      case 8  => Sew.Sew8
+      case 16 => Sew.Sew16
+      case 32 => Sew.Sew32
+      case 64 => Sew.Sew64
+      case n  => throw new IllegalArgumentException(s"unsupported indexed EEW: $n")
+    val indices   = Vector(BigInt(0), BigInt(4), BigInt(8), BigInt(12))
+    val indexBytes = vec2bytes(indices, indexSew)
+    val setup     = List(
+      "la a1, idxst_src",
+      s"vle${dataSew.bits}.v v8, (a1)",
+      "la a1, idxst_idx",
+      s"vle$indexEew.v v16, (a1)",
+      "la a1, idxst_dst")
+    val insnAsm   = s"${insn.name} v8, (a1), v16"
+    val block     = TestSEmit.TestBlock(
+      env, 8, false, insnAsm, setup, None,
+      resultEew = dataSew.bits, resultGroup = 8, resultWholeRegisters = 1)
+    val labels    = List(
+      "idxst_src" -> 0,
+      "idxst_idx" -> srcBytes.size,
+      "idxst_dst" -> (srcBytes.size + indexBytes.size))
+    val allData   = (srcBytes ++ indexBytes).toVector
+    renderWithLabels(insn.name, envMacro, List(block), allData, labels)
+
+  /** Structural placeholder for FP schemas (pending testfloat3
+   *  subprocess wiring) and other unsupported shapes. Marked with
+   *  `# TODO` so AC-16 / Codex review can tell "POC-ready" from
+   *  "fan-out-pending".
    */
   private def emitStructuralPlaceholder(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val env = VTypeEnvelope.unsafe(
