@@ -74,7 +74,14 @@ object InsnsGenerator:
 
   /** Render an RvvInsn declaration for a single info entry. */
   def renderInsn(info: GenInfo): String =
-    val schemaName = schemaEnumName(info.format).getOrElse("VdVs2Vs1Vm") // safe default
+    val schemaName = schemaEnumName(info.format).getOrElse {
+      // Codex round-7 MEDIUM #8: fail-loudly on unknown formats.
+      // A silent default to VdVs2Vs1Vm would mask schema-family
+      // mismatches when upstream adds a new format string.
+      throw new IllegalStateException(
+        s"InsnsGenerator: unknown schema format `${info.format}` for ${info.extension}/${info.name}. " +
+          s"Either Schema.scala is missing a sealed-family entry, or the audit snapshot is stale.")
+    }
     val sb         = new StringBuilder
     val vName      = info.name.replace('.', '_').replace('-', '_')
     sb.append(s"  // ${info.name}  (format: ${info.format})\n")

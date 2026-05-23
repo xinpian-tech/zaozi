@@ -96,10 +96,37 @@ object TomlIntent:
           else
             val body = content.substring(openBracket + 1, close)
             if tests.contains(key) then errors += s"duplicate test key `$key`"
-            else tests(key) = parseRows(body)
+            else
+              parseRowsLoud(body) match
+                case Right(rows) =>
+                  // Empty arrays are legitimate upstream patterns:
+                  // vmv1r.v / vmsif.m / vsext.vf2 etc. omit certain
+                  // SEWs intentionally. Keep them; the audit pass
+                  // produces empty per-key entries which is fine.
+                  tests(key) = rows
+                case Left(msg)   => errors += s"key `$key`: $msg"
       else if !isTopLevelMetadataKey(key) then
         errors += s"unknown key `$key` in tests section"
+    // Non-FP keys: every token must be a hex literal; non-hex tokens
+    // (which silently coerced to BigInt(0)) are structural errors.
+    val nonFpKeys = tests.keys.filter(k => !isFpKey(k)).toList
+    for k <- nonFpKeys do
+      for (row, ri) <- tests(k).zipWithIndex do
+        for (tok, ti) <- row.zipWithIndex do
+          if !looksLikeHexInteger(tok) then
+            errors += s"key `$k` row $ri token $ti: not a hex integer literal: `$tok`"
     (tests.toMap, errors.result())
+
+  /** Strict integer-token predicate. Rejects anything that
+   *  parseHexBigInt would coerce to BigInt(0) (Codex round-7 #6).
+   */
+  private def looksLikeHexInteger(token: String): Boolean =
+    val t = token.trim.stripPrefix("\"").stripSuffix("\"").trim
+    if t.isEmpty then false
+    else if t.startsWith("0x") || t.startsWith("0X") then
+      t.drop(2).forall(c => "0123456789abcdefABCDEF".contains(c))
+    else
+      t.matches("^-?\\d+$")
 
   private val TopLevelMetadataKeys: Set[String] =
     Set("name", "format", "vxrm", "vxsat", "notestfloat3")
@@ -157,28 +184,31 @@ object TomlIntent:
     if depth == 0 then i - 1 else -1
 
   /** Parse the body of an outer array as a sequence of `[...]` row
-   *  literals separated by commas (possibly with whitespace/newlines).
+   *  literals separated by commas. Returns `Left` on malformed input
+   *  (junk between rows, unmatched inner brackets, unterminated quoted
+   *  tokens) per Codex round-6/7 fail-loud requirement.
    */
-  private def parseRows(body: String): List[List[String]] =
-    val rows    = List.newBuilder[List[String]]
-    var i       = 0
-    val n       = body.length
+  private def parseRowsLoud(body: String): Either[String, List[List[String]]] =
+    val rows = List.newBuilder[List[String]]
+    var i    = 0
+    val n    = body.length
     while i < n do
-      // skip whitespace and commas between rows
       while i < n && (body.charAt(i).isWhitespace || body.charAt(i) == ',') do i += 1
-      if i < n && body.charAt(i) == '[' then
+      if i < n then
+        if body.charAt(i) != '[' then
+          return Left(s"unexpected token at body offset $i: ${body.charAt(i)}; expected `[` or `,`")
         val close = findMatchingBracket(body, i)
-        if close > i then
-          rows += splitRow(body.substring(i + 1, close))
-          i = close + 1
-        else i = n
-      else i = n
-    rows.result()
+        if close <= i then return Left(s"unmatched inner `[` at body offset $i")
+        splitRowLoud(body.substring(i + 1, close)) match
+          case Right(row) => rows += row
+          case Left(msg)  => return Left(s"row at offset $i: $msg")
+        i = close + 1
+    Right(rows.result())
 
   /** Split a row like `0xf8, 0x00` or `"smallest_normal_float", "max_float"`
-   *  into raw tokens. Quotes are stripped; other characters preserved.
+   *  into raw tokens. Returns `Left` on unterminated quoted strings.
    */
-  private def splitRow(rowBody: String): List[String] =
+  private def splitRowLoud(rowBody: String): Either[String, List[String]] =
     val tokens = List.newBuilder[String]
     var i      = 0
     val n      = rowBody.length
@@ -187,15 +217,21 @@ object TomlIntent:
       if i < n then
         if rowBody.charAt(i) == '"' then
           val end = rowBody.indexOf('"', i + 1)
-          if end > i then
-            tokens += rowBody.substring(i + 1, end)
-            i = end + 1
-          else i = n
+          if end <= i then return Left(s"unterminated quoted token starting at offset $i")
+          tokens += rowBody.substring(i + 1, end)
+          i = end + 1
         else
           val start = i
           while i < n && rowBody.charAt(i) != ',' && !rowBody.charAt(i).isWhitespace do i += 1
-          tokens += rowBody.substring(start, i).trim
-    tokens.result().filter(_.nonEmpty)
+          val tok = rowBody.substring(start, i).trim
+          if tok.nonEmpty then tokens += tok
+    Right(tokens.result())
+
+  /** Permissive wrapper kept for the public extractTestsKeys path
+   *  (which surfaces the errors up to `parse`).
+   */
+  private def parseRows(body: String): List[List[String]] =
+    parseRowsLoud(body).getOrElse(Nil)
 
   private def sha256(bytes: Array[Byte]): String =
     val md = MessageDigest.getInstance("SHA-256")

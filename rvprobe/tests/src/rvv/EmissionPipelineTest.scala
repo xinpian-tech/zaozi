@@ -76,14 +76,26 @@ object EmissionPipelineTest extends TestSuite:
       assert(((w0 >>> 20) & 0x1) == 0)
       assert(((w1 >>> 20) & 0x1) == 1)
 
-    test("MagicInstrEmit.encode LMUL encoding bits 24:21"):
-      assert(((MagicInstrEmit.encode(0, Lmul.M1, false) >>> 21) & 0xf) == 0)
-      assert(((MagicInstrEmit.encode(0, Lmul.M2, false) >>> 21) & 0xf) == 1)
-      assert(((MagicInstrEmit.encode(0, Lmul.M4, false) >>> 21) & 0xf) == 2)
-      assert(((MagicInstrEmit.encode(0, Lmul.M8, false) >>> 21) & 0xf) == 3)
-      assert(((MagicInstrEmit.encode(0, Lmul.Mf8, false) >>> 21) & 0xf) == 5)
-      assert(((MagicInstrEmit.encode(0, Lmul.Mf4, false) >>> 21) & 0xf) == 6)
-      assert(((MagicInstrEmit.encode(0, Lmul.Mf2, false) >>> 21) & 0xf) == 7)
+    test("MagicInstrEmit.encode rs2[4:1] = whole-register count (pspike contract)"):
+      // Upstream pspike reads `int lmul1 = insn.rs2() >> 1` as the
+      // whole-register count, NOT the architectural vlmul encoding.
+      // M1/Mfractional -> 1, M2 -> 2, M4 -> 4, M8 -> 8.
+      assert(((MagicInstrEmit.encode(0, Lmul.M1, false) >>> 21) & 0xf) == 1)
+      assert(((MagicInstrEmit.encode(0, Lmul.M2, false) >>> 21) & 0xf) == 2)
+      assert(((MagicInstrEmit.encode(0, Lmul.M4, false) >>> 21) & 0xf) == 4)
+      assert(((MagicInstrEmit.encode(0, Lmul.M8, false) >>> 21) & 0xf) == 8)
+      assert(((MagicInstrEmit.encode(0, Lmul.Mf2, false) >>> 21) & 0xf) == 1)
+      assert(((MagicInstrEmit.encode(0, Lmul.Mf4, false) >>> 21) & 0xf) == 1)
+      assert(((MagicInstrEmit.encode(0, Lmul.Mf8, false) >>> 21) & 0xf) == 1)
+
+    test("MagicInstrEmit.wholeRegisterCount matches upstream gMagicInsn semantics"):
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.M1) == 1)
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.M2) == 2)
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.M4) == 4)
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.M8) == 8)
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.Mf2) == 1)
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.Mf4) == 1)
+      assert(MagicInstrEmit.wholeRegisterCount(Lmul.Mf8) == 1)
 
     test("MagicInstrEmit round-trip encode/decode every LMUL"):
       val lmuls = List(Lmul.M1, Lmul.M2, Lmul.M4, Lmul.M8, Lmul.Mf2, Lmul.Mf4, Lmul.Mf8)
@@ -92,12 +104,13 @@ object EmissionPipelineTest extends TestSuite:
           v <- List(true, false)
       do
         val w = MagicInstrEmit.encode(g, l, v)
+        val expectedRC = MagicInstrEmit.wholeRegisterCount(l)
         MagicInstrEmit.decode(w) match
-          case Some((dg, dl, dv)) =>
+          case Some((dg, drc, dv)) =>
             assert(dg == g)
-            assert(dl == l)
+            assert(drc == expectedRC)
             assert(dv == v)
-          case None               =>
+          case None                =>
             assert(false)
 
     test("MagicInstrEmit.emitAsm produces .word 0x... directive"):
