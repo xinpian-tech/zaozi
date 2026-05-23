@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.rvv.unittest
 
-import me.jiuyang.rvprobe.rvv.vtype.{Lmul, Sew, VTypeEnvelope}
+import me.jiuyang.rvprobe.rvv.vtype.{Lmul, Sew, VTypeEnvelope, Vta, Vma}
 
 /** Renders the complete `.S` file for a single per-instruction test.
  *  Matches the upstream macros/general/test_macros.h contract: include
@@ -148,11 +148,16 @@ object TestSEmit:
   def vsetvliAsm(env: VTypeEnvelope): String =
     val sew  = sewToken(env.vtype.sewBits)
     val lmul = lmulToken(env.vtype.lmul)
-    s"li t0, ${env.vl}\n  vsetvli x5, t0, $sew,$lmul,ta,ma"
+    val ta   = vtaToken(env.vtype.vta)
+    val ma   = vmaToken(env.vtype.vma)
+    s"li t0, ${env.vl}\n  vsetvli x5, t0, $sew,$lmul,$ta,$ma"
 
   /** Emit a `vsetvli x5, x0, ...` requesting VLMAX. Used only for
    *  result-store setup where we want to store all elements of the
    *  result register group, not just the original envelope's vl.
+   *  Result-store vsetvli ALWAYS uses ta,ma (agnostic) because we want
+   *  to dump the full register-group footprint regardless of the
+   *  envelope's policy.
    */
   def vsetvliAsmVlmax(env: VTypeEnvelope): String =
     val sew  = sewToken(env.vtype.sewBits)
@@ -202,6 +207,19 @@ object TestSEmit:
     case Lmul.Mf2 => "mf2"
     case Lmul.Mf4 => "mf4"
     case Lmul.Mf8 => "mf8"
+
+  /** Emit the vta token honoring the envelope's policy. Codex r12
+   *  blocking side issue #1: previous code hard-coded `ta,ma`, leaking
+   *  agnostic policy into ordinary tests where upstream uses `tu,mu`.
+   */
+  private def vtaToken(v: Vta): String = v match
+    case Vta.Undisturbed => "tu"
+    case Vta.Agnostic    => "ta"
+
+  /** Emit the vma token honoring the envelope's policy. */
+  private def vmaToken(v: Vma): String = v match
+    case Vma.Undisturbed => "mu"
+    case Vma.Agnostic    => "ma"
 
   /** Choose the RVTEST_*UV* macro for a given (xlen, march-has-v)
    *  combination. Matches upstream Makefile's `EXT_V` branching.

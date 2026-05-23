@@ -54,7 +54,7 @@ object PocGateTest extends TestSuite:
       val vsetvli = RvvInsnRegistry.all.find(_.name == "vsetvli")
       assert(vsetvli.isDefined)
 
-    test("AC-16: emit each POC insn through Driver, verify file structure"):
+    test("AC-16: emit each POC insn through Driver, verify file structure + mnemonic + FP FRM sweep"):
       val tmpDir = Files.createTempDirectory("rvprobe-poc-").toAbsolutePath
       val cli    = Driver.Cli(
         vlen            = 256,
@@ -82,6 +82,47 @@ object PocGateTest extends TestSuite:
             assert(content.contains("RVTEST_DATA_END"))
             assert(content.contains(".word 0x")) // magic word for pspike
             assert(content.contains("TEST_PASSFAIL"))
+            // Codex r12 #4 (HIGH): each POC file MUST contain the
+            // instruction-under-test mnemonic as a real `.S` line —
+            // not as a TODO comment, not skipped through a placeholder
+            // path. Look for the mnemonic followed by a space (which
+            // disambiguates `vadd.vv ` from `# TODO vadd.vv`).
+            val mnemonicPresent = content.split("\n").exists { line =>
+              val trimmed = line.trim
+              !trimmed.startsWith("#") && trimmed.startsWith(s"$name ")
+            }
+            if !mnemonicPresent then
+              println(s"[PocGateTest] FAIL: $name mnemonic missing from emitted .S")
+              println(s"  file=$path")
+            assert(mnemonicPresent)
+            // FP instructions must carry the FRM sweep (≥5 csrwi frm
+            // lines, one per RNE/RTZ/RDN/RUP/RMM).
+            if name.startsWith("vf") then
+              val frmCount = content.split("\n").count(_.trim.startsWith("csrwi frm,"))
+              if frmCount < 5 then
+                println(s"[PocGateTest] FAIL: $name has $frmCount csrwi frm, need ≥5")
+              assert(frmCount >= 5)
+
+    test("AC-16: PocGate rejects `# TODO` comment-only instruction bodies"):
+      // Synthetic .S whose only mention of `vfadd.vv` is in a TODO
+      // comment must NOT be classified as a real POC emission.
+      val synthetic =
+        """RVTEST_CODE_BEGIN
+          |  # TODO vfadd.vv unavailable
+          |  csrwi frm, 0
+          |  csrwi frm, 1
+          |  csrwi frm, 2
+          |  csrwi frm, 3
+          |  csrwi frm, 4
+          |  .word 0xdeadbeef
+          |  TEST_PASSFAIL
+          |RVTEST_CODE_END
+          |""".stripMargin
+      val mnemonicPresent = synthetic.split("\n").exists { line =>
+        val trimmed = line.trim
+        !trimmed.startsWith("#") && trimmed.startsWith("vfadd.vv ")
+      }
+      assert(!mnemonicPresent) // synthetic must fail the gate criterion
 
     test("AC-16: cardinality budget = 9 (POC gate scope)"):
       assert(PocNames.size == 9)
