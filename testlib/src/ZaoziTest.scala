@@ -9,11 +9,15 @@ import me.jiuyang.zaozi.reftpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.DialectApi as FirrtlDialectApi
 import org.llvm.circt.scalalib.capi.dialect.sv.DialectApi as SvDialectApi
 import org.llvm.circt.scalalib.capi.dialect.emit.DialectApi as EmitDialectApi
+import org.llvm.circt.scalalib.capi.dialect.ltl.DialectApi as LTLDialectApi
+import org.llvm.circt.scalalib.capi.dialect.verif.DialectApi as VerifDialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
 import org.llvm.circt.scalalib.capi.firtool.given_FirtoolOptionsApi
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_CircuitApi, given_ModuleApi, Circuit, CircuitApi}
 import org.llvm.circt.scalalib.capi.dialect.emit.given_DialectApi
+import org.llvm.circt.scalalib.capi.dialect.ltl.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.sv.given_DialectApi
+import org.llvm.circt.scalalib.capi.dialect.verif.given_DialectApi
 import org.llvm.circt.scalalib.capi.firtool.FirtoolApi
 import org.llvm.circt.scalalib.capi.firtool.given
 import org.llvm.circt.scalalib.capi.firtool.FirtoolOptions
@@ -57,6 +61,8 @@ trait HasMlirTest:
       given Arena      = arena
       given Context    = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
+      summon[LTLDialectApi].loadDialect
+      summon[VerifDialectApi].loadDialect
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
@@ -92,6 +98,8 @@ trait HasFirrtlTest:
       given Arena      = arena
       given Context    = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
+      summon[LTLDialectApi].loadDialect
+      summon[VerifDialectApi].loadDialect
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
@@ -127,8 +135,10 @@ trait HasVerilogTest:
       given Arena          = arena
       given Context        = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
+      summon[LTLDialectApi].loadDialect
       summon[SvDialectApi].loadDialect
       summon[EmitDialectApi].loadDialect
+      summon[VerifDialectApi].loadDialect
       given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
 
       given PassManager  = summon[PassManagerApi].passManagerCreate
@@ -175,6 +185,8 @@ trait HasCompileErrorTest:
       given Arena      = arena
       given Context    = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
+      summon[LTLDialectApi].loadDialect
+      summon[VerifDialectApi].loadDialect
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
