@@ -19,7 +19,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
 
   // Due to a bug of macro in utest, we have to disable -Xcheck-macros to make dotty happy
   override def scalacOptions: T[Seq[String]] = Task(
-    super.scalacOptions() ++ Seq("-Xprint-suspension", "-experimental", "-Xcheck-macros")
+    super.scalacOptions() ++ Seq("-Xprint-suspension", "-experimental", "-Xcheck-macros", "-language:dynamics")
   )
 
   // JEP 454: the published `elaborator.jar` assembly carries the

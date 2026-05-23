@@ -22,6 +22,7 @@ given [T <: Int | Long | Float | Double]: ScalaTpeToMlirArray[T] with
           case (long: Long, i: Int)     => buffer.setAtIndex(ValueLayout.JAVA_LONG, i, long)
           case (float: Float, i: Int)   => buffer.setAtIndex(ValueLayout.JAVA_FLOAT, i, float)
           case (double: Double, i: Int) => buffer.setAtIndex(ValueLayout.JAVA_DOUBLE, i, double)
+          case other                    => throw MatchError(other)
         buffer
       else MemorySegment.NULL
 

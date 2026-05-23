@@ -48,29 +48,34 @@ given PassApi with
     MlirExternalPassCallbacks.construct(
       callbacksSegment,
       MlirExternalPassCallbacks.construct.allocate(
-        (nil: MemorySegment) =>
+        { (nil: MemorySegment) =>
           try constructCallback()
-          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL), callbackArena
+          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
+        },
+        callbackArena
       )
     )
     MlirExternalPassCallbacks.destruct(
       callbacksSegment,
       MlirExternalPassCallbacks.destruct.allocate(
-        (nil: MemorySegment) =>
+        { (nil: MemorySegment) =>
           try destructCallback()
-          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL), callbackArena
+          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
+        },
+        callbackArena
       )
     )
     initializeCallback.foreach(cb =>
       MlirExternalPassCallbacks.initialize(
         callbacksSegment,
         MlirExternalPassCallbacks.initialize.allocate(
-          (context: MemorySegment, nil: MemorySegment) =>
+          { (context: MemorySegment, nil: MemorySegment) =>
             try cb(Context(context)).segment
             catch
               case t: Throwable =>
                 recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
-                initializeFailureResult,
+                initializeFailureResult
+          },
           callbackArena
         )
       )
@@ -78,25 +83,27 @@ given PassApi with
     MlirExternalPassCallbacks.`clone`(
       callbacksSegment,
       MlirExternalPassCallbacks.`clone`.allocate(
-        (nil: MemorySegment) =>
+        { (nil: MemorySegment) =>
           try cloneCallback()
-          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
-            // mlir-c returns null userData for cloned external passes; see
-            // mlir/lib/CAPI/IR/Pass.cpp ExternalPass::clonePass.
+          catch
+            case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
+          // mlir-c returns null userData for cloned external passes; see
+          // mlir/lib/CAPI/IR/Pass.cpp ExternalPass::clonePass.
           MemorySegment.NULL
-        ,
+        },
         callbackArena
       )
     )
     MlirExternalPassCallbacks.run(
       callbacksSegment,
       MlirExternalPassCallbacks.run.allocate(
-        (operation: MemorySegment, externalPass: MemorySegment, userData: MemorySegment) =>
+        { (operation: MemorySegment, externalPass: MemorySegment, userData: MemorySegment) =>
           try runCallback(Operation(operation), ExternalPass(externalPass))
           catch
             case t: Throwable =>
               recordFailure(t, operation, externalPass)
-              mlirExternalPassSignalFailure(externalPass),
+              mlirExternalPassSignalFailure(externalPass)
+        },
         callbackArena
       )
     )

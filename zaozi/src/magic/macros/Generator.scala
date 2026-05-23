@@ -75,7 +75,7 @@ class generator extends MacroAnnotation:
                 // Ref: https://github.com/com-lihaoyi/mainargs/blob/e815520df9762111643208d57898441d87105811/mainargs/src-3/Macros.scala#L41
                 val paramConstructor =
                   paramCompObj
-                    .memberMethod("apply")
+                    .methodMember("apply")
                     .find(
                       _.paramSymss.flatten.map(_.name) == tpsParam.primaryConstructor.paramSymss.flatten.map(_.name)
                     )
