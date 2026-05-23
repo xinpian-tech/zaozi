@@ -586,27 +586,37 @@ object Driver:
       System.arraycopy(srcData, 0, srcAll, f * srcData.length, srcData.length)
     val dstZero       = Array.fill[Byte](totalSrcBytes)(0.toByte)
 
-    val setup = List.newBuilder[String]
-    setup += "la a1, seg_src"
+    val setupB = List.newBuilder[String]
+    setupB += "la a1, seg_src"
     for f <- 0 until nfields do
-      setup += s"vle${sew.bits}.v v${8 + f}, (a1)"
-      setup += s"addi a1, a1, ${srcData.length}"
-    setup += "la a1, seg_dst"
+      setupB += s"vle${sew.bits}.v v${8 + f * dataEmul}, (a1)"
+      setupB += s"addi a1, a1, ${srcData.length}"
+    setupB += "la a1, seg_dst"
 
     val insnAsm = s"${insn.name} v8, (a1)"
     // After segmented store, reload via segmented load into the same
-    // register groups; resultdata store captures the reloaded bytes.
-    val postInsn = List("la a1, seg_dst", s"vlseg${nfields}e${sew.bits}.v v8, (a1)")
-    val block = TestSEmit.TestBlock(
-      env, 8, false, insnAsm,
-      setupAsm             = setup.result(),
-      dataLabel            = None,
-      resultEew            = sew.bits,
-      resultGroup          = 8,
-      resultWholeRegisters = nfields,
-      postInsn             = postInsn)
+    // register groups so each per-field result-store reads memory.
+    val postInsn0 = List("la a1, seg_dst", s"vlseg${nfields}e${sew.bits}.v v8, (a1)")
+    // Codex r14 #2: per-field blocks so NFIELDS 3/5/6/7 use valid
+    // result-whole-register counts {1,2,4,8} per dataEmul. NOT a
+    // pseudo-LMUL=nfields group.
+    val blocks = (0 until nfields).map { f =>
+      val fieldReg = 8 + f * dataEmul
+      val setup    = if f == 0 then setupB.result() else Nil
+      val post     = if f == 0 then postInsn0 else Nil
+      val asm      = if f == 0 then insnAsm
+                     else s"# field $f result store"
+      TestSEmit.TestBlock(
+        env, fieldReg, false, asm,
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = sew.bits,
+        resultGroup          = fieldReg,
+        resultWholeRegisters = dataEmul,
+        postInsn             = post)
+    }.toList
     val labels = List("seg_src" -> 0, "seg_dst" -> totalSrcBytes)
-    renderWithLabels(insn.name, envMacro, List(block),
+    renderWithLabels(insn.name, envMacro, blocks,
       (srcAll ++ dstZero).toVector, labels)
 
   /** Strided load (`vlse<n>.v vd, (rs1), rs2`). rs2 = byte stride. */
@@ -850,16 +860,24 @@ object Driver:
     for f <- 0 until nfields do
       System.arraycopy(perFieldBytes, 0, srcAll, f * perFieldBytes.length, perFieldBytes.length)
 
-    val setup   = List("la a1, segld_src")
-    val insnAsm = s"${insn.name} v8, (a1)"
-    val block   = TestSEmit.TestBlock(
-      env, 8, false, insnAsm,
-      setupAsm             = setup,
-      dataLabel            = None,
-      resultEew            = sew.bits,
-      resultGroup          = 8,
-      resultWholeRegisters = nfields * dataEmul)
-    renderWithLabels(insn.name, envMacro, List(block),
+    val setup0   = List("la a1, segld_src")
+    val insnAsm  = s"${insn.name} v8, (a1)"
+    // Codex r14 #2: per-field result-store + magic so NFIELDS 3/5/6/7
+    // use valid resultWholeRegisters in {1,2,4,8}.
+    val blocks = (0 until nfields).map { f =>
+      val fieldReg = 8 + f * dataEmul
+      val setup    = if f == 0 then setup0 else Nil
+      val asm      = if f == 0 then insnAsm
+                     else s"# field $f result store"
+      TestSEmit.TestBlock(
+        env, fieldReg, false, asm,
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = sew.bits,
+        resultGroup          = fieldReg,
+        resultWholeRegisters = dataEmul)
+    }.toList
+    renderWithLabels(insn.name, envMacro, blocks,
       srcAll.toVector, List("segld_src" -> 0))
 
   /** Segmented strided load (`vlsseg<nf>e<eew>.v vd, (rs1), rs2`).
@@ -883,18 +901,25 @@ object Driver:
     val perFieldBytes = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 16), sew)
     // Stride = NFIELDS × element-size (interleaved per-field layout).
     val stride = (sew.bits / 8) * nfields
-    val setup = List(
+    val setup0 = List(
       "la a1, segst_src",
       s"li a2, $stride")
     val insnAsm = s"${insn.name} v8, (a1), a2"
-    val block   = TestSEmit.TestBlock(
-      env, 8, false, insnAsm,
-      setupAsm             = setup,
-      dataLabel            = None,
-      resultEew            = sew.bits,
-      resultGroup          = 8,
-      resultWholeRegisters = nfields * dataEmul)
-    renderWithLabels(insn.name, envMacro, List(block),
+    // Codex r14 #2: per-field blocks.
+    val blocks = (0 until nfields).map { f =>
+      val fieldReg = 8 + f * dataEmul
+      val setup    = if f == 0 then setup0 else Nil
+      val asm      = if f == 0 then insnAsm
+                     else s"# field $f result store"
+      TestSEmit.TestBlock(
+        env, fieldReg, false, asm,
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = sew.bits,
+        resultGroup          = fieldReg,
+        resultWholeRegisters = dataEmul)
+    }.toList
+    renderWithLabels(insn.name, envMacro, blocks,
       perFieldBytes.toVector, List("segst_src" -> 0))
 
   /** Segmented strided store (`vssseg<nf>e<eew>.v vs3, (rs1), rs2`).
@@ -926,27 +951,35 @@ object Driver:
     val setupB = List.newBuilder[String]
     setupB += "la a1, segsst_src"
     for f <- 0 until nfields do
-      setupB += s"vle${sew.bits}.v v${8 + f}, (a1)"
+      setupB += s"vle${sew.bits}.v v${8 + f * dataEmul}, (a1)"
       setupB += s"addi a1, a1, ${perFieldBytes.length}"
     setupB += "la a1, segsst_dst"
     setupB += s"li a2, $stride"
     val insnAsm = s"${insn.name} v8, (a1), a2"
     // Reload via matching strided segmented load for memory witness.
     val reloadName = insn.name.replace("vssseg", "vlsseg")
-    val postInsn = List(
+    val postInsn0 = List(
       "la a1, segsst_dst",
       s"li a2, $stride",
       s"$reloadName v8, (a1), a2")
-    val block = TestSEmit.TestBlock(
-      env, 8, false, insnAsm,
-      setupAsm             = setupB.result(),
-      dataLabel            = None,
-      resultEew            = sew.bits,
-      resultGroup          = 8,
-      resultWholeRegisters = nfields * dataEmul,
-      postInsn             = postInsn)
+    // Codex r14 #2: per-field blocks.
+    val blocks = (0 until nfields).map { f =>
+      val fieldReg = 8 + f * dataEmul
+      val setup    = if f == 0 then setupB.result() else Nil
+      val post     = if f == 0 then postInsn0 else Nil
+      val asm      = if f == 0 then insnAsm
+                     else s"# field $f result store"
+      TestSEmit.TestBlock(
+        env, fieldReg, false, asm,
+        setupAsm             = setup,
+        dataLabel            = None,
+        resultEew            = sew.bits,
+        resultGroup          = fieldReg,
+        resultWholeRegisters = dataEmul,
+        postInsn             = post)
+    }.toList
     val labels = List("segsst_src" -> 0, "segsst_dst" -> srcAll.length)
-    renderWithLabels(insn.name, envMacro, List(block),
+    renderWithLabels(insn.name, envMacro, blocks,
       (srcAll ++ dstZero).toVector, labels)
 
   /** Segmented indexed load (`vluxseg<nf>ei<m>.v vd, (rs1), vs2`).
@@ -1124,15 +1157,48 @@ object Driver:
         out(i * bytesPerElem + b) = ((masked >> (b * 8)) & BigInt(0xff)).toByte
     out
 
-  /** Parse the SEW field embedded in load/store names (vle32.v -> 32). */
-  private def inferSewFromName(name: String): Option[Sew] =
-    """v[ls]e?(\d+)""".r.findFirstMatchIn(name).map(_.group(1).toInt).flatMap {
-      case 8  => Some(Sew.Sew8)
-      case 16 => Some(Sew.Sew16)
-      case 32 => Some(Sew.Sew32)
-      case 64 => Some(Sew.Sew64)
-      case _  => None
-    }
+  /** Parse the SEW field embedded in load/store names. Codex r14 #1:
+   *  the round-13 regex `v[ls]e?(\d+)` was too permissive on the
+   *  left side and missed the SEW token in:
+   *    - `vlse64.v` / `vsse64.v` (strided): matched first `e` after
+   *      `vlse`, parsing as "64" but ALSO matching `vleseg`/etc.
+   *    - `vlseg2e64.v` / `vsseg2e64.v` (segmented): "2e64" matched
+   *      "2" instead of "64".
+   *    - `vlsseg2e64.v` / `vssseg2e64.v` (strided segmented).
+   *    - `vleff32.v` / `vle32ff.v` (fault-first variants).
+   *
+   *  Family-aware parser: try each known family prefix and extract
+   *  the SEW token from the canonical position. Families:
+   *    `vle<N>`/`vse<N>` (unit-stride, including fault-first `vle<N>ff`)
+   *    `vlse<N>`/`vsse<N>` (strided)
+   *    `vlseg<F>e<N>`/`vsseg<F>e<N>` (segmented unit-stride)
+   *    `vlsseg<F>e<N>`/`vssseg<F>e<N>` (segmented strided)
+   *  Indexed names (vluxei/vsuxei/vluxseg*ei/...) do NOT encode the
+   *  data SEW in the name — caller supplies the envelope SEW.
+   */
+  private[rvprobe] def inferSewFromName(name: String): Option[Sew] =
+    val candidates = List(
+      // Segmented strided: vlsseg<F>e<N>, vssseg<F>e<N>
+      """^v(?:l|s)sseg\d+e(\d+)""".r,
+      // Segmented unit-stride: vlseg<F>e<N>, vsseg<F>e<N>
+      """^v(?:l|s)seg\d+e(\d+)""".r,
+      // Strided: vlse<N>, vsse<N>
+      """^v(?:l|s)se(\d+)""".r,
+      // Fault-first: vle<N>ff
+      """^vle(\d+)ff""".r,
+      // Unit-stride: vle<N>, vse<N> (also catches vleN.v)
+      """^v(?:l|s)e(\d+)""".r)
+    candidates.iterator
+      .flatMap(_.findFirstMatchIn(name))
+      .map(_.group(1).toInt)
+      .nextOption()
+      .flatMap {
+        case 8  => Some(Sew.Sew8)
+        case 16 => Some(Sew.Sew16)
+        case 32 => Some(Sew.Sew32)
+        case 64 => Some(Sew.Sew64)
+        case _  => None
+      }
 
   private def hasFullV(march: String): Boolean =
     val base = march.split("_", 2)(0).stripPrefix("rv32").stripPrefix("rv64")
