@@ -45,7 +45,11 @@ object Round16FixesTest extends TestSuite:
           val content = new String(Files.readAllBytes(tmp.resolve("vlsseg2e32_v_v-0.S")))
           val bytes   = emittedTestdataBytes(content)
           assert(bytes >= 4 * 2 * 4) // vl=4 * nfields=2 * elemBytes=4 = 32
-        case None => ()
+        case None =>
+          // Codex r16 queued #1: don't pass vacuously when the
+          // registry is missing an expected instruction; the round-13
+          // generator regex fix should have populated all of these.
+          assert(false)
 
     test("Codex r15 #1: vlsseg5e32.v has at least 80 bytes testdata (was 64 in r15)"):
       val maybe = RvvInsnRegistry.all.find(_.name == "vlsseg5e32.v")
@@ -56,7 +60,11 @@ object Round16FixesTest extends TestSuite:
           val content = new String(Files.readAllBytes(tmp.resolve("vlsseg5e32_v_v-0.S")))
           val bytes   = emittedTestdataBytes(content)
           assert(bytes >= 4 * 5 * 4) // vl=4 * nfields=5 * elemBytes=4 = 80
-        case None => ()
+        case None =>
+          // Codex r16 queued #1: don't pass vacuously when the
+          // registry is missing an expected instruction; the round-13
+          // generator regex fix should have populated all of these.
+          assert(false)
 
     test("Codex r15 #1: vlsseg8e64.v has at least 256 bytes testdata (was 128 in r15)"):
       val maybe = RvvInsnRegistry.all.find(_.name == "vlsseg8e64.v")
@@ -67,7 +75,11 @@ object Round16FixesTest extends TestSuite:
           val content = new String(Files.readAllBytes(tmp.resolve("vlsseg8e64_v_v-0.S")))
           val bytes   = emittedTestdataBytes(content)
           assert(bytes >= 4 * 8 * 8) // vl=4 * nfields=8 * elemBytes=8 = 256
-        case None => ()
+        case None =>
+          // Codex r16 queued #1: don't pass vacuously when the
+          // registry is missing an expected instruction; the round-13
+          // generator regex fix should have populated all of these.
+          assert(false)
 
     test("Codex r15 #1: vssseg5e32.v dst buffer is at least 80 bytes"):
       val maybe = RvvInsnRegistry.all.find(_.name == "vssseg5e32.v")
@@ -79,7 +91,11 @@ object Round16FixesTest extends TestSuite:
           // src + dst combined ≥ src(20*5) + dst(vl*nfields*elemBytes = 80).
           val bytes = emittedTestdataBytes(content)
           assert(bytes >= 80 + 80)
-        case None => ()
+        case None =>
+          // Codex r16 queued #1: don't pass vacuously when the
+          // registry is missing an expected instruction; the round-13
+          // generator regex fix should have populated all of these.
+          assert(false)
 
     test("Codex r15 #1: vlseg8e64.v unit-stride segmented has 256 bytes testdata"):
       val maybe = RvvInsnRegistry.all.find(_.name == "vlseg8e64.v")
@@ -90,7 +106,11 @@ object Round16FixesTest extends TestSuite:
           val content = new String(Files.readAllBytes(tmp.resolve("vlseg8e64_v_v-0.S")))
           val bytes = emittedTestdataBytes(content)
           assert(bytes >= 4 * 8 * 8) // vl=4 * nfields=8 * elemBytes=8 = 256
-        case None => ()
+        case None =>
+          // Codex r16 queued #1: don't pass vacuously when the
+          // registry is missing an expected instruction; the round-13
+          // generator regex fix should have populated all of these.
+          assert(false)
 
     // ---- Codex r15 blocking #2: vsetvl renderTestS wired into PocGate ----
 

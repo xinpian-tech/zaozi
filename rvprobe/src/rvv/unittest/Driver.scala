@@ -196,6 +196,13 @@ object Driver:
   private def emitContent(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val isFp = isFpInsn(insn.name)
     insn.schema match
+      // Codex r16 blocking #2 (HIGH): vsetvl/vsetvli/vsetivli have a
+      // dedicated CSR-checking renderer at vsetvl.Tests.renderTestS.
+      // Route through it instead of emitStructuralPlaceholder, so the
+      // normal Driver.emitOne path produces a real .S for these insns.
+      case Schema.Vsetvl | Schema.Vsetvli | Schema.Vsetivli =>
+        me.jiuyang.rvprobe.rvv.vsetvl.Tests.renderTestS(
+          insn.name, cli.vlen, cli.xlen, envMacro)
       case _ if isFp && !insn.notestfloat3 => emitFp(insn, cli, envMacro)
       case Schema.VdVs2Vs1Vm     => emitVdVs2Vs1Vm(insn, cli, envMacro)
       case Schema.VdRs1m         => emitUnitStrideLoad(insn, cli, envMacro)
@@ -619,6 +626,15 @@ object Driver:
     renderWithLabels(insn.name, envMacro, blocks,
       (srcAll ++ dstZero).toVector, labels)
 
+  /** Compute the minimum buffer bytes a strided load/store of `vl`
+   *  elements with the given `stride` and per-element width touches.
+   *  Codex r15 #1 / r16 #1: derive from the SUT shape rather than
+   *  magic-number padding. The SUT reads/writes the closed interval
+   *  `[0, (vl - 1) * stride + elemBytes)`.
+   */
+  private def stridedBytesRequired(vl: Int, stride: Int, elemBytes: Int): Int =
+    (vl - 1) * stride + elemBytes
+
   /** Strided load (`vlse<n>.v vd, (rs1), rs2`). rs2 = byte stride. */
   private def emitStridedLoad(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
@@ -630,17 +646,19 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
-    // Reserve 16 elements worth of memory; stride = 2 × element size
-    // so we read elements at indices 0, 2, 4, 6, ...
-    val elemBytes = sew.bits / 8
-    val padded    = ElemValueLowering.buildVector(canonical, sew, 16)
-    val data      = vec2bytes(padded, sew)
-    val stride    = elemBytes * 2
-    val setup     = List(
+    val elemBytes     = sew.bits / 8
+    val stride        = elemBytes * 2
+    val requiredBytes = stridedBytesRequired(env.vl, stride, elemBytes)
+    val numElems      = math.max(16, (requiredBytes + elemBytes - 1) / elemBytes)
+    val data          = vec2bytes(
+      ElemValueLowering.buildVector(canonical, sew, numElems), sew)
+    require(data.length >= requiredBytes,
+      s"strided load source too small: got ${data.length}, need $requiredBytes")
+    val setup = List(
       "la a1, strided_data",
       s"li a2, $stride")
-    val insnAsm   = s"${insn.name} v8, (a1), a2"
-    val block     = TestSEmit.TestBlock(
+    val insnAsm = s"${insn.name} v8, (a1), a2"
+    val block   = TestSEmit.TestBlock(
       env, 8, false, insnAsm, setup, None,
       resultEew = sew.bits, resultGroup = 8, resultWholeRegisters = 1)
     renderWithLabels(insn.name, envMacro, List(block), data.toVector,
@@ -649,6 +667,7 @@ object Driver:
   /** Strided store (`vsse<n>.v vs3, (rs1), rs2`). Stores at stride.
    *  Codex r11 #2: reload from dst memory after store so resultdata
    *  reflects what the store actually wrote.
+   *  Codex r16 #1: dst buffer sized from `stridedBytesRequired`.
    */
   private def emitStridedStore(insn: RvvInsn, cli: Cli, envMacro: String): String =
     val sew = inferSewFromName(insn.name).getOrElse(Sew.Sew32)
@@ -660,19 +679,26 @@ object Driver:
       me.jiuyang.rvprobe.rvv.pred.ValuePred.One,
       me.jiuyang.rvprobe.rvv.pred.ValuePred.MaxSigned(sew),
       me.jiuyang.rvprobe.rvv.pred.ValuePred.AllOnes(sew))
-    val srcData   = vec2bytes(ElemValueLowering.buildVector(canonical, sew, 4), sew)
-    val dstZero   = Array.fill[Byte](srcData.length * 2)(0.toByte) // wider for stride
-    val stride    = (sew.bits / 8) * 2
-    val setup     = List(
+    val srcData       = vec2bytes(
+      ElemValueLowering.buildVector(canonical, sew, math.max(4, env.vl)), sew)
+    val elemBytes     = sew.bits / 8
+    val stride        = elemBytes * 2
+    val requiredBytes = stridedBytesRequired(env.vl, stride, elemBytes)
+    val dstZero       = Array.fill[Byte](math.max(srcData.length * 2, requiredBytes))(0.toByte)
+    require(srcData.length >= env.vl * elemBytes,
+      s"strided store source too small: got ${srcData.length}, need ${env.vl * elemBytes}")
+    require(dstZero.length >= requiredBytes,
+      s"strided store dst too small: got ${dstZero.length}, need $requiredBytes")
+    val setup = List(
       "la a1, strided_src",
       s"vle${sew.bits}.v v8, (a1)",
       "la a1, strided_dst",
       s"li a2, $stride")
-    val insnAsm   = s"${insn.name} v8, (a1), a2"
-    val postInsn  = List(
+    val insnAsm  = s"${insn.name} v8, (a1), a2"
+    val postInsn = List(
       "la a1, strided_dst",
-      s"vlse${sew.bits}.v v8, (a1), a2") // reload via strided load to capture
-    val block     = TestSEmit.TestBlock(
+      s"vlse${sew.bits}.v v8, (a1), a2")
+    val block = TestSEmit.TestBlock(
       env, 8, false, insnAsm,
       setupAsm             = setup,
       dataLabel            = None,
@@ -680,7 +706,7 @@ object Driver:
       resultGroup          = 8,
       resultWholeRegisters = 1,
       postInsn             = postInsn)
-    val labels    = List("strided_src" -> 0, "strided_dst" -> srcData.length)
+    val labels = List("strided_src" -> 0, "strided_dst" -> srcData.length)
     renderWithLabels(insn.name, envMacro, List(block),
       (srcData ++ dstZero).toVector, labels)
 
