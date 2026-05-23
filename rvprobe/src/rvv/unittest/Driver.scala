@@ -186,9 +186,10 @@ object Driver:
         Files.write(Paths.get("Makefrag"), makefrag.getBytes(StandardCharsets.UTF_8))
         println(s"rvprobe driver: wrote ${names.size} stage1 .S files + Makefrag")
 
-/** Central registry of RvvInsn declarations. Populated by task10/11/13/
- *  14/15 fan-out work; remains empty in task8 so the Driver can compile
- *  and the CLI surface can be tested.
+/** Central registry of RvvInsn declarations, aggregated from the
+ *  auto-generated per-extension lists under `insns/`. The generator
+ *  (`audit/InsnsGenerator.regenerateInsns`) populates this; the
+ *  registry size should match the upstream toml corpus (676).
  */
 object RvvInsnRegistry:
-  val all: List[RvvInsn] = Nil // populated by per-instruction declarations in insns/
+  val all: List[RvvInsn] = me.jiuyang.rvprobe.rvv.insns.AllInsns.all

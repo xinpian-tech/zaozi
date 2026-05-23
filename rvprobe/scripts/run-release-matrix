@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
+#
+# AC-6: full-pipeline soak across the DEC-6 release-blocking matrix.
+# Invokes the upstream Makefile (with the DEC-3 generator-path swap
+# pointing at scripts/rvprobe-driver) for each (VLEN, XLEN, march)
+# tuple in the release-minimum set:
+#   - (VLEN=256, XLEN=64, full upstream march)
+#   - (VLEN=128, XLEN=64, full upstream march)
+#
+# Requires spike + pspike + the upstream Makefile to be available.
+# Exits 0 when every tuple completes; non-zero on any spike-signature
+# mismatch or pipeline error.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ZAOZI_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WORKSPACE_ROOT="$(cd "$ZAOZI_ROOT/.." && pwd)"
+UPSTREAM_ROOT="${UPSTREAM_ROOT:-$WORKSPACE_ROOT/riscv-vector-tests}"
+
+if [ ! -d "$UPSTREAM_ROOT" ]; then
+  echo "ERROR: upstream riscv-vector-tests not found at $UPSTREAM_ROOT" >&2
+  echo "Set UPSTREAM_ROOT to override." >&2
+  exit 2
+fi
+
+FULL_MARCH="gcv_zvbb_zvbc_zfh_zvfh_zvkg_zvkned_zvknha_zvksed_zvksh_zfbfmin_zvfbfmin_zvfbfwma"
+
+declare -a MATRIX=(
+  "256 64 $FULL_MARCH"
+  "128 64 $FULL_MARCH"
+)
+
+OVERALL_RC=0
+
+for entry in "${MATRIX[@]}"; do
+  read -r VLEN XLEN MARCH <<<"$entry"
+  TAG="v${VLEN}x${XLEN}"
+  OUT_DIR="$UPSTREAM_ROOT/out/${TAG}-rvprobe"
+  echo "=================================================================="
+  echo "Matrix cell: VLEN=$VLEN XLEN=$XLEN MARCH=rv${XLEN}${MARCH}"
+  echo "Out dir:     $OUT_DIR"
+  echo "Generator:   $SCRIPT_DIR/rvprobe-driver"
+  echo "=================================================================="
+
+  mkdir -p "$OUT_DIR/tests/stage1"
+  cd "$UPSTREAM_ROOT"
+
+  # Invoke the rvprobe driver directly to emit stage1 (independent of
+  # the upstream Makefile so we can verify even before the Makefile
+  # swap lands in upstream).
+  "$SCRIPT_DIR/rvprobe-driver" \
+    -VLEN "$VLEN" -XLEN "$XLEN" -split 10000 \
+    -stage1output "$OUT_DIR/tests/stage1" \
+    -testfloat3level 2 -repeat 1 \
+    -march "$MARCH" || { OVERALL_RC=1; echo "FAILED: $TAG driver"; continue; }
+
+  # Downstream pipeline (spike + pspike + merger + stage2) is the
+  # upstream Makefile's responsibility. Invoke if available.
+  if command -v spike >/dev/null 2>&1; then
+    make -C "$UPSTREAM_ROOT" \
+      VLEN="$VLEN" XLEN="$XLEN" \
+      MARCH="$MARCH" \
+      GENERATOR="$SCRIPT_DIR/rvprobe-driver" \
+      OUTPUT="$OUT_DIR" \
+      || { OVERALL_RC=1; echo "FAILED: $TAG pipeline"; continue; }
+    echo "PASSED: $TAG"
+  else
+    echo "SKIPPED downstream pipeline for $TAG: spike not on PATH"
+    echo "Stage1 .S files emitted under $OUT_DIR/tests/stage1"
+  fi
+done
+
+if [ $OVERALL_RC -eq 0 ]; then
+  echo "=================================================================="
+  echo "Release-matrix soak: PASSED on all selected cells (or skipped)"
+  echo "=================================================================="
+else
+  echo "=================================================================="
+  echo "Release-matrix soak: FAILED on at least one cell"
+  echo "=================================================================="
+fi
+exit $OVERALL_RC
