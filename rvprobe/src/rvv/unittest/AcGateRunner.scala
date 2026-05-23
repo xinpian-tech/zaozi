@@ -45,8 +45,18 @@ object AcGateRunner:
     "vsseg2e32.v",  "vnclip.wv",  "vfadd.vv",
     "vsetvli")
 
-  /** Tools that must be on PATH for the gate to declare AC-16 evidence. */
-  val RequiredTools: List[String] = List("spike", "pspike", "merger")
+  /** Tools that must be on PATH for the gate to declare AC-16 evidence.
+   *  Codex r18 #4 / AC-10 + DEC-4: `testfloat_gen` is required because
+   *  the FP POC (`vfadd.vv`) needs Berkeley TestFloat-3 operands; the
+   *  xorshift fallback is a smoke-mode only and is flagged as a
+   *  structural failure regardless of tool presence.
+   */
+  val RequiredTools: List[String] = List(
+    "spike",        // RVV reference simulator
+    "pspike",       // upstream's RVV magic-injection wrapper
+    "merger",       // upstream's stage1 → stage2 patch merger
+    "testfloat_gen" // Berkeley TestFloat-3 binary (DEC-4 FP operands)
+  )
 
   /** Result of running the gate over a configuration. */
   final case class Result(

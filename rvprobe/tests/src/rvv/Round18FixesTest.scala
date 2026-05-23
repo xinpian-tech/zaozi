@@ -27,11 +27,24 @@ object Round18FixesTest extends TestSuite:
       val tmp    = Files.createTempDirectory("rvprobe-r18-gate-")
       val config = AcGateRunner.Config(vlen = 256, xlen = 64, march = "rv64gcv")
       val result = AcGateRunner.run(tmp, config)
-      // In this sandbox spike/pspike/merger are not on PATH; status
-      // must be `unavailable`, missing_tools must list at least spike.
-      if !sys.env.contains("RVPROBE_ACGATE_TOOLS_PRESENT") then
-        assert(result.status == "unavailable")
-        assert(result.missingTools.contains("spike"))
+      // Codex r18 blocking #1: removed env-variable escape hatch
+      // that could mask false-pass bugs. In this sandbox
+      // spike/pspike/merger/testfloat_gen are not on PATH; status
+      // MUST be `unavailable`, missing_tools MUST list at least
+      // spike.
+      assert(result.status == "unavailable")
+      assert(result.missingTools.contains("spike"))
+
+    test("Codex r18 blocking #1: gate cannot return `pass` without all required tools"):
+      // Invariant: if any RequiredTool is missing, status MUST be
+      // `unavailable`, NEVER `pass` (no matter how cleanly files
+      // emit). The current sandbox is missing all 4 tools (spike,
+      // pspike, merger, testfloat_gen).
+      val tmp    = Files.createTempDirectory("rvprobe-r18-gate-")
+      val config = AcGateRunner.Config(vlen = 256, xlen = 64, march = "rv64gcv")
+      val result = AcGateRunner.run(tmp, config)
+      assert(result.missingTools.nonEmpty)
+      assert(result.status != "pass")
 
     test("Codex r17 #1: vfadd.vv xorshift-fallback emission is flagged in failures"):
       val tmp    = Files.createTempDirectory("rvprobe-r18-gate-")
@@ -73,7 +86,11 @@ object Round18FixesTest extends TestSuite:
       assert(AcGateRunner.PocNames.contains("vfadd.vv"))
 
     test("Codex r17 #1: RequiredTools includes spike, pspike, merger"):
-      assert(AcGateRunner.RequiredTools == List("spike", "pspike", "merger"))
+      // Round 19 added testfloat_gen per Codex r18 #4; keep the
+      // historical r17 #1 assertion as subset-membership.
+      assert(AcGateRunner.RequiredTools.contains("spike"))
+      assert(AcGateRunner.RequiredTools.contains("pspike"))
+      assert(AcGateRunner.RequiredTools.contains("merger"))
 
     test("Codex r17 #1: AcGateRunner status `pass` requires no failures + all tools"):
       // Status semantics test: simulate via the Result case class.

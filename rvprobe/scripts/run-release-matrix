@@ -33,6 +33,7 @@ declare -a MATRIX=(
 )
 
 OVERALL_RC=0
+ANY_SKIPPED=0
 
 for entry in "${MATRIX[@]}"; do
   read -r VLEN XLEN MARCH <<<"$entry"
@@ -57,7 +58,9 @@ for entry in "${MATRIX[@]}"; do
     -march "$MARCH" || { OVERALL_RC=1; echo "FAILED: $TAG driver"; continue; }
 
   # Downstream pipeline (spike + pspike + merger + stage2) is the
-  # upstream Makefile's responsibility. Invoke if available.
+  # upstream Makefile's responsibility. Codex r18 blocking #2: must
+  # NOT report PASSED when spike is absent — that masks AC-6
+  # unavailability and lets CI claim closure without evidence.
   if command -v spike >/dev/null 2>&1; then
     make -C "$UPSTREAM_ROOT" \
       VLEN="$VLEN" XLEN="$XLEN" \
@@ -67,18 +70,25 @@ for entry in "${MATRIX[@]}"; do
       || { OVERALL_RC=1; echo "FAILED: $TAG pipeline"; continue; }
     echo "PASSED: $TAG"
   else
-    echo "SKIPPED downstream pipeline for $TAG: spike not on PATH"
-    echo "Stage1 .S files emitted under $OUT_DIR/tests/stage1"
+    ANY_SKIPPED=1
+    echo "UNAVAILABLE: $TAG — spike not on PATH"
+    echo "Stage1 .S files emitted under $OUT_DIR/tests/stage1, but"
+    echo "AC-6 cannot be claimed without spike pipeline evidence."
   fi
 done
 
-if [ $OVERALL_RC -eq 0 ]; then
-  echo "=================================================================="
-  echo "Release-matrix soak: PASSED on all selected cells (or skipped)"
-  echo "=================================================================="
-else
-  echo "=================================================================="
+echo "=================================================================="
+if [ $OVERALL_RC -ne 0 ]; then
   echo "Release-matrix soak: FAILED on at least one cell"
   echo "=================================================================="
+  exit $OVERALL_RC
+elif [ $ANY_SKIPPED -ne 0 ]; then
+  echo "Release-matrix soak: AC-6 UNAVAILABLE (spike missing on at least one cell)"
+  echo "=================================================================="
+  # Non-zero exit so CI does NOT treat skip as PASS (Codex r18 #2).
+  exit 3
+else
+  echo "Release-matrix soak: PASSED on all selected cells"
+  echo "=================================================================="
+  exit 0
 fi
-exit $OVERALL_RC
