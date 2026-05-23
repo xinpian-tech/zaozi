@@ -992,6 +992,524 @@ trait ClockApi
 
 trait ResetApi extends AsBool[Reset]
 
+trait SVAApi:
+  def posedge(clock: Referable[Clock] & HasOperation): ClockEvent
+  def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
+  def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent
+
+// // The Boolean Layer
+//   extension [R <: Referable[Bool]](ref:         R)
+//     def rose(
+//       using Arena,
+//       Context,
+//       Block,
+//       sourcecode.File,
+//       sourcecode.Line,
+//       sourcecode.Name.Machine,
+//       InstanceContext
+//     ): Node[Bool]
+//     def fell(
+//       using Arena,
+//       Context,
+//       Block,
+//       sourcecode.File,
+//       sourcecode.Line,
+//       sourcecode.Name.Machine,
+//       InstanceContext
+//     ): Node[Bool]
+//   extension [R <: Referable[T], T <: Data](ref: R)
+//     def stable(
+//       using Arena,
+//       Context,
+//       Block,
+//       sourcecode.File,
+//       sourcecode.Line,
+//       sourcecode.Name.Machine,
+//       InstanceContext
+//     ): Node[Bool]
+//     def past(
+//       n: Int
+//     )(
+//       using Arena,
+//       Context,
+//       Block,
+//       sourcecode.File,
+//       sourcecode.Line,
+//       sourcecode.Name.Machine,
+//       InstanceContext
+//     ): Node[T]
+
+// The Sequential Layer
+  extension [T <: Referable[Bool] & HasOperation](ref: T)
+    def S(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    def I(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Immediate
+
+  extension (ref: Immediate)
+    /** Convert an immediate boolean expression into a property. */
+    def P(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** Immediate implication. This is intentionally non-temporal. */
+    def implies(
+      that: Immediate
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  extension (ref:                                      Sequence)
+    /** SVA/LTL: a ## b, shorthand for a ##1 b.
+      */
+    def ##(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: a ##n b
+      */
+    def ##(
+      n:    Int
+    )(that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: a ##[min:max] b
+      */
+    def ##(
+      min:  Int,
+      max:  Option[Int]
+    )(that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s [*n]
+      */
+    def *(
+      n: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Ranged Repeat
+      * @param min
+      *   for minimal
+      * @param max
+      *   is [[None]] for unbounded, otherwise for maximal
+      *
+      * SVA: s [*n:m] if `max` is [[None]], s [*n:$] if `max` is [[Some]]
+      */
+    def *(
+      min: Int,
+      max: Option[Int]
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s [->n:m]
+      */
+    def *->(
+      min: Int,
+      max: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s[=min:max]
+      */
+    def *=(
+      min: Int,
+      max: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 ##[+] s2
+      */
+    def ##+(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 ##[*] s2
+      */
+    def ##*(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 and s2
+      */
+    def and(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 intersect s2
+      */
+    def intersect(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 or s2
+      */
+    def or(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: not s
+      */
+    def not(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+  extension [T <: Referable[Bool] & HasOperation](ref: T)
+    /** SVA: bool_expr throughout s
+      */
+    def throughout(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+  extension (ref:                                      Sequence)
+    /** SVA: s1 within s2
+      */
+    def within(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+// Property Layer
+  extension (ref: Sequence)
+    /** Unlike SVA, zaozi requires Sequence to explicitly convert to Property. */
+    def P(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s|->p
+      */
+    def |->(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s|=>p
+      */
+    def |=>(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+  extension (ref: Property)
+    /** SVA: p1 implies p2
+      */
+    def implies(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 iff p2
+      */
+    def iff(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+  extension (ref: Sequence)
+    /** SVA: s #-# p
+      */
+    def #-#(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s #=# p
+      */
+    def #=#(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+  extension (ref: Property)
+    /** SVA: always p
+      */
+    def always(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: always[n:m] p
+      */
+    def always(
+      min: Int,
+      max: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s_eventually p
+      */
+    def eventually(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until p2
+      */
+    def until(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until_with p2
+      */
+    def untilWith(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  def Assert[T <: LTLTPE](
+    property: T,
+    label:    Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assume[T <: LTLTPE](
+    property: T,
+    label:    Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Cover[T <: LTLTPE](
+    property: T,
+    label:    Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+
 trait TypeImpl:
   extension (ref: Interface[?])
     private[zaozi] def operationImpl: Operation
@@ -1027,6 +1545,33 @@ trait TypeImpl:
     private[zaozi] def operationImpl:        Operation
     private[zaozi] def ioImpl[T <: Data]:    Wire[T]
     private[zaozi] def probeImpl[T <: Data]: Wire[T]
+  extension (ref: Sequence)
+    private[zaozi] def operationImpl: Operation
+    private[zaozi] def referImpl(
+      using Arena
+    ):                                Value
+    private[zaozi] def toMlirTypeImpl(
+      using Arena,
+      Context
+    ):                                Type
+  extension (ref: Property)
+    private[zaozi] def operationImpl: Operation
+    private[zaozi] def referImpl(
+      using Arena
+    ):                                Value
+    private[zaozi] def toMlirTypeImpl(
+      using Arena,
+      Context
+    ):                                Type
+  extension (ref: Immediate)
+    private[zaozi] def operationImpl: Operation
+    private[zaozi] def referImpl(
+      using Arena
+    ):                                Value
+    private[zaozi] def toMlirTypeImpl(
+      using Arena,
+      Context
+    ):                                Type
 
   extension (ref:  Reset)
     private[zaozi] def toMlirTypeImpl(

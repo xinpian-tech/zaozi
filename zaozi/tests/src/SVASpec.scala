@@ -1,0 +1,713 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2025 <liu@jiuyang.me>
+package me.jiuyang.zaozitest
+
+import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.*
+import me.jiuyang.zaozi.reftpe.*
+import me.jiuyang.zaozi.valuetpe.*
+import me.jiuyang.testlib.*
+
+import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, ContextApi}
+import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
+import utest.*
+
+import java.lang.foreign.Arena
+import scala.annotation.meta.param
+
+case class SVASpecParameter(width: Int) extends Parameter
+given upickle.default.ReadWriter[SVASpecParameter] = upickle.default.macroRW
+
+class SVASpecLayers(parameter: SVASpecParameter) extends LayerInterface(parameter):
+  def layers = Seq(
+    Layer(
+      "Assertion"
+    )
+  )
+
+class SVASpecIO(parameter: SVASpecParameter) extends HWBundle(parameter):
+  val clock = Flipped(Clock())
+  val ib0   = Flipped(Bool())
+  val ib1   = Flipped(Bool())
+
+class SVASpecProbe(parameter: SVASpecParameter) extends DVBundle[SVASpecParameter, SVASpecLayers](parameter)
+
+object SVASpec extends TestSuite:
+  val tests = Tests:
+    test("Simple SVA"):
+      @generator
+      object SimpleSVA extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe] with HasVerilogTest:
+        def architecture(parameter: SVASpecParameter) =
+          val io    = summon[Interface[SVASpecIO]]
+          val probe = summon[Interface[SVASpecProbe]]
+          val a:         Referable[Bool] & HasOperation = io.ib0
+          val immediate: Immediate                      = a.I
+
+          Assert(immediate, Some("Simple SVA"))
+
+      val moduleName = SimpleSVA.moduleName(SVASpecParameter(32))
+      SimpleSVA.verilogTest(SVASpecParameter(32))(
+        s"Simple_SVA: assert property (ib0);"
+      )
+
+    test("api"):
+      test("assert"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io = summon[Interface[SVASpecIO]]
+            val a:         Referable[Bool] & HasOperation = io.ib0
+            val immediate: Immediate                      = a.I
+            val sequence:  Sequence                       = posedge(io.clock)(a.S)
+            val property:  Property                       = a.I.P
+
+            Assert(immediate, Some("assert_0"))
+            Assert(sequence, Some("assert_1"))
+            Assert(property, Some("assert_2"))
+
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"assert_0: assert property (ib0);",
+          s"assert_1: assert property (@(posedge clock) ib0);",
+          s"assert_2: assert property (ib0);"
+        )
+
+      test("assume"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:         Referable[Bool] & HasOperation = io.ib0
+            val immediate: Immediate                      = a.I
+            val sequence:  Sequence                       = posedge(io.clock)(a.S)
+            val property:  Property                       = a.I.P
+
+            Assume(immediate, Some("assume_0"))
+            Assume(sequence, Some("assume_1"))
+            Assume(property, Some("assume_2"))
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"assume_0: assume property (ib0);",
+          s"assume_1: assume property (@(posedge clock) ib0);",
+          s"assume_2: assume property (ib0);"
+        )
+
+      test("cover"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:         Referable[Bool] & HasOperation = io.ib0
+            val immediate: Immediate                      = a.I
+            val sequence:  Sequence                       = posedge(io.clock)(a.S)
+            val property:  Property                       = a.I.P
+
+            Cover(immediate, Some("cover_0"))
+            Cover(sequence, Some("cover_1"))
+            Cover(property, Some("cover_2"))
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"cover_0: cover property (ib0);",
+          s"cover_1: cover property (@(posedge clock) ib0);",
+          s"cover_2: cover property (ib0);"
+        )
+
+    test("Sequence"):
+      test("##n"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasMlirTest
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io = summon[Interface[SVASpecIO]]
+            val a:       Referable[Bool] & HasOperation = io.ib0
+            val b:       Referable[Bool] & HasOperation = io.ib1
+            val delayed: Sequence                       = posedge(io.clock)(a.S ## b.S)
+
+            Assert(delayed)
+        SimpleSVA.mlirTest(SVASpecParameter(32)): out =>
+          Seq("builtin.unrealized_conversion_cast", "ltl.clock", "ltl.clocked_delay", "ltl.concat", "verif.assert")
+            .forall(
+              out.contains
+            )
+            && !out.contains("ltl.delay")
+            && !out.contains("firrtl.int.ltl")
+            && !out.contains("firrtl.int.verif")
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(@(posedge clock) ib0) ##0",
+            "(@(posedge clock) ##1 (@(posedge clock) ib1))"
+          ).forall(out.contains)
+        )
+
+      test("##[n:m]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:       Referable[Bool] & HasOperation = io.ib0
+            val b:       Referable[Bool] & HasOperation = io.ib1
+            val as:      Sequence                       = a.S
+            val bs:      Sequence                       = b.S
+            val delayed: Sequence                       = as.##(1, Some(2))(bs)
+
+            Assert(delayed)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(@(posedge clock) ib0) ##0",
+            "(@(posedge clock) ##[1:2] (@(posedge clock) ib1))"
+          ).forall(out.contains)
+        )
+
+      test("reject invalid ## ranges"):
+        @generator
+        object InvalidDelay
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasCompileErrorTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val as: Sequence = io.ib0.S
+            val bs: Sequence = io.ib1.S
+
+            val negativeDelay = intercept[IllegalArgumentException]:
+              as.##(-1)(bs)
+            assert(negativeDelay.getMessage.contains("delay (-1)"))
+
+            val negativeMin = intercept[IllegalArgumentException]:
+              as.##(-1, Some(2))(bs)
+            assert(negativeMin.getMessage.contains("min (-1)"))
+
+            val invertedRange = intercept[IllegalArgumentException]:
+              as.##(2, Some(1))(bs)
+            assert(invertedRange.getMessage.contains("max (1)"))
+        InvalidDelay.compileErrorTest(SVASpecParameter(32))
+
+      test("##[+]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val as:       Sequence                       = a.S
+            val bs:       Sequence                       = b.S
+            val delayed0: Sequence                       = as.##(1, None)(bs)
+            val delayed1: Sequence                       = as ##+ bs
+
+            Assert(delayed0, Some("assert0"))
+            Assert(delayed1, Some("assert1"))
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "assert0:",
+            "assert1:",
+            "(@(posedge clock) ib0) ##0",
+            "(@(posedge clock) ##[+] (@(posedge clock) ib1))"
+          ).forall(out.contains)
+        )
+
+      test("##[*]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val as:       Sequence                       = a.S
+            val bs:       Sequence                       = b.S
+            val delayed0: Sequence                       = as.##(0, None)(bs)
+            val delayed1: Sequence                       = as ##* bs
+
+            Assert(delayed0, Some("assert0"))
+            Assert(delayed1, Some("assert1"))
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "assert0:",
+            "assert1:",
+            "(@(posedge clock) ib0) ##0",
+            "(@(posedge clock) ##[*] (@(posedge clock) ib1))"
+          ).forall(out.contains)
+        )
+
+      test("[*n]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:       Referable[Bool] & HasOperation = io.ib0
+            val seq:     Sequence                       = a.S
+            val delayed: Sequence                       = seq * 1
+
+            Assert(delayed)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)"
+        )
+
+      test("[*n:m]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:   Referable[Bool] & HasOperation = io.ib0
+            val seq: Sequence                       = a.S
+            val rep: Sequence                       = seq.*(1, Some(2))
+
+            Assert(rep)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)[*1:2]"
+        )
+
+      test("[*n:$]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val seq:  Sequence                       = a.S
+            val rep0: Sequence                       = seq.*(0, None) // [*0:$] -> [*]
+            val rep1: Sequence                       = seq.*(1, None) // [*1:$] -> [+]
+            val rep2: Sequence                       = seq.*(2, None) // [*2:$] -> [*2:$]
+
+            Assert(rep0, Some("assert0"))
+            Assert(rep1, Some("assert1"))
+            Assert(rep2, Some("assert2"))
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"assert0: assert property ((@(posedge clock) ib0)[*]);",
+          s"assert1: assert property ((@(posedge clock) ib0)[+]);",
+          s"assert2: assert property ((@(posedge clock) ib0)[*2:$$]);"
+        )
+
+      test("[->n:m]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val seq:      Sequence                       = a.S
+            val sequence: Sequence                       = seq.*->(1, 2)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)[->1:2]"
+        )
+
+      test("[=n:m]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val seq:      Sequence                       = a.S
+            val sequence: Sequence                       = seq.*=(1, 2)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)[=1:2]"
+        )
+
+      test("and"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val as:       Sequence                       = a.S
+            val bs:       Sequence                       = b.S
+            val sequence: Sequence                       = as.and(bs)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0) and (@(posedge clock) ib1)"
+        )
+
+      test("intersect"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val as:       Sequence                       = a.S * 3
+            val bs:       Sequence                       = b.S * 2
+            val sequence: Sequence                       = as.intersect(bs)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)[*3] intersect (@(posedge clock) ib1)[*2]"
+        )
+
+      test("or"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val as:       Sequence                       = a.S
+            val bs:       Sequence                       = b.S
+            val sequence: Sequence                       = as.or(bs)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0) or (@(posedge clock) ib1)"
+        )
+
+      test("not"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val sequence: Sequence                       = a.S.not
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"not (@(posedge clock) ib0)"
+        )
+
+      test("throughout"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val bs:       Sequence                       = b.S
+            val sequence: Sequence                       = a.throughout(bs)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(ib0[*] intersect (@(posedge clock) ib1))"
+        )
+
+      test("within"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:        Referable[Bool] & HasOperation = io.ib0
+            val b:        Referable[Bool] & HasOperation = io.ib1
+            val as:       Sequence                       = a.S
+            val bs:       Sequence                       = b.S
+            val sequence: Sequence                       = as.within(bs)
+
+            Assert(sequence)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(@(posedge clock) 1'h1) ##0",
+            "(@(posedge clock) ##[*] (@(posedge clock) ib0))",
+            "(@(posedge clock) ##[*] (@(posedge clock) 1'h1))",
+            "intersect (@(posedge clock) ib1)"
+          ).forall(out.contains)
+        )
+
+    test("Property"):
+      test("immediate implies"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io = summon[Interface[SVASpecIO]]
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val prop: Property                       = a.I.implies(b.I)
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(not ib0 or ib1)"
+        )
+
+      test("|->"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = as |-> bp
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0) |-> (@(posedge clock) ib1)"
+        )
+      test("|=>"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = as |=> bp
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(@(posedge clock) ib0) ##0",
+            "(@(posedge clock) ##1 (@(posedge clock) 1'h1))",
+            "|-> (@(posedge clock) ib1)"
+          ).forall(out.contains)
+        )
+      test("implies"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.implies(bp)
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(not (@(posedge clock) ib0) or (@(posedge clock) ib1))"
+        )
+      test("P keeps property clockless"):
+        @generator
+        object SimpleSVA extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe] with HasMlirTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val prop: Property = io.ib0.S.P
+
+            Assert(prop)
+        SimpleSVA.mlirTest(SVASpecParameter(32)): out =>
+          out.contains("ltl.clock") && !out.contains("ltl.repeat")
+      test("iff"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.iff(bp)
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(not ((@(posedge clock) ib0) or (@(posedge clock) ib1))",
+            "or (@(posedge clock) ib0) and (@(posedge clock) ib1))"
+          ).forall(out.contains)
+        )
+      test("#-#"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = as #-# bp
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(not ((@(posedge clock) ib0) |-> not (@(posedge clock) ib1)))"
+        )
+      test("#=#"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = as #=# bp
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(not ((@(posedge clock) ib0) |-> not (@(posedge clock) ib1)) and not",
+            "((@(posedge clock) ib1) |-> not (@(posedge clock) ib0)))"
+          ).forall(out.contains)
+        )
+      test("always"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.always
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)[*]"
+        )
+      test("always[n:m]"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.always(2, 3)
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0)[*2:3]"
+        )
+      test("eventually"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.eventually
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"s_eventually (@(posedge clock) ib0)"
+        )
+      test("until"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.until(bp)
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"(@(posedge clock) ib0) until (@(posedge clock) ib1)"
+        )
+      test("untilWith"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val b:    Referable[Bool] & HasOperation = io.ib1
+            val as:   Sequence                       = a.S
+            val bs:   Sequence                       = b.S
+            val ap:   Property                       = as.P
+            val bp:   Property                       = bs.P
+            val prop: Property                       = ap.untilWith(bp)
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(out =>
+          Seq(
+            "(not ((@(posedge clock) ib0) until (@(posedge clock) ib1))",
+            "or (@(posedge clock) ib0) and (@(posedge clock) ib1))"
+          ).forall(out.contains)
+        )
