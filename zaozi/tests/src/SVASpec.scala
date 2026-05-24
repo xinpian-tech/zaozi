@@ -731,6 +731,22 @@ object SVASpec extends TestSuite:
           "(@(posedge clock) ##1 (@(posedge clock) ib1)) ##0",
           "(@(posedge clock) ##1 (@(posedge clock) ib0)))"
         )
+      test("Asynchronous"):
+        @generator
+        object MultiClock
+            extends Generator[MultiClockParameter, MultiClockLayers, MultiClockIO, MultiClockProbe]
+            with HasVerilogTest:
+          def architecture(parameter: MultiClockParameter) =
+            val io = summon[Interface[MultiClockIO]]
+            val a: Referable[Bool] & HasOperation = io.ib0
+            val b: Referable[Bool] & HasOperation = io.ib1
+
+            Assert(posedge(io.clock0)(a.S) ## negedge(io.clock1)(b.S))
+
+        MultiClock.verilogTest(MultiClockParameter(32))(
+          "((@(posedge clock0) ib0) ##0",
+          "(@(negedge clock1) ##1 (@(negedge clock1) ib1)))"
+        )
       test("Nested"):
         @generator
         object MultiClock
@@ -741,26 +757,12 @@ object SVASpec extends TestSuite:
             val a: Referable[Bool] & HasOperation = io.ib0
             val b: Referable[Bool] & HasOperation = io.ib1
 
-            Assert(posedge(io.clock0)(a.S) ## negedge(io.clock1)(b.S))
-            
-        MultiClock.verilogTest(MultiClockParameter(32))(
-        "((@(posedge clock0) ib0) ##0",
-        "(@(negedge clock1) ##1 (@(negedge clock1) ib1)))"
-        )
-        
-      test("Nested1"):
-        @generator
-        object MultiClock
-            extends Generator[MultiClockParameter, MultiClockLayers, MultiClockIO, MultiClockProbe]
-            with HasVerilogTest:
-          def architecture(parameter: MultiClockParameter) =
-            val io = summon[Interface[MultiClockIO]]
-            val a: Referable[Bool] & HasOperation = io.ib0
-            val b: Referable[Bool] & HasOperation = io.ib1
+            given ClockEvent = posedge(io.clock0)
 
-            Assert(posedge(io.clock0)(a.S) ## negedge(io.clock1)(b.S))
-            
+            Assert(a.S ## negedge(io.clock1)(b.S) ## a.S)
+
         MultiClock.verilogTest(MultiClockParameter(32))(
-        "((@(posedge clock0) ib0) ##0",
-        "(@(negedge clock1) ##1 (@(negedge clock1) ib1)))"
+          "((@(posedge clock0) ib0) ##0",
+          "(@(negedge clock1) ##1 (@(negedge clock1) ib1)) ##0",
+          "(@(posedge clock0) ##1 (@(posedge clock0) ib0)))"
         )
