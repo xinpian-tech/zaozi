@@ -1270,6 +1270,9 @@ trait SVAApi:
     ): Sequence
 
     /** SVA: not s
+      *
+      * This is property negation. CIRCT's `ltl.not` accepts a sequence as a property operand, but always produces
+      * `!ltl.property`.
       */
     def not(
       using Arena,
@@ -1279,7 +1282,7 @@ trait SVAApi:
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Sequence
+    ): Property
   extension [T <: Referable[Bool] & HasOperation](ref: T)
     /** SVA: bool_expr throughout s
       */

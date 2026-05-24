@@ -469,12 +469,11 @@ given SVAApi with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Sequence =
+    ): Property =
       val op = summon[LTLNotApi].op(ref.refer, locate)
       op.operation.appendToBlock()
-      new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
 
   extension [T <: Referable[Bool] & HasOperation](ref: T)
     def throughout(

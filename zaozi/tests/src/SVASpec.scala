@@ -401,9 +401,9 @@ object SVASpec extends TestSuite:
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
             val a:        Referable[Bool] & HasOperation = io.ib0
-            val sequence: Sequence                       = a.S.not
+            val property: Property                       = a.S.not
 
-            Assert(sequence)
+            Assert(property)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           s"not (@(posedge clock) ib0)"
         )
