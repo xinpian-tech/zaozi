@@ -16,7 +16,7 @@ trait AssertApi extends HasOperation[Assert]:
   )(
     using Arena,
     Context
-  ):   Assert
+  ): Assert
 end AssertApi
 
 class Assume(val _operation: Operation)
@@ -28,7 +28,7 @@ trait AssumeApi extends HasOperation[Assume]:
   )(
     using Arena,
     Context
-  ):   Assume
+  ): Assume
 end AssumeApi
 
 class Cover(val _operation: Operation)
@@ -40,5 +40,5 @@ trait CoverApi extends HasOperation[Cover]:
   )(
     using Arena,
     Context
-  ):   Cover
+  ): Cover
 end CoverApi

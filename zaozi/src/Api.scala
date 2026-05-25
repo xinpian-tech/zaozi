@@ -1036,9 +1036,23 @@ trait SVAApi:
     ): Sequence
 
   extension (ref: Sequence)
-    /** SVA/LTL: a ## b, shorthand for a ##1 b.
+    /** SVA/LTL: a ## b, shorthand for a ##0 b.
       */
     def ##(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA/LTL: a ### b, shorthand for a ##1 b.
+      */
+    def ###(
       that: Sequence
     )(
       using Arena,
@@ -1174,48 +1188,6 @@ trait SVAApi:
       InstanceContext
     ): Sequence
 
-    /** SVA: s1 and s2
-      */
-    def and(
-      that: Sequence
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence
-
-    /** SVA: s1 intersect s2
-      */
-    def intersect(
-      that: Sequence
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence
-
-    /** SVA: s1 or s2
-      */
-    def or(
-      that: Sequence
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence
-
     /** SVA: s1 within s2
       */
     def within(
@@ -1230,10 +1202,10 @@ trait SVAApi:
       InstanceContext
     ): Sequence
 
-    /** SVA: s|->p
+    /** SVA: s|=>p
       */
-    def |->(
-      that: LTLExpr
+    def |=>(
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1244,10 +1216,67 @@ trait SVAApi:
       InstanceContext
     ): Property
 
-    /** SVA: s|=>p
+    /** SVA: s #=# p
       */
-    def |=>(
-      that: LTLExpr
+    def #=#(
+      that: LTLPropertyLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  extension (ref: LTLSequenceLike)
+    /** SVA: s1 and s2
+      */
+    def &(
+      that: LTLSequenceLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 intersect s2
+      */
+    def intersect(
+      that: LTLSequenceLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 or s2
+      */
+    def |(
+      that: LTLSequenceLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s|->p
+      */
+    def |->(
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1261,7 +1290,7 @@ trait SVAApi:
     /** SVA: s #-# p
       */
     def #-#(
-      that: LTLExpr
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1272,48 +1301,7 @@ trait SVAApi:
       InstanceContext
     ): Property
 
-    /** SVA: s #=# s
-      */
-    def #=#(
-      that: Sequence
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-
-    /** SVA: always s
-      */
-    def always(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence
-
-    /** SVA: always[n:m] s
-      */
-    def always(
-      min: Int,
-      max: Int
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence
-
-  extension (ref: LTLExpr)
+  extension (ref: LTLPropertyLike)
     /** SVA: not p
       *
       * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
@@ -1329,10 +1317,52 @@ trait SVAApi:
       InstanceContext
     ): Property
 
+    /** SVA: p1 and p2
+      */
+    def &(
+      that: LTLPropertyLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 intersect p2
+      */
+    def intersect(
+      that: LTLPropertyLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 or p2
+      */
+    def |(
+      that: LTLPropertyLike
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
     /** SVA: p1 implies p2
       */
     def implies(
-      that: LTLExpr
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1346,7 +1376,7 @@ trait SVAApi:
     /** SVA: p1 iff p2
       */
     def iff(
-      that: LTLExpr
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1372,7 +1402,7 @@ trait SVAApi:
     /** SVA: p1 until p2
       */
     def until(
-      that: LTLExpr
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1386,7 +1416,7 @@ trait SVAApi:
     /** SVA: p1 until_with p2
       */
     def untilWith(
-      that: LTLExpr
+      that: LTLPropertyLike
     )(
       using Arena,
       Context,
@@ -1397,7 +1427,19 @@ trait SVAApi:
       InstanceContext
     ): Property
 
-  def Assert[T <: LTLExpr](
+    /** SVA: always p
+      */
+    def always(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  def Assert[T <: LTLPropertyLike](
     property: T,
     label:    Option[String] = None
   )(
@@ -1409,7 +1451,7 @@ trait SVAApi:
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit
-  def Assume[T <: LTLExpr](
+  def Assume[T <: LTLPropertyLike](
     property: T,
     label:    Option[String] = None
   )(
@@ -1421,7 +1463,7 @@ trait SVAApi:
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit
-  def Cover[T <: LTLExpr](
+  def Cover[T <: LTLPropertyLike](
     property: T,
     label:    Option[String] = None
   )(
