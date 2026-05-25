@@ -6,7 +6,7 @@ import me.jiuyang.zaozi.{InstanceContext, SVAApi, TypeImpl}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.capi.dialect.ltl.{given_AttributeApi as given_LTLAttributeApi, LTLClockEdge}
+import org.llvm.circt.scalalib.capi.dialect.ltl.{given_AttributeApi, given_TypeApi, LTLClockEdge, TypeApi as LTLTypeApi}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_AsUIntPrimApi, AsUIntPrimApi}
 import org.llvm.circt.scalalib.dialect.ltl.operation.{
   given_AndApi,
@@ -169,6 +169,13 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
+      val cast = summon[OperationApi].operationCreate(
+        name = "builtin.unrealized_conversion_cast",
+        location = locate,
+        operands = Seq(ref.refer),
+        resultsTypes = Some(Seq(summon[LTLTypeApi].propertyTypeGet))
+      )
+      cast.appendToBlock()
       new Property:
         private[zaozi] val _operation: Operation = ref.operation
 
