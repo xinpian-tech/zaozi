@@ -159,28 +159,8 @@ given SVAApi with
       new Immediate:
         private[zaozi] val _operation: Operation = cast
 
-  extension (ref: Immediate)
-    def P(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property =
-      val cast = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(ref.refer),
-        resultsTypes = Some(Seq(summon[LTLTypeApi].propertyTypeGet))
-      )
-      cast.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = ref.operation
-
-    def implies(
-      that: Immediate
+    def throughout(
+      that: Sequence
     )(
       using Arena,
       Context,
@@ -189,13 +169,23 @@ given SVAApi with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Property =
-      val lhsNot = summon[LTLNotApi].op(ref.refer, locate)
-      lhsNot.operation.appendToBlock()
-      val op     = summon[LTLOrApi].op(Seq(lhsNot.result, that.refer), locate)
-      op.operation.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = op.operation
+    ): Sequence =
+      // %repexpr = ltl.repeat %expr, 0 : !ltl.sequence
+      // %res = ltl.intersect %repexpr, %s : !ltl.sequence
+      val cast    = summon[OperationApi].operationCreate(
+        name = "builtin.unrealized_conversion_cast",
+        location = locate,
+        operands = Seq(ref.refer),
+        resultsTypes = Some(Seq(1.integerTypeGet))
+      )
+      cast.appendToBlock()
+      val repexpr = summon[LTLRepeatApi].op(cast.getResult(0), 0L, None, locate)
+      repexpr.operation.appendToBlock()
+      val res     = summon[LTLIntersectApi].op(Seq(repexpr.result, that.refer), locate)
+      res.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = res.operation
+        private[zaozi] val _clockevent: ClockEvent = that._clockevent
 
   extension (ref: Sequence)
     def ##(
@@ -468,49 +458,6 @@ given SVAApi with
         private[zaozi] val _operation:  Operation  = op.operation
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
-    def not(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property =
-      val op = summon[LTLNotApi].op(ref.refer, locate)
-      op.operation.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = op.operation
-
-  extension [T <: Referable[Bool] & HasOperation](ref: T)
-    def throughout(
-      that: Sequence
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence =
-      // %repexpr = ltl.repeat %expr, 0 : !ltl.sequence
-      // %res = ltl.intersect %repexpr, %s : !ltl.sequence
-      val cast    = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(ref.refer),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      cast.appendToBlock()
-      val repexpr = summon[LTLRepeatApi].op(cast.getResult(0), 0L, None, locate)
-      repexpr.operation.appendToBlock()
-      val res     = summon[LTLIntersectApi].op(Seq(repexpr.result, that.refer), locate)
-      res.operation.appendToBlock()
-      new Sequence:
-        private[zaozi] val _operation:  Operation  = res.operation
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
-  extension (ref:                                      Sequence)
     def within(
       that: Sequence
     )(
@@ -527,22 +474,8 @@ given SVAApi with
       given ClockEvent = ref._clockevent
       true.B.S.##*(ref).##*(true.B.S).intersect(that)
 
-  // Property Layer
-  extension (ref: Sequence)
-    def P(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property =
-      new Property:
-        private[zaozi] val _operation: Operation = ref.operation
-
     def |->(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -559,7 +492,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def |=>(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -574,53 +507,8 @@ given SVAApi with
       given ClockEvent = ref._clockevent
       ref.##(1)(true.B.S) |-> that
 
-  extension (ref: Property)
-    def implies(
-      that: Property
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property =
-      // Logical implication: ref => that is equivalent to !ref | that
-      val op0 = summon[LTLNotApi].op(ref.refer, locate)
-      op0.operation.appendToBlock()
-      val op1 = summon[LTLOrApi].op(Seq(op0.result, that.refer), locate)
-      op1.operation.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = op1.operation
-
-    def iff(
-      that: Property
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property =
-      // Logical equivalence: ref <=> that is !(ref | that) | (ref & that)
-      // !(ref | that)
-      val or    = summon[LTLOrApi].op(Seq(ref.refer, that.refer), locate)
-      or.operation.appendToBlock()
-      val left  = summon[LTLNotApi].op(or.result, locate)
-      left.operation.appendToBlock()
-      // ref & that
-      val right = summon[LTLAndApi].op(Seq(ref.refer, that.refer), locate)
-      right.operation.appendToBlock()
-      val op    = summon[LTLOrApi].op(Seq(left.result, right.result), locate)
-      op.operation.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = op.operation
-  extension (ref: Sequence)
     def #-#(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -646,7 +534,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = res.operation
 
     def #=#(
-      that: Property
+      that: Sequence
     )(
       using Arena,
       Context,
@@ -678,7 +566,6 @@ given SVAApi with
       new Property:
         private[zaozi] val _operation: Operation = op.operation
 
-  extension (ref: Property)
     def always(
       using Arena,
       Context,
@@ -687,12 +574,13 @@ given SVAApi with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Property =
+    ): Sequence =
       // always: equivalent to ltl.repeat with 0
       val op = summon[LTLRepeatApi].op(ref.refer, 0L, None, locate)
       op.operation.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = op.operation
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def always(
       min: Int,
@@ -705,11 +593,71 @@ given SVAApi with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Property =
+    ): Sequence =
       // always: equivalent to ltl.repeat with min and max
       require(min >= 0, s"min ($min) must be greater than or equal to 0 in always")
       require(max >= min, s"max ($max) must be greater than or equal to min ($min) in always")
       val op = summon[LTLRepeatApi].op(ref.refer, min.toLong, Some((max - min).toLong), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+
+  extension (ref: LTLTPE)
+    def not(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[LTLNotApi].op(ref.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def implies(
+      that: LTLTPE
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      // Logical implication: ref => that is equivalent to !ref | that
+      val op0 = summon[LTLNotApi].op(ref.refer, locate)
+      op0.operation.appendToBlock()
+      val op1 = summon[LTLOrApi].op(Seq(op0.result, that.refer), locate)
+      op1.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op1.operation
+
+    def iff(
+      that: LTLTPE
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      // Logical equivalence: ref <=> that is !(ref | that) | (ref & that)
+      // !(ref | that)
+      val or    = summon[LTLOrApi].op(Seq(ref.refer, that.refer), locate)
+      or.operation.appendToBlock()
+      val left  = summon[LTLNotApi].op(or.result, locate)
+      left.operation.appendToBlock()
+      // ref & that
+      val right = summon[LTLAndApi].op(Seq(ref.refer, that.refer), locate)
+      right.operation.appendToBlock()
+      val op    = summon[LTLOrApi].op(Seq(left.result, right.result), locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _operation: Operation = op.operation
@@ -729,7 +677,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def until(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -746,7 +694,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def untilWith(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,

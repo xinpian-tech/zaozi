@@ -79,7 +79,7 @@ object SVASpec extends TestSuite:
             val a:         Referable[Bool] & HasOperation = io.ib0
             val immediate: Immediate                      = a.I
             val sequence:  Sequence                       = posedge(io.clock)(a.S)
-            val property:  Property                       = a.I.P
+            val property:  Property                       = a.I.implies(a.I)
 
             Assert(immediate, Some("assert_0"))
             Assert(sequence, Some("assert_1"))
@@ -88,7 +88,7 @@ object SVASpec extends TestSuite:
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           s"assert_0: assert property (ib0);",
           s"assert_1: assert property (@(posedge clock) ib0);",
-          s"assert_2: assert property (ib0);"
+          s"assert_2: assert property (not ib0 or ib0);"
         )
 
       test("assume"):
@@ -102,7 +102,7 @@ object SVASpec extends TestSuite:
             val a:         Referable[Bool] & HasOperation = io.ib0
             val immediate: Immediate                      = a.I
             val sequence:  Sequence                       = posedge(io.clock)(a.S)
-            val property:  Property                       = a.I.P
+            val property:  Property                       = a.I.implies(a.I)
 
             Assume(immediate, Some("assume_0"))
             Assume(sequence, Some("assume_1"))
@@ -110,7 +110,7 @@ object SVASpec extends TestSuite:
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           s"assume_0: assume property (ib0);",
           s"assume_1: assume property (@(posedge clock) ib0);",
-          s"assume_2: assume property (ib0);"
+          s"assume_2: assume property (not ib0 or ib0);"
         )
 
       test("cover"):
@@ -124,7 +124,7 @@ object SVASpec extends TestSuite:
             val a:         Referable[Bool] & HasOperation = io.ib0
             val immediate: Immediate                      = a.I
             val sequence:  Sequence                       = posedge(io.clock)(a.S)
-            val property:  Property                       = a.I.P
+            val property:  Property                       = a.I.implies(a.I)
 
             Cover(immediate, Some("cover_0"))
             Cover(sequence, Some("cover_1"))
@@ -132,7 +132,7 @@ object SVASpec extends TestSuite:
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           s"cover_0: cover property (ib0);",
           s"cover_1: cover property (@(posedge clock) ib0);",
-          s"cover_2: cover property (ib0);"
+          s"cover_2: cover property (not ib0 or ib0);"
         )
 
     test("Sequence"):
@@ -417,6 +417,21 @@ object SVASpec extends TestSuite:
           s"not (@(posedge clock) ib0)"
         )
 
+      test("not immediate"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io             = summon[Interface[SVASpecIO]]
+            val a:    Referable[Bool] & HasOperation = io.ib0
+            val prop: Property                       = a.I.not
+
+            Assert(prop)
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          s"not ib0"
+        )
+
       test("throughout"):
         @generator
         object SimpleSVA
@@ -486,9 +501,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = as |-> bp
+            val prop: Property                       = as |-> bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -506,9 +519,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = as |=> bp
+            val prop: Property                       = as |=> bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -528,21 +539,19 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.implies(bp)
+            val prop: Property                       = as.implies(bs)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           s"(not (@(posedge clock) ib0) or (@(posedge clock) ib1))"
         )
-      test("P keeps property clockless"):
+      test("sequence assert keeps property operand clockless"):
         @generator
         object SimpleSVA extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe] with HasMlirTest:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val prop: Property = io.ib0.S.P
+            val prop: Sequence = io.ib0.S
 
             Assert(prop)
         SimpleSVA.mlirTest(SVASpecParameter(32))(out => out.contains("ltl.clock") && !out.contains("ltl.repeat"))
@@ -559,9 +568,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.iff(bp)
+            val prop: Property                       = as.iff(bs)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -580,9 +587,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = as #-# bp
+            val prop: Property                       = as #-# bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -600,9 +605,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = as #=# bp
+            val prop: Property                       = as #=# bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -621,9 +624,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.always
+            val prop: Sequence                       = as.always
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -641,9 +642,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.always(2, 3)
+            val prop: Sequence                       = as.always(2, 3)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -661,9 +660,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.eventually
+            val prop: Property                       = as.eventually
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -681,9 +678,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.until(bp)
+            val prop: Property                       = as.until(bs)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -701,9 +696,7 @@ object SVASpec extends TestSuite:
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Sequence                       = a.S
             val bs:   Sequence                       = b.S
-            val ap:   Property                       = as.P
-            val bp:   Property                       = bs.P
-            val prop: Property                       = ap.untilWith(bp)
+            val prop: Property                       = as.untilWith(bs)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(

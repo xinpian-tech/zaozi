@@ -1063,21 +1063,10 @@ trait SVAApi:
       InstanceContext
     ): Immediate
 
-  extension (ref: Immediate)
-    /** Convert an immediate boolean expression into a property. */
-    def P(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-
-    /** Immediate implication. This is intentionally non-temporal. */
-    def implies(
-      that: Immediate
+    /** SVA: bool_expr throughout s
+      */
+    def throughout(
+      that: Sequence
     )(
       using Arena,
       Context,
@@ -1086,9 +1075,9 @@ trait SVAApi:
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Property
+    ): Sequence
 
-  extension (ref:                                      Sequence)
+  extension (ref: Sequence)
     /** SVA/LTL: a ## b, shorthand for a ##1 b.
       */
     def ##(
@@ -1269,35 +1258,6 @@ trait SVAApi:
       InstanceContext
     ): Sequence
 
-    /** SVA: not s
-      *
-      * This is property negation. CIRCT's `ltl.not` accepts a sequence as a property operand, but always produces
-      * `!ltl.property`.
-      */
-    def not(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-  extension [T <: Referable[Bool] & HasOperation](ref: T)
-    /** SVA: bool_expr throughout s
-      */
-    def throughout(
-      that: Sequence
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence
-  extension (ref:                                      Sequence)
     /** SVA: s1 within s2
       */
     def within(
@@ -1312,23 +1272,10 @@ trait SVAApi:
       InstanceContext
     ): Sequence
 
-// Property Layer
-  extension (ref: Sequence)
-    /** Unlike SVA, zaozi requires Sequence to explicitly convert to Property. */
-    def P(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-
     /** SVA: s|->p
       */
     def |->(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -1342,7 +1289,7 @@ trait SVAApi:
     /** SVA: s|=>p
       */
     def |=>(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -1352,11 +1299,82 @@ trait SVAApi:
       sourcecode.Name.Machine,
       InstanceContext
     ): Property
-  extension (ref: Property)
+
+    /** SVA: s #-# p
+      */
+    def #-#(
+      that: LTLTPE
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s #=# s
+      */
+    def #=#(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: always s
+      */
+    def always(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: always[n:m] s
+      */
+    def always(
+      min: Int,
+      max: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+  extension (ref: LTLTPE)
+    /** SVA: not p
+      *
+      * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
+      * `!ltl.property`.
+      */
+    def not(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
     /** SVA: p1 implies p2
       */
     def implies(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -1370,62 +1388,7 @@ trait SVAApi:
     /** SVA: p1 iff p2
       */
     def iff(
-      that: Property
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-  extension (ref: Sequence)
-    /** SVA: s #-# p
-      */
-    def #-#(
-      that: Property
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-
-    /** SVA: s #=# p
-      */
-    def #=#(
-      that: Property
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-  extension (ref: Property)
-    /** SVA: always p
-      */
-    def always(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property
-
-    /** SVA: always[n:m] p
-      */
-    def always(
-      min: Int,
-      max: Int
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -1451,7 +1414,7 @@ trait SVAApi:
     /** SVA: p1 until p2
       */
     def until(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
@@ -1465,7 +1428,7 @@ trait SVAApi:
     /** SVA: p1 until_with p2
       */
     def untilWith(
-      that: Property
+      that: LTLTPE
     )(
       using Arena,
       Context,
