@@ -673,7 +673,7 @@ given SVAApi with
         namedAttributes = Seq(
           summon[NamedAttributeApi].namedAttributeGet(
             "label".identifierGet,
-            label.getOrElse(summon[sourcecode.Name].value).stringAttrGet
+            label.getOrElse(valName).stringAttrGet
           )
         ),
         operands = Seq(expression.refer)
