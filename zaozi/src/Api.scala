@@ -6,6 +6,7 @@ import scala.annotation.targetName
 import scala.util.chaining.*
 
 import me.jiuyang.zaozi.magic.macros.summonLayersImpl
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -1275,7 +1276,7 @@ trait SVAApi:
     /** SVA: s|->p
       */
     def |->(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1289,7 +1290,7 @@ trait SVAApi:
     /** SVA: s|=>p
       */
     def |=>(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1303,7 +1304,7 @@ trait SVAApi:
     /** SVA: s #-# p
       */
     def #-#(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1355,7 +1356,7 @@ trait SVAApi:
       InstanceContext
     ): Sequence
 
-  extension (ref: LTLTPE)
+  extension (ref: LTLExpr)
     /** SVA: not p
       *
       * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
@@ -1374,7 +1375,7 @@ trait SVAApi:
     /** SVA: p1 implies p2
       */
     def implies(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1388,7 +1389,7 @@ trait SVAApi:
     /** SVA: p1 iff p2
       */
     def iff(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1414,7 +1415,7 @@ trait SVAApi:
     /** SVA: p1 until p2
       */
     def until(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1428,7 +1429,7 @@ trait SVAApi:
     /** SVA: p1 until_with p2
       */
     def untilWith(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -1439,7 +1440,7 @@ trait SVAApi:
       InstanceContext
     ): Property
 
-  def Assert[T <: LTLTPE](
+  def Assert[T <: LTLExpr](
     property: T,
     label:    Option[String] = None
   )(
@@ -1451,7 +1452,7 @@ trait SVAApi:
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit
-  def Assume[T <: LTLTPE](
+  def Assume[T <: LTLExpr](
     property: T,
     label:    Option[String] = None
   )(
@@ -1463,7 +1464,7 @@ trait SVAApi:
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit
-  def Cover[T <: LTLTPE](
+  def Cover[T <: LTLExpr](
     property: T,
     label:    Option[String] = None
   )(

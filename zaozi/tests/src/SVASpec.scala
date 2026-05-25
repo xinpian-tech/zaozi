@@ -4,6 +4,7 @@ package me.jiuyang.zaozitest
 
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.*
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*

@@ -3,6 +3,7 @@
 package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.{InstanceContext, SVAApi, TypeImpl}
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -475,7 +476,7 @@ given SVAApi with
       true.B.S.##*(ref).##*(true.B.S).intersect(that)
 
     def |->(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -492,7 +493,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def |=>(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -508,7 +509,7 @@ given SVAApi with
       ref.##(1)(true.B.S) |-> that
 
     def #-#(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -603,7 +604,7 @@ given SVAApi with
         private[zaozi] val _operation:  Operation  = op.operation
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
-  extension (ref: LTLTPE)
+  extension (ref: LTLExpr)
     def not(
       using Arena,
       Context,
@@ -619,7 +620,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def implies(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -638,7 +639,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op1.operation
 
     def iff(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -677,7 +678,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def until(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -694,7 +695,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def untilWith(
-      that: LTLTPE
+      that: LTLExpr
     )(
       using Arena,
       Context,
@@ -714,7 +715,7 @@ given SVAApi with
 
       left.implies(right)
 
-  def Assert[T <: LTLTPE](
+  def Assert[T <: LTLExpr](
     expression: T,
     label:      Option[String] = None
   )(
@@ -740,7 +741,7 @@ given SVAApi with
       )
       .appendToBlock()
 
-  def Assume[T <: LTLTPE](
+  def Assume[T <: LTLExpr](
     expression: T,
     label:      Option[String] = None
   )(
@@ -766,7 +767,7 @@ given SVAApi with
       )
       .appendToBlock()
 
-  def Cover[T <: LTLTPE](
+  def Cover[T <: LTLExpr](
     expression: T,
     label:      Option[String] = None
   )(
