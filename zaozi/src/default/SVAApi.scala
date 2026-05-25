@@ -59,13 +59,19 @@ import java.lang.foreign.Arena
 export given_SVAApi.{anyedge, negedge, posedge, Assert, Assume, Cover}
 
 given SVAApi with
+  private def requireSameClock(ref: Sequence, that: Sequence): Unit =
+    require(
+      ref._clockevent == that._clockevent,
+      s"Cannot combine SVA expressions from different clocking events: ${ref._clockevent} and ${that._clockevent}"
+    )
+
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(LTLClockEdge.Pos, clock)
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(LTLClockEdge.Neg, clock)
   def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(LTLClockEdge.Both, clock)
-    
+
   extension [T <: Referable[Bool] & HasOperation](ref: T)
     def S(
       using clock: ClockEvent
@@ -366,10 +372,7 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      require(
-        ref._clockevent == that._clockevent,
-        s"Cannot combine SVA expressions from different clocking events: ${ref._clockevent} and ${that._clockevent}"
-      )
+      requireSameClock(ref, that)
       val op = summon[LTLAndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
@@ -387,10 +390,7 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      require(
-        ref._clockevent == that._clockevent,
-        s"Cannot combine SVA expressions from different clocking events: ${ref._clockevent} and ${that._clockevent}"
-      )
+      requireSameClock(ref, that)
       val op = summon[LTLIntersectApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
@@ -408,10 +408,7 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      require(
-        ref._clockevent == that._clockevent,
-        s"Cannot combine SVA expressions from different clocking events: ${ref._clockevent} and ${that._clockevent}"
-      )
+      requireSameClock(ref, that)
       val op = summon[LTLOrApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:

@@ -424,7 +424,7 @@ object SVASpec extends TestSuite:
             extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
             with HasVerilogTest:
           def architecture(parameter: SVASpecParameter) =
-            val io             = summon[Interface[SVASpecIO]]
+            val io = summon[Interface[SVASpecIO]]
             val a:    Referable[Bool] & HasOperation = io.ib0
             val prop: Property                       = a.I.not
 
@@ -760,3 +760,28 @@ object SVASpec extends TestSuite:
           "(@(negedge clock1) ##1 (@(negedge clock1) ib1)) ##0",
           "(@(posedge clock0) ##1 (@(posedge clock0) ib0)))"
         )
+      test("reject asynchronous sequence boolean ops"):
+        @generator
+        object MultiClock
+            extends Generator[MultiClockParameter, MultiClockLayers, MultiClockIO, MultiClockProbe]
+            with HasCompileErrorTest:
+          def architecture(parameter: MultiClockParameter) =
+            val io = summon[Interface[MultiClockIO]]
+            val a: Referable[Bool] & HasOperation = io.ib0
+            val b: Referable[Bool] & HasOperation = io.ib1
+            val as = posedge(io.clock0)(a.S)
+            val bs = negedge(io.clock1)(b.S)
+
+            val andMismatch = intercept[IllegalArgumentException]:
+              as.and(bs)
+            assert(andMismatch.getMessage.contains("different clocking events"))
+
+            val intersectMismatch = intercept[IllegalArgumentException]:
+              as.intersect(bs)
+            assert(intersectMismatch.getMessage.contains("different clocking events"))
+
+            val orMismatch = intercept[IllegalArgumentException]:
+              as.or(bs)
+            assert(orMismatch.getMessage.contains("different clocking events"))
+
+        MultiClock.compileErrorTest(MultiClockParameter(32))
