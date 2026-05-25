@@ -37,6 +37,14 @@ import org.llvm.circt.scalalib.dialect.ltl.operation.{
   RepeatApi as LTLRepeatApi,
   UntilApi as LTLUntilApi
 }
+import org.llvm.circt.scalalib.dialect.verif.operation.{
+  given_AssertApi,
+  given_AssumeApi,
+  given_CoverApi,
+  AssertApi as VerifAssertApi,
+  AssumeApi as VerifAssumeApi,
+  CoverApi as VerifCoverApi
+}
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
   given_BlockApi,
@@ -666,18 +674,9 @@ given SVAApi with
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
-    summon[OperationApi]
-      .operationCreate(
-        name = "verif.assert",
-        location = locate,
-        namedAttributes = Seq(
-          summon[NamedAttributeApi].namedAttributeGet(
-            "label".identifierGet,
-            label.getOrElse(valName).stringAttrGet
-          )
-        ),
-        operands = Seq(expression.refer)
-      )
+    summon[VerifAssertApi]
+      .op(expression.refer, Some(label.getOrElse(valName)), locate)
+      .operation
       .appendToBlock()
 
   def Assume[T <: LTLExpr](
@@ -692,18 +691,9 @@ given SVAApi with
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
-    summon[OperationApi]
-      .operationCreate(
-        name = "verif.assume",
-        location = locate,
-        namedAttributes = Seq(
-          summon[NamedAttributeApi].namedAttributeGet(
-            "label".identifierGet,
-            label.getOrElse(summon[sourcecode.Name].value).stringAttrGet
-          )
-        ),
-        operands = Seq(expression.refer)
-      )
+    summon[VerifAssumeApi]
+      .op(expression.refer, Some(label.getOrElse(summon[sourcecode.Name].value)), locate)
+      .operation
       .appendToBlock()
 
   def Cover[T <: LTLExpr](
@@ -718,18 +708,9 @@ given SVAApi with
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
-    summon[OperationApi]
-      .operationCreate(
-        name = "verif.cover",
-        location = locate,
-        namedAttributes = Seq(
-          summon[NamedAttributeApi].namedAttributeGet(
-            "label".identifierGet,
-            label.getOrElse(summon[sourcecode.Name].value).stringAttrGet
-          )
-        ),
-        operands = Seq(expression.refer)
-      )
+    summon[VerifCoverApi]
+      .op(expression.refer, Some(label.getOrElse(summon[sourcecode.Name].value)), locate)
+      .operation
       .appendToBlock()
 
 end given
