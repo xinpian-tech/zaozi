@@ -501,27 +501,10 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      // ref #=# that: sequence equivalence property
-      // Equivalent to: (ref #-# that) & (that #-# ref)
-      // Equivalent to: (ref #-# that) & !(that -> !ref)
-
-      val np    = summon[LTLNotApi].op(that.refer, locate)
-      np.operation.appendToBlock()
-      val impl0 = summon[LTLImplicationApi].op(ref.refer, np.result, locate)
-      impl0.operation.appendToBlock()
-      val left  = summon[LTLNotApi].op(impl0.result, locate)
-      left.operation.appendToBlock()
-      val nref  = summon[LTLNotApi].op(ref.refer, locate)
-      nref.operation.appendToBlock()
-      val impl  = summon[LTLImplicationApi].op(that.refer, nref.result, locate)
-      impl.operation.appendToBlock()
-      val right = summon[LTLNotApi].op(impl.result, locate)
-      right.operation.appendToBlock()
-
-      val op = summon[LTLAndApi].op(Seq(left.result, right.result), locate)
-      op.operation.appendToBlock()
-      new Property:
-        private[zaozi] val _operation: Operation = op.operation
+      // ref #=# that: non-overlapping followed-by property.
+      // Equivalent to: !(ref |=> !that)
+      // Equivalent to: (ref ##1 true) #-# that
+      !(ref |=> !that)
 
     def always(
       using Arena,
@@ -561,7 +544,7 @@ given SVAApi with
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
   extension (ref: LTLExpr)
-    def not(
+    def unary_!(
       using Arena,
       Context,
       Block,

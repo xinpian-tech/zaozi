@@ -1319,7 +1319,7 @@ trait SVAApi:
       * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
       * `!ltl.property`.
       */
-    def not(
+    def unary_!(
       using Arena,
       Context,
       Block,

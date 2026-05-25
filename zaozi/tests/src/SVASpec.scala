@@ -411,7 +411,7 @@ object SVASpec extends TestSuite:
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
             val a:        Referable[Bool] & HasOperation = io.ib0
-            val property: Property                       = a.S.not
+            val property: Property                       = !a.S
 
             Assert(property)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -426,7 +426,7 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io = summon[Interface[SVASpecIO]]
             val a:    Referable[Bool] & HasOperation = io.ib0
-            val prop: Property                       = a.I.not
+            val prop: Property                       = !a.I
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -610,8 +610,10 @@ object SVASpec extends TestSuite:
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          "(not ((@(posedge clock) ib0) |-> not (@(posedge clock) ib1)) and not",
-          "((@(posedge clock) ib1) |-> not (@(posedge clock) ib0)))"
+          "not",
+          "((@(posedge clock) ib0) ##0",
+          "(@(posedge clock) ##1 (@(posedge clock) 1'h1)) |-> not",
+          "(@(posedge clock) ib1))"
         )
       test("always"):
         @generator
