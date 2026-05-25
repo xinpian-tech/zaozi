@@ -998,49 +998,6 @@ trait SVAApi:
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
   def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent
 
-// // The Boolean Layer
-//   extension [R <: Referable[Bool]](ref:         R)
-//     def rose(
-//       using Arena,
-//       Context,
-//       Block,
-//       sourcecode.File,
-//       sourcecode.Line,
-//       sourcecode.Name.Machine,
-//       InstanceContext
-//     ): Node[Bool]
-//     def fell(
-//       using Arena,
-//       Context,
-//       Block,
-//       sourcecode.File,
-//       sourcecode.Line,
-//       sourcecode.Name.Machine,
-//       InstanceContext
-//     ): Node[Bool]
-//   extension [R <: Referable[T], T <: Data](ref: R)
-//     def stable(
-//       using Arena,
-//       Context,
-//       Block,
-//       sourcecode.File,
-//       sourcecode.Line,
-//       sourcecode.Name.Machine,
-//       InstanceContext
-//     ): Node[Bool]
-//     def past(
-//       n: Int
-//     )(
-//       using Arena,
-//       Context,
-//       Block,
-//       sourcecode.File,
-//       sourcecode.Line,
-//       sourcecode.Name.Machine,
-//       InstanceContext
-//     ): Node[T]
-
-// The Sequential Layer
   extension [T <: Referable[Bool] & HasOperation](ref: T)
     def S(
       using ClockEvent

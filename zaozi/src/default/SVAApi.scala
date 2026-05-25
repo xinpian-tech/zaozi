@@ -65,48 +65,7 @@ given SVAApi with
     ClockEvent(LTLClockEdge.Neg, clock)
   def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(LTLClockEdge.Both, clock)
-
-  // extension [R <: Referable[Bool]](ref:         R)
-  //   def rose(
-  //     using Arena,
-  //     Context,
-  //     Block,
-  //     sourcecode.File,
-  //     sourcecode.Line,
-  //     sourcecode.Name.Machine,
-  //     InstanceContext
-  //   ): Node[Bool] = ???
-  //   def fell(
-  //     using Arena,
-  //     Context,
-  //     Block,
-  //     sourcecode.File,
-  //     sourcecode.Line,
-  //     sourcecode.Name.Machine,
-  //     InstanceContext
-  //   ): Node[Bool] = ???
-  // extension [R <: Referable[T], T <: Data](ref: R)
-  //   def stable(
-  //     using Arena,
-  //     Context,
-  //     Block,
-  //     sourcecode.File,
-  //     sourcecode.Line,
-  //     sourcecode.Name.Machine,
-  //     InstanceContext
-  //   ): Node[Bool] = ???
-  //   def past(
-  //     n: Int
-  //   )(
-  //     using Arena,
-  //     Context,
-  //     Block,
-  //     sourcecode.File,
-  //     sourcecode.Line,
-  //     sourcecode.Name.Machine,
-  //     InstanceContext
-  //   ): Node[T] = ???
-
+    
   extension [T <: Referable[Bool] & HasOperation](ref: T)
     def S(
       using clock: ClockEvent
