@@ -7,7 +7,7 @@ rvprobe 是基于两阶段 SMT 约束求解的 RISC-V 指令生成器，用于�
 ## 已完成功能
 
 ### 核心求解引擎 (RVGenerator)
-- 两阶段 SMT 求解架构：Stage 1 求解操作码（nameId），Stage 2 求解指令参数
+- 两阶段 SMT 求解架构：Stage 1 求解操作码（opcode），Stage 2 求解指令参数
 - 支持 GAS 汇编输出（AsmMode）和二进制输出（BinMode）
 - NOP 填充支持
 - Z3 随机种子注入（`smt.random_seed` / `sat.random_seed`），每次求解产生不同结果

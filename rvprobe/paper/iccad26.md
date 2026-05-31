@@ -148,7 +148,7 @@ addi rd rs1 imm12 14..12=0 6..2=0x04 1..0=3
 
 // 编译期自动生成的 eDSL API：
 def isAddi(): Ref[Bool] =
-    nameId(239) & hasRd() & hasRs1() & hasImm12()
+    opcodeId(239) & hasRd() & hasRs1() & hasImm12()
 ```
 
 当上游规范发生变更（如新增 ISA 扩展），仅需重新编译即可自动生成对应的约束 API，无需人工修改约束库代码。

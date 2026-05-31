@@ -35,7 +35,7 @@ case object BinMode extends OutputMode
   *
   * Stage 1 (Opcodes): Solve which instruction to use
   *   - Input: Set constraints (isRV64I, etc.) + Opcode constraints (isAddw, etc.)
-  *   - Output: Map[Int, Int] mapping index -> nameId
+  *   - Output: Map[Int, Int] mapping index -> opcode
   *
   * Stage 2 (Args): Solve instruction arguments given fixed opcodes
   *   - Input: Fixed opcodes + Auto arg ranges (from instruction definition) + User arg constraints (rdRange, etc.)
@@ -138,8 +138,8 @@ trait RVGenerator:
           context = "Opcode solving"
         )
         val opcodes = result.model.collect {
-          case (k, v: BigInt) if k.startsWith("nameId_") =>
-            k.stripPrefix("nameId_").toInt -> v.toInt
+          case (k, v: BigInt) if k.startsWith("opcode_") && k.drop("opcode_".length).forall(_.isDigit) =>
+            k.stripPrefix("opcode_").toInt -> v.toInt
         }
         (opcodes, recipe.allStatements())
       } catch {
@@ -227,7 +227,7 @@ trait RVGenerator:
         case Some(opcodeId) =>
           // Real instruction: fix opcode and apply arg constraints
           index.setOpcodeId(opcodeId)
-          smtAssert(index.nameId === opcodeId.S)
+          smtAssert(index.opcode === opcodeId.S)
         case None           =>
         // Pseudo instruction (la/li with FreeReg): no opcode, only arg constraints
 
@@ -285,7 +285,7 @@ trait RVGenerator:
           val index = recipe.getIndex(idx)
           solvedOpcodes.get(idx).foreach { opcodeId =>
             index.setOpcodeId(opcodeId)
-            smtAssert(index.nameId === opcodeId.S)
+            smtAssert(index.opcode === opcodeId.S)
           }
           val args  = index.getArgConstraints().map(_(index))
           if args.nonEmpty then smtAssert(smtAnd(args*))
@@ -550,13 +550,15 @@ trait RVGenerator:
         }
       }
 
-      val nameId = solvedOpcodes(i)
-      val inst   = instructions(nameId)
+      val opcode = solvedOpcodes(i)
+      val inst   = instructions(opcode)
 
       val (args, bits) = inst.args.foldLeft((Vector.empty[String], inst.encoding.value)) {
         case ((argsAcc, bitsAcc), arg) =>
           val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
+          val argNameLowered =
+            if argName == "Opcode" then "opcodeBits"
+            else argName.head.toLower + argName.tail
           val prefix         = if arg.name.startsWith("r") then "x" else ""
 
           // Fetch value from solvedArgs

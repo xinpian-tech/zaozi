@@ -63,6 +63,15 @@ val immMergeRules: Seq[ImmMergeRule] = Seq(
 def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
   immMergeRules.find(r => argNames.contains(r.hiField) && argNames.contains(r.loField))
 
+def argIdent(name: String): String =
+  val argName        = translateToCamelCase(name)
+  val argNameLowered = argName.head.toLower + argName.tail
+  if (argNameLowered == "opcode") "opcodeBits" else argNameLowered
+
+def argHasName(name: String): String =
+  val ident = argIdent(name)
+  ident.head.toUpper + ident.tail
+
 @main def UpdateAsmApi(outputPath: String): Unit =
   val writer = new FileWriter(new File(outputPath))
 
@@ -130,8 +139,7 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
 
       // Build parameter list: non-merged args + merged parameter (if any)
       val nonMergedParams = nonMergedArgs.map { arg =>
-        val argName        = translateToCamelCase(arg.name)
-        val argNameLowered = argName.head.toLower + argName.tail
+        val argNameLowered = argIdent(arg.name)
         val tpe            = if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
         s"$argNameLowered: $tpe"
       }
@@ -163,13 +171,14 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         // For non-rd register and non-register fields: equalFn & hasFn as before
         val nonMergedConstraints = nonMergedArgs.map { arg =>
           val argName        = translateToCamelCase(arg.name)
-          val argNameLowered = argName.head.toLower + argName.tail
+          val argNameLowered = argIdent(arg.name)
+          val hasName        = argHasName(arg.name)
           if (rdArgNames.contains(arg.name)) {
             // rd-like field: FreeReg sentinel check
-            val freeRange = if (arg.name == "rd") s"${argNameLowered}Range(1, 32)" else s"has${argName}()"
-            s"(if ($argNameLowered eq FreeReg) $freeRange else ${argNameLowered}Equal($argNameLowered) & has${argName}())"
+            val freeRange = if (arg.name == "rd") s"${argNameLowered}Range(1, 32)" else s"has${hasName}()"
+            s"(if ($argNameLowered eq FreeReg) $freeRange else ${argNameLowered}Equal($argNameLowered) & has${hasName}())"
           } else {
-            s"${argNameLowered}Equal($argNameLowered) & has${argName}()"
+            s"${argNameLowered}Equal($argNameLowered) & has${hasName}()"
           }
         }
         val constraints          = mergeRule match {
@@ -196,16 +205,14 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         if (hasBimm && !skipLabelOverload.contains(variant.name)) {
           val labelNonImmArgs = nonMergedArgs
           val nonImmParams    = labelNonImmArgs.map { arg =>
-            val argName        = translateToCamelCase(arg.name)
-            val argNameLowered = argName.head.toLower + argName.tail
+            val argNameLowered = argIdent(arg.name)
             val tpe            = if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
             s"$argNameLowered: $tpe"
           }.mkString(", ")
           val labelParams     = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
 
           val labelConstraints = labelNonImmArgs.map { arg =>
-            val argName        = translateToCamelCase(arg.name)
-            val argNameLowered = argName.head.toLower + argName.tail
+            val argNameLowered = argIdent(arg.name)
             s"${argNameLowered}Equal($argNameLowered)"
           }.mkString(" & ")
           val fullConstraints  =
@@ -236,16 +243,14 @@ def findMergeRule(argNames: Set[String]): Option[ImmMergeRule] =
         if (hasJimm) {
           val nonImmArgs   = variant.args.filter(arg => arg.name != "jimm20")
           val nonImmParams = nonImmArgs.map { arg =>
-            val argName        = translateToCamelCase(arg.name)
-            val argNameLowered = argName.head.toLower + argName.tail
+            val argNameLowered = argIdent(arg.name)
             val tpe            = if registerArgNames.contains(arg.name) then "Referable[SInt]" else "Int"
             s"$argNameLowered: $tpe"
           }.mkString(", ")
           val labelParams  = if (nonImmParams.isEmpty) "target: String" else s"$nonImmParams, target: String"
 
           val labelConstraints = nonImmArgs.map { arg =>
-            val argName        = translateToCamelCase(arg.name)
-            val argNameLowered = argName.head.toLower + argName.tail
+            val argNameLowered = argIdent(arg.name)
             s"${argNameLowered}Equal($argNameLowered)"
           }.mkString(" & ")
           val fullConstraints  =

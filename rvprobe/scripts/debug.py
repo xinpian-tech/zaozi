@@ -137,7 +137,7 @@ def debug_smtlib(path: Path, timeout_ms: int) -> int:
     print(f"\nFirst UNSAT: assertion #{hi - 1} (block {block_idx})")
     print(text[:500] + ("..." if len(text) > 500 else ""))
 
-    variables = sorted(set(re.findall(r"\b(?:nameId|rd|rs1|rs2|imm12|csr|freg)_\d+\b", text)))
+    variables = sorted(set(re.findall(r"\b(?:opcode|opcode_bits|rd|rs1|rs2|imm12|csr|freg)_\d+\b", text)))
     if variables:
         print(f"Variables: {', '.join(variables)}")
     return 1

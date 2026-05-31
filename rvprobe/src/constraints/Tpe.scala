@@ -22,7 +22,7 @@ opaque type InstConstraint <: Constraint = Ref[Bool]
 object InstConstraint:
   def apply(ref: Ref[Bool]): InstConstraint = ref
 
-// Specific Instruction Constraint (e.g., nameId === 5)
+// Specific Instruction Constraint (e.g., opcode === 5)
 opaque type OpcodeConstraint <: InstConstraint = Ref[Bool]
 
 object OpcodeConstraint:

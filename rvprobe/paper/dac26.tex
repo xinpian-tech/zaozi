@@ -375,7 +375,7 @@ def hasRd(): Ref[Bool] = rdRange(0, 32)
 
 // 2. Synthesize Instruction API via composition
 def isAddi(): Ref[Bool] =
-    nameId(239) &  // Encodes unique opcode bits
+    opcodeId(239) &  // Selects one generated opcode entry
     hasRd() &      // Enforces destination register range
     hasRs1() &     // Enforces source register range
     hasImm12()     // Enforces immediate value range
@@ -409,7 +409,7 @@ test("AddiTest", isRVI()) {
 }
 \end{lstlisting}
 
-\textbf{Step 2: eDSL Compilation.} The RVProbe compiler parses the script. High-level predicates like \texttt{isAddi()} and \texttt{rdRange} are translated into intermediate Scala SMT expressions (e.g., \texttt{(nameId === 239) \& (rd > 0) \& (rd < 5)}).
+\textbf{Step 2: eDSL Compilation.} The RVProbe compiler parses the script. High-level predicates like \texttt{isAddi()} and \texttt{rdRange} are translated into intermediate Scala SMT expressions (e.g., \texttt{(opcode === 239) \& (rd > 0) \& (rd < 5)}).
 
 \textbf{Step 3: IR Construction.} The framework invokes the \texttt{mlirlib} API to construct the MLIR SMT Dialect IR in-memory. For instance, the constraints from Code \ref{code:edsl_script} are translated into the MLIR SMT Dialect shown in Code \ref{code:mlir},
 
@@ -434,17 +434,17 @@ test("AddiTest", isRVI()) {
 \textbf{Step 4: Constraint Generation.} MLIR lowers the SMT Dialect into standard SMT-LIB2 constraints. Consequently, the MLIR from Code \ref{code:mlir} generates the SMT-LIB2 output visible in Code \ref{code:smt_out}, which the SMT solver can process.
 \begin{lstlisting}[caption={Generated SMT-LIB2 Constraints}, label=code:smt_out]
 (declare-const rd_0 Int)
-(declare-const nameId_0 Int)
+(declare-const opcode_0 Int)
 ; ... constraints omitted ...
 (assert (let ((tmp_2 (< rd_0 5)))
         (let ((tmp_3 (>= rd_0 1)))
-        (let ((tmp_4 (= nameId_0 239)))
+        (let ((tmp_4 (= opcode_0 239)))
         tmp_5)))
 (check-sat)
 (get-model)
 \end{lstlisting}
 
-\textbf{Step 5: Model Reconstruction.} Upon a satisfiable result (\texttt{sat}), the SMT solver returns a model (variable assignments). RVProbe parses this model (e.g., extracting \texttt{nameId\_0 = 239}) and maps it back to the concrete instruction binary (e.g., \texttt{addi x5, x0, 0}) for execution on the Design Under Test (DUT).
+\textbf{Step 5: Model Reconstruction.} Upon a satisfiable result (\texttt{sat}), the SMT solver returns a model (variable assignments). RVProbe parses this model (e.g., extracting \texttt{opcode\_0 = 239}) and maps it back to the concrete instruction binary (e.g., \texttt{addi x5, x0, 0}) for execution on the Design Under Test (DUT).
 
 \section{Evaluation}\label{Sec4}
 
@@ -644,4 +644,3 @@ We introduced \textbf{RVProbe}, a framework leveraging a strictly typed Scala 3 
 \endinput
 %%
 %% End of file `sample-sigconf.tex'.
-

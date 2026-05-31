@@ -41,7 +41,7 @@ def getInstructions(): Seq[Instruction] =
     )
   )
   // Must use the same ordering as getMergedInstructions() so that
-  // nameId indices from constraint solving map to the correct instruction.
+  // opcode indices from constraint solving map to the correct instruction.
   org.chipsalliance.rvdecoderdb
     .instructions(riscvOpcodesPath)
     .toSeq
@@ -53,7 +53,7 @@ def getInstructions(): Seq[Instruction] =
 
 // Returns one entry per unique instruction name with sets merged.
 // Picks the variant with the most args as representative.
-// Used for nameId assignment (RVConstraints) and InstructionArgsCache.
+// Used for opcode assignment (RVConstraints) and InstructionArgsCache.
 def getMergedInstructions(): Seq[MergedInstructionVariant] =
   val riscvOpcodesPath: Path = Path(
     sys.env.getOrElse(

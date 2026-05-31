@@ -23,7 +23,7 @@ Stage 1: solveOpcodes()          Stage 2: solveArgs(fixedOpcodes)
 指令集约束 + 指令类型约束          固定的 opcode 结果 + 参数约束
        ↓                                ↓
 Z3 Solver → Map[Int, Int]        Z3 Solver → Map[String, BigInt]
-(index → nameId)                 (argName_idx → value)
+(index → opcode)                 (argName_idx → value)
 ```
 
 ### 设计优势
