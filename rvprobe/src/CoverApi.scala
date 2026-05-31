@@ -112,6 +112,7 @@ extension (insts: Seq[Index])
       val constraints = pairs.flatMap { case (e, l) =>
         val warConditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
         val rawConditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
+        val wawConditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
 
         // WAR: earlier's source == later's destination
         if (l.hasRd && e.hasRs1) warConditions += (e.rs1 === l.rd)
@@ -121,10 +122,14 @@ extension (insts: Seq[Index])
         if (e.hasRd && l.hasRs1) rawConditions += (l.rs1 === e.rd)
         if (e.hasRd && l.hasRs2) rawConditions += (l.rs2 === e.rd)
 
+        // riscv-dv gives WAW priority over WAR.
+        if (e.hasRd && l.hasRd) wawConditions += (e.rd === l.rd)
+
         if (warConditions.nonEmpty) {
           val warPart = smtOr(warConditions.toSeq*)
           val notRaw  = if (rawConditions.nonEmpty) !smtOr(rawConditions.toSeq*) else true.B
-          Some(warPart & notRaw)
+          val notWaw  = if (wawConditions.nonEmpty) !smtOr(wawConditions.toSeq*) else true.B
+          Some(warPart & notRaw & notWaw)
         } else None
       }
 
@@ -147,8 +152,18 @@ extension (insts: Seq[Index])
       val pairs = insts.zip(insts.tail)
 
       val constraints = pairs.flatMap { case (e, l) =>
+        val rawConditions = scala.collection.mutable.ListBuffer[Ref[Bool]]()
+
+        // Exclude RAW because riscv-dv classifies RAW before WAW.
+        if (e.hasRd && l.hasRs1) rawConditions += (l.rs1 === e.rd)
+        if (e.hasRd && l.hasRs2) rawConditions += (l.rs2 === e.rd)
+
         // WAW: earlier's destination == later's destination
-        if (e.hasRd && l.hasRd) Some(e.rd === l.rd) else None
+        if (e.hasRd && l.hasRd) {
+          val wawPart = e.rd === l.rd
+          val notRaw  = if (rawConditions.nonEmpty) !smtOr(rawConditions.toSeq*) else true.B
+          Some(wawPart & notRaw)
+        } else None
       }
 
       if (constraints.nonEmpty) {

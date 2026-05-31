@@ -140,3 +140,41 @@ object RecipeTest extends TestSuite:
       assert(rdSet == expected)
       assert(rs1Set == expected)
       assert(rs2Set == expected)
+
+    test("HazardPriorityMatchesRiscvDv"):
+      object WawRejectsRaw extends RVGenerator with HasRVProbeTest:
+        val sets = Seq(isRV64I())
+        def constraints() =
+          instruction(0, isAddw()) {
+            rdEqual(1.S) & rs1Equal(2.S) & rs2Equal(3.S)
+          }
+          instruction(1, isAddw()) {
+            rdEqual(1.S) & rs1Equal(1.S) & rs2Equal(4.S)
+          }
+          sequence(0, 2).coverWAW()
+
+      object WarRejectsWaw extends RVGenerator with HasRVProbeTest:
+        val sets = Seq(isRV64I())
+        def constraints() =
+          instruction(0, isAddw()) {
+            rdEqual(1.S) & rs1Equal(1.S) & rs2Equal(3.S)
+          }
+          instruction(1, isAddw()) {
+            rdEqual(1.S) & rs1Equal(2.S) & rs2Equal(4.S)
+          }
+          sequence(0, 2).coverWAR()
+
+      object PureWarStaysSat extends RVGenerator with HasRVProbeTest:
+        val sets = Seq(isRV64I())
+        def constraints() =
+          instruction(0, isAddw()) {
+            rdEqual(1.S) & rs1Equal(2.S) & rs2Equal(3.S)
+          }
+          instruction(1, isAddw()) {
+            rdEqual(2.S) & rs1Equal(4.S) & rs2Equal(5.S)
+          }
+          sequence(0, 2).coverWAR()
+
+      WawRejectsRaw.rvprobeTestArgZ3Output("unsat")
+      WarRejectsWaw.rvprobeTestArgZ3Output("unsat")
+      PureWarStaysSat.rvprobeTestArgZ3Output("sat")
