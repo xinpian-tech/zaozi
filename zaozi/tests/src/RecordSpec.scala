@@ -111,7 +111,7 @@ object RecordSpec extends TestSuite:
           .getMessage() ==> "o not found in ArrayBuffer(a, b)"
       AccessValName.compileErrorTest(RecordSpecParameter(2, 32))
 
-    test("Record as Interface") - xfail("https://github.com/llvm/circt/issues/9817"):
+    test("Record as Interface"):
       @generator
       object RecordAsInterface
           extends Generator[RecordSpecParameter, RecordSpecLayers, RecordAsIO, RecordAsProbe]
@@ -126,8 +126,6 @@ object RecordSpec extends TestSuite:
       RecordAsInterface.verilogTest(RecordSpecParameter(2, 32))(
         "assign output_0 = input_0;",
         "assign output_1 = input_1;",
-        "wire [31:0] input_0_probe = input_0;",
-        "wire [31:0] input_1_probe = input_1;",
-        "`define ref_RecordAsInterface_8f428d5_probe_0 input_0_probe",
-        "`define ref_RecordAsInterface_8f428d5_probe_1 input_1_probe"
+        "`define ref_RecordAsInterface_8f428d5_probe_0 input_0",
+        "`define ref_RecordAsInterface_8f428d5_probe_1 input_1"
       )

@@ -8,9 +8,6 @@
 // RUN: firld %t/*.mlirbc --base-circuit Outer_e4dbbef1 | firtool -format=mlir | FileCheck %s
 // RUN: rm -rf %t
 
-// XFAIL: *
-// https://github.com/llvm/circt/issues/9817
-
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -53,13 +50,13 @@ class InnerIO(parameter: InnerParameter) extends HWBundle(parameter):
   val a0b1   = Flipped(UInt(parameter.width))
 
 class InnerProbe(parameter: InnerParameter) extends DVBundle[InnerParameter, InnerLayers](parameter):
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0 a0_0.a0p_probe
+  // CHECK-DAG: `define ref_Inner_7b2bb635_a0 a0_0.a0p
   val a0     = ProbeRead(UInt(parameter.width), layers("A0"))
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b0 a0_a0B0.a0b0p_probe
+  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b0 a0_a0B0.a0b0p
   val a0b0   = ProbeRead(UInt(parameter.width), layers("A0")("A0B0"))
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b0c0 a0_a0B0_a0B0C0.a0b0c0p_probe
+  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b0c0 a0_a0B0_a0B0C0.a0b0c0p
   val a0b0c0 = ProbeRead(UInt(parameter.width), layers("A0")("A0B0")("A0B0C0"))
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b1 a0_a0B1.a0b1p_probe
+  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b1 a0_a0B1.a0b1p
   val a0b1   = ProbeRead(UInt(parameter.width), layers("A0")("A0B1"))
 
 @generator
@@ -101,13 +98,13 @@ class OuterIO(parameter: OuterParameter) extends HWBundle(parameter):
   val a0b1   = Flipped(UInt(parameter.width))
 
 class OuterProbe(parameter: OuterParameter) extends DVBundle[OuterParameter, OuterLayers](parameter):
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0 a0_0.a0_val_probe
+  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0 a0_0.a0_val
   val a0     = ProbeRead(UInt(parameter.width), layers("A0"))
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b0 a0_a0B0.a0b0_val_probe
+  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b0 a0_a0B0.a0b0_val
   val a0b0   = ProbeRead(UInt(parameter.width), layers("A0")("A0B0"))
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b0c0 a0_a0B0_a0B0C0.a0b0c0_val_probe
+  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b0c0 a0_a0B0_a0B0C0.a0b0c0_val
   val a0b0c0 = ProbeRead(UInt(parameter.width), layers("A0")("A0B0")("A0B0C0"))
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b1 a0_a0B1.a0b1_val_probe
+  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b1 a0_a0B1.a0b1_val
   val a0b1   = ProbeRead(UInt(parameter.width), layers("A0")("A0B1"))
 
 @generator
