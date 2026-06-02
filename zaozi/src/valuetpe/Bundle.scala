@@ -64,7 +64,16 @@ trait Bundle extends Aggregate with DynamicSubfield:
     TypeImpl
   ): Type = this.toMlirTypeImpl
 
-trait BundleField[T <: Data]:
-  private[zaozi] val _name:   String
-  private[zaozi] val _isFlip: Boolean
-  private[zaozi] val _tpe:    T
+// `BundleField[T]` is the documented exception to the
+// "MLIR is the source of truth; only the Scala Data subtype is Scala-resident"
+// rule stated in Data.scala. Of the three fields:
+//   - `dataType`: MUST be Scala-resident; Scala `Data` subclasses cannot be
+//     reverse-derived from an MLIR Type.
+//   - `name` / `isFlipped`: construction inputs handed verbatim to MLIR;
+//     Scala-side and MLIR-side copies are 1:1 mirrors after materialization,
+//     so exposing the Scala-side copies directly for `record.elements`
+//     introspection is correct without going through an MLIR query.
+case class BundleField[T <: Data](
+  name:      String,
+  isFlipped: Boolean,
+  dataType:  T)

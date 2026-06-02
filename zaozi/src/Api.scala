@@ -1056,39 +1056,37 @@ trait TypeImpl:
       Context
     ):  Type
   extension (ref:  ProbeBundle)
-    def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):            Type
+    ): Type
     private[zaozi] def ReadProbeImpl[T <: Data & CanProbe](
       tpe:   T,
       layer: LayerTree
     )(
       using sourcecode.Name.Machine
-    ):            BundleField[RProbe[T]]
+    ): BundleField[RProbe[T]]
     private[zaozi] def ReadWriteProbeImpl[T <: Data & CanProbe](
       tpe:   T,
       layer: LayerTree
     )(
       using sourcecode.Name.Machine
-    ):            BundleField[RWProbe[T]]
+    ): BundleField[RWProbe[T]]
   extension (ref:  Bundle)
-    def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):            Type
+    ): Type
     private[zaozi] def FlippedImpl[T <: Data](
       tpe: T
     )(
       using sourcecode.Name.Machine
-    ):            BundleField[T]
+    ): BundleField[T]
     private[zaozi] def AlignedImpl[T <: Data](
       tpe: T
     )(
       using sourcecode.Name.Machine
-    ):            BundleField[T]
+    ): BundleField[T]
   extension (ref:  ProbeRecord)
     def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(

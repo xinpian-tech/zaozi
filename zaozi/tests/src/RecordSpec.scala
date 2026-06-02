@@ -129,3 +129,84 @@ object RecordSpec extends TestSuite:
         "`define ref_RecordAsInterface_8f428d5_probe_0 input_0",
         "`define ref_RecordAsInterface_8f428d5_probe_1 input_1"
       )
+
+    test("Record.elements returns declared fields in order with correct name, isFlipped and dataType"):
+      @generator
+      object ElementsIntrospection
+          extends Generator[RecordSpecParameter, RecordSpecLayers, SimpleRecordIO, RecordSpecProbe]
+          with HasVerilogTest:
+        def architecture(parameter: RecordSpecParameter) =
+          val io = summon[Interface[SimpleRecordIO]]
+          io.c.field("b") := io.c.field("a")
+
+          val widthVal      = parameter.width
+          val baseInput     = UInt(widthVal)
+          val baseOutput    = UInt(widthVal)
+          val n             = parameter.fieldNum
+          val freshRecord   = new Record:
+            val inputs  = Seq.tabulate(n)(i => Flipped(s"input_$i", baseInput))
+            val outputs = Seq.tabulate(n)(i => Aligned(s"output_$i", baseOutput))
+          freshRecord.toMlirType
+          val freshElements = freshRecord.elements
+          assert(freshElements.size == 2 * n)
+          Seq.tabulate(n): i =>
+            val inField  = freshElements(i)
+            val outField = freshElements(n + i)
+            assert(inField.name == s"input_$i")
+            assert(outField.name == s"output_$i")
+            assert(inField.isFlipped == true)
+            assert(outField.isFlipped == false)
+            assert(inField.dataType eq baseInput)
+            assert(outField.dataType eq baseOutput)
+
+          val patternMatched = freshElements.collect:
+            case BundleField(n, true, _)  => s"flipped:$n"
+            case BundleField(n, false, _) => s"aligned:$n"
+          assert(patternMatched.size == 2 * n)
+      ElementsIntrospection.verilogTest(RecordSpecParameter(2, 32))(
+        "assign c_b = c_a;"
+      )
+
+    test("Record.elements before materialization raises"):
+      @generator
+      object ElementsLifecycle
+          extends Generator[RecordSpecParameter, RecordSpecLayers, SimpleRecordIO, RecordSpecProbe]
+          with HasVerilogTest:
+        def architecture(parameter: RecordSpecParameter) =
+          val io = summon[Interface[SimpleRecordIO]]
+          io.c.field("b") := io.c.field("a")
+          val unmaterialized = new SimpleRecord(parameter.width)
+          intercept[IllegalArgumentException](unmaterialized.elements)
+      ElementsLifecycle.verilogTest(RecordSpecParameter(2, 32))(
+        "assign c_b = c_a;"
+      )
+
+    test("ProbeRecord.elements returns RProbe / RWProbe fields"):
+      @generator
+      object ProbeElementsIntrospection
+          extends Generator[RecordSpecParameter, RecordSpecLayers, RecordAsIO, RecordAsProbe]
+          with HasVerilogTest:
+        def architecture(parameter: RecordSpecParameter) =
+          val io    = summon[Interface[RecordAsIO]]
+          val probe = summon[Interface[RecordAsProbe]]
+          Seq.tabulate(parameter.fieldNum): i =>
+            io.field(s"output_$i") := io.field(s"input_$i")
+            layer("verification"):
+              probe.field[RProbe[UInt]](s"probe_$i") <== io.field[UInt](s"input_$i")
+
+          layer("verification"):
+            val verificationLayer: LayerTree = summon[LayerTree]
+            val freshProbe = new ProbeRecord:
+              val first  = ProbeRead("first", UInt(parameter.width), verificationLayer)
+              val second = ProbeReadWrite("second", UInt(parameter.width), verificationLayer)
+            freshProbe.toMlirType
+            val es         = freshProbe.elements
+            assert(es.size == 2)
+            assert(es(0).name == "first")
+            assert(es(0).isFlipped == false)
+            assert(es(0).dataType.isInstanceOf[RProbe[?]])
+            assert(es(1).name == "second")
+            assert(es(1).dataType.isInstanceOf[RWProbe[?]])
+      ProbeElementsIntrospection.verilogTest(RecordSpecParameter(2, 32))(
+        "assign output_0 = input_0;"
+      )

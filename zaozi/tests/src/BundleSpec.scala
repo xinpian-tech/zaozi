@@ -19,6 +19,10 @@ class TypeParamIO[A <: Bundle, B <: Bundle](_a: A, _b: B) extends Bundle:
 class SimpleBundle extends Bundle:
   val g = Aligned(UInt(32))
 
+class BundleFieldMember extends Bundle:
+  val ready:   BundleField[Bool] = Flipped(Bool())
+  val payload: BundleField[UInt] = Aligned(UInt(8))
+
 class SimpleBundleA extends Bundle:
   val a = Aligned(UInt(32))
 
@@ -174,3 +178,25 @@ object BundleSpec extends TestSuite:
             "Field 'd' does not exist in type me.jiuyang.zaozi.valuetpe.Bundle."
           )
       StructuralTypeDoesntWork.compileErrorTest(BundleSpecParameter(32))
+
+    test("BundleField class member exposes name / isFlipped / dataType"):
+      @generator
+      object BundleFieldMemberAccess
+          extends Generator[BundleSpecParameter, BundleSpecLayers, BundleSpecIO, BundleSpecProbe]
+          with HasVerilogTest:
+        def architecture(parameter: BundleSpecParameter) =
+          val io = summon[Interface[BundleSpecIO]]
+          io.a := io.f.g
+          io.c.dontCare()
+          io.k.foreach(_.dontCare())
+
+          val bundle = new BundleFieldMember
+          assert(bundle.ready.name == "ready")
+          assert(bundle.ready.isFlipped == true)
+          assert(bundle.ready.dataType.isInstanceOf[Bool])
+          assert(bundle.payload.name == "payload")
+          assert(bundle.payload.isFlipped == false)
+          assert(bundle.payload.dataType.isInstanceOf[UInt])
+      BundleFieldMemberAccess.verilogTest(BundleSpecParameter(32))(
+        "module BundleFieldMemberAccess"
+      )
