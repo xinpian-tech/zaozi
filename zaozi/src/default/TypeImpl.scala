@@ -258,13 +258,15 @@ given TypeImpl with
     ): Int =
       data.toMlirType.getBitWidth(true).toInt
   extension (ref:  Vec[?])
-    def elementType: Data = ref._elementType
-    def count:       Int  = ref._count
+    def countImpl(
+      using Arena,
+      Context
+    ): Int = ref.toMlirType.getVectorElementNum.toInt
     def toMlirTypeImpl(
       using Arena,
       Context
     ): Type =
-      val mlirType = elementType.toMlirType.getVector(count)
+      val mlirType = ref._elementType.toMlirType.getVector(ref._count)
       mlirType
   extension (ref:  ProbeBundle)
     def getRefViaFieldValNameImpl[E <: Data](

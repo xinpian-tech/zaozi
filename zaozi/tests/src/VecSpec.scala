@@ -5,6 +5,7 @@ package me.jiuyang.zaozitest
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.Interface
+import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, ContextApi}
@@ -28,6 +29,13 @@ class VecSpecIO(parameter: VecSpecParameter) extends HWBundle(parameter):
   val flatuint = Aligned(UInt(parameter.width * parameter.vecCount))
 
 class VecSpecProbe(parameter: VecSpecParameter) extends DVBundle[VecSpecParameter, VecSpecLayers](parameter)
+
+class VecRecursionBundle(
+  using me.jiuyang.zaozi.TypeImpl,
+  me.jiuyang.zaozi.ConstructorApi)
+    extends Bundle:
+  val payload = Aligned(UInt(8))
+  val flag    = Flipped(UInt(1))
 
 object VecSpec extends TestSuite:
   val tests = Tests:
@@ -208,3 +216,41 @@ object VecSpec extends TestSuite:
             "Expected 1 args, but got 2"
           )
       IncorrectNumberOfArguments.compileErrorTest(VecSpecParameter(8, 4))
+
+    test("Vec.elementType eq construction element type; Vec.count returns expected n"):
+      @generator
+      object VecAccessorIdentity
+          extends Generator[VecSpecParameter, VecSpecLayers, VecSpecIO, VecSpecProbe]
+          with HasVerilogTest:
+        def architecture(parameter: VecSpecParameter) =
+          val io = summon[Interface[VecSpecIO]]
+          io.b.dontCare()
+          io.out.dontCare()
+          io.flatuint.dontCare()
+
+          val element = UInt(parameter.width)
+          val vec     = Vec(parameter.vecCount, element)
+          assert(vec.elementType.eq(element))
+          assert(vec.count == parameter.vecCount)
+      VecAccessorIdentity.verilogTest(VecSpecParameter(8, 4))(
+        "module VecAccessorIdentity"
+      )
+
+    test("Vec.count over Vec[Bundle] does not infinitely recurse"):
+      @generator
+      object VecOfBundleRecursion
+          extends Generator[VecSpecParameter, VecSpecLayers, VecSpecIO, VecSpecProbe]
+          with HasVerilogTest:
+        def architecture(parameter: VecSpecParameter) =
+          val io = summon[Interface[VecSpecIO]]
+          io.b.dontCare()
+          io.out.dontCare()
+          io.flatuint.dontCare()
+
+          val innerBundle = new VecRecursionBundle
+          val vec         = Vec(parameter.vecCount, innerBundle)
+          assert(vec.count == parameter.vecCount)
+          assert(vec.elementType.eq(innerBundle))
+      VecOfBundleRecursion.verilogTest(VecSpecParameter(8, 4))(
+        "module VecOfBundleRecursion"
+      )

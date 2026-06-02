@@ -52,7 +52,7 @@ given TypeUtilsApi with
       case x: Record => ref.asRecord[Record](x)
       case _: SInt   => ref.asSInt
       case _: UInt   => ref.asUInt
-      case x: Vec[?] => ref.asVec(x.getElementType)
+      case x: Vec[?] => ref.asVec(x.elementType)
     ).asInstanceOf[Propagated[R, D]]
 
 end given

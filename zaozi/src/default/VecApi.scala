@@ -59,7 +59,7 @@ given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
           op0.operation.appendToBlock()
           op0.operation
       new Ref[E]:
-        val _tpe:       E         = ref._tpe._elementType
+        val _tpe:       E         = ref._tpe.elementType
         val _operation: Operation = refOp
 
     // sugars

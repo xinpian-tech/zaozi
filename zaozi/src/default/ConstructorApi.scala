@@ -63,10 +63,10 @@ given ConstructorApi with
 
   def Bool(): Bool = new Object with Bool
 
-  def Vec[T <: Data](count: Int, tpe: T): Vec[T] =
+  def Vec[T <: Data](size: Int, tpe: T): Vec[T] =
     new Vec[T]:
       private[zaozi] val _elementType = tpe
-      private[zaozi] val _count       = count
+      private[zaozi] val _count       = size
 
   def when[COND <: Referable[Bool]](
     cond: COND

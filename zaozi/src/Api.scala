@@ -1135,12 +1135,14 @@ trait TypeImpl:
       Context
     ):  Int
   extension (ref:  Vec[?])
-    def elementType: Data
-    def count:       Int
+    private[zaozi] def countImpl(
+      using Arena,
+      Context
+    ): Int
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):               Type
+    ): Type
   extension (ref:  ProbeBundle)
     private[zaozi] def getRefViaFieldValNameImpl[E <: Data](
       refer:        Value,
