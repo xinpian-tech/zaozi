@@ -155,10 +155,20 @@ given SVAApi with
         private[zaozi] val _clockevent: ClockEvent = that._clockevent
 
   extension (ref: Immediate)
-    // If any of the $inputs is of type !ltl.property, the result of the op is an !ltl.property. Otherwise it is an !ltl.sequence.
-    // Immediate and Immediate => Immediate
-    // LTLSequenceLike and LTLSequenceLike => Sequence
-    // LTLPropertyLike and LTLPropertyLike => Property
+    def unary_!(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[NotApi].op(ref.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
     def &(
       that: Immediate
     )(
@@ -173,6 +183,39 @@ given SVAApi with
       val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Immediate:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def &(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence =
+      val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+
+    def &(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
+      op.operation.appendToBlock()
+      new Property:
         private[zaozi] val _operation: Operation = op.operation
 
     def |(
@@ -191,6 +234,39 @@ given SVAApi with
       new Immediate:
         private[zaozi] val _operation: Operation = op.operation
 
+    def |(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence =
+      val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+
+    def |(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
     def intersect(
       that: Immediate
     )(
@@ -207,7 +283,217 @@ given SVAApi with
       new Immediate:
         private[zaozi] val _operation: Operation = op.operation
 
+    def intersect(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence =
+      val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+
+    def intersect(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def |->(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[ImplicationApi].op(ref.refer, thatValue, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def #-#(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val notThat   = summon[NotApi].op(thatValue, locate)
+      notThat.operation.appendToBlock()
+      val impl      = summon[ImplicationApi].op(ref.refer, notThat.result, locate)
+      impl.operation.appendToBlock()
+      val op        = summon[NotApi].op(impl.result, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def implies(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val notRef    = summon[NotApi].op(ref.refer, locate)
+      notRef.operation.appendToBlock()
+      val op        = summon[OrApi].op(Seq(notRef.result, thatValue), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def iff(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val or        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
+      or.operation.appendToBlock()
+      val notOr     = summon[NotApi].op(or.result, locate)
+      notOr.operation.appendToBlock()
+      val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      and.operation.appendToBlock()
+      val op        = summon[OrApi].op(Seq(notOr.result, and.result), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def eventually(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[EventuallyApi].op(ref.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def until(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def untilWith(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      and.operation.appendToBlock()
+      val op        = summon[UntilApi].op(ref.refer, and.result, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def always(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val rhs = false.B.I
+      val op  = summon[UntilApi].op(ref.refer, rhs.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
   extension (ref: Sequence)
+    def unary_!(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[NotApi].op(ref.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
     def ##(
       that: Sequence
     )(
@@ -250,7 +536,6 @@ given SVAApi with
       InstanceContext
     ): Sequence =
       require(n >= 0, s"delay ($n) must be greater than or equal to 0 in sequence delay")
-      // ##[n] that
       val clockAsUInt = summon[AsUIntPrimApi].op(that._clockevent.clock.refer, locate)
       clockAsUInt.operation.appendToBlock()
       val clockCast   = summon[OperationApi].operationCreate(
@@ -270,10 +555,11 @@ given SVAApi with
           locate
         )
       op0.operation.appendToBlock()
-      val delayed     = new Sequence:
+      val clockevent  = that._clockevent
+      val _that       = new Sequence:
         private[zaozi] val _operation:  Operation  = op0.operation
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
-      ref.##(delayed)
+        private[zaozi] val _clockevent: ClockEvent = clockevent
+      ref.##(_that)
 
     def ##(
       min:  Int,
@@ -292,7 +578,6 @@ given SVAApi with
       max.foreach(value =>
         require(value >= min, s"max ($value) must be greater than or equal to min ($min) in sequence delay")
       )
-      // ##[n:m] that
       val clockAsUInt = summon[AsUIntPrimApi].op(that._clockevent.clock.refer, locate)
       clockAsUInt.operation.appendToBlock()
       val clockCast   = summon[OperationApi].operationCreate(
@@ -311,10 +596,11 @@ given SVAApi with
         locate
       )
       op0.operation.appendToBlock()
-      val delayed     = new Sequence:
+      val clockevent  = that._clockevent
+      val _that       = new Sequence:
         private[zaozi] val _operation:  Operation  = op0.operation
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
-      ref.##(delayed)
+        private[zaozi] val _clockevent: ClockEvent = clockevent
+      ref.##(_that)
 
     def *(
       n: Int
@@ -445,7 +731,7 @@ given SVAApi with
       true.B.S.##*(ref).##*(true.B.S).intersect(that)
 
     def |=>(
-      that: LTLPropertyLike
+      that: Immediate | Sequence | Property
     )(
       using Arena,
       Context,
@@ -461,7 +747,7 @@ given SVAApi with
       ref.##(1)(true.B.S) |-> that
 
     def #=#(
-      that: LTLPropertyLike
+      that: Immediate | Sequence | Property
     )(
       using Arena,
       Context,
@@ -474,100 +760,21 @@ given SVAApi with
       // ref #=# that: non-overlapping followed-by property.
       // Equivalent to: !(ref |=> !that)
       // Equivalent to: (ref ### true) #-# that
-      !(ref |=> !that)
-
-  extension (ref: LTLSequenceLike)
-    def &(
-      that: LTLSequenceLike
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence =
-      val clock = (ref, that) match
-        case (left: Sequence, _)  =>
-          left._clockevent
-        case (_, right: Sequence) =>
-          right._clockevent
-        case _                    =>
-          throw IllegalArgumentException("Cannot create an SVA sequence from two clockless expressions")
-      val op    = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
-      op.operation.appendToBlock()
-      new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
-        private[zaozi] val _clockevent: ClockEvent = clock
-
-    def |(
-      that: LTLSequenceLike
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence =
-      val clock = (ref, that) match
-        case (left: Sequence, _)  =>
-          left._clockevent
-        case (_, right: Sequence) =>
-          right._clockevent
-        case _                    =>
-          throw IllegalArgumentException("Cannot create an SVA sequence from two clockless expressions")
-      val op    = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
-      op.operation.appendToBlock()
-      new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
-        private[zaozi] val _clockevent: ClockEvent = clock
-
-    def intersect(
-      that: LTLSequenceLike
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Sequence =
-      val clock = (ref, that) match
-        case (left: Sequence, _)  =>
-          left._clockevent
-        case (_, right: Sequence) =>
-          right._clockevent
-        case _                    =>
-          throw IllegalArgumentException("Cannot create an SVA sequence from two clockless expressions")
-      val op    = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
-      op.operation.appendToBlock()
-      new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
-        private[zaozi] val _clockevent: ClockEvent = clock
-
-    def |->(
-      that: LTLPropertyLike
-    )(
-      using Arena,
-      Context,
-      Block,
-      sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine,
-      InstanceContext
-    ): Property =
-      // ref |-> that: implication property (strong implication)
-      val op = summon[ImplicationApi].op(ref.refer, that.refer, locate)
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val notThat   = summon[NotApi].op(thatValue, locate)
+      notThat.operation.appendToBlock()
+      val followed  = ref |=> new Property:
+        private[zaozi] val _operation: Operation = notThat.operation
+      val op        = summon[NotApi].op(followed.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _operation: Operation = op.operation
 
-    def #-#(
-      that: LTLPropertyLike
+    def &(
+      that: Immediate | Sequence
     )(
       using Arena,
       Context,
@@ -576,14 +783,18 @@ given SVAApi with
       sourcecode.Line,
       sourcecode.Name.Machine,
       InstanceContext
-    ): Property =
-      // ref #-# that: strong implication property (sequence implication)
-      // Equivalent to: !(ref |-> !that)
-      !(ref |-> !that)
+    ): Sequence =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+      val op        = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
-  extension (ref: LTLPropertyLike)
     def &(
-      that: LTLPropertyLike
+      that: Property
     )(
       using Arena,
       Context,
@@ -599,7 +810,27 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def |(
-      that: LTLPropertyLike
+      that: Immediate | Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+      val op        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+
+    def |(
+      that: Property
     )(
       using Arena,
       Context,
@@ -615,7 +846,27 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def intersect(
-      that: LTLPropertyLike
+      that: Immediate | Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+      val op        = summon[IntersectApi].op(Seq(ref.refer, thatValue), locate)
+      op.operation.appendToBlock()
+      new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+
+    def intersect(
+      that: Property
     )(
       using Arena,
       Context,
@@ -630,7 +881,9 @@ given SVAApi with
       new Property:
         private[zaozi] val _operation: Operation = op.operation
 
-    def unary_!(
+    def |->(
+      that: Immediate | Sequence | Property
+    )(
       using Arena,
       Context,
       Block,
@@ -639,13 +892,41 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      val op = summon[NotApi].op(ref.refer, locate)
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[ImplicationApi].op(ref.refer, thatValue, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def #-#(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val notThat   = summon[NotApi].op(thatValue, locate)
+      notThat.operation.appendToBlock()
+      val impl      = summon[ImplicationApi].op(ref.refer, notThat.result, locate)
+      impl.operation.appendToBlock()
+      val op        = summon[NotApi].op(impl.result, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _operation: Operation = op.operation
 
     def implies(
-      that: LTLPropertyLike
+      that: Immediate | Sequence | Property
     )(
       using Arena,
       Context,
@@ -655,11 +936,19 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      // Equivalent to: !ref | that
-      (!ref) | that
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val notRef    = summon[NotApi].op(ref.refer, locate)
+      notRef.operation.appendToBlock()
+      val op        = summon[OrApi].op(Seq(notRef.result, thatValue), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
 
     def iff(
-      that: LTLPropertyLike
+      that: Immediate | Sequence | Property
     )(
       using Arena,
       Context,
@@ -669,8 +958,20 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      // Equivalent to: !(ref | that) | (ref & that)
-      !(ref | that) | (ref & that)
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val or        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
+      or.operation.appendToBlock()
+      val notOr     = summon[NotApi].op(or.result, locate)
+      notOr.operation.appendToBlock()
+      val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      and.operation.appendToBlock()
+      val op        = summon[OrApi].op(Seq(notOr.result, and.result), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
 
     def eventually(
       using Arena,
@@ -687,7 +988,7 @@ given SVAApi with
         private[zaozi] val _operation: Operation = op.operation
 
     def until(
-      that: LTLPropertyLike
+      that: Immediate | Sequence | Property
     )(
       using Arena,
       Context,
@@ -697,14 +998,17 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      // until: equivalent to ltl.until
-      val op = summon[UntilApi].op(ref.refer, that.refer, locate)
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _operation: Operation = op.operation
 
     def untilWith(
-      that: LTLPropertyLike
+      that: Immediate | Sequence | Property
     )(
       using Arena,
       Context,
@@ -714,11 +1018,16 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      // untilWith: equivalent to ltl.until with inclusive semantics
-      // Equivalent to: ref until (ref & that)
-      // Equivalent to: !(ref until that) or (ref & that)
-      // Equivalent to: (ref until that) |-> (ref & that)
-      ref.until(ref & that)
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      and.operation.appendToBlock()
+      val op        = summon[UntilApi].op(ref.refer, and.result, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
 
     def always(
       using Arena,
@@ -729,11 +1038,209 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Property =
-      ref.until(false.B.I)
+      val rhs = false.B.I
+      val op  = summon[UntilApi].op(ref.refer, rhs.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
 
-  def Assert[T <: LTLPropertyLike](
-    expression: T,
-    label:      Option[String] = None
+  extension (ref: Property)
+    def unary_!(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[NotApi].op(ref.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def &(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def |(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def intersect(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[IntersectApi].op(Seq(ref.refer, thatValue), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def implies(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val notRef    = summon[NotApi].op(ref.refer, locate)
+      notRef.operation.appendToBlock()
+      val op        = summon[OrApi].op(Seq(notRef.result, thatValue), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def iff(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val or        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
+      or.operation.appendToBlock()
+      val notOr     = summon[NotApi].op(or.result, locate)
+      notOr.operation.appendToBlock()
+      val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      and.operation.appendToBlock()
+      val op        = summon[OrApi].op(Seq(notOr.result, and.result), locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def eventually(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val op = summon[EventuallyApi].op(ref.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def until(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def untilWith(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val thatValue = that match
+        case value: Immediate => value.refer
+        case value: Sequence  => value.refer
+        case value: Property  => value.refer
+      val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
+      and.operation.appendToBlock()
+      val op        = summon[UntilApi].op(ref.refer, and.result, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+    def always(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property =
+      val rhs = false.B.I
+      val op  = summon[UntilApi].op(ref.refer, rhs.refer, locate)
+      op.operation.appendToBlock()
+      new Property:
+        private[zaozi] val _operation: Operation = op.operation
+
+  def Assert(
+    property: Immediate | Sequence | Property,
+    label:    Option[String] = None
   )(
     using Arena,
     Context,
@@ -743,14 +1250,18 @@ given SVAApi with
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
     summon[AssertApi]
-      .op(expression.refer, Some(label.getOrElse(valName)), locate)
+      .op(value, Some(label.getOrElse(valName)), locate)
       .operation
       .appendToBlock()
 
-  def Assume[T <: LTLPropertyLike](
-    expression: T,
-    label:      Option[String] = None
+  def Assume(
+    property: Immediate | Sequence | Property,
+    label:    Option[String] = None
   )(
     using Arena,
     Context,
@@ -760,14 +1271,18 @@ given SVAApi with
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
     summon[AssumeApi]
-      .op(expression.refer, Some(label.getOrElse(valName)), locate)
+      .op(value, Some(label.getOrElse(valName)), locate)
       .operation
       .appendToBlock()
 
-  def Cover[T <: LTLPropertyLike](
-    expression: T,
-    label:      Option[String] = None
+  def Cover(
+    property: Immediate | Sequence | Property,
+    label:    Option[String] = None
   )(
     using Arena,
     Context,
@@ -777,8 +1292,12 @@ given SVAApi with
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
     summon[CoverApi]
-      .op(expression.refer, Some(label.getOrElse(valName)), locate)
+      .op(value, Some(label.getOrElse(valName)), locate)
       .operation
       .appendToBlock()
 

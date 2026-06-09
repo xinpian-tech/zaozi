@@ -18,7 +18,8 @@ case class ClockEvent(edge: LTLClockEdge, clock: Referable[Clock] & HasOperation
   )
 
 /** The SVA sequence, the inner bool indicate: match success or match failed. */
-trait Sequence extends LTLSequenceLike:
+trait Sequence extends HasOperation:
+  private[zaozi] val _operation:  Operation
   private[zaozi] val _clockevent: ClockEvent
 
   def operation(

@@ -3,13 +3,16 @@
 package me.jiuyang.zaozi.ltltpe
 
 import me.jiuyang.zaozi.*
+import me.jiuyang.zaozi.reftpe.HasOperation
 
 import org.llvm.mlir.scalalib.capi.ir.{Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena
 
 /** A clock-less immediate boolean expression. */
-trait Immediate extends LTLSequenceLike:
+trait Immediate extends HasOperation:
+  private[zaozi] val _operation: Operation
+
   def operation(
     using TypeImpl
   ): Operation = this.operationImpl

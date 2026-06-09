@@ -596,7 +596,7 @@ object SVASpec extends TestSuite:
             val a:    Referable[Bool] & HasOperation = io.ib0
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Property                       = !a.S
-            val bs:   LTLPropertyLike                = b.S
+            val bs:   Sequence                       = b.S
             val prop: Property                       = as & bs
 
             Assert(prop)
@@ -614,7 +614,7 @@ object SVASpec extends TestSuite:
             val a:    Referable[Bool] & HasOperation = io.ib0
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Property                       = !a.S
-            val bs:   LTLPropertyLike                = b.S
+            val bs:   Sequence                       = b.S
             val prop: Property                       = as | bs
 
             Assert(prop)
@@ -632,7 +632,7 @@ object SVASpec extends TestSuite:
             val a:    Referable[Bool] & HasOperation = io.ib0
             val b:    Referable[Bool] & HasOperation = io.ib1
             val as:   Property                       = !a.S
-            val bs:   LTLPropertyLike                = b.S
+            val bs:   Sequence                       = b.S
             val prop: Property                       = as.intersect(bs)
 
             Assert(prop)
@@ -649,7 +649,7 @@ object SVASpec extends TestSuite:
             given ClockEvent = posedge(io.clock)
             val a:              Referable[Bool] & HasOperation = io.ib0
             val b:              Referable[Bool] & HasOperation = io.ib1
-            val lhs:            LTLPropertyLike                = a.S
+            val lhs:            Sequence                       = a.S
             val rhs:            Property                       = !b.S
             val erasedLhs:      Property                       = lhs & rhs
             val propertyToProp: Property                       = (!a.S) & rhs
