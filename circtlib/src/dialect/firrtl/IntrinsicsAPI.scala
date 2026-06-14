@@ -3,7 +3,9 @@
 package org.llvm.circt.scalalib.dialect.firrtl.operation
 
 import org.llvm.mlir.scalalib.capi.support.HasOperation
-import org.llvm.mlir.scalalib.capi.ir.Operation
+import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Value}
+
+import java.lang.foreign.Arena
 
 class ClockDividerIntrinsic(val _operation: Operation)
 class ClockGateIntrinsic(val _operation: Operation)
@@ -18,21 +20,82 @@ class PlusArgsValueIntrinsic(val _operation: Operation)
 class UnclockedAssumeIntrinsic(val _operation: Operation)
 
 class VerifAssertIntrinsic(val _operation: Operation)
-trait VerifAssertIntrinsicApi extends HasOperation[VerifAssertIntrinsic]
+trait VerifAssertIntrinsicApi extends HasOperation[VerifAssertIntrinsic]:
+  def op(
+    property: Value,
+    enable:   Value,
+    label:    String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifAssertIntrinsic
 end VerifAssertIntrinsicApi
 
 class VerifAssumeIntrinsic(val _operation: Operation)
-trait VerifAssumeIntrinsicApi extends HasOperation[VerifAssumeIntrinsic]
+trait VerifAssumeIntrinsicApi extends HasOperation[VerifAssumeIntrinsic]:
+  def op(
+    property: Value,
+    enable:   Value,
+    label:    String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifAssumeIntrinsic
 end VerifAssumeIntrinsicApi
 
 class VerifCoverIntrinsic(val _operation: Operation)
-trait VerifCoverIntrinsicApi extends HasOperation[VerifCoverIntrinsic]
+trait VerifCoverIntrinsicApi extends HasOperation[VerifCoverIntrinsic]:
+  def op(
+    property: Value,
+    enable:   Value,
+    label:    String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifCoverIntrinsic
 end VerifCoverIntrinsicApi
 
 class VerifEnsureIntrinsic(val _operation: Operation)
-trait VerifEnsureIntrinsicApi extends HasOperation[VerifEnsureIntrinsic]
+trait VerifEnsureIntrinsicApi extends HasOperation[VerifEnsureIntrinsic]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifEnsureIntrinsic
+  def op(
+    property: Value,
+    enable:   Value,
+    label:    String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifEnsureIntrinsic
 end VerifEnsureIntrinsicApi
 
 class VerifRequireIntrinsic(val _operation: Operation)
-trait VerifRequireIntrinsicApi extends HasOperation[VerifRequireIntrinsic]
+trait VerifRequireIntrinsicApi extends HasOperation[VerifRequireIntrinsic]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifRequireIntrinsic
+  def op(
+    property: Value,
+    enable:   Value,
+    label:    String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifRequireIntrinsic
 end VerifRequireIntrinsicApi

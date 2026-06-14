@@ -50,26 +50,23 @@ object ContractSpec extends TestSuite:
           }
 
       NoArguments.mlirTest(parameter)(
-        "%4 = firrtl.subfield %io[a] : !firrtl.bundle<a flip: uint<8>, p flip: uint<8>, q flip: uint<8>, r flip: uint<8>>",
-        "%c1_ui1 = firrtl.constant 1 : !firrtl.uint<1>",
+        "%4 = firrtl.subfield %io[a]",
+        "%c1_ui1 = firrtl.constant 1",
         // a >= 1
-        "%5 = firrtl.geq %4, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
-        "%_GEN_0 = firrtl.node interesting_name %5 : !firrtl.uint<1>",
+        "%5 = firrtl.geq %4, %c1_ui1",
+        "%_GEN_0 = firrtl.node interesting_name %5",
         // a + a
-        "%6 = firrtl.add %4, %4 : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
-        "%_GEN_1 = firrtl.node interesting_name %6 : !firrtl.uint<9>",
-        "%c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
+        "%6 = firrtl.add %4, %4",
+        "%_GEN_1 = firrtl.node interesting_name %6",
+        "%c2_ui2 = firrtl.constant 2",
         // a + a >= 2
-        "%7 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
-        "%_GEN_2 = firrtl.node interesting_name %7 : !firrtl.uint<1>",
-        // Contract
-        "verif.contract {",
-        "   %8 = builtin.unrealized_conversion_cast %_GEN_0 : !firrtl.uint<1> to i1",
-        // Require a >= 1
-        "   verif.require %8 : i1",
-        "   %9 = builtin.unrealized_conversion_cast %_GEN_2 : !firrtl.uint<1> to i1",
-        // Ensure a + a >= 2
-        "   verif.ensure %9 : i1",
+        "%7 = firrtl.geq %_GEN_1, %c2_ui2",
+        "%_GEN_2 = firrtl.node interesting_name %7",
+        "firrtl.contract {",
+        // Require(a >= 1)
+        "  firrtl.int.verif.require %_GEN_0",
+        "  firrtl.int.verif.ensure %_GEN_2",
+        // Ensure(a + a >= 2)
         "}"
       )
       NoArguments.verilogTest(parameter)(
@@ -92,11 +89,11 @@ object ContractSpec extends TestSuite:
           val b = Contract((io.a << 3) + io.a) { b =>
             Ensure(b === io.a * 9.U)
           }
-          // Assert((b === io.a * 9.U).I)
+          Assume((b === io.a * 9.U).I)
 
       SingleArgument.verilogTest(parameter)(
         "wire [11:0] _GEN = {4'h0, a};",
-        "assert property ({1'h0, a, 3'h0} + _GEN == _GEN * 12'h9);"
+        "assume property ({1'h0, a, 3'h0} + _GEN == _GEN * 12'h9);"
       )
 
     test("multiple arguments"):
@@ -123,9 +120,10 @@ object ContractSpec extends TestSuite:
           val (u, v) = Contract((c, s)) { case (u, v) =>
             Ensure(u + v === p + q + r)
           }
-          // Assert((u + v === p + q + r).I)
+          // Assume((u + v === p + q + r).I)
 
       MultipleArguments.verilogTest(parameter)(
-        "assert property ({p & q | (p ^ q) & r, 2'h0} == {1'h0, {1'h0, p} + {1'h0, q}}",
-        "  + {2'h0, r})"
+        "wire [7:0] s = p ^ q;",
+        "assume property ({1'h0, p & q | s & r, 1'h0}",
+        "  + {2'h0, s ^ r} == {1'h0, {1'h0, p} + {1'h0, q}} + {2'h0, r});"
       )

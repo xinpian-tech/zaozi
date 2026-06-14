@@ -6,15 +6,19 @@ import me.jiuyang.zaozi.{ContractApi, ContractTuple, ContractTupleArgs, TypeImpl
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.dialect.verif.operation.{
-  AssertApi,
-  AssumeApi,
-  ContractApi as VerifContractApi,
-  EnsureApi,
-  RequireApi,
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlNameKind, given}
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{
+  ContractApi as FirrtlContractApi,
+  NodeApi,
+  VerifEnsureIntrinsicApi,
+  VerifRequireIntrinsicApi,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, OperationApi, Value, given}
+import org.llvm.circt.scalalib.dialect.verif.operation.{AssertApi, AssumeApi, given}
+import org.llvm.mlir.MlirOperation
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, OperationApi, Value, given}
+
+import scala.collection.mutable.{ArrayBuffer, ArrayDeque}
 
 import java.lang.foreign.Arena
 
@@ -27,19 +31,18 @@ private final case class ContractClause(
   label:    Option[String],
   location: Location)
 
-private val contractScopes =
-  scala.collection.mutable.ArrayDeque.empty[scala.collection.mutable.ArrayBuffer[ContractClause]]
+private val contractScopes = ArrayDeque.empty[ArrayBuffer[ContractClause]]
 
 export given_ContractApi.{Contract, Ensure, Require}
 
 given ContractApi with
+  private def operationIsNull(op: Operation): Boolean = MlirOperation.ptr(op.segment).address == 0
   // Lower all public Contract overloads through a flat Seq, while preserving the
   // user-facing body argument and result shapes through the mapping functions.
   private def mapped[R, O](
-    args:          Seq[Referable[? <: Data] & HasOperation],
-    bodyMapping:   Seq[Referable[? <: Data] & HasOperation] => R,
-    resultMapping: Seq[Referable[? <: Data] & HasOperation] => O
-  )(body:          R => (Arena, Context, Block) ?=> Unit
+    args:    Seq[Referable[? <: Data] & HasOperation],
+    mapping: Seq[Referable[? <: Data] & HasOperation] => O
+  )(body:    O => (Arena, Context, Block) ?=> Unit
   )(
     using Arena,
     Context,
@@ -48,79 +51,90 @@ given ContractApi with
     sourcecode.Line,
     TypeImpl
   ): O =
-    val inputValues = args.map(_.refer)
-    val verifInputs = args
-      .zip(inputValues)
-      .map: (arg, value) =>
-        val resultType = arg._tpe match
-          case _:     Bool => 1.integerTypeGet
-          case value: UInt => value._width.integerTypeGet
-          case value: SInt => value._width.integerTypeGet
-          case value: Bits => value._width.integerTypeGet
-          case unsupported =>
-            throw new UnsupportedOperationException(
-              s"verif.contract bridge only supports Bool, UInt, SInt, and Bits; got ${unsupported.getClass.getName}"
-            )
-        val cast       = summon[OperationApi].operationCreate(
-          name = "builtin.unrealized_conversion_cast",
-          location = locate,
-          operands = Seq(value),
-          resultsTypes = Some(Seq(resultType))
-        )
-        cast.appendToBlock()
-        cast.getResult(0)
-    val resultTypes = verifInputs.map(_.getType)
-    val clauses     = scala.collection.mutable.ArrayBuffer.empty[ContractClause]
+    val outerBlock    = summon[Block]
+    val inputValues   = args.map(_.refer)
+    val inputTypes    = inputValues.map(_.getType)
+    val contract      = summon[FirrtlContractApi].op(inputValues, inputTypes, locate)
+    val contractBlock = contract.block
+    val bodyArgs      = args.zipWithIndex.map: (arg, idx) =>
+      val node = summon[NodeApi].op(
+        name = "",
+        location = locate,
+        nameKind = FirrtlNameKind.Droppable,
+        input = contractBlock.getArgument(idx.toLong)
+      )
+      node.operation.appendToBlock()(
+        using contractBlock
+      )
+      new ContractResult(arg._tpe, node.operation)
+    val clauses       = ArrayBuffer.empty[ContractClause]
+    val beforeBody    =
+      if args.isEmpty then
+        var current = outerBlock.getFirstOperation
+        var last    = Option.empty[Operation]
+        while !operationIsNull(current) do
+          last = Some(current)
+          current = current.getNextInBlock
+        last
+      else None
     contractScopes.append(clauses)
     try
-      body(bodyMapping(args))(
+      body(mapping(bodyArgs))(
         using summon[Arena],
         summon[Context],
-        summon[Block]
+        contractBlock
       )
     finally
       contractScopes.remove(contractScopes.length - 1)
-
-    val contract = summon[VerifContractApi].op(verifInputs, resultTypes, locate)
-    contract.operation.appendToBlock()
+    if args.isEmpty then
+      val bodyOps = ArrayBuffer.empty[Operation]
+      var current = beforeBody.map(_.getNextInBlock).getOrElse(outerBlock.getFirstOperation)
+      while !operationIsNull(current) do
+        val next = current.getNextInBlock
+        bodyOps.append(current)
+        current = next
+      bodyOps.foreach: op =>
+        op.removeFromParent()
+        contractBlock.appendOwnedOperation(op)
+    clauses.foreach: clause =>
+      val propertyNode = summon[NodeApi].op(
+        name = "",
+        location = clause.location,
+        nameKind = FirrtlNameKind.Droppable,
+        input = clause.property
+      )
+      propertyNode.operation.appendToBlock()(
+        using contractBlock
+      )
+      val op           = clause.kind match
+        case ContractClauseKind.Require =>
+          summon[VerifRequireIntrinsicApi]
+            .op(propertyNode.operation.getResult(0), clause.label, clause.location)
+            .operation
+        case ContractClauseKind.Ensure  =>
+          summon[VerifEnsureIntrinsicApi]
+            .op(propertyNode.operation.getResult(0), clause.label, clause.location)
+            .operation
+      op.appendToBlock()(
+        using contractBlock
+      )
+    contract.operation.appendToBlock()(
+      using outerBlock
+    )
 
     val results = args.zipWithIndex.map: (arg, idx) =>
-      val resultCast = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
+      val node = summon[NodeApi].op(
+        name = "",
         location = locate,
-        operands = Seq(contract.result),
-        resultsTypes = Some(Seq(inputValues(idx).getType))
+        nameKind = FirrtlNameKind.Droppable,
+        input = contract.result(idx.toLong)
       )
-      resultCast.appendToBlock()
-      new ContractResult(arg._tpe, resultCast)
-    clauses.foreach: clause =>
-      val propertyCast = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = clause.location,
-        operands = Seq(clause.property),
-        resultsTypes = Some(Seq(1.integerTypeGet))
+      node.operation.appendToBlock()(
+        using outerBlock
       )
-      propertyCast.appendToBlock()(
-        using contract.block
-      )
-      val property     = propertyCast.getResult(0)
-      clause.kind match
-        case ContractClauseKind.Require =>
-          summon[RequireApi]
-            .op(property, clause.label, clause.location)
-            .operation
-            .appendToBlock()(
-              using contract.block
-            )
-        case ContractClauseKind.Ensure  =>
-          summon[EnsureApi]
-            .op(property, clause.label, clause.location)
-            .operation
-            .appendToBlock()(
-              using contract.block
-            )
+      new ContractResult(arg._tpe, node.operation)
 
-    resultMapping(results)
+    mapping(results)
 
   def Contract(
     body: => Unit
@@ -132,7 +146,7 @@ given ContractApi with
     sourcecode.Line,
     TypeImpl
   ): Unit =
-    mapped[Unit, Unit](Seq.empty, _ => (), _ => ())(_ => body)
+    mapped[Unit, Unit](Seq.empty, _ => ())(_ => body)
 
   def Contract[T <: Data](
     arg:  Referable[T] & HasOperation
@@ -147,7 +161,6 @@ given ContractApi with
   ): Referable[T] & HasOperation =
     mapped(
       Seq(arg),
-      values => values(0).asInstanceOf[Referable[T] & HasOperation],
       values => values(0).asInstanceOf[Referable[T] & HasOperation]
     )(body)
 
@@ -166,7 +179,6 @@ given ContractApi with
   ): ContractTuple[A] =
     mapped(
       tupleArgs.values(args),
-      _ => args.asInstanceOf[ContractTuple[A]],
       tupleArgs.results
     )(body)
 

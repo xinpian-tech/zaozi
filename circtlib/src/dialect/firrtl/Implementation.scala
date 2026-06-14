@@ -72,6 +72,41 @@ given CircuitApi with
       module.getBody.appendOwnedOperation(c.operation)
   extension (ref: Circuit) def operation: Operation = ref._operation
 end given
+
+given ContractApi with
+  def op(
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): Contract =
+    Contract(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.contract",
+        location = location,
+        regionBlockTypeLocations = Seq(
+          Seq(
+            (inputs.map(_.getType), inputs.map(_ => location))
+          )
+        ),
+        operands = inputs,
+        resultsTypes = Some(resultTypes)
+      )
+    )
+  extension (ref: Contract)
+    def operation: Operation = ref._operation
+    def block(
+      using Arena
+    ): Block = ref.operation.getFirstRegion.getFirstBlock
+    def result(
+      idx: Long
+    )(
+      using Arena
+    ): Value = ref.operation.getResult(idx)
+end given
+
 given ExtModuleApi with
   inline def op(
     symbolName:       String,
@@ -1984,6 +2019,26 @@ end given
 given VerifEnsureIntrinsicApi with
   def op(
     property:    Value,
+    label:       scala.Option[String],
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifEnsureIntrinsic =
+    VerifEnsureIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.ensure",
+        location = location,
+        operands = Seq(property),
+        namedAttributes = label
+          .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
+          .toSeq,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+
+  def op(
+    property:    Value,
     enable:      Value,
     label:       String,
     location:    Location
@@ -2011,6 +2066,26 @@ given VerifEnsureIntrinsicApi with
 end given
 
 given VerifRequireIntrinsicApi with
+  def op(
+    property:    Value,
+    label:       scala.Option[String],
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): VerifRequireIntrinsic =
+    VerifRequireIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.require",
+        location = location,
+        operands = Seq(property),
+        namedAttributes = label
+          .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
+          .toSeq,
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+
   def op(
     property:    Value,
     enable:      Value,
