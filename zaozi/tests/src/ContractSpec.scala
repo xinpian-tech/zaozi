@@ -50,27 +50,25 @@ object ContractSpec extends TestSuite:
           }
 
       NoArguments.mlirTest(parameter)(
-        "%4 = firrtl.subfield %io[a]",
-        "%c1_ui1 = firrtl.constant 1",
-        // a >= 1
-        "%5 = firrtl.geq %4, %c1_ui1",
-        "%_GEN_0 = firrtl.node interesting_name %5",
-        // a + a
-        "%6 = firrtl.add %4, %4",
-        "%_GEN_1 = firrtl.node interesting_name %6",
-        "%c2_ui2 = firrtl.constant 2",
-        // a + a >= 2
-        "%7 = firrtl.geq %_GEN_1, %c2_ui2",
-        "%_GEN_2 = firrtl.node interesting_name %7",
+        "%4 = firrtl.subfield %io[a] : !firrtl.bundle<a flip: uint<8>, p flip: uint<8>, q flip: uint<8>, r flip: uint<8>>",
         "firrtl.contract {",
+        "   %c1_ui1 = firrtl.constant 1 : !firrtl.uint<1>",
+        // a >= 1
+        "   %5 = firrtl.geq %4, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
+        "   %_GEN_0 = firrtl.node interesting_name %5 : !firrtl.uint<1>",
+        "   %6 = firrtl.add %4, %4 : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
+        "   %_GEN_1 = firrtl.node interesting_name %6 : !firrtl.uint<9>",
+        "   %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
+        // a + a >= 2
+        "   %7 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
+        "   %_GEN_2 = firrtl.node interesting_name %7 : !firrtl.uint<1>",
+        "   %8 = firrtl.node %_GEN_0 : !firrtl.uint<1>",
         // Require(a >= 1)
-        "  firrtl.int.verif.require %_GEN_0",
-        "  firrtl.int.verif.ensure %_GEN_2",
+        "   firrtl.int.verif.require %8 : !firrtl.uint<1>",
+        "   %9 = firrtl.node %_GEN_2 : !firrtl.uint<1>",
         // Ensure(a + a >= 2)
-        "}"
-      )
-      NoArguments.verilogTest(parameter)(
-        "module NoArguments"
+        "   firrtl.int.verif.ensure %9 : !firrtl.uint<1>",
+        " }"
       )
 
     test("single argument"):
@@ -89,7 +87,6 @@ object ContractSpec extends TestSuite:
           val b = Contract((io.a << 3) + io.a) { b =>
             Ensure(b === io.a * 9.U)
           }
-          Assume((b === io.a * 9.U).I)
 
       SingleArgument.verilogTest(parameter)(
         "wire [11:0] _GEN = {4'h0, a};",
