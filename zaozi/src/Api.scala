@@ -473,6 +473,14 @@ trait AsVec[D <: Data]:
       InstanceContext
     ): Propagated[R, Vec[E]]
 
+/** Zero-cost re-view of a [[Bundle]] as a string-keyed [[Record]] over the same value (no bitcast; cf. [[AsRecord]]).
+  */
+trait AsRecordView[D <: Bundle]:
+  extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, Record]
+
+trait AsProbeRecordView[D <: ProbeBundle]:
+  extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, ProbeRecord]
+
 trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]:
   extension (ref: PROBE)
     @targetName("send")
