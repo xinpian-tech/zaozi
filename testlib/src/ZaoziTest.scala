@@ -49,10 +49,9 @@ trait HasMlirTest:
   this: Generator[?, ?, ?, ?] =>
   private val self = this.asInstanceOf[Generator[this.TPARAM, this.TLAYER, this.TINTF, this.TPROBE]]
 
-  def mlirTest(
+  def mlirString(
     parameter: this.TPARAM
-  )(predicate: String => Boolean
-  ): Unit =
+  ): String =
     val arena = Arena.ofConfined()
     try
       given Arena      = arena
@@ -68,8 +67,13 @@ trait HasMlirTest:
       summon[MlirModule].getOperation.print(out ++= _)
       summon[Context].destroy()
 
-      assert(predicate(out.toString))
+      out.toString
     finally arena.close()
+
+  def mlirTest(
+    parameter: this.TPARAM
+  )(predicate: String => Boolean
+  ): Unit = assert(predicate(mlirString(parameter)))
 
   def mlirTest(
     parameter:  this.TPARAM
@@ -80,10 +84,9 @@ trait HasFirrtlTest:
   this: Generator[?, ?, ?, ?] =>
   private val self = this.asInstanceOf[Generator[this.TPARAM, this.TLAYER, this.TINTF, this.TPROBE]]
 
-  def firrtlTest(
+  def firrtlString(
     parameter: this.TPARAM
-  )(predicate: String => Boolean
-  ): Unit =
+  ): String =
     val arena = Arena.ofConfined()
     try
       given Arena      = arena
@@ -99,8 +102,13 @@ trait HasFirrtlTest:
       summon[MlirModule].exportFIRRTL(out ++= _)
       summon[Context].destroy()
 
-      assert(predicate(out.toString))
+      out.toString
     finally arena.close()
+
+  def firrtlTest(
+    parameter: this.TPARAM
+  )(predicate: String => Boolean
+  ): Unit = assert(predicate(firrtlString(parameter)))
 
   def firrtlTest(
     parameter:  this.TPARAM
@@ -111,10 +119,9 @@ trait HasVerilogTest:
   this: Generator[?, ?, ?, ?] =>
   private val self = this.asInstanceOf[Generator[this.TPARAM, this.TLAYER, this.TINTF, this.TPROBE]]
 
-  def verilogTest(
+  def verilogString(
     parameter: this.TPARAM
-  )(predicate: String => Boolean
-  ): Unit =
+  ): String =
     val arena = Arena.ofConfined()
     try
       given Arena          = arena
@@ -143,8 +150,13 @@ trait HasVerilogTest:
       summon[PassManager].runOnOp(summon[MlirModule].getOperation)
       summon[Context].destroy()
 
-      assert(predicate(out.toString))
+      out.toString
     finally arena.close()
+
+  def verilogTest(
+    parameter: this.TPARAM
+  )(predicate: String => Boolean
+  ): Unit = assert(predicate(verilogString(parameter)))
 
   def verilogTest(
     parameter:  this.TPARAM
