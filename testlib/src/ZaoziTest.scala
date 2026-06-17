@@ -45,13 +45,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Type
 }
 import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
-import org.llvm.mlir.scalalib.capi.pass.{
-  given_OpPassManagerApi,
-  given_PassManagerApi,
-  PassManager,
-  PassManagerApi
-}
-import utest.{assert}
+import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi, PassManager, PassManagerApi}
+import utest.assert
 
 import java.lang.foreign.Arena
 
