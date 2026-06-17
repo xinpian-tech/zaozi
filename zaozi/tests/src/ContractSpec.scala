@@ -17,7 +17,6 @@ class ContractSpecLayers(parameter: ContractSpecParameter) extends LayerInterfac
   def layers = Seq.empty
 
 class ContractSpecIO(parameter: ContractSpecParameter) extends HWBundle(parameter):
-  val a = Flipped(UInt(parameter.width))
   val p = Flipped(UInt(parameter.width))
   val q = Flipped(UInt(parameter.width))
   val r = Flipped(UInt(parameter.width))
@@ -42,33 +41,33 @@ object ContractSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ContractSpecParameter) =
           val io = summon[Interface[ContractSpecIO]]
-          val a  = io.a
+          val p  = io.p
 
           Contract {
-            Require(a >= 1.U)
-            Ensure(a + a >= 2.U)
+            Require(p >= 1.U)
+            Ensure(p + p >= 2.U)
           }
 
       NoArguments.mlirTest(parameter)(
-        "%4 = firrtl.subfield %io[a] : !firrtl.bundle<a flip: uint<8>, p flip: uint<8>, q flip: uint<8>, r flip: uint<8>>",
+        // Contract
         "firrtl.contract {",
-        "   %c1_ui1 = firrtl.constant 1 : !firrtl.uint<1>",
-        // a >= 1
-        "   %5 = firrtl.geq %4, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
-        "   %_GEN_0 = firrtl.node interesting_name %5 : !firrtl.uint<1>",
-        "   %6 = firrtl.add %4, %4 : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
-        "   %_GEN_1 = firrtl.node interesting_name %6 : !firrtl.uint<9>",
-        "   %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
-        // a + a >= 2
-        "   %7 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
-        "   %_GEN_2 = firrtl.node interesting_name %7 : !firrtl.uint<1>",
-        "   %8 = firrtl.node %_GEN_0 : !firrtl.uint<1>",
-        // Require(a >= 1)
-        "   firrtl.int.verif.require %8 : !firrtl.uint<1>",
-        "   %9 = firrtl.node %_GEN_2 : !firrtl.uint<1>",
-        // Ensure(a + a >= 2)
-        "   firrtl.int.verif.ensure %9 : !firrtl.uint<1>",
-        " }"
+        "  %c1_ui1 = firrtl.constant 1 : !firrtl.uint<1>",
+        // p >= 1
+        "  %4 = firrtl.geq %3, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
+        "  %_GEN_0 = firrtl.node interesting_name %4 : !firrtl.uint<1>",
+        // p + p
+        "  %5 = firrtl.add %3, %3 : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
+        "  %_GEN_1 = firrtl.node interesting_name %5 : !firrtl.uint<9>",
+        "  %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
+        // p + p >= 2
+        "  %6 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
+        "  %_GEN_2 = firrtl.node interesting_name %6 : !firrtl.uint<1>",
+        "  %7 = firrtl.node %_GEN_0 : !firrtl.uint<1>",
+        // require p >= 1
+        "  firrtl.int.verif.require %7 : !firrtl.uint<1>",
+        "  %8 = firrtl.node %_GEN_2 : !firrtl.uint<1>",
+        // ensure p + p >= 2
+        "  firrtl.int.verif.ensure %8 : !firrtl.uint<1>"
       )
 
     test("single argument"):
@@ -83,14 +82,17 @@ object ContractSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ContractSpecParameter) =
           val io = summon[Interface[ContractSpecIO]]
+          val p  = io.p
 
-          val b = Contract((io.a << 3) + io.a) { b =>
-            Ensure(b === io.a * 9.U)
+          val out = Contract((p << 3) + p) { b =>
+            Ensure(b === p * 9.U)
           }
 
       SingleArgument.verilogTest(parameter)(
-        "wire [11:0] _GEN = {4'h0, a};",
-        "assume property ({1'h0, a, 3'h0} + _GEN == _GEN * 12'h9);"
+        // ensure b = p * 9.U
+        "assume property (_GEN == {4'h0, p} * 12'h9);",
+        // formal contract
+        "assert property ({1'h0, _GEN, 3'h0} + _GEN_0 == _GEN_0 * 12'h9);"
       )
 
     test("multiple arguments"):
@@ -117,10 +119,13 @@ object ContractSpec extends TestSuite:
           val (u, v) = Contract((c, s)) { case (u, v) =>
             Ensure(u + v === p + q + r)
           }
-          // Assume((u + v === p + q + r).I)
 
       MultipleArguments.verilogTest(parameter)(
-        "wire [7:0] s = p ^ q;",
-        "assume property ({1'h0, p & q | s & r, 1'h0}",
-        "  + {2'h0, s ^ r} == {1'h0, {1'h0, p} + {1'h0, q}} + {2'h0, r});"
+        // ensure u + v = p + q + r
+        "assume property ({1'h0, _GEN} + {2'h0, _GEN_0} == {1'h0, {1'h0, p} + {1'h0, q}}",
+        "                 + {2'h0, r});",
+        // formal contract
+        "assert property ({1'h0, _GEN & _GEN_0 | s & _GEN_1, 1'h0}",
+        "                 + {2'h0, s ^ _GEN_1} == {1'h0, {1'h0, _GEN} + {1'h0, _GEN_0}}",
+        "                 + {2'h0, _GEN_1});"
       )
