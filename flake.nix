@@ -7,9 +7,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
     circt-src = {
       type = "github";
-      owner = "llvm";
+      owner = "xinpian-tech";
       repo = "circt";
-      ref = "main";
+      ref = "xinpian-main";
       flake = false;
     };
     llvm-src = {
@@ -17,7 +17,7 @@
       owner = "llvm";
       repo = "llvm-project";
       # from CIRCT submodule
-      rev = "e6566c571aead7b48bdf13a8c170515abaeea74e";
+      rev = "b7152ff7026a05282b6ae91ccf150ede0217b08a";
       flake = false;
     };
     circt-nix = {
