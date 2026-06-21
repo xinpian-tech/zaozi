@@ -1055,7 +1055,7 @@ trait ContractApi:
   ): ContractTuple[A]
 
   def Require(
-    property: Referable[Bool],
+    property: Immediate | Sequence | Property,
     label:    Option[String] = None
   )(
     using Arena,
@@ -1067,7 +1067,7 @@ trait ContractApi:
   ): Unit
 
   def Ensure(
-    property: Referable[Bool],
+    property: Immediate | Sequence | Property,
     label:    Option[String] = None
   )(
     using Arena,
