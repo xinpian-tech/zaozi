@@ -16,6 +16,10 @@ __pycache__/
 out/
 result*
 
+# Vendored scala3 fork checkout for the Metals integration; pinned as a nix
+# flake input rather than committed into this repo.
+scala3/
+
 *.vcd
 *.fst
 *.fsdb
