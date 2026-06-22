@@ -15,7 +15,7 @@
 , scalaVersion ? "3.8.3"
 , proxyHost ? null
 , proxyPort ? null
-, outputHash ? "sha256-HewnrIlk86WUq849d1HjKVen6PAoGgbfrzyg4ys+UJo="
+, outputHash ? "sha256-ueMUqp7aM84Q9oodIV4rLtDrIOhWB5JJjgzcPI7IZhQ="
 }:
 
 stdenv.mkDerivation {
@@ -58,6 +58,20 @@ stdenv.mkDerivation {
       io.get-coursier:coursier-cli_3:2.1.25-M17 \
       com.lihaoyi:os-lib_3:0.11.5 \
       org.scala-lang.modules:scala-collection-compat_3:2.13.0
+
+    # Mill's SemanticDB worker + the javac SemanticDB plugin: Metals' BSP buildTargetCompile drives
+    # Mill's SemanticDbJavaModule to produce the WORKSPACE SemanticDB that Metals indexes for
+    # cross-file go-to-definition / find-references. Without these offline, Mill's
+    # `workerClasspath` / `resolvedSemanticDbJavaPluginMvnDeps` tasks fail and Metals never builds a
+    # cross-file index (same-file navigation still works from the open file's SemanticDB).
+    cs fetch --cache "$COURSIER_CACHE" \
+      com.lihaoyi:mill-libs-javalib-scalameta-worker_3:1.1.2 \
+      com.sourcegraph:semanticdb-javac:0.11.1 \
+      org.scalameta:scalameta_2.13:4.14.7 \
+      org.scalameta:semanticdb-shared_2.13:4.14.7 \
+      org.scala-lang:scala-compiler:2.13.15 \
+      io.github.java-diff-utils:java-diff-utils:4.12 \
+      com.google.protobuf:protobuf-java:3.19.6
 
     # Offline-resolvable set: drop coursier sidecar dotfiles + _remote.repositories, but KEEP
     # maven-metadata.xml so coursier can resolve version-range deps offline (see above).

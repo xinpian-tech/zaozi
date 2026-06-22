@@ -187,6 +187,11 @@
                 url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-presentation-compiler_3/3.8.3/scala3-presentation-compiler_3-3.8.3.jar";
                 hash = "sha256-AO0MabUpXkrwRFjwkJ28oox44GtXdNNGwC81izdlzvk=";
               };
+              stockCompiler = pkgs.fetchurl {
+                name = "scala3-compiler_3-3.8.3.jar";
+                url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.8.3/scala3-compiler_3-3.8.3.jar";
+                hash = "sha256-zV5apUthDjdSLe6hk0Sp2WFNX7yc8FLeCKZs63waiXQ=";
+              };
             in
             pkgs.writeShellApplication {
               name = "scala3-shadow-metals-resolution";
@@ -197,6 +202,7 @@
                   --metals-cache "${scala3-shadow-metals-extra}" \
                   --shadow-jars "${scala3-shadow-jars}" \
                   --stock-pc "${stockPc}" \
+                  --stock-compiler "${stockCompiler}" \
                   --probe "${./nix/checks/metals_lsp_probe.py}" \
                   --mill "${pkgs.mill}" "$@"
               '';

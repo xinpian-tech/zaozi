@@ -12,9 +12,12 @@ import json, os, subprocess, sys, threading, time, queue
 WS, FILE = sys.argv[1], sys.argv[2]
 # Two argv shapes:
 #   <ws> <file> <line> <char> [completion|hover|definition]   -- one request
-#   <ws> <file> BATCH <name:mode:line:char> ...               -- many requests, one session
+#   <ws> <file> BATCH <name:mode:line:char> ...               -- many requests, one open file
+#   <ws> <file> MULTI <name:mode:relfile:line:char> ...        -- many requests across files
 if len(sys.argv) > 3 and sys.argv[3] == "BATCH":
     MODE, SPECS, LINE, CHAR = "batch", sys.argv[4:], 0, 0
+elif len(sys.argv) > 3 and sys.argv[3] == "MULTI":
+    MODE, SPECS, LINE, CHAR = "multi", sys.argv[4:], 0, 0
 else:
     LINE, CHAR = int(sys.argv[3]), int(sys.argv[4])
     MODE, SPECS = (sys.argv[5] if len(sys.argv) > 5 else "completion"), []
@@ -139,9 +142,10 @@ notify("workspace/didChangeConfiguration", {"settings": {"metals": {
 }}})
 
 uri = "file://" + os.path.abspath(FILE)
-text = open(FILE).read()
-notify("textDocument/didOpen", {"textDocument": {
-    "uri": uri, "languageId": "scala", "version": 1, "text": text}})
+# MULTI opens each spec's target file itself; single/BATCH operate on the one main file.
+if MODE != "multi":
+    notify("textDocument/didOpen", {"textDocument": {
+        "uri": uri, "languageId": "scala", "version": 1, "text": open(FILE).read()}})
 
 def comp_items(ln, ch, u=None):
     try:
@@ -263,6 +267,35 @@ elif MODE == "batch":
     shutdown()
     if not ready:
         sys.stderr.write("PC not ready (batch)\n"); print(json.dumps({})); sys.exit(3)
+    print(json.dumps(result)); sys.exit(0)
+
+elif MODE == "multi":
+    # specs: name:mode:relfile:line:char — open each distinct file, target each request's uri.
+    opened = {}
+    def file_uri(rel):
+        p = os.path.abspath(os.path.join(WS, rel))
+        u = "file://" + p
+        if u not in opened:
+            notify("textDocument/didOpen", {"textDocument": {
+                "uri": u, "languageId": "scala", "version": 1, "text": open(p).read()}})
+            opened[u] = True
+        return u
+    parsed = [(s.split(":")[0], s.split(":")[1], file_uri(s.split(":")[2]),
+               int(s.split(":")[3]), int(s.split(":")[4])) for s in SPECS]
+    # Warm every distinct file to PC-readiness so cross-file requests have each file's symbols.
+    ready = True
+    for u in dict.fromkeys(p[2] for p in parsed):
+        pos = next(p for p in parsed if p[2] == u)
+        if not wait_ready(pos[3], pos[4], u):
+            ready = False
+            break
+    result = {}
+    if ready:
+        for name, mode, u, ln, ch in parsed:
+            result[name] = one(mode, ln, ch, u)
+    shutdown()
+    if not ready:
+        sys.stderr.write("PC not ready (multi)\n"); print(json.dumps({})); sys.exit(3)
     print(json.dumps(result)); sys.exit(0)
 
 else:  # single hover | definition | references: exit non-zero ONLY if the PC never came up

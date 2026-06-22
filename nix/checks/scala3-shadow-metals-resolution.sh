@@ -15,19 +15,20 @@ set -euo pipefail
 VER=3.8.3
 # --metals-cache is the Metals-ready isolated cache (shadow cache + Metals PC-setup closure,
 # coherently resolved); --shadow-jars provides hashes.json for the patched PC hash.
-METALS=; MC=; SJ=; STOCK_PC=; PROBE=; MILLDIR=
+METALS=; MC=; SJ=; STOCK_PC=; STOCK_C=; PROBE=; MILLDIR=
 while [ $# -gt 0 ]; do
   case "$1" in
-    --metals)       METALS="$2"; shift 2 ;;
-    --metals-cache) MC="$2"; shift 2 ;;
-    --shadow-jars)  SJ="$2"; shift 2 ;;
-    --stock-pc)     STOCK_PC="$2"; shift 2 ;;
-    --probe)        PROBE="$2"; shift 2 ;;
-    --mill)         MILLDIR="$2"; shift 2 ;;
+    --metals)         METALS="$2"; shift 2 ;;
+    --metals-cache)   MC="$2"; shift 2 ;;
+    --shadow-jars)    SJ="$2"; shift 2 ;;
+    --stock-pc)       STOCK_PC="$2"; shift 2 ;;
+    --stock-compiler) STOCK_C="$2"; shift 2 ;;
+    --probe)          PROBE="$2"; shift 2 ;;
+    --mill)           MILLDIR="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
-for v in METALS MC SJ STOCK_PC PROBE MILLDIR; do [ -n "${!v}" ] || { echo "missing arg $v" >&2; exit 2; }; done
+for v in METALS MC SJ STOCK_PC STOCK_C PROBE MILLDIR; do [ -n "${!v}" ] || { echo "missing arg $v" >&2; exit 2; }; done
 MILL_BIN="$MILLDIR/bin"
 
 PASS=0
@@ -35,6 +36,7 @@ ok()   { PASS=$((PASS+1)); echo "PASS  $1"; }
 fail() { echo "FAIL  $1" >&2; exit 1; }
 sha()  { sha256sum "$1" | cut -d' ' -f1; }
 
+C_COORD="https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/$VER/scala3-compiler_3-$VER.jar"
 PC_COORD="https/repo1.maven.org/maven2/org/scala-lang/scala3-presentation-compiler_3/$VER/scala3-presentation-compiler_3-$VER.jar"
 PC_WANT=$(jq -r '.artifacts."scala3-presentation-compiler_3".jarSha256' "$SJ/share/zaozi-shadow/hashes.json")
 [ -n "$PC_WANT" ] && [ "$PC_WANT" != null ] || fail "could not read published patched PC hash"
@@ -86,6 +88,44 @@ M
     else
       python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" "$LN" "$CH" "${8:-completion}"
     fi
+  ) >"$2" 2>>"$3"
+}
+
+# Cross-file runner: a two-file workspace (Bundles.scala defines the bundle; Main.scala uses it),
+# compiled through Metals' BSP path so the WORKSPACE SemanticDB index exists for cross-file
+# navigation. $1 cacheSrcDir, $2 out, $3 log, $4 MULTI-specs, $5 bundlesSrc, $6 mainSrc.
+run_xfile() {
+  local R WS NCD CC H X
+  R=$(mktemp -d -p "$BASE"); WS="$R/ws"; mkdir -p "$WS/foo/src/demo"
+  cat > "$WS/build.mill" <<'M'
+//| mill-version: 1.1.2
+package build
+import mill._
+import mill.scalalib._
+object foo extends ScalaModule {
+  def scalaVersion = "3.8.3"
+  def scalacOptions = Seq("-Xsemanticdb", "-language:dynamics")
+}
+M
+  printf '%s' "$5" > "$WS/foo/src/demo/Bundles.scala"
+  printf '%s' "$6" > "$WS/foo/src/demo/Main.scala"
+  rm -rf "$WS/.bloop" "$WS/.metals" "$WS/out" "$WS/.bsp" 2>/dev/null || true
+  find "$WS" -name '*.semanticdb' -delete 2>/dev/null || true
+  NCD="$R/coursier"; CC="$NCD/cache"; H="$R/home"; X="$R/xdg"; mkdir -p "$NCD" "$H" "$X"
+  cp -rL "$1" "$CC"; chmod -R u+w "$CC"
+  local JOPTS="-Dcoursier.cache=$CC -Dcoursier.ivy.home=$NCD -Divy.home=$NCD -Duser.home=$H -Dzaozi.shadow.marker=true"
+  JOPTS="$JOPTS -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=1 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=1"
+  printf '%s\n' $JOPTS > "$R/mopts"
+  (
+    cd "$WS"
+    export COURSIER_CACHE="$CC" HOME="$H" XDG_CACHE_HOME="$X" IVY_HOME="$NCD" \
+           MILL_JVM_OPTS_PATH="$R/mopts" JAVA_TOOL_OPTIONS="$JOPTS" \
+           METALS_BIN="$METALS/bin/metals" METALS_STDERR="$3" PROBE_TIMEOUT=600 \
+           PATH="$MILL_BIN:$PATH"
+    unset SBT_OPTS JAVA_OPTS http_proxy https_proxy HTTP_PROXY HTTPS_PROXY 2>/dev/null || true
+    if ! mill --no-daemon --offline mill.bsp.BSP/install >/dev/null 2>&1; then exit 90; fi
+    [ -f "$WS/.bsp/mill-bsp.json" ] || exit 91
+    python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" MULTI ${4}
   ) >"$2" 2>>"$3"
 }
 
@@ -394,6 +434,74 @@ ok "task11: textDocument/references on Nested.leaf includes the chained io.child
 # 6c. go-to-definition io.a -> val a (same file, references-capable fixture).
 [ "$(jq -r '.defA[0].line // empty' "$X")" = "$RVALA_LN" ] || fail "task11: definition io.a not at val a (line $RVALA_LN): $(jq -c '.defA' "$X")"
 ok "task11: go-to-definition io.a -> the bundle's val a (line $RVALA_LN)"
+
+echo "== 7. patched cache: CROSS-FILE find-references via the workspace SemanticDB index (AC-8) =="
+# Bundle declared in Bundles.scala; used (cross-file) in Main.scala. Metals' BSP buildTargetCompile
+# (with the SemanticDB worker now in the offline cache) builds the workspace index, so
+# textDocument/references on the Bundles.scala declaration returns the cross-file Main.scala uses.
+XBUN=$(cat <<'SCALA'
+package me.jiuyang.zaozi.valuetpe {
+  trait Data; class Bits extends Data; case class BundleField[T <: Data](dataType: T)
+  trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+  class Nested extends Bundle { val leaf: BundleField[Bits] = ??? }
+}
+package me.jiuyang.zaozi.magic { trait DynamicSubfield }
+package me.jiuyang.zaozi.reftpe {
+  trait Referable[T <: me.jiuyang.zaozi.valuetpe.Data] extends scala.Dynamic {
+    transparent inline def selectDynamic(name: String): Any =
+      new me.jiuyang.zaozi.reftpe.Ref[me.jiuyang.zaozi.valuetpe.Nested]
+  }
+  class Ref[E <: me.jiuyang.zaozi.valuetpe.Data] extends me.jiuyang.zaozi.reftpe.Referable[E]
+}
+package demo {
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField, Nested}
+  class MyBundle extends Bundle { val a: BundleField[Bits] = ???; val child: BundleField[Nested] = ??? }
+}
+SCALA
+)
+XMAIN=$(cat <<'SCALA'
+package demo
+import scala.language.dynamics
+import me.jiuyang.zaozi.reftpe.{Referable, Ref}
+import me.jiuyang.zaozi.valuetpe.Nested
+object Main:
+  def u1(io: Referable[MyBundle]): Ref[Nested] = io.a
+  def u2(io: Referable[MyBundle]): Ref[Nested] = io.a
+  def u3(io: Referable[MyBundle]): Ref[Nested] = io.child.leaf
+SCALA
+)
+xvalpos() { local n l b; n=$(grep -nF "val $2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "xref: no 'val $2'"; l=$(sed -n "${n}p" <<<"$1"); b="${l%%$2*}"; echo "$((n-1)):${#b}"; }
+xln()     { local n; n=$(grep -nF "$2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "xref: no '$2'"; echo "$((n-1))"; }
+XVALA=$(xvalpos "$XBUN" 'a:'); XVALLEAF=$(xvalpos "$XBUN" 'leaf:')
+XVALA_LN="${XVALA%%:*}"; XVALLEAF_LN="${XVALLEAF%%:*}"
+XU1=$(xln "$XMAIN" 'def u1'); XU2=$(xln "$XMAIN" 'def u2'); XU3=$(xln "$XMAIN" 'def u3')
+# refA first so the index has time to populate (references retries) before refLeaf.
+XSPECS="refA:references:foo/src/demo/Bundles.scala:$XVALA refLeaf:references:foo/src/demo/Bundles.scala:$XVALLEAF"
+rc=0; run_xfile "$MC/cache" "$BASE/xr.json" "$BASE/xr.log" "$XSPECS" "$XBUN" "$XMAIN" || rc=$?
+[ "$rc" -eq 0 ] || { tail -30 "$BASE/xr.log" >&2; cat "$BASE/xr.json" 2>/dev/null >&2; fail "task11: cross-file references session failed (rc=$rc)"; }
+XR="$BASE/xr.json"
+jq -e . "$XR" >/dev/null 2>&1 || { cat "$XR" >&2; fail "task11: cross-file references output not valid JSON"; }
+# Exact location set (basename:line, sorted) for a probe result key.
+locset() { jq -r --arg k "$1" '[.[$k][] | ((.uri|split("/")|last) + ":" + (.line|tostring))] | sort | join(",")' "$XR"; }
+want3=$(printf '%s\n' "Bundles.scala:$XVALA_LN" "Main.scala:$XU1" "Main.scala:$XU2" | sort | paste -sd, -)
+[ "$(locset refA)" = "$want3" ] || fail "task11: cross-file references on val a != {decl + both io.a uses}: got=[$(locset refA)] want=[$want3] raw=$(jq -c '.refA' "$XR")"
+ok "task11: cross-file textDocument/references on val a == Bundles.scala decl + both Main.scala io.a uses"
+want2=$(printf '%s\n' "Bundles.scala:$XVALLEAF_LN" "Main.scala:$XU3" | sort | paste -sd, -)
+[ "$(locset refLeaf)" = "$want2" ] || fail "task11: cross-file references on Nested.leaf != {decl + chained io.child.leaf}: got=[$(locset refLeaf)] want=[$want2] raw=$(jq -c '.refLeaf' "$XR")"
+ok "task11: cross-file textDocument/references on Nested.leaf == decl + the chained io.child.leaf use"
+# Stock LSP negative: a stock-COMPILER workspace registers no dynamic-select occurrences, so
+# references on val a returns ONLY the declaration (the use sites come from the patch, not Metals).
+XSTOCK="$BASE/xstock"; mkdir -p "$XSTOCK"; cp -rL "$MC/cache" "$XSTOCK/cache"; chmod -R u+w "$XSTOCK"
+install -m644 "$STOCK_C" "$XSTOCK/cache/$C_COORD"
+rc=0; run_xfile "$XSTOCK/cache" "$BASE/xs.json" "$BASE/xs.log" "refA:references:foo/src/demo/Bundles.scala:$XVALA" "$XBUN" "$XMAIN" || rc=$?
+[ "$rc" -eq 0 ] || { tail -30 "$BASE/xs.log" >&2; cat "$BASE/xs.json" 2>/dev/null >&2; fail "task11: stock cross-file references session failed (rc=$rc)"; }
+XS="$BASE/xs.json"
+jq -e . "$XS" >/dev/null 2>&1 || { cat "$XS" >&2; fail "task11: stock references output not valid JSON"; }
+nstock=$(jq -r '.refA | length' "$XS")
+[ "$nstock" = "1" ] || fail "task11: stock references on val a expected ONLY the declaration (1 loc), got $nstock: $(jq -c '.refA' "$XS")"
+sloc=$(jq -r '.refA[0] | ((.uri|split("/")|last) + ":" + (.line|tostring))' "$XS")
+[ "$sloc" = "Bundles.scala:$XVALA_LN" ] || fail "task11: stock references location is not the declaration: $sloc"
+ok "task11: STOCK toolchain references on val a returns ONLY the declaration (no dynamic use sites)"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"
