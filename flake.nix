@@ -9,7 +9,7 @@
       type = "github";
       owner = "xinpian-tech";
       repo = "circt";
-      ref = "xinpian-main";
+      ref = "verif-contract-direct";
       flake = false;
     };
     llvm-src = {

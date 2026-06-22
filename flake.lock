@@ -32,16 +32,16 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1781548968,
-        "narHash": "sha256-wRRMKvegSRG0l/EXwitGAq3KicAvWz0lYXotv4pXF7s=",
+        "lastModified": 1782111404,
+        "narHash": "sha256-zQdmouzcUZGbB7bAy0uPZWQBugb9chq6rrnUcP+6Hnw=",
         "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "e77dd1671fd222310beeab04950dd5614961ba3e",
+        "rev": "5047edbf79607e7bc57ad7ce0190c1baba177351",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
-        "ref": "xinpian-main",
+        "ref": "verif-contract-direct",
         "repo": "circt",
         "type": "github"
       }
