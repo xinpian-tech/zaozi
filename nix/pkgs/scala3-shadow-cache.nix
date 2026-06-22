@@ -26,7 +26,7 @@
 , proxyPort ? null
   # Recursive sha256 of the normalised cache. Pinned from a real proxied build. Re-pin
   # if the lock, the PC closure, or the patched jar bytes change.
-, outputHash ? "sha256-rSBQgLMP9VidOLbSe1ASDXY/qg3RGhR51DH/p8T2E4o="
+, outputHash ? "sha256-BFdLrEz7tQ/TzOOdmYRry0b57+nmubNFhhce6spW25I="
 }:
 
 let

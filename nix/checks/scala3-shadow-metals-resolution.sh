@@ -137,17 +137,18 @@ if grep -q "__zaozi_marker__" "$BASE/s.labels" 2>/dev/null; then fail "stock PC 
 [ "$(sha "$STOCK/cache/$PC_COORD")" = "$STOCK_PC_SHA" ] || fail "stock: PC coordinate hash changed during the run"
 ok "stock isolated cache: stock PC ran ($nlabels completions), no __zaozi_marker__, PC coord == pinned stock"
 
-echo "== 4. patched cache: zaozi Bundle-field completion (additive, type-gated) =="
+echo "== 4. patched cache: zaozi Bundle/ProbeBundle field completion (AC-5 matrix) =="
 # A synthetic fixture that declares the minimal zaozi shapes BY their real fully-qualified
-# names (the resolver matches by FQN, so no real zaozi/CIRCT closure is needed). `io` is a
-# Referable[MyBundle]; `d` is a non-zaozi scala.Dynamic. The patched PC must list MyBundle's
-# BundleField/Option[BundleField] fields at `io.`, and must NOT augment `d.`.
+# names (the resolver matches by FQN, so no real zaozi/CIRCT closure is needed). It covers a
+# Bundle (`io`), a ProbeBundle (`pb`), a typed prefix (`io.a`), and a non-zaozi Dynamic (`d`),
+# plus a private field `p` and a non-BundleField val `n` that must NOT be offered.
 ZFIX=$(cat <<'SCALA'
 package me.jiuyang.zaozi.valuetpe {
   trait Data
   class Bits extends Data
   case class BundleField[T <: Data](dataType: T)
   trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+  trait ProbeBundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
 }
 package me.jiuyang.zaozi.magic {
   trait DynamicSubfield
@@ -160,11 +161,16 @@ package me.jiuyang.zaozi.reftpe {
 package demo {
   import scala.language.dynamics
   import me.jiuyang.zaozi.reftpe.Referable
-  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  import me.jiuyang.zaozi.valuetpe.{Bundle, ProbeBundle, Bits, BundleField}
   class MyBundle extends Bundle {
     val a: BundleField[Bits] = ???
     val b: BundleField[Bits] = ???
     val k: Option[BundleField[Bits]] = ???
+    private val p: BundleField[Bits] = ???
+    val n: Int = 0
+  }
+  class MyProbe extends ProbeBundle {
+    val x: BundleField[Bits] = ???
   }
   class PlainDyn extends scala.Dynamic {
     def selectDynamic(n: String): Any = ???
@@ -172,38 +178,52 @@ package demo {
   object Main {
     def run(io: Referable[MyBundle]): Unit =
       io.
+    def pre(io: Referable[MyBundle]): Unit =
+      io.a
+    def prb(pb: Referable[MyProbe]): Unit =
+      pb.
     def run2(d: PlainDyn): Unit =
       d.
   }
 }
 SCALA
 )
-# Locate the `io.` and `d.` carets (LSP line is 0-indexed; char = end-of-line, just past the dot).
-IOL=$(grep -nxE '      io\.' <<<"$ZFIX" | head -1 | cut -d: -f1)
-DL=$(grep -nxE '      d\.'  <<<"$ZFIX" | head -1 | cut -d: -f1)
-[ -n "$IOL" ] && [ -n "$DL" ] || fail "zaozi: could not locate completion carets in the fixture"
-IOLN=$((IOL-1)); t=$(sed -n "${IOL}p" <<<"$ZFIX"); IOCH=${#t}
-DLN=$((DL-1));   t=$(sed -n "${DL}p"  <<<"$ZFIX"); DCH=${#t}
-# Positive: io. (Referable[MyBundle]) lists Bundle fields a, b, k.
-rc=0; run_metals "$MC/cache" "$BASE/z.labels" "$BASE/z.log" "" "$ZFIX" "$IOLN" "$IOCH" || rc=$?
-if [ "$rc" -ne 0 ]; then
-  echo "--- zaozi io. run failed (rc=$rc). labels: $(cat "$BASE/z.labels" 2>/dev/null) ---" >&2
-  tail -25 "$BASE/z.log" >&2
-  fail "zaozi: headless Metals completion at io. did not run"
-fi
-# Field completion labels render as `<name>: <fieldType>` (e.g. `a: BundleField[Bits]`).
-for fld in a b k; do
-  jq -e --arg f "$fld" 'any(.[]; test("^" + $f + ": "))' "$BASE/z.labels" >/dev/null 2>&1 \
-    || fail "zaozi: completion at io. is missing Bundle field '$fld' (got: $(cat "$BASE/z.labels" 2>/dev/null))"
+# Run Metals completion at the (unique, full-line) caret matched by regex $2; labels -> $1.
+zrun() { # $1 = labelsOut, $2 = caret line-regex
+  local n t ln ch rc=0
+  n=$(grep -nxE "$2" <<<"$ZFIX" | head -1 | cut -d: -f1)
+  [ -n "$n" ] || fail "zaozi: could not locate caret /$2/ in the fixture"
+  t=$(sed -n "${n}p" <<<"$ZFIX"); ln=$((n-1)); ch=${#t}
+  run_metals "$MC/cache" "$1" "${1%.labels}.log" "" "$ZFIX" "$ln" "$ch" || rc=$?
+  [ "$rc" -eq 0 ] || { tail -20 "${1%.labels}.log" >&2; fail "zaozi: completion run failed (rc=$rc) at /$2/"; }
+}
+has() { jq -e --arg f "$1" 'any(.[]; startswith($f))' "$2" >/dev/null 2>&1; } # any label starts with $1
+# 4a. io. : public BundleField fields a,b,k with Ref[E] detail; private p and non-field n absent.
+zrun "$BASE/z.labels" '      io\.'
+has 'a: Ref['        "$BASE/z.labels" || fail "zaozi: io. missing 'a: Ref[..]' (got: $(cat "$BASE/z.labels"))"
+has 'b: Ref['        "$BASE/z.labels" || fail "zaozi: io. missing 'b: Ref[..]'"
+has 'k: Option[Ref[' "$BASE/z.labels" || fail "zaozi: io. missing 'k: Option[Ref[..]]'"
+if has 'p: ' "$BASE/z.labels"; then fail "zaozi: io. wrongly offered private field 'p'"; fi
+if has 'n: ' "$BASE/z.labels"; then fail "zaozi: io. wrongly offered non-BundleField val 'n'"; fi
+for f in a b k; do
+  c=$(jq --arg f "$f" '[.[] | select(startswith($f + ": "))] | length' "$BASE/z.labels")
+  [ "$c" = "1" ] || fail "zaozi: field '$f' appears $c times in io. completion (expected 1; no duplicates)"
 done
-ok "patched cache: completion at io. lists Bundle fields a, b, k (additive)"
-# Negative: a non-zaozi scala.Dynamic qualifier is NOT augmented with Bundle fields.
-rc=0; run_metals "$MC/cache" "$BASE/zn.labels" "$BASE/zn.log" "" "$ZFIX" "$DLN" "$DCH" || rc=$?
-[ "$rc" -eq 0 ] || { tail -20 "$BASE/zn.log" >&2; fail "zaozi: completion at a non-zaozi Dynamic did not run (rc=$rc)"; }
-for fld in a b k; do
-  if jq -e --arg f "$fld" 'any(.[]; test("^" + $f + ": "))' "$BASE/zn.labels" >/dev/null 2>&1; then
-    fail "zaozi: a non-zaozi scala.Dynamic qualifier was wrongly augmented with '$fld'"
-  fi
+ok "patched cache: io. lists a,b,k as Ref[E]/Option[Ref[E]]; private+non-field excluded; no dups"
+# 4b. io.a : typed prefix yields only field a.
+zrun "$BASE/zp.labels" '      io\.a'
+has 'a: Ref[' "$BASE/zp.labels" || fail "zaozi: prefix io.a@@ missing 'a' (got: $(cat "$BASE/zp.labels"))"
+if has 'b: ' "$BASE/zp.labels"; then fail "zaozi: prefix io.a@@ wrongly offered 'b'"; fi
+if has 'k: ' "$BASE/zp.labels"; then fail "zaozi: prefix io.a@@ wrongly offered 'k'"; fi
+ok "patched cache: typed prefix io.a@@ yields only field a"
+# 4c. pb. : ProbeBundle fields are listed too.
+zrun "$BASE/zb.labels" '      pb\.'
+has 'x: Ref[' "$BASE/zb.labels" || fail "zaozi: ProbeBundle pb. missing 'x' (got: $(cat "$BASE/zb.labels"))"
+ok "patched cache: ProbeBundle completion at pb. lists field x"
+# 4d. d. : a non-zaozi scala.Dynamic qualifier is NOT augmented.
+zrun "$BASE/zn.labels" '      d\.'
+for bad in a b k x; do
+  if has "$bad: Ref" "$BASE/zn.labels"; then fail "zaozi: non-zaozi Dynamic wrongly augmented with '$bad'"; fi
 done
 ok "patched cache: a non-zaozi scala.Dynamic qualifier is not augmented (type-gated)"
 

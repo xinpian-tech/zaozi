@@ -64,7 +64,7 @@ import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.core.Flags
-import dotty.tools.pc.completions.{CompletionAffix, CompletionValue}
+import dotty.tools.pc.completions.CompletionValue
 
 object ZaoziPcSupport:
   private val ReferableFqn       = "me.jiuyang.zaozi.reftpe.Referable"
@@ -84,28 +84,47 @@ object ZaoziPcSupport:
   /** True iff `tpe` is a zaozi `Referable[Bundle/ProbeBundle]`. */
   def isZaoziReferable(tpe: Type)(using Context): Boolean = bundleType(tpe).isDefined
 
-  /** `BundleField[E]` or `Option[BundleField[E]]`. */
-  private def isBundleFieldType(tpe: Type)(using Context): Boolean =
-    if baseClassByFqn(tpe, BundleFieldFqn).exists then true
+  /** Element type `E` of `BundleField[E]` / `Option[BundleField[E]]`, and whether it is
+   *  optional; None if `tpe` is neither shape. */
+  private def refInfo(tpe: Type)(using Context): Option[(Type, Boolean)] =
+    val bf = baseClassByFqn(tpe, BundleFieldFqn)
+    if bf.exists then tpe.baseType(bf).argInfos.headOption.map(e => (e, false))
     else
       val opt = tpe.baseType(defn.OptionClass)
-      opt.exists && opt.argInfos.headOption.exists(a => baseClassByFqn(a, BundleFieldFqn).exists)
+      if !opt.exists then None
+      else opt.argInfos.headOption.flatMap { inner =>
+        val ibf = baseClassByFqn(inner, BundleFieldFqn)
+        if ibf.exists then inner.baseType(ibf).argInfos.headOption.map(e => (e, true)) else None
+      }
 
-  /** Completion items for each `BundleField`/`Option[BundleField]` field of the
-   *  Bundle/ProbeBundle behind a `Referable[T]` qualifier, filtered by the typed
-   *  prefix `query`. Returns Nil for any non-zaozi qualifier. */
-  def bundleFieldCompletions(qualTpe: Type, query: String)(using Context): List[CompletionValue] =
+  /** Completion items for the PUBLIC `BundleField[E]` / `Option[BundleField[E]]` fields of the
+   *  Bundle/ProbeBundle behind a `Referable[T]` qualifier: filtered by the typed prefix `query`,
+   *  de-duplicated against `existing` ordinary completions, with private/protected and
+   *  non-`BundleField` vals excluded. Each renders as `<name>: Ref[E]` (`Option[Ref[E]]` for an
+   *  optional field), kind Field. Returns Nil for any non-zaozi qualifier. */
+  def bundleFieldCompletions(
+      qualTpe: Type,
+      query: String,
+      existing: List[CompletionValue]
+  )(using Context): List[CompletionValue] =
     bundleType(qualTpe) match
       case None => Nil
       case Some(bundleTpe) =>
         val cls = bundleTpe.classSymbol
         if !cls.exists then Nil
         else
+          val taken = existing.iterator.map(c => c.insertText.getOrElse(c.label)).toSet
           cls.asClass.info.decls.toList.flatMap { f =>
-            if f.isTerm && !f.is(Flags.Method)
-               && (query.isEmpty || f.name.toString.startsWith(query))
-               && isBundleFieldType(bundleTpe.memberInfo(f))
-            then List(CompletionValue.Compiler(f.name.toString, f.denot.asSingleDenotation, CompletionAffix.empty))
+            val nm = f.name.toString
+            if f.isTerm && !f.is(Flags.Method) && !f.isOneOf(Flags.Private | Flags.Protected)
+               && (query.isEmpty || nm.startsWith(query)) && !taken.contains(nm)
+            then
+              refInfo(bundleTpe.memberInfo(f)) match
+                case Some((e, optional)) =>
+                  val es     = e.show
+                  val detail = if optional then ": Option[Ref[" + es + "]]" else ": Ref[" + es + "]"
+                  List(CompletionValue.ZaoziField(nm, detail))
+                case None => Nil
             else Nil
           }
 EOF
@@ -160,11 +179,17 @@ object ZaoziSemanticDB:
     }
 EOF
 
-# (4c) Completion hook: in the Select-completion branch, append the zaozi field items.
-#      Anchored on the Select-specific `qual.typeOpt.widenDealias` resolution so the
-#      `case _ => ... defn.AnyType` branch (same tail expression) is left untouched.
+# (4c) A CompletionValue variant for a Zaozi field: caller-supplied label + detail string,
+#      kind Field. Inserted between the `Keyword` and `FileSystemMember` cases.
+CV=presentation-compiler/src/main/dotty/tools/pc/completions/CompletionValue.scala
+perl -0pi -e 's/(      CompletionItemKind\.Keyword\n)(\n  case class FileSystemMember\()/$1\n  case class ZaoziField(label: String, detail: String) extends CompletionValue:\n    override def insertText: Option[String] = Some(label)\n    override def completionItemKind(using Context): CompletionItemKind = CompletionItemKind.Field\n    override def description(printer: ShortenedTypePrinter)(using Context): String = detail\n    override def labelWithDescription(printer: ShortenedTypePrinter)(using Context): String = label + detail\n$2/' "$CV"
+
+# (4d) Completion hook: in the Select-completion branch, append the zaozi field items,
+#      de-duplicated against the ordinary completions. Anchored on the Select-specific
+#      `qual.typeOpt.widenDealias` resolution so the `case _ => ... defn.AnyType` branch
+#      (same tail expression) is left untouched.
 COMPL=presentation-compiler/src/main/dotty/tools/pc/completions/Completions.scala
-perl -0pi -e 's/(            val \(compiler, result\) = enrichedCompilerCompletions\(qual\.typeOpt\.widenDealias\)\n)            \(allAdvanced \+\+ compiler, result\)/$1            val __zaoziFields = dotty.tools.pc.ZaoziPcSupport.bundleFieldCompletions(qual.typeOpt.widenDealias, completionPos.query)\n            (allAdvanced ++ compiler ++ __zaoziFields, result)/' "$COMPL"
+perl -0pi -e 's/(            val \(compiler, result\) = enrichedCompilerCompletions\(qual\.typeOpt\.widenDealias\)\n)            \(allAdvanced \+\+ compiler, result\)/$1            val __zaoziFields = dotty.tools.pc.ZaoziPcSupport.bundleFieldCompletions(qual.typeOpt.widenDealias, completionPos.query, allAdvanced ++ compiler)\n            (allAdvanced ++ compiler ++ __zaoziFields, result)/' "$COMPL"
 
 # Fail closed if any edit did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
@@ -173,5 +198,6 @@ test -f compiler/resources/META-INF/zaozi-shadow/org.scala-lang-scala3-compiler_
 test -f presentation-compiler/resources/META-INF/zaozi-shadow/org.scala-lang-scala3-presentation-compiler_3-$VER.properties
 test -f presentation-compiler/src/main/dotty/tools/pc/ZaoziPcSupport.scala
 test -f compiler/src/dotty/tools/dotc/semanticdb/ZaoziSemanticDB.scala
+grep -q "case class ZaoziField" "$CV"
 grep -q "ZaoziPcSupport.bundleFieldCompletions" "$COMPL"
 echo "zaozi-shadow patch applied (VER=$VER REV=$REV): markers + Bundle-field completion"
