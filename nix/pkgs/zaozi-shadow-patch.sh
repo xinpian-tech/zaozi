@@ -115,30 +115,53 @@ object ZaoziPcSupport:
       else cls.asClass.info.decls.toList.find(f => f.name.toString == name && isOfferedField(bundleTpe, f))
     }
 
-  /** If `path` (the NavigateAST path at the cursor) crosses a zaozi Bundle/ProbeBundle dynamic
-   *  select `io.a` (whose un-reduced `selectDynamic("a")` application is somewhere in the path),
-   *  the resolved PUBLIC field `val` symbol plus the select's expression type (`Ref[E]`); None
-   *  otherwise. Drives hover and go-to-definition. Scans the whole path because the macro's
-   *  expansion may make a sub-tree of the application (not the `Inlined` node) the path head. */
-  // The PUBLIC field symbol of a `qual.selectDynamic("name")` application, if `qual` is a zaozi
-  // Bundle/ProbeBundle `Referable`; None otherwise.
-  private def fieldOfCall(call: Tree)(using Context): Option[Symbol] = call match
-    case Apply(Select(qual, sel), List(Literal(Constant(name: String)))) if sel == nme.selectDynamic =>
-      publicFieldSymbol(qual.tpe.widen, name)
+  /** A zaozi `Referable[Bundle/ProbeBundle].selectDynamic("name")` application, as (qualifier
+   *  type, field name); None if `call` is not such an application (e.g. a non-zaozi Dynamic). */
+  private def zaoziCall(call: Tree)(using Context): Option[(Type, String)] = call match
+    case Apply(Select(qual, sel), List(Literal(Constant(name: String))))
+        if sel == nme.selectDynamic && isZaoziReferable(qual.tpe.widen) =>
+      Some((qual.tpe.widen, name))
     case _ => None
 
-  def resolveDynamicSelect(path: List[Tree])(using Context): Option[(Symbol, Type)] =
+  /** Tri-state classification of the cursor path's (possibly macro-inlined) dynamic select. */
+  enum DynSelect:
+    case Resolved(sym: Symbol, tpe: Type)
+    case UnknownField
+    case NotZaozi
+
+  /** Classify `path`: `Resolved` when it crosses `io.a` for a public Bundle field `a`;
+   *  `UnknownField` when it crosses `io.<x>` on a zaozi `Referable[Bundle]` but `<x>` is not a
+   *  public field; `NotZaozi` otherwise. The application may be a bare path element (definition's
+   *  raw NavigateAST path) or nested in the macro `Inlined.call` (hover's range-expanded path). */
+  def resolveDynamicSelect(path: List[Tree])(using Context): DynSelect =
     path.collectFirst {
-      // The raw NavigateAST path (go-to-definition) has the application as its own element;
-      // the range-expanded path (hover) collapses to the macro `Inlined`, whose `call` is it.
-      case t if fieldOfCall(t).isDefined           => fieldOfCall(t).get
-      case Inlined(call, _, _) if fieldOfCall(call).isDefined => fieldOfCall(call).get
-    }.map { sym =>
-      // The whole `io.a` expression type is on the enclosing macro `Inlined` (the narrowed
-      // `Ref[E]`); the bare `selectDynamic` application is only typed as its declared `Any`.
-      val tpe = path.collectFirst { case inl: Inlined if inl.tpe.exists => inl.tpe }.getOrElse(sym.info)
-      (sym, tpe)
-    }
+      case t if zaoziCall(t).isDefined                      => zaoziCall(t).get
+      case Inlined(call, _, _) if zaoziCall(call).isDefined => zaoziCall(call).get
+    } match
+      case None => DynSelect.NotZaozi
+      case Some((qtpe, name)) =>
+        publicFieldSymbol(qtpe, name) match
+          case Some(sym) =>
+            // The `io.a` expression type is the enclosing macro `Inlined`'s narrowed `Ref[E]`;
+            // the bare `selectDynamic` application is only typed as its declared `Any`.
+            val tpe = path.collectFirst { case inl: Inlined if inl.tpe.exists => inl.tpe }.getOrElse(sym.info)
+            DynSelect.Resolved(sym, tpe)
+          case None => DynSelect.UnknownField
+
+  /** Enclosing (symbol, type) for hover/definition: `Some(field)` when resolved; `Some(Nil)` for
+   *  an unknown zaozi field (so callers do NOT fall through to `selectDynamic`); `None` when the
+   *  path is not a zaozi dynamic select (callers proceed normally). */
+  def hoverDefSymbols(path: List[Tree])(using Context): Option[List[(Symbol, Type, Option[String])]] =
+    resolveDynamicSelect(path) match
+      case DynSelect.Resolved(s, t) => Some(List((s, t, None)))
+      case DynSelect.UnknownField   => Some(Nil)
+      case DynSelect.NotZaozi       => None
+
+  /** True only when the path resolves to a concrete public Bundle field (not unknown/non-zaozi). */
+  def isResolvedDynamicSelect(path: List[Tree])(using Context): Boolean =
+    resolveDynamicSelect(path) match
+      case _: DynSelect.Resolved => true
+      case _                     => false
 
   /** Completion items for the public Bundle fields behind a `Referable[T]` qualifier: filtered by
    *  the typed prefix `query`, de-duplicated against `existing`. Each renders as `<name>: Ref[E]`
@@ -252,7 +275,7 @@ perl -0pi -e 's/(            val \(compiler, result\) = enrichedCompilerCompleti
 #      (not `selectDynamic`). Inserted as the first case (before the named-arg case) so it wins;
 #      non-zaozi paths fall through unchanged (the guard is false).
 MI=presentation-compiler/src/main/dotty/tools/pc/MetalsInteractive.scala
-perl -0pi -e 's/(    import indexed\.ctx\n    path match\n)(      \/\/ For a named arg)/$1      case __zaoziP if dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(__zaoziP).isDefined =>\n        dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(__zaoziP).toList.map((s, t) => (s, t, Option.empty[String]))\n$2/' "$MI"
+perl -0pi -e 's/(    import indexed\.ctx\n    path match\n)(      \/\/ For a named arg)/$1      case __zaoziP if dotty.tools.pc.ZaoziPcSupport.hoverDefSymbols(__zaoziP).isDefined =>\n        dotty.tools.pc.ZaoziPcSupport.hoverDefSymbols(__zaoziP).get\n$2/' "$MI"
 
 # (4f) Hover guard: HoverProvider bails to an empty hover when the path-head type is error/NoType
 #      BEFORE it consults enclosingSymbolsWithExpressionType. For a macro dynamic select the
@@ -260,7 +283,7 @@ perl -0pi -e 's/(    import indexed\.ctx\n    path match\n)(      \/\/ For a nam
 #      (so it reaches the hooked enclosingSymbolsWithExpressionType). Non-zaozi paths are
 #      unchanged (the added conjunct is true only for zaozi selects).
 HP=presentation-compiler/src/main/dotty/tools/pc/HoverProvider.scala
-perl -0pi -e 's/(    )if tp\.isError \|\| tpw == NoType \|\| tpw\.isError \|\| path\.isEmpty\n(    then)/${1}if (tp.isError || tpw == NoType || tpw.isError || path.isEmpty) && dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(enclosing).isEmpty\n$2/' "$HP"
+perl -0pi -e 's/(    )if tp\.isError \|\| tpw == NoType \|\| tpw\.isError \|\| path\.isEmpty\n(    then)/${1}if (tp.isError || tpw == NoType || tpw.isError || path.isEmpty) && !dotty.tools.pc.ZaoziPcSupport.isResolvedDynamicSelect(enclosing)\n$2/' "$HP"
 
 # Fail closed if any edit did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
@@ -271,6 +294,6 @@ test -f presentation-compiler/src/main/dotty/tools/pc/ZaoziPcSupport.scala
 test -f compiler/src/dotty/tools/dotc/semanticdb/ZaoziSemanticDB.scala
 grep -q "case class ZaoziField" "$CV"
 grep -q "ZaoziPcSupport.bundleFieldCompletions" "$COMPL"
-grep -q "ZaoziPcSupport.resolveDynamicSelect" "$MI"
-grep -q "ZaoziPcSupport.resolveDynamicSelect(enclosing)" "$HP"
+grep -q "ZaoziPcSupport.hoverDefSymbols" "$MI"
+grep -q "ZaoziPcSupport.isResolvedDynamicSelect(enclosing)" "$HP"
 echo "zaozi-shadow patch applied (VER=$VER REV=$REV): markers + completion + hover/definition"

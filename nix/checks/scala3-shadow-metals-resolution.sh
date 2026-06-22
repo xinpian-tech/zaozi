@@ -80,7 +80,12 @@ M
     # Fail closed if the Mill BSP connection cannot be installed offline.
     if ! mill --no-daemon --offline mill.bsp.BSP/install >/dev/null 2>&1; then exit 90; fi
     [ -f "$WS/.bsp/mill-bsp.json" ] || exit 91
-    python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" "$LN" "$CH" "${8:-completion}"
+    if [ "${8:-}" = "batch" ]; then
+      # $9 is a space-separated list of name:mode:line:char specs (no spaces within a spec).
+      python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" BATCH ${9}
+    else
+      python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" "$LN" "$CH" "${8:-completion}"
+    fi
   ) >"$2" 2>>"$3"
 }
 
@@ -229,16 +234,19 @@ for bad in a b k x; do
 done
 ok "patched cache: a non-zaozi scala.Dynamic qualifier is not augmented (type-gated)"
 
-echo "== 5. patched cache: zaozi hover + go-to-definition for io.a (AC-6/AC-7) =="
+echo "== 5. patched cache: zaozi hover + go-to-definition matrix (AC-6/AC-7) =="
 # A COMPLETE fixture (no incomplete `io.`) whose Referable.selectDynamic is a transparent inline
 # returning Ref[Bits], so `io.a` becomes a genuine macro `Inlined(io.selectDynamic("a"), ...)` at
-# the PC's typer level — exactly the shape the hover/definition hook targets in real zaozi.
+# the PC's typer level — exactly the shape the hover/definition hook targets in real zaozi. It
+# covers a Bundle (`io`), a ProbeBundle (`pb`), an unknown field (`io.zzz`), and an ordinary
+# non-zaozi val (`s`).
 ZHOV=$(cat <<'SCALA'
 package me.jiuyang.zaozi.valuetpe {
   trait Data
   class Bits extends Data
   case class BundleField[T <: Data](dataType: T)
   trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+  trait ProbeBundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
 }
 package me.jiuyang.zaozi.magic {
   trait DynamicSubfield
@@ -253,40 +261,74 @@ package me.jiuyang.zaozi.reftpe {
 package demo {
   import scala.language.dynamics
   import me.jiuyang.zaozi.reftpe.{Referable, Ref}
-  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  import me.jiuyang.zaozi.valuetpe.{Bundle, ProbeBundle, Bits, BundleField}
   class MyBundle extends Bundle {
     val a: BundleField[Bits] = ???
     val b: BundleField[Bits] = ???
   }
+  class MyProbe extends ProbeBundle {
+    val x: BundleField[Bits] = ???
+  }
   object Main {
+    val s: String = "hi"
     def pre(io: Referable[MyBundle]): Ref[Bits] =
       io.a
     def neg(io: Referable[MyBundle]): Ref[Bits] =
       io.zzz
+    def prb(pb: Referable[MyProbe]): Ref[Bits] =
+      pb.x
+    def ord: String =
+      s
   }
 }
 SCALA
 )
-ZSRC="$ZHOV"
-VALA=$(grep -nxE '    val a: BundleField\[Bits\] = \?\?\?' <<<"$ZHOV" | head -1 | cut -d: -f1)
-[ -n "$VALA" ] || fail "zaozi: could not locate 'val a' in the hover fixture"
-VALA_LN=$((VALA-1))
-# 5a. hover at io.a renders the field with a Ref[Bits] type (NOT selectDynamic).
-zrun "$BASE/hov.txt" '      io\.a' hover
-grep -q "Ref\[Bits\]" "$BASE/hov.txt" || fail "zaozi: hover at io.a did not render Ref[Bits] (got: $(cat "$BASE/hov.txt"))"
-if grep -q "selectDynamic" "$BASE/hov.txt"; then fail "zaozi: hover at io.a fell back to selectDynamic"; fi
-ok "patched cache: hover at io.a renders the field type Ref[Bits] (not selectDynamic)"
-# 5b. go-to-definition at io.a resolves to the bundle's `val a` line.
-zrun "$BASE/def.json" '      io\.a' definition
-defln=$(jq -r '.[0].line // empty' "$BASE/def.json")
-[ "$defln" = "$VALA_LN" ] || fail "zaozi: definition at io.a went to line $defln, expected val a at $VALA_LN (got: $(cat "$BASE/def.json"))"
-ok "patched cache: go-to-definition at io.a resolves to the bundle's val a (line $VALA_LN)"
-# 5c. definition at a misspelled io.zzz does NOT resolve to a bundle field (no bogus location).
-zrun "$BASE/defn.json" '      io\.zzz' definition
-if jq -e --arg l "$VALA_LN" 'any(.[]; .line == ($l|tonumber))' "$BASE/defn.json" >/dev/null 2>&1; then
-  fail "zaozi: definition at misspelled io.zzz wrongly resolved to the val a line"
-fi
-ok "patched cache: misspelled io.zzz yields no bundle-field definition (no bogus location)"
+# caret regex -> "lspLine:char" (char = end of line, just past the identifier).
+caretpos() {
+  local n t; n=$(grep -nxE "$1" <<<"$ZHOV" | head -1 | cut -d: -f1)
+  [ -n "$n" ] || fail "zaozi: could not locate caret /$1/ in the hover fixture"
+  t=$(sed -n "${n}p" <<<"$ZHOV"); echo "$((n-1)):${#t}"
+}
+defline() { # caret regex of a `val` decl -> its 0-indexed line
+  local n; n=$(grep -nxE "$1" <<<"$ZHOV" | head -1 | cut -d: -f1)
+  [ -n "$n" ] || fail "zaozi: could not locate '$1' in the hover fixture"; echo $((n-1))
+}
+IOA=$(caretpos '      io\.a'); IOZ=$(caretpos '      io\.zzz'); PBX=$(caretpos '      pb\.x'); SS=$(caretpos '      s')
+VALA_LN=$(defline '    val a: BundleField\[Bits\] = \?\?\?')
+VALX_LN=$(defline '    val x: BundleField\[Bits\] = \?\?\?')
+# One Metals session, many requests (name:mode:line:char); io.a is first so readiness polls there.
+SPECS="hovA:hover:$IOA defA:definition:$IOA hovZ:hover:$IOZ defZ:definition:$IOZ hovX:hover:$PBX defX:definition:$PBX hovS:hover:$SS"
+rc=0; run_metals "$MC/cache" "$BASE/b.json" "$BASE/b.log" "" "$ZHOV" "" "" batch "$SPECS" || rc=$?
+[ "$rc" -eq 0 ] || { tail -25 "$BASE/b.log" >&2; fail "zaozi: hover/definition batch run failed (rc=$rc)"; }
+B="$BASE/b.json"
+jq -e . "$B" >/dev/null 2>&1 || { cat "$B" >&2; fail "zaozi: batch output is not valid JSON"; }
+hov() { jq -r --arg k "$1" '.[$k] // ""' "$B"; }
+# 5a. hover io.a shows the field `val a` with a Ref[Bits] type, not selectDynamic.
+ha=$(hov hovA)
+grep -q 'Ref\[Bits\]' <<<"$ha" || fail "zaozi: hover io.a missing Ref[Bits] (got: $ha)"
+grep -q 'val a'       <<<"$ha" || fail "zaozi: hover io.a missing the 'val a' field signature (got: $ha)"
+if grep -q 'selectDynamic' <<<"$ha"; then fail "zaozi: hover io.a fell back to selectDynamic (got: $ha)"; fi
+ok "patched cache: hover io.a shows 'val a' with Ref[Bits] (not selectDynamic)"
+# 5b. definition io.a -> the bundle's val a.
+[ "$(jq -r '.defA[0].line // empty' "$B")" = "$VALA_LN" ] || fail "zaozi: definition io.a not at val a (line $VALA_LN): $(jq -c '.defA' "$B")"
+ok "patched cache: go-to-definition io.a -> the bundle's val a (line $VALA_LN)"
+# 5c. definition io.zzz (unknown field) -> empty (no selectDynamic, no bogus location).
+[ "$(jq -r '.defZ | length' "$B")" = "0" ] || fail "zaozi: definition io.zzz returned a location (expected none): $(jq -c '.defZ' "$B")"
+ok "patched cache: misspelled io.zzz -> empty definition (no selectDynamic / no bogus location)"
+# 5d. hover io.zzz (unknown field) fabricates no field.
+hz=$(hov hovZ)
+if grep -qE 'Ref\[Bits\]|val a|val zzz' <<<"$hz"; then fail "zaozi: hover io.zzz fabricated a field (got: $hz)"; fi
+ok "patched cache: hover on unknown io.zzz fabricates no field"
+# 5e. ProbeBundle pb.x: hover (Ref[Bits] + val x) and definition -> val x.
+hx=$(hov hovX)
+grep -q 'Ref\[Bits\]' <<<"$hx" || fail "zaozi: ProbeBundle hover pb.x missing Ref[Bits] (got: $hx)"
+grep -q 'val x'       <<<"$hx" || fail "zaozi: ProbeBundle hover pb.x missing 'val x' (got: $hx)"
+[ "$(jq -r '.defX[0].line // empty' "$B")" = "$VALX_LN" ] || fail "zaozi: ProbeBundle definition pb.x not at val x (line $VALX_LN): $(jq -c '.defX' "$B")"
+ok "patched cache: ProbeBundle pb.x hover (val x: Ref[Bits]) + definition -> val x"
+# 5f. ordinary non-zaozi hover is unchanged.
+hs=$(hov hovS)
+grep -q 'String' <<<"$hs" || fail "zaozi: ordinary non-zaozi hover changed (expected String, got: $hs)"
+ok "patched cache: ordinary non-zaozi hover is unchanged (shows String)"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"

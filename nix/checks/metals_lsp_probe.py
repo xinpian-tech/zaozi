@@ -9,8 +9,15 @@
 # server log lines (window/logMessage, $/progress) go to stderr.
 import json, os, subprocess, sys, threading, time, queue
 
-WS, FILE, LINE, CHAR = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-MODE = sys.argv[5] if len(sys.argv) > 5 else "completion"  # completion | hover | definition
+WS, FILE = sys.argv[1], sys.argv[2]
+# Two argv shapes:
+#   <ws> <file> <line> <char> [completion|hover|definition]   -- one request
+#   <ws> <file> BATCH <name:mode:line:char> ...               -- many requests, one session
+if len(sys.argv) > 3 and sys.argv[3] == "BATCH":
+    MODE, SPECS, LINE, CHAR = "batch", sys.argv[4:], 0, 0
+else:
+    LINE, CHAR = int(sys.argv[3]), int(sys.argv[4])
+    MODE, SPECS = (sys.argv[5] if len(sys.argv) > 5 else "completion"), []
 METALS = os.environ["METALS_BIN"]
 DEADLINE = time.time() + int(os.environ.get("PROBE_TIMEOUT", "300"))
 
@@ -136,77 +143,112 @@ text = open(FILE).read()
 notify("textDocument/didOpen", {"textDocument": {
     "uri": uri, "languageId": "scala", "version": 1, "text": text}})
 
-def poll_completion():
-    """Poll completion until Metals has imported the build and started the PC."""
+def comp_items(ln, ch):
+    try:
+        r = request("textDocument/completion", {"textDocument": {"uri": uri}, "position": {"line": ln, "character": ch}})
+    except TimeoutError:
+        return None
+    res = r.get("result")
+    return (res.get("items") if isinstance(res, dict) else res) or []
+
+def wait_ready(ln, ch):
+    """Wait until completion at (ln,ch) yields items — i.e. the build is imported and the PC is up."""
     while time.time() < DEADLINE:
         log_notes()
-        try:
-            r = request("textDocument/completion", {
-                "textDocument": {"uri": uri},
-                "position": {"line": LINE, "character": CHAR},
-            })
-        except TimeoutError:
-            return None
-        res = r.get("result")
-        items = res.get("items") if isinstance(res, dict) else res
+        items = comp_items(ln, ch)
         if items:
-            return items
+            return True
         time.sleep(2)
-    return None
+    return False
 
-def poll(method):
-    """Poll a hover/definition request (after the PC is up) until it returns a non-empty result."""
-    deadline2 = min(DEADLINE, time.time() + 150)
+def req_result(method, ln, ch):
+    """One request; returns its result (possibly empty/None — an empty result is a valid answer
+    for hover/definition once the PC is up). Short retry to absorb a transient empty."""
+    deadline2 = min(DEADLINE, time.time() + 15)
+    last = None
     while time.time() < deadline2:
         log_notes()
         try:
-            r = request(method, {"textDocument": {"uri": uri}, "position": {"line": LINE, "character": CHAR}})
+            r = request(method, {"textDocument": {"uri": uri}, "position": {"line": ln, "character": ch}})
         except TimeoutError:
             return None
-        if r.get("result"):
-            return r["result"]
+        last = r.get("result")
+        if last:
+            return last
         time.sleep(2)
-    return None
+    return last
 
-out, ok = None, False
+def fmt_hover(res):
+    c = res.get("contents") if isinstance(res, dict) else None
+    if isinstance(c, dict):
+        return c.get("value", "")
+    if isinstance(c, list):
+        return " ".join((x.get("value", "") if isinstance(x, dict) else str(x)) for x in c)
+    return str(c) if c is not None else ""
+
+def fmt_def(res):
+    locs = res if isinstance(res, list) else ([res] if res else [])
+    out = []
+    for l in locs:
+        if not isinstance(l, dict):
+            continue
+        rng = l.get("range") or l.get("targetSelectionRange") or l.get("targetRange") or {}
+        out.append({"uri": l.get("uri") or l.get("targetUri"), "line": (rng.get("start") or {}).get("line")})
+    return out
+
+def one(mode, ln, ch):
+    if mode == "completion":
+        items = []
+        d2 = min(DEADLINE, time.time() + 30)
+        while time.time() < d2:
+            items = comp_items(ln, ch) or []
+            if items:
+                break
+            time.sleep(1)
+        return [it.get("label", "").strip() for it in items]
+    res = req_result("textDocument/" + mode, ln, ch)
+    return fmt_hover(res) if mode == "hover" else fmt_def(res)
+
+def shutdown():
+    log_notes()
+    try:
+        request("shutdown", {}); notify("exit", {})
+    except Exception:
+        pass
+    proc.terminate()
+
 if MODE == "completion":
-    items = poll_completion() or []
-    out = [it.get("label", "").strip() for it in items]
-    ok = bool(out)
-else:
-    poll_completion()                       # cheapest readiness signal: wait for the PC
-    res = poll("textDocument/" + MODE)
-    if MODE == "hover":
-        text = ""
-        c = res.get("contents") if isinstance(res, dict) else None
-        if isinstance(c, dict):
-            text = c.get("value", "")
-        elif isinstance(c, list):
-            text = " ".join((x.get("value", "") if isinstance(x, dict) else str(x)) for x in c)
-        elif c is not None:
-            text = str(c)
-        out, ok = text, bool(text)
-    else:  # definition: Location | Location[] | LocationLink[]
-        locs = res if isinstance(res, list) else ([res] if res else [])
-        norm = []
-        for l in locs:
-            if not isinstance(l, dict):
-                continue
-            rng = l.get("range") or l.get("targetSelectionRange") or l.get("targetRange") or {}
-            norm.append({"uri": l.get("uri") or l.get("targetUri"),
-                         "line": (rng.get("start") or {}).get("line")})
-        out, ok = norm, bool(norm)
+    out, ok = [], False
+    while time.time() < DEADLINE:
+        log_notes()
+        items = comp_items(LINE, CHAR)
+        if items:
+            out, ok = [it.get("label", "").strip() for it in items], True
+            break
+        time.sleep(2)
+    shutdown()
+    if not ok:
+        sys.stderr.write("no completions obtained\n"); print(json.dumps([])); sys.exit(3)
+    print(json.dumps(out)); sys.exit(0)
 
-log_notes()
-try:
-    request("shutdown", {})
-    notify("exit", {})
-except Exception:
-    pass
-proc.terminate()
+elif MODE == "batch":
+    # Readiness via completion at the first spec's position, then run every request once.
+    p0 = SPECS[0].split(":")
+    ready = wait_ready(int(p0[2]), int(p0[3]))
+    result = {}
+    if ready:
+        for spec in SPECS:
+            name, mode, ln, ch = spec.split(":")
+            result[name] = one(mode, int(ln), int(ch))
+    shutdown()
+    if not ready:
+        sys.stderr.write("PC not ready (batch)\n"); print(json.dumps({})); sys.exit(3)
+    print(json.dumps(result)); sys.exit(0)
 
-if not ok:
-    sys.stderr.write(f"no {MODE} result obtained\n")
-    print("" if MODE == "hover" else json.dumps([]))
-    sys.exit(3)
-print(out if MODE == "hover" else json.dumps(out))
+else:  # single hover | definition: exit non-zero ONLY if the PC never came up
+    ready = wait_ready(LINE, CHAR)
+    out = one(MODE, LINE, CHAR) if ready else ("" if MODE == "hover" else [])
+    shutdown()
+    if not ready:
+        sys.stderr.write(f"PC not ready ({MODE})\n"); print("" if MODE == "hover" else json.dumps([])); sys.exit(3)
+    print(out if MODE == "hover" else json.dumps(out)); sys.exit(0)
