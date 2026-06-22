@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# task4 gate: load the pinned Scala 3.8.4 dotty sbt build under nix and list its
-# projects (`sbt projects`). This is the prerequisite to building the patched
-# same-version compiler/PC jars from source. Reproducible + isolated.
+# Load the pinned Scala 3.8.4 dotty sbt build under nix and list its projects
+# (`sbt projects`). This is the prerequisite gate to building the patched same-version
+# compiler/PC jars from source. Reproducible + isolated.
 #
 # Prefer the flake's pinned tools (this flake's nixpkgs) over ambient registry:
 #   nix develop -c bash nix/checks/scala3-build-load.sh        # uses inputs.scala3-src
 #   nix shell .#legacyPackages.x86_64-linux.{sbt,jdk21,git} -c bash nix/checks/scala3-build-load.sh
-# The flake `checks.scala3-build-load` output wires this with the pinned toolchain.
+# The flake `packages.scala3-build-load` app wires this with the pinned toolchain.
 #
 # Env (optional): PXY_HOST / PXY_PORT for an http(s) proxy (sandbox networks).
 set -euo pipefail

@@ -73,6 +73,14 @@
           ];
           inherit system;
         };
+        # Same-version 3.8.4 compiler + presentation-compiler jars built from the pinned
+        # scala3 source (fixed-output, needs network for the dotty dep closure).
+        # proxyHost/proxyPort are null by default (normal network); pass them via
+        # .override for a proxied sandbox.
+        scala3-shadow-jars = pkgs.callPackage ./nix/pkgs/scala3-shadow-jars.nix {
+          scala3-src = inputs.scala3-src;
+          srcRev = inputs.scala3-src.rev or "unknown";
+        };
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -94,13 +102,14 @@
               exec bash ${./nix/checks/scala3-build-load.sh} "${inputs.scala3-src}" "$@"
             '';
           };
-          # Same-version 3.8.4 compiler + presentation-compiler jars built from the
-          # pinned scala3 source (fixed-output, needs network for the dotty dep
-          # closure). proxyHost/proxyPort are null by default (normal network); pass
-          # them via .override for a proxied sandbox. outputHash is TOFU until pinned.
-          scala3-shadow-jars = pkgs.callPackage ./nix/pkgs/scala3-shadow-jars.nix {
-            scala3-src = inputs.scala3-src;
-            srcRev = inputs.scala3-src.rev or "unknown";
+          inherit scala3-shadow-jars;
+          # Isolated coursier cache shadowing the patched jars: the Zaozi compile closure
+          # plus the presentation-compiler closure, with the patched compiler/PC jars
+          # overlaid at their stock coordinates. The sole authoritative cache task5 points
+          # both consumer JVMs at. Fixed-output (coursier fetches the PC closure); pass
+          # proxyHost/proxyPort via .override for a proxied sandbox.
+          scala3-shadow-cache = pkgs.callPackage ./nix/pkgs/scala3-shadow-cache.nix {
+            inherit scala3-shadow-jars;
           };
         };
         devShells.default = pkgs.mkShell {
