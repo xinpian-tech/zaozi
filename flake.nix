@@ -31,8 +31,8 @@
     flake-utils.url = "github:numtide/flake-utils";
     mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
     # Pinned Scala 3.8.4 source for the patched same-version compiler/PC fork
-    # (Metals integration, task4). flake=false: consumed as a source tree by a
-    # nix derivation that builds the marker-only patched jars.
+    # (Metals integration). flake=false: consumed as a source tree by a nix
+    # derivation that builds the marker-only patched jars.
     scala3-src = {
       type = "github";
       owner = "scala";
@@ -82,9 +82,9 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
-          # task4 (Metals integration): reproducible dotty 3.8.4 sbt build-load gate,
-          # driven by this flake's pinned sbt/jdk21/git over the flake-pinned scala3
-          # source (inputs.scala3-src). Runs as an app (needs network for sbt plugin
+          # Metals integration: reproducible dotty 3.8.4 sbt build-load gate, driven
+          # by this flake's pinned sbt/jdk21/git over the flake-pinned scala3 source
+          # (inputs.scala3-src). Runs as an app (needs network for sbt plugin
           # resolution, so not a sandboxed `nix flake check`):
           #   PXY_HOST=.. PXY_PORT=.. nix run .#scala3-build-load
           scala3-build-load = pkgs.writeShellApplication {
@@ -100,6 +100,7 @@
           # them via .override for a proxied sandbox. outputHash is TOFU until pinned.
           scala3-shadow-jars = pkgs.callPackage ./nix/pkgs/scala3-shadow-jars.nix {
             scala3-src = inputs.scala3-src;
+            srcRev = inputs.scala3-src.rev or "unknown";
           };
         };
         devShells.default = pkgs.mkShell {
@@ -110,7 +111,7 @@
           # artifact/JDK load helper — it checks that the stock
           # scala3-presentation-compiler_3:3.8.4 class loads under the dev-shell
           # JDK; it does NOT start Metals. Proving Metals itself resolves+loads
-          # the 3.8.x PC on a BSP workspace is the task11 headless-LSP harness
+          # the 3.8.x PC on a BSP workspace is the headless-LSP harness
           # (see doc/shadow-layout.md).
           nativeBuildInputs = with pkgs; [ nixd jdk25 metals ];
           env = with pkgs; {

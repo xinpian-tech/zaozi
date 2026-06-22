@@ -22,6 +22,7 @@
 , add-determinism
 , scala3-src
 , version ? "3.8.4"
+, srcRev ? "unknown"
 , proxyHost ? null
 , proxyPort ? null
   # Fixed-output hash of the normalised jar set. TOFU: build once with lib.fakeHash,
@@ -63,8 +64,10 @@ stdenv.mkDerivation {
     git init -q
     git -c user.email=build@nix.local -c user.name=nix commit -q --allow-empty -m "scala3 ${version} shadow source"
 
-    # TODO(next round): apply the in-source sentinel patch here (META-INF/zaozi-shadow
-    # resources + property-gated -Dzaozi.shadow.marker behavioural markers) before package.
+    # Apply the shadow patch into the writable source before package (resources +
+    # property-gated behavioural markers; minimal and no effect unless the JVM sets
+    # -Dzaozi.shadow.marker=true).
+    bash ${./zaozi-shadow-patch.sh} "${version}" "${srcRev}"
 
     sbt -batch -no-colors "scala3-compiler-bootstrapped/package; scala3-presentation-compiler/package"
     runHook postBuild
@@ -73,10 +76,24 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
     mkdir -p "$out/jars" "$out/share/zaozi-shadow"
-    cp "$(find . -name 'scala3-compiler_3-${version}.jar' | head -1)" "$out/jars/"
-    cp "$(find . -name 'scala3-presentation-compiler_3-${version}.jar' | head -1)" "$out/jars/"
-    # Normalise for a reproducible FOD output hash.
-    add-determinism "$out/jars/"*.jar || true
+
+    # Exactly one jar of each coordinate must exist, or the build layout changed.
+    pickjar() {
+      local name="$1" matches n
+      matches="$(find . -type f -name "$name")"
+      n="$(printf '%s' "$matches" | grep -c .)"
+      if [ "$n" -ne 1 ]; then
+        echo "expected exactly 1 $name, found $n:" >&2
+        printf '%s\n' "$matches" >&2
+        exit 1
+      fi
+      printf '%s' "$matches"
+    }
+    cp "$(pickjar 'scala3-compiler_3-${version}.jar')" "$out/jars/"
+    cp "$(pickjar 'scala3-presentation-compiler_3-${version}.jar')" "$out/jars/"
+
+    # Normalise for a reproducible FOD output hash (fail closed).
+    add-determinism "$out/jars/"*.jar
     runHook postInstall
   '';
 
