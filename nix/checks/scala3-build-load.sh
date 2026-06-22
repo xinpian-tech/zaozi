@@ -24,8 +24,15 @@ echo "src: $SRC"; echo "sbt: $(sbt --numeric-version 2>/dev/null | tail -1)"; ec
 echo "build.properties sbt.version: $(grep sbt.version "$SRC/project/build.properties" 2>/dev/null)"
 WORK="$ROOT/src"; cp -r "$SRC" "$WORK" 2>/dev/null; chmod -R u+w "$WORK"
 # NOTE: do NOT delete project/project — its build.sbt wires project/Dependencies.scala
-# into the meta-build (dotty's recursive sbt layout). The nix-store source is a clean
-# checkout with no stale targets, so no cleanup is needed.
+# into the meta-build (dotty's recursive sbt layout).
+# dotty's VersionUtil reads the git hash/commit-date via jgit; the flake-pinned source
+# has no .git, so make the working copy a git repo (else: "One of setGitDir or
+# setWorkTree must be called").
+( cd "$WORK"
+  git init -q
+  git add -A 2>/dev/null
+  git -c user.email=build@nix.local -c user.name=nix commit -q -m "scala3 build snapshot" 2>/dev/null
+) || true
 cd "$WORK"
 
 echo "=== sbt projects (full log -> $ROOT/sbt.log) ==="
@@ -35,8 +42,9 @@ tail -50 "$ROOT/sbt.log"
 echo "FULL_LOG: $ROOT/sbt.log ; sbt exit: $rc"
 if [ "$rc" -eq 0 ] \
    && ! grep -q "Project loading failed" "$ROOT/sbt.log" \
-   && grep -qE "^\[info\] +(\* )?scala3-presentation-compiler" "$ROOT/sbt.log"; then
-  echo "RESULT: PASS (build loaded; scala3-presentation-compiler project listed)"; exit 0
+   && grep -qE "^\[info\][[:space:]]+(\* )?scala3-presentation-compiler$" "$ROOT/sbt.log" \
+   && grep -qE "^\[info\][[:space:]]+(\* )?scala3-compiler-bootstrapped$" "$ROOT/sbt.log"; then
+  echo "RESULT: PASS (build loaded; scala3-presentation-compiler + scala3-compiler-bootstrapped projects listed)"; exit 0
 else
   echo "RESULT: FAIL (build did not load)"; exit 1
 fi
