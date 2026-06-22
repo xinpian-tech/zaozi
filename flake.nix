@@ -82,6 +82,18 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
+          # task4 (Metals integration): reproducible dotty 3.8.4 sbt build-load gate,
+          # driven by this flake's pinned sbt/jdk21/git over the flake-pinned scala3
+          # source (inputs.scala3-src). Runs as an app (needs network for sbt plugin
+          # resolution, so not a sandboxed `nix flake check`):
+          #   PXY_HOST=.. PXY_PORT=.. nix run .#scala3-build-load
+          scala3-build-load = pkgs.writeShellApplication {
+            name = "scala3-build-load";
+            runtimeInputs = [ pkgs.sbt pkgs.jdk21 pkgs.git ];
+            text = ''
+              exec bash ${./nix/checks/scala3-build-load.sh} "${inputs.scala3-src}" "$@"
+            '';
+          };
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
