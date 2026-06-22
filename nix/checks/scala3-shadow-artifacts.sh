@@ -41,16 +41,18 @@ entrysha() { unzip -p "$1" "$2" | sha256sum | cut -d' ' -f1; }
 # Capture then match via here-string: `unzip -l | grep -q` would SIGPIPE unzip (grep -q
 # closes the pipe early) and trip `set -o pipefail`.
 has() { local out; out=$(unzip -l "$1" 2>/dev/null) || true; grep -qF "$2" <<<"$out"; }
+# Exact zip-entry match (whole line) via the entry listing.
+hasentry() { local out; out=$(unzip -Z1 "$1" 2>/dev/null) || true; grep -qFx "$2" <<<"$out"; }
 
 echo "== A. patched jars =="
 [ -f "$CJAR" ] || fail "compiler jar missing"
 [ -f "$PJAR" ] || fail "PC jar missing"
 ok "both patched jars exist"
-# Substrings chosen to avoid a literal '$' in the class name.
-if has "$CJAR" "semanticdb/ExtractSemanticDB" && has "$CJAR" "ExtractSemanticInfo.class"; then
+# Exact entries (single-quoted so the '$' in the class name stays literal).
+if hasentry "$CJAR" 'dotty/tools/dotc/semanticdb/ExtractSemanticDB$ExtractSemanticInfo.class'; then
   ok "compiler jar has ExtractSemanticInfo"
 else fail "compiler jar missing ExtractSemanticInfo"; fi
-if has "$PJAR" "dotty/tools/pc/ScalaPresentationCompiler.class"; then
+if hasentry "$PJAR" 'dotty/tools/pc/ScalaPresentationCompiler.class'; then
   ok "PC jar has ScalaPresentationCompiler"
 else fail "PC jar missing ScalaPresentationCompiler"; fi
 for pair in "$CJAR=$CMARK" "$PJAR=$PMARK"; do
@@ -97,13 +99,26 @@ cmp -s "$M/scala3-compiler_3/$VER/scala3-compiler_3-$VER.jar" "$CJAR" || fail "c
 cmp -s "$M/scala3-presentation-compiler_3/$VER/scala3-presentation-compiler_3-$VER.jar" "$PJAR" || fail "cache PC jar != patched"
 ok "cache: https/ root; 1 jar+1 pom per shadowed coord; patched bytes in place"
 B2="$CROOT/https/repo1.maven.org/maven2"
-for c in com/google/guava/guava/33.2.1-jre org/scalameta/mtags-interfaces/1.6.7 \
-         org/lz4/lz4-java/1.8.0 org/eclipse/lsp4j/org.eclipse.lsp4j/1.0.0 \
-         com/google/code/gson/gson/2.14.0; do
+# Every PC-closure coordinate absent from the Zaozi lock must be present, jar+pom, so the
+# cache is an offline-resolvable authoritative source. All 11 are jar-bearing libraries.
+for c in org/scalameta/mtags-interfaces/1.6.7 \
+         org/lz4/lz4-java/1.8.0 \
+         org/eclipse/lsp4j/org.eclipse.lsp4j/1.0.0 \
+         org/eclipse/lsp4j/org.eclipse.lsp4j.jsonrpc/1.0.0 \
+         com/google/code/gson/gson/2.14.0 \
+         com/google/guava/guava/33.2.1-jre \
+         com/google/guava/failureaccess/1.0.2 \
+         com/google/errorprone/error_prone_annotations/2.48.0 \
+         org/checkerframework/checker-qual/3.42.0 \
+         com/google/j2objc/j2objc-annotations/3.0.0 \
+         io/get-coursier/interface/1.0.18; do
   [ -d "$B2/$c" ] || fail "PC-extra coord missing: $c"
-  [ "$(find "$B2/$c" -maxdepth 1 -type f -name '*.jar' | wc -l)" -ge 1 ] || fail "PC-extra coord has no jar: $c"
+  njar=$(find "$B2/$c" -maxdepth 1 -type f -name '*.jar' | wc -l)
+  npom=$(find "$B2/$c" -maxdepth 1 -type f -name '*.pom' | wc -l)
+  [ "$njar" -eq 1 ] || fail "PC-extra coord $c: expected exactly 1 jar, got $njar"
+  [ "$npom" -eq 1 ] || fail "PC-extra coord $c: expected exactly 1 pom, got $npom"
 done
-ok "required PC-extra coordinates present with jars"
+ok "all 11 required PC-extra coordinates present with exactly 1 jar + 1 pom"
 nside=$(find "$CROOT" -type f \( -name '.*' -o -name 'maven-metadata*' \) | wc -l)
 [ "$nside" -eq 0 ] || fail "stale sidecar dotfiles / maven-metadata remain in cache ($nside)"
 ok "no sidecar dotfiles / maven-metadata in cache"
@@ -131,27 +146,27 @@ done
 cp_common="$cp_common:$B2/org/scala-lang/modules/scala-asm/9.9.0-scala-1/scala-asm-9.9.0-scala-1.jar"
 cp_common="$cp_common:$B2/org/scala-sbt/compiler-interface/1.10.7/compiler-interface-1.10.7.jar"
 cp_common="$cp_common:$B2/org/scala-sbt/util-interface/1.10.7/util-interface-1.10.7.jar"
-compile() { # $1 compiler jar, $2 outdir, extra java opts in $3
+compile() { # $1 compiler jar, $2 outdir, $3 stdout file, $4 stderr file, $5 extra java opts
   mkdir -p "$2"
   # JVM -cp runs the compiler; dotc -classpath gives the SOURCE its scala libraries
   # (without it dotc reports "Could not find package scala").
-  java ${3:-} -cp "$1$cp_common" dotty.tools.dotc.Main -classpath "$cp_common" -d "$2" "$WORK/Fixture.scala"
+  java ${5:-} -cp "$1$cp_common" dotty.tools.dotc.Main -classpath "$cp_common" -d "$2" \
+    "$WORK/Fixture.scala" >"$3" 2>"$4"
 }
-compile "$STOCK_C" "$WORK/out-stock" "" 2> "$WORK/stock.err"
-compile "$CJAR" "$WORK/out-patched" "" 2> "$WORK/patched.err"
-if diff -r "$WORK/out-stock" "$WORK/out-patched" >/dev/null; then
-  ok "patched (marker unset) compile output byte-identical to stock"
-else
-  # Fall back to bytecode-level equivalence (ignore any incidental byte diffs).
-  s=$(cd "$WORK/out-stock" && find . -name '*.class' | sort | xargs -I{} javap -p -c {} | sha256sum)
-  p=$(cd "$WORK/out-patched" && find . -name '*.class' | sort | xargs -I{} javap -p -c {} | sha256sum)
-  [ "$s" = "$p" ] || fail "patched compile output differs from stock"
-  ok "patched (marker unset) bytecode equivalent to stock (javap)"
-fi
-grep -q "zaozi-shadow-marker" "$WORK/patched.err" && fail "marker emitted without the property" || true
+compile "$STOCK_C" "$WORK/out-stock"   "$WORK/stock.out"   "$WORK/stock.err"   ""
+compile "$CJAR"    "$WORK/out-patched" "$WORK/patched.out" "$WORK/patched.err" ""
+# Fail closed: ALL compile products (incl. .tasty) must be byte-identical — no fallback.
+diff -r "$WORK/out-stock" "$WORK/out-patched" >/dev/null \
+  || fail "patched (marker unset) compile products differ from stock (incl. .class/.tasty)"
+ok "patched (marker unset) compile products byte-identical to stock (.class + .tasty)"
+# And the unset patched run must produce the same stdout + diagnostics as stock.
+diff "$WORK/stock.out" "$WORK/patched.out" >/dev/null || fail "patched (unset) stdout differs from stock"
+diff "$WORK/stock.err" "$WORK/patched.err" >/dev/null || fail "patched (unset) diagnostics differ from stock"
+ok "patched (marker unset) stdout + diagnostics identical to stock"
+if grep -q "zaozi-shadow-marker" "$WORK/patched.err"; then fail "marker emitted without the property"; fi
 ok "patched compiler emits no marker when zaozi.shadow.marker is unset"
-compile "$CJAR" "$WORK/out-gated" "-Dzaozi.shadow.marker=true" 2> "$WORK/gated.err"
-grep -q "zaozi-shadow-marker compiler org.scala-lang:scala3-compiler_3:$VER" "$WORK/gated.err" \
+compile "$CJAR" "$WORK/out-gated" "$WORK/gated.out" "$WORK/gated.err" "-Dzaozi.shadow.marker=true"
+grep -qF "zaozi-shadow-marker compiler org.scala-lang:scala3-compiler_3:$VER" "$WORK/gated.err" \
   || fail "gated marker not emitted with the property set"
 ok "patched compiler emits the gated marker with -Dzaozi.shadow.marker=true"
 

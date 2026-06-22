@@ -128,7 +128,7 @@
             in
             pkgs.writeShellApplication {
               name = "scala3-shadow-artifacts";
-              runtimeInputs = with pkgs; [ jdk21 unzip jq diffutils coreutils ];
+              runtimeInputs = with pkgs; [ bash jdk21 unzip jq diffutils coreutils gnugrep findutils ];
               text = ''
                 exec bash ${./nix/checks/scala3-shadow-artifacts.sh} \
                   --shadow-jars "${scala3-shadow-jars}" \
