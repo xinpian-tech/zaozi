@@ -49,7 +49,7 @@ trap 'chmod -R u+w "$BASE" 2>/dev/null; rm -rf "$BASE" 2>/dev/null || true' EXIT
 # server log to $3. If $4 is given, the patched PC writes the loaded PC jar URL there
 # (-Dzaozi.shadow.pc.provenance). $5/$6/$7 override the fixture source and completion
 # line/char (default: the greeting fixture at 4 13). Returns the probe exit code.
-run_metals() { # $1 cacheSrcDir, $2 labelsOut, $3 metalsLog, $4 provenanceOut, $5 mainSrc, $6 line, $7 char
+run_metals() { # $1 cacheSrcDir, $2 out, $3 metalsLog, $4 provenanceOut, $5 mainSrc, $6 line, $7 char, $8 mode
   local R WS NCD CC H X LN CH
   R=$(mktemp -d -p "$BASE"); WS="$R/ws"; mkdir -p "$WS/foo/src/demo"
   cat > "$WS/build.mill" <<'M'
@@ -80,7 +80,7 @@ M
     # Fail closed if the Mill BSP connection cannot be installed offline.
     if ! mill --no-daemon --offline mill.bsp.BSP/install >/dev/null 2>&1; then exit 90; fi
     [ -f "$WS/.bsp/mill-bsp.json" ] || exit 91
-    python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" "$LN" "$CH"
+    python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" "$LN" "$CH" "${8:-completion}"
   ) >"$2" 2>>"$3"
 }
 
@@ -188,16 +188,18 @@ package demo {
 }
 SCALA
 )
-# Run Metals completion at the (unique, full-line) caret matched by regex $2; labels -> $1.
-zrun() { # $1 = labelsOut, $2 = caret line-regex
+# Run Metals at the (unique, full-line) caret matched by regex $2 against the fixture in $ZSRC.
+# $1 out file, $3 mode (completion|hover|definition, default completion), $4 char override.
+zrun() {
   local n t ln ch rc=0
-  n=$(grep -nxE "$2" <<<"$ZFIX" | head -1 | cut -d: -f1)
+  n=$(grep -nxE "$2" <<<"$ZSRC" | head -1 | cut -d: -f1)
   [ -n "$n" ] || fail "zaozi: could not locate caret /$2/ in the fixture"
-  t=$(sed -n "${n}p" <<<"$ZFIX"); ln=$((n-1)); ch=${#t}
-  run_metals "$MC/cache" "$1" "${1%.labels}.log" "" "$ZFIX" "$ln" "$ch" || rc=$?
-  [ "$rc" -eq 0 ] || { tail -20 "${1%.labels}.log" >&2; fail "zaozi: completion run failed (rc=$rc) at /$2/"; }
+  t=$(sed -n "${n}p" <<<"$ZSRC"); ln=$((n-1)); ch=${4:-${#t}}
+  run_metals "$MC/cache" "$1" "${1%.*}.log" "" "$ZSRC" "$ln" "$ch" "${3:-completion}" || rc=$?
+  [ "$rc" -eq 0 ] || { tail -20 "${1%.*}.log" >&2; fail "zaozi: ${3:-completion} run failed (rc=$rc) at /$2/"; }
 }
 has() { jq -e --arg f "$1" 'any(.[]; startswith($f))' "$2" >/dev/null 2>&1; } # any label starts with $1
+ZSRC="$ZFIX"
 # 4a. io. : public BundleField fields a,b,k with Ref[E] detail; private p and non-field n absent.
 zrun "$BASE/z.labels" '      io\.'
 has 'a: Ref['        "$BASE/z.labels" || fail "zaozi: io. missing 'a: Ref[..]' (got: $(cat "$BASE/z.labels"))"
@@ -226,6 +228,65 @@ for bad in a b k x; do
   if has "$bad: Ref" "$BASE/zn.labels"; then fail "zaozi: non-zaozi Dynamic wrongly augmented with '$bad'"; fi
 done
 ok "patched cache: a non-zaozi scala.Dynamic qualifier is not augmented (type-gated)"
+
+echo "== 5. patched cache: zaozi hover + go-to-definition for io.a (AC-6/AC-7) =="
+# A COMPLETE fixture (no incomplete `io.`) whose Referable.selectDynamic is a transparent inline
+# returning Ref[Bits], so `io.a` becomes a genuine macro `Inlined(io.selectDynamic("a"), ...)` at
+# the PC's typer level — exactly the shape the hover/definition hook targets in real zaozi.
+ZHOV=$(cat <<'SCALA'
+package me.jiuyang.zaozi.valuetpe {
+  trait Data
+  class Bits extends Data
+  case class BundleField[T <: Data](dataType: T)
+  trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+}
+package me.jiuyang.zaozi.magic {
+  trait DynamicSubfield
+}
+package me.jiuyang.zaozi.reftpe {
+  class Ref[E]
+  trait Referable[T <: me.jiuyang.zaozi.valuetpe.Data] extends scala.Dynamic {
+    transparent inline def selectDynamic(name: String): Any =
+      new me.jiuyang.zaozi.reftpe.Ref[me.jiuyang.zaozi.valuetpe.Bits]
+  }
+}
+package demo {
+  import scala.language.dynamics
+  import me.jiuyang.zaozi.reftpe.{Referable, Ref}
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  class MyBundle extends Bundle {
+    val a: BundleField[Bits] = ???
+    val b: BundleField[Bits] = ???
+  }
+  object Main {
+    def pre(io: Referable[MyBundle]): Ref[Bits] =
+      io.a
+    def neg(io: Referable[MyBundle]): Ref[Bits] =
+      io.zzz
+  }
+}
+SCALA
+)
+ZSRC="$ZHOV"
+VALA=$(grep -nxE '    val a: BundleField\[Bits\] = \?\?\?' <<<"$ZHOV" | head -1 | cut -d: -f1)
+[ -n "$VALA" ] || fail "zaozi: could not locate 'val a' in the hover fixture"
+VALA_LN=$((VALA-1))
+# 5a. hover at io.a renders the field with a Ref[Bits] type (NOT selectDynamic).
+zrun "$BASE/hov.txt" '      io\.a' hover
+grep -q "Ref\[Bits\]" "$BASE/hov.txt" || fail "zaozi: hover at io.a did not render Ref[Bits] (got: $(cat "$BASE/hov.txt"))"
+if grep -q "selectDynamic" "$BASE/hov.txt"; then fail "zaozi: hover at io.a fell back to selectDynamic"; fi
+ok "patched cache: hover at io.a renders the field type Ref[Bits] (not selectDynamic)"
+# 5b. go-to-definition at io.a resolves to the bundle's `val a` line.
+zrun "$BASE/def.json" '      io\.a' definition
+defln=$(jq -r '.[0].line // empty' "$BASE/def.json")
+[ "$defln" = "$VALA_LN" ] || fail "zaozi: definition at io.a went to line $defln, expected val a at $VALA_LN (got: $(cat "$BASE/def.json"))"
+ok "patched cache: go-to-definition at io.a resolves to the bundle's val a (line $VALA_LN)"
+# 5c. definition at a misspelled io.zzz does NOT resolve to a bundle field (no bogus location).
+zrun "$BASE/defn.json" '      io\.zzz' definition
+if jq -e --arg l "$VALA_LN" 'any(.[]; .line == ($l|tonumber))' "$BASE/defn.json" >/dev/null 2>&1; then
+  fail "zaozi: definition at misspelled io.zzz wrongly resolved to the val a line"
+fi
+ok "patched cache: misspelled io.zzz yields no bundle-field definition (no bogus location)"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"

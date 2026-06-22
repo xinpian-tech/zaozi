@@ -10,6 +10,7 @@
 import json, os, subprocess, sys, threading, time, queue
 
 WS, FILE, LINE, CHAR = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+MODE = sys.argv[5] if len(sys.argv) > 5 else "completion"  # completion | hover | definition
 METALS = os.environ["METALS_BIN"]
 DEADLINE = time.time() + int(os.environ.get("PROBE_TIMEOUT", "300"))
 
@@ -135,25 +136,66 @@ text = open(FILE).read()
 notify("textDocument/didOpen", {"textDocument": {
     "uri": uri, "languageId": "scala", "version": 1, "text": text}})
 
-# Poll completion until Metals has imported the build and started the PC.
-labels = []
-last_err = None
-while time.time() < DEADLINE:
-    log_notes()
-    try:
-        r = request("textDocument/completion", {
-            "textDocument": {"uri": uri},
-            "position": {"line": LINE, "character": CHAR},
-        })
-    except TimeoutError as e:
-        last_err = str(e); break
-    res = r.get("result")
-    items = res.get("items") if isinstance(res, dict) else res
-    items = items or []
-    if items:
-        labels = [it.get("label", "").strip() for it in items]
-        break
-    time.sleep(2)
+def poll_completion():
+    """Poll completion until Metals has imported the build and started the PC."""
+    while time.time() < DEADLINE:
+        log_notes()
+        try:
+            r = request("textDocument/completion", {
+                "textDocument": {"uri": uri},
+                "position": {"line": LINE, "character": CHAR},
+            })
+        except TimeoutError:
+            return None
+        res = r.get("result")
+        items = res.get("items") if isinstance(res, dict) else res
+        if items:
+            return items
+        time.sleep(2)
+    return None
+
+def poll(method):
+    """Poll a hover/definition request (after the PC is up) until it returns a non-empty result."""
+    deadline2 = min(DEADLINE, time.time() + 150)
+    while time.time() < deadline2:
+        log_notes()
+        try:
+            r = request(method, {"textDocument": {"uri": uri}, "position": {"line": LINE, "character": CHAR}})
+        except TimeoutError:
+            return None
+        if r.get("result"):
+            return r["result"]
+        time.sleep(2)
+    return None
+
+out, ok = None, False
+if MODE == "completion":
+    items = poll_completion() or []
+    out = [it.get("label", "").strip() for it in items]
+    ok = bool(out)
+else:
+    poll_completion()                       # cheapest readiness signal: wait for the PC
+    res = poll("textDocument/" + MODE)
+    if MODE == "hover":
+        text = ""
+        c = res.get("contents") if isinstance(res, dict) else None
+        if isinstance(c, dict):
+            text = c.get("value", "")
+        elif isinstance(c, list):
+            text = " ".join((x.get("value", "") if isinstance(x, dict) else str(x)) for x in c)
+        elif c is not None:
+            text = str(c)
+        out, ok = text, bool(text)
+    else:  # definition: Location | Location[] | LocationLink[]
+        locs = res if isinstance(res, list) else ([res] if res else [])
+        norm = []
+        for l in locs:
+            if not isinstance(l, dict):
+                continue
+            rng = l.get("range") or l.get("targetSelectionRange") or l.get("targetRange") or {}
+            norm.append({"uri": l.get("uri") or l.get("targetUri"),
+                         "line": (rng.get("start") or {}).get("line")})
+        out, ok = norm, bool(norm)
 
 log_notes()
 try:
@@ -163,8 +205,8 @@ except Exception:
     pass
 proc.terminate()
 
-if not labels:
-    sys.stderr.write(f"no completions obtained ({last_err})\n")
-    print(json.dumps([]))
+if not ok:
+    sys.stderr.write(f"no {MODE} result obtained\n")
+    print("" if MODE == "hover" else json.dumps([]))
     sys.exit(3)
-print(json.dumps(labels))
+print(out if MODE == "hover" else json.dumps(out))

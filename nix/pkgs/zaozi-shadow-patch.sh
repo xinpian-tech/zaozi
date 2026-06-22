@@ -60,10 +60,13 @@ cat > presentation-compiler/src/main/dotty/tools/pc/ZaoziPcSupport.scala <<'EOF'
 // presentation compiler needs no compile-time dependency on zaozi.
 package dotty.tools.pc
 
+import dotty.tools.dotc.ast.tpd.*
+import dotty.tools.dotc.core.Constants.Constant
 import dotty.tools.dotc.core.Contexts.*
+import dotty.tools.dotc.core.Flags
+import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.*
-import dotty.tools.dotc.core.Flags
 import dotty.tools.pc.completions.CompletionValue
 
 object ZaoziPcSupport:
@@ -97,11 +100,49 @@ object ZaoziPcSupport:
         if ibf.exists then inner.baseType(ibf).argInfos.headOption.map(e => (e, true)) else None
       }
 
-  /** Completion items for the PUBLIC `BundleField[E]` / `Option[BundleField[E]]` fields of the
-   *  Bundle/ProbeBundle behind a `Referable[T]` qualifier: filtered by the typed prefix `query`,
-   *  de-duplicated against `existing` ordinary completions, with private/protected and
-   *  non-`BundleField` vals excluded. Each renders as `<name>: Ref[E]` (`Option[Ref[E]]` for an
-   *  optional field), kind Field. Returns Nil for any non-zaozi qualifier. */
+  /** A field is OFFERED iff it is a PUBLIC, non-method val of `BundleField[E]` /
+   *  `Option[BundleField[E]]` type. This single predicate backs completion, hover, and
+   *  go-to-definition so all three agree on the field set. */
+  private def isOfferedField(bundleTpe: Type, f: Symbol)(using Context): Boolean =
+    f.isTerm && !f.is(Flags.Method) && !f.isOneOf(Flags.Private | Flags.Protected)
+      && refInfo(bundleTpe.memberInfo(f)).isDefined
+
+  /** The public Bundle/ProbeBundle field symbol named `name` behind a `Referable[T]` qualifier. */
+  def publicFieldSymbol(qualTpe: Type, name: String)(using Context): Option[Symbol] =
+    bundleType(qualTpe).flatMap { bundleTpe =>
+      val cls = bundleTpe.classSymbol
+      if !cls.exists then None
+      else cls.asClass.info.decls.toList.find(f => f.name.toString == name && isOfferedField(bundleTpe, f))
+    }
+
+  /** If `path` (the NavigateAST path at the cursor) crosses a zaozi Bundle/ProbeBundle dynamic
+   *  select `io.a` (whose un-reduced `selectDynamic("a")` application is somewhere in the path),
+   *  the resolved PUBLIC field `val` symbol plus the select's expression type (`Ref[E]`); None
+   *  otherwise. Drives hover and go-to-definition. Scans the whole path because the macro's
+   *  expansion may make a sub-tree of the application (not the `Inlined` node) the path head. */
+  // The PUBLIC field symbol of a `qual.selectDynamic("name")` application, if `qual` is a zaozi
+  // Bundle/ProbeBundle `Referable`; None otherwise.
+  private def fieldOfCall(call: Tree)(using Context): Option[Symbol] = call match
+    case Apply(Select(qual, sel), List(Literal(Constant(name: String)))) if sel == nme.selectDynamic =>
+      publicFieldSymbol(qual.tpe.widen, name)
+    case _ => None
+
+  def resolveDynamicSelect(path: List[Tree])(using Context): Option[(Symbol, Type)] =
+    path.collectFirst {
+      // The raw NavigateAST path (go-to-definition) has the application as its own element;
+      // the range-expanded path (hover) collapses to the macro `Inlined`, whose `call` is it.
+      case t if fieldOfCall(t).isDefined           => fieldOfCall(t).get
+      case Inlined(call, _, _) if fieldOfCall(call).isDefined => fieldOfCall(call).get
+    }.map { sym =>
+      // The whole `io.a` expression type is on the enclosing macro `Inlined` (the narrowed
+      // `Ref[E]`); the bare `selectDynamic` application is only typed as its declared `Any`.
+      val tpe = path.collectFirst { case inl: Inlined if inl.tpe.exists => inl.tpe }.getOrElse(sym.info)
+      (sym, tpe)
+    }
+
+  /** Completion items for the public Bundle fields behind a `Referable[T]` qualifier: filtered by
+   *  the typed prefix `query`, de-duplicated against `existing`. Each renders as `<name>: Ref[E]`
+   *  (`Option[Ref[E]]` for optional), kind Field. Returns Nil for any non-zaozi qualifier. */
   def bundleFieldCompletions(
       qualTpe: Type,
       query: String,
@@ -116,8 +157,7 @@ object ZaoziPcSupport:
           val taken = existing.iterator.map(c => c.insertText.getOrElse(c.label)).toSet
           cls.asClass.info.decls.toList.flatMap { f =>
             val nm = f.name.toString
-            if f.isTerm && !f.is(Flags.Method) && !f.isOneOf(Flags.Private | Flags.Protected)
-               && (query.isEmpty || nm.startsWith(query)) && !taken.contains(nm)
+            if isOfferedField(bundleTpe, f) && (query.isEmpty || nm.startsWith(query)) && !taken.contains(nm)
             then
               refInfo(bundleTpe.memberInfo(f)) match
                 case Some((e, optional)) =>
@@ -140,10 +180,13 @@ cat > compiler/src/dotty/tools/dotc/semanticdb/ZaoziSemanticDB.scala <<'EOF'
 // definition (PC) and reference (compiler) symbols line up.
 package dotty.tools.dotc.semanticdb
 
+import dotty.tools.dotc.ast.tpd.*
+import dotty.tools.dotc.core.Constants.Constant
 import dotty.tools.dotc.core.Contexts.*
+import dotty.tools.dotc.core.Flags
+import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.*
-import dotty.tools.dotc.core.Flags
 
 object ZaoziSemanticDB:
   private val ReferableFqn       = "me.jiuyang.zaozi.reftpe.Referable"
@@ -166,17 +209,28 @@ object ZaoziSemanticDB:
       val opt = tpe.baseType(defn.OptionClass)
       opt.exists && opt.argInfos.headOption.exists(a => baseClassByFqn(a, BundleFieldFqn).exists)
 
-  /** The `BundleField`/`Option[BundleField]` field symbol named `name` on the
+  /** The same PUBLIC field predicate as the presentation compiler's `ZaoziPcSupport.isOfferedField`,
+   *  so reference occurrences cover exactly the fields completion/hover/definition offer. */
+  private def isOfferedField(bundleTpe: Type, f: Symbol)(using Context): Boolean =
+    f.isTerm && !f.is(Flags.Method) && !f.isOneOf(Flags.Private | Flags.Protected)
+      && isBundleFieldType(bundleTpe.memberInfo(f))
+
+  /** The public `BundleField`/`Option[BundleField]` field symbol named `name` on the
    *  Bundle/ProbeBundle behind a `Referable[T]` qualifier, if any. */
   def fieldSymbol(qualTpe: Type, name: String)(using Context): Option[Symbol] =
     bundleType(qualTpe).flatMap { bundleTpe =>
       val cls = bundleTpe.classSymbol
       if !cls.exists then None
-      else cls.asClass.info.decls.toList.find { f =>
-        f.isTerm && !f.is(Flags.Method) && f.name.toString == name
-          && isBundleFieldType(bundleTpe.memberInfo(f))
-      }
+      else cls.asClass.info.decls.toList.find(f => f.name.toString == name && isOfferedField(bundleTpe, f))
     }
+
+  /** For a typed `qual.selectDynamic("name")` call (the un-reduced `Inlined.call`) whose qualifier
+   *  is a zaozi Bundle/ProbeBundle `Referable`, the resolved public field symbol; None otherwise. */
+  def resolveDynamicSelect(call: Tree)(using Context): Option[Symbol] =
+    call match
+      case Apply(Select(qual, sel), List(Literal(Constant(name: String)))) if sel == nme.selectDynamic =>
+        fieldSymbol(qual.tpe, name)
+      case _ => None
 EOF
 
 # (4c) A CompletionValue variant for a Zaozi field: caller-supplied label + detail string,
@@ -191,6 +245,23 @@ perl -0pi -e 's/(      CompletionItemKind\.Keyword\n)(\n  case class FileSystemM
 COMPL=presentation-compiler/src/main/dotty/tools/pc/completions/Completions.scala
 perl -0pi -e 's/(            val \(compiler, result\) = enrichedCompilerCompletions\(qual\.typeOpt\.widenDealias\)\n)            \(allAdvanced \+\+ compiler, result\)/$1            val __zaoziFields = dotty.tools.pc.ZaoziPcSupport.bundleFieldCompletions(qual.typeOpt.widenDealias, completionPos.query, allAdvanced ++ compiler)\n            (allAdvanced ++ compiler ++ __zaoziFields, result)/' "$COMPL"
 
+# (4e) Hover + go-to-definition hook: a top-level case in
+#      `MetalsInteractive.enclosingSymbolsWithExpressionType` that, when the cursor path crosses a
+#      zaozi Bundle/ProbeBundle dynamic select `io.a`, returns the resolved field `val` symbol +
+#      its `Ref[E]` expression type, so HoverProvider and PcDefinitionProvider point at the field
+#      (not `selectDynamic`). Inserted as the first case (before the named-arg case) so it wins;
+#      non-zaozi paths fall through unchanged (the guard is false).
+MI=presentation-compiler/src/main/dotty/tools/pc/MetalsInteractive.scala
+perl -0pi -e 's/(    import indexed\.ctx\n    path match\n)(      \/\/ For a named arg)/$1      case __zaoziP if dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(__zaoziP).isDefined =>\n        dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(__zaoziP).toList.map((s, t) => (s, t, Option.empty[String]))\n$2/' "$MI"
+
+# (4f) Hover guard: HoverProvider bails to an empty hover when the path-head type is error/NoType
+#      BEFORE it consults enclosingSymbolsWithExpressionType. For a macro dynamic select the
+#      head type is exactly that, so relax the guard when the path crosses a zaozi dynamic select
+#      (so it reaches the hooked enclosingSymbolsWithExpressionType). Non-zaozi paths are
+#      unchanged (the added conjunct is true only for zaozi selects).
+HP=presentation-compiler/src/main/dotty/tools/pc/HoverProvider.scala
+perl -0pi -e 's/(    )if tp\.isError \|\| tpw == NoType \|\| tpw\.isError \|\| path\.isEmpty\n(    then)/${1}if (tp.isError || tpw == NoType || tpw.isError || path.isEmpty) && dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(enclosing).isEmpty\n$2/' "$HP"
+
 # Fail closed if any edit did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
 grep -q "__zaozi_marker__" "$PC"
@@ -200,4 +271,6 @@ test -f presentation-compiler/src/main/dotty/tools/pc/ZaoziPcSupport.scala
 test -f compiler/src/dotty/tools/dotc/semanticdb/ZaoziSemanticDB.scala
 grep -q "case class ZaoziField" "$CV"
 grep -q "ZaoziPcSupport.bundleFieldCompletions" "$COMPL"
-echo "zaozi-shadow patch applied (VER=$VER REV=$REV): markers + Bundle-field completion"
+grep -q "ZaoziPcSupport.resolveDynamicSelect" "$MI"
+grep -q "ZaoziPcSupport.resolveDynamicSelect(enclosing)" "$HP"
+echo "zaozi-shadow patch applied (VER=$VER REV=$REV): markers + completion + hover/definition"
