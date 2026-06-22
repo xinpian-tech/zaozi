@@ -210,6 +210,7 @@ import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.*
+import dotty.tools.dotc.util.Spans.Span
 
 object ZaoziSemanticDB:
   private val ReferableFqn       = "me.jiuyang.zaozi.reftpe.Referable"
@@ -252,7 +253,22 @@ object ZaoziSemanticDB:
   def resolveDynamicSelect(call: Tree)(using Context): Option[Symbol] =
     call match
       case Apply(Select(qual, sel), List(Literal(Constant(name: String)))) if sel == nme.selectDynamic =>
-        fieldSymbol(qual.tpe, name)
+        fieldSymbol(qual.tpe.widen, name)
+      case _ => None
+
+  /** The resolved public field symbol AND the source name span of `io.a` for a
+   *  `qual.selectDynamic("name")` call — the field-reference occurrence to register in
+   *  `ExtractSemanticInfo`. Prefers the `selectDynamic` select's `nameSpan` (the `a` source
+   *  range), falling back to the literal `"a"` span. None for non-zaozi/unresolved selects. */
+  def dynamicFieldUse(call: Tree)(using Context): Option[(Symbol, Span)] =
+    call match
+      case Apply(sel @ Select(qual, name), List(lit @ Literal(Constant(fname: String))))
+          if name == nme.selectDynamic =>
+        fieldSymbol(qual.tpe.widen, fname).map { sym =>
+          val ns   = sel.nameSpan
+          val span = if ns.exists && !ns.isZeroExtent then ns else lit.span
+          (sym, span)
+        }
       case _ => None
 EOF
 
@@ -285,6 +301,14 @@ perl -0pi -e 's/(    import indexed\.ctx\n    path match\n)(      \/\/ For a nam
 HP=presentation-compiler/src/main/dotty/tools/pc/HoverProvider.scala
 perl -0pi -e 's/(    )if tp\.isError \|\| tpw == NoType \|\| tpw\.isError \|\| path\.isEmpty\n(    then)/${1}if (tp.isError || tpw == NoType || tpw.isError || path.isEmpty) && !dotty.tools.pc.ZaoziPcSupport.isResolvedDynamicSelect(enclosing)\n$2/' "$HP"
 
+# (4g) Find-references: in the compiler's ExtractSemanticInfo traversal, register a REFERENCE
+#      occurrence for the resolved Bundle/ProbeBundle field at the `io.a` use site. This phase
+#      runs BEFORE PostTyper/Inlining, so the macro `Inlined.call` is still the un-reduced
+#      `io.selectDynamic("a")`. Additive: ZaoziSemanticDB.dynamicFieldUse is None for non-zaozi
+#      selects, so ordinary `.semanticdb` output is unchanged (and `.class`/`.tasty` never).
+ESDB=compiler/src/dotty/tools/dotc/semanticdb/ExtractSemanticDB.scala
+perl -0pi -e 's/(        case tree: Inlined =>\n)(          traverse\(tree\.call\))/$1          ZaoziSemanticDB.dynamicFieldUse(tree.call).foreach((__zsSym, __zsSpan) => registerUseGuarded(None, __zsSym, __zsSpan, tree.source))\n$2/' "$ESDB"
+
 # Fail closed if any edit did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
 grep -q "__zaozi_marker__" "$PC"
@@ -296,4 +320,5 @@ grep -q "case class ZaoziField" "$CV"
 grep -q "ZaoziPcSupport.bundleFieldCompletions" "$COMPL"
 grep -q "ZaoziPcSupport.hoverDefSymbols" "$MI"
 grep -q "ZaoziPcSupport.isResolvedDynamicSelect(enclosing)" "$HP"
+grep -q "ZaoziSemanticDB.dynamicFieldUse" "$ESDB"
 echo "zaozi-shadow patch applied (VER=$VER REV=$REV): markers + completion + hover/definition"
