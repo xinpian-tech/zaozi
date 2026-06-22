@@ -108,9 +108,9 @@
           inherit scala3-shadow-jars;
           # Isolated coursier cache shadowing the patched jars: the Zaozi compile closure
           # plus the presentation-compiler closure, with the patched compiler/PC jars
-          # overlaid at their stock coordinates. The sole authoritative cache task5 points
-          # both consumer JVMs at. Fixed-output (coursier fetches the PC closure); pass
-          # proxyHost/proxyPort via .override for a proxied sandbox.
+          # overlaid at their stock coordinates. The sole authoritative cache both consumer
+          # JVMs (Mill/scalac and Metals/PC) resolve from. Fixed-output (coursier fetches
+          # the PC closure); pass proxyHost/proxyPort via .override for a proxied sandbox.
           inherit scala3-shadow-cache;
           # Repeatable verification gate for the shadow artifacts: asserts the patched
           # jar + cache contract, hashes.json consistency, patched != stock, and proves
@@ -144,17 +144,26 @@
           # gated marker are checked, with the patched/empty/stock cache-state matrix. The
           # stock cache is the existing ivy-gather zaozi-lock cache; the workspace is this
           # flake's own source. Run: nix run .#scala3-shadow-resolution
-          scala3-shadow-resolution = pkgs.writeShellApplication {
-            name = "scala3-shadow-resolution";
-            runtimeInputs = with pkgs; [ bash mill jdk21 jq gnugrep findutils coreutils gnutar ];
-            text = ''
-              exec bash ${./nix/checks/scala3-shadow-resolution.sh} \
-                --shadow-cache "${scala3-shadow-cache}" \
-                --shadow-jars "${scala3-shadow-jars}" \
-                --stock-cache "${pkgs.ivy-gather ./nix/zaozi/zaozi-lock.nix}" \
-                --workspace "${self}" "$@"
-            '';
-          };
+          scala3-shadow-resolution =
+            let
+              stockCompiler = pkgs.fetchurl {
+                name = "scala3-compiler_3-3.8.4.jar";
+                url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.8.4/scala3-compiler_3-3.8.4.jar";
+                hash = "sha256-dAvgK1HoFe8qknpCLWH9hR4lQDZV+57i4Ha0+c4fs04=";
+              };
+            in
+            pkgs.writeShellApplication {
+              name = "scala3-shadow-resolution";
+              runtimeInputs = with pkgs; [ bash mill jdk21 jq gnugrep findutils coreutils gnutar ];
+              text = ''
+                exec bash ${./nix/checks/scala3-shadow-resolution.sh} \
+                  --shadow-cache "${scala3-shadow-cache}" \
+                  --shadow-jars "${scala3-shadow-jars}" \
+                  --stock-cache "${pkgs.ivy-gather ./nix/zaozi/zaozi-lock.nix}" \
+                  --stock-compiler "${stockCompiler}" \
+                  --workspace "${self}" "$@"
+              '';
+            };
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];

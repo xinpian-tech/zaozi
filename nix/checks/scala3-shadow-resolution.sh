@@ -16,17 +16,18 @@
 set -euo pipefail
 
 VER=3.8.4
-SC=; SJ=; STOCK_SC=; WORKSPACE=
+SC=; SJ=; STOCK_SC=; STOCK_C=; WORKSPACE=
 while [ $# -gt 0 ]; do
   case "$1" in
-    --shadow-cache) SC="$2"; shift 2 ;;
-    --shadow-jars)  SJ="$2"; shift 2 ;;
-    --stock-cache)  STOCK_SC="$2"; shift 2 ;;
-    --workspace)    WORKSPACE="$2"; shift 2 ;;
+    --shadow-cache)   SC="$2"; shift 2 ;;
+    --shadow-jars)    SJ="$2"; shift 2 ;;
+    --stock-cache)    STOCK_SC="$2"; shift 2 ;;
+    --stock-compiler) STOCK_C="$2"; shift 2 ;;
+    --workspace)      WORKSPACE="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
-for v in SC SJ STOCK_SC WORKSPACE; do [ -n "${!v}" ] || { echo "missing arg $v" >&2; exit 2; }; done
+for v in SC SJ STOCK_SC STOCK_C WORKSPACE; do [ -n "${!v}" ] || { echo "missing arg $v" >&2; exit 2; }; done
 
 PASS=0
 ok()   { PASS=$((PASS+1)); echo "PASS  $1"; }
@@ -65,8 +66,10 @@ mill_show() { # $1 cacheSrc, $2 outjson, $3 outerr -> mill rc
   ) >"$2" 2>"$3" || rc=$?
   return $rc
 }
-# Mill PathRefs are rendered "qref:v1:<hash>:/abs/path"; strip the prefix.
-strip_qref() { sed -E 's#^qref:v[0-9]+:[0-9a-f]+:##'; }
+# Mill renders classpath PathRefs as "qref:v1:<hash>:/abs/path"; the path is everything
+# after the last ':' (nix/tmp paths contain no ':'), so bash '##*:' strips the prefix with
+# no external sed dependency.
+strip_qref() { local x; x="$1"; printf '%s' "${x##*:}"; }
 
 # A probe that reports, from the actual JVM, where dotty.tools.dotc.Driver was loaded from.
 mkdir -p "$BASE/probe"
@@ -90,8 +93,9 @@ SCALA
 echo "== 1. patched cache: real Mill resolution + JVM provenance + gated marker =="
 mill_show "$SC/cache" "$BASE/p.json" "$BASE/p.err" || fail "mill failed to resolve against the patched cache: $(tail -3 "$BASE/p.err")"
 PCACHE="$LAST_CC"
-mapfile -t CP < <(jq -r '.[]' "$BASE/p.json" | strip_qref)
-[ "${#CP[@]}" -ge 8 ] || fail "patched: unexpected classpath size ${#CP[@]}"
+mapfile -t RAW < <(jq -r '.[]' "$BASE/p.json")
+[ "${#RAW[@]}" -ge 8 ] || fail "patched: unexpected classpath size ${#RAW[@]}"
+CP=(); for r in "${RAW[@]}"; do CP+=("$(strip_qref "$r")"); done
 CJAR=""; for j in "${CP[@]}"; do [[ "$j" == *"scala3-compiler_3-$VER.jar" ]] && CJAR="$j"; done
 [ -n "$CJAR" ] || fail "patched: no scala3-compiler_3 jar in Mill classpath"
 case "$CJAR" in "$PCACHE"/*) ;; *) fail "patched: resolved compiler not under isolated cache: $CJAR";; esac
@@ -103,11 +107,14 @@ case "$loc" in "$PCACHE"/*) ;; *) fail "patched: JVM loaded Driver from outside 
 [ "$(sha "$loc")" = "$want" ] || fail "patched: probed CodeSource hash != published patched"
 ok "patched cache: the compiler JVM loads Driver from the Mill-resolved patched jar"
 mkdir -p "$BASE/out1"
+rc=0
 java -Dzaozi.shadow.marker=true -cp "$CPJOIN" dotty.tools.dotc.Main -classpath "$CPJOIN" \
-  -d "$BASE/out1" "$BASE/F.scala" >/dev/null 2>"$BASE/m1.err" || true
+  -d "$BASE/out1" "$BASE/F.scala" >"$BASE/m1.out" 2>"$BASE/m1.err" || rc=$?
+[ "$rc" -eq 0 ] || fail "patched: compile from the Mill-resolved classpath failed (rc=$rc): $(tail -3 "$BASE/m1.err")"
+[ -f "$BASE/out1/z/F.class" ] || fail "patched: compile produced no class output"
 grep -qF "zaozi-shadow-marker compiler org.scala-lang:scala3-compiler_3:$VER" "$BASE/m1.err" \
   || fail "patched: gated marker not emitted from the Mill-resolved compiler"
-ok "patched cache: the Mill-resolved compiler emits the gated marker"
+ok "patched cache: the Mill-resolved compiler compiles the fixture and emits the gated marker"
 
 echo "== 2. empty cache: offline Mill resolution fails =="
 EMPTY="$BASE/empty"; mkdir -p "$EMPTY/https"
@@ -115,21 +122,27 @@ rc=0; mill_show "$EMPTY" "$BASE/e.json" "$BASE/e.err" || rc=$?
 [ "$rc" -ne 0 ] || fail "empty isolated cache: Mill unexpectedly succeeded offline"
 ok "empty isolated cache: offline Mill resolution fails (rc=$rc, no fallback)"
 
-echo "== 3. stock cache: stock bytes, no marker =="
+echo "== 3. stock cache: exact stock bytes, no marker =="
+stockhash=$(sha "$STOCK_C")
+[ "$stockhash" != "$want" ] || fail "pinned stock compiler hash equals patched?!"
 mill_show "$STOCK_SC/cache" "$BASE/s.json" "$BASE/s.err" || fail "mill failed to resolve against the stock cache: $(tail -3 "$BASE/s.err")"
 KCACHE="$LAST_CC"
-mapfile -t SCP < <(jq -r '.[]' "$BASE/s.json" | strip_qref)
+mapfile -t SRAW < <(jq -r '.[]' "$BASE/s.json")
+SCP=(); for r in "${SRAW[@]}"; do SCP+=("$(strip_qref "$r")"); done
 KJAR=""; for j in "${SCP[@]}"; do [[ "$j" == *"scala3-compiler_3-$VER.jar" ]] && KJAR="$j"; done
 [ -n "$KJAR" ] || fail "stock: no scala3-compiler_3 jar in Mill classpath"
 case "$KJAR" in "$KCACHE"/*) ;; *) fail "stock: resolved compiler not under isolated stock cache: $KJAR";; esac
-[ "$(sha "$KJAR")" != "$want" ] || fail "stock: Mill-resolved compiler hash equals patched?!"
-ok "stock cache: Mill resolves the stock compiler under the isolated cache (hash != patched)"
+[ "$(sha "$KJAR")" = "$stockhash" ] || fail "stock: Mill-resolved compiler hash != pinned stock jar"
+ok "stock cache: Mill resolves exactly the pinned stock compiler (hash == stock, != patched)"
 SCPJOIN=$(IFS=:; echo "${SCP[*]}")
 mkdir -p "$BASE/out3"
+rc=0
 java -Dzaozi.shadow.marker=true -cp "$SCPJOIN" dotty.tools.dotc.Main -classpath "$SCPJOIN" \
-  -d "$BASE/out3" "$BASE/F.scala" >/dev/null 2>"$BASE/m3.err" || true
+  -d "$BASE/out3" "$BASE/F.scala" >"$BASE/m3.out" 2>"$BASE/m3.err" || rc=$?
+[ "$rc" -eq 0 ] || fail "stock: compile from the Mill-resolved classpath failed (rc=$rc): $(tail -3 "$BASE/m3.err")"
+[ -f "$BASE/out3/z/F.class" ] || fail "stock: compile produced no class output"
 if grep -q "zaozi-shadow-marker" "$BASE/m3.err"; then fail "stock compiler emitted the marker?!"; fi
-ok "stock cache: the Mill-resolved stock compiler emits no marker even with the property"
+ok "stock cache: the Mill-resolved stock compiler compiles the fixture and emits no marker"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"
