@@ -127,7 +127,7 @@ notify("initialized", {})
 # Force auto-import + offline behaviour via configuration.
 notify("workspace/didChangeConfiguration", {"settings": {"metals": {
     "autoImportBuild": "all",
-    "fallbackScalaVersion": "3.8.4",
+    "fallbackScalaVersion": "3.8.3",
 }}})
 
 uri = "file://" + os.path.abspath(FILE)

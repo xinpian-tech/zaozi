@@ -29,7 +29,7 @@
   # Fixed-output hash of the normalised jar set (recursive sha256 of $out). Pinned from
   # a real proxied build of the patched same-version jars + hashes.json. Re-pin if the
   # scala3 source rev or the marker patch changes the jar bytes.
-, outputHash ? "sha256-9FMwEMw/ANkdN2JGzbwAbmTNNaVnMlcwFpqyi8afi/Y="
+, outputHash ? "sha256-oxunWn1IEuMEYuph3bZEg+bwpkDjZYrm0tVR/u8TkYY="
 }:
 
 stdenv.mkDerivation {
@@ -52,7 +52,7 @@ stdenv.mkDerivation {
     runHook preBuild
     export HOME="$TMPDIR/home" COURSIER_CACHE="$TMPDIR/cs" XDG_CACHE_HOME="$TMPDIR/xdg"
     mkdir -p "$HOME/.sbt/boot" "$HOME/.sbt/global" "$HOME/.sbt/staging" "$HOME/.ivy2" \
-             "$HOME/.cache" "$COURSIER_CACHE" "$XDG_CACHE_HOME"
+             "$HOME/.cache" "$HOME/jtmp" "$COURSIER_CACHE" "$XDG_CACHE_HOME"
 
     proxyOpts=""
     ${lib.optionalString (proxyHost != null) ''
@@ -62,6 +62,10 @@ stdenv.mkDerivation {
     # its boot lock under user.home/.sbt. Pin user.home and every sbt working dir to the
     # writable $HOME so the launcher can create its boot/lock/ivy state.
     sbtDirs="-Duser.home=$HOME -Dsbt.boot.directory=$HOME/.sbt/boot -Dsbt.global.base=$HOME/.sbt/global -Dsbt.global.staging=$HOME/.sbt/staging -Dsbt.ivy.home=$HOME/.ivy2"
+    # sbt's server/ipc socket lives under java.io.tmpdir (default /tmp); creating it under
+    # /tmp intermittently fails with AccessDenied in the sandbox. Point java.io.tmpdir at a
+    # writable $HOME dir and disable server autostart.
+    sbtDirs="$sbtDirs -Djava.io.tmpdir=$HOME/jtmp -Dsbt.server.autostart=false"
     export SBT_OPTS="$proxyOpts $sbtDirs -Dsbt.server=false -Dsbt.ci=true -Xmx6g"
     export JAVA_TOOL_OPTIONS="$proxyOpts -Duser.home=$HOME"
 
