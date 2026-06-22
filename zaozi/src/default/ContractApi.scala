@@ -39,21 +39,6 @@ export given_ContractApi.{Contract, Ensure, Require}
 
 given ContractApi with
   private def operationIsNull(op: Operation): Boolean = MlirOperation.ptr(op.segment).address == 0
-
-  // The property carried by an Immediate / Sequence / Property has already been
-  // converted to a core (i1) / LTL value by the SVA frontend (see SVAApi, which
-  // inserts the firrtl -> i1/ltl `unrealized_conversion_cast`), so verif.require
-  // / verif.ensure can consume it directly without any further cast.
-  private def propertyValue(
-    property: Immediate | Sequence | Property
-  )(
-    using Arena,
-    TypeImpl
-  ): Value = property match
-    case immediate: Immediate => immediate.refer
-    case sequence:  Sequence  => sequence.refer
-    case prop:      Property   => prop.refer
-
   // Lower all public Contract overloads through a flat Seq, while preserving the
   // user-facing body argument and result shapes through the mapping functions.
   private def mapped[R, O](
@@ -68,33 +53,25 @@ given ContractApi with
     sourcecode.Line,
     TypeImpl
   ): O =
-    val outerBlock    = summon[Block]
-    val inputValues   = args.map(_.refer)
-    val inputTypes    = inputValues.map(_.getType)
-    // verif.contract passes its operands through to its results (AllTypesMatch),
-    // so the result types mirror the input types.
-    val contract      = summon[VerifContractApi].op(inputValues, inputTypes, locate)
-    val contractBlock = contract.block
-    // verif.contract carries one block argument per input (matching the input
-    // types). Those block arguments dominate the body region, so FIRRTL
-    // declarations inside the body may reference them. Expose each block
-    // argument to the user body through a pass-through node. The FIRRTL -> HW
-    // lowering remaps the block arguments to the contract's results.
-    val bodyArgs      = args.zipWithIndex.map: (arg, idx) =>
+    val inputValues = args.map(_.refer)
+    val inputTypes  = inputValues.map(_.getType)
+    val contract    = summon[VerifContractApi].op(inputs = inputValues, resultTypes = inputTypes, location = locate)
+
+    val bodyArgs   = args.zipWithIndex.map: (arg, idx) =>
       val node = summon[NodeApi].op(
         name = "",
         location = locate,
         nameKind = FirrtlNameKind.Droppable,
-        input = contractBlock.getArgument(idx.toLong)
+        input = contract.block.getArgument(idx.toLong)
       )
       node.operation.appendToBlock()(
-        using contractBlock
+        using contract.block
       )
       new ContractResult(arg._tpe, node.operation)
-    val clauses       = ArrayBuffer.empty[ContractClause]
-    val beforeBody    =
+    val clauses    = ArrayBuffer.empty[ContractClause]
+    val beforeBody =
       if args.isEmpty then
-        var current = outerBlock.getFirstOperation
+        var current = summon[Block].getFirstOperation
         var last    = Option.empty[Operation]
         while !operationIsNull(current) do
           last = Some(current)
@@ -106,20 +83,20 @@ given ContractApi with
       body(mapping(bodyArgs))(
         using summon[Arena],
         summon[Context],
-        contractBlock
+        contract.block
       )
     finally
       contractScopes.remove(contractScopes.length - 1)
     if args.isEmpty then
       val bodyOps = ArrayBuffer.empty[Operation]
-      var current = beforeBody.map(_.getNextInBlock).getOrElse(outerBlock.getFirstOperation)
+      var current = beforeBody.map(_.getNextInBlock).getOrElse(summon[Block].getFirstOperation)
       while !operationIsNull(current) do
         val next = current.getNextInBlock
         bodyOps.append(current)
         current = next
       bodyOps.foreach: op =>
         op.removeFromParent()
-        contractBlock.appendOwnedOperation(op)
+        contract.block.appendOwnedOperation(op)
     clauses.foreach: clause =>
       val op = clause.kind match
         case ContractClauseKind.Require =>
@@ -127,11 +104,9 @@ given ContractApi with
         case ContractClauseKind.Ensure  =>
           summon[EnsureApi].op(clause.property, clause.label, clause.location).operation
       op.appendToBlock()(
-        using contractBlock
+        using contract.block
       )
-    contract.operation.appendToBlock()(
-      using outerBlock
-    )
+    contract.operation.appendToBlock()
 
     val results = args.zipWithIndex.map: (arg, idx) =>
       val node = summon[NodeApi].op(
@@ -140,9 +115,7 @@ given ContractApi with
         nameKind = FirrtlNameKind.Droppable,
         input = contract.operation.getResult(idx.toLong)
       )
-      node.operation.appendToBlock()(
-        using outerBlock
-      )
+      node.operation.appendToBlock()
       new ContractResult(arg._tpe, node.operation)
 
     mapping(results)
@@ -204,11 +177,13 @@ given ContractApi with
     sourcecode.Line,
     TypeImpl
   ): Unit =
-    val value = propertyValue(property)
+    val value = property match
+      case immediate: Immediate => immediate.refer
+      case sequence:  Sequence  => sequence.refer
+      case prop:      Property  => prop.refer
     if contractScopes.nonEmpty then
       contractScopes.last.append(ContractClause(ContractClauseKind.Require, value, label, locate))
-    else
-      summon[AssumeApi].op(value, label, locate).operation.appendToBlock()
+    else summon[AssumeApi].op(value, label, locate).operation.appendToBlock()
 
   def Ensure(
     property: Immediate | Sequence | Property,
@@ -221,8 +196,11 @@ given ContractApi with
     sourcecode.Line,
     TypeImpl
   ): Unit =
-    val value = propertyValue(property)
+    val value = property match
+      case immediate: Immediate => immediate.refer
+      case sequence:  Sequence  => sequence.refer
+      case prop:      Property  => prop.refer
+
     if contractScopes.nonEmpty then
       contractScopes.last.append(ContractClause(ContractClauseKind.Ensure, value, label, locate))
-    else
-      summon[AssertApi].op(value, label, locate).operation.appendToBlock()
+    else summon[AssertApi].op(value, label, locate).operation.appendToBlock()

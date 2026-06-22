@@ -48,24 +48,21 @@ object ContractSpec extends TestSuite:
             Ensure((p + p >= 2.U).I)
           }
 
-      // NOTE: the Contract is now built on the verif dialect. The property
-      // computations stay in FIRRTL and are converted to i1 by the SVA `.I`
-      // (Immediate) frontend (a `builtin.unrealized_conversion_cast`) before
-      // feeding verif.require / verif.ensure. The exact SSA names below were
-      // loosened to stable tokens; regenerate precise golden strings by running
-      // this test once a build is available.
       NoArguments.mlirTest(parameter)(
-        // Contract now lowers to the verif dialect.
         "verif.contract {",
-        // p >= 1 and p + p >= 2 are computed in FIRRTL.
-        "firrtl.geq",
-        "firrtl.add",
-        // .I converts the firrtl bool property to i1.
-        "builtin.unrealized_conversion_cast",
-        "!firrtl.uint<1> to i1",
-        // require p >= 1 / ensure p + p >= 2 on the verif dialect.
-        "verif.require",
-        "verif.ensure"
+        "  %c1_ui1 = firrtl.constant 1 : !firrtl.uint<1>",
+        "  %4 = firrtl.geq %3, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
+        "  %_GEN_0 = firrtl.node interesting_name %4 : !firrtl.uint<1>",
+        "  %5 = builtin.unrealized_conversion_cast %_GEN_0 : !firrtl.uint<1> to i1",
+        "  %6 = firrtl.add %3, %3 : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
+        "  %_GEN_1 = firrtl.node interesting_name %6 : !firrtl.uint<9>",
+        "  %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
+        "  %7 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
+        "  %_GEN_2 = firrtl.node interesting_name %7 : !firrtl.uint<1>",
+        "  %8 = builtin.unrealized_conversion_cast %_GEN_2 : !firrtl.uint<1> to i1",
+        "  verif.require %5 : i1",
+        "  verif.ensure %8 : i1",
+        "}"
       )
 
     test("single argument"):

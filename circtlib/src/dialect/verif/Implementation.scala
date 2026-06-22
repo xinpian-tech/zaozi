@@ -40,10 +40,6 @@ given ContractApi with
         location = location,
         operands = inputs,
         resultsTypes = Some(resultTypes),
-        // Give the body block one argument per input (matching the input
-        // types). A frontend can refer to the inputs through these block
-        // arguments, which dominate the body region; the FIRRTL -> HW lowering
-        // remaps them to the contract's results.
         regionBlockTypeLocations = Seq(
           Seq(
             (resultTypes, resultTypes.map(_ => location))
