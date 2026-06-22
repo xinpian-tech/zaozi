@@ -78,7 +78,13 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY SBT_OPTS JAVA_OPTS 2>/dev/nu
 
 cd "$WS"
 echo "== pre-install the Mill BSP connection (so Metals connects instead of bootstrapping its own) =="
-mill --no-daemon --offline mill.bsp.BSP/install >/dev/null 2>&1 && echo "  .bsp installed: $(ls .bsp)"
+# Fail CLOSED: if BSP cannot be installed offline, stop before starting Metals (otherwise
+# Metals would fall back to bootstrapping its own build server, weakening the proof).
+if ! mill --no-daemon --offline mill.bsp.BSP/install >"$ROOT/bsp.log" 2>&1; then
+  echo "FAIL  mill BSP install failed offline:" >&2; tail -6 "$ROOT/bsp.log" >&2; exit 1
+fi
+[ -f "$WS/.bsp/mill-bsp.json" ] || { echo "FAIL  .bsp/mill-bsp.json not created" >&2; exit 1; }
+echo "  .bsp installed: $(ls .bsp)"
 
 echo "== drive headless Metals completion =="
 labels=$(python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" 4 13 || true)
