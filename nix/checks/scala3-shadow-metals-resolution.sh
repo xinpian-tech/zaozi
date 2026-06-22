@@ -47,9 +47,10 @@ trap 'chmod -R u+w "$BASE" 2>/dev/null; rm -rf "$BASE" 2>/dev/null || true' EXIT
 # Drive headless Metals against an isolated copy of cacheSrcDir (a dir whose child is
 # https/), merging the Metals extra closure in. Writes completion labels to $2 and Metals'
 # server log to $3. If $4 is given, the patched PC writes the loaded PC jar URL there
-# (-Dzaozi.shadow.pc.provenance). Returns the probe exit code.
-run_metals() { # $1 cacheSrcDir, $2 labelsOut, $3 metalsLog, $4 provenanceOut (optional)
-  local R WS NCD CC H X
+# (-Dzaozi.shadow.pc.provenance). $5/$6/$7 override the fixture source and completion
+# line/char (default: the greeting fixture at 4 13). Returns the probe exit code.
+run_metals() { # $1 cacheSrcDir, $2 labelsOut, $3 metalsLog, $4 provenanceOut, $5 mainSrc, $6 line, $7 char
+  local R WS NCD CC H X LN CH
   R=$(mktemp -d -p "$BASE"); WS="$R/ws"; mkdir -p "$WS/foo/src/demo"
   cat > "$WS/build.mill" <<'M'
 //| mill-version: 1.1.2
@@ -60,7 +61,9 @@ object foo extends ScalaModule {
   def scalaVersion = "3.8.3"
 }
 M
-  printf 'package demo\nobject Main:\n  val greeting: String = "hi"\n  def run(): Unit =\n    greeting.\n' > "$WS/foo/src/demo/Main.scala"
+  if [ -n "${5:-}" ]; then printf '%s' "$5" > "$WS/foo/src/demo/Main.scala"
+  else printf 'package demo\nobject Main:\n  val greeting: String = "hi"\n  def run(): Unit =\n    greeting.\n' > "$WS/foo/src/demo/Main.scala"; fi
+  LN="${6:-4}"; CH="${7:-13}"
   NCD="$R/coursier"; CC="$NCD/cache"; H="$R/home"; X="$R/xdg"; mkdir -p "$NCD" "$H" "$X"
   cp -rL "$1" "$CC"; chmod -R u+w "$CC"
   local JOPTS="-Dcoursier.cache=$CC -Dcoursier.ivy.home=$NCD -Divy.home=$NCD -Duser.home=$H -Dzaozi.shadow.marker=true"
@@ -77,7 +80,7 @@ M
     # Fail closed if the Mill BSP connection cannot be installed offline.
     if ! mill --no-daemon --offline mill.bsp.BSP/install >/dev/null 2>&1; then exit 90; fi
     [ -f "$WS/.bsp/mill-bsp.json" ] || exit 91
-    python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" 4 13
+    python3 "$PROBE" "$WS" "$WS/foo/src/demo/Main.scala" "$LN" "$CH"
   ) >"$2" 2>>"$3"
 }
 
@@ -133,6 +136,76 @@ if grep -q "__zaozi_marker__" "$BASE/s.labels" 2>/dev/null; then fail "stock PC 
 # The PC coordinate Metals resolved+loaded from is the pinned stock jar, before and after.
 [ "$(sha "$STOCK/cache/$PC_COORD")" = "$STOCK_PC_SHA" ] || fail "stock: PC coordinate hash changed during the run"
 ok "stock isolated cache: stock PC ran ($nlabels completions), no __zaozi_marker__, PC coord == pinned stock"
+
+echo "== 4. patched cache: zaozi Bundle-field completion (additive, type-gated) =="
+# A synthetic fixture that declares the minimal zaozi shapes BY their real fully-qualified
+# names (the resolver matches by FQN, so no real zaozi/CIRCT closure is needed). `io` is a
+# Referable[MyBundle]; `d` is a non-zaozi scala.Dynamic. The patched PC must list MyBundle's
+# BundleField/Option[BundleField] fields at `io.`, and must NOT augment `d.`.
+ZFIX=$(cat <<'SCALA'
+package me.jiuyang.zaozi.valuetpe {
+  trait Data
+  class Bits extends Data
+  case class BundleField[T <: Data](dataType: T)
+  trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+}
+package me.jiuyang.zaozi.magic {
+  trait DynamicSubfield
+}
+package me.jiuyang.zaozi.reftpe {
+  trait Referable[T <: me.jiuyang.zaozi.valuetpe.Data] extends scala.Dynamic {
+    def selectDynamic(name: String): Any
+  }
+}
+package demo {
+  import scala.language.dynamics
+  import me.jiuyang.zaozi.reftpe.Referable
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  class MyBundle extends Bundle {
+    val a: BundleField[Bits] = ???
+    val b: BundleField[Bits] = ???
+    val k: Option[BundleField[Bits]] = ???
+  }
+  class PlainDyn extends scala.Dynamic {
+    def selectDynamic(n: String): Any = ???
+  }
+  object Main {
+    def run(io: Referable[MyBundle]): Unit =
+      io.
+    def run2(d: PlainDyn): Unit =
+      d.
+  }
+}
+SCALA
+)
+# Locate the `io.` and `d.` carets (LSP line is 0-indexed; char = end-of-line, just past the dot).
+IOL=$(grep -nxE '      io\.' <<<"$ZFIX" | head -1 | cut -d: -f1)
+DL=$(grep -nxE '      d\.'  <<<"$ZFIX" | head -1 | cut -d: -f1)
+[ -n "$IOL" ] && [ -n "$DL" ] || fail "zaozi: could not locate completion carets in the fixture"
+IOLN=$((IOL-1)); t=$(sed -n "${IOL}p" <<<"$ZFIX"); IOCH=${#t}
+DLN=$((DL-1));   t=$(sed -n "${DL}p"  <<<"$ZFIX"); DCH=${#t}
+# Positive: io. (Referable[MyBundle]) lists Bundle fields a, b, k.
+rc=0; run_metals "$MC/cache" "$BASE/z.labels" "$BASE/z.log" "" "$ZFIX" "$IOLN" "$IOCH" || rc=$?
+if [ "$rc" -ne 0 ]; then
+  echo "--- zaozi io. run failed (rc=$rc). labels: $(cat "$BASE/z.labels" 2>/dev/null) ---" >&2
+  tail -25 "$BASE/z.log" >&2
+  fail "zaozi: headless Metals completion at io. did not run"
+fi
+# Field completion labels render as `<name>: <fieldType>` (e.g. `a: BundleField[Bits]`).
+for fld in a b k; do
+  jq -e --arg f "$fld" 'any(.[]; test("^" + $f + ": "))' "$BASE/z.labels" >/dev/null 2>&1 \
+    || fail "zaozi: completion at io. is missing Bundle field '$fld' (got: $(cat "$BASE/z.labels" 2>/dev/null))"
+done
+ok "patched cache: completion at io. lists Bundle fields a, b, k (additive)"
+# Negative: a non-zaozi scala.Dynamic qualifier is NOT augmented with Bundle fields.
+rc=0; run_metals "$MC/cache" "$BASE/zn.labels" "$BASE/zn.log" "" "$ZFIX" "$DLN" "$DCH" || rc=$?
+[ "$rc" -eq 0 ] || { tail -20 "$BASE/zn.log" >&2; fail "zaozi: completion at a non-zaozi Dynamic did not run (rc=$rc)"; }
+for fld in a b k; do
+  if jq -e --arg f "$fld" 'any(.[]; test("^" + $f + ": "))' "$BASE/zn.labels" >/dev/null 2>&1; then
+    fail "zaozi: a non-zaozi scala.Dynamic qualifier was wrongly augmented with '$fld'"
+  fi
+done
+ok "patched cache: a non-zaozi scala.Dynamic qualifier is not augmented (type-gated)"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"

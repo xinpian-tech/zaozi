@@ -15,7 +15,7 @@
 , scalaVersion ? "3.8.3"
 , proxyHost ? null
 , proxyPort ? null
-, outputHash ? "sha256-v0HnShQmo7vUBkXrm8FIrxpWb6zrFRqFQssRnx8wYAA="
+, outputHash ? "sha256-6NyPJwmRFrVo4ZgVo2q3oSdHr6hSQnZSAWSNRna8TXQ="
 }:
 
 stdenv.mkDerivation {
