@@ -123,10 +123,10 @@
             let
               stockJar = name: hash: pkgs.fetchurl {
                 inherit name hash;
-                url = "https://repo1.maven.org/maven2/org/scala-lang/${name}/3.8.4/${name}-3.8.4.jar";
+                url = "https://repo1.maven.org/maven2/org/scala-lang/${name}/3.8.3/${name}-3.8.3.jar";
               };
-              stockCompiler = stockJar "scala3-compiler_3" "sha256-dAvgK1HoFe8qknpCLWH9hR4lQDZV+57i4Ha0+c4fs04=";
-              stockPc = stockJar "scala3-presentation-compiler_3" "sha256-I3P9kVVgQoxKT0Dme/H5U572E9l0B7QG7KsZQV4QGls=";
+              stockCompiler = stockJar "scala3-compiler_3" "sha256-zV5apUthDjdSLe6hk0Sp2WFNX7yc8FLeCKZs63waiXQ=";
+              stockPc = stockJar "scala3-presentation-compiler_3" "sha256-AO0MabUpXkrwRFjwkJ28oox44GtXdNNGwC81izdlzvk=";
             in
             pkgs.writeShellApplication {
               name = "scala3-shadow-artifacts";
@@ -149,9 +149,9 @@
           scala3-shadow-resolution =
             let
               stockCompiler = pkgs.fetchurl {
-                name = "scala3-compiler_3-3.8.4.jar";
-                url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.8.4/scala3-compiler_3-3.8.4.jar";
-                hash = "sha256-dAvgK1HoFe8qknpCLWH9hR4lQDZV+57i4Ha0+c4fs04=";
+                name = "scala3-compiler_3-3.8.3.jar";
+                url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.8.3/scala3-compiler_3-3.8.3.jar";
+                hash = "sha256-zV5apUthDjdSLe6hk0Sp2WFNX7yc8FLeCKZs63waiXQ=";
               };
             in
             pkgs.writeShellApplication {

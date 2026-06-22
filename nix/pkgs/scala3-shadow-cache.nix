@@ -25,9 +25,8 @@
 , proxyHost ? null
 , proxyPort ? null
   # Recursive sha256 of the normalised cache. Pinned from a real proxied build. Re-pin
-  # if the lock, the PC closure, or the patched jar bytes change (TOFU: lib.fakeHash until
-  # the 3.8.3 rebuild reports the real hash).
-, outputHash ? lib.fakeHash
+  # if the lock, the PC closure, or the patched jar bytes change.
+, outputHash ? "sha256-Q5tDY+dsTfV7BzBGgXL3Kv/4jhzmWAzKZHRlfBqs5do="
 }:
 
 let
