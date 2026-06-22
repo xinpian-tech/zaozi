@@ -75,7 +75,11 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ nixd jdk25 ];
+          # metals pinned (nixpkgs 1.6.5) for the Metals/IDE integration: it
+          # resolves the per-project Scala 3.8.x presentation compiler, and
+          # launching the editor from this dev shell is the supported path for
+          # the shadowed PC (see doc/shadow-layout.md, DEC-2).
+          nativeBuildInputs = with pkgs; [ nixd jdk25 metals ];
           env = with pkgs; {
             CIRCT_INSTALL_PATH = circt-install;
             MLIR_INSTALL_PATH = mlir-install;

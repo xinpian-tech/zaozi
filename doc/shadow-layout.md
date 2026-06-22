@@ -159,8 +159,11 @@ error; (c) hash equals stock + marker absent (graceful degradation, AC-10/AC-4 n
   `ivy2local/ivys/ivy.xml`) for `scala3-compiler_3` (strong evidence it does).
 - **Metals PC jar-path introspection.** Whether Metals exposes the resolved PC jar
   path directly; if not, rely on the behavioral `__zaozi_marker__` proof.
-- **Metals version** (hand-off to task15): the PC artifact must be resolvable and
-  loadable by the pinned Metals under nix/JDK 25 before task5's LSP gate.
+- **Metals version** (RESOLVED in task15): pinned **Metals 1.6.5** (nixpkgs, added
+  to the dev shell). `metals --version` reports "Scala 3 versions from 3.3.4 are
+  automatically supported", so 3.8.4 is supported; `scala3-presentation-compiler_3:3.8.4`
+  exists on Maven Central (pom+jar HTTP 200). The full "Metals actually loaded the
+  3.8.4 PC" smoke is the task5/task11 headless-LSP gate.
 - **JAVA_TOOL_OPTIONS pollution** (section 3 gotcha) must be neutralized in whatever
   launches the two JVMs.
 
