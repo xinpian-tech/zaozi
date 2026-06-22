@@ -86,6 +86,14 @@
         scala3-shadow-cache = pkgs.callPackage ./nix/pkgs/scala3-shadow-cache.nix {
           inherit scala3-shadow-jars;
         };
+        # Metals 1.6.7 packaged via coursier (supports Scala 3.8.3; nixpkgs only ships 1.6.5,
+        # which caps Scala 3 support at 3.8.0).
+        metals_1_6_7 = pkgs.callPackage ./nix/pkgs/metals-bin.nix { };
+        # Metals-ready cache: the shadow cache + the extra offline closure Metals' PC-setup
+        # path needs, fetched coherently into the shadow cache.
+        scala3-shadow-metals-extra = pkgs.callPackage ./nix/pkgs/scala3-shadow-metals-extra.nix {
+          inherit scala3-shadow-cache;
+        };
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -164,6 +172,33 @@
                   --stock-cache "${pkgs.ivy-gather ./nix/zaozi/zaozi-lock.nix}" \
                   --stock-compiler "${stockCompiler}" \
                   --workspace "${self}" "$@"
+              '';
+            };
+          inherit metals_1_6_7 scala3-shadow-metals-extra;
+          # AC-4 Metals/PC gate: drive headless Metals 1.6.7 against an isolated copy of the
+          # shadow cache (+ the Metals PC-setup closure) and prove textDocument/completion
+          # returns __zaozi_marker__ from the patched 3.8.3 PC, with JVM-side PC jar hash
+          # provenance == hashes.json; empty cache fails offline; stock PC returns no marker.
+          # Run: nix run .#scala3-shadow-metals-resolution
+          scala3-shadow-metals-resolution =
+            let
+              stockPc = pkgs.fetchurl {
+                name = "scala3-presentation-compiler_3-3.8.3.jar";
+                url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-presentation-compiler_3/3.8.3/scala3-presentation-compiler_3-3.8.3.jar";
+                hash = "sha256-AO0MabUpXkrwRFjwkJ28oox44GtXdNNGwC81izdlzvk=";
+              };
+            in
+            pkgs.writeShellApplication {
+              name = "scala3-shadow-metals-resolution";
+              runtimeInputs = with pkgs; [ bash mill jdk21 python3 jq gnugrep findutils coreutils gnutar ];
+              text = ''
+                exec bash ${./nix/checks/scala3-shadow-metals-resolution.sh} \
+                  --metals "${metals_1_6_7}" \
+                  --metals-cache "${scala3-shadow-metals-extra}" \
+                  --shadow-jars "${scala3-shadow-jars}" \
+                  --stock-pc "${stockPc}" \
+                  --probe "${./nix/checks/metals_lsp_probe.py}" \
+                  --mill "${pkgs.mill}" "$@"
               '';
             };
         };

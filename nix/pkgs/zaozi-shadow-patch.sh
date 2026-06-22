@@ -33,8 +33,10 @@ perl -0pi -e 's/(\n  def process\(args: Array\[String\], rootCtx: Context\): Rep
 PC=presentation-compiler/src/main/dotty/tools/pc/ScalaPresentationCompiler.scala
 perl -0pi -e 's/\n      new CompletionProvider\(/\n      val __zaoziCompletionList = new CompletionProvider(/' "$PC"
 # getItems may return an immutable list, so build a fresh ArrayList (copy + prepend the
-# marker) and setItems it back rather than mutating the original in place.
-perl -0pi -e 's/(\n      \)\.completions\(\)\n)(    \}\(params\.toQueryContext\))/$1      if sys.props.get("zaozi.shadow.marker").contains("true") then\n        val __zaoziNew = new java.util.ArrayList[l.CompletionItem]()\n        val __zaoziCur = __zaoziCompletionList.getItems\n        if __zaoziCur != null then __zaoziNew.addAll(__zaoziCur)\n        __zaoziNew.add(0, new l.CompletionItem("__zaozi_marker__"))\n        __zaoziCompletionList.setItems(__zaoziNew)\n      __zaoziCompletionList\n$2/' "$PC"
+# marker) and setItems it back rather than mutating the original in place. Also emit the
+# loaded PC jar's CodeSource (JVM-side provenance) so a harness can hash the actually-loaded
+# presentation-compiler jar against the published patched hash.
+perl -0pi -e 's/(\n      \)\.completions\(\)\n)(    \}\(params\.toQueryContext\))/$1      if sys.props.get("zaozi.shadow.marker").contains("true") then\n        val __zaoziNew = new java.util.ArrayList[l.CompletionItem]()\n        val __zaoziCur = __zaoziCompletionList.getItems\n        if __zaoziCur != null then __zaoziNew.addAll(__zaoziCur)\n        __zaoziNew.add(0, new l.CompletionItem("__zaozi_marker__"))\n        __zaoziCompletionList.setItems(__zaoziNew)\n        try\n          val __zaoziCs = classOf[ScalaPresentationCompiler].getProtectionDomain.getCodeSource\n          if __zaoziCs != null then\n            val __zaoziLoc = __zaoziCs.getLocation\n            if __zaoziLoc != null then System.err.println("zaozi-shadow-pc " + __zaoziLoc.getPath)\n        catch case _: Throwable => ()\n      __zaoziCompletionList\n$2/' "$PC"
 
 # Fail closed if any of the three edits did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
