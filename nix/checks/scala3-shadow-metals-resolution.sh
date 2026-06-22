@@ -46,8 +46,9 @@ trap 'chmod -R u+w "$BASE" 2>/dev/null; rm -rf "$BASE" 2>/dev/null || true' EXIT
 
 # Drive headless Metals against an isolated copy of cacheSrcDir (a dir whose child is
 # https/), merging the Metals extra closure in. Writes completion labels to $2 and Metals'
-# server log to $3. Returns the probe exit code.
-run_metals() { # $1 cacheSrcDir, $2 labelsOut, $3 metalsLog
+# server log to $3. If $4 is given, the patched PC writes the loaded PC jar URL there
+# (-Dzaozi.shadow.pc.provenance). Returns the probe exit code.
+run_metals() { # $1 cacheSrcDir, $2 labelsOut, $3 metalsLog, $4 provenanceOut (optional)
   local R WS NCD CC H X
   R=$(mktemp -d -p "$BASE"); WS="$R/ws"; mkdir -p "$WS/foo/src/demo"
   cat > "$WS/build.mill" <<'M'
@@ -64,6 +65,7 @@ M
   cp -rL "$1" "$CC"; chmod -R u+w "$CC"
   local JOPTS="-Dcoursier.cache=$CC -Dcoursier.ivy.home=$NCD -Divy.home=$NCD -Duser.home=$H -Dzaozi.shadow.marker=true"
   JOPTS="$JOPTS -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=1 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=1"
+  if [ -n "${4:-}" ]; then JOPTS="$JOPTS -Dzaozi.shadow.pc.provenance=$4"; fi
   printf '%s\n' $JOPTS > "$R/mopts"
   (
     cd "$WS"
@@ -79,8 +81,8 @@ M
   ) >"$2" 2>>"$3"
 }
 
-echo "== 1. patched cache: headless Metals completion returns __zaozi_marker__ + PC provenance =="
-rc=0; run_metals "$MC/cache" "$BASE/p.labels" "$BASE/p.log" || rc=$?
+echo "== 1. patched cache: headless Metals completion returns __zaozi_marker__ + JVM PC provenance =="
+rc=0; run_metals "$MC/cache" "$BASE/p.labels" "$BASE/p.log" "$BASE/p.prov" || rc=$?
 if ! grep -q "__zaozi_marker__" "$BASE/p.labels"; then
   echo "--- patched run failed (rc=$rc). labels: $(cat "$BASE/p.labels" 2>/dev/null) ---" >&2
   echo "--- metals.log tail ---" >&2; tail -25 "$BASE/p.log" >&2
@@ -89,22 +91,22 @@ if ! grep -q "__zaozi_marker__" "$BASE/p.labels"; then
   fail "patched: completion did not return __zaozi_marker__"
 fi
 ok "patched cache: headless Metals textDocument/completion returns __zaozi_marker__"
-# PC provenance. Primary: the patched PC prints its loaded jar's CodeSource from the Metals
-# JVM (`zaozi-shadow-pc <path>`). Fallback (if the CodeSource lookup was unavailable): the
-# isolated cache is the sole offline source, so the PC jar Metals resolved+loaded is the one
-# at the coordinate in that cache.
-# `URL.getPath` may or may not keep the `file:` prefix; try both, and tolerate no match
-# under `set -e -o pipefail` (a non-matching grep must not abort the script).
-pcloc=$(grep -m1 "zaozi-shadow-pc file:" "$BASE/p.log" 2>/dev/null | sed 's#^.*zaozi-shadow-pc file:##; s#[[:space:]]*$##' || true)
-[ -n "$pcloc" ] || pcloc=$(grep -m1 "zaozi-shadow-pc " "$BASE/p.log" 2>/dev/null | sed 's#^.*zaozi-shadow-pc ##; s#[[:space:]]*$##' || true)
-if [ -n "$pcloc" ] && [ -f "$pcloc" ]; then
-  [ "$(sha "$pcloc")" = "$PC_WANT" ] || fail "patched: JVM-loaded PC jar hash != published patched ($pcloc)"
-  ok "patched cache: the Metals JVM reports loading the PC jar whose hash == published patched"
-else
-  cjar="$MC/cache/$PC_COORD"
-  [ -f "$cjar" ] && [ "$(sha "$cjar")" = "$PC_WANT" ] || fail "patched: isolated-cache PC jar hash != published patched"
-  ok "patched cache: the PC jar resolved from the isolated cache has hash == published patched"
-fi
+# PC provenance, fail-closed and JVM-side. The patched PC, running inside the Metals JVM, wrote
+# the URL of the jar it was loaded from to $BASE/p.prov (-Dzaozi.shadow.pc.provenance) — a
+# getResource/CodeSource URL of the form `jar:file:/<jar>!/<entry>` or `file:/<jar>`. Normalise
+# to the local jar path, require it to exist, and require its hash == the published patched PC
+# hash. There is NO cache-file fallback: if the Metals JVM does not report a hashable PC jar,
+# the gate fails.
+[ -s "$BASE/p.prov" ] || fail "patched: Metals JVM did not report a loaded PC jar path (provenance file empty)"
+pcurl=$(cat "$BASE/p.prov")
+pcloc=${pcurl#jar:}        # jar:file:/x!/...  -> file:/x!/...
+pcloc=${pcloc%%!/*}        # file:/x!/...      -> file:/x
+pcloc=${pcloc#file:}       # file:/x           -> /x  (or //x for file://x)
+pcloc=${pcloc#//}          # //x               -> x
+case "$pcloc" in /*) ;; *) pcloc="/$pcloc" ;; esac
+[ -f "$pcloc" ] || fail "patched: JVM-reported PC jar path does not exist ($pcurl)"
+[ "$(sha "$pcloc")" = "$PC_WANT" ] || fail "patched: JVM-loaded PC jar hash != published patched ($pcloc)"
+ok "patched cache: the Metals JVM reports loading the PC jar whose hash == published patched"
 
 echo "== 2. empty cache: offline Metals PC resolution fails, no marker =="
 EMPTY="$BASE/empty"; mkdir -p "$EMPTY/https"
@@ -113,13 +115,24 @@ rc=0; run_metals "$EMPTY" "$BASE/e.labels" "$BASE/e.log" || rc=$?
 if grep -q "__zaozi_marker__" "$BASE/e.labels" 2>/dev/null; then fail "empty cache unexpectedly returned the marker"; fi
 ok "empty isolated cache: offline resolution fails (rc=$rc), no __zaozi_marker__ (no fallback)"
 
-echo "== 3. stock cache: stock PC, no marker =="
+echo "== 3. stock cache: stock PC actually runs, returns ordinary completions but no marker =="
 STOCK="$BASE/stockcache"; mkdir -p "$STOCK"; cp -rL "$MC/cache" "$STOCK/cache"; chmod -R u+w "$STOCK"
 install -m644 "$STOCK_PC" "$STOCK/cache/$PC_COORD"
-[ "$(sha "$STOCK/cache/$PC_COORD")" = "$STOCK_PC_SHA" ] || fail "stock overlay failed"
+[ "$(sha "$STOCK/cache/$PC_COORD")" = "$STOCK_PC_SHA" ] || fail "stock overlay failed (pre-run hash != pinned stock)"
 rc=0; run_metals "$STOCK/cache" "$BASE/s.labels" "$BASE/s.log" || rc=$?
+# Fail-closed: the stock PC must genuinely start and serve completions (rc 0 + >=1 ordinary
+# completion label), otherwise "no marker" would pass on a broken run that never reached the PC.
+if [ "$rc" -ne 0 ]; then
+  echo "--- stock run failed (rc=$rc). labels: $(cat "$BASE/s.labels" 2>/dev/null) ---" >&2
+  tail -25 "$BASE/s.log" >&2
+  fail "stock: headless Metals did not complete successfully (the stock PC must actually run)"
+fi
+nlabels=$(jq 'length' "$BASE/s.labels" 2>/dev/null || echo 0)
+[ "${nlabels:-0}" -ge 1 ] || fail "stock: PC produced no ordinary completions (got: $(cat "$BASE/s.labels" 2>/dev/null))"
 if grep -q "__zaozi_marker__" "$BASE/s.labels" 2>/dev/null; then fail "stock PC unexpectedly returned the marker"; fi
-ok "stock isolated cache: stock PC returns no __zaozi_marker__"
+# The PC coordinate Metals resolved+loaded from is the pinned stock jar, before and after.
+[ "$(sha "$STOCK/cache/$PC_COORD")" = "$STOCK_PC_SHA" ] || fail "stock: PC coordinate hash changed during the run"
+ok "stock isolated cache: stock PC ran ($nlabels completions), no __zaozi_marker__, PC coord == pinned stock"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"

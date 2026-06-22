@@ -33,10 +33,14 @@ perl -0pi -e 's/(\n  def process\(args: Array\[String\], rootCtx: Context\): Rep
 PC=presentation-compiler/src/main/dotty/tools/pc/ScalaPresentationCompiler.scala
 perl -0pi -e 's/\n      new CompletionProvider\(/\n      val __zaoziCompletionList = new CompletionProvider(/' "$PC"
 # getItems may return an immutable list, so build a fresh ArrayList (copy + prepend the
-# marker) and setItems it back rather than mutating the original in place. Also emit the
-# loaded PC jar's CodeSource (JVM-side provenance) so a harness can hash the actually-loaded
-# presentation-compiler jar against the published patched hash.
-perl -0pi -e 's/(\n      \)\.completions\(\)\n)(    \}\(params\.toQueryContext\))/$1      if sys.props.get("zaozi.shadow.marker").contains("true") then\n        val __zaoziNew = new java.util.ArrayList[l.CompletionItem]()\n        val __zaoziCur = __zaoziCompletionList.getItems\n        if __zaoziCur != null then __zaoziNew.addAll(__zaoziCur)\n        __zaoziNew.add(0, new l.CompletionItem("__zaozi_marker__"))\n        __zaoziCompletionList.setItems(__zaoziNew)\n        try\n          val __zaoziCs = classOf[ScalaPresentationCompiler].getProtectionDomain.getCodeSource\n          if __zaoziCs != null then\n            val __zaoziLoc = __zaoziCs.getLocation\n            if __zaoziLoc != null then System.err.println("zaozi-shadow-pc " + __zaoziLoc.getPath)\n        catch case _: Throwable => ()\n      __zaoziCompletionList\n$2/' "$PC"
+# marker) and setItems it back rather than mutating the original in place. Also record the
+# loaded PC jar's location (JVM-side provenance) so a harness can hash the actually-loaded
+# presentation-compiler jar against the published patched hash. `getResource` on the class's
+# own bytecode yields a reliable `jar:file:...!/...` URL (Metals loads the PC through a
+# java.net.URLClassLoader); `getProtectionDomain.getCodeSource` is a fallback. The location is
+# written to the file named by -Dzaozi.shadow.pc.provenance (a file channel, since Metals
+# redirects System.err around PC operations so the stderr line alone is not reliably captured).
+perl -0pi -e 's/(\n      \)\.completions\(\)\n)(    \}\(params\.toQueryContext\))/$1      if sys.props.get("zaozi.shadow.marker").contains("true") then\n        val __zaoziNew = new java.util.ArrayList[l.CompletionItem]()\n        val __zaoziCur = __zaoziCompletionList.getItems\n        if __zaoziCur != null then __zaoziNew.addAll(__zaoziCur)\n        __zaoziNew.add(0, new l.CompletionItem("__zaozi_marker__"))\n        __zaoziCompletionList.setItems(__zaoziNew)\n        try\n          val __zaoziRes = classOf[ScalaPresentationCompiler].getResource("ScalaPresentationCompiler.class")\n          val __zaoziCs = classOf[ScalaPresentationCompiler].getProtectionDomain.getCodeSource\n          val __zaoziLoc = if __zaoziRes != null then __zaoziRes.toString else if __zaoziCs != null && __zaoziCs.getLocation != null then __zaoziCs.getLocation.toString else ""\n          if __zaoziLoc.nonEmpty then\n            System.err.println("zaozi-shadow-pc " + __zaoziLoc)\n            sys.props.get("zaozi.shadow.pc.provenance").foreach(__o => java.nio.file.Files.write(java.nio.file.Paths.get(__o), __zaoziLoc.getBytes("UTF-8")))\n        catch case _: Throwable => ()\n      __zaoziCompletionList\n$2/' "$PC"
 
 # Fail closed if any of the three edits did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
