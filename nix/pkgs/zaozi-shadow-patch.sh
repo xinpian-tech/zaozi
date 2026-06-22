@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Apply the Zaozi shadow SENTINEL patch to a scala3 source tree, in place, from the
+# Apply the Zaozi shadow marker patch to a scala3 source tree, in place, from the
 # tree root, before `sbt package`. Minimal, removable, and PROPERTY-GATED: it has no
-# effect unless the JVM is started with -Dzaozi.shadow.marker=true. This is the
-# sentinel-first marker that proves the patched compiler/PC bytes are the ones loaded;
-# the real navigation patches replace it later.
+# effect unless the JVM is started with -Dzaozi.shadow.marker=true. The markers prove
+# the patched compiler/PC bytes are the ones actually loaded; the real navigation
+# patches replace them later.
 #
 #   bash zaozi-shadow-patch.sh [version] [scala3SourceRev]
 set -euo pipefail
@@ -18,7 +18,7 @@ mk_marker() { # $1 = project resources dir, $2 = artifact id
 artifact=org.scala-lang:$2:$VER
 zaoziShadow=true
 scala3SourceRev=$REV
-patchSet=sentinel-v1
+patchSet=marker-v1
 builtBy=nix
 EOF
 }

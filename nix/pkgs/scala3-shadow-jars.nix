@@ -19,15 +19,17 @@
 , jdk21
 , git
 , unzip
+, perl
 , add-determinism
 , scala3-src
 , version ? "3.8.4"
 , srcRev ? "unknown"
 , proxyHost ? null
 , proxyPort ? null
-  # Fixed-output hash of the normalised jar set. TOFU: build once with lib.fakeHash,
-  # then pin the hash nix reports.
-, outputHash ? lib.fakeHash
+  # Fixed-output hash of the normalised jar set (recursive sha256 of $out). Pinned from
+  # a real proxied build of the patched same-version 3.8.4 jars + hashes.json. Re-pin if
+  # the scala3 source rev or the marker patch changes the jar bytes.
+, outputHash ? "sha256-2bp+ttHIUenNEPKxPs9qDSKTMnB3jkWUYM8EkFEkL/8="
 }:
 
 stdenv.mkDerivation {
@@ -35,7 +37,7 @@ stdenv.mkDerivation {
   inherit version;
   src = scala3-src;
 
-  nativeBuildInputs = [ sbt jdk21 git unzip add-determinism ];
+  nativeBuildInputs = [ sbt jdk21 git unzip perl add-determinism ];
 
   outputHashMode = "recursive";
   outputHashAlgo = "sha256";
@@ -49,14 +51,19 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     export HOME="$TMPDIR/home" COURSIER_CACHE="$TMPDIR/cs" XDG_CACHE_HOME="$TMPDIR/xdg"
-    mkdir -p "$HOME" "$COURSIER_CACHE" "$XDG_CACHE_HOME"
+    mkdir -p "$HOME/.sbt/boot" "$HOME/.sbt/global" "$HOME/.sbt/staging" "$HOME/.ivy2" \
+             "$HOME/.cache" "$COURSIER_CACHE" "$XDG_CACHE_HOME"
 
     proxyOpts=""
     ${lib.optionalString (proxyHost != null) ''
       proxyOpts="-Dhttp.proxyHost=${proxyHost} -Dhttp.proxyPort=${toString proxyPort} -Dhttps.proxyHost=${proxyHost} -Dhttps.proxyPort=${toString proxyPort}"
     ''}
-    export SBT_OPTS="$proxyOpts -Dsbt.server=false -Dsbt.ci=true -Xmx6g"
-    export JAVA_TOOL_OPTIONS="$proxyOpts"
+    # The sandbox default user.home is /var/empty (read-only), but sbt's launcher puts
+    # its boot lock under user.home/.sbt. Pin user.home and every sbt working dir to the
+    # writable $HOME so the launcher can create its boot/lock/ivy state.
+    sbtDirs="-Duser.home=$HOME -Dsbt.boot.directory=$HOME/.sbt/boot -Dsbt.global.base=$HOME/.sbt/global -Dsbt.global.staging=$HOME/.sbt/staging -Dsbt.ivy.home=$HOME/.ivy2"
+    export SBT_OPTS="$proxyOpts $sbtDirs -Dsbt.server=false -Dsbt.ci=true -Xmx6g"
+    export JAVA_TOOL_OPTIONS="$proxyOpts -Duser.home=$HOME"
 
     # Writable copy; dotty VersionUtil reads git via jgit, so init a repo (the pinned
     # source has no .git). Keep project/project (wires the recursive meta-build).
@@ -92,8 +99,49 @@ stdenv.mkDerivation {
     cp "$(pickjar 'scala3-compiler_3-${version}.jar')" "$out/jars/"
     cp "$(pickjar 'scala3-presentation-compiler_3-${version}.jar')" "$out/jars/"
 
-    # Normalise for a reproducible FOD output hash (fail closed).
+    # Normalise for a reproducible FOD output hash (fail closed). Must run BEFORE
+    # hashing so the recorded SHA-256s match the bytes that actually ship.
     add-determinism "$out/jars/"*.jar
+
+    # Provenance: record the source rev, patch-set id, and the SHA-256 of each whole
+    # jar and of its marker resource, so a later JVM-loaded jar can be compared to this
+    # output and patched jars are distinguishable from stock.
+    cjar="$out/jars/scala3-compiler_3-${version}.jar"
+    pjar="$out/jars/scala3-presentation-compiler_3-${version}.jar"
+    cmarker="META-INF/zaozi-shadow/org.scala-lang-scala3-compiler_3-${version}.properties"
+    pmarker="META-INF/zaozi-shadow/org.scala-lang-scala3-presentation-compiler_3-${version}.properties"
+    csha="$(sha256sum "$cjar" | cut -d' ' -f1)"
+    psha="$(sha256sum "$pjar" | cut -d' ' -f1)"
+    cmsha="$(unzip -p "$cjar" "$cmarker" | sha256sum | cut -d' ' -f1)"
+    pmsha="$(unzip -p "$pjar" "$pmarker" | sha256sum | cut -d' ' -f1)"
+    # Assert the marker resources are actually present (non-empty hash of empty input
+    # is the well-known SHA-256 of "", which must NOT be accepted).
+    empty="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    if [ "$cmsha" = "$empty" ] || [ "$pmsha" = "$empty" ]; then
+      echo "marker resource missing from a jar (empty hash)" >&2; exit 1
+    fi
+    cat > "$out/share/zaozi-shadow/hashes.json" <<JSON
+    {
+      "scala3SourceRev": "${srcRev}",
+      "patchSet": "marker-v1",
+      "version": "${version}",
+      "builtBy": "nix",
+      "artifacts": {
+        "scala3-compiler_3": {
+          "jar": "scala3-compiler_3-${version}.jar",
+          "jarSha256": "$csha",
+          "markerResource": "$cmarker",
+          "markerSha256": "$cmsha"
+        },
+        "scala3-presentation-compiler_3": {
+          "jar": "scala3-presentation-compiler_3-${version}.jar",
+          "jarSha256": "$psha",
+          "markerResource": "$pmarker",
+          "markerSha256": "$pmsha"
+        }
+      }
+    }
+    JSON
     runHook postInstall
   '';
 
