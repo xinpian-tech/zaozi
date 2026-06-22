@@ -94,6 +94,13 @@
               exec bash ${./nix/checks/scala3-build-load.sh} "${inputs.scala3-src}" "$@"
             '';
           };
+          # Same-version 3.8.4 compiler + presentation-compiler jars built from the
+          # pinned scala3 source (fixed-output, needs network for the dotty dep
+          # closure). proxyHost/proxyPort are null by default (normal network); pass
+          # them via .override for a proxied sandbox. outputHash is TOFU until pinned.
+          scala3-shadow-jars = pkgs.callPackage ./nix/pkgs/scala3-shadow-jars.nix {
+            scala3-src = inputs.scala3-src;
+          };
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
