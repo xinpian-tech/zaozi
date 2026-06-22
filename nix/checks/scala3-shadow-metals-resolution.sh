@@ -44,7 +44,7 @@ package build
 import mill._
 import mill.scalalib._
 object foo extends ScalaModule {
-  def scalaVersion = "3.8.4"
+  def scalaVersion = "3.8.3"
 }
 M
 cat > "$WS/foo/src/demo/Main.scala" <<'S'

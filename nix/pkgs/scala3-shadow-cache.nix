@@ -21,12 +21,13 @@
 , coursier
 , ivy-gather
 , scala3-shadow-jars
-, version ? "3.8.4"
+, version ? "3.8.3"
 , proxyHost ? null
 , proxyPort ? null
   # Recursive sha256 of the normalised cache. Pinned from a real proxied build. Re-pin
-  # if the lock, the PC closure, or the patched jar bytes change.
-, outputHash ? "sha256-k1JNdstD3HeO3IPYoPQJtiimOG1ii8LI2qRxSuuWTZk="
+  # if the lock, the PC closure, or the patched jar bytes change (TOFU: lib.fakeHash until
+  # the 3.8.3 rebuild reports the real hash).
+, outputHash ? lib.fakeHash
 }:
 
 let

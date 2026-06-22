@@ -15,7 +15,7 @@
 # Needs on PATH: mill, java, javac, jq, sha256sum, grep, tar, timeout.
 set -euo pipefail
 
-VER=3.8.4
+VER=3.8.3
 SC=; SJ=; STOCK_SC=; STOCK_C=; WORKSPACE=
 while [ $# -gt 0 ]; do
   case "$1" in

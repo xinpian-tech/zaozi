@@ -7,7 +7,7 @@
 #
 #   bash zaozi-shadow-patch.sh [version] [scala3SourceRev]
 set -euo pipefail
-VER="${1:-3.8.4}"
+VER="${1:-3.8.3}"
 REV="${2:-unknown}"
 
 # (1) Provenance marker resources packaged into each jar (commonSettings maps

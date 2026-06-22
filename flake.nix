@@ -30,14 +30,16 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
-    # Pinned Scala 3.8.4 source for the patched same-version compiler/PC fork
-    # (Metals integration). flake=false: consumed as a source tree by a nix
-    # derivation that builds the marker-only patched jars.
+    # Pinned Scala 3.8.3 source for the patched same-version compiler/PC fork
+    # (Metals integration). 3.8.3 is the latest Scala 3 the Metals line supports
+    # (1.6.7 caps at 3.8.3); 3.8.4 is unsupported by every released Metals.
+    # flake=false: consumed as a source tree by a nix derivation that builds the
+    # marker-only patched jars.
     scala3-src = {
       type = "github";
       owner = "scala";
       repo = "scala3";
-      ref = "3.8.4";
+      ref = "3.8.3";
       flake = false;
     };
   };

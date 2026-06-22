@@ -11,7 +11,7 @@
 # Needs on PATH: java, unzip, jq, sha256sum, cmp, find, diff.
 set -euo pipefail
 
-VER=3.8.4
+VER=3.8.3
 SJ=; SC=; STOCK_C=; STOCK_PC=
 while [ $# -gt 0 ]; do
   case "$1" in
