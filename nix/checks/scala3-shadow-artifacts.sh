@@ -170,48 +170,85 @@ grep -qF "zaozi-shadow-marker compiler org.scala-lang:scala3-compiler_3:$VER" "$
   || fail "gated marker not emitted with the property set"
 ok "patched compiler emits the gated marker with -Dzaozi.shadow.marker=true"
 
-echo "== F. find-references: patched compiler emits a Bundle-field REFERENCE occurrence =="
-# A Zaozi-shaped fixture (minimal me.jiuyang.zaozi.* shapes by FQN + a transparent-inline
-# selectDynamic) with two `io.zfield` use sites. Compiled with -Xsemanticdb, the PATCHED
-# compiler's ExtractSemanticInfo registers a REFERENCE occurrence per use; the STOCK compiler
-# emits only the `val zfield` definition (the use is hidden inside Inlined.expansion, which
-# ExtractSemanticDB skips). So the field's semanticdb symbol occurs MORE times under patched.
+echo "== F. find-references: patched compiler emits Bundle-field REFERENCE occurrences =="
+# A Zaozi-shaped fixture (minimal me.jiuyang.zaozi.* by FQN + a transparent-inline selectDynamic).
+# `Ref[E] extends Referable[E]` so a chained `io.child.leaf` is genuinely two selectDynamic
+# selects: io.child (field on MyBundle) -> Ref[Nested] (a Referable[Nested]) -> .leaf (field on
+# Nested). Two `io.zfield` use sites + one chained `io.child.leaf`. Compiled with -Xsemanticdb,
+# the PATCHED compiler's ExtractSemanticInfo registers a REFERENCE occurrence at each field-name
+# span; the STOCK compiler emits none (the use is hidden in Inlined.expansion, which it skips).
 cat > "$WORK/Refs.scala" <<'SCALA'
 package me.jiuyang.zaozi.valuetpe {
   trait Data
   class Bits extends Data
   case class BundleField[T <: Data](dataType: T)
   trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+  class Nested extends Bundle {
+    val leaf: BundleField[Bits] = ???
+  }
 }
 package me.jiuyang.zaozi.magic { trait DynamicSubfield }
 package me.jiuyang.zaozi.reftpe {
-  class Ref[E]
   trait Referable[T <: me.jiuyang.zaozi.valuetpe.Data] extends scala.Dynamic {
     transparent inline def selectDynamic(name: String): Any =
-      new me.jiuyang.zaozi.reftpe.Ref[me.jiuyang.zaozi.valuetpe.Bits]
+      new me.jiuyang.zaozi.reftpe.Ref[me.jiuyang.zaozi.valuetpe.Nested]
   }
+  class Ref[E <: me.jiuyang.zaozi.valuetpe.Data] extends me.jiuyang.zaozi.reftpe.Referable[E]
 }
 package demo {
   import scala.language.dynamics
   import me.jiuyang.zaozi.reftpe.{Referable, Ref}
-  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Nested, Bits, BundleField}
   class MyBundle extends Bundle {
-    val zfield: BundleField[Bits] = ???
+    val zfield: BundleField[Bits]   = ???
+    val child:  BundleField[Nested] = ???
   }
   object Uses {
-    def u1(io: Referable[MyBundle]): Ref[Bits] = io.zfield
-    def u2(io: Referable[MyBundle]): Ref[Bits] = io.zfield
+    def u1(io: Referable[MyBundle]): Ref[Nested] = io.zfield
+    def u2(io: Referable[MyBundle]): Ref[Nested] = io.zfield
+    def u3(io: Referable[MyBundle]): Ref[Nested] = io.child.leaf
   }
 }
 SCALA
+# A real SemanticDB parser (dotty's own proto classes, in the compiler jar) — prints one line
+# `role TAB symbol TAB <source slice covered by the range>` per occurrence, so the gate can
+# assert exact REFERENCE roles, exact field symbols, and exact field-name spans (not a byte grep).
+cat > "$WORK/SdbDump.scala" <<'SCALA'
+import java.nio.file.{Files, Paths}
+import dotty.tools.dotc.semanticdb.*
+object SdbDump:
+  def main(args: Array[String]): Unit =
+    val docs = TextDocuments.parseFrom(Files.readAllBytes(Paths.get(args(0))))
+    val fallback = if args.length > 1 then String(Files.readAllBytes(Paths.get(args(1))), "UTF-8") else ""
+    for d <- docs.documents; o <- d.occurrences do
+      val role = if o.role.isReference then "REFERENCE" else if o.role.isDefinition then "DEFINITION" else "OTHER"
+      val text = if d.text.nonEmpty then d.text else fallback
+      val slice = o.range match
+        case Some(r) if r.startLine == r.endLine =>
+          val lines = text.split("\n", -1)
+          if r.startLine >= 0 && r.startLine < lines.length then
+            val ln = lines(r.startLine)
+            val s  = math.max(0, r.startCharacter); val e = math.min(ln.length, r.endCharacter)
+            if s <= e then ln.substring(s, e) else ""
+          else ""
+        case _ => ""
+      println(s"$role\t${o.symbol}\t$slice")
+SCALA
+mkdir -p "$WORK/dump"
+( cd "$WORK" && java -cp "$CJAR$cp_common" dotty.tools.dotc.Main -classpath "$CJAR$cp_common" \
+    -d "$WORK/dump" SdbDump.scala ) >"$WORK/dump.out" 2>"$WORK/dump.err" \
+  || { cat "$WORK/dump.err" >&2; fail "find-references: could not compile the SemanticDB dumper"; }
 sdbcompile() { # $1 compiler jar, $2 outdir
   mkdir -p "$2"
-  # Compile from $WORK with a RELATIVE source path so the semanticdb sourceroot-relative path is
-  # `Refs.scala` and the file lands at $2/META-INF/semanticdb/Refs.scala.semanticdb (not outside
-  # $2). -language:dynamics enables `extends scala.Dynamic` at the Referable definition site too.
+  # Compile from $WORK with a RELATIVE source path so the sourceroot-relative .semanticdb lands at
+  # $2/META-INF/semanticdb/Refs.scala.semanticdb. -language:dynamics enables `extends scala.Dynamic`
+  # at the Referable definition site too (an import in `package demo` covers only the use sites).
   ( cd "$WORK" && java -cp "$1$cp_common" dotty.tools.dotc.Main -classpath "$cp_common" \
       -language:dynamics -Xsemanticdb -d "$2" Refs.scala ) >"$2.out" 2>"$2.err" \
     || { cat "$2.err" >&2; fail "find-references: compile failed ($1)"; }
+}
+dump() { # $1 .semanticdb  -> role/symbol/slice lines
+  java -cp "$WORK/dump:$CJAR$cp_common" SdbDump "$1" "$WORK/Refs.scala"
 }
 sdbcompile "$STOCK_C" "$WORK/refs-stock"
 sdbcompile "$CJAR"    "$WORK/refs-patched"
@@ -219,12 +256,26 @@ sdb_s=$(find "$WORK/refs-stock"   -name '*.semanticdb' | head -1)
 sdb_p=$(find "$WORK/refs-patched" -name '*.semanticdb' | head -1)
 { [ -n "$sdb_s" ] && [ -f "$sdb_s" ] && [ -n "$sdb_p" ] && [ -f "$sdb_p" ]; } \
   || fail "find-references: .semanticdb not produced (stock=$sdb_s patched=$sdb_p)"
-cnt_s=$(grep -ao 'MyBundle#zfield' "$sdb_s" | wc -l | tr -d ' ')
-cnt_p=$(grep -ao 'MyBundle#zfield' "$sdb_p" | wc -l | tr -d ' ')
-[ "${cnt_s:-0}" -ge 1 ] || fail "find-references: stock .semanticdb lacks the field symbol (cnt_s=$cnt_s)"
-[ "${cnt_p:-0}" -gt "${cnt_s:-0}" ] \
-  || fail "find-references: patched ($cnt_p) added no field-ref occurrence over stock ($cnt_s)"
-ok "find-references: patched compiler emits Bundle-field reference occurrences ($cnt_p > stock $cnt_s)"
+occ_s=$(dump "$sdb_s"); occ_p=$(dump "$sdb_p")
+# A REFERENCE occurrence whose symbol ENDS WITH `<Class>#<field>.` and whose covered slice is the
+# bare field name `<field>` — exactly what AC-8 requires (REFERENCE role, field symbol, name span).
+refcount() { # $1 occurrences, $2 class#field
+  printf '%s\n' "$1" | grep -aP "^REFERENCE\t.*\Q$2\E\.\t\Q${2##*#}\E$" | wc -l | tr -d ' '
+}
+# Patched: exactly one REFERENCE per use site, at the field-name span.
+[ "$(refcount "$occ_p" 'MyBundle#zfield')" = "2" ] \
+  || fail "find-references: patched expected 2 REFERENCE 'zfield' occ at the name span, got: $(printf '%s\n' "$occ_p" | grep -a zfield)"
+[ "$(refcount "$occ_p" 'MyBundle#child')"  = "1" ] \
+  || fail "find-references: patched expected 1 REFERENCE 'child' occ at the name span, got: $(printf '%s\n' "$occ_p" | grep -a child)"
+[ "$(refcount "$occ_p" 'Nested#leaf')"     = "1" ] \
+  || fail "find-references: patched expected 1 REFERENCE 'leaf' occ at the name span, got: $(printf '%s\n' "$occ_p" | grep -a leaf)"
+ok "find-references: patched emits REFERENCE occurrences at the field-name span (zfield x2, child, leaf)"
+# Stock: ZERO field-reference occurrences (the use sites are hidden in Inlined.expansion).
+for f in 'MyBundle#zfield' 'MyBundle#child' 'Nested#leaf'; do
+  [ "$(printf '%s\n' "$occ_s" | grep -aP "^REFERENCE\t.*\Q$f\E\." | wc -l | tr -d ' ')" = "0" ] \
+    || fail "find-references: stock compiler unexpectedly emitted a REFERENCE for '$f'"
+done
+ok "find-references: stock compiler emits ZERO field-reference occurrences (confirms the patch)"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"
