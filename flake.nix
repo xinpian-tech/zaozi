@@ -137,6 +137,23 @@
                   --stock-pc "${stockPc}" "$@"
               '';
             };
+          # AC-4 (compiler-consumer half): from the actual compiler JVM, pointed at an
+          # isolated writable copy of the shadow cache (HOME/COURSIER_CACHE/IVY_HOME
+          # sanitized, no network), prove the loaded scala3-compiler_3:3.8.4 CodeSource is
+          # under the isolated cache and its hash == the published patched jar, the gated
+          # marker fires, and the cache-state matrix holds (patched->marker; empty->offline
+          # resolution fails; stock->stock hash + no marker). The stock cache is the
+          # existing ivy-gather zaozi-lock cache. Run: nix run .#scala3-shadow-resolution
+          scala3-shadow-resolution = pkgs.writeShellApplication {
+            name = "scala3-shadow-resolution";
+            runtimeInputs = with pkgs; [ bash jdk21 jq gnugrep findutils coreutils ];
+            text = ''
+              exec bash ${./nix/checks/scala3-shadow-resolution.sh} \
+                --shadow-cache "${scala3-shadow-cache}" \
+                --shadow-jars "${scala3-shadow-jars}" \
+                --stock-cache "${pkgs.ivy-gather ./nix/zaozi/zaozi-lock.nix}" "$@"
+            '';
+          };
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
