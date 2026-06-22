@@ -75,10 +75,13 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          # metals pinned (nixpkgs 1.6.5) for the Metals/IDE integration: it
-          # resolves the per-project Scala 3.8.x presentation compiler, and
-          # launching the editor from this dev shell is the supported path for
-          # the shadowed PC (see doc/shadow-layout.md, DEC-2).
+          # metals pinned (nixpkgs 1.6.5) for the Metals/IDE integration.
+          # Launching the editor from this dev shell is the supported path for
+          # the shadowed PC (DEC-2). Metals resolves the per-project Scala 3 PC
+          # at runtime; that it resolves AND loads scala3-presentation-compiler_3:
+          # 3.8.4 under JDK 25 is proven by nix/checks/metals-pc-smoke.sh
+          # (see doc/shadow-layout.md). The full editor-grade LSP smoke is the
+          # task11 headless harness.
           nativeBuildInputs = with pkgs; [ nixd jdk25 metals ];
           env = with pkgs; {
             CIRCT_INSTALL_PATH = circt-install;
