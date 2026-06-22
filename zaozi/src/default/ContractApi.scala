@@ -75,15 +75,17 @@ given ContractApi with
     // so the result types mirror the input types.
     val contract      = summon[VerifContractApi].op(inputValues, inputTypes, locate)
     val contractBlock = contract.block
-    // Unlike firrtl.contract, verif.contract has no block arguments: its body
-    // refers to the contract's results directly (graph region). Expose each
-    // result to the body through a pass-through node.
+    // verif.contract carries one block argument per input (matching the input
+    // types). Those block arguments dominate the body region, so FIRRTL
+    // declarations inside the body may reference them. Expose each block
+    // argument to the user body through a pass-through node. The FIRRTL -> HW
+    // lowering remaps the block arguments to the contract's results.
     val bodyArgs      = args.zipWithIndex.map: (arg, idx) =>
       val node = summon[NodeApi].op(
         name = "",
         location = locate,
         nameKind = FirrtlNameKind.Droppable,
-        input = contract.operation.getResult(idx.toLong)
+        input = contractBlock.getArgument(idx.toLong)
       )
       node.operation.appendToBlock()(
         using contractBlock
