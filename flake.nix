@@ -30,6 +30,16 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
+    # Pinned Scala 3.8.4 source for the patched same-version compiler/PC fork
+    # (Metals integration, task4). flake=false: consumed as a source tree by a
+    # nix derivation that builds the marker-only patched jars.
+    scala3-src = {
+      type = "github";
+      owner = "scala";
+      repo = "scala3";
+      ref = "3.8.4";
+      flake = false;
+    };
   };
 
   outputs =

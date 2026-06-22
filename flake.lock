@@ -195,7 +195,25 @@
         "flake-utils": "flake-utils_2",
         "llvm-src": "llvm-src",
         "mill-ivy-fetcher": "mill-ivy-fetcher",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "scala3-src": "scala3-src"
+      }
+    },
+    "scala3-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1780302192,
+        "narHash": "sha256-uKhC4RJY4mDfScVI7FnrZ1QlqukGiu8AEGgwe7MsRWs=",
+        "owner": "scala",
+        "repo": "scala3",
+        "rev": "7d4833b619d31ea9acac97fccf1e74b42b89c49f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "scala",
+        "ref": "3.8.4",
+        "repo": "scala3",
+        "type": "github"
       }
     },
     "slang-src": {
