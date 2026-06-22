@@ -330,5 +330,70 @@ hs=$(hov hovS)
 grep -q 'String' <<<"$hs" || fail "zaozi: ordinary non-zaozi hover changed (expected String, got: $hs)"
 ok "patched cache: ordinary non-zaozi hover is unchanged (shows String)"
 
+echo "== 6. patched cache: headless find-references + go-to-definition (AC-8 LSP / AC-7) =="
+# A COMPLETE single-file fixture whose Referable.selectDynamic is a transparent inline returning
+# Ref[Nested] (a Referable[Nested]), so `io.child.leaf` is a genuine two-selectDynamic chain.
+# Compiled by the PATCHED compiler (shadow cache), the file's SemanticDB carries the find-references
+# occurrences at each `io.a` use, so Metals' textDocument/references on `val a` returns every use.
+ZREF=$(cat <<'SCALA'
+package me.jiuyang.zaozi.valuetpe {
+  trait Data
+  class Bits extends Data
+  case class BundleField[T <: Data](dataType: T)
+  trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+  class Nested extends Bundle { val leaf: BundleField[Bits] = ??? }
+}
+package me.jiuyang.zaozi.magic { trait DynamicSubfield }
+package me.jiuyang.zaozi.reftpe {
+  trait Referable[T <: me.jiuyang.zaozi.valuetpe.Data] extends scala.Dynamic {
+    transparent inline def selectDynamic(name: String): Any =
+      new me.jiuyang.zaozi.reftpe.Ref[me.jiuyang.zaozi.valuetpe.Nested]
+  }
+  class Ref[E <: me.jiuyang.zaozi.valuetpe.Data] extends me.jiuyang.zaozi.reftpe.Referable[E]
+}
+package demo {
+  import scala.language.dynamics
+  import me.jiuyang.zaozi.reftpe.{Referable, Ref}
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField, Nested}
+  class MyBundle extends Bundle {
+    val a: BundleField[Bits]       = ???
+    val child: BundleField[Nested] = ???
+  }
+  object Main:
+    def u1(io: Referable[MyBundle]): Ref[Nested] = io.a
+    def u2(io: Referable[MyBundle]): Ref[Nested] = io.a
+    def u3(io: Referable[MyBundle]): Ref[Nested] = io.child.leaf
+    def neg(io: Referable[MyBundle]): Ref[Nested] = io.zzz
+}
+SCALA
+)
+# 0-indexed line:char. usepos -> caret at end of a unique use line; valpos -> caret on the
+# identifier of a `val <id>:` declaration.
+usepos() { local n l; n=$(grep -nF "$2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "refs: no '$2'"; l=$(sed -n "${n}p" <<<"$1"); echo "$((n-1)):${#l}"; }
+valpos() { local n l b; n=$(grep -nF "val $2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "refs: no 'val $2'"; l=$(sed -n "${n}p" <<<"$1"); b="${l%%$2*}"; echo "$((n-1)):${#b}"; }
+RIOA=$(usepos "$ZREF" 'def u1')
+RVALA=$(valpos "$ZREF" 'a:');    RVALLEAF=$(valpos "$ZREF" 'leaf:')
+RVALA_LN="${RVALA%%:*}"
+# defA first so batch readiness polls at io.a (a position that yields completions when the PC is up).
+# (The misspelled-field definition negative is covered by leg 5; here the focus is LSP references.)
+RSPECS="defA:definition:$RIOA refA:references:$RVALA refLeaf:references:$RVALLEAF"
+rc=0; run_metals "$MC/cache" "$BASE/x.json" "$BASE/x.log" "" "$ZREF" "" "" batch "$RSPECS" || rc=$?
+[ "$rc" -eq 0 ] || { tail -30 "$BASE/x.log" >&2; cat "$BASE/x.json" 2>/dev/null >&2; fail "task11: find-references/definition session failed (rc=$rc)"; }
+X="$BASE/x.json"
+jq -e . "$X" >/dev/null 2>&1 || { cat "$X" >&2; fail "task11: references output is not valid JSON"; }
+# 6a. find-references on val a -> the declaration plus BOTH io.a use sites (3 locations).
+nref=$(jq -r '.refA | length' "$X")
+[ "${nref:-0}" -ge 3 ] || fail "task11: references on val a returned <3 locations (decl + 2 io.a uses): $(jq -c '.refA' "$X")"
+jq -e --argjson L "$RVALA_LN" '[.refA[].line] | index($L) != null' "$X" >/dev/null \
+  || fail "task11: references on val a missing the declaration occurrence (line $RVALA_LN): $(jq -c '.refA' "$X")"
+ok "task11: textDocument/references on val a returns the decl + both io.a use sites ($nref locations)"
+# 6b. chained io.child.leaf: references on Nested.leaf returns the decl + the chained use (>=2).
+nleaf=$(jq -r '.refLeaf | length' "$X")
+[ "${nleaf:-0}" -ge 2 ] || fail "task11: references on Nested.leaf returned <2 (decl + chained io.child.leaf): $(jq -c '.refLeaf' "$X")"
+ok "task11: textDocument/references on Nested.leaf includes the chained io.child.leaf use ($nleaf locations)"
+# 6c. go-to-definition io.a -> val a (same file, references-capable fixture).
+[ "$(jq -r '.defA[0].line // empty' "$X")" = "$RVALA_LN" ] || fail "task11: definition io.a not at val a (line $RVALA_LN): $(jq -c '.defA' "$X")"
+ok "task11: go-to-definition io.a -> the bundle's val a (line $RVALA_LN)"
+
 echo ""
 echo "ALL $PASS CHECKS PASSED"

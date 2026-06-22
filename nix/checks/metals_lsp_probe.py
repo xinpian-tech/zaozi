@@ -143,25 +143,25 @@ text = open(FILE).read()
 notify("textDocument/didOpen", {"textDocument": {
     "uri": uri, "languageId": "scala", "version": 1, "text": text}})
 
-def comp_items(ln, ch):
+def comp_items(ln, ch, u=None):
     try:
-        r = request("textDocument/completion", {"textDocument": {"uri": uri}, "position": {"line": ln, "character": ch}})
+        r = request("textDocument/completion", {"textDocument": {"uri": u or uri}, "position": {"line": ln, "character": ch}})
     except TimeoutError:
         return None
     res = r.get("result")
     return (res.get("items") if isinstance(res, dict) else res) or []
 
-def wait_ready(ln, ch):
+def wait_ready(ln, ch, u=None):
     """Wait until completion at (ln,ch) yields items — i.e. the build is imported and the PC is up."""
     while time.time() < DEADLINE:
         log_notes()
-        items = comp_items(ln, ch)
+        items = comp_items(ln, ch, u)
         if items:
             return True
         time.sleep(2)
     return False
 
-def req_result(method, ln, ch):
+def req_result(method, ln, ch, u=None):
     """One request; returns its result (possibly empty/None — an empty result is a valid answer
     for hover/definition once the PC is up). Short retry to absorb a transient empty."""
     deadline2 = min(DEADLINE, time.time() + 15)
@@ -169,13 +169,31 @@ def req_result(method, ln, ch):
     while time.time() < deadline2:
         log_notes()
         try:
-            r = request(method, {"textDocument": {"uri": uri}, "position": {"line": ln, "character": ch}})
+            r = request(method, {"textDocument": {"uri": u or uri}, "position": {"line": ln, "character": ch}})
         except TimeoutError:
             return None
         last = r.get("result")
         if last:
             return last
         time.sleep(2)
+    return last
+
+def req_ref(ln, ch, u=None):
+    """textDocument/references (with the declaration). Needs the workspace compiled + SemanticDB
+    indexed, so retry longer for the index to populate; accept once >=2 locations (def + >=1 ref)."""
+    deadline2 = min(DEADLINE, time.time() + 90)
+    last = None
+    while time.time() < deadline2:
+        log_notes()
+        try:
+            r = request("textDocument/references", {"textDocument": {"uri": u or uri},
+                "position": {"line": ln, "character": ch}, "context": {"includeDeclaration": True}})
+        except TimeoutError:
+            return None
+        last = r.get("result")
+        if last and len(last) >= 2:
+            return last
+        time.sleep(3)
     return last
 
 def fmt_hover(res):
@@ -196,17 +214,19 @@ def fmt_def(res):
         out.append({"uri": l.get("uri") or l.get("targetUri"), "line": (rng.get("start") or {}).get("line")})
     return out
 
-def one(mode, ln, ch):
+def one(mode, ln, ch, u=None):
     if mode == "completion":
         items = []
         d2 = min(DEADLINE, time.time() + 30)
         while time.time() < d2:
-            items = comp_items(ln, ch) or []
+            items = comp_items(ln, ch, u) or []
             if items:
                 break
             time.sleep(1)
         return [it.get("label", "").strip() for it in items]
-    res = req_result("textDocument/" + mode, ln, ch)
+    if mode == "references":
+        return fmt_def(req_ref(ln, ch, u))
+    res = req_result("textDocument/" + mode, ln, ch, u)
     return fmt_hover(res) if mode == "hover" else fmt_def(res)
 
 def shutdown():
@@ -245,7 +265,7 @@ elif MODE == "batch":
         sys.stderr.write("PC not ready (batch)\n"); print(json.dumps({})); sys.exit(3)
     print(json.dumps(result)); sys.exit(0)
 
-else:  # single hover | definition: exit non-zero ONLY if the PC never came up
+else:  # single hover | definition | references: exit non-zero ONLY if the PC never came up
     ready = wait_ready(LINE, CHAR)
     out = one(MODE, LINE, CHAR) if ready else ("" if MODE == "hover" else [])
     shutdown()
