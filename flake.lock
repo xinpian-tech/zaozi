@@ -32,11 +32,11 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1782111404,
-        "narHash": "sha256-zQdmouzcUZGbB7bAy0uPZWQBugb9chq6rrnUcP+6Hnw=",
+        "lastModified": 1782123977,
+        "narHash": "sha256-nZPE4jCUuiGZlyfuCRiY4eL5oHaPa4lBZeVKIWhYo24=",
         "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "5047edbf79607e7bc57ad7ce0190c1baba177351",
+        "rev": "7bf715bcc414c09807aea7236e2a69353aefbe6e",
         "type": "github"
       },
       "original": {
