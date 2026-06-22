@@ -277,5 +277,156 @@ for f in 'MyBundle#zfield' 'MyBundle#child' 'Nested#leaf'; do
 done
 ok "find-references: stock compiler emits ZERO field-reference occurrences (confirms the patch)"
 
+echo "== G. AC-9 symbol-string consistency: PC resolver == compiler resolver, across shapes =="
+# A multi-shape fixture: the same synthetic me.jiuyang.zaozi.* types plus a public Bundle field `f`
+# in five positions — top-level, package-nested, object-nested, nested-class, and a LOCAL bundle
+# declared inside a def. Each has an `io.f` use site (a zaozi selectDynamic).
+cat > "$WORK/Shapes.scala" <<'SCALA'
+package me.jiuyang.zaozi.valuetpe {
+  trait Data
+  class Bits extends Data
+  case class BundleField[T <: Data](dataType: T)
+  trait Bundle extends Data with me.jiuyang.zaozi.magic.DynamicSubfield
+  class Nested extends Bundle { val leaf: BundleField[Bits] = ??? }
+}
+package me.jiuyang.zaozi.magic { trait DynamicSubfield }
+package me.jiuyang.zaozi.reftpe {
+  trait Referable[T <: me.jiuyang.zaozi.valuetpe.Data] extends scala.Dynamic {
+    transparent inline def selectDynamic(name: String): Any =
+      new me.jiuyang.zaozi.reftpe.Ref[me.jiuyang.zaozi.valuetpe.Nested]
+  }
+  class Ref[E <: me.jiuyang.zaozi.valuetpe.Data] extends me.jiuyang.zaozi.reftpe.Referable[E]
+}
+package demo.sub {
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  class PkgB extends Bundle { val f: BundleField[Bits] = ??? }   // shape: package-nested
+}
+package demo {
+  import scala.language.dynamics
+  import me.jiuyang.zaozi.reftpe.Referable
+  import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField}
+  class TopB extends Bundle { val f: BundleField[Bits] = ??? }                  // shape: top-level
+  object Obj { class ObjB extends Bundle { val f: BundleField[Bits] = ??? } }   // shape: object-nested
+  class Outer { class InnerB extends Bundle { val f: BundleField[Bits] = ??? } }// shape: nested-class
+  object Uses {
+    def uTop(io: Referable[TopB]): Any         = io.f
+    def uPkg(io: Referable[demo.sub.PkgB]): Any = io.f
+    def uObj(io: Referable[Obj.ObjB]): Any     = io.f
+    def uInner(io: Referable[Outer#InnerB]): Any = io.f
+    def uLocal(): Any = {                                                        // shape: local-bundle
+      class LocalB extends Bundle { val f: BundleField[Bits] = ??? }
+      def use(io: Referable[LocalB]): Any = io.f
+      use
+    }
+  }
+}
+SCALA
+# The checker EXECUTES both resolvers on the typed fixture and derives each field symbol's string
+# via the compiler's OWN mechanism `SemanticSymbolBuilder.symbolName` — the exact path the
+# reference/definition occurrences use, NOT a hand-rolled builder. (It is declared in package
+# dotty.tools.dotc.semanticdb so it may call that private[semanticdb] entry; 3.8.3 has no public
+# `symbolToName`.) It types the source with the PC's own InteractiveDriver, finds each `io.f`
+# selectDynamic (in the un-reduced `Inlined.call`, exactly like the find-references patch), and
+# prints `SITE TAB <PC symbol> TAB <compiler symbol> TAB <selectDynamic symbol>` per site.
+cat > "$WORK/SymConsistency.scala" <<'SCALA'
+package dotty.tools.dotc.semanticdb
+import java.nio.file.{Files, Paths}
+import dotty.tools.dotc.interactive.InteractiveDriver
+import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Symbols.Symbol
+import dotty.tools.dotc.ast.tpd.*
+import dotty.tools.dotc.core.Constants.Constant
+import dotty.tools.dotc.core.StdNames.nme
+import dotty.tools.dotc.core.Types.Type
+import dotty.tools.pc.ZaoziPcSupport
+object SymConsistency:
+  // The compiler's own SemanticDB symbol mechanism (the same SemanticSymbolBuilder the
+  // reference/definition occurrences use). A fresh builder per call gives the canonical global
+  // name; local symbols get a fresh per-builder index (handled separately in the gate).
+  private def sName(sym: Symbol)(using Context): String = SemanticSymbolBuilder().symbolName(sym)
+  def main(args: Array[String]): Unit =
+    val src  = Paths.get(args(1)).toAbsolutePath
+    val code = String(Files.readAllBytes(src), "UTF-8")
+    val driver = new InteractiveDriver(List("-classpath", args(0), "-color:never", "-language:dynamics"))
+    val uri = src.toUri
+    driver.run(uri, code)
+    given Context = driver.currentCtx
+    val tree = driver.compilationUnits(uri).tpdTree
+    val sites = scala.collection.mutable.ListBuffer[(Type, String)]()
+    def collect(t: Tree)(using Context): Unit = t match
+      case Apply(Select(qual, sel), List(Literal(Constant(n: String)))) if sel == nme.selectDynamic =>
+        sites += ((qual.tpe.widen, n))
+      case _ =>
+    object Trav extends TreeTraverser:
+      def traverse(t: Tree)(using Context): Unit = t match
+        case inl: Inlined => traverse(inl.call); traverseChildren(inl)
+        case _            => collect(t); traverseChildren(t)
+    Trav.traverse(tree)
+    val sb = new StringBuilder
+    for (qtpe, name) <- sites.toList do
+      val p = ZaoziPcSupport.publicFieldSymbol(qtpe, name).map(sName).getOrElse("<none>")
+      val c = ZaoziSemanticDB.fieldSymbol(qtpe, name).map(sName).getOrElse("<none>")
+      val m = qtpe.member(nme.selectDynamic)
+      val d = if m.exists then sName(m.symbol) else "<none>"
+      sb.append("SITE\t").append(p).append('\t').append(c).append('\t').append(d).append('\n')
+    print(sb.toString)
+SCALA
+cp_arg="${cp_common#:}"
+mkdir -p "$WORK/symcheck"
+( cd "$WORK" && java -cp "$CJAR:$PJAR$cp_common" dotty.tools.dotc.Main -classpath "$CJAR:$PJAR$cp_common" \
+    -d "$WORK/symcheck" SymConsistency.scala ) >"$WORK/symcheck.out" 2>"$WORK/symcheck.err" \
+  || { cat "$WORK/symcheck.err" >&2; fail "AC-9: could not compile the symbol-consistency checker"; }
+# -Xverify:none so loading dotty.tools.pc.ZaoziPcSupport does not eagerly verify (and thus load) its
+# unused bundleFieldCompletions method, whose CompletionValue/scala.meta deps are not on this gate's
+# classpath; publicFieldSymbol itself touches none of them.
+java -Xverify:none -cp "$WORK/symcheck:$CJAR:$PJAR$cp_common" dotty.tools.dotc.semanticdb.SymConsistency \
+    "$cp_arg" "$WORK/Shapes.scala" >"$WORK/sites.raw" 2>"$WORK/symrun.err" \
+  || { cat "$WORK/symrun.err" >&2; fail "AC-9: symbol-consistency checker failed to run"; }
+grep '^SITE' "$WORK/sites.raw" > "$WORK/sites.tsv" || true
+nsites=$(wc -l < "$WORK/sites.tsv" | tr -d ' ')
+[ "$nsites" = "5" ] || fail "AC-9: expected 5 selectDynamic sites, got $nsites: $(cat "$WORK/sites.raw")"
+# Per site: the PC symbol is byte-for-byte the compiler symbol, and NOT the (divergent) selectDynamic
+# symbol — so an intentionally divergent derivation would be caught by the equality assertion.
+while IFS=$(printf '\t') read -r _ p c d; do
+  { [ -n "$p" ] && [ "$p" != "<none>" ]; } || fail "AC-9: PC resolver produced no symbol (line: $p $c $d)"
+  [ "$p" = "$c" ] || fail "AC-9: PC symbol '$p' != compiler symbol '$c' (byte-for-byte consistency)"
+  [ "$p" != "$d" ] || fail "AC-9: negative failed — field symbol equals the selectDynamic symbol '$d'"
+done < "$WORK/sites.tsv"
+# Every required GLOBAL shape resolved to its exact SemanticDB symbol form.
+for want in 'demo/TopB#f.' 'demo/sub/PkgB#f.' 'demo/Obj.ObjB#f.' 'demo/Outer#InnerB#f.'; do
+  grep -qF "$want" "$WORK/sites.tsv" || fail "AC-9: expected shape symbol '$want' not among resolved sites: $(cat "$WORK/sites.tsv")"
+done
+ok "AC-9: PC resolver symbol == compiler resolver symbol (byte-for-byte) across all 5 shapes"
+# Cross-check the in-memory symbols against the REAL on-disk .semanticdb from the patched compiler:
+# the reference occurrence (task9) and the definition occurrence of the field val must carry the
+# same symbol — both from the compiler's own mechanism — for every shape.
+mkdir -p "$WORK/shapes-sdb"
+( cd "$WORK" && java -cp "$CJAR$cp_common" dotty.tools.dotc.Main -classpath "$cp_common" \
+    -language:dynamics -Xsemanticdb -d "$WORK/shapes-sdb" Shapes.scala ) >"$WORK/shapes.out" 2>"$WORK/shapes.err" \
+  || { cat "$WORK/shapes.err" >&2; fail "AC-9: Shapes.scala -Xsemanticdb compile failed"; }
+ssdb=$(find "$WORK/shapes-sdb" -name '*.semanticdb' | head -1)
+{ [ -n "$ssdb" ] && [ -f "$ssdb" ]; } || fail "AC-9: Shapes.scala .semanticdb not produced"
+occ=$(java -cp "$WORK/dump:$CJAR$cp_common" SdbDump "$ssdb" "$WORK/Shapes.scala")
+while IFS=$(printf '\t') read -r _ p c d; do
+  case "$p" in
+    local*)
+      # Local symbols use a per-file builder index, so the in-memory (fresh-builder) string need not
+      # equal the on-disk index; assert instead that the on-disk REFERENCE and DEFINITION of the local
+      # `f` carry the SAME local symbol (this is what Metals links def<->refs by).
+      lref=$(printf '%s\n' "$occ" | grep -aP "^REFERENCE\tlocal[0-9]+\tf$" | head -1 | cut -f2)
+      ldef=$(printf '%s\n' "$occ" | grep -aP "^DEFINITION\tlocal[0-9]+\tf$" | head -1 | cut -f2)
+      { [ -n "$lref" ] && [ "$lref" = "$ldef" ]; } \
+        || fail "AC-9: local-bundle on-disk REFERENCE/DEFINITION symbol mismatch (ref='$lref' def='$ldef')"
+      ;;
+    *)
+      rc=$(printf '%s\n' "$occ" | grep -aP "^REFERENCE\t\Q$p\E\t" | wc -l | tr -d ' ')
+      dc=$(printf '%s\n' "$occ" | grep -aP "^DEFINITION\t\Q$p\E\t" | wc -l | tr -d ' ')
+      [ "$rc" -ge 1 ] || fail "AC-9: no on-disk REFERENCE occurrence for $p"
+      [ "$dc" -ge 1 ] || fail "AC-9: no on-disk DEFINITION occurrence for $p (def==ref symbol consistency)"
+      ;;
+  esac
+done < "$WORK/sites.tsv"
+ok "AC-9: on-disk REFERENCE == DEFINITION symbol for every shape (compiler's own mechanism)"
+
 echo ""
 echo "ALL $PASS CHECKS PASSED"
