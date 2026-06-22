@@ -75,7 +75,7 @@
           ];
           inherit system;
         };
-        # Same-version 3.8.4 compiler + presentation-compiler jars built from the pinned
+        # Same-version 3.8.3 compiler + presentation-compiler jars built from the pinned
         # scala3 source (fixed-output, needs network for the dotty dep closure).
         # proxyHost/proxyPort are null by default (normal network); pass them via
         # .override for a proxied sandbox.
@@ -95,7 +95,7 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
-          # Metals integration: reproducible dotty 3.8.4 sbt build-load gate, driven
+          # Metals integration: reproducible dotty 3.8.3 sbt build-load gate, driven
           # by this flake's pinned sbt/jdk21/git over the flake-pinned scala3 source
           # (inputs.scala3-src). Runs as an app (needs network for sbt plugin
           # resolution, so not a sandboxed `nix flake check`):
@@ -117,7 +117,7 @@
           # Repeatable verification gate for the shadow artifacts: asserts the patched
           # jar + cache contract, hashes.json consistency, patched != stock, and proves
           # the marker patch is inert (patched compiler with the property unset produces
-          # compile output identical to stock 3.8.4 and emits no marker; with the
+          # compile output identical to stock 3.8.3 and emits no marker; with the
           # property set it emits the gated marker). Run: nix run .#scala3-shadow-artifacts
           scala3-shadow-artifacts =
             let
@@ -173,7 +173,7 @@
           # launching the editor from this dev shell is the supported path for
           # the shadowed PC (DEC-2). nix/checks/metals-pc-smoke.sh is only an
           # artifact/JDK load helper — it checks that the stock
-          # scala3-presentation-compiler_3:3.8.4 class loads under the dev-shell
+          # scala3-presentation-compiler_3:3.8.3 class loads under the dev-shell
           # JDK; it does NOT start Metals. Proving Metals itself resolves+loads
           # the 3.8.x PC on a BSP workspace is the headless-LSP harness
           # (see doc/shadow-layout.md).

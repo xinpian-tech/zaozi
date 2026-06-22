@@ -2,7 +2,7 @@
 # Repeatable verification gate for the shadow toolchain artifacts. Asserts the
 # patched-jar + shadow-cache contract and proves the marker patch is inert:
 # the patched compiler, with zaozi.shadow.marker unset, produces compile output
-# identical to the stock 3.8.4 compiler and prints no marker; with the property
+# identical to the stock 3.8.3 compiler and prints no marker; with the property
 # set it prints exactly the gated marker line.
 #
 #   scala3-shadow-artifacts.sh --shadow-jars DIR --shadow-cache DIR \
@@ -101,10 +101,10 @@ ok "cache: https/ root; 1 jar+1 pom per shadowed coord; patched bytes in place"
 B2="$CROOT/https/repo1.maven.org/maven2"
 # Every PC-closure coordinate absent from the Zaozi lock must be present, jar+pom, so the
 # cache is an offline-resolvable authoritative source. All 11 are jar-bearing libraries.
-for c in org/scalameta/mtags-interfaces/1.6.7 \
+for c in org/scalameta/mtags-interfaces/1.6.3 \
          org/lz4/lz4-java/1.8.0 \
-         org/eclipse/lsp4j/org.eclipse.lsp4j/1.0.0 \
-         org/eclipse/lsp4j/org.eclipse.lsp4j.jsonrpc/1.0.0 \
+         org/eclipse/lsp4j/org.eclipse.lsp4j/0.24.0 \
+         org/eclipse/lsp4j/org.eclipse.lsp4j.jsonrpc/0.24.0 \
          com/google/code/gson/gson/2.14.0 \
          com/google/guava/guava/33.2.1-jre \
          com/google/guava/failureaccess/1.0.2 \

@@ -4,7 +4,7 @@
 # isolated HOME/XDG/IVY_HOME and sanitized JVM/proxy opts) at a writable copy of that
 # cache, then run `mill --no-daemon --offline show zaozi.scalaCompilerClasspath` in a clean
 # workspace copy and inspect the actually-resolved classpath:
-#   - patched cache -> Mill resolves the patched scala3-compiler_3:3.8.4 (path under the
+#   - patched cache -> Mill resolves the patched scala3-compiler_3:3.8.3 (path under the
 #     isolated cache, SHA-256 == hashes.json); the loaded compiler emits the marker.
 #   - empty cache   -> offline Mill resolution fails (no bytes, no fallback).
 #   - stock cache   -> Mill resolves the stock compiler (hash != patched); no marker.

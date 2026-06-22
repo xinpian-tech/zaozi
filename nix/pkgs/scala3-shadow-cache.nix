@@ -105,7 +105,7 @@ stdenv.mkDerivation {
   dontInstall = true;
 
   meta = {
-    description = "Isolated coursier cache shadowing the patched 3.8.4 compiler + presentation-compiler";
+    description = "Isolated coursier cache shadowing the patched 3.8.3 compiler + presentation-compiler";
     platforms = lib.platforms.linux;
   };
 }

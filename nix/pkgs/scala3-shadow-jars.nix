@@ -1,4 +1,4 @@
-# Builds same-version 3.8.4 scala3-compiler_3 and scala3-presentation-compiler_3
+# Builds same-version 3.8.3 scala3-compiler_3 and scala3-presentation-compiler_3
 # jars FROM SOURCE (the pinned scala3-src), for the Metals/IDE shadow toolchain.
 #
 # Why a fixed-output derivation (FOD): the dotty sbt build resolves its plugin/dep
@@ -7,9 +7,9 @@
 # so the jars are normalised with add-determinism (already used by zaozi.nix) to keep
 # the output hash stable across rebuilds.
 #
-# Exact version: dotty's Build.scala sets the version to `baseVersion` (= "3.8.4")
+# Exact version: dotty's Build.scala sets the version to `baseVersion` (= "3.8.3")
 # only when `isRelease` (env RELEASEBUILD=yes); otherwise it appends `-bin-SNAPSHOT`.
-# So RELEASEBUILD=yes yields the exact stock coordinate `3.8.4` (no custom suffix).
+# So RELEASEBUILD=yes yields the exact stock coordinate `3.8.3` (no custom suffix).
 #
 # Proxy: in a proxied/sandboxed network, pass proxyHost/proxyPort so sbt's resolver
 # can reach Maven (the FOD build env is minimal). In a normal network leave them null.
@@ -43,7 +43,7 @@ stdenv.mkDerivation {
   outputHashAlgo = "sha256";
   inherit outputHash;
 
-  # Drives Build.scala `isRelease` => version == "3.8.4" exactly.
+  # Drives Build.scala `isRelease` => version == "3.8.3" exactly.
   RELEASEBUILD = "yes";
 
   dontConfigure = true;
@@ -146,7 +146,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    description = "Same-version 3.8.4 scala3-compiler/presentation-compiler jars built from source (Metals shadow toolchain)";
+    description = "Same-version 3.8.3 scala3-compiler/presentation-compiler jars built from source (Metals shadow toolchain)";
     platforms = lib.platforms.linux;
   };
 }
