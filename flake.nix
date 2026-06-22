@@ -81,6 +81,9 @@
           scala3-src = inputs.scala3-src;
           srcRev = inputs.scala3-src.rev or "unknown";
         };
+        scala3-shadow-cache = pkgs.callPackage ./nix/pkgs/scala3-shadow-cache.nix {
+          inherit scala3-shadow-jars;
+        };
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -108,9 +111,32 @@
           # overlaid at their stock coordinates. The sole authoritative cache task5 points
           # both consumer JVMs at. Fixed-output (coursier fetches the PC closure); pass
           # proxyHost/proxyPort via .override for a proxied sandbox.
-          scala3-shadow-cache = pkgs.callPackage ./nix/pkgs/scala3-shadow-cache.nix {
-            inherit scala3-shadow-jars;
-          };
+          inherit scala3-shadow-cache;
+          # Repeatable verification gate for the shadow artifacts: asserts the patched
+          # jar + cache contract, hashes.json consistency, patched != stock, and proves
+          # the marker patch is inert (patched compiler with the property unset produces
+          # compile output identical to stock 3.8.4 and emits no marker; with the
+          # property set it emits the gated marker). Run: nix run .#scala3-shadow-artifacts
+          scala3-shadow-artifacts =
+            let
+              stockJar = name: hash: pkgs.fetchurl {
+                inherit name hash;
+                url = "https://repo1.maven.org/maven2/org/scala-lang/${name}/3.8.4/${name}-3.8.4.jar";
+              };
+              stockCompiler = stockJar "scala3-compiler_3" "sha256-dAvgK1HoFe8qknpCLWH9hR4lQDZV+57i4Ha0+c4fs04=";
+              stockPc = stockJar "scala3-presentation-compiler_3" "sha256-I3P9kVVgQoxKT0Dme/H5U572E9l0B7QG7KsZQV4QGls=";
+            in
+            pkgs.writeShellApplication {
+              name = "scala3-shadow-artifacts";
+              runtimeInputs = with pkgs; [ jdk21 unzip jq diffutils coreutils ];
+              text = ''
+                exec bash ${./nix/checks/scala3-shadow-artifacts.sh} \
+                  --shadow-jars "${scala3-shadow-jars}" \
+                  --shadow-cache "${scala3-shadow-cache}" \
+                  --stock-compiler "${stockCompiler}" \
+                  --stock-pc "${stockPc}" "$@"
+              '';
+            };
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
