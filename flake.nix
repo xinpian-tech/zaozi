@@ -137,21 +137,22 @@
                   --stock-pc "${stockPc}" "$@"
               '';
             };
-          # AC-4 (compiler-consumer half): from the actual compiler JVM, pointed at an
-          # isolated writable copy of the shadow cache (HOME/COURSIER_CACHE/IVY_HOME
-          # sanitized, no network), prove the loaded scala3-compiler_3:3.8.4 CodeSource is
-          # under the isolated cache and its hash == the published patched jar, the gated
-          # marker fires, and the cache-state matrix holds (patched->marker; empty->offline
-          # resolution fails; stock->stock hash + no marker). The stock cache is the
-          # existing ivy-gather zaozi-lock cache. Run: nix run .#scala3-shadow-resolution
+          # Proves the shadow cache wins the REAL Mill/coursier compiler resolution: for
+          # each cache state, an isolated COURSIER_CACHE (+ isolated HOME/IVY_HOME, no
+          # network) is the sole source for `mill --no-daemon --offline show
+          # zaozi.scalaCompilerClasspath`; the resolved compiler jar path + hash + the
+          # gated marker are checked, with the patched/empty/stock cache-state matrix. The
+          # stock cache is the existing ivy-gather zaozi-lock cache; the workspace is this
+          # flake's own source. Run: nix run .#scala3-shadow-resolution
           scala3-shadow-resolution = pkgs.writeShellApplication {
             name = "scala3-shadow-resolution";
-            runtimeInputs = with pkgs; [ bash jdk21 jq gnugrep findutils coreutils ];
+            runtimeInputs = with pkgs; [ bash mill jdk21 jq gnugrep findutils coreutils gnutar ];
             text = ''
               exec bash ${./nix/checks/scala3-shadow-resolution.sh} \
                 --shadow-cache "${scala3-shadow-cache}" \
                 --shadow-jars "${scala3-shadow-jars}" \
-                --stock-cache "${pkgs.ivy-gather ./nix/zaozi/zaozi-lock.nix}" "$@"
+                --stock-cache "${pkgs.ivy-gather ./nix/zaozi/zaozi-lock.nix}" \
+                --workspace "${self}" "$@"
             '';
           };
         };

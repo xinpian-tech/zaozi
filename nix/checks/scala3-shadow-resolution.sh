@@ -1,67 +1,76 @@
 #!/usr/bin/env bash
-# AC-4 (compiler-consumer half): prove that, against an ISOLATED writable copy of the
-# shadow cache (with HOME / XDG_CACHE_HOME / COURSIER_CACHE / IVY_HOME / JAVA_TOOL_OPTIONS
-# sanitized and no network), the compiler JVM loads the PATCHED scala3-compiler_3:3.8.4
-# from the isolated cache — provenance asserted from the actual JVM via the loaded class's
-# CodeSource, not merely from a resolver. Plus the cache-state matrix.
+# Prove the shadow cache is the sole authoritative source for the REAL Mill/coursier
+# compiler resolution. For each cache state, point an isolated COURSIER_CACHE (plus
+# isolated HOME/XDG/IVY_HOME and sanitized JVM/proxy opts) at a writable copy of that
+# cache, then run `mill --no-daemon --offline show zaozi.scalaCompilerClasspath` in a clean
+# workspace copy and inspect the actually-resolved classpath:
+#   - patched cache -> Mill resolves the patched scala3-compiler_3:3.8.4 (path under the
+#     isolated cache, SHA-256 == hashes.json); the loaded compiler emits the marker.
+#   - empty cache   -> offline Mill resolution fails (no bytes, no fallback).
+#   - stock cache   -> Mill resolves the stock compiler (hash != patched); no marker.
 #
-#   scala3-shadow-resolution.sh --shadow-cache DIR --shadow-jars DIR --stock-cache DIR
+#   scala3-shadow-resolution.sh --shadow-cache DIR --shadow-jars DIR --stock-cache DIR \
+#                               --workspace DIR
 #
-# Needs on PATH: java, javac, jq, sha256sum, grep, find.
+# Needs on PATH: mill, java, javac, jq, sha256sum, grep, tar, timeout.
 set -euo pipefail
 
 VER=3.8.4
-SC=; SJ=; STOCK_SC=
+SC=; SJ=; STOCK_SC=; WORKSPACE=
 while [ $# -gt 0 ]; do
   case "$1" in
     --shadow-cache) SC="$2"; shift 2 ;;
     --shadow-jars)  SJ="$2"; shift 2 ;;
     --stock-cache)  STOCK_SC="$2"; shift 2 ;;
+    --workspace)    WORKSPACE="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
-for v in SC SJ STOCK_SC; do [ -n "${!v}" ] || { echo "missing arg $v" >&2; exit 2; }; done
+for v in SC SJ STOCK_SC WORKSPACE; do [ -n "${!v}" ] || { echo "missing arg $v" >&2; exit 2; }; done
 
 PASS=0
 ok()   { PASS=$((PASS+1)); echo "PASS  $1"; }
 fail() { echo "FAIL  $1" >&2; exit 1; }
 sha()  { sha256sum "$1" | cut -d' ' -f1; }
 
-# Isolated, sanitized environment: the copied cache is the sole authoritative source;
-# the user's ~/.cache/coursier, ~/.ivy2 and any proxy are never consulted.
-ROOT=$(mktemp -d)
-trap 'rm -rf "$ROOT"' EXIT
-export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/xdg" COURSIER_CACHE="$ROOT/cc" IVY_HOME="$ROOT/ivy"
-mkdir -p "$HOME" "$XDG_CACHE_HOME" "$COURSIER_CACHE" "$IVY_HOME"
-unset JAVA_TOOL_OPTIONS JAVA_OPTS SBT_OPTS http_proxy https_proxy HTTP_PROXY HTTPS_PROXY 2>/dev/null || true
+BASE=$(mktemp -d)
+trap 'chmod -R u+w "$BASE" 2>/dev/null; rm -rf "$BASE"' EXIT
 
-# Writable isolated copies of each cache state.
-PATCHED="$ROOT/patched"; cp -rL "$SC/cache" "$PATCHED"; chmod -R u+w "$PATCHED"
-STOCK="$ROOT/stock";     cp -rL "$STOCK_SC/cache" "$STOCK"; chmod -R u+w "$STOCK"
-EMPTY="$ROOT/empty";     mkdir -p "$EMPTY/https"
+want=$(jq -r '.artifacts."scala3-compiler_3".jarSha256' "$SJ/share/zaozi-shadow/hashes.json")
+[ -n "$want" ] && [ "$want" != null ] || fail "could not read published patched compiler hash"
 
-mvn() { printf '%s' "$1/https/repo1.maven.org/maven2"; }
-# Resolve a coordinate by its Maven path inside a cache root (the cache IS the repo).
-resolve_compiler() { # $1 cache root -> prints jar path, or returns 1 if absent
-  local p; p="$(mvn "$1")/org/scala-lang/scala3-compiler_3/$VER/scala3-compiler_3-$VER.jar"
-  [ -f "$p" ] && printf '%s' "$p"
+# Run the real consumer (Mill) against an isolated copy of $1 (a cache dir whose immediate
+# child is https/). Writes the resolved-classpath JSON to $2 and Mill's log to $3, sets the
+# global LAST_CC to the isolated COURSIER_CACHE, and returns Mill's exit code.
+LAST_CC=""
+mill_show() { # $1 cacheSrc, $2 outjson, $3 outerr -> mill rc
+  local R WS NCD CC H X JOPTS rc
+  R=$(mktemp -d -p "$BASE")
+  WS="$R/ws"; mkdir -p "$WS"
+  tar -C "$WORKSPACE" -cf - --exclude=./out . | tar -C "$WS" -xf -
+  chmod -R u+w "$WS"
+  NCD="$R/coursier"; CC="$NCD/cache"; H="$R/home"; X="$R/xdg"
+  mkdir -p "$NCD" "$H" "$X"
+  cp -rL "$1" "$CC"; chmod -R u+w "$CC"
+  JOPTS="-Dcoursier.cache=$CC -Dcoursier.ivy.home=$NCD -Divy.home=$NCD -Duser.home=$H"
+  printf '%s\n' $JOPTS > "$R/mopts"
+  LAST_CC="$CC"
+  rc=0
+  (
+    cd "$WS"
+    export COURSIER_CACHE="$CC" HOME="$H" XDG_CACHE_HOME="$X" IVY_HOME="$NCD" \
+           MILL_JVM_OPTS_PATH="$R/mopts" JAVA_TOOL_OPTIONS="$JOPTS"
+    unset JAVA_OPTS SBT_OPTS http_proxy https_proxy HTTP_PROXY HTTPS_PROXY 2>/dev/null || true
+    timeout 360 mill --no-daemon --offline show zaozi.scalaCompilerClasspath
+  ) >"$2" 2>"$3" || rc=$?
+  return $rc
 }
-# Compiler runtime classpath (the 7 deps) from a cache root.
-cpof() {
-  local b; b="$(mvn "$1")"
-  printf '%s' \
-"$b/org/scala-lang/scala3-library_3/$VER/scala3-library_3-$VER.jar:\
-$b/org/scala-lang/scala-library/$VER/scala-library-$VER.jar:\
-$b/org/scala-lang/tasty-core_3/$VER/tasty-core_3-$VER.jar:\
-$b/org/scala-lang/scala3-interfaces/$VER/scala3-interfaces-$VER.jar:\
-$b/org/scala-lang/modules/scala-asm/9.9.0-scala-1/scala-asm-9.9.0-scala-1.jar:\
-$b/org/scala-sbt/compiler-interface/1.10.7/compiler-interface-1.10.7.jar:\
-$b/org/scala-sbt/util-interface/1.10.7/util-interface-1.10.7.jar"
-}
+# Mill PathRefs are rendered "qref:v1:<hash>:/abs/path"; strip the prefix.
+strip_qref() { sed -E 's#^qref:v[0-9]+:[0-9a-f]+:##'; }
 
-# Probe: from the actual JVM, where was dotty.tools.dotc.Driver loaded from?
-mkdir -p "$ROOT/probe"
-cat > "$ROOT/probe/Probe.java" <<'JAVA'
+# A probe that reports, from the actual JVM, where dotty.tools.dotc.Driver was loaded from.
+mkdir -p "$BASE/probe"
+cat > "$BASE/probe/Probe.java" <<'JAVA'
 public class Probe {
   public static void main(String[] a) throws Exception {
     var loc = Class.forName("dotty.tools.dotc.Driver")
@@ -70,46 +79,57 @@ public class Probe {
   }
 }
 JAVA
-javac -d "$ROOT/probe" "$ROOT/probe/Probe.java"
-probe() { java -cp "$ROOT/probe:$1:$2" Probe; }   # $1 compiler jar, $2 common cp
+javac -d "$BASE/probe" "$BASE/probe/Probe.java"
 
-cat > "$ROOT/F.scala" <<'SCALA'
+cat > "$BASE/F.scala" <<'SCALA'
 package z
 object F:
   val a: Int = 1
 SCALA
-compile() { # $1 compiler jar, $2 common cp, $3 outdir, $4 errfile, $5 extra java opts
-  mkdir -p "$3"
-  java ${5:-} -cp "$1:$2" dotty.tools.dotc.Main -classpath "$2" -d "$3" "$ROOT/F.scala" >/dev/null 2>"$4"
-}
 
-want=$(jq -r '.artifacts."scala3-compiler_3".jarSha256' "$SJ/share/zaozi-shadow/hashes.json")
-[ -n "$want" ] && [ "$want" != null ] || fail "could not read published patched compiler hash"
+echo "== 1. patched cache: real Mill resolution + JVM provenance + gated marker =="
+mill_show "$SC/cache" "$BASE/p.json" "$BASE/p.err" || fail "mill failed to resolve against the patched cache: $(tail -3 "$BASE/p.err")"
+PCACHE="$LAST_CC"
+mapfile -t CP < <(jq -r '.[]' "$BASE/p.json" | strip_qref)
+[ "${#CP[@]}" -ge 8 ] || fail "patched: unexpected classpath size ${#CP[@]}"
+CJAR=""; for j in "${CP[@]}"; do [[ "$j" == *"scala3-compiler_3-$VER.jar" ]] && CJAR="$j"; done
+[ -n "$CJAR" ] || fail "patched: no scala3-compiler_3 jar in Mill classpath"
+case "$CJAR" in "$PCACHE"/*) ;; *) fail "patched: resolved compiler not under isolated cache: $CJAR";; esac
+[ "$(sha "$CJAR")" = "$want" ] || fail "patched: Mill-resolved compiler hash != published patched"
+ok "patched cache: Mill resolves the compiler under the isolated cache; hash == published patched"
+CPJOIN=$(IFS=:; echo "${CP[*]}")
+loc=$(java -cp "$BASE/probe:$CPJOIN" Probe 2>/dev/null)
+case "$loc" in "$PCACHE"/*) ;; *) fail "patched: JVM loaded Driver from outside the isolated cache: $loc";; esac
+[ "$(sha "$loc")" = "$want" ] || fail "patched: probed CodeSource hash != published patched"
+ok "patched cache: the compiler JVM loads Driver from the Mill-resolved patched jar"
+mkdir -p "$BASE/out1"
+java -Dzaozi.shadow.marker=true -cp "$CPJOIN" dotty.tools.dotc.Main -classpath "$CPJOIN" \
+  -d "$BASE/out1" "$BASE/F.scala" >/dev/null 2>"$BASE/m1.err" || true
+grep -qF "zaozi-shadow-marker compiler org.scala-lang:scala3-compiler_3:$VER" "$BASE/m1.err" \
+  || fail "patched: gated marker not emitted from the Mill-resolved compiler"
+ok "patched cache: the Mill-resolved compiler emits the gated marker"
 
-echo "== 1. patched isolated cache: JVM-side provenance + gated marker =="
-PJ=$(resolve_compiler "$PATCHED") || fail "patched cache: compiler not resolvable"
-case "$PJ" in "$PATCHED"/*) ;; *) fail "resolved jar not under the isolated cache: $PJ";; esac
-loc=$(probe "$PJ" "$(cpof "$PATCHED")")
-case "$loc" in "$PATCHED"/*) ;; *) fail "JVM loaded Driver from outside the isolated cache: $loc";; esac
-[ "$(sha "$loc")" = "$(sha "$PJ")" ] || fail "probed code source != resolved jar"
-[ "$(sha "$PJ")" = "$want" ] || fail "loaded compiler hash != published patched ($(sha "$PJ") vs $want)"
-ok "patched cache: JVM loads compiler from the isolated cache; path+hash == published patched"
-compile "$PJ" "$(cpof "$PATCHED")" "$ROOT/o1" "$ROOT/e1" "-Dzaozi.shadow.marker=true"
-grep -qF "zaozi-shadow-marker compiler org.scala-lang:scala3-compiler_3:$VER" "$ROOT/e1" \
-  || fail "patched cache: gated compiler marker not emitted"
-ok "patched cache: scalac emits the gated compiler marker"
+echo "== 2. empty cache: offline Mill resolution fails =="
+EMPTY="$BASE/empty"; mkdir -p "$EMPTY/https"
+rc=0; mill_show "$EMPTY" "$BASE/e.json" "$BASE/e.err" || rc=$?
+[ "$rc" -ne 0 ] || fail "empty isolated cache: Mill unexpectedly succeeded offline"
+ok "empty isolated cache: offline Mill resolution fails (rc=$rc, no fallback)"
 
-echo "== 2. empty isolated cache (offline): resolution fails =="
-if resolve_compiler "$EMPTY" >/dev/null; then fail "empty isolated cache unexpectedly resolved a compiler"; fi
-ok "empty isolated cache: offline resolution fails (no patched bytes, no fallback)"
-
-echo "== 3. stock isolated cache: stock bytes, no marker =="
-KJ=$(resolve_compiler "$STOCK") || fail "stock cache: compiler not resolvable"
-[ "$(sha "$KJ")" != "$want" ] || fail "stock cache compiler hash equals patched?!"
-ok "stock isolated cache: resolves the stock compiler (hash != patched)"
-compile "$KJ" "$(cpof "$STOCK")" "$ROOT/o3" "$ROOT/e3" "-Dzaozi.shadow.marker=true"
-if grep -q "zaozi-shadow-marker" "$ROOT/e3"; then fail "stock compiler emitted the marker?!"; fi
-ok "stock isolated cache: scalac emits no marker even with the property set"
+echo "== 3. stock cache: stock bytes, no marker =="
+mill_show "$STOCK_SC/cache" "$BASE/s.json" "$BASE/s.err" || fail "mill failed to resolve against the stock cache: $(tail -3 "$BASE/s.err")"
+KCACHE="$LAST_CC"
+mapfile -t SCP < <(jq -r '.[]' "$BASE/s.json" | strip_qref)
+KJAR=""; for j in "${SCP[@]}"; do [[ "$j" == *"scala3-compiler_3-$VER.jar" ]] && KJAR="$j"; done
+[ -n "$KJAR" ] || fail "stock: no scala3-compiler_3 jar in Mill classpath"
+case "$KJAR" in "$KCACHE"/*) ;; *) fail "stock: resolved compiler not under isolated stock cache: $KJAR";; esac
+[ "$(sha "$KJAR")" != "$want" ] || fail "stock: Mill-resolved compiler hash equals patched?!"
+ok "stock cache: Mill resolves the stock compiler under the isolated cache (hash != patched)"
+SCPJOIN=$(IFS=:; echo "${SCP[*]}")
+mkdir -p "$BASE/out3"
+java -Dzaozi.shadow.marker=true -cp "$SCPJOIN" dotty.tools.dotc.Main -classpath "$SCPJOIN" \
+  -d "$BASE/out3" "$BASE/F.scala" >/dev/null 2>"$BASE/m3.err" || true
+if grep -q "zaozi-shadow-marker" "$BASE/m3.err"; then fail "stock compiler emitted the marker?!"; fi
+ok "stock cache: the Mill-resolved stock compiler emits no marker even with the property"
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"
