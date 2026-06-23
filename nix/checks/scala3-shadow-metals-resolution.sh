@@ -503,5 +503,17 @@ sloc=$(jq -r '.refA[0] | ((.uri|split("/")|last) + ":" + (.line|tostring))' "$XS
 [ "$sloc" = "Bundles.scala:$XVALA_LN" ] || fail "task11: stock references location is not the declaration: $sloc"
 ok "task11: STOCK toolchain references on val a returns ONLY the declaration (no dynamic use sites)"
 
+# NOTE (R35): there is deliberately NO cross-file go-to-definition leg here. Cross-file
+# `textDocument/definition` to a WORKSPACE MEMBER symbol does not resolve in this headless offline
+# Metals harness for ANY symbol — proven with a NORMAL (non-dynamic) field: the PC correctly reports
+# `found symbol in pc: demo/Plain#zz.` (a valid symbol), yet `search.definition(symbol)` returns
+# empty, so the definition is empty. The dynamic `io.a` fails the same way. This is a Metals offline
+# workspace definition-index limitation (`SymbolSearch.definition` is not populated for cross-file
+# workspace member symbols here), NOT a defect in the shadow PC: same-file definition works (legs
+# 5/6) and cross-file find-references works (leg 7, the reference index IS populated, and its result
+# already includes the Bundles.scala declaration — the field's cross-file identity). A PC patch that
+# recovers the correct semanticdb symbol for `io.a` was prototyped and reverted: it cannot help while
+# `search.definition` itself returns empty for a correct symbol.
+
 echo ""
 echo "ALL $PASS CHECKS PASSED"
