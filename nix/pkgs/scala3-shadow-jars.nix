@@ -29,7 +29,7 @@
   # Fixed-output hash of the normalised jar set (recursive sha256 of $out). Pinned from
   # a real proxied build of the patched same-version jars + hashes.json. Re-pin if the
   # scala3 source rev or the marker patch changes the jar bytes.
-, outputHash ? "sha256-zlP/o7i2W9gnVkTaSZg+8g+PuZ5RB/oyoKMQODHnHos="
+, outputHash ? "sha256-FP7QgIvVqQQyTcFdBYFg6e7E3+Uyy7WrsCVaL75IjZI="
 }:
 
 stdenv.mkDerivation {

@@ -456,6 +456,7 @@ package me.jiuyang.zaozi.reftpe {
 package demo {
   import me.jiuyang.zaozi.valuetpe.{Bundle, Bits, BundleField, Nested}
   class MyBundle extends Bundle { val a: BundleField[Bits] = ???; val child: BundleField[Nested] = ??? }
+  class Plain { val zz: Int = 1 }   // a NORMAL (non-zaozi) cross-file control
 }
 SCALA
 )
@@ -468,15 +469,20 @@ object Main:
   def u1(io: Referable[MyBundle]): Ref[Nested] = io.a
   def u2(io: Referable[MyBundle]): Ref[Nested] = io.a
   def u3(io: Referable[MyBundle]): Ref[Nested] = io.child.leaf
+  def neg(io: Referable[MyBundle]): Ref[Nested] = io.zzz
+  def un(p: Plain): Int = p.zz
 SCALA
 )
 xvalpos() { local n l b; n=$(grep -nF "val $2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "xref: no 'val $2'"; l=$(sed -n "${n}p" <<<"$1"); b="${l%%$2*}"; echo "$((n-1)):${#b}"; }
 xln()     { local n; n=$(grep -nF "$2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "xref: no '$2'"; echo "$((n-1))"; }
+xuse()    { local n l; n=$(grep -nF "$2" <<<"$1" | head -1 | cut -d: -f1); [ -n "$n" ] || fail "xref: no '$2'"; l=$(sed -n "${n}p" <<<"$1"); echo "$((n-1)):${#l}"; }
 XVALA=$(xvalpos "$XBUN" 'a:'); XVALLEAF=$(xvalpos "$XBUN" 'leaf:')
 XVALA_LN="${XVALA%%:*}"; XVALLEAF_LN="${XVALLEAF%%:*}"
 XU1=$(xln "$XMAIN" 'def u1'); XU2=$(xln "$XMAIN" 'def u2'); XU3=$(xln "$XMAIN" 'def u3')
-# refA first so the index has time to populate (references retries) before refLeaf.
-XSPECS="refA:references:foo/src/demo/Bundles.scala:$XVALA refLeaf:references:foo/src/demo/Bundles.scala:$XVALLEAF"
+XIOA=$(xuse "$XMAIN" 'def u1'); XIOZ=$(xuse "$XMAIN" 'def neg'); XPZ=$(xuse "$XMAIN" 'def un')
+# refA first so the index has time to populate (references retries) before refLeaf. defA/defZ/defPlain
+# exercise cross-file go-to-definition (the direct-Location bypass) + the negatives.
+XSPECS="refA:references:foo/src/demo/Bundles.scala:$XVALA refLeaf:references:foo/src/demo/Bundles.scala:$XVALLEAF defA:definition:foo/src/demo/Main.scala:$XIOA defZ:definition:foo/src/demo/Main.scala:$XIOZ defPlain:definition:foo/src/demo/Main.scala:$XPZ"
 rc=0; run_xfile "$MC/cache" "$BASE/xr.json" "$BASE/xr.log" "$XSPECS" "$XBUN" "$XMAIN" || rc=$?
 [ "$rc" -eq 0 ] || { tail -30 "$BASE/xr.log" >&2; cat "$BASE/xr.json" 2>/dev/null >&2; fail "task11: cross-file references session failed (rc=$rc)"; }
 XR="$BASE/xr.json"
@@ -489,6 +495,23 @@ ok "task11: cross-file textDocument/references on val a == Bundles.scala decl + 
 want2=$(printf '%s\n' "Bundles.scala:$XVALLEAF_LN" "Main.scala:$XU3" | sort | paste -sd, -)
 [ "$(locset refLeaf)" = "$want2" ] || fail "task11: cross-file references on Nested.leaf != {decl + chained io.child.leaf}: got=[$(locset refLeaf)] want=[$want2] raw=$(jq -c '.refLeaf' "$XR")"
 ok "task11: cross-file textDocument/references on Nested.leaf == decl + the chained io.child.leaf use"
+# 7c. CROSS-FILE go-to-definition: io.a in Main.scala -> val a in the separate Bundles.scala. The PC
+# returns a DIRECT Location from the field symbol's source position (bypassing Metals' empty offline
+# search.definition), so this resolves where Metals' own index does not.
+defA_uri=$(jq -r '.defA[0].uri // ""' "$XR"); defA_line=$(jq -r '.defA[0].line // empty' "$XR")
+case "$defA_uri" in *"/Bundles.scala") : ;; *) fail "task11: cross-file definition io.a did not resolve into Bundles.scala: $(jq -c '.defA' "$XR")" ;; esac
+[ "$defA_line" = "$XVALA_LN" ] || fail "task11: cross-file definition io.a not at val a (line $XVALA_LN): $(jq -c '.defA' "$XR")"
+ok "task11: cross-file go-to-definition io.a (Main.scala) -> val a (Bundles.scala) line $XVALA_LN"
+# 7d. Misspelled io.zzz (chain-capable Ref extends Referable shape) -> EMPTY definition (the tri-state
+# UnknownField returns DefinitionResultImpl.empty; never selectDynamic / a bogus location).
+[ "$(jq -r '.defZ | length' "$XR")" = "0" ] || fail "task11: misspelled io.zzz definition returned a location: $(jq -c '.defZ' "$XR")"
+ok "task11: misspelled io.zzz -> empty cross-file definition (no selectDynamic / no bogus location)"
+# 7e. NORMAL (non-zaozi) cross-file control p.zz: the PC reports the correct symbol but Metals'
+# search.definition is empty offline, so a NORMAL field does NOT resolve cross-file here. This is
+# checked in to prove (a) the harness's definition-index limitation is real and field-agnostic, and
+# (b) the zaozi io.a fix above works specifically because it BYPASSES that broken path.
+[ "$(jq -r '.defPlain | length' "$XR")" = "0" ] || fail "task11: normal-field control p.zz unexpectedly resolved (Metals search.definition was assumed empty offline): $(jq -c '.defPlain' "$XR")"
+ok "task11: normal-field control p.zz -> empty cross-file definition (Metals search.definition is empty offline; zaozi io.a resolves only via the direct-Location bypass)"
 # Stock LSP negative: a stock-COMPILER workspace registers no dynamic-select occurrences, so
 # references on val a returns ONLY the declaration (the use sites come from the patch, not Metals).
 XSTOCK="$BASE/xstock"; mkdir -p "$XSTOCK"; cp -rL "$MC/cache" "$XSTOCK/cache"; chmod -R u+w "$XSTOCK"
@@ -503,17 +526,13 @@ sloc=$(jq -r '.refA[0] | ((.uri|split("/")|last) + ":" + (.line|tostring))' "$XS
 [ "$sloc" = "Bundles.scala:$XVALA_LN" ] || fail "task11: stock references location is not the declaration: $sloc"
 ok "task11: STOCK toolchain references on val a returns ONLY the declaration (no dynamic use sites)"
 
-# NOTE (R35): there is deliberately NO cross-file go-to-definition leg here. Cross-file
-# `textDocument/definition` to a WORKSPACE MEMBER symbol does not resolve in this headless offline
-# Metals harness for ANY symbol — proven with a NORMAL (non-dynamic) field: the PC correctly reports
-# `found symbol in pc: demo/Plain#zz.` (a valid symbol), yet `search.definition(symbol)` returns
-# empty, so the definition is empty. The dynamic `io.a` fails the same way. This is a Metals offline
-# workspace definition-index limitation (`SymbolSearch.definition` is not populated for cross-file
-# workspace member symbols here), NOT a defect in the shadow PC: same-file definition works (legs
-# 5/6) and cross-file find-references works (leg 7, the reference index IS populated, and its result
-# already includes the Bundles.scala declaration — the field's cross-file identity). A PC patch that
-# recovers the correct semanticdb symbol for `io.a` was prototyped and reverted: it cannot help while
-# `search.definition` itself returns empty for a correct symbol.
+# NOTE (R36): leg 7 now PROVES cross-file go-to-definition for `io.a` (7c). Metals' own
+# `SymbolSearch.definition(symbol)` is empty offline for cross-file WORKSPACE MEMBER symbols — even a
+# NORMAL field (`p.zz`, checked in as 7e) does not resolve, despite the PC reporting the correct
+# symbol — so the ordinary non-local definition path cannot work here. The shadow PC sidesteps it:
+# for a resolved zaozi Bundle field, PcDefinitionProvider returns a DIRECT Location from the field
+# symbol's own `sourcePos`/`source` (TASTy records the original source), so `io.a` resolves to
+# Bundles.scala `val a` while the unpatched `p.zz` path stays empty — demonstrating the fix mechanism.
 
 echo ""
 echo "ALL $PASS CHECKS PASSED"

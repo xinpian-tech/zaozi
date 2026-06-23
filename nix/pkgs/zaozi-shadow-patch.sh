@@ -309,6 +309,15 @@ perl -0pi -e 's/(    )if tp\.isError \|\| tpw == NoType \|\| tpw\.isError \|\| p
 ESDB=compiler/src/dotty/tools/dotc/semanticdb/ExtractSemanticDB.scala
 perl -0pi -e 's/(        case tree: Inlined =>\n)(          traverse\(tree\.call\))/$1          ZaoziSemanticDB.dynamicFieldUse(tree.call).foreach((__zsSym, __zsSpan) => registerUseGuarded(None, __zsSym, __zsSpan, tree.source))\n$2/' "$ESDB"
 
+# (4h) Cross-file go-to-definition: Metals' SymbolSearch.definition is empty for cross-file workspace
+#      member symbols in the offline harness (it fails for ordinary fields too), so the non-local
+#      branch never resolves. For a RESOLVED zaozi Bundle field, return a DIRECT Location from the
+#      field symbol's own sourcePos/source (TASTy records the original source), bypassing
+#      search.definition entirely; an UNKNOWN zaozi field yields an empty definition (never
+#      selectDynamic); non-zaozi paths keep the original logic. Same-file selects resolve the same way.
+PD=presentation-compiler/src/main/dotty/tools/pc/PcDefinitionProvider.scala
+perl -0pi -e 's/(  private def findDefinitions\(\n      path: List\[Tree\],\n      pos: SourcePosition,\n      indexed: IndexedContext,\n      uri: URI\n  \): DefinitionResult =\n    import indexed\.ctx\n)    definitionsForSymbols\(\n      MetalsInteractive\.enclosingSymbols\(path, pos, indexed\),\n      uri,\n      pos\n    \)/${1}    def __zaoziFallback = definitionsForSymbols(MetalsInteractive.enclosingSymbols(path, pos, indexed), uri, pos)\n    dotty.tools.pc.ZaoziPcSupport.resolveDynamicSelect(path) match\n      case dotty.tools.pc.ZaoziPcSupport.DynSelect.Resolved(__zsym, _) =>\n        val __loc =\n          try\n            val __sp = __zsym.sourcePos\n            val __jp = if __sp.exists then __sp.source.file.jpath else null\n            if __jp != null then new Location(__jp.toUri.toString, __sp.toLsp) else null\n          catch case _: Throwable => null\n        if __loc != null then DefinitionResultImpl("", java.util.Collections.singletonList(__loc)) else __zaoziFallback\n      case dotty.tools.pc.ZaoziPcSupport.DynSelect.UnknownField => DefinitionResultImpl.empty\n      case dotty.tools.pc.ZaoziPcSupport.DynSelect.NotZaozi => __zaoziFallback/' "$PD"
+
 # Fail closed if any edit did not take.
 grep -q "zaozi-shadow-marker compiler" compiler/src/dotty/tools/dotc/Driver.scala
 grep -q "__zaozi_marker__" "$PC"
@@ -321,4 +330,6 @@ grep -q "ZaoziPcSupport.bundleFieldCompletions" "$COMPL"
 grep -q "ZaoziPcSupport.hoverDefSymbols" "$MI"
 grep -q "ZaoziPcSupport.isResolvedDynamicSelect(enclosing)" "$HP"
 grep -q "ZaoziSemanticDB.dynamicFieldUse" "$ESDB"
+grep -q "ZaoziPcSupport.resolveDynamicSelect(path)" "$PD"
+grep -q "DynSelect.Resolved" "$PD"
 echo "zaozi-shadow patch applied (VER=$VER REV=$REV): markers + completion + hover/definition"
