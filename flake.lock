@@ -2,29 +2,26 @@
   "nodes": {
     "circt-nix": {
       "inputs": {
-        "circt-src": [
-          "circt-src"
-        ],
+        "circt-src": "circt-src",
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
-        "llvm-submodule-src": [
-          "llvm-src"
-        ],
+        "llvm-submodule-src": "llvm-submodule-src",
         "nixpkgs": [
           "nixpkgs"
         ],
         "slang-src": "slang-src"
       },
       "locked": {
-        "lastModified": 1779370424,
-        "narHash": "sha256-q0FpuqQ9lLH5tGE2DffPzqisx4y7iuHuwq79HbhByS4=",
-        "owner": "unlsycn",
+        "lastModified": 1782305456,
+        "narHash": "sha256-hbRFW5nx0lsTafDI9F43wUibrQ5t7+BKJamY1jKwej0=",
+        "owner": "xinpian-tech",
         "repo": "circt-nix",
-        "rev": "8e8c00adc52d19be0acc302b19c7e0a58065d90c",
+        "rev": "6430b6632608aa3acde9866e5658a48e43802d22",
         "type": "github"
       },
       "original": {
-        "owner": "unlsycn",
+        "owner": "xinpian-tech",
+        "ref": "xinpian-main",
         "repo": "circt-nix",
         "type": "github"
       }
@@ -32,16 +29,16 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1779324920,
-        "narHash": "sha256-uuRtkPF75Vwem6aqbQpAMp9mgxTxGuUQ+lnnytAcC8I=",
-        "owner": "llvm",
+        "lastModified": 1782226806,
+        "narHash": "sha256-icHRstozpMiu9Jlk9q9ROlC/fueiGQLdAlRMP10Pvq0=",
+        "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "5306f6fde0007cd4ca53f1981ebab98a2f83fd36",
+        "rev": "b14826f973799604756a5c745c938a7749b082b2",
         "type": "github"
       },
       "original": {
-        "owner": "llvm",
-        "ref": "main",
+        "owner": "xinpian-tech",
+        "ref": "xinpian-main",
         "repo": "circt",
         "type": "github"
       }
@@ -119,20 +116,20 @@
         "type": "github"
       }
     },
-    "llvm-src": {
+    "llvm-submodule-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1778901466,
-        "narHash": "sha256-3llZ6LQ7B1TrRn6g7DsWkl6Lr6IjfDPb1TEfhwwl8h4=",
+        "lastModified": 1780700903,
+        "narHash": "sha256-rms9EtZ/58qdrO45SsxFDGlYIBy1mnIpDZoD/5fyrQ4=",
         "owner": "llvm",
         "repo": "llvm-project",
-        "rev": "e6566c571aead7b48bdf13a8c170515abaeea74e",
+        "rev": "b7152ff7026a05282b6ae91ccf150ede0217b08a",
         "type": "github"
       },
       "original": {
         "owner": "llvm",
         "repo": "llvm-project",
-        "rev": "e6566c571aead7b48bdf13a8c170515abaeea74e",
+        "rev": "b7152ff7026a05282b6ae91ccf150ede0217b08a",
         "type": "github"
       }
     },
@@ -143,11 +140,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1772549846,
-        "narHash": "sha256-R6J8KOey8OyEE7cAV8G1U2gY0eOrPJkBAHR7pX3yryo=",
+        "lastModified": 1772960587,
+        "narHash": "sha256-JXcsEMWWoChpsCPuJQJaTdkEemC4Q5bcu3fPNTJvTGk=",
         "owner": "Avimitin",
         "repo": "mill-ivy-fetcher",
-        "rev": "325b485c8213b2f21677c0fae240b13f85055d7a",
+        "rev": "54fbe54b4ad66d0dcefc240ed6388238c5fc1dfd",
         "type": "github"
       },
       "original": {
@@ -174,11 +171,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1769987528,
-        "narHash": "sha256-sQ6JzVhMuNcIz95KFfpolqMNbMqbi8OnI1EUIagbWtk=",
+        "lastModified": 1782231800,
+        "narHash": "sha256-AyPvq+cx3JFicSd687dhhIfUMryk9PUFmHnofBjalMg=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "faa7f0dbe6480ab660843ab5f44735965f6283e9",
+        "rev": "6f5e2d2ea55618c5197ce40e346f205c35d2213e",
         "type": "github"
       },
       "original": {
@@ -191,9 +188,7 @@
     "root": {
       "inputs": {
         "circt-nix": "circt-nix",
-        "circt-src": "circt-src",
         "flake-utils": "flake-utils_2",
-        "llvm-src": "llvm-src",
         "mill-ivy-fetcher": "mill-ivy-fetcher",
         "nixpkgs": "nixpkgs_2"
       }

@@ -5,29 +5,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
-    circt-src = {
-      type = "github";
-      owner = "llvm";
-      repo = "circt";
-      ref = "main";
-      flake = false;
-    };
-    llvm-src = {
-      type = "github";
-      owner = "llvm";
-      repo = "llvm-project";
-      # from CIRCT submodule
-      rev = "e6566c571aead7b48bdf13a8c170515abaeea74e";
-      flake = false;
-    };
-    circt-nix = {
-      url = "github:unlsycn/circt-nix";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        circt-src.follows = "circt-src";
-        llvm-submodule-src.follows = "llvm-src";
-      };
-    };
+    circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
     flake-utils.url = "github:numtide/flake-utils";
     mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
   };
