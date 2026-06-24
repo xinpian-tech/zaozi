@@ -6,6 +6,7 @@ import scala.annotation.targetName
 import scala.util.chaining.*
 
 import me.jiuyang.zaozi.magic.macros.summonLayersImpl
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -984,6 +985,837 @@ trait ClockApi
 
 trait ResetApi extends AsBool[Reset]
 
+trait SVAApi:
+  def posedge(clock: Referable[Clock] & HasOperation): ClockEvent
+  def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
+  def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent
+
+  /** SVA: always p
+    */
+  def always(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Property
+
+  /** SVA: s_eventually p
+    */
+  def eventually(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Property
+
+  extension [T <: Referable[Bool] & HasOperation](ref: T)
+    def S(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    def I(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Immediate
+
+    /** SVA: bool_expr throughout s
+      */
+    infix def throughout(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+  extension (ref: Immediate)
+    /** SVA: not p
+      *
+      * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
+      * `!ltl.property`.
+      */
+    def unary_!(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 and p2
+      */
+    def &(
+      that: Immediate
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Immediate
+    def &(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+    def &(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s1 intersect s2
+      */
+    infix def intersect(
+      that: Immediate
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Immediate
+    infix def intersect(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+    infix def intersect(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s1 or s2
+      */
+    def |(
+      that: Immediate
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Immediate
+    def |(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+    def |(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s|->p
+      */
+    def |->(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s #-# p
+      */
+    def #-#(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 implies p2
+      */
+    infix def implies(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 iff p2
+      */
+    infix def iff(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until p2
+      */
+    infix def until(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until_with p2
+      */
+    infix def untilWith(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  extension (ref: Sequence)
+    /** SVA: not p
+      *
+      * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
+      * `!ltl.property`.
+      */
+    def unary_!(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: a ## b, shorthand for a ##0 b.
+      */
+    def ##(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: a ### b, shorthand for a ##1 b.
+      */
+    def ###(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: a ##n b
+      */
+    def ##(
+      n:    Int
+    )(that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: a ##[min:max] b
+      */
+    def ##(
+      min:  Int,
+      max:  Option[Int]
+    )(that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s [*n]
+      */
+    def *(
+      n: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Ranged Repeat
+      * @param min
+      *   for minimal
+      * @param max
+      *   is [[None]] for unbounded, otherwise for maximal
+      *
+      * SVA: s [*n:$] if `max` is [[None]], s [*n:m] if `max` is [[Some]]
+      */
+    def *(
+      min: Int,
+      max: Option[Int]
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s [->n:m]
+      */
+    def *->(
+      min: Int,
+      max: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s[=min:max]
+      */
+    def *=(
+      min: Int,
+      max: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 ##[+] s2
+      */
+    def ##+(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 ##[*] s2
+      */
+    def ##*(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s1 within s2
+      */
+    infix def within(
+      that: Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** SVA: s|=>p
+      */
+    def |=>(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s #=# p
+      */
+    def #=#(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 and p2
+      */
+    def &(
+      that: Immediate | Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+    def &(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s1 intersect s2
+      */
+    infix def intersect(
+      that: Immediate | Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+    infix def intersect(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s1 or s2
+      */
+    def |(
+      that: Immediate | Sequence
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+    def |(
+      that: Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s|->p
+      */
+    def |->(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: s #-# p
+      */
+    def #-#(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 implies p2
+      */
+    infix def implies(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 iff p2
+      */
+    infix def iff(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until p2
+      */
+    infix def until(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until_with p2
+      */
+    infix def untilWith(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  extension (ref: Property)
+    /** SVA: not p
+      *
+      * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces
+      * `!ltl.property`.
+      */
+    def unary_!(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 and p2
+      */
+    def &(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 intersect p2
+      */
+    infix def intersect(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 or p2
+      */
+    def |(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 implies p2
+      */
+    infix def implies(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 iff p2
+      */
+    infix def iff(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until p2
+      */
+    infix def until(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+    /** SVA: p1 until_with p2
+      */
+    infix def untilWith(
+      that: Immediate | Sequence | Property
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Property
+
+  def Assert(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assume(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Cover(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assert(
+    property: Immediate | Sequence | Property,
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assume(
+    property: Immediate | Sequence | Property,
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Cover(
+    property: Immediate | Sequence | Property,
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+
 trait TypeImpl:
   extension (ref: Interface[?])
     private[zaozi] def operationImpl: Operation
@@ -1019,6 +1851,33 @@ trait TypeImpl:
     private[zaozi] def operationImpl:        Operation
     private[zaozi] def ioImpl[T <: Data]:    Wire[T]
     private[zaozi] def probeImpl[T <: Data]: Wire[T]
+  extension (ref: Sequence)
+    private[zaozi] def operationImpl: Operation
+    private[zaozi] def referImpl(
+      using Arena
+    ):                                Value
+    private[zaozi] def toMlirTypeImpl(
+      using Arena,
+      Context
+    ):                                Type
+  extension (ref: Property)
+    private[zaozi] def operationImpl: Operation
+    private[zaozi] def referImpl(
+      using Arena
+    ):                                Value
+    private[zaozi] def toMlirTypeImpl(
+      using Arena,
+      Context
+    ):                                Type
+  extension (ref: Immediate)
+    private[zaozi] def operationImpl: Operation
+    private[zaozi] def referImpl(
+      using Arena
+    ):                                Value
+    private[zaozi] def toMlirTypeImpl(
+      using Arena,
+      Context
+    ):                                Type
 
   extension (ref:  Reset)
     private[zaozi] def toMlirTypeImpl(
