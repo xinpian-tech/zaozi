@@ -7,43 +7,40 @@ import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.capi.dialect.ltl.{given_AttributeApi, given_TypeApi, LTLClockEdge, TypeApi as LTLTypeApi}
-import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_AsUIntPrimApi, AsUIntPrimApi}
-import org.llvm.circt.scalalib.dialect.ltl.operation.{
-  given_AndApi,
-  given_ClockApi,
-  given_ClockedDelayApi,
-  given_ConcatApi,
-  given_EventuallyApi,
-  given_GoToRepeatApi,
-  given_ImplicationApi,
-  given_IntersectApi,
-  given_NonConsecutiveRepeatApi,
-  given_NotApi,
-  given_OrApi,
-  given_RepeatApi,
-  given_UntilApi,
-  AndApi,
-  ClockApi,
-  ClockedDelayApi,
-  ConcatApi,
-  EventuallyApi,
-  GoToRepeatApi,
-  ImplicationApi,
-  IntersectApi,
-  NonConsecutiveRepeatApi,
-  NotApi,
-  OrApi,
-  RepeatApi,
-  UntilApi
-}
-import org.llvm.circt.scalalib.dialect.verif.operation.{
-  given_AssertApi,
-  given_AssumeApi,
-  given_CoverApi,
-  AssertApi,
-  AssumeApi,
-  CoverApi
+import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{
+  given_LTLAndIntrinsicApi,
+  given_LTLClockIntrinsicApi,
+  given_LTLClockedDelayIntrinsicApi,
+  given_LTLConcatIntrinsicApi,
+  given_LTLEventuallyIntrinsicApi,
+  given_LTLGoToRepeatIntrinsicApi,
+  given_LTLImplicationIntrinsicApi,
+  given_LTLIntersectIntrinsicApi,
+  given_LTLNonConsecutiveRepeatIntrinsicApi,
+  given_LTLNotIntrinsicApi,
+  given_LTLOrIntrinsicApi,
+  given_LTLRepeatIntrinsicApi,
+  given_LTLUntilIntrinsicApi,
+  given_VerifAssertApi,
+  given_VerifAssumeApi,
+  given_VerifCoverApi,
+  LTLAndIntrinsicApi as AndApi,
+  LTLClockIntrinsicApi as ClockApi,
+  LTLClockedDelayIntrinsicApi as ClockedDelayApi,
+  LTLConcatIntrinsicApi as ConcatApi,
+  LTLEventuallyIntrinsicApi as EventuallyApi,
+  LTLGoToRepeatIntrinsicApi as GoToRepeatApi,
+  LTLImplicationIntrinsicApi as ImplicationApi,
+  LTLIntersectIntrinsicApi as IntersectApi,
+  LTLNonConsecutiveRepeatIntrinsicApi as NonConsecutiveRepeatApi,
+  LTLNotIntrinsicApi as NotApi,
+  LTLOrIntrinsicApi as OrApi,
+  LTLRepeatIntrinsicApi as RepeatApi,
+  LTLUntilIntrinsicApi as UntilApi,
+  VerifAssertApi as AssertApi,
+  VerifAssumeApi as AssumeApi,
+  VerifCoverApi as CoverApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
@@ -57,8 +54,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given_ValueApi,
   Block,
   Context,
-  Operation,
-  OperationApi
+  Operation
 }
 
 import java.lang.foreign.Arena
@@ -67,11 +63,11 @@ export given_SVAApi.{always, anyedge, eventually, negedge, posedge, Assert, Assu
 
 given SVAApi with
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent =
-    ClockEvent(LTLClockEdge.Pos, clock)
+    ClockEvent(FirrtlEventControl.AtPosEdge, clock)
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent =
-    ClockEvent(LTLClockEdge.Neg, clock)
+    ClockEvent(FirrtlEventControl.AtNegEdge, clock)
   def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent =
-    ClockEvent(LTLClockEdge.Both, clock)
+    ClockEvent(FirrtlEventControl.AtEdge, clock)
 
   def always(
     property: Immediate | Sequence | Property
@@ -126,23 +122,7 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      val boolAsI1    = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(ref.refer),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      boolAsI1.appendToBlock()
-      val clockAsUInt = summon[AsUIntPrimApi].op(clock.clock.refer, locate)
-      clockAsUInt.operation.appendToBlock()
-      val clockAsI1   = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(clockAsUInt.result),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      clockAsI1.appendToBlock()
-      val seq         = summon[ClockApi].op(boolAsI1.getResult(0), clock.edge, clockAsI1.getResult(0), locate)
+      val seq = summon[ClockApi].op(ref.refer, clock.edge, clock.clock.refer, locate)
       seq.operation.appendToBlock()
       new Sequence:
         private[zaozi] val _operation:  Operation  = seq.operation
@@ -157,15 +137,8 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Immediate =
-      val cast = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(ref.refer),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      cast.appendToBlock()
       new Immediate:
-        private[zaozi] val _operation: Operation = cast
+        private[zaozi] val _operation: Operation = ref.operation
 
     infix def throughout(
       that: Sequence
@@ -178,16 +151,7 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      // %repexpr = ltl.repeat %expr, 0 : !ltl.sequence
-      // %res = ltl.intersect %repexpr, %s : !ltl.sequence
-      val cast    = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(ref.refer),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      cast.appendToBlock()
-      val repexpr = summon[RepeatApi].op(cast.getResult(0), 0L, None, locate)
+      val repexpr = summon[RepeatApi].op(ref.refer, 0L, None, locate)
       repexpr.operation.appendToBlock()
       val res     = summon[IntersectApi].op(Seq(repexpr.result, that.refer), locate)
       res.operation.appendToBlock()
@@ -548,28 +512,19 @@ given SVAApi with
       InstanceContext
     ): Sequence =
       require(n >= 0, s"delay ($n) must be greater than or equal to 0 in sequence delay")
-      val clockAsUInt = summon[AsUIntPrimApi].op(that._clockevent.clock.refer, locate)
-      clockAsUInt.operation.appendToBlock()
-      val clockCast   = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(clockAsUInt.result),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      clockCast.appendToBlock()
-      val op0         =
+      val op         =
         summon[ClockedDelayApi].op(
           that.refer,
           that._clockevent.edge,
-          clockCast.getResult(0),
+          that._clockevent.clock.refer,
           n.toLong,
           Some(0L),
           locate
         )
-      op0.operation.appendToBlock()
-      val clockevent  = that._clockevent
-      val _that       = new Sequence:
-        private[zaozi] val _operation:  Operation  = op0.operation
+      op.operation.appendToBlock()
+      val clockevent = that._clockevent
+      val _that      = new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
         private[zaozi] val _clockevent: ClockEvent = clockevent
       ref.##(_that)
 
@@ -590,27 +545,18 @@ given SVAApi with
       max.foreach(value =>
         require(value >= min, s"max ($value) must be greater than or equal to min ($min) in sequence delay")
       )
-      val clockAsUInt = summon[AsUIntPrimApi].op(that._clockevent.clock.refer, locate)
-      clockAsUInt.operation.appendToBlock()
-      val clockCast   = summon[OperationApi].operationCreate(
-        name = "builtin.unrealized_conversion_cast",
-        location = locate,
-        operands = Seq(clockAsUInt.result),
-        resultsTypes = Some(Seq(1.integerTypeGet))
-      )
-      clockCast.appendToBlock()
-      val op0         = summon[ClockedDelayApi].op(
+      val op         = summon[ClockedDelayApi].op(
         that.refer,
         that._clockevent.edge,
-        clockCast.getResult(0),
+        that._clockevent.clock.refer,
         min.toLong,
         max.map(value => (value - min).toLong),
         locate
       )
-      op0.operation.appendToBlock()
-      val clockevent  = that._clockevent
-      val _that       = new Sequence:
-        private[zaozi] val _operation:  Operation  = op0.operation
+      op.operation.appendToBlock()
+      val clockevent = that._clockevent
+      val _that      = new Sequence:
+        private[zaozi] val _operation:  Operation  = op.operation
         private[zaozi] val _clockevent: ClockEvent = clockevent
       ref.##(_that)
 

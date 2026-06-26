@@ -5,12 +5,12 @@ package me.jiuyang.zaozi.ltltpe
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.{HasOperation, Referable}
 import me.jiuyang.zaozi.valuetpe.*
-import org.llvm.circt.scalalib.capi.dialect.ltl.LTLClockEdge
+import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.mlir.scalalib.capi.ir.{Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena
 
-case class ClockEvent(edge: LTLClockEdge, clock: Referable[Clock] & HasOperation):
+case class ClockEvent(edge: FirrtlEventControl, clock: Referable[Clock] & HasOperation):
   def apply[T](
     body: ClockEvent ?=> T
   ): T = body(

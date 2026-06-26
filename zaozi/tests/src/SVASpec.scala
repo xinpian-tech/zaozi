@@ -190,11 +190,10 @@ object SVASpec extends TestSuite:
 
             Assert(delayed)
         SimpleSVA.mlirTest(SVASpecParameter(32))(
-          "builtin.unrealized_conversion_cast",
-          "ltl.clock",
-          "ltl.clocked_delay",
-          "ltl.concat",
-          "verif.assert"
+          "firrtl.int.ltl.clock",
+          "firrtl.int.ltl.clocked_delay",
+          "firrtl.int.ltl.concat",
+          "firrtl.int.verif.assert"
         )
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "(@(posedge clock) ib0) ##0",
@@ -863,6 +862,7 @@ object SVASpec extends TestSuite:
         @generator
         object MultiClock
             extends Generator[MultiClockParameter, MultiClockLayers, MultiClockIO, MultiClockProbe]
+            with HasMlirTest
             with HasVerilogTest:
           def architecture(parameter: MultiClockParameter) =
             val io = summon[Interface[MultiClockIO]]
@@ -871,6 +871,8 @@ object SVASpec extends TestSuite:
 
             Assert(posedge(io.clock0)(a.S) ## negedge(io.clock1)(b.S))
 
+        println(MultiClock.mlirString(MultiClockParameter(32)))
+        println(MultiClock.verilogString(MultiClockParameter(32)))
         MultiClock.verilogTest(MultiClockParameter(32))(
           "(@(posedge clock0) ib0) ##0 (@(negedge clock1) ib1)"
         )

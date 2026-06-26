@@ -11,7 +11,6 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.given
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlBundleFieldApi
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{OpenSubfieldApi, SubfieldApi, given}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.TypeApi as FirrtlTypeApi
-import org.llvm.circt.scalalib.capi.dialect.ltl.{given_TypeApi, TypeApi as LTLTypeApi}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Type, Value, given}
 
 import java.lang.foreign.Arena
@@ -75,7 +74,7 @@ given TypeImpl with
     def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type = summon[LTLTypeApi].sequenceTypeGet
+    ): Type = 1.getUInt
   extension (ref: Property)
     def operationImpl: Operation = ref._operation
     def referImpl(
@@ -84,7 +83,7 @@ given TypeImpl with
     def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type = summon[LTLTypeApi].propertyTypeGet
+    ): Type = 1.getUInt
   extension (ref: Immediate)
     def operationImpl: Operation = ref._operation
     def referImpl(
@@ -93,7 +92,7 @@ given TypeImpl with
     def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type = 1.integerTypeGet
+    ): Type = 1.getUInt
 
   extension (ref: Reset)
     def toMlirTypeImpl(

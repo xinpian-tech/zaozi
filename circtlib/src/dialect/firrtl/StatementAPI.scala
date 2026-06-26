@@ -3,7 +3,9 @@
 package org.llvm.circt.scalalib.dialect.firrtl.operation
 
 import org.llvm.mlir.scalalib.capi.support.HasOperation
-import org.llvm.mlir.scalalib.capi.ir.Operation
+import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Value}
+
+import java.lang.foreign.Arena
 
 class Assert(val _operation: Operation)
 class Assume(val _operation: Operation)
@@ -38,9 +40,39 @@ trait RefReleaseApi        extends HasOperation[RefRelease]:
 end RefReleaseApi
 class Skip(val _operation: Operation)
 class Stop(val _operation: Operation)
-class IntVerifAssert(val _operation: Operation)
-class IntVerifAssume(val _operation: Operation)
-class IntVerifCover(val _operation: Operation)
+class VerifAssert(val _operation: Operation)
+trait VerifAssertApi       extends HasOperation[VerifAssert]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifAssert
+end VerifAssertApi
+class VerifAssume(val _operation: Operation)
+trait VerifAssumeApi       extends HasOperation[VerifAssume]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifAssume
+end VerifAssumeApi
+class VerifCover(val _operation: Operation)
+trait VerifCoverApi        extends HasOperation[VerifCover]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifCover
+end VerifCoverApi
 class When(val _operation: Operation)
 trait WhenApi              extends HasOperation[When]:
 end WhenApi
