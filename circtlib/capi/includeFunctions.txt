@@ -498,6 +498,7 @@ seqTypeIsAFirMem             # header: $CIRCT_INSTALL_PATH/include/circt-c/Diale
 seqTypeIsAHLMem              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
 seqTypeIsAImmutable          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
 mlirGetDialectHandle__verif__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Verif.h
+registerVerifPasses           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Verif.h
 mlirExportFIRRTL # header: $CIRCT_INSTALL_PATH/include/circt-c/ExportFIRRTL.h
 mlirExportSplitVerilog # header: $CIRCT_INSTALL_PATH/include/circt-c/ExportVerilog.h
 mlirExportVerilog      # header: $CIRCT_INSTALL_PATH/include/circt-c/ExportVerilog.h
