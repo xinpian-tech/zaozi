@@ -54,11 +54,11 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with PanamaModule 
 
   def header = Task.Source(moduleDir / "capi" / "jextract-headers.h")
 
-  def circtInstallPath = Task(
+  def circtInstallPath = Task.Input(
     os.Path(Task.env.getOrElse("CIRCT_INSTALL_PATH", "CIRCT_INSTALL_PATH not found, you are not in the nix env?"))
   )
 
-  def jextractBinary = Task(
+  def jextractBinary = Task.Input(
     os.Path(
       Task.env.getOrElse("JEXTRACT_INSTALL_PATH", "JEXTRACT_INSTALL_PATH not found, you are not in the nix env?")
     ) / "bin" / "jextract"
