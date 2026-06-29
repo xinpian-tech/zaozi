@@ -45,7 +45,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
       def javaLibraryPath: T[Seq[os.Path]] = Task(
         (circtlib.libraryPaths()).map(_.path)
       )
-      def javaHome:        T[os.Path]      = Task(os.Path(sys.props("java.home")))
+      def javaHome:        T[os.Path]      = Task.Input(os.Path(sys.props("java.home")))
       def litDir:          T[os.Path]      = Task(moduleDir)
       def litConfigIn:     T[PathRef]      = Task.Source(moduleDir / "lit.site.cfg.py.in")
     }

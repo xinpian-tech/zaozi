@@ -50,7 +50,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with PanamaModule 
     os.Path(Task.env.getOrElse("MLIR_INSTALL_PATH", "MLIR_INSTALL_PATH not found, you are not in the nix env?"))
   )
 
-  def jextractBinary = Task(
+  def jextractBinary = Task.Input(
     os.Path(
       Task.env.getOrElse("JEXTRACT_INSTALL_PATH", "JEXTRACT_INSTALL_PATH not found, you are not in the nix env?")
     ) / "bin" / "jextract"

@@ -260,7 +260,7 @@ trait LitModule extends Module {
     )
     PathRef(Task.dest)
   }
-  def litBinary          = Task(
+  def litBinary          = Task.Input(
     os.Path(
       Task.env.getOrElse("LIT_INSTALL_PATH", "LIT_INSTALL_PATH not found, you are not in the nix env?")
     ) / "bin" / "lit"
