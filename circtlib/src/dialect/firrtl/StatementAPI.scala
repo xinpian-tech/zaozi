@@ -73,6 +73,28 @@ trait VerifCoverApi        extends HasOperation[VerifCover]:
     Context
   ): VerifCover
 end VerifCoverApi
+class VerifRequire(val _operation: Operation)
+trait VerifRequireApi      extends HasOperation[VerifRequire]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifRequire
+end VerifRequireApi
+class VerifEnsure(val _operation: Operation)
+trait VerifEnsureApi       extends HasOperation[VerifEnsure]:
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifEnsure
+end VerifEnsureApi
 class When(val _operation: Operation)
 trait WhenApi              extends HasOperation[When]:
 end WhenApi

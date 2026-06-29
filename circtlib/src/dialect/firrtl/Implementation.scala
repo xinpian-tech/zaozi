@@ -73,6 +73,39 @@ given CircuitApi with
       module.getBody.appendOwnedOperation(c.operation)
   extension (ref: Circuit) def operation: Operation = ref._operation
 end given
+
+given ContractApi with
+  def op(
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): Contract =
+    Contract(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.contract",
+        location = location,
+        operands = inputs,
+        resultsTypes = Some(resultTypes),
+        regionBlockTypeLocations = Seq(
+          Seq(
+            (resultTypes, resultTypes.map(_ => location))
+          )
+        )
+      )
+    )
+  extension (ref: Contract)
+    def operation: Operation = ref._operation
+    def block(
+      using Arena
+    ): Block = operation.getFirstRegion.getFirstBlock
+    def result(
+      using Arena
+    ): Value = operation.getResult(0)
+end given
+
 given ExtModuleApi with
   inline def op(
     symbolName:       String,
@@ -790,6 +823,50 @@ given VerifCoverApi with
       )
     )
   extension (ref: VerifCover) def operation: Operation = ref._operation
+end given
+
+given VerifRequireApi with
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifRequire =
+    VerifRequire(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.require",
+        location = location,
+        namedAttributes = label
+          .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
+          .toSeq,
+        operands = Seq(property)
+      )
+    )
+  extension (ref: VerifRequire) def operation: Operation = ref._operation
+end given
+
+given VerifEnsureApi with
+  def op(
+    property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifEnsure =
+    VerifEnsure(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.verif.ensure",
+        location = location,
+        namedAttributes = label
+          .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
+          .toSeq,
+        operands = Seq(property)
+      )
+    )
+  extension (ref: VerifEnsure) def operation: Operation = ref._operation
 end given
 // Expression
 

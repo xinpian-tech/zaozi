@@ -4,7 +4,7 @@ package org.llvm.circt.scalalib.dialect.firrtl.operation
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlConvention, FirrtlLayerConvention}
 import org.llvm.mlir.scalalib.capi.support.{*, given}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Module as MlirModule, Operation, Value}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Module as MlirModule, Operation, Type, Value}
 
 import java.lang.foreign.Arena
 
@@ -29,6 +29,26 @@ trait CircuitApi extends HasOperation[Circuit]:
 end CircuitApi
 
 class Class(val _operation: Operation)
+class Contract(val _operation: Operation)
+trait ContractApi extends HasOperation[Contract]:
+  def op(
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): Contract
+
+  extension (ref: Contract)
+    def block(
+      using Arena
+    ): Block
+    def result(
+      using Arena
+    ): Value
+end ContractApi
+
 class ExtClass(val _operation: Operation)
 class ExtModule(val _operation: Operation)
 
