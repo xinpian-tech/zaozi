@@ -8,15 +8,16 @@ import org.llvm.mlir.scalalib.capi.ir.Context
 
 import java.lang.foreign.Arena
 
-/** Arc Dialect Api
+/** Verif Dialect Api
   * {{{
   * mlirGetDialectHandle__verif__
-  * registerArcPasses
+  * registerVerifPasses
   * }}}
   */
 trait DialectApi:
   inline def loadDialect(
     using arena: Arena,
     context:     Context
-  ): Unit
+  ):                  Unit
+  def registerPasses: Unit
 end DialectApi
