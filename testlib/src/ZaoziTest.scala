@@ -44,7 +44,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   OperationApi,
   Type
 }
-import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
+import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
+import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi, PassManager, PassManagerApi}
 import utest.assert
 
 import java.lang.foreign.Arena
@@ -139,6 +140,7 @@ trait HasVerilogTest:
       summon[SvDialectApi].loadDialect
       summon[EmitDialectApi].loadDialect
       summon[VerifDialectApi].loadDialect
+      summon[VerifDialectApi].registerPasses
       given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
 
       given PassManager  = summon[PassManagerApi].passManagerCreate
@@ -148,6 +150,10 @@ trait HasVerilogTest:
       summon[PassManager].preprocessTransforms(firtoolOptions)
       summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
       summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
+      summon[PassManager].getAsOpPassManager.addPipeline(
+        "lower-contracts,verif-lower-symbolic-values{mode=yosys},verif-lower-tests",
+        err => throw new RuntimeException(s"verif pipeline parse error: $err")
+      )
       summon[PassManager].hwToSV(firtoolOptions)
       // TODO: we need a pass for export verilog on a MLIRModule, not it export empty string.
       summon[PassManager].exportVerilog(firtoolOptions, out ++= _)
