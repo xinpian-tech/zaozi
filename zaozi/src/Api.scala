@@ -993,6 +993,91 @@ trait ClockApi
 
 trait ResetApi extends AsBool[Reset]
 
+type ContractTuple[A <: Tuple] <: Tuple = A match
+  case EmptyTuple           => EmptyTuple
+  case Referable[t] *: tail => (Referable[t] & HasOperation) *: ContractTuple[tail]
+
+trait ContractTupleArgs[A <: Tuple]:
+  def values(args:    A):                                        Seq[Referable[? <: Data] & HasOperation]
+  def results(values: Seq[Referable[? <: Data] & HasOperation]): ContractTuple[A]
+
+object ContractTupleArgs:
+  given empty: ContractTupleArgs[EmptyTuple] with
+    def values(args: EmptyTuple):                                  Seq[Referable[? <: Data] & HasOperation] = Seq.empty
+    def results(values: Seq[Referable[? <: Data] & HasOperation]): EmptyTuple                               =
+      EmptyTuple
+
+  given cons[T <: Data, H <: Referable[T] & HasOperation, Tail <: Tuple](
+    using tailArgs: ContractTupleArgs[Tail]
+  ): ContractTupleArgs[H *: Tail] with
+    def values(args: H *: Tail): Seq[Referable[? <: Data] & HasOperation] =
+      args.head +: tailArgs.values(args.tail)
+
+    def results(values: Seq[Referable[? <: Data] & HasOperation]): ContractTuple[H *: Tail] =
+      (values.head *: tailArgs.results(values.tail)).asInstanceOf[ContractTuple[H *: Tail]]
+
+trait ContractApi:
+  def Contract(
+    body: => Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    TypeImpl
+  ): Unit
+
+  def Contract[T <: Data](
+    arg:  Referable[T] & HasOperation
+  )(body: (Referable[T] & HasOperation) => (Arena, Context, Block) ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    TypeImpl
+  ): Referable[T] & HasOperation
+
+  def Contract[A <: Tuple](
+    args: A
+  )(body: ContractTuple[A] => (Arena, Context, Block) ?=> Unit
+  )(
+    using ContractTupleArgs[A]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    TypeImpl
+  ): ContractTuple[A]
+
+  def Require(
+    property: Immediate | Sequence | Property,
+    label:    Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    TypeImpl
+  ): Unit
+
+  def Ensure(
+    property: Immediate | Sequence | Property,
+    label:    Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    TypeImpl
+  ): Unit
+
 trait SVAApi:
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
