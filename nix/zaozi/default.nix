@@ -5,4 +5,3 @@
 lib.makeScope newScope (scope: {
   zaozi-assembly = scope.callPackage ./zaozi.nix { };
 })
-

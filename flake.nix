@@ -48,8 +48,13 @@
         packages = {
           default = pkgs.zaozi.zaozi-assembly;
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
+          zaozi-jasper = pkgs.zaozi-jasper;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
+        };
+        apps.zaozi-jasper = {
+          type = "app";
+          program = "${pkgs.zaozi-jasper}/bin/zaozi-jasper";
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];

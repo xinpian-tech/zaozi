@@ -7,5 +7,7 @@ final: prev:
 
   mlir-install = final.callPackage ./pkgs/mlir-install.nix { };
 
+  zaozi-jasper = final.callPackage ./jasper { };
+
   zaozi = final.callPackage ./zaozi { };
 }
