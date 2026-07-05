@@ -531,6 +531,20 @@ trait MonoConnect[D <: Data, SRC <: Referable[D], SINK <: Writable[D]]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
+
+/** FIRRTL `invalidate`. A unary capability deliberately separate from [[MonoConnect]], so its availability is not tied
+  * to `:=`'s.
+  */
+trait DontCare[D <: Data, SINK <: Writable[D]]:
+  extension (ref: SINK)
+    def dontCare(
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
 trait Cvt[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def zext(
