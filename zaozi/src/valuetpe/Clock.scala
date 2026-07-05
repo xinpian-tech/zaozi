@@ -7,7 +7,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
-trait Clock extends Data with CanProbe:
+trait Clock extends Element with CanProbe:
   def toMlirType(
     using Arena,
     Context,

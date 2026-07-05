@@ -7,7 +7,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
-trait Vec[E <: Data] extends Data:
+trait Vec[E <: Data] extends Connectable:
   private[zaozi] val _elementType: E
   private[zaozi] val _count:       Int
 

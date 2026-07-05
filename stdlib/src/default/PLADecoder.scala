@@ -60,4 +60,4 @@ object PLADecoder extends Generator[DecoderParameter, DecoderLayers, DecoderIO, 
         .reverse
         .map(_.asBits)
         .reduce(_ ## _)
-    io.output := invMatrixOutputs.asRecord(new DecoderOutput(parameter.tables))
+    io.output :<= invMatrixOutputs.asRecord(new DecoderOutput(parameter.tables))

@@ -44,7 +44,7 @@ object VecSpec extends TestSuite:
       object Assign extends Generator[VecSpecParameter, VecSpecLayers, VecSpecIO, VecSpecProbe] with HasVerilogTest:
         def architecture(parameter: VecSpecParameter) =
           val io = summon[Interface[VecSpecIO]]
-          io.b := io.a
+          io.b :<= io.a
           io.out.dontCare()
           io.flatuint.dontCare()
       Assign.verilogTest(VecSpecParameter(8, 4))(
@@ -58,7 +58,7 @@ object VecSpec extends TestSuite:
       object AsBits extends Generator[VecSpecParameter, VecSpecLayers, VecSpecIO, VecSpecProbe] with HasVerilogTest:
         def architecture(parameter: VecSpecParameter) =
           val io = summon[Interface[VecSpecIO]]
-          io.b := io.a.asBits.asVec(Bits(parameter.width))
+          io.b :<= io.a.asBits.asVec(Bits(parameter.width))
           io.out.dontCare()
           io.flatuint.dontCare()
       AsBits.verilogTest(VecSpecParameter(8, 4))(

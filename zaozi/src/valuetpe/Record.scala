@@ -10,7 +10,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value}
 
 import java.lang.foreign.Arena
 
-trait Record extends Aggregate with UntypedDynamicSubfield:
+trait Record extends Aggregate with Connectable with UntypedDynamicSubfield:
   def Flipped[T <: Data](
     name: String,
     tpe:  T

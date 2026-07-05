@@ -25,7 +25,7 @@ trait VecUtilsApi:
       VecApi[E, V]
     ): IndexedSeq[Ref[E]]
 
-  extension [E <: Data](seq: Seq[Referable[E]])
+  extension [E <: Connectable](seq: Seq[Referable[E]])
     def toVec(
       using Arena,
       Context,

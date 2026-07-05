@@ -110,11 +110,11 @@ given QueueImpl with
 
     io.enq.ready       := !fifo.io.full | (if (parameter.pipe) io.deq.ready else false.B)
     fifo.io.push_req_n := !(io.enq.fire & (if (parameter.flow) !(fifo.io.empty & io.deq.ready) else true.B))
-    fifo.io.data_in    := dataIn
+    fifo.io.data_in :<= dataIn
 
     io.deq.valid      := !fifo.io.empty | (if (parameter.flow) io.enq.valid else false.B)
     fifo.io.pop_req_n := !(io.deq.ready & !fifo.io.empty)
-    io.deq.bits       := (if (parameter.flow) (fifo.io.empty ? (io.enq.bits, dataOut)) else dataOut)
+    io.deq.bits :<= (if (parameter.flow) (fifo.io.empty ? (io.enq.bits, dataOut)) else dataOut)
 
     io.empty := fifo.io.empty
     io.full  := fifo.io.full

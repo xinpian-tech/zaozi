@@ -101,7 +101,7 @@ object VecUtilsSpec extends TestSuite:
           def architecture(parameter: VecUtilsSpecParameter) =
             val io = summon[Interface[VecUtilsSpecIO]]
             io.out.dontCare()
-            io.b := io.a.toSeq.reverse.toVec
+            io.b :<= io.a.toSeq.reverse.toVec
         ReverseToVec.verilogTest(VecUtilsSpecParameter(8, 4))(
           "assign b_0 = a_3",
           "assign b_1 = a_2",

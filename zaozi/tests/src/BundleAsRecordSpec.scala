@@ -90,6 +90,18 @@ object BundleAsRecordSpec extends TestSuite:
         "assign out = in;"
       )
 
+    test("Bundle type exposes elements directly (type-level introspection)"):
+      @generator
+      object DirectElems extends Generator[BARParameter, BARLayers, SimpleIO, BARProbe] with HasVerilogTest:
+        def architecture(parameter: BARParameter) =
+          val io = summon[Interface[SimpleIO]]
+          val es = io.getType.elements
+          assert(es.map(_.name) == Seq("in", "out"))
+          assert(es(0).isFlipped == true)
+          assert(es(1).isFlipped == false)
+          io.out := io.in
+      DirectElems.verilogTest(BARParameter(8))("assign out = in;")
+
     test("asRecord field connect renders identical Verilog to typed access"):
       @generator
       object EqTyped extends Generator[BARParameter, BARLayers, SimpleIO, BARProbe] with HasVerilogTest:
@@ -138,8 +150,8 @@ object BundleAsRecordSpec extends TestSuite:
           val io = summon[Interface[NestedIO]]
           io.asRecord.field[Payload]("nOut").asRecord.field("m") :=
             io.asRecord.field[Payload]("nIn").asRecord.field("m")
-          val dv = io.asRecord.field[Vec[Data]]("vOut")
-          val sv = io.asRecord.field[Vec[Data]]("vIn")
+          val dv = io.asRecord.field[Vec[UInt]]("vOut")
+          val sv = io.asRecord.field[Vec[UInt]]("vIn")
           (0 until dv.length).foreach: i =>
             dv(i) := sv(i)
       NestedDescent.verilogTest(BARParameter(8))(
@@ -177,8 +189,8 @@ object BundleAsRecordSpec extends TestSuite:
           dstV.getType.elements.foreach: f =>
             f.dataType match
               case _: Vec[?] =>
-                val d = dstV.field[Vec[Data]](f.name)
-                val s = srcV.field[Vec[Data]](f.name)
+                val d = dstV.field[Vec[Element]](f.name)
+                val s = srcV.field[Vec[Element]](f.name)
                 (0 until d.length).foreach: i =>
                   d(i) := s(i)
               case _ =>
@@ -208,8 +220,8 @@ object BundleAsRecordSpec extends TestSuite:
           dstV.getType.elements.foreach: f =>
             f.dataType match
               case _: Vec[?] =>
-                val d = dstV.field[Vec[Data]](f.name)
-                val s = srcV.field[Vec[Data]](f.name)
+                val d = dstV.field[Vec[Element]](f.name)
+                val s = srcV.field[Vec[Element]](f.name)
                 (0 until d.length).foreach: i =>
                   d(i) := s(i)
               case _ =>

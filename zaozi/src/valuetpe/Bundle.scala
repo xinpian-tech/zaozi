@@ -9,7 +9,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value}
 
 import java.lang.foreign.Arena
 
-trait Bundle extends Aggregate with DynamicSubfield:
+trait Bundle extends Aggregate with Connectable with DynamicSubfield:
   def Flipped[T <: Data](
     tpe: T
   )(

@@ -520,10 +520,10 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
       sourcecode.File,
       sourcecode.Line
     ): Unit
-trait MonoConnect[D <: Data, SRC <: Referable[D], SINK <: Writable[D]]:
+
+trait DontCare[D <: Data, SINK <: Writable[D]]:
   extension (ref: SINK)
-    def :=(
-      that: SRC
+    def dontCare(
     )(
       using Arena,
       Context,
@@ -532,16 +532,48 @@ trait MonoConnect[D <: Data, SRC <: Referable[D], SINK <: Writable[D]]:
       sourcecode.Line
     ): Unit
 
-/** FIRRTL `invalidate`. A unary capability deliberately separate from [[MonoConnect]], so its availability is not tied
-  * to `:=`'s.
-  */
-trait DontCare[D <: Data, SINK <: Writable[D]]:
-  extension (ref: SINK)
-    def dontCare(
+final class ConnectException(message: String) extends Exception(message)
+
+trait Connect[A <: Connectable]:
+  extension [SINK <: Writable[A]](sink:  SINK)
+    def :=[SRC <: Referable[A]](
+      src: SRC
+    )(
+      using A <:< Element,
+      Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+    def :<>=[SRC <: Writable[A]](
+      src: SRC
     )(
       using Arena,
       Context,
       Block,
+      TypeImpl,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+    def :<=[SRC <: Referable[A]](
+      src: SRC
+    )(
+      using Arena,
+      Context,
+      Block,
+      TypeImpl,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+  extension [SINK <: Referable[A]](sink: SINK)
+    def :>=[SRC <: Writable[A]](
+      src: SRC
+    )(
+      using Arena,
+      Context,
+      Block,
+      TypeImpl,
       sourcecode.File,
       sourcecode.Line
     ): Unit
@@ -1990,37 +2022,37 @@ trait TypeImpl:
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  Clock)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  UInt)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  SInt)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  Bits)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  Analog)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  Bool)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):  Type
+    ):                                      Type
   extension (ref:  ProbeBundle)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
@@ -2053,56 +2085,52 @@ trait TypeImpl:
     )(
       using sourcecode.Name.Machine
     ): BundleField[T]
-  extension (ref:  Aggregate)
-    /** Declared fields of a materialized type, in declaration order, as a read-only snapshot. Type-level introspection
-      * only: value-level dynamic access still goes through the `asRecord` view.
-      */
-    def elements: Seq[BundleField[?]]
+  extension (ref:  Aggregate) def elements: Seq[BundleField[?]]
   extension (ref:  ProbeRecord)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):            Type
+    ): Type
     private[zaozi] def ReadProbeImpl[T <: Data & CanProbe](
       name:  String,
       tpe:   T,
       layer: LayerTree
-    ):            BundleField[RProbe[T]]
+    ): BundleField[RProbe[T]]
     private[zaozi] def ReadWriteProbeImpl[T <: Data & CanProbe](
       name:  String,
       tpe:   T,
       layer: LayerTree
-    ):            BundleField[RWProbe[T]]
+    ): BundleField[RWProbe[T]]
   extension (ref:  Record)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):            Type
+    ): Type
     private[zaozi] def FlippedImpl[T <: Data](
       name: String,
       tpe:  T
-    ):            BundleField[T]
+    ): BundleField[T]
     private[zaozi] def AlignedImpl[T <: Data](
       name: String,
       tpe:  T
-    ):            BundleField[T]
+    ): BundleField[T]
   extension (ref:  RProbe[?])
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context,
       TypeImpl
-    ):  Type
+    ):                                      Type
   extension (ref:  RWProbe[?])
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context,
       TypeImpl
-    ):  Type
+    ):                                      Type
   extension (data: Data)
     private[zaozi] def widthImpl(
       using Arena,
       Context
-    ):  Int
+    ):                                      Int
   extension (ref:  Vec[?])
     private[zaozi] def countImpl(
       using Arena,

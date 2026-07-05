@@ -7,7 +7,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
-trait Analog extends Data:
+trait Analog extends Element:
   private[zaozi] val _width: Int
 
   def toMlirType(
