@@ -9,7 +9,8 @@ import org.llvm.mlir.CAPI.{
   mlirIntegerTypeGetWidth,
   mlirIntegerTypeSignedGet,
   mlirIntegerTypeUnsignedGet,
-  mlirNoneTypeGet
+  mlirNoneTypeGet,
+  mlirTypeEqual
 }
 
 import java.lang.foreign.{Arena, MemorySegment}
@@ -41,6 +42,7 @@ given TypeApi with
   extension (tpe:   Type)
     inline def integerTypeGetWidth: Int           =
       mlirIntegerTypeGetWidth(tpe.segment)
+    inline def equal(that: Type):   Boolean       = mlirTypeEqual(tpe.segment, that.segment)
     inline def segment:             MemorySegment = tpe._segment
     inline def sizeOf:              Int           = MlirType.sizeof().toInt
 end given
