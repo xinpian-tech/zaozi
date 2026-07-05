@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.BrentKungAdder" %s --
-// DEFINE: %{bmc} = circt-bmc %t-w8.clean.mlir --module=BrentKungAdder_width8_radix2_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
+// DEFINE: %{bmc} = circt-bmc %t-w8.contract.hw.mlir --module=BrentKungAdder_width8_radix2_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
 
 // width 8, radix 2
 // RUN: %{test} config %t-w8.json --width 8 --radix 2
@@ -12,13 +12,8 @@
 // RUN: firtool BrentKungAdder_width8_radix2.mlirbc | FileCheck %s -check-prefix=VERILOG8
 // RUN: firtool BrentKungAdder_width8_radix2.mlirbc --hw-pass-plugin='lower-contracts' --output-hw-mlir=%t-w8.contract.hw.mlir --disable-output
 // RUN: FileCheck %s -check-prefix=LOWERED8 --input-file=%t-w8.contract.hw.mlir
-// RUN: printf 'module {\n' > %t-w8.formal.mlir
-// RUN: sed -n '/^  verif.formal @BrentKungAdder_width8_radix2_CheckContract_0/,/^  }/p' %t-w8.contract.hw.mlir >> %t-w8.formal.mlir
-// RUN: printf '}\n' >> %t-w8.formal.mlir
-// RUN: circt-opt %t-w8.formal.mlir --prepare-for-formal --hw-cleanup --canonicalize --cse -o %t-w8.clean.mlir
-// RUN: FileCheck %s -check-prefix=FORMAL8 --input-file=%t-w8.clean.mlir
 // RUN: %{bmc} | FileCheck %s -check-prefix=BMC8
-// RUN: rm %t-w8.json %t-w8.contract.hw.mlir %t-w8.formal.mlir %t-w8.clean.mlir BrentKungAdder_width8_radix2.mlirbc -f
+// RUN: rm %t-w8.json %t-w8.contract.hw.mlir BrentKungAdder_width8_radix2.mlirbc -f
 
 // width 32, radix 8
 // RUN: %{test} config %t-w32r8.json --width 32 --radix 8
@@ -56,10 +51,6 @@
 // LOWERED8-LABEL: verif.formal @BrentKungAdder_width8_radix2_CheckContract_0
 // LOWERED8: verif.assert
 // LOWERED8-SAME: prefix_adder_matches_add
-
-// FORMAL8: verif.formal @BrentKungAdder_width8_radix2_CheckContract_0
-// FORMAL8: verif.assert
-// FORMAL8-SAME: prefix_adder_matches_add
 
 // BMC8: Bound reached with no violations!
 
