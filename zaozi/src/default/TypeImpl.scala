@@ -204,10 +204,11 @@ given TypeImpl with
       ref._elements += bf
       bf
 
-  extension (ref: ProbeRecord)
+  extension (ref: Aggregate)
     def elements: Seq[BundleField[?]] =
       require(!ref.instantiating)
       ref._elements.toSeq
+  extension (ref: ProbeRecord)
     def toMlirTypeImpl(
       using Arena,
       Context
@@ -238,9 +239,6 @@ given TypeImpl with
       bf
 
   extension (ref: Record)
-    def elements: Seq[BundleField[?]] =
-      require(!ref.instantiating)
-      ref._elements.toSeq
     def toMlirTypeImpl(
       using Arena,
       Context

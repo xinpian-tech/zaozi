@@ -2039,8 +2039,12 @@ trait TypeImpl:
     )(
       using sourcecode.Name.Machine
     ): BundleField[T]
-  extension (ref:  ProbeRecord)
+  extension (ref:  Aggregate)
+    /** Declared fields of a materialized type, in declaration order, as a read-only snapshot. Type-level introspection
+      * only: value-level dynamic access still goes through the `asRecord` view.
+      */
     def elements: Seq[BundleField[?]]
+  extension (ref:  ProbeRecord)
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
@@ -2056,7 +2060,6 @@ trait TypeImpl:
       layer: LayerTree
     ):            BundleField[RWProbe[T]]
   extension (ref:  Record)
-    def elements: Seq[BundleField[?]]
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
