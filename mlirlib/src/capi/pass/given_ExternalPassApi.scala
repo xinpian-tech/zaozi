@@ -44,23 +44,26 @@ given PassApi with
       System.err.println(s"[zaozi:external-pass:upcall] ${t.getClass.getName}: ${t.getMessage}")
       t.printStackTrace(System.err)
 
+    val constructUpcall: MlirExternalPassCallbacks.construct.Function =
+      (userData: MemorySegment) =>
+        try constructCallback()
+        catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
+
+    val destructUpcall: MlirExternalPassCallbacks.destruct.Function =
+      (userData: MemorySegment) =>
+        try destructCallback()
+        catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
+
     val callbacksSegment = MlirExternalPassCallbacks.allocate(arena)
     MlirExternalPassCallbacks.construct(
       callbacksSegment,
-      MlirExternalPassCallbacks.construct.allocate(
-        (nil: MemorySegment) =>
-          try constructCallback()
-          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL), callbackArena
-      )
+      MlirExternalPassCallbacks.construct.allocate(constructUpcall, callbackArena)
     )
     MlirExternalPassCallbacks.destruct(
       callbacksSegment,
-      MlirExternalPassCallbacks.destruct.allocate(
-        (nil: MemorySegment) =>
-          try destructCallback()
-          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL), callbackArena
-      )
+      MlirExternalPassCallbacks.destruct.allocate(destructUpcall, callbackArena)
     )
+
     initializeCallback.foreach(cb =>
       MlirExternalPassCallbacks.initialize(
         callbacksSegment,
