@@ -5,5 +5,6 @@ config.java_home = "@JAVA_HOME@"
 config.java_library_path = "@JAVA_LIBRARY_PATH@".split(",")
 config.java_opts = "@JAVA_OPTS@".split(",")
 config.lit_dir = "@LIT_DIR@".split(",")
+config.z3lib = "@Z3_LIB@".split(",")
 config.test_exec_root = os.path.dirname(__file__)
 lit_config.load_config(config, "@LIT_DIR@/lit.cfg.py")

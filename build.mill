@@ -215,6 +215,7 @@ trait LitModule extends Module {
   def javaHome:        T[os.Path]
   def litDir:          T[os.Path]
   def litConfigIn:     T[PathRef]
+  def z3Lib:           T[String] = Task.Input(Task.env.getOrElse("Z3_LIB", ""))
   def javaOpts:        T[Seq[String]] = Task(
     Seq(
       "--java-opt=--enable-native-access=ALL-UNNAMED",
@@ -231,6 +232,7 @@ trait LitModule extends Module {
         .replaceAll("@JAVA_LIBRARY_PATH@", javaLibraryPath().mkString(","))
         .replaceAll("@JAVA_OPTS@", javaOpts().mkString(","))
         .replaceAll("@LIT_DIR@", litDir().toString)
+        .replaceAll("@Z3_LIB@", z3Lib())
     )
     PathRef(Task.dest)
   }

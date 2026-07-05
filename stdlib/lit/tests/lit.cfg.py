@@ -16,6 +16,7 @@ config.substitutions = [
     ('%JAVAHOME', config.java_home),
     ('%JAVALIBRARYPATH', ':'.join(config.java_library_path)),
     ('%JAVAOPTS', ' '.join(config.java_opts)),
+    ('%Z3LIB', ':'.join(config.z3lib)),
 ]
 config.test_source_root = os.path.dirname(__file__)
 
@@ -29,7 +30,7 @@ env_vars_to_pass = [
     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
     "http_proxy", "https_proxy", "all_proxy", "no_proxy",
     "COURSIER_CACHE",
-    "NIX_LDFLAGS"
+    "NIX_LDFLAGS", "Z3_LIB"
 ]
 for var in env_vars_to_pass:
     if var in os.environ:

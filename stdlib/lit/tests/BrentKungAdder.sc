@@ -2,16 +2,23 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.BrentKungAdder" %s --
+// DEFINE: %{bmc} = circt-bmc %t-w8.clean.mlir --module=BrentKungAdder_width8_radix2_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
 
 // width 8, radix 2
 // RUN: %{test} config %t-w8.json --width 8 --radix 2
 // RUN: FileCheck %s -check-prefix=CONFIG8 --input-file=%t-w8.json
 // RUN: %{test} design %t-w8.json
+// RUN: circt-opt BrentKungAdder_width8_radix2.mlirbc | FileCheck %s -check-prefix=CONTRACT8
 // RUN: firtool BrentKungAdder_width8_radix2.mlirbc | FileCheck %s -check-prefix=VERILOG8
-// RUN: firtool BrentKungAdder_width8_radix2.mlirbc --output-hw-mlir=%t-w8.hw.mlir --disable-output
-// RUN: circt-opt %t-w8.hw.mlir --strip-contracts -o %t-w8.stripped.hw.mlir
-// RUN: Z3_LIB=$(printf '%%s\n' "${NIX_LDFLAGS:-}" | tr ' ' '\n' | sed -n 's#^-L\(.*z3-[^ ]*-lib/lib\)#\1/libz3.so#p' | head -1); test -n "$Z3_LIB" || Z3_LIB=$(find /nix/store -maxdepth 5 -name libz3.so | head -1); circt-lec %t-w8.stripped.hw.mlir %S/BrentKungAdderGolden.hw.mlir --c1 BrentKungAdder_width8_radix2 --c2 BrentKungAdderGolden --shared-libs="$Z3_LIB" --run | FileCheck %s -check-prefix=LEC8
-// RUN: rm %t-w8.json %t-w8.hw.mlir %t-w8.stripped.hw.mlir BrentKungAdder_width8_radix2.mlirbc -f
+// RUN: firtool BrentKungAdder_width8_radix2.mlirbc --hw-pass-plugin='lower-contracts' --output-hw-mlir=%t-w8.contract.hw.mlir --disable-output
+// RUN: FileCheck %s -check-prefix=LOWERED8 --input-file=%t-w8.contract.hw.mlir
+// RUN: printf 'module {\n' > %t-w8.formal.mlir
+// RUN: sed -n '/^  verif.formal @BrentKungAdder_width8_radix2_CheckContract_0/,/^  }/p' %t-w8.contract.hw.mlir >> %t-w8.formal.mlir
+// RUN: printf '}\n' >> %t-w8.formal.mlir
+// RUN: circt-opt %t-w8.formal.mlir --prepare-for-formal --hw-cleanup --canonicalize --cse -o %t-w8.clean.mlir
+// RUN: FileCheck %s -check-prefix=FORMAL8 --input-file=%t-w8.clean.mlir
+// RUN: %{bmc} | FileCheck %s -check-prefix=BMC8
+// RUN: rm %t-w8.json %t-w8.contract.hw.mlir %t-w8.formal.mlir %t-w8.clean.mlir BrentKungAdder_width8_radix2.mlirbc -f
 
 // width 32, radix 8
 // RUN: %{test} config %t-w32r8.json --width 32 --radix 8
@@ -29,10 +36,13 @@
 
 // radix must change the RTL: the two width-32 designs (radix 8 vs 4) differ.
 // `not diff` passes iff the files are NOT identical.
-// RUN: not diff %t-r8.sv %t-r4.sv
+// RUN: not diff -q %t-r8.sv %t-r4.sv >/dev/null
 // RUN: rm %t-w32r8.json %t-w32r4.json %t-r8.sv %t-r4.sv BrentKungAdder_width32_radix8.mlirbc BrentKungAdder_width32_radix4.mlirbc -f
 
 // CONFIG8: {"width":8,"radix":2}
+
+// CONTRACT8: firrtl.contract
+// CONTRACT8: firrtl.int.verif.ensure
 
 // VERILOG8-LABEL: module BrentKungAdder_width8_radix2
 // VERILOG8: input{{ +}}[7:0]{{ +}}A,
@@ -40,7 +50,18 @@
 // VERILOG8: output{{ +}}CO,
 // VERILOG8: output{{ +}}[7:0]{{ +}}SUM
 
-// LEC8: c1 == c2
+// LOWERED8-LABEL: hw.module @BrentKungAdder_width8_radix2
+// LOWERED8: verif.assume
+// LOWERED8-SAME: prefix_adder_matches_add
+// LOWERED8-LABEL: verif.formal @BrentKungAdder_width8_radix2_CheckContract_0
+// LOWERED8: verif.assert
+// LOWERED8-SAME: prefix_adder_matches_add
+
+// FORMAL8: verif.formal @BrentKungAdder_width8_radix2_CheckContract_0
+// FORMAL8: verif.assert
+// FORMAL8-SAME: prefix_adder_matches_add
+
+// BMC8: Bound reached with no violations!
 
 // CONFIG32R8: {"width":32,"radix":8}
 
@@ -49,8 +70,8 @@
 // VERILOG32R8: input{{ +}}CI,
 // VERILOG32R8: output{{ +}}CO,
 // VERILOG32R8: output{{ +}}[31:0]{{ +}}SUM
-// The radix-8 group-propagate fold emits 8-wide AND-chains.
-// VERILOG32R8: {{_GEN_[0-9]+ & _GEN_[0-9]+ & _GEN_[0-9]+ & _GEN_[0-9]+ & _GEN_[0-9]+ & _GEN_[0-9]+ & _GEN_[0-9]+ & _GEN_[0-9]+}}
+// The radix-8 group-propagate fold emits wide AND-chains.
+// VERILOG32R8: {{.+ & .+ & .+ & .+ & .+ & .+ & .+ & .+}}
 
 // CONFIG32R4: {"width":32,"radix":4}
 

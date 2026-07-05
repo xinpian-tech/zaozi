@@ -62,6 +62,7 @@
             LIT_INSTALL_PATH = lit;
             SCALA_CLI_INSTALL_PATH = scala-cli;
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
+            Z3_LIB = "${z3.lib}/lib/libz3.so";
           };
           # -Djextract.decls.per.header=65535 is scoped to the jextract
           # subprocess via PanamaModule.jextractEnv in build.mill, so it no

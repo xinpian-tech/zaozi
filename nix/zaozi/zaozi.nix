@@ -81,6 +81,7 @@ let
     env.JEXTRACT_INSTALL_PATH = jextract;
     env.LIBC_INCLUDE_PATH = "${stdenv.cc.libc.dev}/include";
     env.LIT_INSTALL_PATH = lit;
+    env.Z3_LIB = "${z3.lib}/lib/libz3.so";
     # -Djextract.decls.per.header=65535 is scoped to PanamaModule's jextract
     # subprocess (see build.mill jextractEnv). -Xss32m stays global because
     # scalac's JavaParser deep-recurses through the 95K-line single-class
