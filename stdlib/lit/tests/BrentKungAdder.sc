@@ -8,7 +8,10 @@
 // RUN: FileCheck %s -check-prefix=CONFIG8 --input-file=%t-w8.json
 // RUN: %{test} design %t-w8.json
 // RUN: firtool BrentKungAdder_width8_radix2.mlirbc | FileCheck %s -check-prefix=VERILOG8
-// RUN: rm %t-w8.json BrentKungAdder_width8_radix2.mlirbc -f
+// RUN: firtool BrentKungAdder_width8_radix2.mlirbc --output-hw-mlir=%t-w8.hw.mlir --disable-output
+// RUN: circt-opt %t-w8.hw.mlir --strip-contracts -o %t-w8.stripped.hw.mlir
+// RUN: Z3_LIB=$(printf '%%s\n' "${NIX_LDFLAGS:-}" | tr ' ' '\n' | sed -n 's#^-L\(.*z3-[^ ]*-lib/lib\)#\1/libz3.so#p' | head -1); test -n "$Z3_LIB" || Z3_LIB=$(find /nix/store -maxdepth 5 -name libz3.so | head -1); circt-lec %t-w8.stripped.hw.mlir %S/BrentKungAdderGolden.hw.mlir --c1 BrentKungAdder_width8_radix2 --c2 BrentKungAdderGolden --shared-libs="$Z3_LIB" --run | FileCheck %s -check-prefix=LEC8
+// RUN: rm %t-w8.json %t-w8.hw.mlir %t-w8.stripped.hw.mlir BrentKungAdder_width8_radix2.mlirbc -f
 
 // width 32, radix 8
 // RUN: %{test} config %t-w32r8.json --width 32 --radix 8
@@ -36,6 +39,8 @@
 // VERILOG8: input{{ +}}CI,
 // VERILOG8: output{{ +}}CO,
 // VERILOG8: output{{ +}}[7:0]{{ +}}SUM
+
+// LEC8: c1 == c2
 
 // CONFIG32R8: {"width":32,"radix":8}
 

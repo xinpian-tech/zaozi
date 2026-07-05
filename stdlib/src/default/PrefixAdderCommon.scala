@@ -92,7 +92,7 @@ def connectPrefixAdder[I <: PrefixAdderIO[?]](
     node.leafs match
       case Seq()    => Seq(node.idx -> cin)
       case children =>
-        val carriesInto = children.init.scanLeft(cin)((c, prev) => (propagates(prev) | c) & generates(prev))
+        val carriesInto = children.init.scanLeft(cin)((c, prev) => (propagates(prev) & c) | generates(prev))
         children.zip(carriesInto).flatMap((ch, ci) => threadCarries(ch, ci))
 
   // The tree spans width+1 columns, so the root carries no group (G,P) of its

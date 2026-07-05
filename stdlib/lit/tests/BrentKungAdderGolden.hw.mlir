@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
 // Equivalent to:
-//   assign {CO, SUM} = A + B + CI;
-hw.module @Add8(in %A : i8, in %B : i8, in %CI : i1, out CO : i1, out SUM : i8) {
+//   logic [8:0] ref = {1'b0, A} + {1'b0, B} + CI;
+//   assign {CO, SUM} = ref;
+hw.module @BrentKungAdderGolden(in %A : i8, in %B : i8, in %CI : i1, out CO : i1, out SUM : i8) {
   %false = hw.constant false
   %c0_i8 = hw.constant 0 : i8
   %A9 = comb.concat %false, %A : i1, i8

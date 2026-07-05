@@ -28,7 +28,8 @@ env_vars_to_pass = [
     "SCALA_CLI_HOME", "JAVA_OPTS",
     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
     "http_proxy", "https_proxy", "all_proxy", "no_proxy",
-    "COURSIER_CACHE"
+    "COURSIER_CACHE",
+    "NIX_LDFLAGS"
 ]
 for var in env_vars_to_pass:
     if var in os.environ:
