@@ -14,7 +14,7 @@ import java.lang.foreign.Arena
 
 class AsyncDomain extends Bundle:
   val clock = Aligned(Clock())
-  val reset = Aligned(AsyncReset())
+  val reset = Aligned(Reset())
 
 class SyncDomain extends Bundle:
   val clock = Aligned(Clock())

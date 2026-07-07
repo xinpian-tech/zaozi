@@ -241,8 +241,6 @@ trait ConstructorApi:
 
   def Reset(): Reset
 
-  def AsyncReset(): Reset
-
   def UInt(width: Int): UInt
 
   def Bits(width: Int): Bits

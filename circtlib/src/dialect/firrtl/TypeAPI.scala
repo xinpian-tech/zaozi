@@ -4,7 +4,6 @@ package org.llvm.circt.scalalib.dialect.firrtl.tpe
 
 class AnalogType
 class AnyRefType
-class AsyncResetType
 class BaseTypeAliasType
 class BoolType
 class BundleType

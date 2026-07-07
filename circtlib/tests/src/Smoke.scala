@@ -264,8 +264,8 @@ object Smoke extends TestSuite:
             test("AndR"):
               summon[AndRPrimApi].op(uint1.result, unknownLocation).operation.appendToBlock()
 
-            test("AsAsyncReset"):
-              summon[AsAsyncResetPrimApi].op(bool1.result, unknownLocation).operation.appendToBlock()
+            test("AsReset"):
+              summon[AsResetPrimApi].op(bool1.result, unknownLocation).operation.appendToBlock()
 
             test("AsClock"):
               summon[AsClockPrimApi].op(bool1.result, unknownLocation).operation.appendToBlock()

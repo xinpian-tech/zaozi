@@ -6,7 +6,6 @@ import org.llvm.circt.*
 import org.llvm.circt.CAPI.{
   firrtlTypeGetAnalog,
   firrtlTypeGetAnyRef,
-  firrtlTypeGetAsyncReset,
   firrtlTypeGetBitWidth,
   firrtlTypeGetBoolean,
   firrtlTypeGetBundle,
@@ -32,7 +31,6 @@ import org.llvm.circt.CAPI.{
   firrtlTypeGetVectorNumElements,
   firrtlTypeIsAAnalog,
   firrtlTypeIsAAnyRef,
-  firrtlTypeIsAAsyncReset,
   firrtlTypeIsABoolean,
   firrtlTypeIsABundle,
   firrtlTypeIsAClass,
@@ -65,10 +63,6 @@ given TypeApi with
     using arena: Arena,
     context:     Context
   ): Type = Type(firrtlTypeGetAnyRef(arena, context.segment))
-  inline def getAsyncReset(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetAsyncReset(arena, context.segment))
   extension (tpe:                      Type)
     inline def getBitWidth(ignoreFlip: Boolean): Long = firrtlTypeGetBitWidth(tpe.segment, ignoreFlip)
   inline def getBoolean(
@@ -197,7 +191,6 @@ given TypeApi with
   extension (tpe:                      Type)
     inline def isAnalog:     Boolean = firrtlTypeIsAAnalog(tpe.segment)
     inline def isAnyRef:     Boolean = firrtlTypeIsAAnyRef(tpe.segment)
-    inline def isAsyncReset: Boolean = firrtlTypeIsAAsyncReset(tpe.segment)
     inline def isBoolean:    Boolean = firrtlTypeIsABoolean(tpe.segment)
     inline def isBundle:     Boolean = firrtlTypeIsABundle(tpe.segment)
     inline def isClass:      Boolean = firrtlTypeIsAClass(tpe.segment)

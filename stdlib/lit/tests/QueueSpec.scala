@@ -38,10 +38,7 @@ class QueueSpecLayers(parameter: QueueSpecParameter) extends LayerInterface(para
 // CHECK-DAG-NEXT: );
 class QueueSpecIO(parameter: QueueSpecParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
-  val reset = Flipped(
-    if parameter.useAsyncReset then AsyncReset()
-    else Reset()
-  )
+  val reset = Flipped(Reset())
   val i     = Flipped(Decoupled(UInt(parameter.width)))
   val o     = Aligned(Decoupled(UInt(parameter.width)))
 

@@ -1288,23 +1288,23 @@ given AndRPrimApi with
 
 end given
 
-given AsAsyncResetPrimApi with
+given AsResetPrimApi with
   def op(
     input:       Value,
     location:    Location
   )(
     using arena: Arena,
     context:     Context
-  ): AsAsyncResetPrim =
-    AsAsyncResetPrim(
+  ): AsResetPrim =
+    AsResetPrim(
       summon[OperationApi].operationCreate(
-        name = "firrtl.asAsyncReset",
+        name = "firrtl.asReset",
         location = location,
         operands = Seq(input),
         inferredResultsTypes = Some(1)
       )
     )
-  extension (ref: AsAsyncResetPrim)
+  extension (ref: AsResetPrim)
     def operation: Operation = ref._operation
     def result(
       using Arena

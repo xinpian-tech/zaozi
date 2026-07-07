@@ -31,10 +31,7 @@ class QueueIO[D <: HardwareDataType](
   import _ca.*
 
   val clock       = Flipped(Clock())
-  val reset       = Flipped(
-    if parameter.useAsyncReset then AsyncReset()
-    else Reset()
-  )
+  val reset       = Flipped(Reset())
   val enq         = Flipped(Decoupled(parameter.gen))
   val deq         = Aligned(Decoupled(parameter.gen))
   val empty       = Aligned(Bool())

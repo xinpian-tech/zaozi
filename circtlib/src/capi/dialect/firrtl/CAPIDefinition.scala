@@ -204,7 +204,6 @@ end AttributeApi
   * {{{
   * firrtlTypeGetAnalog
   * firrtlTypeGetAnyRef
-  * firrtlTypeGetAsyncReset
   * firrtlTypeGetBitWidth
   * firrtlTypeGetBoolean
   * firrtlTypeGetBundle
@@ -230,7 +229,6 @@ end AttributeApi
   * firrtlTypeGetVectorNumElements
   * firrtlTypeIsAAnalog
   * firrtlTypeIsAAnyRef
-  * firrtlTypeIsAAsyncReset
   * firrtlTypeIsABoolean
   * firrtlTypeIsABundle
   * firrtlTypeIsAClass
@@ -256,10 +254,6 @@ trait TypeApi:
       context:     Context
     ):                                                                              Type
   inline def getAnyRef(
-    using arena: Arena,
-    context:     Context
-  ):                                                                                Type
-  inline def getAsyncReset(
     using arena: Arena,
     context:     Context
   ):                                                                                Type
@@ -368,7 +362,6 @@ trait TypeApi:
   extension (tpe:                Type)
     inline def isAnalog:     Boolean
     inline def isAnyRef:     Boolean
-    inline def isAsyncReset: Boolean
     inline def isBoolean:    Boolean
     inline def isBundle:     Boolean
     inline def isClass:      Boolean

@@ -99,7 +99,7 @@ private def connect(
     case _: UInt   => "UInt"
     case _: SInt   => "SInt"
     case _: Clock  => "Clock"
-    case r: Reset  => if r._isAsync then "AsyncReset" else "Reset"
+    case _: Reset  => "Reset"
     case _: Bits   => "Bits"
     case _: Analog => "Analog"
     case _: Vec[?] => "Vec"

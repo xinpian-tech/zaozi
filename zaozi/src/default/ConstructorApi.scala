@@ -40,11 +40,7 @@ export given_ConstructorApi.*
 
 given ConstructorApi with
   def Clock(): Clock = new Object with Clock
-  def Reset(): Reset = new Reset:
-    val _isAsync: Boolean = false
-
-  def AsyncReset(): Reset = new Reset:
-    val _isAsync: Boolean = true
+  def Reset(): Reset = new Object with Reset
 
   def UInt(_width: Int): UInt =
     val w = _width

@@ -24,9 +24,9 @@ class AndRPrim(val _operation: Operation)
 trait AndRPrimApi extends HasOperation[AndRPrim]
 end AndRPrimApi
 
-class AsAsyncResetPrim(val _operation: Operation)
-trait AsAsyncResetPrimApi extends HasOperation[AsAsyncResetPrim]
-end AsAsyncResetPrimApi
+class AsResetPrim(val _operation: Operation)
+trait AsResetPrimApi extends HasOperation[AsResetPrim]
+end AsResetPrimApi
 
 class AsClockPrim(val _operation: Operation)
 trait AsClockPrimApi extends HasOperation[AsClockPrim]

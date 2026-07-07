@@ -174,8 +174,6 @@ class MultiBadRec(
   Aligned("ve", Vec(2, new Leaf(if producer then 16 else 8)))
   if producer then Aligned("sh", Vec(2, summon[ConstructorApi].UInt(width)))
   else Aligned("sh", summon[ConstructorApi].UInt(width))
-  if producer then Aligned("rst", summon[ConstructorApi].AsyncReset())
-  else Aligned("rst", summon[ConstructorApi].Reset())
   if producer then Aligned("b1", summon[ConstructorApi].UInt(1))
   else Aligned("b1", summon[ConstructorApi].Bool())
   Aligned("ord", new OrderRec(producer, width))
@@ -353,7 +351,7 @@ object ConnectableSpec extends TestSuite:
           val b = Wire(new MultiBadRec(true, parameter.width))
           a :<>= b
       val msg = intercept[ConnectException](Bad.firrtlString(ConnParameter(8))).getMessage
-      assert(msg.contains("12 error(s)"))
+      assert(msg.contains("11 error(s)"))
       assert(msg.contains("missing in producer: onlyA"))
       assert(msg.contains("missing in sink: onlyB"))
       assert(msg.contains("w: width mismatch 8 vs 16"))
@@ -363,7 +361,6 @@ object ConnectableSpec extends TestSuite:
       assert(msg.contains("ve[*].x: width mismatch"))
       assert(msg.contains("ve[*].y: width mismatch"))
       assert(msg.contains("sh: incompatible or unsupported types (UInt vs Vec)"))
-      assert(msg.contains("rst: kind mismatch Reset vs AsyncReset"))
       assert(msg.contains("b1: kind mismatch Bool vs UInt"))
       assert(msg.contains("ord: field order mismatch"))
 

@@ -95,7 +95,6 @@ firrtlAttrGetRUW                   # header: $CIRCT_INSTALL_PATH/include/circt-c
 firrtlImportAnnotationsFromJSONRaw # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetAnalog                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetAnyRef                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
-firrtlTypeGetAsyncReset            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetBitWidth              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetBoolean               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetBundle                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
@@ -121,7 +120,6 @@ firrtlTypeGetVectorElement         # header: $CIRCT_INSTALL_PATH/include/circt-c
 firrtlTypeGetVectorNumElements     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsAAnalog                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsAAnyRef                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
-firrtlTypeIsAAsyncReset            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsABoolean               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsABundle                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsAClass                 # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h

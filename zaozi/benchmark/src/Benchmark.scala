@@ -88,7 +88,7 @@ class GCDOutput(parameter: GCDParameter) extends Bundle:
 
 class GCDIO(parameter: GCDParameter) extends HWBundle(parameter):
   val clock:  BundleField[Clock]                 = Flipped(Clock())
-  val reset:  BundleField[Reset]                 = Flipped(if (parameter.useAsyncReset) AsyncReset() else Reset())
+  val reset:  BundleField[Reset]                 = Flipped(Reset())
   val input:  BundleField[DecoupledIO[GCDInput]] = Flipped(Decoupled(new GCDInput(parameter)))
   val output: BundleField[ValidIO[GCDOutput]]    = Aligned(Valid(GCDOutput(parameter)))
 

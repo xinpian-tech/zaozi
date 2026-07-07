@@ -8,8 +8,6 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 import java.lang.foreign.Arena
 
 trait Reset extends Element with CanProbe:
-  private[zaozi] val _isAsync: Boolean
-
   final def toMlirType(
     using Arena,
     Context,
