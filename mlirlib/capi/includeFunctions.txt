@@ -1261,6 +1261,8 @@ mlirCreateConversionTosaToLinalg                         # header: $MLIR_INSTALL
 mlirCreateConversionTosaToLinalgNamed                    # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirCreateConversionTosaToMLProgram                      # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirCreateConversionTosaToSCFPass                        # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
+mlirCreateConversionTosaToSPIRVTosa                      # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
+mlirCreateConversionTosaToSPIRVTosaMarkGraphConstants    # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirCreateConversionTosaToTensorPass                     # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirCreateConversionUBToLLVMConversionPass               # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirCreateConversionUBToSPIRVConversionPass              # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
@@ -1346,15 +1348,15 @@ mlirRegisterConversionTosaToLinalg                       # header: $MLIR_INSTALL
 mlirRegisterConversionTosaToLinalgNamed                  # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirRegisterConversionTosaToMLProgram                    # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirRegisterConversionTosaToSCFPass                      # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
+mlirRegisterConversionTosaToSPIRVTosa                    # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
+mlirRegisterConversionTosaToSPIRVTosaMarkGraphConstants  # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirRegisterConversionTosaToTensorPass                   # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirRegisterConversionUBToLLVMConversionPass             # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirRegisterConversionUBToSPIRVConversionPass            # header: $MLIR_INSTALL_PATH/include/mlir/Conversion/Passes.capi.h.inc
 mlirCreateAMDGPUAmdgpuEmulateAtomicsPass           # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
-mlirCreateAMDGPUAmdgpuFoldMemRefOpsPass            # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
 mlirCreateAMDGPUAmdgpuMaskedloadToLoadPass         # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
 mlirCreateAMDGPUAmdgpuResolveStridedMetadataPass   # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
 mlirRegisterAMDGPUAmdgpuEmulateAtomicsPass         # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
-mlirRegisterAMDGPUAmdgpuFoldMemRefOpsPass          # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
 mlirRegisterAMDGPUAmdgpuMaskedloadToLoadPass       # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
 mlirRegisterAMDGPUAmdgpuResolveStridedMetadataPass # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
 mlirRegisterAMDGPUPasses                           # header: $MLIR_INSTALL_PATH/include/mlir/Dialect/AMDGPU/Transforms/Passes.capi.h.inc
