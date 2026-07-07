@@ -98,13 +98,7 @@ given TypeImpl with
     def toMlirTypeImpl(
       using Arena,
       Context
-    ): Type =
-      val mlirType =
-        if (ref._isAsync)
-          summon[FirrtlTypeApi].getAsyncReset
-        else
-          1.getUInt
-      mlirType
+    ): Type = 1.getUInt
   extension (ref: Clock)
     def toMlirTypeImpl(
       using Arena,

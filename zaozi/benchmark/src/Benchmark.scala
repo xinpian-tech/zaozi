@@ -97,9 +97,11 @@ class GCDProbe(parameter: GCDParameter) extends DVBundle[GCDParameter, GCDLayers
 @generator
 object GCD extends Generator[GCDParameter, GCDLayers, GCDIO, GCDProbe]:
   def architecture(parameter: GCDParameter) =
-    val io           = summon[Interface[GCDIO]]
-    given Ref[Clock] = io.clock
-    given Ref[Reset] = io.reset
+    val io            = summon[Interface[GCDIO]]
+    given ClockScope = ClockScope.posedge(io.clock)
+    given ResetScope =
+      if parameter.useAsyncReset then ResetScope.asyncActiveHigh(io.reset)
+      else ResetScope.syncActiveHigh(io.reset)
 
     val x           = Reg(UInt(parameter.width))
     val y           = RegInit(0.U(parameter.width))

@@ -173,8 +173,8 @@ object TypeUtilSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: TypeUtilParameter) =
           val io           = summon[Interface[TypeUtilIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val constBits: Const[Bits] = 0.U(parameter.width).asBits
           val reg = RegInit(constBits)
           io.outBits := reg
@@ -194,8 +194,8 @@ object TypeUtilSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: TypeUtilParameter) =
           val io           = summon[Interface[TypeUtilIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val constUInt: Const[UInt] = 0.B(parameter.width).asType(UInt(parameter.width))
           val reg = RegInit(constUInt)
           io.out := reg
@@ -215,8 +215,8 @@ object TypeUtilSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: TypeUtilParameter) =
           val io           = summon[Interface[TypeUtilIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.U(parameter.width).asBits.asType(SInt(parameter.width)))
           io.outSInt := reg
           reg        := io.inSInt

@@ -45,8 +45,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.U(parameter.width).asBits)
           io.outBits := reg
           reg        := io.inBits
@@ -65,8 +65,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.B(parameter.width).asUInt)
           io.out := reg
           reg    := io.inUInt
@@ -85,8 +85,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.B(parameter.width).asSInt)
           io.outSInt := reg
           reg        := io.inSInt
@@ -105,8 +105,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(false.B.asBits.asBool)
           io.outBool := reg
           reg        := io.inBool
@@ -125,8 +125,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.S(parameter.width).asBits)
           io.outBits := reg
           reg        := io.inBits
@@ -145,8 +145,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(true.B.asBits.asBool)
           io.outBool := reg
           reg        := io.inBool
@@ -205,8 +205,8 @@ object ConstPropSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ConstPropParameter) =
           val io           = summon[Interface[ConstPropIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.U(parameter.width).asBits.asSInt)
           io.outSInt := reg
           reg        := io.inSInt
@@ -226,8 +226,8 @@ object ConstPropSpec extends TestSuite:
         def architecture(parameter: ConstPropParameter) =
           val io = summon[Interface[ConstPropIO]]
           compileError("""
-            given Ref[Clock] = io.syncDomain.clock
-            given Ref[Reset] = io.syncDomain.reset
+            given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+            given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
             val wire = Wire(UInt(parameter.width))
             val reg = RegInit(wire.asBits)
           """).check(

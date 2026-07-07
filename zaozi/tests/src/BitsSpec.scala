@@ -22,17 +22,17 @@ class BitsSpecLayers(parameter: BitsSpecParameter) extends LayerInterface(parame
 class BitsSpecIO(
   parameter: BitsSpecParameter)
     extends HWBundle(parameter):
-  val a          = Flipped(Bits(parameter.width))
-  val b          = Flipped(Bits(parameter.width))
-  val c          = Flipped(UInt(parameter.width))
-  val d          = Flipped(Bool())
-  val sint       = Aligned(SInt(parameter.width))
-  val uint       = Aligned(UInt(parameter.width))
-  val bits       = Aligned(Bits(parameter.width))
-  val widenBits  = Aligned(Bits(2 * parameter.width))
-  val bool       = Aligned(Bool())
-  val clock      = Flipped(Clock())
-  val asyncReset = Flipped(AsyncReset())
+  val a         = Flipped(Bits(parameter.width))
+  val b         = Flipped(Bits(parameter.width))
+  val c         = Flipped(UInt(parameter.width))
+  val d         = Flipped(Bool())
+  val sint      = Aligned(SInt(parameter.width))
+  val uint      = Aligned(UInt(parameter.width))
+  val bits      = Aligned(Bits(parameter.width))
+  val widenBits = Aligned(Bits(2 * parameter.width))
+  val bool      = Aligned(Bool())
+  val clock     = Flipped(Clock())
+  val reset     = Flipped(Reset())
 
 class BitsSpecProbe(parameter: BitsSpecParameter) extends DVBundle[BitsSpecParameter, BitsSpecLayers](parameter)
 

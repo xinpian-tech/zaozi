@@ -10,7 +10,9 @@ import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
+import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena
@@ -84,6 +86,40 @@ class InstanceContext:
       o
 
   val anonSignalCounter = new AnonSignalCounter(0)
+
+final case class ClockScope private[zaozi] (
+  clock: Ref[Clock],
+  clockEdge: FirrtlEventControl = FirrtlEventControl.AtPosEdge):
+  def apply[T](body: ClockScope ?=> T): T = body(
+    using this
+  )
+
+object ClockScope:
+  def posedge(clock: Ref[Clock]): ClockScope = ClockScope(clock, FirrtlEventControl.AtPosEdge)
+  def negedge(clock: Ref[Clock]): ClockScope = ClockScope(clock, FirrtlEventControl.AtNegEdge)
+end ClockScope
+
+final case class ResetScope private[zaozi] (
+  reset:     Ref[Reset],
+  resetType: RegResetType,
+  resetPolarity: RegResetPolarity):
+  def apply[T](body: ResetScope ?=> T): T = body(
+    using this
+  )
+
+object ResetScope:
+  def syncActiveHigh(reset: Ref[Reset]): ResetScope =
+    ResetScope(reset, RegResetType.SyncReset, RegResetPolarity.PosReset)
+
+  def syncActiveLow(reset: Ref[Reset]): ResetScope =
+    ResetScope(reset, RegResetType.SyncReset, RegResetPolarity.NegReset)
+
+  def asyncActiveHigh(reset: Ref[Reset]): ResetScope =
+    ResetScope(reset, RegResetType.AsyncReset, RegResetPolarity.PosReset)
+
+  def asyncActiveLow(reset: Ref[Reset]): ResetScope =
+    ResetScope(reset, RegResetType.AsyncReset, RegResetPolarity.NegReset)
+end ResetScope
 
 trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]]:
   /* For traits with self-type annotation that don't want type parameters
@@ -308,10 +344,11 @@ trait ConstructorApi:
   def Reg[T <: Data](
     refType: T
   )(
+    using ClockScope
+  )(
     using Arena,
     Context,
     Block,
-    Ref[Clock],
     sourcecode.File,
     sourcecode.Line,
     sourcecode.Name.Machine,
@@ -320,11 +357,13 @@ trait ConstructorApi:
   def RegInit[T <: Data](
     input: Const[T]
   )(
+    using ClockScope
+  )(
+    using ResetScope
+  )(
     using Arena,
     Context,
     Block,
-    Ref[Clock],
-    Ref[Reset],
     sourcecode.File,
     sourcecode.Line,
     sourcecode.Name.Machine,

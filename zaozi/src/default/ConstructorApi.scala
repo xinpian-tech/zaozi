@@ -15,6 +15,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
 }
 import org.llvm.circt.scalalib.dialect.firrtl.operation
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
+  AsResetPrimApi,
   ConnectApi,
   ConstantApi,
   InstanceApi,
@@ -161,21 +162,24 @@ given ConstructorApi with
   def Reg[T <: Data](
     refType: T
   )(
+    using ClockScope
+  )(
     using Arena,
     Context,
     Block,
-    Ref[Clock],
     sourcecode.File,
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
   ): Reg[T] =
-    val regOp = summon[RegApi].op(
+    val clockScope = summon[ClockScope]
+    val regOp      = summon[RegApi].op(
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
       tpe = refType.toMlirType,
-      clock = summon[Ref[Clock]].refer
+      clock = clockScope.clock.refer,
+      clockEdge = clockScope.clockEdge
     )
     regOp.operation.appendToBlock()
     new Reg[T]:
@@ -185,24 +189,33 @@ given ConstructorApi with
   def RegInit[T <: Data](
     input: Const[T]
   )(
+    using ClockScope
+  )(
+    using ResetScope
+  )(
     using Arena,
     Context,
     Block,
-    Ref[Clock],
-    Ref[Reset],
     sourcecode.File,
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
   ): Reg[T] =
+    val clockScope = summon[ClockScope]
+    val resetScope = summon[ResetScope]
+    val asResetOp  = summon[AsResetPrimApi].op(resetScope.reset.refer, locate)
+    asResetOp.operation.appendToBlock()
     val regResetOp = summon[RegResetApi].op(
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
       tpe = input._tpe.toMlirType,
-      clock = summon[Ref[Clock]].refer,
-      reset = summon[Ref[Reset]].refer,
-      resetValue = input.refer
+      clock = clockScope.clock.refer,
+      reset = asResetOp.result,
+      resetValue = input.refer,
+      clockEdge = clockScope.clockEdge,
+      resetType = resetScope.resetType,
+      resetPolarity = resetScope.resetPolarity
     )
     regResetOp.operation.appendToBlock()
     new Reg[T]:

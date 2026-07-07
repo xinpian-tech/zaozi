@@ -871,8 +871,6 @@ object SVASpec extends TestSuite:
 
             Assert(posedge(io.clock0)(a.S) ## negedge(io.clock1)(b.S))
 
-        println(MultiClock.mlirString(MultiClockParameter(32)))
-        println(MultiClock.verilogString(MultiClockParameter(32)))
         MultiClock.verilogTest(MultiClockParameter(32))(
           "(@(posedge clock0) ib0) ##0 (@(negedge clock1) ib1)"
         )

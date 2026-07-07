@@ -61,7 +61,7 @@ object ReferableSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ReferableSpecParameter) =
           val io           = summon[Interface[ReferableSpecIO]]
-          given Ref[Clock] = io.syncDomain.clock
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
           val reg          = Reg(UInt(parameter.width))
           io.passthrough.o := reg
           reg              := io.passthrough.i
@@ -77,12 +77,29 @@ object ReferableSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ReferableSpecParameter) =
           val io           = summon[Interface[ReferableSpecIO]]
-          given Ref[Clock] = io.syncDomain.clock
-          given Ref[Reset] = io.syncDomain.reset
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
           val reg          = RegInit(0.U(parameter.width))
           io.passthrough.o := reg
           reg              := io.passthrough.i
       RegisterWithSyncReset.verilogTest(ReferableSpecParameter(8))(
+        "always @(posedge syncDomain_clock) begin",
+        "if (syncDomain_reset)"
+      )
+
+    test("Register with explicit domain"):
+      @generator
+      object RegisterWithExplicitDomain
+          extends Generator[ReferableSpecParameter, ReferableSpecLayers, ReferableSpecIO, ReferableSpecProbe]
+          with HasVerilogTest:
+        def architecture(parameter: ReferableSpecParameter) =
+          val io           = summon[Interface[ReferableSpecIO]]
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
+          val reg          = RegInit(0.U(parameter.width))
+          io.passthrough.o := reg
+          reg              := io.passthrough.i
+      RegisterWithExplicitDomain.verilogTest(ReferableSpecParameter(8))(
         "always @(posedge syncDomain_clock) begin",
         "if (syncDomain_reset)"
       )
@@ -94,8 +111,8 @@ object ReferableSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: ReferableSpecParameter) =
           val io           = summon[Interface[ReferableSpecIO]]
-          given Ref[Clock] = io.asyncDomain.clock
-          given Ref[Reset] = io.asyncDomain.reset
+          given ClockScope = ClockScope.posedge(io.asyncDomain.clock)
+          given ResetScope = ResetScope.asyncActiveHigh(io.asyncDomain.reset)
           val reg          = RegInit(0.U(parameter.width))
           io.passthrough.o := reg
           reg              := io.passthrough.i
@@ -135,8 +152,7 @@ object ReferableSpec extends TestSuite:
           extends Generator[ReferableSpecParameter, ReferableSpecLayers, ReferableSpecIO, ReferableSpecProbe]
           with HasCompileErrorTest:
         def architecture(parameter: ReferableSpecParameter) =
-          val io           = summon[Interface[ReferableSpecIO]]
-          given Ref[Clock] = io.syncDomain.clock
+          val io = summon[Interface[ReferableSpecIO]]
           compileError("""val n = io.passthrough.i + io.passthrough.i; n := io.passthrough.i""").check(
             "",
             "Type parameter T must be a subtype of DynamicSubfield"
