@@ -1125,7 +1125,6 @@ trait ContractApi:
 trait SVAApi:
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
-  def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent
 
   /** SVA: always p
     */

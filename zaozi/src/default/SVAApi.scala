@@ -59,15 +59,13 @@ import org.llvm.mlir.scalalib.capi.ir.{
 
 import java.lang.foreign.Arena
 
-export given_SVAApi.{always, anyedge, eventually, negedge, posedge, Assert, Assume, Cover}
+export given_SVAApi.{always, eventually, negedge, posedge, Assert, Assume, Cover}
 
 given SVAApi with
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(FirrtlEventControl.AtPosEdge, clock)
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(FirrtlEventControl.AtNegEdge, clock)
-  def anyedge(clock: Referable[Clock] & HasOperation): ClockEvent =
-    ClockEvent(FirrtlEventControl.AtEdge, clock)
 
   def always(
     property: Immediate | Sequence | Property

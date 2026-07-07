@@ -58,13 +58,11 @@ given FirrtlEventControlApi with
     override inline def fromNative: FirrtlEventControl = int match
       case i if i == FIRRTL_EVENT_CONTROL_AT_POS_EDGE() => FirrtlEventControl.AtPosEdge
       case i if i == FIRRTL_EVENT_CONTROL_AT_NEG_EDGE() => FirrtlEventControl.AtNegEdge
-      case i if i == FIRRTL_EVENT_CONTROL_AT_EDGE()     => FirrtlEventControl.AtEdge
   extension (ref: FirrtlEventControl)
     inline def toNative: Int =
       ref match
         case FirrtlEventControl.AtPosEdge => FIRRTL_EVENT_CONTROL_AT_POS_EDGE()
         case FirrtlEventControl.AtNegEdge => FIRRTL_EVENT_CONTROL_AT_NEG_EDGE()
-        case FirrtlEventControl.AtEdge    => FIRRTL_EVENT_CONTROL_AT_EDGE()
     inline def sizeOf:   Int = 4
 
 given FirrtlConventionApi with

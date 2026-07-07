@@ -42,7 +42,6 @@ end FirrtlClassElementApi
 enum FirrtlEventControl:
   case AtPosEdge
   case AtNegEdge
-  case AtEdge
 end FirrtlEventControl
 trait FirrtlEventControlApi extends HasSizeOf[FirrtlEventControl] with EnumHasToNative[FirrtlEventControl]
 
