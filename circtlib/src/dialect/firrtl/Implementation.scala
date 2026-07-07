@@ -469,7 +469,8 @@ given RegApi with
     location:    Location,
     nameKind:    FirrtlNameKind,
     tpe:         Type,
-    clock:       Value
+    clock:       Value,
+    clockEdge:   FirrtlEventControl
   )(
     using arena: Arena,
     context:     Context
@@ -485,7 +486,12 @@ given RegApi with
           // ::circt::firrtl::NameKindEnumAttr
           namedAttributeApi.namedAttributeGet("nameKind".identifierGet, nameKind.attrGetNameKind),
           // ::mlir::ArrayAttr
-          namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet)
+          namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet),
+          // ::circt::firrtl::EventControlAttr
+          namedAttributeApi.namedAttributeGet(
+            "clockEdge".identifierGet,
+            clockEdge.attrGetEventControl
+          )
           // ::circt::hw::InnerSymAttr
           // namedAttributeApi.namedAttributeGet("inner_sym".identifierGet, ???),
           // ::mlir::UnitAttr
@@ -500,16 +506,19 @@ given RegApi with
 end given
 given RegResetApi with
   inline def op(
-    name:        String,
-    location:    Location,
-    nameKind:    FirrtlNameKind,
-    tpe:         Type,
-    clock:       Value,
-    reset:       Value,
-    resetValue:  Value
+    name:          String,
+    location:      Location,
+    nameKind:      FirrtlNameKind,
+    tpe:           Type,
+    clock:         Value,
+    reset:         Value,
+    resetValue:    Value,
+    clockEdge:     FirrtlEventControl,
+    resetType:     RegResetType,
+    resetPolarity: RegResetPolarity
   )(
-    using arena: Arena,
-    context:     Context
+    using arena:   Arena,
+    context:       Context
   ): RegReset = RegReset(
     summon[OperationApi].operationCreate(
       name = "firrtl.regreset",
@@ -522,7 +531,22 @@ given RegResetApi with
           // ::circt::firrtl::NameKindEnumAttr
           namedAttributeApi.namedAttributeGet("nameKind".identifierGet, nameKind.attrGetNameKind),
           // ::mlir::ArrayAttr
-          namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet)
+          namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet),
+          // ::circt::firrtl::EventControlAttr
+          namedAttributeApi.namedAttributeGet(
+            "clockEdge".identifierGet,
+            clockEdge.attrGetEventControl
+          ),
+          // ::circt::firrtl::RegResetTypeAttr
+          namedAttributeApi.namedAttributeGet(
+            "resetType".identifierGet,
+            resetType.attrValue.integerAttrGet(32.integerTypeGet)
+          ),
+          // ::circt::firrtl::RegResetPolarityAttr
+          namedAttributeApi.namedAttributeGet(
+            "resetPolarity".identifierGet,
+            resetPolarity.attrValue.integerAttrGet(32.integerTypeGet)
+          )
           // ::circt::hw::InnerSymAttr
           // namedAttributeApi.namedAttributeGet("inner_sym".identifierGet, ???),
           // ::mlir::UnitAttr

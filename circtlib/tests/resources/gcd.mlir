@@ -4,9 +4,9 @@ module {
     %c0_i16 = hw.constant 0 : i16
     %false = hw.constant false
     %true = hw.constant true
-    %x = seq.firreg %7 clock %clock {firrtl.random_init_start = 0 : ui64, sv.namehint = "x"} : i16
-    %y = seq.firreg %8 clock %clock reset sync %reset, %c0_i16 {firrtl.random_init_start = 16 : ui64} : i16
-    %startupFlag = seq.firreg %9 clock %clock reset sync %reset, %false {firrtl.random_init_start = 32 : ui64} : i1
+    %x = seq.firreg %7 clock %clock {clockEdge = 0 : i32, firrtl.random_init_start = 0 : ui64, sv.namehint = "x"} : i16
+    %y = seq.firreg %8 clock %clock reset sync %reset, %c0_i16 {clockEdge = 0 : i32, resetPolarity = 0 : i32, firrtl.random_init_start = 16 : ui64} : i16
+    %startupFlag = seq.firreg %9 clock %clock reset sync %reset, %false {clockEdge = 0 : i32, resetPolarity = 0 : i32, firrtl.random_init_start = 32 : ui64} : i1
     %0 = comb.icmp bin ne %y, %c0_i16 {sv.namehint = "busy"} : i16
     %1 = comb.icmp bin ugt %x, %y : i16
     %2 = comb.sub bin %x, %y {sv.namehint = "_x_T"} : i16

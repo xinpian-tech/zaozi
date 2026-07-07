@@ -10,6 +10,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   DialectApi as FirrtlDialect,
   FirrtlBundleFieldApi,
   FirrtlConvention,
+  FirrtlEventControl,
   FirrtlNameKind,
   TypeApi as FirrtlTypeApi
 }
@@ -141,7 +142,8 @@ object Smoke extends TestSuite:
                   location = unknownLocation,
                   nameKind = FirrtlNameKind.Droppable,
                   tpe = 32.getUInt,
-                  clock = clock.result
+                  clock = clock.result,
+                  clockEdge = FirrtlEventControl.AtPosEdge
                 )
                 .operation
                 .appendToBlock()
@@ -177,7 +179,10 @@ object Smoke extends TestSuite:
                   tpe = 32.getUInt,
                   clock = clock.result,
                   reset = reset.result,
-                  resetValue = resetValue.result
+                  resetValue = resetValue.result,
+                  clockEdge = FirrtlEventControl.AtPosEdge,
+                  resetType = RegResetType.SyncReset,
+                  resetPolarity = RegResetPolarity.PosReset
                 )
                 .operation
                 .appendToBlock()

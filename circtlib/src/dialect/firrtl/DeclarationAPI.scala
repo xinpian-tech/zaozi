@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.firrtl.operation
 
-import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlNameKind}
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlEventControl, FirrtlNameKind}
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Type, Value}
 
@@ -30,9 +30,51 @@ end NodeApi
 class Object(val _operation: Operation)
 class Reg(val _operation: Operation)
 trait RegApi      extends HasOperation[Reg]:
+  inline def op(
+    name:        String,
+    location:    Location,
+    nameKind:    FirrtlNameKind,
+    tpe:         Type,
+    clock:       Value,
+    clockEdge:   FirrtlEventControl
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Reg
 end RegApi
 class RegReset(val _operation: Operation)
+enum RegResetType:
+  case SyncReset, AsyncReset
+
+  def attrValue: Long = this match
+    case SyncReset  => 0L
+    case AsyncReset => 1L
+end RegResetType
+
+enum RegResetPolarity:
+  case PosReset, NegReset
+
+  def attrValue: Long = this match
+    case PosReset => 0L
+    case NegReset => 1L
+end RegResetPolarity
+
 trait RegResetApi extends HasOperation[RegReset]:
+  inline def op(
+    name:          String,
+    location:      Location,
+    nameKind:      FirrtlNameKind,
+    tpe:           Type,
+    clock:         Value,
+    reset:         Value,
+    resetValue:    Value,
+    clockEdge:     FirrtlEventControl,
+    resetType:     RegResetType,
+    resetPolarity: RegResetPolarity
+  )(
+    using arena:   Arena,
+    context:       Context
+  ): RegReset
 end RegResetApi
 class Wire(val _operation: Operation)
 trait WireApi     extends HasOperation[Wire]:
