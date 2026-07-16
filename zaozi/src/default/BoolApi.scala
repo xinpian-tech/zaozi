@@ -9,6 +9,7 @@ import me.jiuyang.zaozi.{BoolApi, InstanceContext}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_FirrtlBundleFieldApi, given_TypeApi, FirrtlNameKind}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   AndPrimApi,
+  AsClockPrimApi,
   EQPrimApi,
   MuxPrimApi,
   NEQPrimApi,
@@ -24,6 +25,44 @@ import java.lang.foreign.Arena
 
 given BoolApi with
   extension [LHS <: Referable[Bool]](ref: LHS)
+    def asClock(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Propagated[LHS, Clock] =
+      val asClockOp = summon[AsClockPrimApi].op(ref.refer, locate)
+      asClockOp.operation.appendToBlock()
+      val nodeOp    = summon[NodeApi].op(
+        name = valName,
+        location = locate,
+        nameKind = FirrtlNameKind.Interesting,
+        input = asClockOp.result
+      )
+      nodeOp.operation.appendToBlock()
+      propagate[LHS, Clock](ref, new Object with Clock, nodeOp.operation.getResult(0))
+
+    def asReset(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Propagated[LHS, Reset] =
+      val nodeOp = summon[NodeApi].op(
+        name = valName,
+        location = locate,
+        nameKind = FirrtlNameKind.Interesting,
+        input = ref.refer
+      )
+      nodeOp.operation.appendToBlock()
+      propagate[LHS, Reset](ref, new Object with Reset, nodeOp.operation.getResult(0))
+
     def unary_!(
       using Arena,
       Context,
