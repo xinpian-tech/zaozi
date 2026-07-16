@@ -446,6 +446,28 @@ trait AsBool[D <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Propagated[R, Bool]
+trait AsClock[D <: Data]:
+  extension [R <: Referable[D]](ref: R)
+    def asClock(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Propagated[R, Clock]
+trait AsReset[D <: Data]:
+  extension [R <: Referable[D]](ref: R)
+    def asReset(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Propagated[R, Reset]
 trait AsSInt[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asSInt(
@@ -1030,6 +1052,8 @@ trait BitsApi
 
 trait BoolApi
     extends AsBits[Bool]
+    with AsClock[Bool]
+    with AsReset[Bool]
     with Neg[Bool, Bool]
     with Eq[Bool, Bool]
     with Neq[Bool, Bool]
@@ -1073,7 +1097,7 @@ trait RecordApi[T <: Record | ProbeRecord] extends AsBits[T]
 
 trait VecApi[E <: Data, V <: Vec[E]] extends AsBits[V] with RefElement[V, E] with GetLength[E, V]
 
-trait ClockApi
+trait ClockApi extends AsBool[Clock]
 
 trait ResetApi extends AsBool[Reset]
 
