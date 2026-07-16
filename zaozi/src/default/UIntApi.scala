@@ -31,6 +31,10 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
+/** Implements `UIntApi`; see that trait in `me.jiuyang.zaozi.Api` for arithmetic/shift semantics -- notably that
+  * `+`/`-` grow the result by one bit rather than wrapping, and that `<<`'s static case grows the width while `>>`'s
+  * static case pads back to the original width.
+  */
 given UIntApi with
   extension [LHS <: Referable[UInt]](ref: LHS)
     def asBits(

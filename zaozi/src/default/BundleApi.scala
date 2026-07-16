@@ -14,6 +14,7 @@ import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
 import java.lang.foreign.Arena
 
+/** Implements `BundleApi`: `asBits` is a `firrtl.bitcast` to a same-width `Bits`, not a field-by-field walk. */
 given [T <: Bundle | ProbeBundle]: BundleApi[T] with
   extension [R <: Referable[T]](ref: R)
     def asBits(

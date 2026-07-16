@@ -32,6 +32,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
+/** Implements `SIntApi`; see that trait in `me.jiuyang.zaozi.Api`. The `>>` static case sign-extends back to the
+  * original width (arithmetic shift), unlike `UIntApi`'s zero-extending equivalent.
+  */
 given SIntApi with
   extension [LHS <: Referable[SInt]](ref: LHS)
     def asBits(

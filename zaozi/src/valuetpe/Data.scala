@@ -9,6 +9,11 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
+/** Base type for every hardware value/type Zaozi can represent: [[Bits]], [[UInt]], [[SInt]], [[Bool]], [[Clock]],
+  * [[Reset]], [[Analog]], aggregates ([[Bundle]], [[Record]], [[Vec]]), and probe reference types. A `Data` is a
+  * type-level description (e.g. "a 32-bit UInt") that gets turned into an MLIR FIRRTL type on demand -- it does not by
+  * itself refer to a value in the circuit; see [[me.jiuyang.zaozi.reftpe.Referable]] for that.
+  */
 trait Data:
   // toMlirType is called lazily when constructing MLIR operations.
   // This design requires maintaining type metadata (e.g., _width) in Scala objects.
@@ -26,6 +31,9 @@ trait Data:
     TypeImpl
   ): Int = this.widthImpl
 
+/** Base type for `Data` with named sub-fields ([[Bundle]], [[Record]], [[ProbeBundle]], [[ProbeRecord]]), i.e. anything
+  * whose fields are discovered dynamically by field access rather than being a plain scalar.
+  */
 trait Aggregate extends Data:
   this: DynamicSubfield | UntypedDynamicSubfield =>
   private[zaozi] var instantiating = true

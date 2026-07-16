@@ -52,7 +52,15 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import java.lang.foreign.Arena
 import java.nio.file.StandardOpenOption.*
 
+/** Shared implementation behind both `me.jiuyang.zaozi.default.GeneratorApi` (for `Generator`) and
+  * `me.jiuyang.zaozi.default.VerilogWrapperApi` (for `VerilogWrapper`): building a FIRRTL `instance` op and writing a
+  * module's elaborated MLIR bytecode to disk.
+  */
 object BaseGeneratorHelper:
+  /** Builds a FIRRTL `firrtl.instance` of `moduleName` and wraps its IO/probe ports in fresh `io`/`probe` wires
+    * (aligned fields connected instance-out-to-wire, flipped fields wire-to-instance-in), producing the [[Instance]]
+    * returned by `instantiate`.
+    */
   def createInstance[
     PARAM <: Parameter,
     L <: LayerInterface[PARAM],
@@ -133,6 +141,10 @@ object BaseGeneratorHelper:
         private[zaozi] val _tpe       = probeTpe
         private[zaozi] val _operation = probeWire.operation
 
+  /** Elaborates `createModule` into a fresh circuit and writes its MLIR bytecode to `$ZAOZI_OUTDIR/moduleName.mlirbc`
+    * (or `./moduleName.mlirbc` if unset) -- but only the first time `parameter` is seen (guarded by
+    * `elaboratedModules`), so re-instantiating the same parameterization elsewhere in the design is a no-op.
+    */
   def dumpMlirbc[PARAM <: Parameter](
     moduleName:        String,
     elaboratedModules: scala.collection.mutable.HashSet[PARAM],

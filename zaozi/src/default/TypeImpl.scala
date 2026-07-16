@@ -16,6 +16,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, T
 import java.lang.foreign.Arena
 import scala.collection.immutable.SeqMap
 
+/** Implements `TypeImpl`: builds the MLIR FIRRTL `Type` for each [[Data]] subtype and the raw `Operation`/`Value`
+  * accessors every other `default` API is built on. See `me.jiuyang.zaozi.TypeImpl` in `me.jiuyang.zaozi.Api`.
+  */
 given TypeImpl with
   private def buildBundleMlirType(
     ref: Aggregate

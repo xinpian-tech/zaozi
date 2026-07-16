@@ -69,6 +69,10 @@ given VerilogWrapperApi:
     V <: VerilogParameter
   ](wrapper: VerilogWrapper[PARAM, L, I, P, V]
   )
+    /** Declares `wrapper` as a FIRRTL `extmodule` (a black-boxed external module, generated verilog-side and given by
+      * name only) with `wrapper.verilogParameter`'s fields as Verilog module parameters (`String`,
+      * `BigInt`/`Int`/`Long`, `Double`, and `Boolean` values only).
+      */
     def extmodule(
       parameter: PARAM
     )(

@@ -12,6 +12,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
+/** Implements `VecApi`. [[ref]]/`apply` chooses a `SubindexOp` (static) or `SubaccessOp` (dynamic) based on whether
+  * `idx` is an `Int` or a `Referable[UInt]`; see `me.jiuyang.zaozi.RefElement` in `me.jiuyang.zaozi.Api`.
+  */
 given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
   extension [R <: Referable[V]](ref: R)
     def asBits(

@@ -20,6 +20,10 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
 import java.lang.foreign.Arena
 
+/** Implements `ProbeConnect`'s three `<==` overloads via FIRRTL's `ref.send`/`ref.cast`/`ref.define`/ `ref.resolve`
+  * ops: send+define to originate a probe from data, plain define to alias one probe to another, and resolve+connect to
+  * read a probe back into an ordinary value. See `me.jiuyang.zaozi.ProbeConnect` in `me.jiuyang.zaozi.Api`.
+  */
 given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]
   : ProbeConnect[D, P, DATA, PROBE] with
   extension (ref: PROBE)

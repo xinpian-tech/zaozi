@@ -14,6 +14,9 @@ import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
 import java.lang.foreign.Arena
 
+/** Implements `RecordApi`: `asBits` is a `firrtl.bitcast` to a same-width `Bits`, and [[field]] looks up a named field
+  * dynamically (the `Record` counterpart to a `Bundle`'s statically-declared `val` fields).
+  */
 given [T <: Record | ProbeRecord]: RecordApi[T] with
   extension [R <: Referable[T]](ref: R)
     def asBits(

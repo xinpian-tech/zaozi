@@ -61,6 +61,9 @@ import java.lang.foreign.Arena
 
 export given_SVAApi.{always, eventually, negedge, posedge, Assert, Assume, Cover}
 
+/** Implements `SVAApi` by lowering to CIRCT's `ltl` (property/sequence) and `verif` (assert/assume/cover) dialects; see
+  * `me.jiuyang.zaozi.SVAApi` in `me.jiuyang.zaozi.Api` for the SVA syntax each combinator corresponds to.
+  */
 given SVAApi with
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent =
     ClockEvent(FirrtlEventControl.AtPosEdge, clock)

@@ -7,6 +7,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
+/** A clock signal (FIRRTL's `!firrtl.clock`). Used with [[me.jiuyang.zaozi.ClockScope]] to give registers an implicit
+  * clock.
+  */
 trait Clock extends Element with CanProbe:
   def toMlirType(
     using Arena,
