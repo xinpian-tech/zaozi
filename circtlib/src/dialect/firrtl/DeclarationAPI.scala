@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.firrtl.operation
 
+import mainargs.TokensReader
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlEventControl, FirrtlNameKind}
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Type, Value}
@@ -57,6 +58,30 @@ enum RegResetPolarity:
   def attrValue: Long = this match
     case PosReset => 0L
     case NegReset => 1L
+end RegResetPolarity
+
+object RegResetPolarity:
+  given upickle.default.ReadWriter[RegResetPolarity] =
+    upickle.default
+      .readwriter[String]
+      .bimap[RegResetPolarity](
+        {
+          case PosReset => "active-high"
+          case NegReset => "active-low"
+        },
+        {
+          case "active-high" => PosReset
+          case "active-low"  => NegReset
+          case value         => throw new IllegalArgumentException(s"Unknown reset polarity: $value")
+        }
+      )
+
+  given TokensReader.Simple[RegResetPolarity]:
+    def shortName = "reset-polarity"
+    def read(strs: Seq[String]): Either[String, RegResetPolarity] = strs match
+      case Seq("active-high") => Right(PosReset)
+      case Seq("active-low")  => Right(NegReset)
+      case _                  => Left("reset polarity must be active-high or active-low")
 end RegResetPolarity
 
 trait RegResetApi extends HasOperation[RegReset]:

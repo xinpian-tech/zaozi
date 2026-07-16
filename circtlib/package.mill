@@ -13,7 +13,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with PanamaModule 
   outer =>
   def scalaVersion = Task(v.scala)
   def moduleDeps   = Seq(mlirlib)
-  def mvnDeps      = Seq(v.pprint)
+  def mvnDeps      = Seq(v.mainargs, v.pprint, v.upickle)
 
   override def dumpIncludes() = Task.Command {
     super.dumpIncludes()()
