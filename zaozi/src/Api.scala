@@ -1336,14 +1336,6 @@ object ContractTupleArgs:
   * result) -- separately from the implementation that produces them. Used in `me.jiuyang.stdlib.PrefixAdderCommon` to
   * state "this prefix-tree network computes `A + B + CI`" independent of the tree shape, and in
   * `me.jiuyang.zaozitest.ContractSpec` for minimal examples.
-  *
-  * '''What actually gets checked''': `Ensure` lowers to an `assert property` in a separate `..._CheckContract_N` module
-  * tagged `// FORMAL TEST` in the exported Verilog (see `me.jiuyang.zaozi.default.SVAApi`'s emission pipeline), and
-  * callers of the contracted value see it as an `assume`d free variable satisfying the stated property. Nothing in this
-  * repository's own build currently runs a solver against that assertion -- it is a machine-checkable statement of
-  * intent for an external formal tool, not a check `mill test` enforces today. Verify a contracted design's actual
-  * numeric behavior with simulation (see `SubleqSimSpec`/`VarAdderSimSpec`) or by structurally matching the emitted
-  * RTL, not by relying on `Ensure` alone.
   */
 trait ContractApi:
   /** The no-argument form: states properties about values already in scope, e.g. `Require((p >= 1.U).I)` /
