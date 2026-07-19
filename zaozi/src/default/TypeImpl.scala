@@ -63,9 +63,9 @@ given TypeImpl with
       using Arena
     ): Value = ref.operation.getResult(0)
   extension (ref: Instance[?, ?])
-    def operationImpl:        Operation = ref._operation
-    def ioImpl[T <: Data]:    Wire[T]   = ref._ioWire.asInstanceOf[Wire[T]]
-    def probeImpl[T <: Data]: Wire[T]   = ref._probeWire.asInstanceOf[Wire[T]]
+    def operationImpl:                     Operation    = ref._operation
+    def ioImpl[T <: HWInterface[?]]:       Interface[T] = ref._io.asInstanceOf[Interface[T]]
+    def probeImpl[T <: DVInterface[?, ?]]: Interface[T] = ref._probe.asInstanceOf[Interface[T]]
   extension (ref: Sequence)
     def operationImpl: Operation = ref._operation
     def referImpl(

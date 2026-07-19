@@ -86,6 +86,7 @@ given GeneratorApi:
       val unknownLocation   = summon[LocationApi].locationUnknownGet
       val ioNumFields       = io.toMlirType.getBundleNumFields.toInt
       val probeNumFields    = probe.toMlirType.getBundleNumFields.toInt
+      val moduleDoc         = generator.moduleDoc(parameter).map(normalizeDocumentation)
       val bfs               =
         Seq.tabulate(ioNumFields)(io.toMlirType.getBundleFieldByIndex) ++
           Seq.tabulate(probeNumFields)(probe.toMlirType.getBundleFieldByIndex)
@@ -94,7 +95,8 @@ given GeneratorApi:
         unknownLocation,
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
-        generator.layers(parameter).nameHierarchies
+        generator.layers(parameter).nameHierarchies,
+        comment = moduleDoc
       )
       given Block           = module.block
       val ioWire            = summon[WireApi].op(

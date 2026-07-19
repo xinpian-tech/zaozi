@@ -228,7 +228,8 @@ given ModuleApi with
     location:         Location,
     firrtlConvention: FirrtlConvention,
     interface:        Seq[(FirrtlBundleField, Location)],
-    layers:           Seq[Seq[String]]
+    layers:           Seq[Seq[String]],
+    comment:          scala.Option[String] = scala.None
   )(
     using arena:      Arena,
     context:          Context
@@ -293,7 +294,8 @@ given ModuleApi with
               .map(path => path.reverse.last.symbolRefAttrGet(path.drop(1).map(_.flatSymbolRefAttrGet)))
               .arrayAttrGet
           )
-        )
+        ) ++ comment.map: value =>
+          namedAttributeApi.namedAttributeGet("comment".identifierGet, value.stringAttrGet)
     )
   )
   extension (ref: Module)

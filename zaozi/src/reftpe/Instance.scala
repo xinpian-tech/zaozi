@@ -8,12 +8,12 @@ import org.llvm.mlir.scalalib.capi.ir.Operation
 import me.jiuyang.zaozi.HWInterface
 import me.jiuyang.zaozi.DVInterface
 
-abstract class Instance[IOTpe <: HWInterface[?], ProbeTpe <: DVInterface[?, ?]] extends HasOperation:
+abstract class Instance[IOTpe <: HWInterface[?], ProbeTpe <: DVInterface[?, ?]] extends Documentable:
   private[zaozi] val _ioTpe:     IOTpe
   private[zaozi] val _probeTpe:  ProbeTpe
   private[zaozi] val _operation: Operation
-  private[zaozi] val _ioWire:    Wire[IOTpe]
-  private[zaozi] val _probeWire: Wire[ProbeTpe]
+  private[zaozi] val _io:        Interface[IOTpe]
+  private[zaozi] val _probe:     Interface[ProbeTpe]
 
   def operation(
     using TypeImpl
@@ -21,8 +21,8 @@ abstract class Instance[IOTpe <: HWInterface[?], ProbeTpe <: DVInterface[?, ?]] 
 
   def io(
     using TypeImpl
-  ): Wire[IOTpe] = this.ioImpl[IOTpe]
+  ): Interface[IOTpe] = this.ioImpl[IOTpe]
 
   def probe(
     using TypeImpl
-  ): Wire[ProbeTpe] = this.probeImpl[ProbeTpe]
+  ): Interface[ProbeTpe] = this.probeImpl[ProbeTpe]

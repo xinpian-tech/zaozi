@@ -5,7 +5,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
-    circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
+    circt-nix = {
+      url = "github:xinpian-tech/circt-nix/xinpian-main";
+      inputs.circt-src.url = "github:xinpian-tech/circt/master";
+    };
     flake-utils.url = "github:numtide/flake-utils";
     mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
   };

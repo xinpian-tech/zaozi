@@ -41,6 +41,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Module as MlirModule,
   ModuleApi as MlirModuleApi,
   NamedAttributeApi,
+  Operation,
   OperationApi,
   Type
 }
@@ -54,13 +55,15 @@ trait HasMlirTest:
   this: Generator[?, ?, ?, ?] =>
   private val self = this.asInstanceOf[Generator[this.TPARAM, this.TLAYER, this.TINTF, this.TPROBE]]
 
-  def mlirString(
+  private def withMlirOperation[T](
     parameter: this.TPARAM
-  ): String =
-    val arena = Arena.ofConfined()
+  )(callback:  (Arena, Context) ?=> Operation => T
+  ): T =
+    val arena   = Arena.ofConfined()
+    given Arena = arena
+    val context = summon[ContextApi].contextCreate
     try
-      given Arena      = arena
-      given Context    = summon[ContextApi].contextCreate
+      given Context    = context
       summon[FirrtlDialectApi].loadDialect
       summon[LTLDialectApi].loadDialect
       summon[VerifDialectApi].loadDialect
@@ -70,12 +73,23 @@ trait HasMlirTest:
       self.module(parameter).appendToCircuit()
       validateCircuit()
 
-      val out = new StringBuilder
-      summon[MlirModule].getOperation.print(out ++= _)
-      summon[Context].destroy()
+      callback(summon[MlirModule].getOperation)
+    finally
+      context.destroy()
+      arena.close()
 
+  def mlirString(
+    parameter: this.TPARAM
+  ): String =
+    withMlirOperation(parameter): root =>
+      val out = new StringBuilder
+      root.print(out ++= _)
       out.toString
-    finally arena.close()
+
+  def mlirOperationTest(
+    parameter: this.TPARAM
+  )(predicate: (Arena, Context) ?=> Operation => Boolean
+  ): Unit = withMlirOperation(parameter)(root => assert(predicate(root)))
 
   def mlirTest(
     parameter: this.TPARAM
