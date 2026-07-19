@@ -136,6 +136,9 @@ trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface
   def moduleName(parameter: PARAM): String =
     s"${this.getClass.getSimpleName.stripSuffix("$")}_${parameter.hashCode.toHexString}"
 
+  /** Documentation emitted immediately before this generated module. */
+  def moduleDoc(parameter: PARAM): Option[String] = None
+
   def architecture(parameter: PARAM): (
     Arena,
     Context,
@@ -272,6 +275,17 @@ trait VerilogWrapperApi:
       InstanceContext
     ): Instance[I, P]
 
+trait DocApi:
+  extension [T <: Documentable](target: T)
+    /** Attach documentation to a hardware declaration for emission in generated RTL. */
+    def doc(
+      text: String
+    )(
+      using Arena,
+      Context,
+      TypeImpl
+    ): T
+
 trait ConstructorApi:
   def Clock(): Clock
 
@@ -379,7 +393,7 @@ trait ConstructorApi:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ):   Node[T]
+  ):   Node[T] & Documentable
   extension (bigInt: BigInt)
     def U(
       width: Int
@@ -2024,9 +2038,9 @@ trait TypeImpl:
       using Arena
     ):                                Value
   extension (ref: Instance[?, ?])
-    private[zaozi] def operationImpl:        Operation
-    private[zaozi] def ioImpl[T <: Data]:    Wire[T]
-    private[zaozi] def probeImpl[T <: Data]: Wire[T]
+    private[zaozi] def operationImpl:                     Operation
+    private[zaozi] def ioImpl[T <: HWInterface[?]]:       Interface[T]
+    private[zaozi] def probeImpl[T <: DVInterface[?, ?]]: Interface[T]
   extension (ref: Sequence)
     private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(

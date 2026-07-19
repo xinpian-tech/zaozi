@@ -126,10 +126,10 @@ object BaseGeneratorHelper:
       val _ioTpe     = ioTpe
       val _probeTpe  = probeTpe
       val _operation = instanceOp.operation
-      val _ioWire    = new Wire[I]:
+      val _io        = new Interface[I]:
         private[zaozi] val _tpe       = ioTpe
         private[zaozi] val _operation = ioWire.operation
-      val _probeWire = new Wire[P]:
+      val _probe     = new Interface[P]:
         private[zaozi] val _tpe       = probeTpe
         private[zaozi] val _operation = probeWire.operation
 
