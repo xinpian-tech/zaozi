@@ -29,7 +29,16 @@ object v {
 
 trait ZaoziScalaModule extends ScalaModule {
   override def scalacOptions: T[Seq[String]] = Task(
-    super.scalacOptions() ++ Seq("-java-output-version", "25")
+    super.scalacOptions() ++ Seq(
+      "-java-output-version",
+      "25",
+      // Emit SemanticDB so the project can be indexed by SemanticDB-based
+      // tooling (Metals, scalafix, scala3-bsp-semantic-ls). Built into the
+      // Scala 3 compiler; -sourceroot keeps emitted URIs workspace-relative.
+      "-Xsemanticdb",
+      "-sourceroot",
+      mill.api.BuildCtx.workspaceRoot.toString
+    )
   )
 }
 
