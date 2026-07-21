@@ -31,6 +31,24 @@ You can use `nix develop` to enter the development environment in the Nix flow,
 after you installed the dependencies and set the env. You can use
 `mill mill.bsp.BSP/install` to config BSP and open with Intellij IDEA or metal.
 
+### Zed
+
+Install the `scala3-bsp-semantic-ls` Zed adapter through the Nix-managed Zed
+configuration, then launch Zed from the project development environment:
+
+```shell
+nix develop --command zeditor .
+```
+
+Depending on the Zed installation, the command may be named `zed` instead of
+`zeditor`. Trust the worktree when Zed prompts for it so project settings and
+language servers are enabled. On Linux, the development shell hook generates
+the project-level `.zed/settings.json`, selecting the
+`scala3-bsp-semantic-ls` adapter and its exact Nix store binary path. Zed does
+not discover or download the server. The existing development-shell hook also
+generates `.bsp/mill-bsp.json`; the shared Mill module enables the SemanticDB
+options required by the server.
+
 ## Swap CIRCT for development
 Zaozi always follows the latest version of CIRCT. To use the specific version
 of CIRCT for development, you override the circt version in nix script. You can

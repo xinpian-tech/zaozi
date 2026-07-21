@@ -8,6 +8,7 @@
     circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
     flake-utils.url = "github:numtide/flake-utils";
     mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
+    scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
   };
 
   outputs =
@@ -17,6 +18,7 @@
       flake-utils,
       mill-ivy-fetcher,
       circt-nix,
+      scala3-bsp-semantic-ls,
       ...
     }:
     let
@@ -41,6 +43,24 @@
           ];
           inherit system;
         };
+        scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default;
+        zedSettings = pkgs.writeText "zaozi-zed-settings.json" ''
+          {
+            "languages": {
+              "Scala": {
+                "language_servers": ["scala3-bsp-semantic-ls"]
+              }
+            },
+            "lsp": {
+              "scala3-bsp-semantic-ls": {
+                "binary": {
+                  "path": "${scala3BspSemanticLs}/bin/scala3-bsp-semantic-ls",
+                  "arguments": []
+                }
+              }
+            }
+          }
+        '';
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -53,13 +73,18 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ nixd jdk25 ];
+          nativeBuildInputs = with pkgs; [ nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
+            scala3BspSemanticLs
+          ];
           env = with pkgs; {
             CIRCT_INSTALL_PATH = circt-install;
             MLIR_INSTALL_PATH = mlir-install;
             JEXTRACT_INSTALL_PATH = jextract;
             LIBC_INCLUDE_PATH = "${stdenv.cc.libc.dev}/include";
             LIT_INSTALL_PATH = lit;
+            # Share regular Mill outputs with BSP so SemanticDB produced by
+            # `mill __.compile` is immediately visible to the language server.
+            MILL_NO_SEPARATE_BSP_OUTPUT_DIR = "1";
             SCALA_CLI_INSTALL_PATH = scala-cli;
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
             Z3_LIB = "${z3.lib}/lib/libz3.so";
@@ -74,6 +99,9 @@
           # without it scalac throws StackOverflowError in pullOutFirstConstr.
           shellHook = ''
             export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Xss32m"
+            ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+              install -Dm644 ${zedSettings} .zed/settings.json
+            ''}
           '';
         };
       }
