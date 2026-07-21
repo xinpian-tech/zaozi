@@ -170,4 +170,24 @@ object PluginSpec extends TestSuite:
       assert(occurrencesOf(doc, "fixtures/OuterBundle#inner.").nonEmpty)
       assert(occurrencesOf(doc, selectDynamicSymbol).isEmpty)
     }
+
+    test("interactive presentation-compiler pipeline stays functional with the plugin loaded") {
+      // The PC island (and Metals) reuses the batch scalacOptions, so InteractiveDriver loads the
+      // plugin too. Its pipeline (parser/typer/SetRootTree/cookComments) has none of the phase's
+      // anchors; the plugin must contribute no phases there instead of crashing Plugins.schedule
+      // (NoSuchElementException: key not found: extractSemanticDBExtractSemanticInfo) during
+      // driver construction.
+      val out    = scratchRoot / "interactive-out"
+      os.makeDir.all(out)
+      val driver = new dotty.tools.dotc.interactive.InteractiveDriver(
+        List("-classpath", fixtureCp, "-d", out.toString, "-experimental", s"-Xplugin:$pluginJar")
+      )
+      val uri    = java.net.URI.create("file:///InteractiveProbe.scala")
+      val code   = "class InteractiveProbe { val x: Int = 1; def f: Int = x }"
+      val diags  = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, code))
+      assert(diags.isEmpty)
+      val unit   = driver.compilationUnits.get(uri)
+      assert(unit.isDefined)
+      assert(!unit.get.tpdTree.isEmpty)
+    }
   }
