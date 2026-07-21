@@ -1,0 +1,31 @@
+name: Check Documentation
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - labeled
+
+# Cancel the current workflow when new commit pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-doc:
+    name: "Build zaozi documentation"
+    runs-on: [self-hosted, linux, nixos]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zaozi documentation
+        run: |
+          set -o pipefail
+          nix develop -c mill --no-daemon --ticker false zaozi.docJar 2>&1 | tee "$RUNNER_TEMP/zaozi-doc.log"
+          if grep -Eq "Couldn't resolve a member for the given link query|Unable to parse query" "$RUNNER_TEMP/zaozi-doc.log"; then
+            exit 1
+          fi
+        env:
+          # Work around a ScalaDoc 3.7.4 signature-rendering failure on JDK 25's C2 compiler.
+          JDK_JAVA_OPTIONS: -XX:TieredStopAtLevel=1

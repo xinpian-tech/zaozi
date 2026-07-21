@@ -33,7 +33,7 @@ trait Referable[T <: Data] extends Dynamic:
     TypeImpl
   ): Int = _tpe.width
 
-  /** macro to call [[DynamicSubfield.getRefViaFieldValName]] */
+  /** Macro to call `getRefViaFieldValName` on [[me.jiuyang.zaozi.magic.DynamicSubfield DynamicSubfield]]. */
   transparent inline def selectDynamic(name: String):                                  Any = ${ referableSelectDynamic('this, 'name) }
   transparent inline def applyDynamic(name: String)(inline args: Any*):                Any = ${
     referableApplyDynamic('this, 'name, 'args)

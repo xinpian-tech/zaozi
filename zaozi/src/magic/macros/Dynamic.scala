@@ -38,8 +38,8 @@ private def summonContextualParameters(
 
   (arena, typeImpl, context, block, file, line, valName, instanceContext)
 
-/** This macro takes [[fieldName]] from dynamic access, retrieve type at compile time and call runtimeSelectDynamic to
-  * do subaccess
+/** This macro takes `fieldName` from dynamic access, retrieve type at compile time and call runtimeSelectDynamic to do
+  * subaccess
   *
   * TODO: think about:
   * {{{

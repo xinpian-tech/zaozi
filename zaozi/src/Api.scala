@@ -511,7 +511,8 @@ trait AsVec[D <: Data]:
       InstanceContext
     ): Propagated[R, Vec[E]]
 
-/** Zero-cost re-view of a [[Bundle]] as a string-keyed [[Record]] over the same value (no bitcast; cf. [[AsRecord]]).
+/** Zero-cost re-view of a [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]] as a string-keyed
+  * [[me.jiuyang.zaozi.valuetpe.Record Record]] over the same value (no bitcast; cf. [[AsRecord]]).
   */
 trait AsRecordView[D <: Bundle]:
   extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, Record]

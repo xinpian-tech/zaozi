@@ -12,9 +12,9 @@ import java.lang.foreign.Arena
 import scala.language.dynamics
 
 /** Due to Scala not allowing deferred macro call(calling user defined macro from outer macro). Any implementation to
-  * [[DynamicSubfield]] should make sure the dynamic access is to a val that has a return type of [[BundleField]]. For
-  * now jiuyang cannot come up with better solution to let user define their own macro, however they can still implement
-  * their own [[Bundle]].
+  * [[DynamicSubfield]] should make sure the dynamic access is to a val that has a return type of
+  * [[me.jiuyang.zaozi.valuetpe.BundleField BundleField]]. For now jiuyang cannot come up with better solution to let
+  * user define their own macro, however they can still implement their own [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]].
   */
 trait DynamicSubfield:
   def getRefViaFieldValName[E <: Data](
