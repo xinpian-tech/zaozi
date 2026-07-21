@@ -30,12 +30,16 @@ import java.nio.file.{Files, Path, Paths}
   * of the bundle field itself, so SemanticDB-first tooling (scala3-bsp-semantic-ls, Metals, scalafix) cannot resolve
   * go-to-definition or find-references for bundle fields.
   *
-  * This [[StandardPlugin]] adds a single phase that runs right after the compiler's own
-  * `extractSemanticDBExtractSemanticInfo` phase (which writes the `.semanticdb` file for every compilation unit of the
-  * run *before* the next phase group starts) and before `posttyper` (so the tree still has exactly the shape the
-  * extractor saw). For each compilation unit it rewrites the dynamic-method occurrences to the SemanticDB symbol of the
-  * accessed bundle field `val`, using the compiler's own symbol naming so the occurrences group with the definitions
-  * the extractor already emitted for the defining `val`s.
+  * This [[StandardPlugin]] hosts the two pipeline-dispatched zaozi tooling phases (see [[initialize]] for the dispatch
+  * contract):
+  *   - batch: [[ZaoziSemanticDBPhase]], which runs right after the compiler's own
+  *     `extractSemanticDBExtractSemanticInfo` phase (which writes the `.semanticdb` file for every compilation unit of
+  *     the run *before* the next phase group starts) and before `posttyper` (so the tree still has exactly the shape
+  *     the extractor saw). For each compilation unit it rewrites the dynamic-method occurrences to the SemanticDB
+  *     symbol of the accessed bundle field `val`, using the compiler's own symbol naming so the occurrences group with
+  *     the definitions the extractor already emitted for the defining `val`s.
+  *   - interactive: [[ZaoziPcNavPhase]], which makes the presentation compiler's symbol-at-cursor (definition/hover)
+  *     resolve a dynamic access to the field declaration.
   *
   * Design notes (deliberate differences from the earlier ResearchPlugin prototype, zaozi PR #91):
   *   - Standard plugin on the stable compiler; no `-experimental`, no nightly pin.
@@ -50,28 +54,41 @@ import java.nio.file.{Files, Path, Paths}
   */
 class ZaoziSemanticDBPlugin extends StandardPlugin:
   override val name:        String = "zaozi-semanticdb"
-  override val description: String = "enhance SemanticDB with bundle-field occurrences for the zaozi hardware DSL"
+  override val description: String =
+    "zaozi tooling: SemanticDB bundle-field occurrences (batch) and PC bundle-field navigation (interactive)"
 
-  /** Interactive-pipeline safety contract: the plugin jar travels on the modules' scalacOptions, so any dotty pipeline
-    * that honors `-Xplugin` will load this plugin — including the presentation compiler's `InteractiveDriver` (Metals,
-    * scala3-bsp-semantic-ls PC islands), whose pipeline is only parser/typer/SetRootTree/cookComments, and scaladoc. In
-    * such pipelines this phase's anchors do not exist, and `Plugins.schedule` throws `NoSuchElementException: key not
-    * found: extractSemanticDBExtractSemanticInfo` while propagating ordering constraints for names that are neither
-    * in-plan phases nor other plugin phases — aborting `InteractiveDriver` construction and thereby every IDE request
-    * (determined empirically on 3.8.4).
+  /** Pipeline-dispatched phase contribution — the safety contract behind the single build-wired `-Xplugin` jar serving
+    * every dotty pipeline that loads it.
+    *
+    * The plugin jar travels on the modules' scalacOptions, so any dotty pipeline that honors `-Xplugin` loads this
+    * plugin: the batch compiler (zinc/mill), the interactive presentation compiler (`InteractiveDriver` — Metals and
+    * the scala3-bsp-semantic-ls PC islands; its pipeline is only parser/typer/SetRootTree/cookComments), scaladoc's
+    * tasty inspector (ReadTasty/TastyInspectorPhase), and the REPL (full batch pipeline). Contributing a phase whose
+    * `runsAfter`/`runsBefore` anchors are absent from the active plan makes `Plugins.schedule` throw
+    * `NoSuchElementException: key not found: <anchor>` while propagating ordering constraints — which aborts
+    * `InteractiveDriver` construction and thereby every IDE request (determined empirically on 3.8.4).
     *
     * `Run.compileUnits` calls `addPluginPhases(ctx.base.phasePlan)` after `rootContext` has set the plan of the active
-    * `Compiler`, so the pipeline is observable here: contribute the phase only when every anchor is present, and
-    * contribute nothing (a loaded but inert plugin) otherwise. SemanticDB extraction exists only in the batch pipeline,
-    * so nothing is lost.
+    * `Compiler`, so the pipeline is observable here, and each phase is contributed exactly to the pipeline it is meant
+    * for:
+    *   - Batch (plan has the SemanticDB extractor and `posttyper`): the [[ZaoziSemanticDBPhase]] enhancer only. The nav
+    *     phase must NEVER run here — it mutates the typed tree, and a batch mutation of `Inlined.call` would be pickled
+    *     into published TASTy.
+    *   - Interactive (plan has the nav anchors `typer`/`SetRootTree` but NO `posttyper` — the presence of `posttyper`
+    *     is what separates the batch/REPL pipelines, which also contain `SetRootTree`, from the interactive one): the
+    *     [[ZaoziPcNavPhase]] only. SemanticDB extraction does not exist there.
+    *   - Anything else (scaladoc's inspector has neither anchor set): nothing — a loaded but inert plugin.
     */
   override def initialize(
     options: List[String]
   )(
     using Context
   ): List[PluginPhase] =
-    val planPhases = ctx.base.phasePlan.flatten.iterator.map(_.phaseName).toSet
-    if ZaoziSemanticDBPhase.anchors.subsetOf(planPhases) then List(ZaoziSemanticDBPhase())
+    val planPhases  = ctx.base.phasePlan.flatten.iterator.map(_.phaseName).toSet
+    val batch       = ZaoziSemanticDBPhase.anchors.subsetOf(planPhases)
+    val interactive = ZaoziPcNavPhase.anchors.subsetOf(planPhases) && !planPhases.contains("posttyper")
+    if batch then List(ZaoziSemanticDBPhase())
+    else if interactive then List(ZaoziPcNavPhase())
     else Nil
 
 object ZaoziSemanticDBPlugin:
