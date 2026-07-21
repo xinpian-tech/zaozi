@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
+package build.`zaozi-compiler-plugin`
+
+import mill._
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+
+import build.{v, ZaoziPublishModule}
+import build.zaozi
+
+// The SemanticDB-enhancer compiler plugin. Deliberately NOT a ZaoziScalaModule: that trait loads
+// this very plugin into scalac, which would make the plugin depend on its own jar.
+object `package` extends ScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
+  def scalaVersion = Task(v.scala)
+
+  // Inside scalac the compiler classes are provided by the plugin classloader's parent, so the
+  // compiler must stay a compile-only dependency and not leak into the published runtime deps.
+  // plugin.properties (the scalac plugin descriptor) ships from the default resources/ directory.
+  def compileMvnDeps = Seq(mvn"org.scala-lang::scala3-compiler:${v.scala}")
+
+  object tests extends ScalaTests with ScalafmtModule with TestModule.Utest {
+    // The spec drives a real in-process scalac (dotty.tools.dotc.Main) over the fixture sources
+    // and parses the emitted .semanticdb protobufs, so it needs the compiler at runtime.
+    def mvnDeps = Seq(v.utest, v.oslib, mvn"org.scala-lang::scala3-compiler:${v.scala}")
+
+    // The fixtures are compiled (not run), so the test JVM only needs the classpath *string* of
+    // the zaozi DSL for the -classpath of the in-process compiler.
+    def forkEnv = Task {
+      super.forkEnv() ++ Map(
+        "ZAOZI_PLUGIN_JAR"        -> m.jar().path.toString,
+        "ZAOZI_FIXTURE_CLASSPATH" -> zaozi.runClasspath().map(_.path).mkString(java.io.File.pathSeparator),
+        "ZAOZI_FIXTURE_SOURCES"   -> (moduleDir / "resources" / "fixtures").toString
+      )
+    }
+  }
+}
