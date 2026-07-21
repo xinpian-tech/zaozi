@@ -171,6 +171,106 @@ object PluginSpec extends TestSuite:
       assert(occurrencesOf(doc, selectDynamicSymbol).isEmpty)
     }
 
+    test("interactive: the nav phase resolves a dynamic access to the bundle field") {
+      // The PC island (and Metals) loads the plugin through the module's -Xplugin scalacOption;
+      // in the interactive pipeline the dispatched ZaoziPcNavPhase must rewrite the retained
+      // `Inlined.call` of `io.field1` into a typed ref of the field val, which is what makes
+      // symbol-at-cursor (definition/hover) land on `val field1 = Aligned(...)`.
+      val buffer =
+        """package navprobe
+          |
+          |import me.jiuyang.zaozi.*
+          |import me.jiuyang.zaozi.default.{*, given}
+          |import me.jiuyang.zaozi.reftpe.Referable
+          |import me.jiuyang.zaozi.valuetpe.*
+          |import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+          |
+          |import java.lang.foreign.Arena
+          |
+          |class NavBundle extends Bundle:
+          |  val field1 = Aligned(UInt(8))
+          |
+          |object NavUse:
+          |  def use(
+          |    io: Referable[NavBundle]
+          |  )(
+          |    using Arena,
+          |    Block,
+          |    Context,
+          |    TypeImpl,
+          |    InstanceContext
+          |  ): Unit =
+          |    val x = io.field1
+          |    ()
+          |""".stripMargin
+
+      // (rewrittenAccessTexts, selectDynamicCallCount) over every retained Inlined.call.
+      def inlinedCalls(withPlugin: Boolean): (List[String], Int) =
+        import dotty.tools.dotc.ast.tpd
+        import dotty.tools.dotc.core.Contexts.Context as DottyContext
+        val out            = scratchRoot / (if withPlugin then "nav-on" else "nav-off")
+        os.makeDir.all(out)
+        val options        = List("-classpath", fixtureCp, "-d", out.toString, "-experimental")
+          ++ (if withPlugin then List(s"-Xplugin:$pluginJar") else Nil)
+        val driver         = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val uri            = java.net.URI.create(s"file:///NavProbe${if withPlugin then "On" else "Off"}.scala")
+        val diags          = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+        assert(diags.isEmpty)
+        given DottyContext = driver.currentCtx
+        val fieldAccesses  = List.newBuilder[String]
+        var dynCalls       = 0
+        val traverser      = new tpd.TreeTraverser:
+          override def traverse(
+            tree: tpd.Tree
+          )(
+            using DottyContext
+          ): Unit = tree match
+            case inlined: tpd.Inlined =>
+              val callSym = inlined.call.symbol
+              if callSym.exists && callSym.name.toString == "field1" && callSym.owner.name.toString == "NavBundle"
+              then
+                val span = inlined.call.span
+                fieldAccesses += buffer.substring(span.start, span.end)
+              if callSym.exists && callSym.name.toString == "selectDynamic" then dynCalls += 1
+              traverse(inlined.call)
+              inlined.bindings.foreach(traverse)
+              traverse(inlined.expansion)
+            case _ => traverseChildren(tree)
+        traverser.traverse(driver.compilationUnits(uri).tpdTree)
+        (fieldAccesses.result(), dynCalls)
+
+      val (rewritten, dynLeft) = inlinedCalls(withPlugin = true)
+      // The retained call of the access is now a ref to NavBundle#field1, spanning the access.
+      assert(rewritten == List("io.field1"))
+      assert(dynLeft == 0)
+
+      val (baseline, dynBaseline) = inlinedCalls(withPlugin = false)
+      // Without the plugin the retained call still points at Referable#selectDynamic.
+      assert(baseline.isEmpty)
+      assert(dynBaseline > 0)
+    }
+
+    test("batch: tasty and bytecode are byte-identical with and without the plugin") {
+      // The nav phase must never even schedule in the batch pipeline (a batch rewrite of
+      // Inlined.call would be pickled into published TASTy), and the SemanticDB enhancer must
+      // never touch trees — so every .tasty/.class artifact must be byte-identical; only the
+      // .semanticdb payloads may differ.
+      val on                       = scratchRoot / "inert-on"
+      val off                      = scratchRoot / "inert-off"
+      compile(on, Seq(bundlesScala, usesScala), withPlugin = true)
+      compile(off, Seq(bundlesScala, usesScala), withPlugin = false)
+      def artifacts(base: os.Path) =
+        os.walk(base).filter(p => os.isFile(p) && (p.ext == "tasty" || p.ext == "class")).map(_.relativeTo(base))
+      val rels                     = artifacts(off)
+      assert(rels.nonEmpty)
+      assert(artifacts(on).toSet == rels.toSet)
+      rels.foreach { rel =>
+        val relPath   = rel.toString
+        val identical = java.util.Arrays.equals(os.read.bytes(on / rel), os.read.bytes(off / rel))
+        assert(identical, relPath.nonEmpty) // relPath in scope so a failure names the artifact
+      }
+    }
+
     test("interactive presentation-compiler pipeline stays functional with the plugin loaded") {
       // The PC island (and Metals) reuses the batch scalacOptions, so InteractiveDriver loads the
       // plugin too. Its pipeline (parser/typer/SetRootTree/cookComments) has none of the phase's
