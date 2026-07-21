@@ -37,8 +37,23 @@ trait ZaoziScalaModule extends ScalaModule {
       // Scala 3 compiler; -sourceroot keeps emitted URIs workspace-relative.
       "-Xsemanticdb",
       "-sourceroot",
-      mill.api.BuildCtx.workspaceRoot.toString
+      mill.api.BuildCtx.workspaceRoot.toString,
+      // Load the zaozi SemanticDB-enhancer plugin into every DSL module so
+      // bundle fields accessed through scala.Dynamic get real occurrences in
+      // the emitted SemanticDB. Mill only synthesizes -Xplugin flags for
+      // scalacPluginMvnDeps (published plugins), so a workspace-local plugin
+      // module is wired through its jar explicitly; ScalaTests forwards
+      // scalacOptions, so test modules inherit the plugin as well.
+      s"-Xplugin:${build.`zaozi-compiler-plugin`.jar().path}"
     )
+  )
+
+  // Also expose the plugin jar as a content-hashed input: the -Xplugin string
+  // above is path-only, so without this a plugin rebuild would not invalidate
+  // downstream compiles (mill hashes scalacPluginClasspath PathRefs into the
+  // compile inputs and zinc's compiler cache key).
+  override def scalacPluginClasspath: T[Seq[PathRef]] = Task(
+    super.scalacPluginClasspath() ++ Seq(build.`zaozi-compiler-plugin`.jar())
   )
 }
 
