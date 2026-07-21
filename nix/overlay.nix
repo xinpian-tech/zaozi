@@ -8,7 +8,9 @@ final: prev:
 
   circt-install = final.callPackage ./pkgs/circt-install.nix { };
 
-  mlir-install = final.callPackage ./pkgs/mlir-install.nix { };
+  mlir-install = final.callPackage ./pkgs/mlir-install.nix {
+    inherit (final.llvmPackages_circt) libllvm mlir;
+  };
 
   zaozi = final.callPackage ./zaozi { };
 }
