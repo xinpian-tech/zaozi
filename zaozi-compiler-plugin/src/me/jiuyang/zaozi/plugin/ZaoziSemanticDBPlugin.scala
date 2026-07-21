@@ -52,15 +52,36 @@ class ZaoziSemanticDBPlugin extends StandardPlugin:
   override val name:        String = "zaozi-semanticdb"
   override val description: String = "enhance SemanticDB with bundle-field occurrences for the zaozi hardware DSL"
 
+  /** Interactive-pipeline safety contract: the plugin jar travels on the modules' scalacOptions, so any dotty pipeline
+    * that honors `-Xplugin` will load this plugin — including the presentation compiler's `InteractiveDriver` (Metals,
+    * scala3-bsp-semantic-ls PC islands), whose pipeline is only parser/typer/SetRootTree/cookComments, and scaladoc. In
+    * such pipelines this phase's anchors do not exist, and `Plugins.schedule` throws `NoSuchElementException: key not
+    * found: extractSemanticDBExtractSemanticInfo` while propagating ordering constraints for names that are neither
+    * in-plan phases nor other plugin phases — aborting `InteractiveDriver` construction and thereby every IDE request
+    * (determined empirically on 3.8.4).
+    *
+    * `Run.compileUnits` calls `addPluginPhases(ctx.base.phasePlan)` after `rootContext` has set the plan of the active
+    * `Compiler`, so the pipeline is observable here: contribute the phase only when every anchor is present, and
+    * contribute nothing (a loaded but inert plugin) otherwise. SemanticDB extraction exists only in the batch pipeline,
+    * so nothing is lost.
+    */
   override def initialize(
     options: List[String]
   )(
     using Context
   ): List[PluginPhase] =
-    List(ZaoziSemanticDBPhase())
+    val planPhases = ctx.base.phasePlan.flatten.iterator.map(_.phaseName).toSet
+    if ZaoziSemanticDBPhase.anchors.subsetOf(planPhases) then List(ZaoziSemanticDBPhase())
+    else Nil
 
 object ZaoziSemanticDBPlugin:
   val phaseName: String = "zaoziSemanticdb"
+
+object ZaoziSemanticDBPhase:
+  /** The phases this plugin phase orders itself against; it must only be scheduled into pipelines that contain all of
+    * them (see [[ZaoziSemanticDBPlugin.initialize]]).
+    */
+  val anchors: Set[String] = Set("extractSemanticDBExtractSemanticInfo", "posttyper")
 
 class ZaoziSemanticDBPhase extends PluginPhase:
   override val phaseName: String = ZaoziSemanticDBPlugin.phaseName
