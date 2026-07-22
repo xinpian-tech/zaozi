@@ -472,11 +472,6 @@ rtgtestTypeIsAFloatRegister     # header: $CIRCT_INSTALL_PATH/include/circt-c/Di
 rtgtestTypeIsAIntegerRegister   # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/RTGTest.h
 mlirGetDialectHandle__sv__        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
 registerSVPasses                  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
-svAttrIsASVAttributeAttr          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
-svSVAttributeAttrGet              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
-svSVAttributeAttrGetEmitAsComment # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
-svSVAttributeAttrGetExpression    # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
-svSVAttributeAttrGetName          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/SV.h
 mlirGetDialectHandle__seq__  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
 registerSeqPasses            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
 seqClockTypeGet              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
