@@ -13,8 +13,6 @@ arcStateTypeGetBitWidth         # header: $CIRCT_INSTALL_PATH/include/circt-c/Di
 arcStateTypeGetByteWidth        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcStateTypeGetType             # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcStorageTypeGet               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
-arcStorageTypeGetSize           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
-arcStorageTypeGetWithSize       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcTypeIsAMemory                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcTypeIsASimModelInstance      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcTypeIsAState                 # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
