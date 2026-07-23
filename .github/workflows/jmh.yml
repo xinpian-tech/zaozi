@@ -19,4 +19,4 @@ jobs:
     runs-on: [self-hosted, linux, nixos]
     steps:
       - uses: actions/checkout@v4
-      - run: nix develop -c bash -c "mill --no-daemon --ticker false zaozi.benchmark.runJmh 2>&1 | grep -E '^Iteration|^Benchmark|^ZaoziBenchmark' > $GITHUB_STEP_SUMMARY"
+      - run: nix develop -c bash -c "mill --no-daemon --ticker false zaozi.benchmark.runJmh -wi 0 -i 1 -r 1s -f 1 2>&1 | grep -E '^Iteration|^Benchmark|^ZaoziBenchmark' > $GITHUB_STEP_SUMMARY"
