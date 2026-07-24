@@ -1,0 +1,142 @@
+#import "../lib.typ": *
+
+= 概念模型 <ch-model>
+
+本章建立全文档共用的概念骨架：一个设计由两张相互正交的图描述；它的生成过程被切成三个单向依赖的阶段；参与其中的模块只有两种形态；穿越协商与硬件之间边界的数据只有一种。
+
+== 两张图 <sec-two-graphs>
+
+一个 Syntheke 设计同时是两张图：
+
+- #term[层次树][hierarchy tree]　顶点是#term[模块][module]。它表达*所有权*：谁例化了谁、命名空间如何嵌套、物理上的模块边界在哪里。这棵树最终一一对应生成电路的模块层次。
+- #term[协商图][negotiation graph]　顶点是#term[节点][node]。节点是模块在某个协议上的接入点，每个节点唯一从属于一个模块。图的边是#term[连接][connection]——两个节点之间的一条协商关系。
+
+关键性质是：*连接不受层次约束*。深处子树里的一个节点可以与另一棵子树里的节点直接相连；两个节点相隔多少层模块边界，是层次树的事，不是协商图的事。跨越边界所需的端口，由协商阶段收尾的打洞遍统一规划（@sec-passes，规则详见@ch-hierarchy），不需要设计者逐层转发。
+
+#图([两张图的正交。方框嵌套是层次树；圆点与绿色连线是协商图。连接 A—C 依次穿过 P、Q、R 三层模块边界，各穿越处的端口由框架规划（@ch-hierarchy）。])[
+  #syn-diagram(
+    spacing: (11mm, 7mm),
+    // 协商图节点
+    node((0, 0.2), text(fill: c-edge)[A], name: <na>, shape: fletcher.shapes.circle),
+    node((1, 1.2), text(fill: c-edge)[B], name: <nb>, shape: fletcher.shapes.circle),
+    node((3, 0.2), text(fill: c-edge)[C], name: <nc>, shape: fletcher.shapes.circle),
+    // 层次 enclose
+    node(enclose: (<na>,), stroke: c-hier, inset: 12pt, snap: false, name: <m1>),
+    node(enclose: (<na>, <nb>, <m1>), stroke: c-hier, inset: 24pt, snap: false, name: <m2>),
+    node(enclose: (<nc>,), stroke: c-hier, inset: 12pt, snap: false, name: <m3>),
+    node(enclose: (<m2>, <m3>), stroke: c-hier, inset: 36pt, snap: false, name: <top>),
+    // 标签
+    node((0, -0.62), text(size: 8pt, fill: c-hier)[模块 P], stroke: none),
+    node((0.5, 1.95), text(size: 8pt, fill: c-hier)[模块 Q], stroke: none),
+    node((3, -0.62), text(size: 8pt, fill: c-hier)[模块 R], stroke: none),
+    node((1.6, 2.6), text(size: 8pt, fill: c-hier)[顶层], stroke: none),
+    // 连接
+    edge(<na>, <nb>, "-|>", stroke: c-edge),
+    edge(<na>, <nc>, "-|>", stroke: c-edge, label: text(fill: c-edge)[跨层次连接]),
+  )
+]
+
+两张图为什么必须分开？因为把它们合并就是把#ref(<ch-motivation>)批评过的错误制度化：若拓扑必须追随层次（只许父子相连），则任何跨子树的连接都需要手工逐层转发端口，交叉开关必须与它的每个使用者互为父子——模块层次受连接关系支配，或连接关系受模块层次限制。分开之后，层次按物理与团队边界组织，拓扑按协议逻辑组织，两者互不约束（R6）。
+
+== 节点、连接与协议 <sec-node-conn-proto>
+
+每个节点声明三件事：
+
++ 它服从的#term[协议][protocol]——参数的类型与结算规则（@ch-protocol）；
++ 它的#term[角色][role]——源、汇、适配、枢纽等，决定它接受多少条边、参数如何穿过它变换（@ch-topology）；
++ 它的#term[参数表][parameter list]——作为源/汇时静态给出的参数列表（每条边一项），或作为中间角色时的参数变换函数。
+
+连接把一个节点的出边侧与另一个节点的入边侧绑在一起，并携带一个#term[基数意图][cardinality intent]——这条声明代表恰好一条边，还是"由某一侧决定的若干条边"（R3，@ch-topology）。协商完成后，每条连接展开为零条或多条#term[边][edge]；边是点对点的最终链路，持有结算出的边参数。
+
+#不变量[一条连接的两端必须服从同一协议。跨协议的转换不是连接的属性，而是一个显式的适配节点（@sec-protocol-object）。]
+
+== 三阶段流水线 <sec-triptych>
+
+设计的生成被切为三个阶段，前一阶段的输出是后一阶段的唯一输入。我们借三联画之名称之为 #term[Triptych 流水线][the Triptych pipeline]：
+
+#图([Triptych 流水线。矩形是阶段，胶囊是阶段间的不可变产物。左右两侧分别是宿主语言闭包与硬件对象的世界，中间的协商是纯数据计算。])[
+  #syn-diagram(
+    spacing: (8mm, 9mm),
+    node((0, 0), [*构建* \ Build], name: <b>),
+    node((1, 0), [设计规格 \ `DesignSpec`], name: <spec>, shape: fletcher.shapes.pill, fill: c-fill),
+    node((2, 0), [*协商* \ Negotiate], name: <n>),
+    node((3, 0), [协商结果 \ `ResolvedDesign`], name: <res>, shape: fletcher.shapes.pill, fill: c-fill),
+    node((4, 0), [*例化* \ Elaborate], name: <e>),
+    node((5, 0), [电路 \ FIRRTL], name: <fir>, shape: fletcher.shapes.pill, fill: c-fill),
+    edge(<b>, <spec>, "-|>"),
+    edge(<spec>, <n>, "-|>"),
+    edge(<n>, <res>, "-|>"),
+    edge(<res>, <e>, "-|>"),
+    edge(<e>, <fir>, "-|>"),
+  )
+]
+
+#table(
+  columns: (auto, 1fr, 1fr, auto),
+  table.header([阶段], [做什么], [禁止什么], [纯度]),
+  [构建],
+  [宿主语言普通代码：例化模块树、声明节点、书写连接。可以有任意控制流——条件拓扑、循环生成子系统都只是普通程序。],
+  [读取任何协商结果。这不是纪律而是类型事实：结果对象只在协商返回后才存在，构建期程序无从引用它。],
+  [有副作用（累积声明），但被限制在 `design` 块内],
+  [协商],
+  [纯函数 `DesignSpec => Either[Errors, ResolvedDesign]`：解析基数、传播参数、结算每条边、计算协议参数、规划端口与连线。],
+  [触碰任何硬件对象；读取规格之外的任何环境。],
+  [纯函数，错误是值（R4）],
+  [例化],
+  [消费协商结果：以最终参数调用 zaozi 生成器，发射结构模块，执行连线计划。],
+  [做任何决策。所有需要判断的问题都已在协商结果中有答案；本阶段只是忠实执行。],
+  [将协商结果转写为电路（经 zaozi），全程不含决策],
+)
+
+这个切分直接兑现 R4 与 R5。特别地，"在协商完成前读取协商结果"在本模型中*无法表达*：构建期的世界里不存在边参数这种东西；生成器模块想依赖协商结果的部分，被显式建模为协商期计算的协议参数（@sec-two-layer-params），在例化期整体交付。三个阶段之间不存在任何回调回流。
+
+构建期的副作用（声明节点、记录连接）被一个只能由框架入口注入的#term[构建器令牌][builder token]封闭。在宿主语言中，令牌是一个上下文值：
+
+```scala
+def design(body: DesignBuilder ?=> Unit): DesignSpec   // 唯一提供令牌的入口
+```
+
+每个连接算子都要求 `(using DesignBuilder)` 才能编译，于是在 `design { ... }` 块之外书写连接直接编译失败；块返回时构建器固化为不可变的规格，令牌不再被持有——"在协商完成后追加连接"同样是无法表达的程序。
+
+== 模块的两种形态 <sec-module-kinds>
+
+层次树上的模块恰好两种，以密封类型区分，不存在混合形态：
+
+- #term[结构模块][`WrapperModule`]　只包含：子模块、用于转发的节点、连接声明。*没有任何硬件逻辑。*它对应的电路模块由框架整体生成——内容仅有子实例、端口与连线（@ch-hierarchy）。
+- #term[生成器模块][`GeneratorModule`]　持有*恰好一个* zaozi 生成器。它的节点声明携带硬件绑定——指明节点对应生成器接口的哪个字段。*全部硬件逻辑都在生成器里。*
+
+用词辨析：*生成器*指硬件域的模块工厂本身——zaozi 的对象，以参数为唯一输入、以模块为输出（@sec-generator-contract）；*生成器模块*是协商域里持有它的那个拓扑模块。二者始终不混用。
+
+#不变量[结构模块拥有零个生成器，生成器模块拥有恰好一个生成器；二者密封，无第三种形态。]
+
+为什么禁止"既有子模块又含少量逻辑"的中间形态？因为此类逻辑几乎必然需要引用协商结果（例如按最终边数生成仲裁器），而它所处的位置又在协商所需的拓扑声明之中——两个阶段在同一段代码中相互依赖，阶段边界随之失效。将此类逻辑归入生成器（它以协议参数的形式获得协商结果），纯组合保留给结构模块，三阶段边界才能成立。经验上，所有在结构模块中直接书写逻辑的需求，都可以改写为例化一个小型生成器模块。
+
+== 序列化边界 <sec-serialization-boundary>
+
+协商这一侧与硬件生成那一侧之间，只交换一种数据：每个生成器模块最终交给生成器的#term[完整参数][full parameter]——用户参数与协议参数的合成（@sec-two-layer-params）。zaozi 要求它可序列化；这一要求带来直接收益："协商一次、处处例化"、按参数缓存生成结果、以及把协商产物归档送审，全部因此成为可能（R8）。
+
+边界的协商一侧，规格中的参数变换函数、硬件绑定等都是宿主语言闭包，*从不*要求可序列化——它们活在单次进程内。可选地，拓扑、边参数、层树可以导出为 JSON 供工具消费（@ch-tooling），但那是便利，不是契约。
+
+#图([序列化边界。左侧协商域内是含闭包的规格与纯数据的协商结果；右侧硬件域是生成器与 MLIR。跨越边界的只有可序列化的完整参数。])[
+  #syn-canvas({
+    import cetz.draw: *
+    // 左域
+    rect((0, 0), (5.1, 3.2), stroke: 0.7pt, radius: 0.1)
+    content((2.55, 2.8), [*协商域*])
+    rect((0.35, 1.55), (4.75, 2.35), stroke: 0.6pt + gray, radius: 0.08)
+    content((2.55, 1.95), [规格 / 协商结果（含闭包，JVM 局部）])
+    // 右域
+    rect((7.1, 0), (11.6, 3.2), stroke: 0.7pt, radius: 0.1)
+    content((9.35, 2.8), [*硬件域*])
+    rect((7.45, 1.55), (11.25, 2.35), stroke: 0.6pt + gray, radius: 0.08)
+    content((9.35, 1.95), [zaozi 生成器 / MLIR])
+    // 边界线
+    line((6.1, -0.25), (6.1, 3.45), stroke: 2.2pt)
+    content((6.1, 3.72), [序列化边界])
+    // 跨界箭头
+    line((4.9, 0.75), (7.3, 0.75), mark: (end: ">"), stroke: 1.1pt + c-edge)
+    content((6.1, 1.12), text(fill: c-edge)[完整参数（可序列化）])
+  })
+]
+
+以上四节给出了骨架：两张图（R1、R6）、三个阶段（R4、R5）、两种模块、一条序列化边界（R8）。余下各章逐一充实：协议与参数（@ch-protocol，R2）、基数（@ch-topology，R3）、协商算法（@ch-negotiation）、层次穿越与模块生成（@ch-hierarchy）、硬件边界（@ch-hardware）、验证（@ch-verification，R7）与工具（@ch-tooling）。

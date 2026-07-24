@@ -1,0 +1,86 @@
+#import "../lib.typ": *
+
+= 术语、决策与索引
+
+== 术语表
+
+#table(
+  columns: (auto, auto, 1fr),
+  table.header([中文], [English], [一句话定义（定义处）]),
+  [层次树], [hierarchy tree], [模块的所有权与命名空间树，一一对应电路层次（@sec-two-graphs）。],
+  [模块], [module], [层次树的顶点；只有结构模块与生成器模块两种形态（@sec-two-graphs、@sec-module-kinds）。],
+  [协商图], [negotiation graph], [节点与连接构成的参数协商图，独立于层次（@sec-two-graphs）。],
+  [节点], [node], [模块在某个协议上的接入点，带角色与参数表（@sec-node-conn-proto）。],
+  [连接], [connection], [两个节点间的一条协商关系声明，带基数意图（@sec-node-conn-proto）。],
+  [边], [edge], [协商后一条点对点链路；连接展开为零至多条边（@sec-node-conn-proto）。],
+  [参数表], [parameter list], [源/汇节点静态声明的参数列表，每条边一项；其长度决定该节点的边数（@sec-node-conn-proto、@sec-star-solving）。],
+  [构建器令牌], [builder token], [框架入口注入的上下文值；连接算子在其作用域外无法编译（@sec-triptych）。],
+  [协议], [protocol], [定义 `Down`/`Up`/`Edge` 三类型与结算函数的对象（@sec-protocol-object）。],
+  [混合适配节点], [mixed adapter node], [入出两侧服从不同协议、携带跨协议变换的适配节点（@sec-protocol-object）。],
+  [下行 / 上行参数], [downward / upward parameter], [沿边顺流 / 逆流传播的参数（@sec-three-param-kinds）。],
+  [边参数], [edge parameter], [一条边结算后的最终参数（@sec-three-param-kinds）。],
+  [协议接口], [protocol interface], [边的硬件形状的纯数据描述（@sec-protocol-interface)。],
+  [用户 / 协议 / 完整参数], [user / protocol / full parameter], [构建期人写 / 协商期算出 / 二者合并后交给生成器（@sec-two-layer-params）。],
+  [结构模块], [`WrapperModule`], [只含子模块、节点与连接的模块；电路体由框架发射（@sec-module-kinds、@sec-wrapper-emission）。],
+  [生成器], [generator], [硬件域的模块工厂：消费一个可序列化参数产出电路模块。与"生成器模块"是不同概念（@sec-generator-contract）。],
+  [生成器模块], [`GeneratorModule`], [持有恰一个生成器的模块；全部硬件在生成器内（@sec-module-kinds、@sec-generator-module）。],
+  [硬件绑定], [hardware binding], [节点到生成器接口字段的映射函数，例化期做结构校验（@sec-generator-module）。],
+  [角色], [role], [节点的边数约束与参数变换形状：源、汇、适配、枢纽、比例、恒等、瞬态（@sec-roles）。],
+  [基数意图], [cardinality intent], [连接的数量语义：单连、汇定、源定、弹性（@sec-operators）。],
+  [星号解], [star solution], [节点每侧一个的统一展开数（@sec-star-solving）。],
+  [共享解规则], [shared-star rule], [同侧全部星号连接展开同一解（@sec-star-solving）。],
+  [弱指针], [weak pointer], [枢纽的星号语义：在用则一条，孤立则零条（@sec-star-solving）。],
+  [基数依赖图], [cardinality dependency graph], [源定/汇定连接产生的求解先后关系（@sec-star-solving）。],
+  [端口向量], [port vector], [节点一侧按声明序前缀和排定的边索引区间（@sec-star-solving）。],
+  [弹性分量], [flex component], [由弹性连接经可弹节点连成的判向单元（@sec-flex）。],
+  [边视图], [`EdgeView`], [生成器模块可见的本模块边只读视图（@sec-settle-pp）。],
+  [打洞], [port punching], [沿层次路径为跨界边规划端口与连线（@sec-punch-planning）。],
+  [结构键], [structural key], [模块去重用的规范化身份（@sec-dedup）。],
+  [探针源 / 探针汇], [DV source / DV sink], [验证协议的两端；参数只上行（@sec-dv-model）。],
+  [层路径], [layer path], [探针所属的可擦除层命名链（@sec-layers）。],
+  [zaozi], [—], [Syntheke 委托硬件构造的独立生成器库（Scala 3，经 MLIR/CIRCT 产出 FIRRTL）；Syntheke 对它只假设"参数进、模块出"（@sec-generator-contract）。],
+  [Triptych 流水线], [the Triptych pipeline], [构建—协商—例化三阶段（@sec-triptych）。],
+)
+
+== 需求映射
+
+#table(
+  columns: (auto, 1fr, auto),
+  table.header([需求], [落点], [主要章节]),
+  [R1 显式拓扑], [规格与协商结果在内存中即是可遍历的纯数据；JSON 导出只是把这些数据写出来], [@sec-two-graphs、@sec-triptych、@sec-export],
+  [R2 双向参数], [`Down`/`Up`/`negotiate`], [@sec-three-param-kinds–@sec-protocol-object、@sec-propagation],
+  [R3 基数可推断], [四算子与星号求解], [@sec-operators–@sec-flex],
+  [R4 纯协商], [遍流水线、错误累积], [@sec-passes、@sec-error-accumulation],
+  [R5 相位分离], [Triptych 与模块二分], [@sec-triptych–@sec-module-kinds],
+  [R6 层次无关], [打洞与命名], [@sec-punch-planning–@sec-port-naming],
+  [R7 验证一等], [验证协议与层], [@ch-verification],
+  [R8 可序列化边界], [唯一跨越边界的数据是完整参数], [@sec-serialization-boundary、@sec-serialization-list],
+)
+
+== 设计决策索引
+
+#table(
+  columns: (auto, 1fr, auto),
+  table.header([编号], [决策], [章节]),
+  [@dec-pi-required], [协议接口必选。], [@sec-protocol-interface],
+  [@dec-pp-local], [协议参数的依赖界限是本模块。], [@sec-settle-pp],
+  [@dec-port-naming], [端口名不含哈希，接受线性长名。], [@sec-port-naming],
+  [@dec-binding-check], [绑定校验在例化期做结构比对。], [@sec-generator-module],
+  [@dec-dv-once], [探针连接只允许单连。], [@sec-dv-routing],
+  [@dec-dv-ancestor], [探针汇必须是探针源的严格祖先。], [@sec-dv-routing],
+  [@dec-layer-merge], [同路径合并，同路径异协议报错。], [@sec-layers],
+)
+
+== 开放问题索引
+
+#table(
+  columns: (auto, 1fr, auto),
+  table.header([编号], [问题], [章节]),
+  [@open-multi-round], [显式多轮协商。], [@sec-settle-pp],
+  [@open-incr-cache], [跨设计的增量缓存。], [@sec-dedup],
+  [@open-typed-binding], [类型级绑定强化。], [@sec-generator-module],
+)
+
+== 结语
+
+这份文档从"接口参数是拓扑的全局函数"这一个观察出发，推出了两张图、三个阶段、一条序列化边界；协议给出参数的语义，角色与算子给出图的形状，协商把二者算成一份可序列化、可复现、可审计的结果，例化只是照着这份结果生成电路。每一处形式化——共享解规则、端口区间、结构键、层的前缀树并——都服务于同一个目标：*使每一个字节的来源都可以被追溯*。实现应当以本文档为契约；文档未及之处，以#ref(<ch-motivation>)的八条需求（R1–R8）为裁决依据。
