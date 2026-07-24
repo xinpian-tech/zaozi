@@ -8,7 +8,7 @@ import org.llvm.mlir.scalalib.capi.ir.Operation
 import me.jiuyang.zaozi.HWInterface
 import me.jiuyang.zaozi.DVInterface
 
-abstract class Instance[IOTpe <: HWInterface[?], ProbeTpe <: DVInterface[?, ?]] extends HasOperation:
+abstract class Instance[IOTpe <: HWInterface[?], ProbeTpe <: DVInterface[?, ?]]:
   private[zaozi] val _ioTpe:     IOTpe
   private[zaozi] val _probeTpe:  ProbeTpe
   private[zaozi] val _operation: Operation

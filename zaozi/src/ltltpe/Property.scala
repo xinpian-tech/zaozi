@@ -3,17 +3,12 @@
 package me.jiuyang.zaozi.ltltpe
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.reftpe.HasOperation
-import org.llvm.mlir.scalalib.capi.ir.{Context, Operation, Type, Value}
+import org.llvm.mlir.scalalib.capi.ir.{Context, Type, Value}
 
 import java.lang.foreign.Arena
 
-trait Property extends HasOperation:
-  private[zaozi] val _operation: Operation
-
-  def operation(
-    using TypeImpl
-  ): Operation = this.operationImpl
+trait Property:
+  private[zaozi] val _refer: Value
 
   def refer(
     using Arena,

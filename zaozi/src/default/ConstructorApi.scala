@@ -32,7 +32,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   WireApi,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
 import java.lang.foreign.Arena
 
@@ -156,8 +156,8 @@ given ConstructorApi with
     )
     wireOp.operation.appendToBlock()
     new Wire[T]:
-      val _tpe:       T         = refType
-      val _operation: Operation = wireOp.operation
+      val _tpe:   T     = refType
+      val _refer: Value = wireOp.operation.getResult(0)
 
   def Reg[T <: Data](
     refType: T
@@ -183,8 +183,8 @@ given ConstructorApi with
     )
     regOp.operation.appendToBlock()
     new Reg[T]:
-      val _tpe:       T         = refType
-      val _operation: Operation = regOp.operation
+      val _tpe:   T     = refType
+      val _refer: Value = regOp.operation.getResult(0)
 
   def RegInit[T <: Data](
     input: Const[T]
@@ -219,8 +219,8 @@ given ConstructorApi with
     )
     regResetOp.operation.appendToBlock()
     new Reg[T]:
-      val _tpe:       T         = input._tpe
-      val _operation: Operation = regResetOp.operation
+      val _tpe:   T     = input._tpe
+      val _refer: Value = regResetOp.operation.getResult(0)
 
   def Node[T <: Data](
     ref: Referable[T]
@@ -241,8 +241,8 @@ given ConstructorApi with
     )
     nodeOp.operation.appendToBlock()
     new Node[T]:
-      val _tpe:       T         = ref._tpe
-      val _operation: Operation = nodeOp.operation
+      val _tpe:   T     = ref._tpe
+      val _refer: Value = nodeOp.operation.getResult(0)
 
   extension (bigInt: BigInt)
     def U(
@@ -262,9 +262,9 @@ given ConstructorApi with
       )
       constOp.operation.appendToBlock()
       new Const[UInt]:
-        val _tpe:       UInt      = new UInt:
+        val _tpe:   UInt  = new UInt:
           private[zaozi] val _width = constOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = constOp.operation
+        val _refer: Value = constOp.operation.getResult(0)
     def U(
       using Arena,
       Context,
@@ -287,9 +287,9 @@ given ConstructorApi with
       )
       constOp.operation.appendToBlock()
       new Const[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = constOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = constOp.operation
+        val _refer: Value = constOp.operation.getResult(0)
     def B(
       using Arena,
       Context,
@@ -312,9 +312,9 @@ given ConstructorApi with
       )
       constOp.operation.appendToBlock()
       new Const[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = constOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = constOp.operation
+        val _refer: Value = constOp.operation.getResult(0)
     def S(
       using Arena,
       Context,
@@ -338,6 +338,6 @@ given ConstructorApi with
       )
       constOp.operation.appendToBlock()
       new Const[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = constOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = constOp.operation.getResult(0)
 end given

@@ -127,11 +127,11 @@ object BaseGeneratorHelper:
       val _probeTpe  = probeTpe
       val _operation = instanceOp.operation
       val _ioWire    = new Wire[I]:
-        private[zaozi] val _tpe       = ioTpe
-        private[zaozi] val _operation = ioWire.operation
+        private[zaozi] val _tpe   = ioTpe
+        private[zaozi] val _refer = ioWire.operation.getResult(0)
       val _probeWire = new Wire[P]:
-        private[zaozi] val _tpe       = probeTpe
-        private[zaozi] val _operation = probeWire.operation
+        private[zaozi] val _tpe   = probeTpe
+        private[zaozi] val _refer = probeWire.operation.getResult(0)
 
   def dumpMlirbc[PARAM <: Parameter](
     moduleName:        String,

@@ -163,8 +163,13 @@ trait HasVerilogTest:
       summon[Circuit].appendToModule()
       self.module(parameter).appendToCircuit()
       validateCircuit()
-      summon[PassManager].runOnOp(summon[MlirModule].getOperation)
+      val passResult   = summon[PassManager].runOnOp(summon[MlirModule].getOperation)
       summon[Context].destroy()
+      if passResult.failed then
+        throw new RuntimeException(
+          s"firtool lowering pipeline failed for module '${self.moduleName(parameter)}'; " +
+            "inspect the MLIR diagnostics emitted above for the cause."
+        )
 
       out.toString
     finally arena.close()

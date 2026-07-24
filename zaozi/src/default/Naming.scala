@@ -41,17 +41,17 @@ private inline def bundleFieldName(
   case anonName                                                   => throw NameNotFoundException(s"Cannot find name for BundleField ${anonName}")
 
 private[zaozi] def propagate[R <: Referable[?], RET <: Data](
-  source: R,
-  tpe:    RET,
-  op:     org.llvm.mlir.scalalib.capi.ir.Operation
+  source:   R,
+  tpe:      RET,
+  refValue: org.llvm.mlir.scalalib.capi.ir.Value
 ): Propagated[R, RET] =
   val result = source match
     case _: Const[?] =>
       new Const[RET]:
-        val _tpe       = tpe
-        val _operation = op
+        val _tpe   = tpe
+        val _refer = refValue
     case _ =>
       new Node[RET]:
-        val _tpe       = tpe
-        val _operation = op
+        val _tpe   = tpe
+        val _refer = refValue
   result.asInstanceOf[Propagated[R, RET]]
