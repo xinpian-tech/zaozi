@@ -47,16 +47,13 @@
 
 #table(
   columns: (auto, 1fr, auto),
-  table.header([需求], [落点], [主要章节]),
-  [@req-topology], [规格与协商结果在内存中即是可遍历的纯数据；JSON 导出只是把这些数据写出来], [@sec-two-graphs、@sec-triptych、@sec-export],
-  [@req-bidir], [`Down`/`Up`/`negotiate`], [@sec-three-param-kinds–@sec-protocol-object、@sec-propagation],
-  [@req-cardinality], [四算子与星号求解], [@sec-operators–@sec-flex],
-  [@req-pure], [遍流水线、错误语义], [@sec-passes、@sec-error-semantics],
-  [@req-phases], [Triptych 与模块二分], [@sec-triptych–@sec-module-kinds],
-  [@req-hierarchy], [打洞与命名], [@sec-punch-planning–@sec-port-naming],
-  [@req-verification], [验证协议与层], [@ch-verification],
-  [@req-serializable], [唯一跨越边界的数据是完整参数], [@sec-serialization-boundary、@sec-serialization-list],
-  [@req-static-eval], [协商结果即性能模型，评估先于电路], [@sec-static-eval],
+  table.header([需求], [回应它的设计], [主要章节]),
+  [@req-iteration], [eDSL 规格是唯一事实来源；图从规格导出；三阶段把静态可查错误全部前置到协商期；边数求解使增删设备不改数量声明], [@sec-triptych、@sec-star-solving、@sec-visualization、@sec-error-semantics],
+  [@req-negotiation], [两端指认与双向参数流；逐边结算；错误在协商期报出], [@sec-three-param-kinds–@sec-protocol-object、@sec-propagation],
+  [@req-hierarchy], [打洞规划与确定性命名], [@sec-punch-planning–@sec-port-naming],
+  [@req-verification], [验证协议、层次路由与层声明], [@ch-verification],
+  [@req-ip], [唯一跨越序列化边界的数据是完整参数], [@sec-serialization-boundary、@sec-serialization-list],
+  [@req-perf], [协商结果即性能模型，评估先于电路], [@sec-static-eval],
 )
 
 == 设计决策索引
@@ -78,6 +75,7 @@
 #table(
   columns: (auto, 1fr, auto),
   table.header([编号], [问题], [章节]),
+  [@open-cardinality-negotiation], [边数推断与参数协商的耦合。], [@ch-topology],
   [@open-multi-round], [显式多轮协商。], [@sec-settle-pp],
   [@open-incr-cache], [跨设计的增量缓存。], [@sec-dedup],
   [@open-typed-binding], [类型级绑定强化。], [@sec-generator-module],
@@ -85,4 +83,4 @@
 
 == 结语
 
-这份文档从"接口参数是拓扑的全局函数"这一个观察出发，推出了两张图、三个阶段、一条序列化边界；协议给出参数的语义，角色与算子给出图的形状，协商把二者算成一份可序列化、可复现、可审计的结果，例化只是照着这份结果生成电路。每一处形式化——共享解规则、端口区间、结构键、层的前缀树并——都服务于同一个目标：*使每一个字节的来源都可以被追溯*。实现应当以本文档为契约；文档未及之处，以#ref(<sec-requirements>)的九条需求为裁决依据。
+这份文档从"接口参数是拓扑的全局函数"这一个观察出发，推出了两张图、三个阶段、一条序列化边界；协议给出参数的语义，角色与算子给出图的形状，协商把二者算成一份可序列化、可复现、可审计的结果，例化只是照着这份结果生成电路。每一处形式化——共享解规则、端口区间、结构键、层的前缀树并——都服务于同一个目标：*使每一个字节的来源都可以被追溯*。实现应当以本文档为契约；文档未及之处，以#ref(<sec-requirements>)的六条需求为裁决依据。
