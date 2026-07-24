@@ -44,7 +44,8 @@
   )
   // 仅外部链接加下划线；文内交叉引用保持正文样式
   show link: it => if type(it.dest) == str { underline(it) } else { it }
-  // 交叉引用渲染：一级标题 → “第 N 章”，其余标题 → “§N.M”；决策/开放问题沿用默认（补充词 + 编号）
+  // 交叉引用渲染：一级标题 → “第 N 章”，其余标题 → “§N.M”；
+  // 需求 → “名称”需求（按名引用，不用编号）；决策/开放问题沿用默认（补充词 + 编号）
   show ref: it => {
     let el = it.element
     if el != none and el.func() == heading {
@@ -54,10 +55,13 @@
       } else {
         link(el.location(), [§#nums.map(str).join(".")])
       }
+    } else if el != none and el.func() == figure and el.kind == "requirement" and el.caption != none {
+      link(el.location(), [“#el.caption.body”需求])
     } else {
       it
     }
   }
+  show figure.where(kind: "requirement"): it => it.body
   set table(stroke: 0.5pt + luma(170), inset: 6pt)
   show figure.caption: set text(size: 9pt, fill: luma(80))
   set figure(gap: 3mm)
@@ -71,6 +75,28 @@
 // ============ 决策框 / 开放问题框 ============
 #let decision-counter = counter("syn-decision")
 #let open-counter = counter("syn-open")
+#let req-counter = counter("syn-req")
+
+// 需求为可交叉引用的命名元素；@label 渲染为“名称”需求，而非编号。
+#let 需求(title, body) = figure(
+  kind: "requirement",
+  supplement: [需求],
+  numbering: "1",
+  caption: figure.caption(title),
+  block(
+    width: 100%,
+    stroke: (left: 2.5pt + luma(110)),
+    fill: luma(249),
+    inset: 9pt,
+    radius: 2pt,
+    align(left)[
+      #req-counter.step()
+      #text(weight: "bold")[需求 #context req-counter.display()　#title]
+      #linebreak()
+      #body
+    ],
+  ),
+)
 
 // 决策/开放问题为可交叉引用的编号元素（figure kind），@label 渲染为“决策 N”/“开放问题 N”。
 #let 决策(title, body) = figure(
