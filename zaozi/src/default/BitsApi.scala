@@ -35,7 +35,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   XorPrimApi,
   XorRPrimApi
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
 import java.lang.foreign.Arena
 
@@ -61,7 +61,7 @@ given BitsApi with
       nodeOp.operation.appendToBlock()
       val tpe    = new SInt:
         private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
-      propagate[LHS, SInt](ref, tpe, nodeOp.operation)
+      propagate[LHS, SInt](ref, tpe, nodeOp.operation.getResult(0))
     def asUInt(
       using Arena,
       Context,
@@ -80,7 +80,7 @@ given BitsApi with
       nodeOp.operation.appendToBlock()
       val tpe    = new UInt:
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-      propagate[LHS, UInt](ref, tpe, nodeOp.operation)
+      propagate[LHS, UInt](ref, tpe, nodeOp.operation.getResult(0))
     def asBool(
       using Arena,
       Context,
@@ -102,7 +102,7 @@ given BitsApi with
         s"Cannot convert ${summon[sourcecode.Name.Machine]}: Bits(${width}) to Bool"
       )
       nodeOp.operation.appendToBlock()
-      propagate[LHS, Bool](ref, new Object with Bool, nodeOp.operation)
+      propagate[LHS, Bool](ref, new Object with Bool, nodeOp.operation.getResult(0))
     def asBundle[T <: Bundle](
       tpe: T
     )(
@@ -120,7 +120,7 @@ given BitsApi with
         location = locate
       )
       bitcastOp.operation.appendToBlock()
-      propagate[LHS, T](ref, tpe, bitcastOp.operation)
+      propagate[LHS, T](ref, tpe, bitcastOp.operation.getResult(0))
     def asRecord[T <: Record](
       tpe: T
     )(
@@ -138,7 +138,7 @@ given BitsApi with
         location = locate
       )
       bitcastOp.operation.appendToBlock()
-      propagate[LHS, T](ref, tpe, bitcastOp.operation)
+      propagate[LHS, T](ref, tpe, bitcastOp.operation.getResult(0))
     def asVec[E <: Data](
       tpe: E
     )(
@@ -164,7 +164,7 @@ given BitsApi with
         location = locate
       )
       bitcastOp.operation.appendToBlock()
-      propagate[LHS, Vec[E]](ref, Vec[E](count, tpe), bitcastOp.operation)
+      propagate[LHS, Vec[E]](ref, Vec[E](count, tpe), bitcastOp.operation.getResult(0))
     def unary_~(
       using Arena,
       Context,
@@ -184,9 +184,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def andR(
       using Arena,
@@ -207,8 +207,8 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def orR(
       using Arena,
@@ -229,8 +229,8 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def xorR(
       using Arena,
@@ -251,8 +251,8 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def ===[RHS <: Referable[Bits]](
       that: RHS
@@ -275,8 +275,8 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
     def =/=[RHS <: Referable[Bits]](
       that: RHS
     )(
@@ -298,8 +298,8 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
     def &[RHS <: Referable[Bits]](
       that: RHS
     )(
@@ -321,9 +321,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
     def |[RHS <: Referable[Bits]](
       that: RHS
     )(
@@ -345,9 +345,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def ^[RHS <: Referable[Bits]](
       that: RHS
@@ -370,9 +370,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def ##[RHS <: Referable[Bits]](
       that: RHS
@@ -395,9 +395,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
     def <<(
       that: Int | Referable[UInt]
     )(
@@ -425,9 +425,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
     def >>(
       that: Int | Referable[UInt]
     )(
@@ -459,9 +459,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def head(
       that: Int
@@ -484,9 +484,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
     def tail(
       that: Int
     )(
@@ -508,9 +508,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
     def pad(
       that: Int
     )(
@@ -532,9 +532,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
     def bits(
       hi: Int,
       lo: Int
@@ -557,9 +557,9 @@ given BitsApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bits]:
-        val _tpe:       Bits      = new Bits:
+        val _tpe:   Bits  = new Bits:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def bit(
       idx: Int

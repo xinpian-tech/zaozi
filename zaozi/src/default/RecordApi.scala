@@ -33,7 +33,7 @@ given [T <: Record | ProbeRecord]: RecordApi[T] with
       bitcastOp.operation.appendToBlock()
       val tpe       = new Bits:
         private[zaozi] val _width = bitcastOp.operation.getResult(0).getType.getBitWidth(true).toInt
-      propagate[R, Bits](ref, tpe, bitcastOp.operation)
+      propagate[R, Bits](ref, tpe, bitcastOp.operation.getResult(0))
 
     def field[T <: Data](
       fieldName: String

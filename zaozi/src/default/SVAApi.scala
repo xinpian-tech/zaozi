@@ -54,7 +54,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given_ValueApi,
   Block,
   Context,
-  Operation
+  Operation,
+  Value
 }
 
 import java.lang.foreign.Arena
@@ -62,9 +63,9 @@ import java.lang.foreign.Arena
 export given_SVAApi.{always, eventually, negedge, posedge, Assert, Assume, Cover}
 
 given SVAApi with
-  def posedge(clock: Referable[Clock] & HasOperation): ClockEvent =
+  def posedge(clock: Referable[Clock]): ClockEvent =
     ClockEvent(FirrtlEventControl.AtPosEdge, clock)
-  def negedge(clock: Referable[Clock] & HasOperation): ClockEvent =
+  def negedge(clock: Referable[Clock]): ClockEvent =
     ClockEvent(FirrtlEventControl.AtNegEdge, clock)
 
   def always(
@@ -86,7 +87,7 @@ given SVAApi with
     val op    = summon[UntilApi].op(value, rhs.refer, locate)
     op.operation.appendToBlock()
     new Property:
-      private[zaozi] val _operation: Operation = op.operation
+      private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   def eventually(
     property: Immediate | Sequence | Property
@@ -106,9 +107,9 @@ given SVAApi with
     val op    = summon[EventuallyApi].op(value, locate)
     op.operation.appendToBlock()
     new Property:
-      private[zaozi] val _operation: Operation = op.operation
+      private[zaozi] val _refer: Value = op.operation.getResult(0)
 
-  extension [T <: Referable[Bool] & HasOperation](ref: T)
+  extension [T <: Referable[Bool]](ref: T)
     def S(
       using clock: ClockEvent
     )(
@@ -123,7 +124,7 @@ given SVAApi with
       val seq = summon[ClockApi].op(ref.refer, clock.edge, clock.clock.refer, locate)
       seq.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = seq.operation
+        private[zaozi] val _refer:      Value      = seq.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = clock
 
     def I(
@@ -136,7 +137,7 @@ given SVAApi with
       InstanceContext
     ): Immediate =
       new Immediate:
-        private[zaozi] val _operation: Operation = ref.operation
+        private[zaozi] val _refer: Value = ref.refer
 
     infix def throughout(
       that: Sequence
@@ -154,7 +155,7 @@ given SVAApi with
       val res     = summon[IntersectApi].op(Seq(repexpr.result, that.refer), locate)
       res.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = res.operation
+        private[zaozi] val _refer:      Value      = res.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = that._clockevent
 
   extension (ref: Immediate)
@@ -170,7 +171,7 @@ given SVAApi with
       val op = summon[NotApi].op(ref.refer, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def &(
       that: Immediate
@@ -186,7 +187,7 @@ given SVAApi with
       val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Immediate:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def &(
       that: Sequence
@@ -202,7 +203,7 @@ given SVAApi with
       val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = that._clockevent
 
     def &(
@@ -219,7 +220,7 @@ given SVAApi with
       val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |(
       that: Immediate
@@ -235,7 +236,7 @@ given SVAApi with
       val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Immediate:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |(
       that: Sequence
@@ -251,7 +252,7 @@ given SVAApi with
       val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = that._clockevent
 
     def |(
@@ -268,7 +269,7 @@ given SVAApi with
       val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def intersect(
       that: Immediate
@@ -284,7 +285,7 @@ given SVAApi with
       val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Immediate:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def intersect(
       that: Sequence
@@ -300,7 +301,7 @@ given SVAApi with
       val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = that._clockevent
 
     infix def intersect(
@@ -317,7 +318,7 @@ given SVAApi with
       val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |->(
       that: Immediate | Sequence | Property
@@ -337,7 +338,7 @@ given SVAApi with
       val op        = summon[ImplicationApi].op(ref.refer, thatValue, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def #-#(
       that: Immediate | Sequence | Property
@@ -361,7 +362,7 @@ given SVAApi with
       val op        = summon[NotApi].op(impl.result, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def implies(
       that: Immediate | Sequence | Property
@@ -383,7 +384,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(notRef.result, thatValue), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def iff(
       that: Immediate | Sequence | Property
@@ -409,7 +410,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(notOr.result, and.result), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def until(
       that: Immediate | Sequence | Property
@@ -429,7 +430,7 @@ given SVAApi with
       val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def untilWith(
       that: Immediate | Sequence | Property
@@ -451,7 +452,7 @@ given SVAApi with
       val op        = summon[UntilApi].op(ref.refer, and.result, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   extension (ref: Sequence)
     def unary_!(
@@ -466,7 +467,7 @@ given SVAApi with
       val op = summon[NotApi].op(ref.refer, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def ##(
       that: Sequence
@@ -482,7 +483,7 @@ given SVAApi with
       val op = summon[ConcatApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def ###(
@@ -522,7 +523,7 @@ given SVAApi with
       op.operation.appendToBlock()
       val clockevent = that._clockevent
       val _that      = new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = clockevent
       ref.##(_that)
 
@@ -554,7 +555,7 @@ given SVAApi with
       op.operation.appendToBlock()
       val clockevent = that._clockevent
       val _that      = new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = clockevent
       ref.##(_that)
 
@@ -573,7 +574,7 @@ given SVAApi with
       val op = summon[RepeatApi].op(ref.refer, n.toLong, Some(0L), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def *(
@@ -593,7 +594,7 @@ given SVAApi with
       val op = summon[RepeatApi].op(ref.refer, min.toLong, max.map(value => (value - min).toLong), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def *->(
@@ -618,7 +619,7 @@ given SVAApi with
       )
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def *=(
@@ -643,7 +644,7 @@ given SVAApi with
       )
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def ##+(
@@ -723,11 +724,11 @@ given SVAApi with
       val notThat   = summon[NotApi].op(thatValue, locate)
       notThat.operation.appendToBlock()
       val followed  = ref |=> new Property:
-        private[zaozi] val _operation: Operation = notThat.operation
+        private[zaozi] val _refer: Value = notThat.operation.getResult(0)
       val op        = summon[NotApi].op(followed.refer, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def &(
       that: Immediate | Sequence
@@ -746,7 +747,7 @@ given SVAApi with
       val op        = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def &(
@@ -763,7 +764,7 @@ given SVAApi with
       val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |(
       that: Immediate | Sequence
@@ -782,7 +783,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     def |(
@@ -799,7 +800,7 @@ given SVAApi with
       val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def intersect(
       that: Immediate | Sequence
@@ -818,7 +819,7 @@ given SVAApi with
       val op        = summon[IntersectApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _operation:  Operation  = op.operation
+        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
         private[zaozi] val _clockevent: ClockEvent = ref._clockevent
 
     infix def intersect(
@@ -835,7 +836,7 @@ given SVAApi with
       val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |->(
       that: Immediate | Sequence | Property
@@ -855,7 +856,7 @@ given SVAApi with
       val op        = summon[ImplicationApi].op(ref.refer, thatValue, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def #-#(
       that: Immediate | Sequence | Property
@@ -879,7 +880,7 @@ given SVAApi with
       val op        = summon[NotApi].op(impl.result, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def implies(
       that: Immediate | Sequence | Property
@@ -901,7 +902,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(notRef.result, thatValue), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def iff(
       that: Immediate | Sequence | Property
@@ -927,7 +928,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(notOr.result, and.result), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def until(
       that: Immediate | Sequence | Property
@@ -947,7 +948,7 @@ given SVAApi with
       val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def untilWith(
       that: Immediate | Sequence | Property
@@ -969,7 +970,7 @@ given SVAApi with
       val op        = summon[UntilApi].op(ref.refer, and.result, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   extension (ref: Property)
     def unary_!(
@@ -984,7 +985,7 @@ given SVAApi with
       val op = summon[NotApi].op(ref.refer, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def &(
       that: Immediate | Sequence | Property
@@ -1004,7 +1005,7 @@ given SVAApi with
       val op        = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |(
       that: Immediate | Sequence | Property
@@ -1024,7 +1025,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def intersect(
       that: Immediate | Sequence | Property
@@ -1044,7 +1045,7 @@ given SVAApi with
       val op        = summon[IntersectApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def implies(
       that: Immediate | Sequence | Property
@@ -1066,7 +1067,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(notRef.result, thatValue), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def iff(
       that: Immediate | Sequence | Property
@@ -1092,7 +1093,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(notOr.result, and.result), locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def until(
       that: Immediate | Sequence | Property
@@ -1112,7 +1113,7 @@ given SVAApi with
       val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def untilWith(
       that: Immediate | Sequence | Property
@@ -1134,7 +1135,7 @@ given SVAApi with
       val op        = summon[UntilApi].op(ref.refer, and.result, locate)
       op.operation.appendToBlock()
       new Property:
-        private[zaozi] val _operation: Operation = op.operation
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   def Assert(
     property: Immediate | Sequence | Property

@@ -3,14 +3,14 @@
 package me.jiuyang.zaozi.ltltpe
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.reftpe.{HasOperation, Referable}
+import me.jiuyang.zaozi.reftpe.Referable
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
-import org.llvm.mlir.scalalib.capi.ir.{Context, Operation, Type, Value}
+import org.llvm.mlir.scalalib.capi.ir.{Context, Type, Value}
 
 import java.lang.foreign.Arena
 
-case class ClockEvent(edge: FirrtlEventControl, clock: Referable[Clock] & HasOperation):
+case class ClockEvent(edge: FirrtlEventControl, clock: Referable[Clock]):
   def apply[T](
     body: ClockEvent ?=> T
   ): T = body(
@@ -18,13 +18,9 @@ case class ClockEvent(edge: FirrtlEventControl, clock: Referable[Clock] & HasOpe
   )
 
 /** The SVA sequence, the inner bool indicate: match success or match failed. */
-trait Sequence extends HasOperation:
-  private[zaozi] val _operation:  Operation
+trait Sequence:
+  private[zaozi] val _refer:      Value
   private[zaozi] val _clockevent: ClockEvent
-
-  def operation(
-    using TypeImpl
-  ): Operation = this.operationImpl
 
   def refer(
     using Arena,

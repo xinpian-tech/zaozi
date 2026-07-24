@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.{InstanceContext, VecApi}
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_FirrtlBundleFieldApi, given_TypeApi, FirrtlNameKind}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{BitCastApi, NodeApi, SubaccessApi, SubindexApi, given}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
 import java.lang.foreign.Arena
 
@@ -31,7 +31,7 @@ given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
       bitcastOp.operation.appendToBlock()
       val tpe       = new Bits:
         private[zaozi] val _width = bitcastOp.operation.getResult(0).getType.getBitWidth(true).toInt
-      propagate[R, Bits](ref, tpe, bitcastOp.operation)
+      propagate[R, Bits](ref, tpe, bitcastOp.operation.getResult(0))
 
     def length(
       using Arena,
@@ -59,8 +59,8 @@ given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
           op0.operation.appendToBlock()
           op0.operation
       new Ref[E]:
-        val _tpe:       E         = ref._tpe.elementType
-        val _operation: Operation = refOp
+        val _tpe:   E     = ref._tpe.elementType
+        val _refer: Value = refOp.getResult(0)
 
     // sugars
     def apply(

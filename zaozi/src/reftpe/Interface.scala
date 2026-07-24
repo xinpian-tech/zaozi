@@ -4,16 +4,13 @@ package me.jiuyang.zaozi.reftpe
 
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.zaozi.{DVInterface, HWInterface, Parameter, TypeImpl}
-import org.llvm.mlir.scalalib.capi.ir.{Operation, Value}
+import org.llvm.mlir.scalalib.capi.ir.Value
 
 import java.lang.foreign.Arena
 
-abstract class Interface[T <: HWInterface[?] | DVInterface[?, ?]] extends Writable[T] with HasOperation:
-  private[zaozi] val _tpe:       T
-  private[zaozi] val _operation: Operation
-  def operation(
-    using TypeImpl
-  ): Operation = this.operationImpl
+abstract class Interface[T <: HWInterface[?] | DVInterface[?, ?]] extends Writable[T]:
+  private[zaozi] val _tpe:   T
+  private[zaozi] val _refer: Value
   def refer(
     using Arena,
     TypeImpl

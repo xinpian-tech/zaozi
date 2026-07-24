@@ -18,7 +18,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   XorPrimApi,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
 import java.lang.foreign.Arena
 
@@ -43,8 +43,8 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def asBits(
       using Arena,
@@ -64,7 +64,7 @@ given BoolApi with
       nodeOp.operation.appendToBlock()
       val tpe    = new Object with Bits:
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-      propagate[LHS, Bits](ref, tpe, nodeOp.operation)
+      propagate[LHS, Bits](ref, tpe, nodeOp.operation.getResult(0))
 
     def ===[RHS <: Referable[Bool]](
       that: RHS
@@ -87,8 +87,8 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def =/=[RHS <: Referable[Bool]](
       that: RHS
@@ -111,8 +111,8 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def &[RHS <: Referable[Bool]](
       that: RHS
@@ -135,8 +135,8 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def |[RHS <: Referable[Bool]](
       that: RHS
@@ -159,8 +159,8 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def ^[RHS <: Referable[Bool]](
       that: RHS
@@ -183,8 +183,8 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def ?[Ret <: Data](
       con: Referable[Ret],
@@ -208,6 +208,6 @@ given BoolApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Ret]:
-        val _tpe:       Ret       = con._tpe
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Ret   = con._tpe
+        val _refer: Value = nodeOp.operation.getResult(0)
 end given

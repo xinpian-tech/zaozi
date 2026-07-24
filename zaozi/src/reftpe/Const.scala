@@ -4,17 +4,13 @@ package me.jiuyang.zaozi.reftpe
 
 import me.jiuyang.zaozi.TypeImpl
 import me.jiuyang.zaozi.valuetpe.*
-import org.llvm.mlir.scalalib.capi.ir.{Operation, Value}
+import org.llvm.mlir.scalalib.capi.ir.Value
 
 import java.lang.foreign.Arena
 
-abstract class Const[T <: Data] extends Referable[T] with HasOperation:
-  private[zaozi] val _tpe:       T
-  private[zaozi] val _operation: Operation
-
-  def operation(
-    using TypeImpl
-  ): Operation = this.operationImpl
+abstract class Const[T <: Data] extends Referable[T]:
+  private[zaozi] val _tpe:   T
+  private[zaozi] val _refer: Value
 
   def refer(
     using Arena,

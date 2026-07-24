@@ -4,9 +4,15 @@ package org.llvm.mlir.scalalib.capi.ir
 
 import org.llvm.mlir.*
 import org.llvm.mlir.CAPI.{
+  mlirBlockArgumentGetArgNumber,
+  mlirBlockArgumentGetOwner,
+  mlirOpResultGetOwner,
+  mlirOpResultGetResultNumber,
   mlirValueDump,
   mlirValueGetFirstUse,
   mlirValueGetType,
+  mlirValueIsABlockArgument,
+  mlirValueIsAOpResult,
   mlirValuePrint,
   mlirValuePrintAsOperand,
   mlirValueReplaceAllUsesOfWith,
@@ -39,6 +45,16 @@ given ValueApi with
     ): Unit =
       mlirValuePrintAsOperand(value.segment, state.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
     inline def replaceAllUsesOfWith(w: Value): Unit          = mlirValueReplaceAllUsesOfWith(value.segment, w.segment)
+    inline def isOpResult:                     Boolean       = mlirValueIsAOpResult(value.segment)
+    inline def isBlockArgument:                Boolean       = mlirValueIsABlockArgument(value.segment)
+    inline def opResultGetOwner(
+      using arena: Arena
+    ): Operation = Operation(mlirOpResultGetOwner(arena, value.segment))
+    inline def opResultGetResultNumber:        Long          = mlirOpResultGetResultNumber(value.segment)
+    inline def blockArgumentGetOwner(
+      using arena: Arena
+    ): Block = Block(mlirBlockArgumentGetOwner(arena, value.segment))
+    inline def blockArgumentGetArgNumber:      Long          = mlirBlockArgumentGetArgNumber(value.segment)
     inline def segment:                        MemorySegment = value._segment
     inline def sizeOf:                         Int           = MlirValue.sizeof().toInt
 end given

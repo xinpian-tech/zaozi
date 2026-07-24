@@ -33,62 +33,54 @@ given TypeImpl with
       .getBundle
 
   extension (ref: Interface[?])
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
   extension (ref: Wire[?])
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
   extension (ref: Reg[?])
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
   extension (ref: Node[?])
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
   extension (ref: Ref[?])
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
   extension (ref: Const[?])
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
   extension (ref: Instance[?, ?])
     def operationImpl:        Operation = ref._operation
     def ioImpl[T <: Data]:    Wire[T]   = ref._ioWire.asInstanceOf[Wire[T]]
     def probeImpl[T <: Data]: Wire[T]   = ref._probeWire.asInstanceOf[Wire[T]]
   extension (ref: Sequence)
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
+    // LTL refs have no aggregate MLIR type; `1.getUInt` is an unconsumed placeholder.
     def toMlirTypeImpl(
       using Arena,
       Context
     ): Type = 1.getUInt
   extension (ref: Property)
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
     def toMlirTypeImpl(
       using Arena,
       Context
     ): Type = 1.getUInt
   extension (ref: Immediate)
-    def operationImpl: Operation = ref._operation
     def referImpl(
       using Arena
-    ): Value = ref.operation.getResult(0)
+    ): Value = ref._refer
     def toMlirTypeImpl(
       using Arena,
       Context
@@ -328,8 +320,8 @@ given TypeImpl with
             )
           openSubfieldOp.operation.appendToBlock()
           new Ref[E]:
-            val _tpe:       E         = field.dataType.asInstanceOf[E]
-            val _operation: Operation = openSubfieldOp.operation
+            val _tpe:   E     = field.dataType.asInstanceOf[E]
+            val _refer: Value = openSubfieldOp.operation.getResult(0)
 
   extension (ref: Bundle)
     def getRefViaFieldValNameImpl[E <: Data](
@@ -371,8 +363,8 @@ given TypeImpl with
             )
           subfieldOp.operation.appendToBlock()
           new Ref[E]:
-            val _tpe:       E         = field.dataType.asInstanceOf[E]
-            val _operation: Operation = subfieldOp.operation
+            val _tpe:   E     = field.dataType.asInstanceOf[E]
+            val _refer: Value = subfieldOp.operation.getResult(0)
 
   extension (ref: ProbeRecord)
     def getUntypedRefViaFieldValNameImpl(
@@ -400,8 +392,8 @@ given TypeImpl with
             )
           openSubfieldOp.operation.appendToBlock()
           new Ref[Data]:
-            val _tpe:       Data      = field.dataType.asInstanceOf[Data]
-            val _operation: Operation = openSubfieldOp.operation
+            val _tpe:   Data  = field.dataType.asInstanceOf[Data]
+            val _refer: Value = openSubfieldOp.operation.getResult(0)
         .getOrElse:
           throw new Exception(s"$fieldValName not found in ${ref._elements.map(_.name)}")
   extension (ref: Record)
@@ -430,8 +422,8 @@ given TypeImpl with
             )
           subfieldOp.operation.appendToBlock()
           new Ref[Data]:
-            val _tpe:       Data      = field.dataType.asInstanceOf[Data]
-            val _operation: Operation = subfieldOp.operation
+            val _tpe:   Data  = field.dataType.asInstanceOf[Data]
+            val _refer: Value = subfieldOp.operation.getResult(0)
         .getOrElse:
           throw new Exception(s"$fieldValName not found in ${ref._elements.map(_.name)}")
 end given

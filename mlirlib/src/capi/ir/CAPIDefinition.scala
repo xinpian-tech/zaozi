@@ -516,6 +516,16 @@ trait ValueApi extends HasSegment[Value] with HasSizeOf[Value]:
       using arena: Arena
     ):                                         Unit
     inline def replaceAllUsesOfWith(w: Value): Unit
+    inline def isOpResult:                     Boolean
+    inline def isBlockArgument:                Boolean
+    inline def opResultGetOwner(
+      using arena: Arena
+    ):                                         Operation
+    inline def opResultGetResultNumber:        Long
+    inline def blockArgumentGetOwner(
+      using arena: Arena
+    ):                                         Block
+    inline def blockArgumentGetArgNumber:      Long
 end ValueApi
 
 class OpOperand(val _segment: MemorySegment)

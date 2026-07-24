@@ -28,7 +28,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   SubPrimApi,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
 import java.lang.foreign.Arena
 
@@ -54,7 +54,7 @@ given SIntApi with
       nodeOp.operation.appendToBlock()
       val tpe    = new Bits:
         private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
-      propagate[LHS, Bits](ref, tpe, nodeOp.operation)
+      propagate[LHS, Bits](ref, tpe, nodeOp.operation.getResult(0))
 
     def +[RHS <: Referable[SInt]](
       that: RHS
@@ -77,9 +77,9 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def -[RHS <: Referable[SInt]](
       that: RHS
@@ -102,9 +102,9 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def *[RHS <: Referable[SInt]](
       that: RHS
@@ -127,9 +127,9 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def /[RHS <: Referable[SInt]](
       that: RHS
@@ -152,9 +152,9 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def %[RHS <: Referable[SInt]](
       that: RHS
@@ -177,9 +177,9 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def <[RHS <: Referable[SInt]](
       that: RHS
@@ -202,8 +202,8 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def <=[RHS <: Referable[SInt]](
       that: RHS
@@ -226,8 +226,8 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def >[RHS <: Referable[SInt]](
       that: RHS
@@ -250,8 +250,8 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def >=[RHS <: Referable[SInt]](
       that: RHS
@@ -274,8 +274,8 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def ===[RHS <: Referable[SInt]](
       that: RHS
@@ -298,8 +298,8 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def =/=[RHS <: Referable[SInt]](
       that: RHS
@@ -322,8 +322,8 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[Bool]:
-        val _tpe:       Bool      = new Object with Bool
-        val _operation: Operation = nodeOp.operation
+        val _tpe:   Bool  = new Object with Bool
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def <<(
       that: Int | Referable[UInt]
@@ -352,9 +352,9 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 
     def >>(
       that: Int | Referable[UInt]
@@ -387,7 +387,7 @@ given SIntApi with
       )
       nodeOp.operation.appendToBlock()
       new Node[SInt]:
-        val _tpe:       SInt      = new SInt:
+        val _tpe:   SInt  = new SInt:
           private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
-        val _operation: Operation = nodeOp.operation
+        val _refer: Value = nodeOp.operation.getResult(0)
 end given

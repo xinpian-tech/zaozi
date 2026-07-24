@@ -515,10 +515,10 @@ trait AsVec[D <: Data]:
   * [[me.jiuyang.zaozi.valuetpe.Record Record]] over the same value (no bitcast; cf. [[AsRecord]]).
   */
 trait AsRecordView[D <: Bundle]:
-  extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, Record]
+  extension [R <: Referable[D]](ref: R) def asRecord: Propagated[R, Record]
 
 trait AsProbeRecordView[D <: ProbeBundle]:
-  extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, ProbeRecord]
+  extension [R <: Referable[D]](ref: R) def asRecord: Propagated[R, ProbeRecord]
 
 trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]:
   extension (ref: PROBE)
@@ -1079,25 +1079,25 @@ trait ResetApi extends AsBool[Reset]
 
 type ContractTuple[A <: Tuple] <: Tuple = A match
   case EmptyTuple           => EmptyTuple
-  case Referable[t] *: tail => (Referable[t] & HasOperation) *: ContractTuple[tail]
+  case Referable[t] *: tail => (Referable[t]) *: ContractTuple[tail]
 
 trait ContractTupleArgs[A <: Tuple]:
-  def values(args:    A):                                        Seq[Referable[? <: Data] & HasOperation]
-  def results(values: Seq[Referable[? <: Data] & HasOperation]): ContractTuple[A]
+  def values(args:    A):                         Seq[Referable[? <: Data]]
+  def results(values: Seq[Referable[? <: Data]]): ContractTuple[A]
 
 object ContractTupleArgs:
   given empty: ContractTupleArgs[EmptyTuple] with
-    def values(args: EmptyTuple):                                  Seq[Referable[? <: Data] & HasOperation] = Seq.empty
-    def results(values: Seq[Referable[? <: Data] & HasOperation]): EmptyTuple                               =
+    def values(args: EmptyTuple):                   Seq[Referable[? <: Data]] = Seq.empty
+    def results(values: Seq[Referable[? <: Data]]): EmptyTuple                =
       EmptyTuple
 
-  given cons[T <: Data, H <: Referable[T] & HasOperation, Tail <: Tuple](
+  given cons[T <: Data, H <: Referable[T], Tail <: Tuple](
     using tailArgs: ContractTupleArgs[Tail]
   ): ContractTupleArgs[H *: Tail] with
-    def values(args: H *: Tail): Seq[Referable[? <: Data] & HasOperation] =
+    def values(args: H *: Tail): Seq[Referable[? <: Data]] =
       args.head +: tailArgs.values(args.tail)
 
-    def results(values: Seq[Referable[? <: Data] & HasOperation]): ContractTuple[H *: Tail] =
+    def results(values: Seq[Referable[? <: Data]]): ContractTuple[H *: Tail] =
       (values.head *: tailArgs.results(values.tail)).asInstanceOf[ContractTuple[H *: Tail]]
 
 trait ContractApi:
@@ -1113,8 +1113,8 @@ trait ContractApi:
   ): Unit
 
   def Contract[T <: Data](
-    arg:  Referable[T] & HasOperation
-  )(body: (Referable[T] & HasOperation) => (Arena, Context, Block) ?=> Unit
+    arg:  Referable[T]
+  )(body: (Referable[T]) => (Arena, Context, Block) ?=> Unit
   )(
     using Arena,
     Context,
@@ -1122,8 +1122,7 @@ trait ContractApi:
     sourcecode.File,
     sourcecode.Line,
     TypeImpl
-  ): Referable[T] & HasOperation
-
+  ): Referable[T]
   def Contract[A <: Tuple](
     args: A
   )(body: ContractTuple[A] => (Arena, Context, Block) ?=> Unit
@@ -1163,8 +1162,8 @@ trait ContractApi:
   ): Unit
 
 trait SVAApi:
-  def posedge(clock: Referable[Clock] & HasOperation): ClockEvent
-  def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
+  def posedge(clock: Referable[Clock]): ClockEvent
+  def negedge(clock: Referable[Clock]): ClockEvent
 
   /** SVA: always p
     */
@@ -1194,7 +1193,7 @@ trait SVAApi:
     InstanceContext
   ): Property
 
-  extension [T <: Referable[Bool] & HasOperation](ref: T)
+  extension [T <: Referable[Bool]](ref: T)
     def S(
       using ClockEvent
     )(
@@ -1994,66 +1993,57 @@ trait SVAApi:
 
 trait TypeImpl:
   extension (ref: Interface[?])
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
   extension (ref: Wire[?])
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
   extension (ref: Reg[?])
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
   extension (ref: Node[?])
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
   extension (ref: Ref[?])
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
   extension (ref: Const[?])
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
   extension (ref: Instance[?, ?])
     private[zaozi] def operationImpl:        Operation
     private[zaozi] def ioImpl[T <: Data]:    Wire[T]
     private[zaozi] def probeImpl[T <: Data]: Wire[T]
   extension (ref: Sequence)
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):                                Type
+    ): Type
   extension (ref: Property)
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):                                Type
+    ): Type
   extension (ref: Immediate)
-    private[zaozi] def operationImpl: Operation
     private[zaozi] def referImpl(
       using Arena
-    ):                                Value
+    ): Value
     private[zaozi] def toMlirTypeImpl(
       using Arena,
       Context
-    ):                                Type
+    ): Type
 
   extension (ref:  Reset)
     private[zaozi] def toMlirTypeImpl(

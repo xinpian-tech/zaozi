@@ -61,7 +61,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   NamedAttributeApi,
   Operation,
   OperationApi,
-  Type
+  Type,
+  Value
 }
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
 
@@ -145,12 +146,12 @@ given GeneratorApi:
               .appendToBlock()
       given Interface[I]    =
         new Interface[I]:
-          val _tpe:       I         = io
-          val _operation: Operation = ioWire.operation
+          val _tpe:   I     = io
+          val _refer: Value = ioWire.operation.getResult(0)
       given Interface[P]    =
         new Interface[P]:
-          val _tpe:       P         = probe
-          val _operation: Operation = probeWire.operation
+          val _tpe:   P     = probe
+          val _refer: Value = probeWire.operation.getResult(0)
       given InstanceContext = new InstanceContext
       given L               = generator.layers(parameter)
       generator.architecture(parameter)

@@ -59,8 +59,8 @@ object SVASpec extends TestSuite:
         def architecture(parameter: SVASpecParameter) =
           val io    = summon[Interface[SVASpecIO]]
           val probe = summon[Interface[SVASpecProbe]]
-          val a:         Referable[Bool] & HasOperation = io.ib0
-          val immediate: Immediate                      = a.I
+          val a:         Referable[Bool] = io.ib0
+          val immediate: Immediate       = a.I
 
           Assert(immediate, "Simple SVA")
 
@@ -77,10 +77,10 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: SVASpecParameter) =
             val io = summon[Interface[SVASpecIO]]
-            val a:         Referable[Bool] & HasOperation = io.ib0
-            val immediate: Immediate                      = a.I
-            val sequence:  Sequence                       = posedge(io.clock)(a.S)
-            val property:  Property                       = a.I implies a.I
+            val a:         Referable[Bool] = io.ib0
+            val immediate: Immediate       = a.I
+            val sequence:  Sequence        = posedge(io.clock)(a.S)
+            val property:  Property        = a.I implies a.I
 
             Assert(immediate, "assert_0")
             Assert(sequence, "assert_1")
@@ -100,10 +100,10 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:         Referable[Bool] & HasOperation = io.ib0
-            val immediate: Immediate                      = a.I
-            val sequence:  Sequence                       = posedge(io.clock)(a.S)
-            val property:  Property                       = a.I implies a.I
+            val a:         Referable[Bool] = io.ib0
+            val immediate: Immediate       = a.I
+            val sequence:  Sequence        = posedge(io.clock)(a.S)
+            val property:  Property        = a.I implies a.I
 
             Assume(immediate, "assume_0")
             Assume(sequence, "assume_1")
@@ -122,10 +122,10 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:         Referable[Bool] & HasOperation = io.ib0
-            val immediate: Immediate                      = a.I
-            val sequence:  Sequence                       = posedge(io.clock)(a.S)
-            val property:  Property                       = a.I implies a.I
+            val a:         Referable[Bool] = io.ib0
+            val immediate: Immediate       = a.I
+            val sequence:  Sequence        = posedge(io.clock)(a.S)
+            val property:  Property        = a.I implies a.I
 
             Cover(immediate, "cover_0")
             Cover(sequence, "cover_1")
@@ -146,9 +146,9 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:      Referable[Bool] & HasOperation = io.ib0
-            val b:      Referable[Bool] & HasOperation = io.ib1
-            val concat: Sequence                       = a.S ## b.S
+            val a:      Referable[Bool] = io.ib0
+            val b:      Referable[Bool] = io.ib1
+            val concat: Sequence        = a.S ## b.S
 
             Assert(concat)
         SimpleSVA.mlirTest(SVASpecParameter(32))(out =>
@@ -166,9 +166,9 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:       Referable[Bool] & HasOperation = io.ib0
-            val b:       Referable[Bool] & HasOperation = io.ib1
-            val delayed: Sequence                       = a.S ### b.S
+            val a:       Referable[Bool] = io.ib0
+            val b:       Referable[Bool] = io.ib1
+            val delayed: Sequence        = a.S ### b.S
 
             Assert(delayed)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -184,9 +184,9 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: SVASpecParameter) =
             val io = summon[Interface[SVASpecIO]]
-            val a:       Referable[Bool] & HasOperation = io.ib0
-            val b:       Referable[Bool] & HasOperation = io.ib1
-            val delayed: Sequence                       = posedge(io.clock)(a.S.##(5)(b.S))
+            val a:       Referable[Bool] = io.ib0
+            val b:       Referable[Bool] = io.ib1
+            val delayed: Sequence        = posedge(io.clock)(a.S.##(5)(b.S))
 
             Assert(delayed)
         SimpleSVA.mlirTest(SVASpecParameter(32))(
@@ -208,11 +208,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:       Referable[Bool] & HasOperation = io.ib0
-            val b:       Referable[Bool] & HasOperation = io.ib1
-            val as:      Sequence                       = a.S
-            val bs:      Sequence                       = b.S
-            val delayed: Sequence                       = as.##(1, Some(2))(bs)
+            val a:       Referable[Bool] = io.ib0
+            val b:       Referable[Bool] = io.ib1
+            val as:      Sequence        = a.S
+            val bs:      Sequence        = b.S
+            val delayed: Sequence        = as.##(1, Some(2))(bs)
 
             Assert(delayed)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -252,12 +252,12 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val as:       Sequence                       = a.S
-            val bs:       Sequence                       = b.S
-            val delayed0: Sequence                       = as.##(1, None)(bs)
-            val delayed1: Sequence                       = as ##+ bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val as:       Sequence        = a.S
+            val bs:       Sequence        = b.S
+            val delayed0: Sequence        = as.##(1, None)(bs)
+            val delayed1: Sequence        = as ##+ bs
 
             Assert(delayed0, "assert0")
             Assert(delayed1, "assert1")
@@ -276,12 +276,12 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val as:       Sequence                       = a.S
-            val bs:       Sequence                       = b.S
-            val delayed0: Sequence                       = as.##(0, None)(bs)
-            val delayed1: Sequence                       = as ##* bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val as:       Sequence        = a.S
+            val bs:       Sequence        = b.S
+            val delayed0: Sequence        = as.##(0, None)(bs)
+            val delayed1: Sequence        = as ##* bs
 
             Assert(delayed0, "assert0")
             Assert(delayed1, "assert1")
@@ -300,9 +300,9 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:       Referable[Bool] & HasOperation = io.ib0
-            val seq:     Sequence                       = a.S
-            val delayed: Sequence                       = seq * 1
+            val a:       Referable[Bool] = io.ib0
+            val seq:     Sequence        = a.S
+            val delayed: Sequence        = seq * 1
 
             Assert(delayed)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -317,9 +317,9 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:   Referable[Bool] & HasOperation = io.ib0
-            val seq: Sequence                       = a.S
-            val rep: Sequence                       = seq.*(1, Some(2))
+            val a:   Referable[Bool] = io.ib0
+            val seq: Sequence        = a.S
+            val rep: Sequence        = seq.*(1, Some(2))
 
             Assert(rep)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -334,11 +334,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val seq:  Sequence                       = a.S
-            val rep0: Sequence                       = seq.*(0, None) // [*0:$] -> [*]
-            val rep1: Sequence                       = seq.*(1, None) // [*1:$] -> [+]
-            val rep2: Sequence                       = seq.*(2, None) // [*2:$] -> [*2:$]
+            val a:    Referable[Bool] = io.ib0
+            val seq:  Sequence        = a.S
+            val rep0: Sequence        = seq.*(0, None) // [*0:$] -> [*]
+            val rep1: Sequence        = seq.*(1, None) // [*1:$] -> [+]
+            val rep2: Sequence        = seq.*(2, None) // [*2:$] -> [*2:$]
 
             Assert(rep0, "assert0")
             Assert(rep1, "assert1")
@@ -357,9 +357,9 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val seq:      Sequence                       = a.S
-            val sequence: Sequence                       = seq.*->(1, 2)
+            val a:        Referable[Bool] = io.ib0
+            val seq:      Sequence        = a.S
+            val sequence: Sequence        = seq.*->(1, 2)
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -374,9 +374,9 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val seq:      Sequence                       = a.S
-            val sequence: Sequence                       = seq.*=(1, 2)
+            val a:        Referable[Bool] = io.ib0
+            val seq:      Sequence        = a.S
+            val sequence: Sequence        = seq.*=(1, 2)
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -391,11 +391,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val as:       Sequence                       = a.S
-            val bs:       Sequence                       = b.S
-            val sequence: Sequence                       = as & bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val as:       Sequence        = a.S
+            val bs:       Sequence        = b.S
+            val sequence: Sequence        = as & bs
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -410,11 +410,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val as:       Sequence                       = a.S * 3
-            val bs:       Sequence                       = b.S * 2
-            val sequence: Sequence                       = as intersect bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val as:       Sequence        = a.S * 3
+            val bs:       Sequence        = b.S * 2
+            val sequence: Sequence        = as intersect bs
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -429,11 +429,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val as:       Sequence                       = a.S
-            val bs:       Sequence                       = b.S
-            val sequence: Sequence                       = as | bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val as:       Sequence        = a.S
+            val bs:       Sequence        = b.S
+            val sequence: Sequence        = as | bs
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -448,8 +448,8 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val property: Property                       = !a.S
+            val a:        Referable[Bool] = io.ib0
+            val property: Property        = !a.S
 
             Assert(property)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -463,8 +463,8 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: SVASpecParameter) =
             val io = summon[Interface[SVASpecIO]]
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val prop: Property                       = !a.I
+            val a:    Referable[Bool] = io.ib0
+            val prop: Property        = !a.I
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -479,10 +479,10 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val bs:       Sequence                       = b.S
-            val sequence: Sequence                       = a throughout bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val bs:       Sequence        = b.S
+            val sequence: Sequence        = a throughout bs
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -497,11 +497,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:        Referable[Bool] & HasOperation = io.ib0
-            val b:        Referable[Bool] & HasOperation = io.ib1
-            val as:       Sequence                       = a.S
-            val bs:       Sequence                       = b.S
-            val sequence: Sequence                       = as within bs
+            val a:        Referable[Bool] = io.ib0
+            val b:        Referable[Bool] = io.ib1
+            val as:       Sequence        = a.S
+            val bs:       Sequence        = b.S
+            val sequence: Sequence        = as within bs
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -519,9 +519,9 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: SVASpecParameter) =
             val io = summon[Interface[SVASpecIO]]
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val prop: Property                       = a.I implies b.I
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val prop: Property        = a.I implies b.I
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -536,11 +536,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as |-> bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as |-> bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -554,11 +554,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as |=> bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as |=> bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -574,11 +574,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as implies bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as implies bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -592,11 +592,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Property                       = !a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as & bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Property        = !a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as & bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -610,11 +610,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Property                       = !a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as | bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Property        = !a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as | bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -628,11 +628,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Property                       = !a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as intersect bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Property        = !a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as intersect bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -646,12 +646,12 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:              Referable[Bool] & HasOperation = io.ib0
-            val b:              Referable[Bool] & HasOperation = io.ib1
-            val lhs:            Sequence                       = a.S
-            val rhs:            Property                       = !b.S
-            val erasedLhs:      Property                       = lhs & rhs
-            val propertyToProp: Property                       = (!a.S) & rhs
+            val a:              Referable[Bool] = io.ib0
+            val b:              Referable[Bool] = io.ib1
+            val lhs:            Sequence        = a.S
+            val rhs:            Property        = !b.S
+            val erasedLhs:      Property        = lhs & rhs
+            val propertyToProp: Property        = (!a.S) & rhs
 
             Assert(erasedLhs, "assert0")
             Assert(propertyToProp, "assert1")
@@ -666,9 +666,9 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: SVASpecParameter) =
             val io = summon[Interface[SVASpecIO]]
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val prop: Property                       = a.I |-> b.I
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val prop: Property        = a.I |-> b.I
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -693,11 +693,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as iff bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as iff bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -712,11 +712,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as #-# bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as #-# bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -730,11 +730,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as #=# bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as #=# bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -751,11 +751,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bp:   Property                       = !b.S
-            val prop: Property                       = as #=# bp
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bp:   Property        = !b.S
+            val prop: Property        = as #=# bp
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -772,11 +772,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = always(as)
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = always(as)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -790,11 +790,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = eventually(as)
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = eventually(as)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -808,11 +808,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as until bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as until bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -826,11 +826,11 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a:    Referable[Bool] & HasOperation = io.ib0
-            val b:    Referable[Bool] & HasOperation = io.ib1
-            val as:   Sequence                       = a.S
-            val bs:   Sequence                       = b.S
-            val prop: Property                       = as untilWith bs
+            val a:    Referable[Bool] = io.ib0
+            val b:    Referable[Bool] = io.ib1
+            val as:   Sequence        = a.S
+            val bs:   Sequence        = b.S
+            val prop: Property        = as untilWith bs
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -847,8 +847,8 @@ object SVASpec extends TestSuite:
           def architecture(parameter: SVASpecParameter) =
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
-            val a: Referable[Bool] & HasOperation = io.ib0
-            val b: Referable[Bool] & HasOperation = io.ib1
+            val a: Referable[Bool] = io.ib0
+            val b: Referable[Bool] = io.ib1
 
             Assert(a.S ### b.S ### a.S ### b.S ### a.S)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
@@ -866,8 +866,8 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: MultiClockParameter) =
             val io = summon[Interface[MultiClockIO]]
-            val a: Referable[Bool] & HasOperation = io.ib0
-            val b: Referable[Bool] & HasOperation = io.ib1
+            val a: Referable[Bool] = io.ib0
+            val b: Referable[Bool] = io.ib1
 
             Assert(posedge(io.clock0)(a.S) ## negedge(io.clock1)(b.S))
 
@@ -881,8 +881,8 @@ object SVASpec extends TestSuite:
             with HasVerilogTest:
           def architecture(parameter: MultiClockParameter) =
             val io = summon[Interface[MultiClockIO]]
-            val a: Referable[Bool] & HasOperation = io.ib0
-            val b: Referable[Bool] & HasOperation = io.ib1
+            val a: Referable[Bool] = io.ib0
+            val b: Referable[Bool] = io.ib1
 
             given ClockEvent = posedge(io.clock0)
 

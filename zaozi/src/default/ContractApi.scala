@@ -42,8 +42,8 @@ given ContractApi with
   // Lower all public Contract overloads through a flat Seq, while preserving the
   // user-facing body argument and result shapes through the mapping functions.
   private def mapped[R, O](
-    args:    Seq[Referable[? <: Data] & HasOperation],
-    mapping: Seq[Referable[? <: Data] & HasOperation] => O
+    args:    Seq[Referable[? <: Data]],
+    mapping: Seq[Referable[? <: Data]] => O
   )(body:    O => (Arena, Context, Block) ?=> Unit
   )(
     using Arena,
@@ -67,7 +67,7 @@ given ContractApi with
       node.operation.appendToBlock()(
         using contract.block
       )
-      new ContractResult(arg._tpe, node.operation)
+      new ContractResult(arg._tpe, node.operation.getResult(0))
     val clauses    = ArrayBuffer.empty[ContractClause]
     val beforeBody =
       if args.isEmpty then
@@ -116,7 +116,7 @@ given ContractApi with
         input = contract.operation.getResult(idx.toLong)
       )
       node.operation.appendToBlock()
-      new ContractResult(arg._tpe, node.operation)
+      new ContractResult(arg._tpe, node.operation.getResult(0))
 
     mapping(results)
 
@@ -133,8 +133,8 @@ given ContractApi with
     mapped[Unit, Unit](Seq.empty, _ => ())(_ => body)
 
   def Contract[T <: Data](
-    arg:  Referable[T] & HasOperation
-  )(body: (Referable[T] & HasOperation) => (Arena, Context, Block) ?=> Unit
+    arg:  Referable[T]
+  )(body: (Referable[T]) => (Arena, Context, Block) ?=> Unit
   )(
     using Arena,
     Context,
@@ -142,10 +142,10 @@ given ContractApi with
     sourcecode.File,
     sourcecode.Line,
     TypeImpl
-  ): Referable[T] & HasOperation =
+  ): Referable[T] =
     mapped(
       Seq(arg),
-      values => values(0).asInstanceOf[Referable[T] & HasOperation]
+      values => values(0).asInstanceOf[Referable[T]]
     )(body)
 
   def Contract[A <: Tuple](
