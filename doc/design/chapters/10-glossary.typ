@@ -19,6 +19,7 @@
   [构建器令牌], [builder token], [框架入口注入的上下文值；附着在其作用域外无法编译（@sec-triptych）。],
   [协议], [protocol], [定义 `Down`/`Up`/`Edge` 三类型与结算函数的对象（@sec-protocol-object）。],
   [跨协议适配], [cross-protocol adapter], [两侧服从不同协议、携带跨协议变换的适配器，置于缝上（@sec-protocol-object）。],
+  [缝], [seam], [两条独立协商的总线相接之处；两侧接口不一致时插入位宽/域适配器，一致则为直连（@sec-ic-phases）。],
   [下行 / 上行参数], [downward / upward parameter], [上游端 / 下游端的声明，分别沿边、逆边传播（@sec-three-param-kinds）。],
   [两端指认], [end-role identification], [协议对边两端的规定：各是什么角色、各自声明什么（供给与需求）、哪端为上游（@sec-three-param-kinds）。],
   [边参数], [edge parameter], [一条边结算后的最终参数（@sec-three-param-kinds）。],
