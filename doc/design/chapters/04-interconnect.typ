@@ -46,21 +46,21 @@ val sys    = Bus("sys",    fabric = Noc(Mesh(2, 2)))   // 由 2×2 网格片上�
 
 == 附着:唯一的连接原语 <sec-attach>
 
-把成员接入总线只有一种写法,称为#term[附着][attach]:
+把一个设备接入总线只有一种写法——用 `<-` 把它绑到总线的一个具名落点上:
 
 ```scala
-sys.node("n_mem") <~ dram
+sys.node("n_mem") <- dram
 ```
 
-`sys.node("n_mem")` 取出 `sys` 的物理互连中名为 `n_mem` 的#term[具名节点][named node]——物理互连对外暴露的一个物理落点,一个端口或一个路由器(@sec-placement);`<~` 把成员 `dram` 附着在这个节点上。附着是本模型唯一的连接原语:设计的整张连接结构,就是全部附着行的集合。
+`sys.node("n_mem")` 是 `sys` 的物理互连暴露的一个#term[具名节点][named node]——一个物理落点,可能是一个端口或一个路由器(@sec-placement);`<-` 把设备 `dram` 绑在这个落点上,读作"这个落点承载 dram"。附着是本模型唯一的连接原语:设计的整张连接结构,就是全部 `<-` 行的集合。
 
-成员只有一种形态:叶子设备。多数成员是处理器、存储控制器、外设这类不再分解的部件;连接两条总线的桥(@sec-flat-nest)也是一种设备,在它所接入的每条总线上都是一个普通成员。二者以同一语法附着,对总线完全同质:总线不需要为"成员是桥"设任何特例,清单的成员表(@sec-manifest)也因此对全部成员只有一种表示。
+*一个节点既是连接点,又是那束 IO 线。*一个设备靠它的一个#term[节点][node]接入总线——节点是设备的一个协议端口,声明自己服从的协议、以及自己的方向(发起者还是响应者)。这个节点在协商里结算出的参数,*就是*它端口的线形状:绑上它,就接上了它的 IO,再没有一道"把节点另行映射到某个硬件字段"的手续。连接与硬件是同一个节点的两面(@ch-hardware)。
 
-数量就是附着的个数。一条总线有多少成员——它的物理互连要提供多少端口——答案就是数一数附着行。数量没有独立的声明:增加一个设备就是增加一行附着,删除一个设备就是删除一行,一切计数随之自动正确。数量不可能与事实失配,因为它没有第二处表达。
+*方向来自节点的角色,不来自算子。*处理器的取指口声明自己发起访问,存储的口声明自己响应;数据往哪个方向流,由角色定死。所以 `<-` 只说"谁承载谁",不带方向——连接原语因此只有一个,不像旧式互连要为"谁主谁从、各接几条"分出好几种写法。(某个 fabric 若限定某落点只接特定方向,那是它自己的能力约束,在能力校验时裁决,@sec-manifest。)
 
-方向由成员给出。`<~` 记录哪一端是发起者、哪一端是响应者,而这来自成员自身的角色——处理器声明自己发起访问,存储声明自己响应——不来自节点:节点只是位置,发起者与响应者都经它接入;某个 fabric 若限定某节点只接特定方向,那属于它自己的能力约束,在能力校验时裁决(@sec-manifest)。协商的双向参数流(@ch-negotiation)沿这个方向定向。
+*数量就是附着的条数。*一条总线上有多少设备、它的物理互连要提供多少端口,答案就是数一数 `<-` 行。数量没有独立声明:增删一个设备就是增删一行,计数随之自动正确,不可能与事实失配。
 
-一个成员对应它模块侧的一个节点;一个生成器模块可以持有多个节点,分别附着到不同总线——例如一个 DMA 以数据接口接入系统总线、以配置接口接入外设总线,那是两个节点、两次独立的附着。
+*一个设备可以有多个节点。*一个 DMA 同时有数据口与配置口,就是两个节点,分别绑到不同总线,各是一次独立的附着;桥(@sec-flat-nest)正是这样一个双节点设备,在它接入的两条总线上各占一个节点。多数设备只有一个节点,写起来就是上面那一行。设备之间对总线完全同质——叶子设备也好、桥也好,总线不为谁设特例,清单的成员表(@sec-manifest)对全部成员只有一种表示。
 
 === 落点:具名节点 <sec-placement>
 
@@ -78,7 +78,7 @@ sys.node("n_mem") <~ dram
 
 ```scala
 for ((core, i) <- cores.zipWithIndex)
-  sys.node(s"n_core_$i") <~ core
+  sys.node(s"n_core_$i") <- core
 ```
 
 这条规则约束的是决定者——落点由规格给出,绝不由 fabric 代劳——不约束写法的长短。
@@ -87,7 +87,7 @@ for ((core, i) <- cores.zipWithIndex)
 
 #不变量[一个成员恰好附着一次,落在一个具名节点上;一个具名节点可承载一个或多个成员——共享同一路由器的若干成员各在其上占一个端口;空置的具名节点合法。]
 
-#图([附着到具名节点。三行附着:`sys.node("n_cpu") <~ cpu`、`sys.node("n_mem") <~ dram`、`sys.node("n_periph") <~ periph`。实心圆是物理互连暴露的具名节点;成员落在节点上,方向来自成员的角色。])[
+#图([附着到具名节点。三行附着:`sys.node("n_cpu") <- cpu`、`sys.node("n_mem") <- dram`、`sys.node("n_periph") <- periph`。实心圆是物理互连暴露的具名节点;成员落在节点上,方向来自成员的角色。])[
   #syn-canvas({
     import cetz.draw: *
     rect((0, 0), (10.4, 1.5), stroke: 1pt, radius: 0.1)
@@ -103,7 +103,7 @@ for ((core, i) <- cores.zipWithIndex)
       content((x, 2.925), mlabs.at(i))
       line((x, 2.55), (x, 1.7), mark: (end: ">"), stroke: 0.8pt)
     }
-    content((6.05, 2.12), text(size: 8pt, fill: c-dim)[附着 `<~`])
+    content((6.05, 2.12), text(size: 8pt, fill: c-dim)[附着 `<-`])
   })
 ]
 
@@ -237,15 +237,15 @@ for ((core, i) <- cores.zipWithIndex)
 
 ```scala
 val periph = Bus("periph", fabric = Crossbar())
-periph.node("p_uart")   <~ uart          // 响应者,服务 0x1000_0000 起 4 KiB
-periph.node("p_spi")    <~ spi           // 响应者,服务 0x1000_1000 起 4 KiB
-periph.node("p_gpio")   <~ gpio          // 响应者,服务 0x1000_2000 起 4 KiB
-periph.node("p_bridge") <~ periphBridge  // 桥的 periph 侧节点:发起者
+periph.node("p_uart")   <- uart          // 响应者,服务 0x1000_0000 起 4 KiB
+periph.node("p_spi")    <- spi           // 响应者,服务 0x1000_1000 起 4 KiB
+periph.node("p_gpio")   <- gpio          // 响应者,服务 0x1000_2000 起 4 KiB
+periph.node("p_bridge") <- periphBridge  // 桥的 periph 侧节点:发起者
 
 val sys = Bus("sys", fabric = Noc(Mesh(2, 2)))
-sys.node("n_cpu")    <~ cpu           // 发起者
-sys.node("n_mem")    <~ dram          // 响应者,服务 0x8000_0000 起
-sys.node("n_bridge") <~ periphBridge  // 桥的 sys 侧节点:响应者,转发外设地址窗口
+sys.node("n_cpu")    <- cpu           // 发起者
+sys.node("n_mem")    <- dram          // 响应者,服务 0x8000_0000 起
+sys.node("n_bridge") <- periphBridge  // 桥的 sys 侧节点:响应者,转发外设地址窗口
 ```
 
 注释里的地址是各成员自己的声明,附着行只给落点;`sys` 的 fabric 策略把网格的三个路由器命名为 `n_cpu`、`n_mem`、`n_bridge`,第四个路由器空置。`periph` 不在 `sys` 之内:两条总线地位对等,唯一的关联是桥同时是二者的成员。
