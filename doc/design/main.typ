@@ -27,7 +27,7 @@
 #include "chapters/01-motivation.typ"
 #include "chapters/02-model.typ"
 #include "chapters/03-protocol.typ"
-#include "chapters/04-topology.typ"
+#include "chapters/04-interconnect.typ"
 #include "chapters/05-negotiation.typ"
 #include "chapters/06-hierarchy.typ"
 #include "chapters/07-hardware.typ"
