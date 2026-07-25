@@ -70,6 +70,7 @@
             };
             typstSource = "analysis/${name}.typ";
             inherit fontPaths;
+            unstable_typstPackages = typstPackages;
           };
       in
       {
@@ -79,6 +80,7 @@
           rational = archive "rational" ./rational.typ;
           naming = archive "naming" ./naming.typ;
           cardinality-survey = analysis "cardinality-survey";
+          interconnect-rationale = analysis "interconnect-rationale";
         };
       });
 }
