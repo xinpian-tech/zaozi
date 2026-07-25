@@ -139,4 +139,4 @@ def design(body: DesignBuilder ?=> Unit): DesignSpec   // 唯一提供令牌的�
   })
 ]
 
-以上四节给出了骨架：两张图、三个阶段、两种模块、一条序列化边界；它们如何逐条回应#ref(<sec-requirements>)的六条需求，见@sec-req-map。余下各章逐一充实：协议与参数（@ch-protocol）、边数（@ch-topology）、协商算法（@ch-negotiation）、层次穿越与模块生成（@ch-hierarchy）、硬件边界（@ch-hardware）、验证（@ch-verification）以及工具与静态评估（@ch-tooling）；需求与章节的完整对应见@sec-req-map。
+以上四节给出了骨架：两张图、三个阶段、两种模块、一条序列化边界；它们如何逐条回应#ref(<sec-requirements>)的七条需求，见@sec-req-map。余下各章逐一充实：协议与参数（@ch-protocol）、边数（@ch-topology）、协商算法（@ch-negotiation）、层次穿越与模块生成（@ch-hierarchy）、硬件边界（@ch-hardware）、验证（@ch-verification）以及工具与静态评估（@ch-tooling）；需求与章节的完整对应见@sec-req-map。
