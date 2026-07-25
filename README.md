@@ -91,9 +91,10 @@ with Typst, all diagrams drawn with fletcher/cetz. The build is managed by
 Typst packages are pinned in the flake, so the PDF is fully reproducible.
 
 ```shell
-nix build ./doc#design     # → ./result is syntheke-design.pdf
-nix build ./doc#rational   # archived early notes (Chinese)
-nix build ./doc#naming     # archived naming study (Chinese)
+nix build ./doc#design              # → ./result is syntheke-design.pdf
+nix build ./doc#cardinality-survey  # empirical survey backing design discussions
+nix build ./doc#rational            # archived early notes (Chinese)
+nix build ./doc#naming              # archived naming study (Chinese)
 ```
 
 ## Repository layout
@@ -101,6 +102,7 @@ nix build ./doc#naming     # archived naming study (Chinese)
 | path | contents |
 |---|---|
 | `doc/design/` | the design-document series (Typst, Chinese) |
+| `doc/analysis/` | evidence documents: empirical surveys of existing codebases that back design discussions |
 | `doc/*.typ` | archived pre-design notes (Chinese) |
 | `doc/flake.nix` | Typix-managed documentation build |
 | `diplomacy/` | vendored read-only reference sources studied during the design phase; not part of Syntheke |

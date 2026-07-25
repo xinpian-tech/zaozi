@@ -60,6 +60,17 @@
             typstSource = "${name}.typ";
             inherit fontPaths;
           };
+
+        analysis = name:
+          typixLib.buildTypstProject {
+            name = "${name}.pdf";
+            src = pkgs.lib.fileset.toSource {
+              root = ./.;
+              fileset = ./analysis;
+            };
+            typstSource = "analysis/${name}.typ";
+            inherit fontPaths;
+          };
       in
       {
         packages = {
@@ -67,6 +78,7 @@
           design = design;
           rational = archive "rational" ./rational.typ;
           naming = archive "naming" ./naming.typ;
+          cardinality-survey = analysis "cardinality-survey";
         };
       });
 }
