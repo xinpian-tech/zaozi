@@ -14,7 +14,7 @@
   [物理互连], [fabric], [兑现一条总线的硬件生成器（交叉开关／片上网络／直连）；一条总线恰好对应一个（@sec-bus-fabric）。],
   [成员], [member], [附着到总线的东西：叶子设备，或连接两条总线的桥，二者同质（@sec-attach）。],
   [桥], [bridge], [连接两条平总线的设备：一侧为响应者、一侧为发起者，内部做地址转换/跨时钟域/位宽转换；有意义的边界（独立交付、域改变、换 fabric）即一个桥（@sec-flat-nest）。],
-  [节点], [node], [模块在某个协议上的一个端口，带协议与方向；一次附着把它绑到总线的一个具名节点上，它结算出的接口就是它的 IO 线形状（@sec-attach、@sec-generator-module）。],
+  [节点], [node], [模块在某个协议上的一个端口，带协议与方向；一次附着把它接到总线的一个具名节点上，它结算出的接口就是它的 IO 线形状（@sec-attach、@sec-generator-module）。],
   [边], [edge], [协商后一条点对点链路；每次附着结算出一条边（@sec-settle-pp）。],
   [构建器令牌], [builder token], [框架入口注入的上下文值；附着在其作用域外无法编译（@sec-triptych）。],
   [协议], [protocol], [定义 `Down`/`Up`/`Edge` 三类型与结算函数的对象（@sec-protocol-object）。],
@@ -28,7 +28,7 @@
   [生成器], [generator], [硬件域的模块工厂：消费一个可序列化参数产出电路模块。与"生成器模块"是不同概念（@sec-generator-contract）。],
   [生成器模块], [`GeneratorModule`], [持有恰一个生成器的模块；全部硬件在生成器内（@sec-module-kinds、@sec-generator-module）。],
   [角色], [role], [成员的方向：发起者或响应者；聚合由总线承担，跨协议或跨域适配落在桥内（@sec-flat-nest）。],
-  [附着], [attach], [`bus.node("名") <- 设备`：唯一的连接原语，把设备的一个节点绑到总线落点上；绑上节点即接上它的端口/IO，数量即附着的个数（@sec-attach）。],
+  [附着], [attach], [`bus.node("名") <- 设备`：唯一的连接原语，把设备的一个节点附着到总线落点上；一个节点附上来就接上了它的端口/IO，数量即附着的个数（@sec-attach）。],
   [具名节点], [named node], [物理互连暴露的物理落点，一个端口或路由器，以名字标识（@sec-placement）。],
   [落点], [placement], [成员落在哪个具名节点；构建期显式给出，协商不读，例化期消费（@sec-placement）。],
   [清单], [manifest], [总线交给物理互连的数据：成员表与可达表；唯一的一次交接（@sec-manifest）。],
@@ -76,7 +76,7 @@
   table.header([编号], [问题], [章节]),
   [@open-multi-round], [显式多轮协商。], [@sec-settle-pp],
   [@open-incr-cache], [跨设计的增量缓存。], [@sec-dedup],
-  [@open-typed-binding], [类型级绑定强化。], [@sec-generator-module],
+  [@open-typed-binding], [类型级端口校验强化。], [@sec-generator-module],
 )
 
 == 结语

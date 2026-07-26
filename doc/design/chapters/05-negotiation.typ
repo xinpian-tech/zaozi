@@ -82,7 +82,7 @@
 
 == 边结算与协议参数 <sec-settle-pp>
 
-*边结算*对每个成员的边独立调用其协议的 `negotiate(down, up)`（@sec-protocol-object）：发起侧事实与响应侧事实在此合成边参数——这条链路的定论。结算失败即协商停止，错误附带该成员与附着行的书写位置。结算成功后，清单里该成员的接口由 `interfaceOf` 从边参数导出（@sec-protocol-interface），打洞规划与例化期的绑定校验（@sec-generator-contract）引用的也是同一份数据。逐边独立意味着结算天然可并行，也意味着一条边的失败报告不含任何别的边的噪声。
+*边结算*对每个成员的边独立调用其协议的 `negotiate(down, up)`（@sec-protocol-object）：发起侧事实与响应侧事实在此合成边参数——这条链路的定论。结算失败即协商停止，错误附带该成员与附着行的书写位置。结算成功后，清单里该成员的接口由 `interfaceOf` 从边参数导出（@sec-protocol-interface），打洞规划与例化期的端口校验（@sec-generator-contract）引用的也是同一份数据。逐边独立意味着结算天然可并行，也意味着一条边的失败报告不含任何别的边的噪声。
 
 *协议参数*是协商结果进入生成器的唯一通道（@sec-two-layer-params）。每个生成器模块声明一个纯函数：
 

@@ -95,7 +95,7 @@
 def design(body: DesignBuilder ?=> Unit): DesignSpec   // 唯一提供令牌的入口
 ```
 
-附着算子 `<-` 要求 `(using DesignBuilder)` 才能编译，于是在 `design { ... }` 块之外书写附着直接编译失败；块返回时构建器固化为不可变的规格，令牌不再被持有——"在协商完成后追加附着"同样是无法表达的程序。
+附着算子 `<-`（@sec-attach）要求 `(using DesignBuilder)` 才能编译，于是在 `design { ... }` 块之外书写附着直接编译失败；块返回时构建器固化为不可变的规格，令牌不再被持有——"在协商完成后追加附着"同样是无法表达的程序。
 
 == 模块的两种形态 <sec-module-kinds>
 
