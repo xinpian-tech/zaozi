@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <clo91eaf@qq.com>
 package me.jiuyang.zaozi.default
 
-import me.jiuyang.zaozi.{ContractApi, ContractTuple, ContractTupleArgs, TypeImpl}
+import me.jiuyang.zaozi.{ContractApi, ContractTuple, ContractTupleArgs, InstanceContext, TypeImpl}
 import me.jiuyang.zaozi.ltltpe.{Immediate, Property, Sequence}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
@@ -39,6 +39,7 @@ export given_ContractApi.{Contract, Ensure, Require}
 
 given ContractApi with
   private def operationIsNull(op: Operation): Boolean = MlirOperation.ptr(op.segment).address == 0
+
   // Lower all public Contract overloads through a flat Seq, while preserving the
   // user-facing body argument and result shapes through the mapping functions.
   private def mapped[R, O](
@@ -167,8 +168,48 @@ given ContractApi with
     )(body)
 
   def Require(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext,
+    TypeImpl
+  ): Unit =
+    val value = property match
+      case immediate: Immediate => immediate.refer
+      case sequence:  Sequence  => sequence.refer
+      case prop:      Property  => prop.refer
+    if contractScopes.nonEmpty then
+      contractScopes.last.append(ContractClause(ContractClauseKind.Require, value, Some(valName), locate))
+    else summon[VerifAssumeApi].op(value, Some(valName), locate).operation.appendToBlock()
+
+  def Ensure(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext,
+    TypeImpl
+  ): Unit =
+    val value = property match
+      case immediate: Immediate => immediate.refer
+      case sequence:  Sequence  => sequence.refer
+      case prop:      Property  => prop.refer
+    if contractScopes.nonEmpty then
+      contractScopes.last.append(ContractClause(ContractClauseKind.Ensure, value, Some(valName), locate))
+    else summon[VerifAssertApi].op(value, Some(valName), locate).operation.appendToBlock()
+
+  def Require(
     property: Immediate | Sequence | Property,
-    label:    Option[String] = None
+    label:    String
   )(
     using Arena,
     Context,
@@ -182,12 +223,12 @@ given ContractApi with
       case sequence:  Sequence  => sequence.refer
       case prop:      Property  => prop.refer
     if contractScopes.nonEmpty then
-      contractScopes.last.append(ContractClause(ContractClauseKind.Require, value, label, locate))
-    else summon[VerifAssumeApi].op(value, label, locate).operation.appendToBlock()
+      contractScopes.last.append(ContractClause(ContractClauseKind.Require, value, Some(label), locate))
+    else summon[VerifAssumeApi].op(value, Some(label), locate).operation.appendToBlock()
 
   def Ensure(
     property: Immediate | Sequence | Property,
-    label:    Option[String] = None
+    label:    String
   )(
     using Arena,
     Context,
@@ -200,7 +241,6 @@ given ContractApi with
       case immediate: Immediate => immediate.refer
       case sequence:  Sequence  => sequence.refer
       case prop:      Property  => prop.refer
-
     if contractScopes.nonEmpty then
-      contractScopes.last.append(ContractClause(ContractClauseKind.Ensure, value, label, locate))
-    else summon[VerifAssertApi].op(value, label, locate).operation.appendToBlock()
+      contractScopes.last.append(ContractClause(ContractClauseKind.Ensure, value, Some(label), locate))
+    else summon[VerifAssertApi].op(value, Some(label), locate).operation.appendToBlock()
