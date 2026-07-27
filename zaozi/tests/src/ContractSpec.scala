@@ -54,12 +54,12 @@ object ContractSpec extends TestSuite:
         "  %4 = firrtl.geq %3, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
         "  %_GEN_0 = firrtl.node interesting_name %4 : !firrtl.uint<1>",
         "  %5 = firrtl.add %3, %3 : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
-        "  %_GEN_1 = firrtl.node interesting_name %5 : !firrtl.uint<9>",
+        "  %_GEN_2 = firrtl.node interesting_name %5 : !firrtl.uint<9>",
         "  %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
-        "  %6 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
-        "  %_GEN_2 = firrtl.node interesting_name %6 : !firrtl.uint<1>",
-        "  firrtl.int.verif.require %_GEN_0 : !firrtl.uint<1>",
-        "  firrtl.int.verif.ensure %_GEN_2 : !firrtl.uint<1>",
+        "  %6 = firrtl.geq %_GEN_2, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
+        "  %_GEN_3 = firrtl.node interesting_name %6 : !firrtl.uint<1>",
+        """  firrtl.int.verif.require %_GEN_0 {label = "_GEN_1"} : !firrtl.uint<1>""",
+        """  firrtl.int.verif.ensure %_GEN_3 {label = "_GEN_4"} : !firrtl.uint<1>""",
         "}"
       )
 
