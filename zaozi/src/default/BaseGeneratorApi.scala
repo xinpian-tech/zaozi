@@ -58,8 +58,8 @@ import java.nio.file.StandardOpenOption.*
   */
 object BaseGeneratorHelper:
   /** Builds a FIRRTL `firrtl.instance` of `moduleName` and wraps its IO/probe ports in fresh `io`/`probe` wires
-    * (aligned fields connected instance-out-to-wire, flipped fields wire-to-instance-in), producing the [[Instance]]
-    * returned by `instantiate`.
+    * (aligned fields connected instance-out-to-wire, flipped fields wire-to-instance-in), producing the
+    * [[me.jiuyang.zaozi.reftpe.Instance Instance]] returned by `instantiate`.
     */
   def createInstance[
     PARAM <: Parameter,

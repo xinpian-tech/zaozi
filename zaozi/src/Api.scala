@@ -75,13 +75,13 @@ abstract class LayerInterface[P <: Parameter](parameter: P) extends Seq[LayerTre
 trait HWInterface[P <: Parameter](parameter: P) extends Aggregate:
   this: Bundle | Record =>
 
-/** A [[Generator]]'s IO declared as a [[Bundle]] -- fields are `val`s, as in [[me.jiuyang.hello.HelloWorldIO]] /
-  * `me.jiuyang.varadder.VarAdderIO`.
+/** A [[Generator]]'s IO declared as a [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]] -- fields are `val`s, as in
+  * `me.jiuyang.hello.HelloWorldIO` / `me.jiuyang.varadder.VarAdderIO`.
   */
 abstract class HWBundle[P <: Parameter](parameter: P) extends HWInterface(parameter) with Bundle
 
-/** A [[Generator]]'s IO declared as a [[Record]] -- fields are named dynamically, for ports whose shape isn't known
-  * until `parameter` is inspected.
+/** A [[Generator]]'s IO declared as a [[me.jiuyang.zaozi.valuetpe.Record Record]] -- fields are named dynamically, for
+  * ports whose shape isn't known until `parameter` is inspected.
   */
 abstract class HWRecord[P <: Parameter](parameter: P) extends HWInterface(parameter) with Record
 
@@ -97,14 +97,17 @@ trait DVInterface[P <: Parameter, L <: LayerInterface[P]](parameter: P) extends 
   transparent inline def layers:       L                 = _layersOpt.getOrElse:
     summonLayers.asInstanceOf[L].tap(l => _layersOpt = Some(l))
 
-/** A [[Generator]]'s debug interface declared as a [[ProbeBundle]] -- probe fields are `val`s, as in
-  * `me.jiuyang.varadder.VarAdderProbe`. Modules with no probes still declare one, typically empty.
+/** A [[Generator]]'s debug interface declared as a [[me.jiuyang.zaozi.valuetpe.ProbeBundle ProbeBundle]] -- probe
+  * fields are `val`s, as in `me.jiuyang.varadder.VarAdderProbe`. Modules with no probes still declare one, typically
+  * empty.
   */
 abstract class DVBundle[P <: Parameter, L <: LayerInterface[P]](parameter: P)
     extends DVInterface[P, L](parameter)
     with ProbeBundle
 
-/** A [[Generator]]'s debug interface declared as a [[ProbeRecord]] -- probe fields are named dynamically. */
+/** A [[Generator]]'s debug interface declared as a [[me.jiuyang.zaozi.valuetpe.ProbeRecord ProbeRecord]] -- probe
+  * fields are named dynamically.
+  */
 abstract class DVRecord[P <: Parameter, L <: LayerInterface[P]](parameter: P)
     extends DVInterface[P, L](parameter)
     with ProbeRecord
@@ -282,8 +285,9 @@ trait GeneratorApi:
     ): Instance[I, P]
 
     /** Elaborates (once per distinct `parameter`, memoized) and instantiates `generator` as a sub-module of the
-      * enclosing architecture, e.g. `Subtractor.instantiate(SubtractorParameter(width))`. Returns an [[Instance]] whose
-      * `.io`/`.probe` are the sub-module's ports/probes, wired with `:=`/`<==` like any other `Referable`.
+      * enclosing architecture, e.g. `Subtractor.instantiate(SubtractorParameter(width))`. Returns an
+      * [[me.jiuyang.zaozi.reftpe.Instance Instance]] whose `.io`/`.probe` are the sub-module's ports/probes, wired with
+      * `:=`/`<==` like any other `Referable`.
       */
     def instantiate(
       parameter: PARAM
@@ -590,7 +594,8 @@ trait AsUInt[D <: Data]:
       InstanceContext
     ): Propagated[R, UInt]
 
-/** Bitcasts to a [[Bundle]] shape: reinterprets the same underlying bits as `tpe`'s fields, with no runtime cost.
+/** Bitcasts to a [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]] shape: reinterprets the same underlying bits as `tpe`'s
+  * fields, with no runtime cost.
   */
 trait AsBundle[D <: Data]:
   extension [R <: Referable[D]](ref: R)
@@ -606,7 +611,9 @@ trait AsBundle[D <: Data]:
       InstanceContext
     ): Propagated[R, T]
 
-/** Bitcasts to a [[Record]] shape: reinterprets the same underlying bits as `tpe`'s named fields. */
+/** Bitcasts to a [[me.jiuyang.zaozi.valuetpe.Record Record]] shape: reinterprets the same underlying bits as `tpe`'s
+  * named fields.
+  */
 trait AsRecord[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asRecord[T <: Record](
@@ -621,8 +628,8 @@ trait AsRecord[D <: Data]:
       InstanceContext
     ): Propagated[R, T]
 
-/** Bitcasts to a [[Vec]] of `tpe` elements: the source width must divide evenly by `tpe`'s width, producing
-  * `srcWidth / tpe.width` elements.
+/** Bitcasts to a [[me.jiuyang.zaozi.valuetpe.Vec Vec]] of `tpe` elements: the source width must divide evenly by
+  * `tpe`'s width, producing `srcWidth / tpe.width` elements.
   */
 trait AsVec[D <: Data]:
   extension [R <: Referable[D]](ref: R)
@@ -644,16 +651,19 @@ trait AsVec[D <: Data]:
 trait AsRecordView[D <: Bundle]:
   extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, Record]
 
-/** The [[ProbeBundle]]/[[ProbeRecord]] counterpart to [[AsRecordView]]. */
+/** The [[me.jiuyang.zaozi.valuetpe.ProbeBundle ProbeBundle]]/[[me.jiuyang.zaozi.valuetpe.ProbeRecord ProbeRecord]]
+  * counterpart to [[AsRecordView]].
+  */
 trait AsProbeRecordView[D <: ProbeBundle]:
   extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, ProbeRecord]
 
-/** Connects probe reference fields ([[RProbe]]/[[RWProbe]]), via `<==`, three ways: define a probe from the data it
-  * observes (`probeField <== dataValue`), alias one probe field to another (`probeField <== otherProbeField`), or, on
-  * the reading side, resolve a probe back into an ordinary value (`dataValue <== probeField`). Ordinary `:=`/`:<=`/etc.
+/** Connects probe reference fields ([[me.jiuyang.zaozi.valuetpe.RProbe RProbe]]/
+  * [[me.jiuyang.zaozi.valuetpe.RWProbe RWProbe]]), via `<==`, three ways: define a probe from the data it observes
+  * (`probeField <== dataValue`), alias one probe field to another (`probeField <== otherProbeField`), or, on the
+  * reading side, resolve a probe back into an ordinary value (`dataValue <== probeField`). Ordinary `:=`/`:<=`/etc.
   * deliberately reject probe types (see the "probe types do not participate in bulk connects" error in
-  * `me.jiuyang.zaozi.default.Connect`) -- `<==` is the only way to connect them, and it requires an enclosing [[layer]]
-  * for the color check.
+  * `me.jiuyang.zaozi.default.Connect`) -- `<==` is the only way to connect them, and it requires an enclosing
+  * [[ConstructorApi.layer]] for the color check.
   */
 trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]:
   extension (ref: PROBE)
@@ -720,9 +730,9 @@ final class ConnectException(message: String) extends Exception(message)
   */
 trait Connect[A <: Connectable]:
   extension [SINK <: Writable[A]](sink:  SINK)
-    /** Plain mono-directional connect, sink `<-` source. Only defined for scalar ([[Element]]) types -- no structural
-      * recursion, so it's the one operator usable inside `when`/`otherwise` branches where the sink's shape must
-      * already be known to be a leaf.
+    /** Plain mono-directional connect, sink `<-` source. Only defined for scalar
+      * ([[me.jiuyang.zaozi.valuetpe.Element]]) types -- no structural recursion, so it's the one operator usable inside
+      * `when`/`otherwise` branches where the sink's shape must already be known to be a leaf.
       */
     def :=[SRC <: Referable[A]](
       src: SRC
@@ -1177,8 +1187,9 @@ trait Mux[Cond <: Data]:
       InstanceContext
     ): Node[Ret]
 
-/** Indexes into a [[Vec]]-like `D`, either statically (`Int`, a fixed `SubindexOp`) or dynamically (`Referable[UInt]`,
-  * a `SubaccessOp` selected at runtime). `apply` is the usual spelling, e.g. `vec(3)` or `vec(io.sel)`.
+/** Indexes into a [[me.jiuyang.zaozi.valuetpe.Vec Vec]]-like `D`, either statically (`Int`, a fixed `SubindexOp`) or
+  * dynamically (`Referable[UInt]`, a `SubaccessOp` selected at runtime). `apply` is the usual spelling, e.g. `vec(3)`
+  * or `vec(io.sel)`.
   */
 trait RefElement[D <: Data, E <: Data]:
   extension [R <: Referable[D]](ref: R)
@@ -1200,8 +1211,9 @@ trait GetLength[E <: Data, V <: Vec[E]]:
       Context
     ): Int
 
-/** The full extension-method surface of [[Bits]]: casts, bitwise ops, structural ops (concat/slice/shift), but no
-  * arithmetic (`+`, `-`, ... -- cast to [[UInt]]/[[SInt]] first). Implemented by `me.jiuyang.zaozi.default.BitsApi`.
+/** The full extension-method surface of [[me.jiuyang.zaozi.valuetpe.Bits Bits]]: casts, bitwise ops, structural ops
+  * (concat/slice/shift), but no arithmetic (`+`, `-`, ... -- cast to [[me.jiuyang.zaozi.valuetpe.UInt UInt]]/
+  * [[me.jiuyang.zaozi.valuetpe.SInt SInt]] first). Implemented by `me.jiuyang.zaozi.default.BitsApi`.
   */
 trait BitsApi
     extends AsSInt[Bits]
@@ -1228,8 +1240,8 @@ trait BitsApi
     with ExtractElement[Bits, Bool]
     with ExtractRange[Bits, Bits]
 
-/** The extension-method surface of [[Bool]]: logical ops, equality, and the [[Mux]] `?` operator. Implemented by
-  * `me.jiuyang.zaozi.default.BoolApi`.
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Bool Bool]]: logical ops, equality, and the [[Mux]] `?`
+  * operator. Implemented by `me.jiuyang.zaozi.default.BoolApi`.
   */
 trait BoolApi
     extends AsBits[Bool]
@@ -1241,8 +1253,8 @@ trait BoolApi
     with Xor[Bool, Bool]
     with Mux[Bool]
 
-/** The extension-method surface of [[UInt]]: arithmetic, comparison, and static/dynamic shifts. Implemented by
-  * `me.jiuyang.zaozi.default.UIntApi`.
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.UInt UInt]]: arithmetic, comparison, and static/dynamic
+  * shifts. Implemented by `me.jiuyang.zaozi.default.UIntApi`.
   */
 trait UIntApi
     extends AsBits[UInt]
@@ -1260,8 +1272,8 @@ trait UIntApi
     with Shl[UInt, UInt]
     with Shr[UInt, UInt]
 
-/** The extension-method surface of [[SInt]]: signed arithmetic, comparison, and static/dynamic shifts. Implemented by
-  * `me.jiuyang.zaozi.default.SIntApi`.
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.SInt SInt]]: signed arithmetic, comparison, and
+  * static/dynamic shifts. Implemented by `me.jiuyang.zaozi.default.SIntApi`.
   */
 trait SIntApi
     extends AsBits[SInt]
@@ -1278,27 +1290,29 @@ trait SIntApi
     with Shl[SInt, SInt]
     with Shr[SInt, SInt]
 
-/** The extension-method surface of [[Bundle]]/[[me.jiuyang.zaozi.valuetpe.ProbeBundle]]: just `asBits`. Implemented by
-  * `me.jiuyang.zaozi.default.BundleApi`.
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]]/
+  * [[me.jiuyang.zaozi.valuetpe.ProbeBundle]]: just `asBits`. Implemented by `me.jiuyang.zaozi.default.BundleApi`.
   */
 trait BundleApi[T <: Bundle | ProbeBundle] extends AsBits[T]
 
-/** The extension-method surface of [[Record]]/[[me.jiuyang.zaozi.valuetpe.ProbeRecord]]: just `asBits`. Implemented by
-  * `me.jiuyang.zaozi.default.RecordApi`.
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Record Record]]/
+  * [[me.jiuyang.zaozi.valuetpe.ProbeRecord]]: just `asBits`. Implemented by `me.jiuyang.zaozi.default.RecordApi`.
   */
 trait RecordApi[T <: Record | ProbeRecord] extends AsBits[T]
 
-/** The extension-method surface of [[Vec]]: `asBits`, indexing ([[RefElement]]), and [[GetLength]]. Implemented by
-  * `me.jiuyang.zaozi.default.VecApi`.
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Vec Vec]]: `asBits`, indexing ([[RefElement]]), and
+  * [[GetLength]]. Implemented by `me.jiuyang.zaozi.default.VecApi`.
   */
 trait VecApi[E <: Data, V <: Vec[E]] extends AsBits[V] with RefElement[V, E] with GetLength[E, V]
 
-/** The extension-method surface of [[Clock]] -- currently empty; clocks are only used positionally (as the argument to
-  * [[ClockScope.posedge]]/[[ClockScope.negedge]]).
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Clock Clock]] -- currently empty; clocks are only used
+  * positionally (as the argument to [[ClockScope.posedge]]/[[ClockScope.negedge]]).
   */
 trait ClockApi
 
-/** The extension-method surface of [[Reset]]: just `asBool`. Implemented by `me.jiuyang.zaozi.default.ResetApi`. */
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Reset Reset]]: just `asBool`. Implemented by
+  * `me.jiuyang.zaozi.default.ResetApi`.
+  */
 trait ResetApi extends AsBool[Reset]
 
 /** Maps a tuple of `Referable[t]` argument types to the corresponding tuple of `Referable[t] & HasOperation` results
@@ -1413,7 +1427,8 @@ trait ContractApi:
     TypeImpl
   ): Unit
 
-/** SystemVerilog Assertion combinators for building [[Immediate]]/[[Sequence]]/[[Property]] properties (used with
+/** SystemVerilog Assertion combinators for building [[me.jiuyang.zaozi.ltltpe.Immediate Immediate]]/
+  * [[me.jiuyang.zaozi.ltltpe.Sequence Sequence]]/[[me.jiuyang.zaozi.ltltpe.Property Property]] properties (used with
   * [[ContractApi.Require]]/[[ContractApi.Ensure]] and [[Assert]]/[[Assume]]/[[Cover]]), plus the assertion directives
   * themselves. Each combinator's doc names the SVA syntax it corresponds to.
   */
