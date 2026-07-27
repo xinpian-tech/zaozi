@@ -37,8 +37,7 @@ object ContractSpec extends TestSuite:
             ContractSpecIO,
             ContractSpecProbe
           ]
-          with HasMlirTest
-          with HasVerilogTest:
+          with HasMlirTest:
         def architecture(parameter: ContractSpecParameter) =
           val io = summon[Interface[ContractSpecIO]]
           val p  = io.p
@@ -54,12 +53,12 @@ object ContractSpec extends TestSuite:
         "  %0 = firrtl.geq %p, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
         "  %_GEN_0 = firrtl.node interesting_name %0 : !firrtl.uint<1>",
         "  %1 = firrtl.add %p, %p : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
-        "  %_GEN_1 = firrtl.node interesting_name %1 : !firrtl.uint<9>",
+        "  %_GEN_2 = firrtl.node interesting_name %1 : !firrtl.uint<9>",
         "  %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
-        "  %2 = firrtl.geq %_GEN_1, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
-        "  %_GEN_2 = firrtl.node interesting_name %2 : !firrtl.uint<1>",
-        "  firrtl.int.verif.require %_GEN_0 : !firrtl.uint<1>",
-        "  firrtl.int.verif.ensure %_GEN_2 : !firrtl.uint<1>",
+        "  %2 = firrtl.geq %_GEN_2, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
+        "  %_GEN_3 = firrtl.node interesting_name %2 : !firrtl.uint<1>",
+        "  firrtl.int.verif.require %_GEN_0 {label = \"_GEN_1\"} : !firrtl.uint<1>",
+        "  firrtl.int.verif.ensure %_GEN_3 {label = \"_GEN_4\"} : !firrtl.uint<1>",
         "}"
       )
 
