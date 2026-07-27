@@ -41,7 +41,7 @@ object AbsVal extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValP
     val checkedAbsVal = Contract(absVal) { value =>
       val negExpected = (0.U(parameter.width) - io.A.asUInt).asBits.bits(parameter.width - 1, 0)
       val expected    = sign ? (negExpected, io.A)
-      Ensure((value === expected).I, Some("absval_matches_abs"))
+      Ensure((value === expected).I, "absval_matches_abs")
     }
 
     io.ABSVAL := checkedAbsVal

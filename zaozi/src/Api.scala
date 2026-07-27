@@ -1162,8 +1162,34 @@ trait ContractApi:
   ): ContractTuple[A]
 
   def Require(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext,
+    TypeImpl
+  ): Unit
+
+  def Ensure(
+    property: Immediate | Sequence | Property
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext,
+    TypeImpl
+  ): Unit
+
+  def Require(
     property: Immediate | Sequence | Property,
-    label:    Option[String] = None
+    label:    String
   )(
     using Arena,
     Context,
@@ -1175,7 +1201,7 @@ trait ContractApi:
 
   def Ensure(
     property: Immediate | Sequence | Property,
-    label:    Option[String] = None
+    label:    String
   )(
     using Arena,
     Context,

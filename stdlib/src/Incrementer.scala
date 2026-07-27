@@ -58,7 +58,7 @@ object Incrementer
 
     val checkedSUM = Contract(sumWord) { sum =>
       val expected = (io.A.asUInt + 1.U(width)).asBits.bits(width - 1, 0)
-      Ensure((sum === expected).I, Some("incrementer_matches_add"))
+      Ensure((sum === expected).I, "incrementer_matches_add")
     }
 
     io.SUM := checkedSUM

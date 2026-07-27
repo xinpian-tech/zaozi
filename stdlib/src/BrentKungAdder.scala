@@ -111,7 +111,7 @@ object BrentKungAdder
     val (checkedCO, checkedSUM) = Contract((carryOut, sumWord)) { case (co, sum) =>
       val observed = (co.asBits ## sum).asUInt
       val expected = (io.A.asUInt + io.B.asUInt + io.CI.asBits.asUInt).asBits.bits(width, 0).asUInt
-      Ensure((observed === expected).I, Some("prefix_adder_matches_add"))
+      Ensure((observed === expected).I, "prefix_adder_matches_add")
     }
 
     io.SUM := checkedSUM
