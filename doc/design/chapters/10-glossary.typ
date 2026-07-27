@@ -38,7 +38,7 @@
   [探针源 / 探针汇], [DV source / DV sink], [验证协议的上游端与下游端；只有源侧的下行声明，汇端聚合（@sec-dv-model）。],
   [层路径], [layer path], [探针所属的 FIRRTL 层命名链；层的关闭与移除由 FIRRTL 提供（@sec-layers）。],
   [zaozi], [—], [Syntheke 委托硬件构造的独立生成器库（Scala 3，经 MLIR/CIRCT 产出 FIRRTL）；Syntheke 对它只假设"参数进、模块出"（@sec-generator-contract）。],
-  [Triptych 流水线], [the Triptych pipeline], [构建—协商—例化三阶段（@sec-triptych）。],
+  [Triptych 流水线], [the Triptych pipeline], [构建、协商、例化三阶段（@sec-triptych）。],
 )
 
 == 需求映射 <sec-req-map>

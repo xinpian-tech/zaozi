@@ -16,10 +16,10 @@
 ```json
 { "modules": [ { "id": 3, "name": "l2", "parent": 1, "kind": "generator" } ],
   "buses":   [ { "id": 7, "name": "mbus", "fabric": "crossbar" } ],
-  "members": [ { "id": 12, "owner": 3, "role": "responder",
+  "agents":  [ { "id": 12, "owner": 3, "role": "responder",
                  "valName": "banks", "protocol": "membus/1.0" } ],
-  "attachments": [ { "member": 12, "bus": 7, "node": "n_l2",
-                     "at": "Soc.scala:41" } ] }
+  "binds":   [ { "agent": 12, "bus": 7, "node": "n_l2",
+                 "at": "Soc.scala:41" } ] }
 ```
 
 导出属于"可选可序列化"一类（@sec-serialization-list）：供人与工具消费，不构成版本兼容契约。唯一始终受契约保护的是参数导出，因为它是生成器的正式输入。
