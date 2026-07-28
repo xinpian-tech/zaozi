@@ -8,6 +8,13 @@ The goal of this project is providing an eDSL frontend framework for hardware de
 
 Zaozi compiles with `--release 25` (classfile major version `69`), so **JDK 25 is the minimum runtime and the only supported development JDK**. The supported setup path is `nix develop` against this repository's `flake.nix`, which provisions JDK 25 (`nixpkgs.jdk25`), Mill 1.1.2 (with `mill.jre = jdk25`), Scala 3.7.4, scala-cli 1.12.1, jextract (May 2025 source, built on JDK 25), MLIR / CIRCT, lit, and z3.
 
+When the Mill toolchain or its dependencies change, regenerate the locked Maven
+repository from the project root:
+
+```bash
+nix develop -c ./bump-mill-lock.sh
+```
+
 ## Project Structure
 
 - **mlirlib**:

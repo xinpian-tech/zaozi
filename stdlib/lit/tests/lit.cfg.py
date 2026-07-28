@@ -21,15 +21,15 @@ config.substitutions = [
 config.test_source_root = os.path.dirname(__file__)
 
 # Pass through environment variables to allow configuration from the runner/CI.
-# Proxy variables and COURSIER_CACHE propagate so scala-cli's embedded coursier
-# can reach Maven Central via the caller's HTTP proxy and reuse the Mill-
-# populated Coursier cache rather than cold-fetching into a new default cache
-# directory under $user.home/.cache/coursier.
+# Coursier and proxy variables propagate so scala-cli uses the same repository
+# policy as Mill. Mif provides an explicit mirror and clean cache, while
+# nix develop provides the locked local repository through
+# COURSIER_REPOSITORIES.
 env_vars_to_pass = [
-    "SCALA_CLI_HOME", "JAVA_OPTS",
+    "SCALA_CLI_HOME", "JAVA_OPTS", "JAVA_TOOL_OPTIONS",
     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
     "http_proxy", "https_proxy", "all_proxy", "no_proxy",
-    "COURSIER_CACHE",
+    "COURSIER_CACHE", "COURSIER_REPOSITORIES", "COURSIER_MIRRORS",
     "NIX_LDFLAGS", "Z3_LIB"
 ]
 for var in env_vars_to_pass:

@@ -14,10 +14,7 @@
 , add-determinism
 , z3
 , espresso
-, mill-ivy-fetcher
-, ivy-gather
-, writeShellApplication
-, mill-ivy-env-shell-hook
+, mkMavenRepository
 
 }:
 
@@ -30,6 +27,7 @@ let
         root = ./../..;
         fileset = unions [
           ./../../build.mill
+          ./../../zaozi-compiler-plugin
           ./../../circtlib
           ./../../mlirlib
           ./../../decoder
@@ -42,18 +40,7 @@ let
         ];
       };
 
-    passthru.bump = writeShellApplication {
-      name = "bump-zaozi-mill-lock";
-      runtimeInputs = [
-        mill
-        mill-ivy-fetcher
-      ];
-      text = ''
-        mif run -p "${src}" -o ./nix/zaozi/zaozi-lock.nix "$@"
-      '';
-    };
-
-    buildInputs = [ (ivy-gather ./zaozi-lock.nix) ];
+    buildInputs = [ (mkMavenRepository { lockFile = ./../../mtf.lock.json; }) ];
 
     nativeBuildInputs = [
       mill
@@ -70,8 +57,6 @@ let
     ];
 
     shellHook = ''
-      ${mill-ivy-env-shell-hook}
-
       mill --no-daemon mill.bsp.BSP/install
       # other commands
     '';

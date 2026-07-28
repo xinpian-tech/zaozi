@@ -75,7 +75,7 @@
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
-          "mill-ivy-fetcher",
+          "mvn-trace-forge",
           "nixpkgs"
         ]
       },
@@ -188,26 +188,6 @@
     },
     "mill-ivy-fetcher": {
       "inputs": {
-        "flake-parts": "flake-parts",
-        "nixpkgs": "nixpkgs_2",
-        "treefmt-nix": "treefmt-nix"
-      },
-      "locked": {
-        "lastModified": 1772960587,
-        "narHash": "sha256-JXcsEMWWoChpsCPuJQJaTdkEemC4Q5bcu3fPNTJvTGk=",
-        "owner": "Avimitin",
-        "repo": "mill-ivy-fetcher",
-        "rev": "54fbe54b4ad66d0dcefc240ed6388238c5fc1dfd",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Avimitin",
-        "repo": "mill-ivy-fetcher",
-        "type": "github"
-      }
-    },
-    "mill-ivy-fetcher_2": {
-      "inputs": {
         "flake-parts": "flake-parts_2",
         "nixpkgs": "nixpkgs_4",
         "treefmt-nix": "treefmt-nix_2"
@@ -223,6 +203,26 @@
       "original": {
         "owner": "Avimitin",
         "repo": "mill-ivy-fetcher",
+        "type": "github"
+      }
+    },
+    "mvn-trace-forge": {
+      "inputs": {
+        "flake-parts": "flake-parts",
+        "nixpkgs": "nixpkgs_2",
+        "treefmt-nix": "treefmt-nix"
+      },
+      "locked": {
+        "lastModified": 1785312062,
+        "narHash": "sha256-BsEh4fbXhpTmRLvOTGVBGyDcTx7JC6NdRgdQbejpzFI=",
+        "owner": "Avimitin",
+        "repo": "mvn-trace-forge",
+        "rev": "335d024759a6a4f060cd2635e215e9855d99dcd1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Avimitin",
+        "repo": "mvn-trace-forge",
         "type": "github"
       }
     },
@@ -310,7 +310,7 @@
       "inputs": {
         "circt-nix": "circt-nix",
         "flake-utils": "flake-utils_2",
-        "mill-ivy-fetcher": "mill-ivy-fetcher",
+        "mvn-trace-forge": "mvn-trace-forge",
         "nixpkgs": "nixpkgs_3",
         "scala3-bsp-semantic-ls": "scala3-bsp-semantic-ls"
       }
@@ -319,7 +319,7 @@
       "inputs": {
         "crane": "crane",
         "flake-utils": "flake-utils_3",
-        "mill-ivy-fetcher": "mill-ivy-fetcher_2",
+        "mill-ivy-fetcher": "mill-ivy-fetcher",
         "nixpkgs": "nixpkgs_5",
         "zaozi": "zaozi"
       },
@@ -402,7 +402,7 @@
     "treefmt-nix": {
       "inputs": {
         "nixpkgs": [
-          "mill-ivy-fetcher",
+          "mvn-trace-forge",
           "nixpkgs"
         ]
       },
