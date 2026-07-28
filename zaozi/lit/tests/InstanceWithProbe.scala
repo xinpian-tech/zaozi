@@ -63,7 +63,7 @@ class InnerProbe(parameter: InnerParameter) extends DVBundle[InnerParameter, Inn
 object Inner extends Generator[InnerParameter, InnerLayers, InnerIO, InnerProbe]:
   def architecture(parameter: InnerParameter) =
     val io    = summon[Interface[InnerIO]]
-    val probe = summon[Interface[InnerProbe]]
+    val probe = summon[ProbeInterface[InnerProbe]]
     layer("A0"):
       // CHECK-DAG: bind Inner_7b2bb635 Inner_7b2bb635_A0 a0_0 ();
       val a0p = Wire(UInt(parameter.width))
@@ -111,7 +111,7 @@ class OuterProbe(parameter: OuterParameter) extends DVBundle[OuterParameter, Out
 object Outer extends Generator[OuterParameter, OuterLayers, OuterIO, OuterProbe]:
   def architecture(parameter: OuterParameter) =
     val io    = summon[Interface[OuterIO]]
-    val probe = summon[Interface[OuterProbe]]
+    val probe = summon[ProbeInterface[OuterProbe]]
 
     val inner = Inner.instantiate(InnerParameter(parameter.width))
     inner.io.a0     := io.a0

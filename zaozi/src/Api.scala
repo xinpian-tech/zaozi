@@ -141,7 +141,7 @@ trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface
     Context,
     Block,
     Interface[I],
-    Interface[P],
+    ProbeInterface[P],
     L,
     InstanceContext
   ) ?=> Unit
@@ -1992,7 +1992,7 @@ trait SVAApi:
   ): Unit
 
 trait TypeImpl:
-  extension (ref: Interface[?])
+  extension (ref: ProbeInterface[?])
     private[zaozi] def referImpl(
       using Arena
     ): Value
@@ -2018,7 +2018,6 @@ trait TypeImpl:
     ): Value
   extension (ref: Instance[?, ?])
     private[zaozi] def operationImpl:        Operation
-    private[zaozi] def ioImpl[T <: Data]:    Wire[T]
     private[zaozi] def probeImpl[T <: Data]: Wire[T]
   extension (ref: Sequence)
     private[zaozi] def referImpl(

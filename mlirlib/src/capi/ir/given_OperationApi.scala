@@ -38,6 +38,7 @@ import org.llvm.mlir.CAPI.{
   mlirOperationSetOperand,
   mlirOperationSetOperands,
   mlirOperationSetSuccessor,
+  mlirOperationVerify,
   mlirOperationWalk,
   mlirOperationWriteBytecode,
   mlirOperationWriteBytecodeWithConfig,
@@ -136,8 +137,10 @@ given OperationApi with
     )(
       using arena: Arena
     ): Value = Value(mlirOperationGetResult(arena, operation.segment, pos))
-    inline def getNumResults: Long =
+    inline def getNumResults: Long    =
       mlirOperationGetNumResults(operation.segment)
+    inline def verify:        Boolean =
+      mlirOperationVerify(operation.segment)
     inline def getSuccessor(
       pos:         Long
     )(

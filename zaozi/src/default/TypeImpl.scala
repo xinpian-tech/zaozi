@@ -32,7 +32,7 @@ given TypeImpl with
       .toSeq // to immutable Seq
       .getBundle
 
-  extension (ref: Interface[?])
+  extension (ref: ProbeInterface[?])
     def referImpl(
       using Arena
     ): Value = ref._refer
@@ -58,7 +58,6 @@ given TypeImpl with
     ): Value = ref._refer
   extension (ref: Instance[?, ?])
     def operationImpl:        Operation = ref._operation
-    def ioImpl[T <: Data]:    Wire[T]   = ref._ioWire.asInstanceOf[Wire[T]]
     def probeImpl[T <: Data]: Wire[T]   = ref._probeWire.asInstanceOf[Wire[T]]
   extension (ref: Sequence)
     def referImpl(

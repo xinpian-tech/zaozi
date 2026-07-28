@@ -9,7 +9,7 @@ import me.jiuyang.zaozi.Parameter
 import me.jiuyang.zaozi.HWInterface
 import me.jiuyang.zaozi.DVInterface
 import org.llvm.mlir.scalalib.capi.ir.Block
-import me.jiuyang.zaozi.reftpe.{Const, Interface, Node, Propagated, Referable}
+import me.jiuyang.zaozi.reftpe.{Const, Node, Propagated, Referable}
 import me.jiuyang.zaozi.valuetpe.Data
 import me.jiuyang.zaozi.ConstructorApi
 import me.jiuyang.zaozi.InstanceContext

@@ -60,7 +60,7 @@ object BundleSpec extends TestSuite:
           val io = summon[Interface[BundleSpecIO]]
           io.a := io.f.g
       BundleInBundleShouldWork.firrtlTest(BundleSpecParameter(32))(
-        "connect io.a, io.f.g"
+        "connect a, f.g"
       )
 
     test("Bundle with type parameter should work"):
@@ -72,7 +72,7 @@ object BundleSpec extends TestSuite:
           val io = summon[Interface[BundleSpecIO]]
           io.a := io.j.a.a
       BundleWithTypeParameterShouldWork.firrtlTest(BundleSpecParameter(32))(
-        "connect io.a, io.j.a.a"
+        "connect a, j.a.a"
       )
 
     test("Symbol found"):
@@ -84,7 +84,7 @@ object BundleSpec extends TestSuite:
           val io = summon[Interface[BundleSpecIO]]
           io.a := io.b
       SymbolFound.firrtlTest(BundleSpecParameter(32))(
-        "connect io.a, io.b"
+        "connect a, b"
       )
 
     test("Optional field"):
@@ -96,9 +96,9 @@ object BundleSpec extends TestSuite:
           val io = summon[Interface[BundleSpecIO]]
           io.k.foreach(_ := io.b)
       OptionalField.firrtlTest(BundleSpecParameter(32))(
-        "connect io.k, io.b"
+        "connect k, b"
       )
-      OptionalField.firrtlTest(BundleSpecParameter(8))(out => !out.contains("connect io.k, io.b"))
+      OptionalField.firrtlTest(BundleSpecParameter(8))(out => !out.contains("connect k, b"))
 
     test("asBits should work"):
       @generator

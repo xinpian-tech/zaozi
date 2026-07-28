@@ -4,7 +4,7 @@ package me.jiuyang.zaozitest
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.reftpe.{Const, Interface}
+import me.jiuyang.zaozi.reftpe.{Const, Interface, ProbeInterface}
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
@@ -165,7 +165,7 @@ object BundleAsRecordSpec extends TestSuite:
       object ProbeView extends Generator[BARParameter, BARLayers, SimpleIO, ProbeIO] with HasVerilogTest:
         def architecture(parameter: BARParameter) =
           val io    = summon[Interface[SimpleIO]]
-          val probe = summon[Interface[ProbeIO]]
+          val probe = summon[ProbeInterface[ProbeIO]]
           io.asRecord.field("out") := io.asRecord.field("in")
 
           val es = probe.asRecord.getType.elements

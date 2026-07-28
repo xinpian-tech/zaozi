@@ -4,6 +4,7 @@ package me.jiuyang.zaozi.reftpe
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.valuetpe.*
+import me.jiuyang.zaozi.magic.DynamicSubfield
 import me.jiuyang.zaozi.magic.macros.{referableApplyDynamic, referableApplyDynamicNamed, referableSelectDynamic}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.Module as CirctModule
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value, given}
@@ -17,8 +18,7 @@ type Propagated[R <: Referable[?], RET <: Data] = R match
   case _        => Node[RET]
 
 trait Referable[T <: Data] extends Dynamic:
-  private[zaozi] val _tpe: T
-
+  private[zaozi] val _tpe:   T
   private[zaozi] val _refer: Value
 
   // Ideally, we can get all attribute from MLIR but the Scala type itself
@@ -40,7 +40,32 @@ trait Referable[T <: Data] extends Dynamic:
     TypeImpl
   ): Int = _tpe.width
 
-  /** Macro to call `getRefViaFieldValName` on [[me.jiuyang.zaozi.magic.DynamicSubfield DynamicSubfield]]. */
+  private[zaozi] def subRef(
+    name: String
+  )(
+    using Arena,
+    Block,
+    Context,
+    TypeImpl,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): Ref[Data] =
+    _tpe.asInstanceOf[DynamicSubfield].getRefViaFieldValName[Data](refer, name)
+
+  private[zaozi] def subRefOption(
+    name: String
+  )(
+    using Arena,
+    Block,
+    Context,
+    TypeImpl,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): Option[Ref[Data]] =
+    _tpe.asInstanceOf[DynamicSubfield].getOptionRefViaFieldValName[Data](refer, name)
+
   transparent inline def selectDynamic(name: String):                                  Any = ${ referableSelectDynamic('this, 'name) }
   transparent inline def applyDynamic(name: String)(inline args: Any*):                Any = ${
     referableApplyDynamic('this, 'name, 'args)

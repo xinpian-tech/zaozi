@@ -96,7 +96,7 @@ object VecSpec extends TestSuite:
           io.out := io.a.ref(io.idx)
           io.flatuint.dontCare()
       DynamicIndex.firrtlTest(VecSpecParameter(8, 4))(
-        "connect io.out, io.a[io.idx]"
+        "connect out, a[idx]"
       )
 
     test("Dynamic index apply"):
@@ -110,7 +110,7 @@ object VecSpec extends TestSuite:
           io.out := io.a(io.idx)
           io.flatuint.dontCare()
       DynamicIndexApply.firrtlTest(VecSpecParameter(8, 4))(
-        "connect io.out, io.a[io.idx]"
+        "connect out, a[idx]"
       )
 
     test("Static index"):
@@ -198,7 +198,7 @@ object VecSpec extends TestSuite:
           io.b(io.idx) := io.a(io.idx)
           io.flatuint.dontCare()
       DynamicIndexAssign.firrtlTest(VecSpecParameter(8, 4))(
-        "connect io.b[io.idx], io.a[io.idx]"
+        "connect b[idx], a[idx]"
       )
 
     test("Apply with incorrect number of arguments"):

@@ -31,13 +31,11 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_ModuleApi,
   Circuit,
   CircuitApi,
-  ConnectApi,
   InstanceApi,
   Module as CirctModule,
   ModuleApi,
   OpenSubfieldApi,
   RefDefineApi,
-  SubfieldApi,
   WireApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
@@ -82,53 +80,29 @@ given GeneratorApi:
       using Arena,
       Context
     ): CirctModule =
-      val io                = generator.interface(parameter)
-      val probe             = generator.probe(parameter)
-      val unknownLocation   = summon[LocationApi].locationUnknownGet
-      val ioNumFields       = io.toMlirType.getBundleNumFields.toInt
-      val probeNumFields    = probe.toMlirType.getBundleNumFields.toInt
-      val bfs               =
+      val io                  = generator.interface(parameter)
+      val probe               = generator.probe(parameter)
+      val unknownLocation     = summon[LocationApi].locationUnknownGet
+      val ioNumFields         = io.toMlirType.getBundleNumFields.toInt
+      val probeNumFields      = probe.toMlirType.getBundleNumFields.toInt
+      val bfs                 =
         Seq.tabulate(ioNumFields)(io.toMlirType.getBundleFieldByIndex) ++
           Seq.tabulate(probeNumFields)(probe.toMlirType.getBundleFieldByIndex)
-      val module            = summon[ModuleApi].op(
+      val module              = summon[ModuleApi].op(
         generator.moduleName(parameter),
         unknownLocation,
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
         generator.layers(parameter).nameHierarchies
       )
-      given Block           = module.block
-      val ioWire            = summon[WireApi].op(
-        "io",
-        unknownLocation,
-        FirrtlNameKind.Droppable,
-        io.toMlirType
-      )
-      ioWire.operation.appendToBlock()
-      val probeWire         = summon[WireApi].op(
+      given Block             = module.block
+      val probeWire           = summon[WireApi].op(
         "probe",
         unknownLocation,
         FirrtlNameKind.Droppable,
         probe.toMlirType
       )
       probeWire.operation.appendToBlock()
-      Seq
-        .tabulate(ioNumFields): ioIdx =>
-          (bfs(ioIdx), ioIdx)
-        .foreach:
-          case (bf, idx) =>
-            val subRefToIOWire = summon[SubfieldApi].op(
-              ioWire.result,
-              idx,
-              unknownLocation
-            )
-            subRefToIOWire.operation.appendToBlock()
-            (
-              if (bf.getIsFlip)
-                summon[ConnectApi].op(module.getIO(idx), subRefToIOWire.result, unknownLocation)
-              else
-                summon[ConnectApi].op(subRefToIOWire.result, module.getIO(idx), unknownLocation)
-            ).operation.appendToBlock()
       Seq
         .tabulate(probeNumFields): probeIdx =>
           (bfs(ioNumFields + probeIdx), probeIdx)
@@ -144,16 +118,14 @@ given GeneratorApi:
               .op(module.getIO(ioNumFields + idx), subRefToProbeWire.result, unknownLocation)
               .operation
               .appendToBlock()
-      given Interface[I]    =
-        new Interface[I]:
-          val _tpe:   I     = io
-          val _refer: Value = ioWire.operation.getResult(0)
-      given Interface[P]    =
-        new Interface[P]:
+      given Interface[I]      =
+        new Interface[I](io, IArray.tabulate(ioNumFields)(idx => module.getIO(idx)))
+      given ProbeInterface[P] =
+        new ProbeInterface[P]:
           val _tpe:   P     = probe
           val _refer: Value = probeWire.operation.getResult(0)
-      given InstanceContext = new InstanceContext
-      given L               = generator.layers(parameter)
+      given InstanceContext   = new InstanceContext
+      given L                 = generator.layers(parameter)
       generator.architecture(parameter)
       module
 
