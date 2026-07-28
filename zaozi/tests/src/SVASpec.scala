@@ -58,7 +58,7 @@ object SVASpec extends TestSuite:
       object SimpleSVA extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe] with HasVerilogTest:
         def architecture(parameter: SVASpecParameter) =
           val io    = summon[Interface[SVASpecIO]]
-          val probe = summon[Interface[SVASpecProbe]]
+          val probe = summon[ProbeInterface[SVASpecProbe]]
           val a:         Referable[Bool] = io.ib0
           val immediate: Immediate       = a.I
 

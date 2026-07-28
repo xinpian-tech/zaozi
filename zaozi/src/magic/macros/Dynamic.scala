@@ -58,6 +58,55 @@ private def summonContextualParameters(
   * macro here can use Implicits.search to find the implicit instance from given. another issue is I don't have a good
   * idea to deal with valName on BundleField.
   */
+/** Shape of the top-level field named `fieldName` inside the shape type `T`, resolved at compile time. `Aligned` for a
+  * `BundleField[e]`, `Optional` for an `Option[BundleField[e]]`; the receiver-agnostic half of the [[selectDynamic]]
+  * macro (shared by [[me.jiuyang.zaozi.reftpe.Referable Referable]] and the port-table
+  * [[me.jiuyang.zaozi.reftpe.Interface Interface]]).
+  */
+private enum FieldShape:
+  case Aligned(elem: Any) // Type[?] of the element
+  case Optional(elem: Any) // Type[?] of the element
+
+private def resolveFieldShape[T: Type](
+  fieldName: Expr[String]
+)(
+  using Quotes
+): FieldShape =
+  import quotes.reflect.*
+
+  val shapeType           = TypeRepr.of[T]
+  val dynamicSubfieldType = TypeRepr.of[me.jiuyang.zaozi.magic.DynamicSubfield]
+
+  // Ensure the shape supports typed dynamic subfield navigation.
+  if (!(shapeType <:< dynamicSubfieldType)) {
+    report.errorAndAbort(s"Type parameter T must be a subtype of DynamicSubfield, but got ${shapeType.show}.")
+  }
+
+  // Check if the field exists in the shape type
+  val fieldNameStr   = fieldName.valueOrAbort
+  val fieldSymbolOpt = shapeType.classSymbol.flatMap(_.declaredFields.find(_.name == fieldNameStr))
+  val fieldSymbol    = fieldSymbolOpt.getOrElse {
+    report.errorAndAbort(s"Field '$fieldNameStr' does not exist in type ${shapeType.show}.")
+  }
+
+  val fieldType = fieldSymbol.tree match {
+    case ValDef(_, fieldTypeTree, _) =>
+      // Substitute type parameters in the field type with the concrete type arguments from shapeType
+      val typeParams = shapeType.typeSymbol.declaredTypes.filter(_.isTypeParam)
+      val typeArgs   = shapeType.typeArgs
+      fieldTypeTree.tpe.substituteTypes(typeParams.take(typeArgs.length), typeArgs)
+    case _                           => report.errorAndAbort(s"Unable to determine the type of field '$fieldNameStr'.")
+  }
+
+  val bundleFieldType       = TypeRepr.of[me.jiuyang.zaozi.valuetpe.BundleField[?]]
+  val optionBundleFieldType = TypeRepr.of[Option[me.jiuyang.zaozi.valuetpe.BundleField[?]]]
+  if (fieldType <:< bundleFieldType)
+    FieldShape.Aligned(fieldType.typeArgs.head.asType)
+  else if (fieldType <:< optionBundleFieldType)
+    FieldShape.Optional(fieldType.typeArgs.head.typeArgs.head.asType)
+  else
+    report.errorAndAbort(s"Field type '${fieldType.show}' does not conform to the upper bound BundleField.")
+
 def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
   ref:       Expr[me.jiuyang.zaozi.reftpe.Referable[T]],
   fieldName: Expr[String]
@@ -66,76 +115,63 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
 ): Expr[Any] =
   import quotes.reflect.*
 
-  // Get the type of `tpe` field from `Referable`
-  val referableType       = TypeRepr.of[T]
-  val dynamicSubfieldType = TypeRepr.of[me.jiuyang.zaozi.magic.DynamicSubfield]
-
-  // Ensure T is a subtype of Bundle
-  if (!(referableType <:< dynamicSubfieldType)) {
-    report.errorAndAbort(s"Type parameter T must be a subtype of DynamicSubfield, but got ${referableType.show}.")
-  }
-
-  // Check if the field exists in the Bundle type
-  val fieldNameStr   = fieldName.valueOrAbort
-  val fieldSymbolOpt = referableType.classSymbol.flatMap(_.declaredFields.find(_.name == fieldNameStr))
-  val fieldSymbol    = fieldSymbolOpt.getOrElse {
-    report.errorAndAbort(s"Field '$fieldNameStr' does not exist in type ${referableType.show}.")
-  }
-
-  val fieldType = fieldSymbol.tree match {
-    case ValDef(_, fieldTypeTree, _) =>
-      // Substitute type parameters in the field type with the concrete type arguments from referableType
-      val typeParams = referableType.typeSymbol.declaredTypes.filter(_.isTypeParam)
-      val typeArgs   = referableType.typeArgs
-      fieldTypeTree.tpe.substituteTypes(typeParams.take(typeArgs.length), typeArgs)
-    case _                           => report.errorAndAbort(s"Unable to determine the type of field '$fieldNameStr'.")
-  }
-
   val (arena, typeImpl, context, block, file, line, valName, _) = summonContextualParameters
 
-  // Ensure the field type conforms to Data
-  val bundleFieldType       = TypeRepr.of[me.jiuyang.zaozi.valuetpe.BundleField[?]]
-  val optionBundleFieldType = TypeRepr.of[Option[me.jiuyang.zaozi.valuetpe.BundleField[?]]]
-  if (fieldType <:< bundleFieldType)
-    fieldType.typeArgs.head.asType match
-      case '[tpe] =>
-        '{
-          given java.lang.foreign.Arena                = $arena
-          given me.jiuyang.zaozi.TypeImpl              = $typeImpl
-          given org.llvm.mlir.scalalib.capi.ir.Context = $context
-          given org.llvm.mlir.scalalib.capi.ir.Block   = $block
-          given sourcecode.File                        = $file
-          given sourcecode.Line                        = $line
-          given sourcecode.Name.Machine                = $valName
-          $ref._tpe
-            .asInstanceOf[me.jiuyang.zaozi.magic.DynamicSubfield]
-            // Hack with union type
-            .getRefViaFieldValName[tpe & me.jiuyang.zaozi.valuetpe.Data](
-              $ref.refer,
-              $fieldName
-            )
-        }
-  else if (fieldType <:< optionBundleFieldType)
-    fieldType.typeArgs.head.typeArgs.head.asType match
-      case '[tpe] =>
-        '{
-          given java.lang.foreign.Arena                = $arena
-          given me.jiuyang.zaozi.TypeImpl              = $typeImpl
-          given org.llvm.mlir.scalalib.capi.ir.Context = $context
-          given org.llvm.mlir.scalalib.capi.ir.Block   = $block
-          given sourcecode.File                        = $file
-          given sourcecode.Line                        = $line
-          given sourcecode.Name.Machine                = $valName
-          $ref._tpe
-            .asInstanceOf[me.jiuyang.zaozi.magic.DynamicSubfield]
-            // Hack with union type
-            .getOptionRefViaFieldValName[tpe & me.jiuyang.zaozi.valuetpe.Data](
-              $ref.refer,
-              $fieldName
-            )
-        }
-  else
-    report.errorAndAbort(s"Field type '${fieldType.show}' does not conform to the upper bound BundleField.")
+  resolveFieldShape[T](fieldName) match
+    case FieldShape.Aligned(elem)  =>
+      elem.asInstanceOf[Type[?]] match
+        case '[tpe] =>
+          '{
+            given java.lang.foreign.Arena                = $arena
+            given me.jiuyang.zaozi.TypeImpl              = $typeImpl
+            given org.llvm.mlir.scalalib.capi.ir.Context = $context
+            given org.llvm.mlir.scalalib.capi.ir.Block   = $block
+            given sourcecode.File                        = $file
+            given sourcecode.Line                        = $line
+            given sourcecode.Name.Machine                = $valName
+            $ref
+              .subRef($fieldName)
+              .asInstanceOf[me.jiuyang.zaozi.reftpe.Ref[tpe & me.jiuyang.zaozi.valuetpe.Data]]
+          }
+    case FieldShape.Optional(elem) =>
+      elem.asInstanceOf[Type[?]] match
+        case '[tpe] =>
+          '{
+            given java.lang.foreign.Arena                = $arena
+            given me.jiuyang.zaozi.TypeImpl              = $typeImpl
+            given org.llvm.mlir.scalalib.capi.ir.Context = $context
+            given org.llvm.mlir.scalalib.capi.ir.Block   = $block
+            given sourcecode.File                        = $file
+            given sourcecode.Line                        = $line
+            given sourcecode.Name.Machine                = $valName
+            $ref
+              .subRefOption($fieldName)
+              .asInstanceOf[Option[me.jiuyang.zaozi.reftpe.Ref[tpe & me.jiuyang.zaozi.valuetpe.Data]]]
+          }
+
+def interfaceSelectDynamic[T <: me.jiuyang.zaozi.HWInterface[?]: Type](
+  ref:       Expr[me.jiuyang.zaozi.reftpe.Interface[T]],
+  fieldName: Expr[String]
+)(
+  using Quotes
+): Expr[Any] =
+  import quotes.reflect.*
+
+  resolveFieldShape[T](fieldName) match
+    case FieldShape.Aligned(elem)  =>
+      elem.asInstanceOf[Type[?]] match
+        case '[tpe] =>
+          '{
+            $ref.subRef($fieldName).asInstanceOf[me.jiuyang.zaozi.reftpe.Ref[tpe & me.jiuyang.zaozi.valuetpe.Data]]
+          }
+    case FieldShape.Optional(elem) =>
+      elem.asInstanceOf[Type[?]] match
+        case '[tpe] =>
+          '{
+            $ref
+              .subRefOption($fieldName)
+              .asInstanceOf[Option[me.jiuyang.zaozi.reftpe.Ref[tpe & me.jiuyang.zaozi.valuetpe.Data]]]
+          }
 
 private def getTypeParameters(
   fieldValueExpr: Expr[Any]
@@ -176,16 +212,12 @@ private def summonTypeclassTerm(
     case failure: ImplicitSearchFailure =>
       report.errorAndAbort(s"Cannot summon ${typeRepr.show}: ${failure.explanation}")
 
-def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
+private def applyCallOnField(
   using Quotes
-)(ref:       Expr[me.jiuyang.zaozi.reftpe.Referable[T]],
-  fieldName: Expr[String],
-  args:      Seq[quotes.reflect.Term]
+)(fieldValueExpr: Expr[Any],
+  args:           Seq[quotes.reflect.Term]
 ): Expr[Any] =
   import quotes.reflect.*
-
-  // Get the "field" expression via selectDynamic
-  val fieldValueExpr = referableSelectDynamic[T](ref, fieldName)
 
   val contextualArgs = summonContextualParameters match
     case (arena, _, context, block, file, line, valName, instanceContext) =>
@@ -231,6 +263,22 @@ def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
 
   // Turn it back into an Expr
   applyCallTerm.asExpr
+
+def referableApplyCall[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
+  using Quotes
+)(ref:       Expr[me.jiuyang.zaozi.reftpe.Referable[T]],
+  fieldName: Expr[String],
+  args:      Seq[quotes.reflect.Term]
+): Expr[Any] =
+  applyCallOnField(referableSelectDynamic[T](ref, fieldName), args)
+
+def interfaceApplyCall[T <: me.jiuyang.zaozi.HWInterface[?]: Type](
+  using Quotes
+)(ref:       Expr[me.jiuyang.zaozi.reftpe.Interface[T]],
+  fieldName: Expr[String],
+  args:      Seq[quotes.reflect.Term]
+): Expr[Any] =
+  applyCallOnField(interfaceSelectDynamic[T](ref, fieldName), args)
 
 def referableApplyDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
   ref:       Expr[me.jiuyang.zaozi.reftpe.Referable[T]],
@@ -281,3 +329,52 @@ def referableApplyDynamicNamed[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
       report.errorAndAbort(s"Expected varargs for applyDynamicNamed, got: ${other.show}")
 
   referableApplyCall(ref, fieldName, varargs)
+
+def interfaceApplyDynamic[T <: me.jiuyang.zaozi.HWInterface[?]: Type](
+  ref:       Expr[me.jiuyang.zaozi.reftpe.Interface[T]],
+  fieldName: Expr[String],
+  args:      Expr[Seq[Any]]
+)(
+  using Quotes
+): Expr[Any] =
+  import quotes.reflect.*
+  val varargs = args match
+    case Varargs(exprs) => exprs.map(_.asTerm)
+    case other          =>
+      report.errorAndAbort(s"Expected varargs for applyDynamic, got: ${other.show}")
+
+  interfaceApplyCall(ref, fieldName, varargs)
+
+def interfaceApplyDynamicNamed[T <: me.jiuyang.zaozi.HWInterface[?]: Type](
+  ref:       Expr[me.jiuyang.zaozi.reftpe.Interface[T]],
+  fieldName: Expr[String],
+  args:      Expr[Seq[(String, Any)]]
+)(
+  using Quotes
+): Expr[Any] =
+  import quotes.reflect.*
+  val varargs = args match
+    case Varargs(argExprs) =>
+      (argExprs.map {
+        case '{ ($key: String, $value: Any) } =>
+          key.value match
+            case Some(k) => NamedArg(k, value.asTerm)
+            case None    =>
+              report.errorAndAbort("Named argument must have a statically known key string.")
+        case other                            =>
+          report.errorAndAbort(s"Expected a literal (String, Any), got: ${other.show}")
+      } match
+        case idx +: Nil          =>
+          if (idx.name != "idx") report.errorAndAbort(s"Unexpected named arguments ${idx.name}.")
+          Seq(idx)
+        case arg1 +: arg2 +: Nil =>
+          (arg1.name, arg2.name) match
+            case ("hi", "lo")   => Seq(arg1, arg2)
+            case ("lo", "hi")   => Seq(arg2, arg1)
+            case (name1, name2) => report.errorAndAbort(s"Unexpected named arguments (${name1}, ${name2}).")
+        case args                => args
+      ).map(_.value)
+    case other             =>
+      report.errorAndAbort(s"Expected varargs for applyDynamicNamed, got: ${other.show}")
+
+  interfaceApplyCall(ref, fieldName, varargs)

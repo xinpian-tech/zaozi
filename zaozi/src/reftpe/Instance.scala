@@ -12,16 +12,15 @@ abstract class Instance[IOTpe <: HWInterface[?], ProbeTpe <: DVInterface[?, ?]]:
   private[zaozi] val _ioTpe:     IOTpe
   private[zaozi] val _probeTpe:  ProbeTpe
   private[zaozi] val _operation: Operation
-  private[zaozi] val _ioWire:    Wire[IOTpe]
+
+  private[zaozi] val _io:        Interface[IOTpe]
   private[zaozi] val _probeWire: Wire[ProbeTpe]
 
   def operation(
     using TypeImpl
   ): Operation = this.operationImpl
 
-  def io(
-    using TypeImpl
-  ): Wire[IOTpe] = this.ioImpl[IOTpe]
+  def io: Interface[IOTpe] = _io
 
   def probe(
     using TypeImpl

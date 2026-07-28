@@ -4,7 +4,7 @@ package me.jiuyang.zaozitest
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.reftpe.Interface
+import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
@@ -118,7 +118,7 @@ object RecordSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: RecordSpecParameter) =
           val io    = summon[Interface[RecordAsIO]]
-          val probe = summon[Interface[RecordAsProbe]]
+          val probe = summon[ProbeInterface[RecordAsProbe]]
           Seq.tabulate(parameter.fieldNum): i =>
             io.field(s"output_$i") := io.field(s"input_$i")
             layer("verification"):
@@ -188,7 +188,7 @@ object RecordSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: RecordSpecParameter) =
           val io    = summon[Interface[RecordAsIO]]
-          val probe = summon[Interface[RecordAsProbe]]
+          val probe = summon[ProbeInterface[RecordAsProbe]]
           Seq.tabulate(parameter.fieldNum): i =>
             io.field(s"output_$i") := io.field(s"input_$i")
             layer("verification"):

@@ -16,19 +16,15 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
 import org.llvm.circt.scalalib.dialect.firrtl.operation.given
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_CircuitApi,
-  given_ConnectApi,
   given_InstanceApi,
   given_OpenSubfieldApi,
   given_RefDefineApi,
-  given_SubfieldApi,
   given_WireApi,
   Circuit,
   CircuitApi,
-  ConnectApi,
   InstanceApi,
   OpenSubfieldApi,
   RefDefineApi,
-  SubfieldApi,
   WireApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
@@ -83,13 +79,6 @@ object BaseGeneratorHelper:
       layers = layers.nameHierarchies
     )
     instanceOp.operation.appendToBlock()
-    val ioWire      = summon[WireApi].op(
-      s"${valName}_io",
-      summon[LocationApi].locationUnknownGet,
-      FirrtlNameKind.Droppable,
-      ioTpe.toMlirType
-    )
-    ioWire.operation.appendToBlock()
     val probeWire   = summon[WireApi].op(
       s"${valName}_probe",
       summon[LocationApi].locationUnknownGet,
@@ -98,19 +87,6 @@ object BaseGeneratorHelper:
     )
     probeWire.operation.appendToBlock()
 
-    ioFields.zipWithIndex.foreach:    (field, idx) =>
-      val flip       = field.getIsFlip
-      val instanceIO = instanceOp.operation.getResult(idx)
-      val wireIO     = summon[SubfieldApi].op(
-        ioWire.result,
-        idx,
-        locate
-      )
-      wireIO.operation.appendToBlock()
-      val connect    =
-        if (flip) summon[ConnectApi].op(wireIO.result, instanceIO, locate)
-        else summon[ConnectApi].op(instanceIO, wireIO.result, locate)
-      connect.operation.appendToBlock()
     probeFields.zipWithIndex.foreach: (field, idx) =>
       val instanceIO = instanceOp.operation.getResult(ioFields.length + idx)
       val wireProbe  = summon[OpenSubfieldApi].op(
@@ -126,9 +102,7 @@ object BaseGeneratorHelper:
       val _ioTpe     = ioTpe
       val _probeTpe  = probeTpe
       val _operation = instanceOp.operation
-      val _ioWire    = new Wire[I]:
-        private[zaozi] val _tpe   = ioTpe
-        private[zaozi] val _refer = ioWire.operation.getResult(0)
+      val _io        = new Interface[I](ioTpe, IArray.tabulate(ioFields.length)(idx => instanceOp.operation.getResult(idx)))
       val _probeWire = new Wire[P]:
         private[zaozi] val _tpe   = probeTpe
         private[zaozi] val _refer = probeWire.operation.getResult(0)

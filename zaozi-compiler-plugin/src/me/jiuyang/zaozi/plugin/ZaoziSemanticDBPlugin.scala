@@ -25,10 +25,11 @@ import java.nio.file.{Files, Path, Paths}
 /** Zaozi SemanticDB enhancement plugin.
   *
   * Zaozi's hardware DSL accesses bundle fields through `scala.Dynamic`: `io.field` is rewritten by the typer to
-  * `io.selectDynamic("field")`, which is a transparent inline macro that expands to `getRefViaFieldValName` calls.
-  * Vanilla SemanticDB therefore records an occurrence of `Referable#selectDynamic().` at the `field` position instead
-  * of the bundle field itself, so SemanticDB-first tooling (scala3-bsp-semantic-ls, Metals, scalafix) cannot resolve
-  * go-to-definition or find-references for bundle fields.
+  * `io.selectDynamic("field")`, a transparent inline macro that expands to `subRef`/`subRefOption` calls, where `io` is
+  * a `Referable[T]` or an `Interface[T]`. Vanilla SemanticDB therefore records an occurrence of
+  * `Referable#selectDynamic().` (or `Interface#selectDynamic().`) at the `field` position instead of the bundle field
+  * itself, so SemanticDB-first tooling (scala3-bsp-semantic-ls, Metals, scalafix) cannot resolve go-to-definition or
+  * find-references for bundle fields.
   *
   * This [[StandardPlugin]] hosts the two pipeline-dispatched zaozi tooling phases (see [[initialize]] for the dispatch
   * contract):
@@ -119,7 +120,7 @@ class ZaoziSemanticDBPhase extends PluginPhase:
       ctx.settings.semanticdbTarget.value.isEmpty && ctx.settings.outputDir.value.isInstanceOf[JarArchive]
     super.isRunnable && ctx.settings.Xsemanticdb.value && !writesToOutputJar
 
-  /** A bundle-field access through `Referable`'s dynamic methods, proven from the typed tree. */
+  /** A bundle-field access through `Referable`'s or `Interface`'s dynamic methods, proven from the typed tree. */
   private case class DynamicFieldUse(fieldSym: Symbol, dynamicSym: Symbol, span: Spans.Span)
 
   /** A bundle-field `val` defined in the current unit. */
@@ -129,12 +130,18 @@ class ZaoziSemanticDBPhase extends PluginPhase:
     using Context
   ): Unit =
     val referableCls       = getClassIfDefined("me.jiuyang.zaozi.reftpe.Referable")
+    val interfaceCls       = getClassIfDefined("me.jiuyang.zaozi.reftpe.Interface")
     val dynamicSubfieldCls = getClassIfDefined("me.jiuyang.zaozi.magic.DynamicSubfield")
     val bundleFieldCls     = getClassIfDefined("me.jiuyang.zaozi.valuetpe.BundleField")
-    if !(referableCls.exists && dynamicSubfieldCls.exists && bundleFieldCls.exists) then return
+    if !(referableCls.exists && interfaceCls.exists && dynamicSubfieldCls.exists && bundleFieldCls.exists) then return
 
     val unit      = ctx.compilationUnit
-    val collector = Collector(referableCls.asClass, dynamicSubfieldCls.asClass, bundleFieldCls.asClass)
+    val collector = Collector(
+      referableCls.asClass,
+      interfaceCls.asClass,
+      dynamicSubfieldCls.asClass,
+      bundleFieldCls.asClass
+    )
     collector.traverse(unit.tpdTree)
     if collector.uses.isEmpty && collector.defs.isEmpty then return
 
@@ -149,7 +156,11 @@ class ZaoziSemanticDBPhase extends PluginPhase:
     * node is visited (the extractor never emits occurrences from expansions, so there is nothing to rewrite there
     * either).
     */
-  private final class Collector(referableCls: ClassSymbol, dynamicSubfieldCls: ClassSymbol, bundleFieldCls: ClassSymbol)
+  private final class Collector(
+    referableCls:       ClassSymbol,
+    interfaceCls:       ClassSymbol,
+    dynamicSubfieldCls: ClassSymbol,
+    bundleFieldCls:     ClassSymbol)
       extends TreeTraverser:
     val defs = collection.mutable.ListBuffer.empty[FieldDef]
     val uses = collection.mutable.ListBuffer.empty[DynamicFieldUse]
@@ -188,8 +199,9 @@ class ZaoziSemanticDBPhase extends PluginPhase:
         _.derivesFrom(bundleFieldCls)
       ))
 
-    /** Match the retained call of an inlined `Referable` dynamic application: `recv.selectDynamic("field")`,
-      * `recv.applyDynamic("field")(args*)`, `recv.applyDynamicNamed("field")(args*)`, with or without type arguments.
+    /** Match the retained call of an inlined `Referable` or `Interface` dynamic application:
+      * `recv.selectDynamic("field")`, `recv.applyDynamic("field")(args*)`, `recv.applyDynamicNamed("field")(args*)`,
+      * with or without type arguments.
       */
     private def collectDynamicCall(
       call: Tree
@@ -199,16 +211,16 @@ class ZaoziSemanticDBPhase extends PluginPhase:
       def unwrap(t: Tree): Option[(Select, Tree, String)] = t match
         case Apply(fun, args) =>
           fun match
-            case sel @ Select(recv, _) if isReferableDynamic(sel.symbol)               =>
+            case sel @ Select(recv, _) if isDynamicSelector(sel.symbol)               =>
               args match
                 case Literal(Constant(fieldName: String)) :: _ => Some((sel, recv, fieldName))
                 case _                                         => None
-            case TypeApply(sel @ Select(recv, _), _) if isReferableDynamic(sel.symbol) =>
+            case TypeApply(sel @ Select(recv, _), _) if isDynamicSelector(sel.symbol) =>
               args match
                 case Literal(Constant(fieldName: String)) :: _ => Some((sel, recv, fieldName))
                 case _                                         => None
             case fun: Apply => unwrap(fun)
-            case _                                                                     => None
+            case _                                                                    => None
         case _                => None
 
       unwrap(call).foreach { case (sel, recv, fieldName) =>
@@ -218,17 +230,17 @@ class ZaoziSemanticDBPhase extends PluginPhase:
           if fieldSym.exists then uses += DynamicFieldUse(fieldSym, sel.symbol, nameSpan)
       }
 
-    private def isReferableDynamic(
+    private def isDynamicSelector(
       sym: Symbol
     )(
       using Context
     ): Boolean =
-      sym.exists && sym.owner == referableCls &&
+      sym.exists && (sym.owner == referableCls || sym.owner == interfaceCls) &&
         (sym.name == nme.selectDynamic || sym.name == nme.applyDynamic || sym.name == nme.applyDynamicNamed)
 
-    /** Resolve the accessed field `val` from the receiver's type: `Referable[T]` gives the bundle type `T`; the field
-      * is its member with the accessed name and a `BundleField` type. Purely type-derived, so it works for bundles
-      * defined in other files or upstream jars.
+    /** Resolve the accessed field `val` from the receiver's type: the `T` of a `Referable[T]` or `Interface[T]`
+      * receiver is the bundle type; the field is its member with the accessed name and a `BundleField` type. Purely
+      * type-derived, so it works for bundles defined in other files or upstream jars.
       */
     private def fieldSymbolFor(
       recv:      Tree,
@@ -236,11 +248,22 @@ class ZaoziSemanticDBPhase extends PluginPhase:
     )(
       using Context
     ): Symbol =
-      recv.tpe.widenDealias.baseType(referableCls) match
-        case AppliedType(_, bundleTpe :: Nil) =>
+      bundleTypeOf(recv.tpe.widenDealias) match
+        case Some(bundleTpe) =>
           val member = bundleTpe.member(termName(fieldName)).symbol
           if member.exists && isBundleFieldType(member.info) then member else NoSymbol
-        case _                                => NoSymbol
+        case None            => NoSymbol
+
+    /** The bundle type of a `Referable[T]` or `Interface[T]` receiver: its sole type argument `T`. */
+    private def bundleTypeOf(
+      tpe: Type
+    )(
+      using Context
+    ): Option[Type] =
+      def arg(cls: ClassSymbol) = tpe.baseType(cls) match
+        case AppliedType(_, bundleTpe :: Nil) => Some(bundleTpe)
+        case _                                => None
+      arg(referableCls).orElse(arg(interfaceCls))
   end Collector
 
   /** The `.semanticdb` path for `source`, computed exactly as `ExtractSemanticDB` does, honoring `-semanticdb-target`

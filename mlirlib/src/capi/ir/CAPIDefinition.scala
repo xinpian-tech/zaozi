@@ -286,6 +286,7 @@ trait OperationApi extends HasSegment[Operation] with HasSizeOf[Operation]:
       using arena: Arena
     ):                                                   Value
     inline def getNumResults:                            Long
+    inline def verify:                                   Boolean
     inline def getSuccessor(
       pos:         Long
     )(

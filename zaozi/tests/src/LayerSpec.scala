@@ -62,7 +62,7 @@ object LayerSpec extends TestSuite:
           with HasVerilogTest:
         def architecture(parameter: LayerSpecParameter) =
           val io    = summon[Interface[LayerSpecIO]]
-          val probe = summon[Interface[LayerSpecProbe]]
+          val probe = summon[ProbeInterface[LayerSpecProbe]]
           layer("A0"):
             // calculation to prevent optimization
             val a0p = Wire(UInt(parameter.width))

@@ -11,24 +11,24 @@ import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.plugins.PluginPhase
 
-import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
 /** Presentation-compiler phase that makes go-to-definition and hover on a zaozi dynamic bundle-field access resolve to
   * the real field declaration.
   *
-  * A `Referable[T]` (`scala.Dynamic`) access `io.a` is a `transparent inline selectDynamic("a")` whose expansion drops
-  * the field name to a runtime string; the retained pre-inlining call `io.selectDynamic("a")` carries only the
-  * framework method symbol, so the compiler resolves `io.a` to `selectDynamic` rather than `val a`. This phase runs
-  * after `typer` (the inline expansion already happened there) and structurally rewrites the `Inlined.call` to a typed
-  * reference to the resolved field symbol, so the interactive symbol-at-cursor lookup returns the field.
+  * A `Referable[T]` or `Interface[T]` (`scala.Dynamic`) access `io.a` is a `transparent inline selectDynamic("a")`
+  * whose expansion drops the field name to a runtime string; the retained pre-inlining call `io.selectDynamic("a")`
+  * carries only the framework method symbol, so the compiler resolves `io.a` to `selectDynamic` rather than `val a`.
+  * This phase runs after `typer` (the inline expansion already happened there) and structurally rewrites the
+  * `Inlined.call` to a typed reference to the resolved field symbol, so the interactive symbol-at-cursor lookup returns
+  * the field.
   *
   * It is contributed by [[ZaoziSemanticDBPlugin.initialize]] ONLY to interactive presentation-compiler pipelines
   * (parser/typer/SetRootTree/cookComments): the rewrite mutates the typed tree, so in the batch pipeline it would be
   * pickled into published TASTy — batch compilations get the SemanticDB enhancer phase instead and this phase is never
-  * scheduled there. It keys strictly on the zaozi API (receiver derives from `me.jiuyang.zaozi.reftpe.Referable`, field
-  * owner from `me.jiuyang.zaozi.magic.DynamicSubfield`), so it is inert on foreign `scala.Dynamic` code, and every step
-  * is guarded so it can never fail an interactive request.
+  * scheduled there. It keys strictly on the zaozi API (receiver derives from `me.jiuyang.zaozi.reftpe.Referable` or
+  * `me.jiuyang.zaozi.reftpe.Interface`, whose bundle type argument is a `me.jiuyang.zaozi.magic.DynamicSubfield`), so
+  * it is inert on foreign `scala.Dynamic` code, and every step is guarded so it can never fail an interactive request.
   */
 class ZaoziPcNavPhase extends PluginPhase:
   import ZaoziPcNavPhase.*
@@ -98,12 +98,11 @@ class ZaoziPcNavPhase extends PluginPhase:
           case _ => super.transform(t)
       mapper.transform(call)
 
-  /** `(bundleType, fieldName)` of a zaozi dynamic field access, from the retained pre-inlining call. Two shapes are
-    * recognized:
-    *   - `qual.selectDynamic("field")` — the retained call for `io.field`; the bundle is the `T` of the `Referable[T]`
-    *     receiver (the primary path).
-    *   - `bundle.getRefViaFieldValName[..](..)("field")` (and the optional variant) — the macro-expanded accessor, if
-    *     it is ever the retained call; the bundle is the accessor's `DynamicSubfield` receiver (defensive).
+  /** `(bundleType, fieldName)` of a zaozi dynamic field access, from the retained pre-inlining call. Two selector
+    * shapes are recognized, both on a `Referable[T]` or `Interface[T]` receiver whose type argument `T` is the bundle:
+    *   - `qual.selectDynamic("field")` — the retained call for `io.field` (the primary path).
+    *   - `qual.subRef("field")` / `qual.subRefOption("field")` — the macro-expanded accessor, if it is ever the
+    *     retained call (defensive).
     *
     * `applyDynamic`/`applyDynamicNamed` (index/slice) are intentionally NOT matched, so `io.vec(i)`/`io.bits(hi, lo)`
     * stay as identity.
@@ -114,38 +113,22 @@ class ZaoziPcNavPhase extends PluginPhase:
     using Context
   ): Option[(Type, String)] =
     call match
-      case Apply(Select(qual, sel), List(Literal(Constant(field: String)))) if sel.toString == "selectDynamic" =>
-        bundleOfReferable(qual.tpe.widen).map(t => (t, field))
-      case app @ Apply(fun, _) if accessorName(fun).isDefined                                                  =>
-        for
-          field  <- literalArg(app)
-          recv   <- accessorReceiver(fun)
-          bundle <- bundleOfReceiver(recv)
-        yield (bundle, field)
-      case _                                                                                                   => None
+      case Apply(Select(qual, sel), List(Literal(Constant(field: String)))) if isFieldSelector(sel.toString) =>
+        bundleOf(qual.tpe.widen).map(t => (t, field))
+      case _                                                                                                 => None
 
-  /** `T` of a `Referable[T]` receiver, when `T <: DynamicSubfield`. */
-  private def bundleOfReferable(
+  private def isFieldSelector(name: String): Boolean =
+    name == "selectDynamic" || name == "subRef" || name == "subRefOption"
+
+  /** `T` of a `Referable[T]` or `Interface[T]` receiver, when `T <: DynamicSubfield`. */
+  private def bundleOf(
     tpe: Type
   )(
     using Context
   ): Option[Type] =
-    tpe.baseClasses.find(_.fullName.toString == ReferableName).flatMap { referable =>
-      tpe.baseType(referable).argInfos.headOption.filter(isDynamicSubfield)
-    }
-
-  /** Bundle type of a `getRefViaFieldValName` receiver: peel a leading `asInstanceOf[DynamicSubfield]` to recover the
-    * concrete pre-cast type.
-    */
-  private def bundleOfReceiver(
-    recv: Tree
-  )(
-    using Context
-  ): Option[Type] =
-    val tpe = recv match
-      case TypeApply(Select(inner, cast), _) if cast.toString == "asInstanceOf" => inner.tpe.widen
-      case _                                                                    => recv.tpe.widen
-    Option(tpe).filter(isDynamicSubfield)
+    def argOf(className: String) =
+      tpe.baseClasses.find(_.fullName.toString == className).flatMap(cls => tpe.baseType(cls).argInfos.headOption)
+    argOf(ReferableName).orElse(argOf(InterfaceName)).filter(isDynamicSubfield)
 
   private def isDynamicSubfield(
     tpe: Type
@@ -153,47 +136,6 @@ class ZaoziPcNavPhase extends PluginPhase:
     using Context
   ): Boolean =
     tpe.baseClasses.exists(_.fullName.toString == DynamicSubfieldName)
-
-  /** The bundle-field-accessor method name if `fun` selects one, else None. */
-  @tailrec
-  private def accessorName(
-    fun: Tree
-  )(
-    using Context
-  ): Option[String] =
-    fun match
-      case Select(_, name) if isAccessor(name.toString) => Some(name.toString)
-      case Apply(inner, _)                              => accessorName(inner)
-      case TypeApply(inner, _)                          => accessorName(inner)
-      case _                                            => None
-
-  @tailrec
-  private def accessorReceiver(
-    fun: Tree
-  )(
-    using Context
-  ): Option[Tree] =
-    fun match
-      case Select(recv, name) if isAccessor(name.toString) => Some(recv)
-      case Apply(inner, _)                                 => accessorReceiver(inner)
-      case TypeApply(inner, _)                             => accessorReceiver(inner)
-      case _                                               => None
-
-  private def isAccessor(name: String): Boolean =
-    name == "getRefViaFieldValName" || name == "getOptionRefViaFieldValName"
-
-  /** The first string-literal argument anywhere in a (possibly curried) apply. */
-  private def literalArg(
-    tree: Tree
-  )(
-    using Context
-  ): Option[String] =
-    def scan(t: Tree): Option[String] = t match
-      case Apply(fun, args)  =>
-        args.collectFirst { case Literal(Constant(s: String)) => s }.orElse(scan(fun))
-      case TypeApply(fun, _) => scan(fun)
-      case _                 => None
-    scan(tree)
 
   /** Resolve `field` to a real, non-synthetic term member of the bundle type. */
   private def resolveField(
@@ -214,4 +156,5 @@ object ZaoziPcNavPhase:
   val anchors: Set[String] = Set("typer", "SetRootTree")
 
   private val ReferableName       = "me.jiuyang.zaozi.reftpe.Referable"
+  private val InterfaceName       = "me.jiuyang.zaozi.reftpe.Interface"
   private val DynamicSubfieldName = "me.jiuyang.zaozi.magic.DynamicSubfield"

@@ -4,7 +4,7 @@ package me.jiuyang.zaozitest
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.reftpe.Interface
+import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 
@@ -248,8 +248,8 @@ object ConnectableSpec extends TestSuite:
           io.b.bits  := io.a.bits
       val p = ConnParameter(8)
       val cs = connects(Bi.firrtlString(p))
-      assert(cs.contains("connect io.b, io.a"))
-      assert(!cs.exists(_.startsWith("connect io.b.")))
+      assert(cs.contains("connect b, a"))
+      assert(!cs.exists(_.startsWith("connect b.")))
       assert(Bi.verilogString(p) == Manual.verilogString(p))
 
     test("halves emit exactly the selected passive subtrees"):
@@ -368,7 +368,7 @@ object ConnectableSpec extends TestSuite:
       @generator
       object Bad extends Generator[ConnParameter, ConnLayers, EmptyIO, ConnProbe] with HasFirrtlTest:
         def architecture(parameter: ConnParameter) =
-          val probe     = summon[Interface[ConnProbe]]
+          val probe     = summon[ProbeInterface[ConnProbe]]
           compileError("probe :<>= probe")
           val laundered = probe.asInstanceOf[me.jiuyang.zaozi.reftpe.Writable[Record]]
           laundered :<>= laundered
