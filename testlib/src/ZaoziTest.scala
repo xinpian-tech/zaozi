@@ -44,7 +44,6 @@ import org.llvm.mlir.scalalib.capi.ir.{
   OperationApi,
   Type
 }
-import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
 import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi, PassManager, PassManagerApi}
 import utest.assert
 
@@ -163,13 +162,11 @@ trait HasVerilogTest:
       summon[Circuit].appendToModule()
       self.module(parameter).appendToCircuit()
       validateCircuit()
-      val passResult   = summon[PassManager].runOnOp(summon[MlirModule].getOperation)
+      summon[PassManager].runOnOpOrThrow(
+        summon[MlirModule].getOperation,
+        s"firtool lowering pipeline for module '${self.moduleName(parameter)}'"
+      )
       summon[Context].destroy()
-      if passResult.failed then
-        throw new RuntimeException(
-          s"firtool lowering pipeline failed for module '${self.moduleName(parameter)}'; " +
-            "inspect the MLIR diagnostics emitted above for the cause."
-        )
 
       out.toString
     finally arena.close()

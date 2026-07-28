@@ -3,9 +3,18 @@
 package org.llvm.mlir.scalalib.capi.diagnostic
 
 import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{MlirDiagnosticError, MlirDiagnosticNote, MlirDiagnosticRemark, MlirDiagnosticWarning}
+import org.llvm.mlir.CAPI.{
+  mlirDiagnosticGetLocation,
+  mlirDiagnosticPrint,
+  MlirDiagnosticError,
+  MlirDiagnosticNote,
+  MlirDiagnosticRemark,
+  MlirDiagnosticWarning
+}
+import org.llvm.mlir.scalalib.capi.ir.Location
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.MemorySegment
+import java.lang.foreign.{Arena, MemorySegment}
 
 given DiagnosticHandlerApi with
   extension (diagnosticHandler: DiagnosticHandler) inline def segment: MemorySegment = diagnosticHandler._segment
@@ -29,4 +38,19 @@ given DiagnosticEnumApi with
       case DiagnosticSeverityEnum.Remark  => MlirDiagnosticRemark()
       case DiagnosticSeverityEnum.Warning => MlirDiagnosticWarning()
     inline def sizeOf:   Int = 4
+end given
+
+given DiagnosticApi with
+  extension (diagnostic: Diagnostic)
+    inline def getLocation(
+      using arena: Arena
+    ): Location = Location(mlirDiagnosticGetLocation(arena, diagnostic.segment))
+    inline def print(
+      callback:    String => Unit
+    )(
+      using arena: Arena
+    ): Unit =
+      mlirDiagnosticPrint(diagnostic.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
+    inline def segment: MemorySegment = diagnostic._segment
+    inline def sizeOf:  Int           = MlirDiagnostic.sizeof().toInt
 end given

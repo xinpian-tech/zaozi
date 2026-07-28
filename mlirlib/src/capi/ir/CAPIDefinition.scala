@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
+import org.llvm.mlir.scalalib.capi.diagnostic.Diagnostic
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 import java.lang.foreign.{Arena, MemorySegment}
@@ -34,6 +35,12 @@ trait ContextApi extends HasSegment[Context] with HasSizeOf[Context]:
     inline def enableMultithreading(enable:     Boolean):         Unit
     inline def loadAllAvailableDialects():                        Unit
     inline def setThreadPool(threadPool:        LlvmThreadPool):  Unit
+    def attachDiagnosticHandler(
+      handler:     Diagnostic => Boolean
+    )(
+      using arena: Arena
+    ):                                                            Long
+    inline def detachDiagnosticHandler(id:      Long):            Unit
 end ContextApi
 
 class Dialect(val _segment: MemorySegment)
