@@ -7,22 +7,21 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
     circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
     flake-utils.url = "github:numtide/flake-utils";
-    mill-ivy-fetcher.url = "github:Avimitin/mill-ivy-fetcher";
+    mvn-trace-forge.url = "github:Avimitin/mvn-trace-forge";
     scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
   };
 
   outputs =
-    inputs@{
-      self,
-      nixpkgs,
-      flake-utils,
-      mill-ivy-fetcher,
-      circt-nix,
-      scala3-bsp-semantic-ls,
-      ...
+    inputs@{ self
+    , nixpkgs
+    , flake-utils
+    , mvn-trace-forge
+    , circt-nix
+    , scala3-bsp-semantic-ls
+    , ...
     }:
     let
-      overlay = import ./nix/overlay.nix;
+      overlay = import ./nix/overlay.nix inputs;
       local-overlay = import ./nix/local-overlay.nix;
     in
     {
@@ -36,10 +35,9 @@
         pkgs = import nixpkgs {
           overlays = [
             circt-nix.overlays.default
-            mill-ivy-fetcher.overlays.mill-overlay
+            mvn-trace-forge.overlays.default
             overlay
             local-overlay
-            mill-ivy-fetcher.overlays.default
           ];
           inherit system;
         };
@@ -73,7 +71,7 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
+          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
           ];
           env = with pkgs; {
