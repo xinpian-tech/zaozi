@@ -5,16 +5,19 @@ package org.llvm.mlir.scalalib.capi.ir
 import org.llvm.mlir.*
 import org.llvm.mlir.CAPI.{
   mlirContextAppendDialectRegistry,
+  mlirContextAttachDiagnosticHandler,
   mlirContextCreate,
   mlirContextCreateWithRegistry,
   mlirContextCreateWithThreading,
   mlirContextDestroy,
+  mlirContextDetachDiagnosticHandler,
   mlirContextEnableMultithreading,
   mlirContextGetOrLoadDialect,
   mlirContextLoadAllAvailableDialects,
   mlirContextSetAllowUnregisteredDialects,
   mlirContextSetThreadPool
 }
+import org.llvm.mlir.scalalib.capi.diagnostic.Diagnostic
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 import java.lang.foreign.{Arena, MemorySegment}
@@ -57,6 +60,31 @@ given ContextApi with
       mlirContextLoadAllAvailableDialects(context.segment)
     inline def setThreadPool(threadPool: LlvmThreadPool):        Unit =
       mlirContextSetThreadPool(context.segment, threadPool.segment)
+
+    def attachDiagnosticHandler(
+      handler:     Diagnostic => Boolean
+    )(
+      using arena: Arena
+    ): Long =
+      // MLIR handler protocol: a success result consumes the diagnostic, failure propagates it.
+      val consumed  = MlirLogicalResult.allocate(arena)
+      MlirLogicalResult.value(consumed, 1.toByte)
+      val propagate = MlirLogicalResult.allocate(arena)
+      val stub      = MlirDiagnosticHandler.allocate(
+        // A Throwable crossing this native upcall boundary aborts the JVM.
+        (diagnosticSegment: MemorySegment, _userData: MemorySegment) =>
+          try if handler(Diagnostic(diagnosticSegment)) then consumed else propagate
+          catch
+            case t: Throwable =>
+              System.err.println(s"diagnostic handler threw ${t.getClass.getName}: ${t.getMessage}")
+              propagate
+        ,
+        arena
+      )
+      mlirContextAttachDiagnosticHandler(context.segment, stub, MemorySegment.NULL, MemorySegment.NULL)
+
+    inline def detachDiagnosticHandler(id: Long): Unit =
+      mlirContextDetachDiagnosticHandler(context.segment, id)
 
     inline def segment: MemorySegment = context._segment
     inline def sizeOf:  Int           = MlirContext.sizeof().toInt
