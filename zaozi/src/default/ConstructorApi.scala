@@ -39,6 +39,10 @@ import java.lang.foreign.Arena
 // When Import the default, all method in ConstructorApi should be exported
 export given_ConstructorApi.*
 
+/** Implements `ConstructorApi`; see that trait in `me.jiuyang.zaozi.Api` for each constructor's semantics. Also defines
+  * `BigInt#B(width: Int)`, a width-explicit `Bits` literal, beyond what the abstract trait declares (still usable once
+  * this `given` is imported).
+  */
 given ConstructorApi with
   def Clock(): Clock = new Object with Clock
   def Reset(): Reset = new Object with Reset

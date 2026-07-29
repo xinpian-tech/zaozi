@@ -22,6 +22,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
+/** Implements `BoolApi`; see that trait and `me.jiuyang.zaozi.Mux` in `me.jiuyang.zaozi.Api` for the `?` mux operator's
+  * semantics.
+  */
 given BoolApi with
   extension [LHS <: Referable[Bool]](ref: LHS)
     def unary_!(

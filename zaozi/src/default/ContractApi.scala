@@ -37,6 +37,10 @@ private val contractScopes = ArrayDeque.empty[ArrayBuffer[ContractClause]]
 
 export given_ContractApi.{Contract, Ensure, Require}
 
+/** Implements `ContractApi` by lowering to CIRCT's `firrtl.contract` op wrapping `verif.assert`/`verif.assume`/
+  * `verif.require`/`verif.ensure`; see `me.jiuyang.zaozi.ContractApi` in `me.jiuyang.zaozi.Api` for what that means in
+  * practice, including what's (not) actually checked by this repository's own build.
+  */
 given ContractApi with
   private def operationIsNull(op: Operation): Boolean = MlirOperation.ptr(op.segment).address == 0
   // Lower all public Contract overloads through a flat Seq, while preserving the

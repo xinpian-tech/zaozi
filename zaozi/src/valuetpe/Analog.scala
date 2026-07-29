@@ -7,6 +7,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
+/** A bidirectional analog wire of [[width]] bits (FIRRTL's `!firrtl.analog<width>`), used for things like tristate
+  * buses. Unlike other [[Element]]s it does not extend [[CanProbe]].
+  */
 trait Analog extends Element:
   private[zaozi] val _width: Int
 

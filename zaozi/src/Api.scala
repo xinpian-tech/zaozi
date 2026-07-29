@@ -52,7 +52,16 @@ extension (layers: Seq[LayerTree])
   def nameHierarchies:                           Seq[Seq[String]] =
     layers.flatMap(_._dfs).filter(_.children.isEmpty).map(_.nameHierarchy)
 
-abstract class Parameter                                    extends Product
+/** Base type for a [[Generator]]'s parameters: the compile-time (Scala-level) configuration of a module, e.g. bit
+  * widths and feature flags. Must be a `case class` for structural equality (used to dedupe elaborated module
+  * instances) and needs an `upickle.default.ReadWriter` given instance for CLI parsing.
+  */
+abstract class Parameter extends Product
+
+/** Base type for a [[Generator]]'s optional debug/verification layers (FIRRTL layers): a `Seq[Layer]` naming the layer
+  * tree that field probes ([[me.jiuyang.zaozi.valuetpe.RProbe]]/[[me.jiuyang.zaozi.valuetpe.RWProbe]]) in its
+  * [[DVInterface]] can be colored with. `layers = Seq.empty` if the module has no debug layers.
+  */
 abstract class LayerInterface[P <: Parameter](parameter: P) extends Seq[LayerTree]:
   def layers: Seq[Layer]
 
@@ -60,23 +69,52 @@ abstract class LayerInterface[P <: Parameter](parameter: P) extends Seq[LayerTre
   final override def iterator        = layers.toLayerTrees.iterator
   final override def length          = layers.toLayerTrees.length
 
-trait HWInterface[P <: Parameter](parameter: P)       extends Aggregate:
+/** Base type for a [[Generator]]'s hardware IO: the ports visible on the emitted module. Implemented as either
+  * [[HWBundle]] (statically-shaped) or [[HWRecord]] (dynamically-shaped).
+  */
+trait HWInterface[P <: Parameter](parameter: P) extends Aggregate:
   this: Bundle | Record =>
+
+/** A [[Generator]]'s IO declared as a [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]] -- fields are `val`s, as in
+  * `me.jiuyang.hello.HelloWorldIO` / `me.jiuyang.varadder.VarAdderIO`.
+  */
 abstract class HWBundle[P <: Parameter](parameter: P) extends HWInterface(parameter) with Bundle
+
+/** A [[Generator]]'s IO declared as a [[me.jiuyang.zaozi.valuetpe.Record Record]] -- fields are named dynamically, for
+  * ports whose shape isn't known until `parameter` is inspected.
+  */
 abstract class HWRecord[P <: Parameter](parameter: P) extends HWInterface(parameter) with Record
 
+/** Base type for a [[Generator]]'s debug/verification interface: the probe fields exposed alongside the ordinary IO,
+  * colored by the module's [[LayerInterface]]. Implemented as either [[DVBundle]] (statically shaped) or [[DVRecord]]
+  * (dynamically shaped); see [[me.jiuyang.zaozi.valuetpe.ProbeBundle]]/ [[me.jiuyang.zaozi.valuetpe.ProbeRecord]] for
+  * the field-declaration API.
+  */
 trait DVInterface[P <: Parameter, L <: LayerInterface[P]](parameter: P) extends Aggregate:
   this: ProbeBundle | ProbeRecord =>
   private var _layersOpt:              Option[L]         = None
   transparent inline def summonLayers: LayerInterface[?] = ${ summonLayersImpl }
   transparent inline def layers:       L                 = _layersOpt.getOrElse:
     summonLayers.asInstanceOf[L].tap(l => _layersOpt = Some(l))
+
+/** A [[Generator]]'s debug interface declared as a [[me.jiuyang.zaozi.valuetpe.ProbeBundle ProbeBundle]] -- probe
+  * fields are `val`s, as in `me.jiuyang.varadder.VarAdderProbe`. Modules with no probes still declare one, typically
+  * empty.
+  */
 abstract class DVBundle[P <: Parameter, L <: LayerInterface[P]](parameter: P)
     extends DVInterface[P, L](parameter)
     with ProbeBundle
+
+/** A [[Generator]]'s debug interface declared as a [[me.jiuyang.zaozi.valuetpe.ProbeRecord ProbeRecord]] -- probe
+  * fields are named dynamically.
+  */
 abstract class DVRecord[P <: Parameter, L <: LayerInterface[P]](parameter: P)
     extends DVInterface[P, L](parameter)
     with ProbeRecord
+
+/** Per-elaboration mutable state threaded implicitly through architecture construction; currently just the counter used
+  * to name otherwise-unnamed signals uniquely.
+  */
 class InstanceContext:
   class AnonSignalCounter(private var _count: Int):
     def count = _count
@@ -87,6 +125,10 @@ class InstanceContext:
 
   val anonSignalCounter = new AnonSignalCounter(0)
 
+/** The implicit clock a `Reg`/`RegInit` is built under (see `me.jiuyang.zaozi.default.ConstructorApi`), given via
+  * `using ClockScope`. Construct one with [[ClockScope.posedge]]/[[ClockScope.negedge]] and bring it into scope with
+  * `given ClockScope = ...` (see `me.jiuyang.subleq.Subleq`).
+  */
 final case class ClockScope private[zaozi] (
   clock: Ref[Clock],
   clockEdge: FirrtlEventControl = FirrtlEventControl.AtPosEdge):
@@ -99,6 +141,12 @@ object ClockScope:
   def negedge(clock: Ref[Clock]): ClockScope = ClockScope(clock, FirrtlEventControl.AtNegEdge)
 end ClockScope
 
+/** The implicit reset (and its type/polarity) a `RegInit` is built under (see
+  * `me.jiuyang.zaozi.default.ConstructorApi`), given via `using ResetScope`. Construct one with one of
+  * [[ResetScope.syncActiveHigh]], [[ResetScope.syncActiveLow]], [[ResetScope.asyncActiveHigh]],
+  * [[ResetScope.asyncActiveLow]], and bring it into scope with `given ResetScope = ...` (see
+  * `me.jiuyang.subleq.Subleq`).
+  */
 final case class ResetScope private[zaozi] (
   reset:     Ref[Reset],
   resetType: RegResetType,
@@ -121,6 +169,12 @@ object ResetScope:
     ResetScope(reset, RegResetType.AsyncReset, RegResetPolarity.NegReset)
 end ResetScope
 
+/** A hardware module generator, parameterized over [[Parameter]] (`PARAM`), [[LayerInterface]] (`L`), [[HWInterface]]
+  * (`I`), and [[DVInterface]] (`P`). Concrete generators are `object`s annotated `@generator` (see
+  * `me.jiuyang.hello.HelloWorld`, `me.jiuyang.subleq.Subleq`, `me.jiuyang.varadder.VarAdder`), which fills in
+  * [[layers]], [[interface]], [[probe]], [[parseParameter]], and [[main]] by macro -- an author only writes
+  * [[architecture]] (the module body) and, optionally, overrides [[moduleName]].
+  */
 trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]]:
   /* For traits with self-type annotation that don't want type parameters
      e.g
@@ -133,9 +187,16 @@ trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface
   type TINTF  = I
   type TPROBE = P
 
+  /** The emitted FIRRTL/Verilog module's name; defaults to the generator's class name plus a hash of `parameter`, so
+    * distinct parameterizations never collide. Override for a stable, human-chosen name (see
+    * `me.jiuyang.stdlib.BrentKungAdder`).
+    */
   def moduleName(parameter: PARAM): String =
     s"${this.getClass.getSimpleName.stripSuffix("$")}_${parameter.hashCode.toHexString}"
 
+  /** The module body: given the elaborated `Interface[I]` (IO) and `Interface[P]` (probes) implicitly in scope, wire up
+    * the design. This is the one method every generator author implements by hand.
+    */
   def architecture(parameter: PARAM): (
     Arena,
     Context,
@@ -153,12 +214,21 @@ trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface
   def interface(parameter: PARAM): I
   def probe(parameter:     PARAM): P
 
+  /** Parses `parameter` from command-line args; generated from `PARAM`'s fields by the `@generator` macro. */
   def parseParameter(args: Seq[String]): PARAM
 
+  /** CLI entry point generated by the `@generator` macro: parses `args` into a `PARAM` and dumps the module. */
   def main(args: Array[String]): Unit
 
+/** Base type for the (Verilog-side) parameters of a [[VerilogWrapper]], analogous to [[Parameter]] but for the
+  * black-boxed external module a `VerilogWrapper` describes.
+  */
 abstract class VerilogParameter extends Product
 
+/** Describes an externally-provided Verilog module (an `extmodule`) so it can be instantiated from a [[Generator]]'s
+  * architecture like any other module, without Zaozi generating its body. See
+  * `me.jiuyang.zaozi.default.VerilogWrapperApi` for the `extmodule`/`instance`/`instantiate` builders.
+  */
 trait VerilogWrapper[
   PARAM <: Parameter,
   L <: LayerInterface[PARAM],
@@ -214,6 +284,11 @@ trait GeneratorApi:
       InstanceContext
     ): Instance[I, P]
 
+    /** Elaborates (once per distinct `parameter`, memoized) and instantiates `generator` as a sub-module of the
+      * enclosing architecture, e.g. `Subtractor.instantiate(SubtractorParameter(width))`. Returns an
+      * [[me.jiuyang.zaozi.reftpe.Instance Instance]] whose `.io`/`.probe` are the sub-module's ports/probes, wired with
+      * `:=`/`<==` like any other `Referable`.
+      */
     def instantiate(
       parameter: PARAM
     )(
@@ -226,6 +301,9 @@ trait GeneratorApi:
       InstanceContext
     ): Instance[I, P]
 
+    /** Elaborates `generator` at `parameter` and writes the resulting MLIR bytecode to disk, without emitting
+      * FIRRTL/Verilog.
+      */
     def dumpMlirbc(
       parameter: PARAM
     )(
@@ -233,6 +311,9 @@ trait GeneratorApi:
       Context
     ): Unit
 
+    /** Implementation of [[Generator.main]], generated by the `@generator` macro: parses `args` into a `PARAM` and
+      * dumps the elaborated module.
+      */
     def mainImpl(
       args: Array[String]
     )(
@@ -260,6 +341,9 @@ trait VerilogWrapperApi:
       InstanceContext
     ): Instance[I, P]
 
+    /** Instantiates the external module `wrapper` describes as a sub-module of the enclosing architecture, the
+      * [[VerilogWrapper]] counterpart to `Generator#instantiate`.
+      */
     def instantiate(
       parameter: PARAM
     )(
@@ -272,6 +356,10 @@ trait VerilogWrapperApi:
       InstanceContext
     ): Instance[I, P]
 
+/** Constructors for hardware types, values, and control-flow -- the vocabulary an architecture body is written in.
+  * Implemented by `me.jiuyang.zaozi.default.ConstructorApi` and typically brought into scope wholesale via
+  * `import me.jiuyang.zaozi.default.{*, given}`.
+  */
 trait ConstructorApi:
   def Clock(): Clock
 
@@ -287,6 +375,11 @@ trait ConstructorApi:
 
   def Vec[T <: Data](size: Int, tpe: T): Vec[T]
 
+  /** Structural `if`: connects to a sink conditionally on `cond`, evaluated combinationally (unlike Scala's `if`, both
+    * `when` and [[otherwise]] participate in hardware, not just one taken branch). For a value-level (expression)
+    * conditional, see `Bool#?` instead. Pair with [[otherwise]] for the else branch; an omitted `otherwise` leaves the
+    * sink unassigned along that path.
+    */
   def when[COND <: Referable[Bool]](
     cond: COND
   )(body: (Arena, Context, Block) ?=> Unit
@@ -299,6 +392,7 @@ trait ConstructorApi:
   ): When
 
   extension (when: When)
+    /** The `else` branch of a [[when]]. */
     def otherwise(
       body: (Arena, Context, Block) ?=> Unit
     )(
@@ -310,6 +404,10 @@ trait ConstructorApi:
 
   extension (layers: Seq[LayerTree]) def apply(name: String): LayerTree
 
+  /** Declares a debug/verification layer named `layerName` (nested under any enclosing `layer` in scope) and runs
+    * `body` under it -- probe fields defined inside are colored with this layer and only observable when it's enabled
+    * at Verilog emission time.
+    */
   def layer(
     layerName: String
   )(body:      (
@@ -330,6 +428,9 @@ trait ConstructorApi:
     sourcecode.Line
   ): Unit
 
+  /** Declares a combinational signal of type `T`: undriven until assigned with `:=`/`:<=`/etc., and readable anywhere
+    * afterward in the same architecture.
+    */
   def Wire[T <: Data](
     refType: T
   )(
@@ -340,7 +441,12 @@ trait ConstructorApi:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ):   Wire[T]
+  ): Wire[T]
+
+  /** Declares a clocked register of type `T`, initialized to an undefined value (holds whatever value it's assigned on
+    * the first clock edge it's written). Requires a [[ClockScope]] in scope; for a reset value, use [[RegInit]]
+    * instead.
+    */
   def Reg[T <: Data](
     refType: T
   )(
@@ -353,7 +459,12 @@ trait ConstructorApi:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ):   Reg[T]
+  ): Reg[T]
+
+  /** Declares a clocked register initialized to the literal `input` on reset. Requires both a [[ClockScope]] and a
+    * [[ResetScope]] in scope; `input` must be a `Const` (a literal, e.g. `0.U(8)`), not an arbitrary wire -- see
+    * `me.jiuyang.zaozi.reftpe.Const`.
+    */
   def RegInit[T <: Data](
     input: Const[T]
   )(
@@ -368,7 +479,11 @@ trait ConstructorApi:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ):   Reg[T]
+  ): Reg[T]
+
+  /** Gives `ref` an explicit, named intermediate value in the emitted FIRRTL/Verilog (a `node`), useful for naming an
+    * otherwise-anonymous expression for readability or waveform debugging.
+    */
   def Node[T <: Data](
     ref: Referable[T]
   )(
@@ -381,6 +496,7 @@ trait ConstructorApi:
     InstanceContext
   ):   Node[T]
   extension (bigInt: BigInt)
+    /** A `width`-bit unsigned literal. */
     def U(
       width: Int
     )(
@@ -390,16 +506,22 @@ trait ConstructorApi:
       sourcecode.File,
       sourcecode.Line
     ): Const[UInt]
+
+    /** An unsigned literal at its natural (minimal) width, i.e. `bitLength`. */
     def U(
       using Arena,
       Context,
       Block
     ): Const[UInt]
+
+    /** A `Bits` literal at its natural (minimal) width. */
     def B(
       using Arena,
       Context,
       Block
     ): Const[Bits]
+
+    /** A `width`-bit signed (two's-complement) literal. */
     def S(
       width: Int
     )(
@@ -409,12 +531,15 @@ trait ConstructorApi:
       sourcecode.File,
       sourcecode.Line
     ): Const[SInt]
+
+    /** A signed literal at its natural width, including the sign bit. */
     def S(
       using Arena,
       Context,
       Block
     ): Const[SInt]
   extension (bool:   Boolean)
+    /** A 1-bit `Bool` literal. */
     def B(
       using Arena,
       Context,
@@ -469,6 +594,9 @@ trait AsUInt[D <: Data]:
       InstanceContext
     ): Propagated[R, UInt]
 
+/** Bitcasts to a [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]] shape: reinterprets the same underlying bits as `tpe`'s
+  * fields, with no runtime cost.
+  */
 trait AsBundle[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asBundle[T <: Bundle](
@@ -483,6 +611,9 @@ trait AsBundle[D <: Data]:
       InstanceContext
     ): Propagated[R, T]
 
+/** Bitcasts to a [[me.jiuyang.zaozi.valuetpe.Record Record]] shape: reinterprets the same underlying bits as `tpe`'s
+  * named fields.
+  */
 trait AsRecord[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asRecord[T <: Record](
@@ -497,6 +628,9 @@ trait AsRecord[D <: Data]:
       InstanceContext
     ): Propagated[R, T]
 
+/** Bitcasts to a [[me.jiuyang.zaozi.valuetpe.Vec Vec]] of `tpe` elements: the source width must divide evenly by
+  * `tpe`'s width, producing `srcWidth / tpe.width` elements.
+  */
 trait AsVec[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asVec[E <: Data](
@@ -517,9 +651,20 @@ trait AsVec[D <: Data]:
 trait AsRecordView[D <: Bundle]:
   extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, Record]
 
+/** The [[me.jiuyang.zaozi.valuetpe.ProbeBundle ProbeBundle]]/[[me.jiuyang.zaozi.valuetpe.ProbeRecord ProbeRecord]]
+  * counterpart to [[AsRecordView]].
+  */
 trait AsProbeRecordView[D <: ProbeBundle]:
   extension [R <: Referable[D] & HasOperation](ref: R) def asRecord: Propagated[R, ProbeRecord]
 
+/** Connects probe reference fields ([[me.jiuyang.zaozi.valuetpe.RProbe RProbe]]/
+  * [[me.jiuyang.zaozi.valuetpe.RWProbe RWProbe]]), via `<==`, three ways: define a probe from the data it observes
+  * (`probeField <== dataValue`), alias one probe field to another (`probeField <== otherProbeField`), or, on the
+  * reading side, resolve a probe back into an ordinary value (`dataValue <== probeField`). Ordinary `:=`/`:<=`/etc.
+  * deliberately reject probe types (see the "probe types do not participate in bulk connects" error in
+  * `me.jiuyang.zaozi.default.Connect`) -- `<==` is the only way to connect them, and it requires an enclosing
+  * [[ConstructorApi.layer]] for the color check.
+  */
 trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]:
   extension (ref: PROBE)
     @targetName("send")
@@ -559,6 +704,9 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
       sourcecode.Line
     ): Unit
 
+/** Marks `ref` as intentionally undriven (FIRRTL's invalid value), e.g. `io.sum.dontCare()` before conditionally
+  * assigning it -- the counterpart to Chisel's `:= DontCare`.
+  */
 trait DontCare[D <: Data, SINK <: Writable[D]]:
   extension (ref: SINK)
     def dontCare(
@@ -570,10 +718,22 @@ trait DontCare[D <: Data, SINK <: Writable[D]]:
       sourcecode.Line
     ): Unit
 
+/** Thrown when a [[Connect]] operator's sink/source shapes don't line up (mismatched field names, widths, orientations,
+  * or `Vec` lengths); the message lists every mismatch found, not just the first.
+  */
 final class ConnectException(message: String) extends Exception(message)
 
+/** The connect operators, mirroring Chisel's "new" (`:=`, `:<>=`, `:<=`, `:>=`) connection operators. All but `:=`
+  * recurse structurally through `Vec`/`Bundle`/`Record`, matching sink and source fields by name and validating
+  * widths/orientations before emitting anything (a mismatch throws [[ConnectException]] listing every error found, not
+  * just the first).
+  */
 trait Connect[A <: Connectable]:
   extension [SINK <: Writable[A]](sink:  SINK)
+    /** Plain mono-directional connect, sink `<-` source. Only defined for scalar
+      * ([[me.jiuyang.zaozi.valuetpe.Element]]) types -- no structural recursion, so it's the one operator usable inside
+      * `when`/`otherwise` branches where the sink's shape must already be known to be a leaf.
+      */
     def :=[SRC <: Referable[A]](
       src: SRC
     )(
@@ -584,6 +744,10 @@ trait Connect[A <: Connectable]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
+
+    /** Bidirectional bulk connect: aligned fields flow sink `<-` source, flipped fields flow sink `->` source,
+      * recursively -- the usual way to wire a sub-module's IO or a nested bundle both ways at once.
+      */
     def :<>=[SRC <: Writable[A]](
       src: SRC
     )(
@@ -594,6 +758,8 @@ trait Connect[A <: Connectable]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
+
+    /** Half of [[:<>=]]: connects only the aligned (non-flipped) leaves, sink `<-` source. */
     def :<=[SRC <: Referable[A]](
       src: SRC
     )(
@@ -605,6 +771,7 @@ trait Connect[A <: Connectable]:
       sourcecode.Line
     ): Unit
   extension [SINK <: Referable[A]](sink: SINK)
+    /** Half of [[:<>=]]: connects only the flipped leaves, sink `->` source. */
     def :>=[SRC <: Writable[A]](
       src: SRC
     )(
@@ -615,6 +782,8 @@ trait Connect[A <: Connectable]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
+
+/** Zero-extending conversion capability (no `given` instance is currently registered for any `D`). */
 trait Cvt[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def zext(
@@ -863,6 +1032,10 @@ trait Xor[D <: Data, RET <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[RET]
+
+/** Bit concatenation: `a ## b` places `a` at the high (MSB) end and `b` at the low (LSB) end, with combined width
+  * `a.width + b.width`.
+  */
 trait Cat[D <: Data]:
   extension [LHS <: Referable[D]](ref: LHS)
     def ##[RHS <: Referable[D]](
@@ -877,6 +1050,10 @@ trait Cat[D <: Data]:
       InstanceContext
     ): Node[D]
 
+/** Left shift, either by a compile-time-constant `Int` (static shift, grows the width by the shift amount -- no bits
+  * are lost) or by a `Referable[UInt]` (dynamic/barrel shift, width grows to accommodate the maximum possible shift).
+  * Unlike [[Shr]]'s `Int` case, the static case here does not pad back to the original width.
+  */
 trait Shl[D <: Data, OUT <: Data]:
   extension [R <: Referable[D]](ref: R)
     def <<(
@@ -890,6 +1067,11 @@ trait Shl[D <: Data, OUT <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[OUT]
+
+/** Right shift, either by a compile-time-constant `Int` (static shift; the result is padded back to the original width,
+  * unlike [[Shl]]'s static case which grows) or by a `Referable[UInt]` (dynamic/barrel shift, width unchanged). Sign-
+  * or zero-extends new high bits per `D` (arithmetic for `SInt`, logical otherwise).
+  */
 trait Shr[D <: Data, OUT <: Data]:
   extension [R <: Referable[D]](ref: R)
     def >>(
@@ -903,6 +1085,8 @@ trait Shr[D <: Data, OUT <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[D]
+
+/** Keeps the top (MSB-most) `that` bits, discarding the rest. */
 trait Head[D <: Data, OUT <: Data]:
   extension [R <: Referable[D]](ref: R)
     def head(
@@ -916,6 +1100,11 @@ trait Head[D <: Data, OUT <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[OUT]
+
+/** Drops the top (MSB-most) `that` bits, keeping the rest -- note this does NOT resize to `that` bits, it removes
+  * `that` bits from the current width (a common source of off-by-width bugs; see the regression guard in
+  * `me.jiuyang.subleqtest.SubleqStructuralSpec`).
+  */
 trait Tail[D <: Data, OUT <: Data]:
   extension [R <: Referable[D]](ref: R)
     def tail(
@@ -929,6 +1118,9 @@ trait Tail[D <: Data, OUT <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[OUT]
+
+/** Extends to `that` bits (a no-op if already `>= that` bits), sign-extending for `SInt` and zero-extending otherwise.
+  */
 trait Pad[D <: Data, OUT <: Data]:
   extension [R <: Referable[D]](ref: R)
     def pad(
@@ -942,6 +1134,10 @@ trait Pad[D <: Data, OUT <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[OUT]
+
+/** Slices out bits `[hi:lo]`, inclusive on both ends and 0-indexed from the LSB (so `bits(width - 1, 0)` is the whole
+  * value). Requires `hi >= lo`.
+  */
 trait ExtractRange[D <: Data, E <: Data]:
   extension [R <: Referable[D]](ref: R)
     def bits(
@@ -956,6 +1152,8 @@ trait ExtractRange[D <: Data, E <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[E]
+
+/** Slices out a single bit at `idx` (0-indexed from the LSB) as an `E` (e.g. `Bool` for `Bits#bit`). */
 trait ExtractElement[D <: Data, E <: Data]:
   extension [R <: Referable[D]](ref: R)
     def bit(
@@ -969,6 +1167,11 @@ trait ExtractElement[D <: Data, E <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[E]
+
+/** Value-level (expression) conditional: `cond ? (thenValue, elseValue)`, evaluated combinationally (both branches are
+  * elaborated regardless of `cond`, unlike a Scala `if`). This is Zaozi's `Mux`; for a structural (statement-level)
+  * conditional, see [[ConstructorApi.when]] instead.
+  */
 trait Mux[Cond <: Data]:
   extension [CondR <: Referable[Cond]](ref: CondR)
     def ?[Ret <: Data](
@@ -983,6 +1186,11 @@ trait Mux[Cond <: Data]:
       sourcecode.Name.Machine,
       InstanceContext
     ): Node[Ret]
+
+/** Indexes into a [[me.jiuyang.zaozi.valuetpe.Vec Vec]]-like `D`, either statically (`Int`, a fixed `SubindexOp`) or
+  * dynamically (`Referable[UInt]`, a `SubaccessOp` selected at runtime). `apply` is the usual spelling, e.g. `vec(3)`
+  * or `vec(io.sel)`.
+  */
 trait RefElement[D <: Data, E <: Data]:
   extension [R <: Referable[D]](ref: R)
     def ref(
@@ -1003,6 +1211,10 @@ trait GetLength[E <: Data, V <: Vec[E]]:
       Context
     ): Int
 
+/** The full extension-method surface of [[me.jiuyang.zaozi.valuetpe.Bits Bits]]: casts, bitwise ops, structural ops
+  * (concat/slice/shift), but no arithmetic (`+`, `-`, ... -- cast to [[me.jiuyang.zaozi.valuetpe.UInt UInt]]/
+  * [[me.jiuyang.zaozi.valuetpe.SInt SInt]] first). Implemented by `me.jiuyang.zaozi.default.BitsApi`.
+  */
 trait BitsApi
     extends AsSInt[Bits]
     with AsUInt[Bits]
@@ -1028,6 +1240,9 @@ trait BitsApi
     with ExtractElement[Bits, Bool]
     with ExtractRange[Bits, Bits]
 
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Bool Bool]]: logical ops, equality, and the [[Mux]] `?`
+  * operator. Implemented by `me.jiuyang.zaozi.default.BoolApi`.
+  */
 trait BoolApi
     extends AsBits[Bool]
     with Neg[Bool, Bool]
@@ -1037,6 +1252,10 @@ trait BoolApi
     with Or[Bool, Bool]
     with Xor[Bool, Bool]
     with Mux[Bool]
+
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.UInt UInt]]: arithmetic, comparison, and static/dynamic
+  * shifts. Implemented by `me.jiuyang.zaozi.default.UIntApi`.
+  */
 trait UIntApi
     extends AsBits[UInt]
     with Add[UInt, UInt]
@@ -1052,6 +1271,10 @@ trait UIntApi
     with Neq[UInt, Bool]
     with Shl[UInt, UInt]
     with Shr[UInt, UInt]
+
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.SInt SInt]]: signed arithmetic, comparison, and
+  * static/dynamic shifts. Implemented by `me.jiuyang.zaozi.default.SIntApi`.
+  */
 trait SIntApi
     extends AsBits[SInt]
     with Add[SInt, SInt]
@@ -1067,20 +1290,42 @@ trait SIntApi
     with Shl[SInt, SInt]
     with Shr[SInt, SInt]
 
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Bundle Bundle]]/
+  * [[me.jiuyang.zaozi.valuetpe.ProbeBundle]]: just `asBits`. Implemented by `me.jiuyang.zaozi.default.BundleApi`.
+  */
 trait BundleApi[T <: Bundle | ProbeBundle] extends AsBits[T]
 
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Record Record]]/
+  * [[me.jiuyang.zaozi.valuetpe.ProbeRecord]]: just `asBits`. Implemented by `me.jiuyang.zaozi.default.RecordApi`.
+  */
 trait RecordApi[T <: Record | ProbeRecord] extends AsBits[T]
 
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Vec Vec]]: `asBits`, indexing ([[RefElement]]), and
+  * [[GetLength]]. Implemented by `me.jiuyang.zaozi.default.VecApi`.
+  */
 trait VecApi[E <: Data, V <: Vec[E]] extends AsBits[V] with RefElement[V, E] with GetLength[E, V]
 
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Clock Clock]] -- currently empty; clocks are only used
+  * positionally (as the argument to [[ClockScope.posedge]]/[[ClockScope.negedge]]).
+  */
 trait ClockApi
 
+/** The extension-method surface of [[me.jiuyang.zaozi.valuetpe.Reset Reset]]: just `asBool`. Implemented by
+  * `me.jiuyang.zaozi.default.ResetApi`.
+  */
 trait ResetApi extends AsBool[Reset]
 
+/** Maps a tuple of `Referable[t]` argument types to the corresponding tuple of `Referable[t] & HasOperation` results
+  * the tupled [[ContractApi.Contract]] overload hands to its body -- internal plumbing for that overload's
+  * variadic-tuple ergonomics, not something called directly.
+  */
 type ContractTuple[A <: Tuple] <: Tuple = A match
   case EmptyTuple           => EmptyTuple
   case Referable[t] *: tail => (Referable[t] & HasOperation) *: ContractTuple[tail]
 
+/** Evidence needed to convert a heterogeneous tuple of `Referable`s to/from a `Seq`, so the tupled
+  * [[ContractApi.Contract]] overload can accept any arity. Not called directly.
+  */
 trait ContractTupleArgs[A <: Tuple]:
   def values(args:    A):                                        Seq[Referable[? <: Data] & HasOperation]
   def results(values: Seq[Referable[? <: Data] & HasOperation]): ContractTuple[A]
@@ -1100,7 +1345,16 @@ object ContractTupleArgs:
     def results(values: Seq[Referable[? <: Data] & HasOperation]): ContractTuple[H *: Tail] =
       (values.head *: tailArgs.results(values.tail)).asInstanceOf[ContractTuple[H *: Tail]]
 
+/** Formal contracts (CIRCT's `verif.contract`): a boundary that states a behavioral property of one or more values --
+  * via [[Require]] (an assumption the caller must uphold) and [[Ensure]] (a property the contract asserts about its
+  * result) -- separately from the implementation that produces them. Used in `me.jiuyang.stdlib.PrefixAdderCommon` to
+  * state "this prefix-tree network computes `A + B + CI`" independent of the tree shape, and in
+  * `me.jiuyang.zaozitest.ContractSpec` for minimal examples.
+  */
 trait ContractApi:
+  /** The no-argument form: states properties about values already in scope, e.g. `Require((p >= 1.U).I)` /
+    * `Ensure((p + p >= 2.U).I)`.
+    */
   def Contract(
     body: => Unit
   )(
@@ -1112,6 +1366,9 @@ trait ContractApi:
     TypeImpl
   ): Unit
 
+  /** Wraps a single value at a contract boundary: `body` states what's true of the value passed to it (via
+    * [[Ensure]]/[[Require]]), and the returned reference is a fresh, contract-bounded view of `arg`.
+    */
   def Contract[T <: Data](
     arg:  Referable[T] & HasOperation
   )(body: (Referable[T] & HasOperation) => (Arena, Context, Block) ?=> Unit
@@ -1124,6 +1381,10 @@ trait ContractApi:
     TypeImpl
   ): Referable[T] & HasOperation
 
+  /** The tupled form of the single-value [[Contract]] overload, for stating a joint property of several values at once
+    * (e.g. `Contract((carry, sum)) { case (c, s) => Ensure((c + s === a + b).I) }` in
+    * `me.jiuyang.stdlib.PrefixAdderCommon`).
+    */
   def Contract[A <: Tuple](
     args: A
   )(body: ContractTuple[A] => (Arena, Context, Block) ?=> Unit
@@ -1138,6 +1399,7 @@ trait ContractApi:
     TypeImpl
   ): ContractTuple[A]
 
+  /** States a property the contract's caller must guarantee (an assumption, lowered to `assume property`). */
   def Require(
     property: Immediate | Sequence | Property,
     label:    Option[String] = None
@@ -1150,6 +1412,9 @@ trait ContractApi:
     TypeImpl
   ): Unit
 
+  /** States a property the contract guarantees about its result (an obligation, lowered to `assert property` in a
+    * separate formal-test module -- see the "what actually gets checked" note on [[ContractApi]]).
+    */
   def Ensure(
     property: Immediate | Sequence | Property,
     label:    Option[String] = None
@@ -1162,6 +1427,11 @@ trait ContractApi:
     TypeImpl
   ): Unit
 
+/** SystemVerilog Assertion combinators for building [[me.jiuyang.zaozi.ltltpe.Immediate Immediate]]/
+  * [[me.jiuyang.zaozi.ltltpe.Sequence Sequence]]/[[me.jiuyang.zaozi.ltltpe.Property Property]] properties (used with
+  * [[ContractApi.Require]]/[[ContractApi.Ensure]] and [[Assert]]/[[Assume]]/[[Cover]]), plus the assertion directives
+  * themselves. Each combinator's doc names the SVA syntax it corresponds to.
+  */
 trait SVAApi:
   def posedge(clock: Referable[Clock] & HasOperation): ClockEvent
   def negedge(clock: Referable[Clock] & HasOperation): ClockEvent
@@ -1992,6 +2262,10 @@ trait SVAApi:
     InstanceContext
   ): Unit
 
+/** Internal seam between the public API traits above (`Generator`, `ConstructorApi`, `BitsApi`, ...) and their concrete
+  * implementations in `me.jiuyang.zaozi.default`: the raw MLIR `Operation`/`Value`/`Type` accessors every `given`
+  * implementation is built on. Entirely `private[zaozi]` -- not part of the surface a generator author calls.
+  */
 trait TypeImpl:
   extension (ref: Interface[?])
     private[zaozi] def operationImpl: Operation

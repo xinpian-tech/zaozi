@@ -7,6 +7,11 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
+/** An unsigned integer of [[width]] bits (FIRRTL's `!firrtl.uint<width>`), with arithmetic (`+`, `-`, `*`, ...),
+  * comparison, and shift operators. Widths grow according to FIRRTL rules (e.g. `+`/`-` produce one more bit than the
+  * wider operand) rather than wrapping or saturating; truncate explicitly (e.g. `.asBits.tail(1)`) where wraparound is
+  * wanted.
+  */
 trait UInt extends Element with CanProbe:
   private[zaozi] val _width: Int
 

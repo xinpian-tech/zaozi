@@ -10,7 +10,12 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value}
 import java.lang.foreign.Arena
 
 // The ProbeBundle is only defined at the interface of a module
+/** The statically-shaped counterpart to [[Bundle]] for a module's debug/verification interface (`DVBundle`): fields are
+  * [[RProbe]]/[[RWProbe]] references built with [[ProbeRead]]/[[ProbeReadWrite]] rather than plain `Flipped`/`Aligned`
+  * data fields.
+  */
 trait ProbeBundle extends Aggregate with DynamicSubfield:
+  /** Declares a read-only probe field of `tpe`, visible only when `layer` is enabled. */
   def ProbeRead[T <: Data & CanProbe](
     tpe:   T,
     layer: LayerTree
@@ -20,6 +25,7 @@ trait ProbeBundle extends Aggregate with DynamicSubfield:
   ): BundleField[RProbe[T]] =
     this.ReadProbeImpl(tpe, layer)
 
+  /** Declares a read-write (forceable) probe field of `tpe`, visible only when `layer` is enabled. */
   def ProbeReadWrite[T <: Data & CanProbe](
     tpe:   T,
     layer: LayerTree

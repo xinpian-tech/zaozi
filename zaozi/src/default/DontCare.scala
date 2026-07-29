@@ -11,6 +11,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
 import java.lang.foreign.Arena
 
+/** Implements `DontCare`: connects `ref` from a fresh `firrtl.invalidvalue`, FIRRTL's explicit "undriven" marker. */
 given [D <: Data, SINK <: Writable[D]]: DontCare[D, SINK] with
   extension (ref: SINK)
     def dontCare(

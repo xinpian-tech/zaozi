@@ -10,7 +10,12 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value}
 
 import java.lang.foreign.Arena
 
+/** The dynamically-shaped counterpart to [[Record]] for a module's debug/verification interface (`DVRecord`): fields
+  * are named explicitly and are [[RProbe]]/[[RWProbe]] references built with [[ProbeRead]]/ [[ProbeReadWrite]] rather
+  * than plain `Flipped`/`Aligned` data fields.
+  */
 trait ProbeRecord extends Aggregate with UntypedDynamicSubfield:
+  /** Declares a read-only probe field of `tpe`, named explicitly, visible only when `layer` is enabled. */
   def ProbeRead[T <: Data & CanProbe](
     name:  String,
     tpe:   T,
@@ -20,6 +25,8 @@ trait ProbeRecord extends Aggregate with UntypedDynamicSubfield:
   ): BundleField[RProbe[T]] =
     this.ReadProbeImpl(name, tpe, layer)
 
+  /** Declares a read-write (forceable) probe field of `tpe`, named explicitly, visible only when `layer` is enabled.
+    */
   def ProbeReadWrite[T <: Data & CanProbe](
     name:  String,
     tpe:   T,

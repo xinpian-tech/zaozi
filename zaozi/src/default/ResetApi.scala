@@ -13,6 +13,9 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 import java.lang.foreign.Arena
 import org.llvm.circt.scalalib.dialect.firrtl.operation.AsUIntPrimApi
 
+/** Implements `ResetApi`: `asBool` is a plain `firrtl.asUInt` cast (a `Reset`'s underlying representation is already a
+  * single bit, regardless of whether it resolves to sync or async).
+  */
 given ResetApi with
   extension [R <: Referable[Reset]](ref: R)
     def asBool(

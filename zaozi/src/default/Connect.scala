@@ -19,6 +19,10 @@ private enum ConnDir(val connectToConsumer: Boolean, val connectToProducer: Bool
 /** The one reason analog is refused, shared by the `:=` fast path and the analyze walk. */
 private val analogNotConnectable = "cannot connect an Analog; FIRRTL connects analog via attach only"
 
+/** Implements `Connect`. `:<>=`/`:<=`/`:>=` go through [[connect]] below, which walks sink/source structurally,
+  * validates shapes with a full error list before emitting anything (see [[connect]]'s doc), and special-cases `Analog`
+  * (attach-only in FIRRTL, refused here with [[ConnectException]] rather than silently mis-wiring it).
+  */
 given [A <: Connectable]: Connect[A] with
   extension [SINK <: Writable[A]](sink:  SINK)
     def :=[SRC <: Referable[A]](

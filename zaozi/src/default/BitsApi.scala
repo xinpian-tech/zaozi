@@ -39,6 +39,10 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, g
 
 import java.lang.foreign.Arena
 
+/** Implements `BitsApi`; see that trait and its constituent capability traits (`AsUInt`, `Cat`, `Shl`/`Shr`,
+  * `Head`/`Tail`/`Pad`, `ExtractRange`/`ExtractElement`, ...) in `me.jiuyang.zaozi.Api` for the semantics of each
+  * operator.
+  */
 given BitsApi with
   extension [LHS <: Referable[Bits]](ref: LHS)
     def asSInt(

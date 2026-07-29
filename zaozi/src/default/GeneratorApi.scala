@@ -71,6 +71,11 @@ import java.nio.file.StandardOpenOption.*
 
 export me.jiuyang.zaozi.magic.macros.generator
 
+/** Implements `GeneratorApi`: builds the `firrtl.module` for a `Generator` from its `interface`/`probe`/`layers`
+  * (wiring the `io`/`probe` wires the architecture body reads and writes to the module's actual ports), and the
+  * `instance`/`instantiate`/`dumpMlirbc`/`mainImpl` machinery around it. See `me.jiuyang.zaozi.GeneratorApi` in
+  * `me.jiuyang.zaozi.Api`.
+  */
 given GeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: Generator[PARAM, L, I, P]
