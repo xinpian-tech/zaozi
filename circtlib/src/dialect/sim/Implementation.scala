@@ -177,3 +177,90 @@ given FormatConcatApi with
       using Arena
     ): Value = ref.operation.getResult(0)
 end given
+
+private inline def outputStreamType(
+  using Arena,
+  Context
+): Type = summon[SimTypeApi].outputStreamTypeGet
+
+given StdoutStreamApi with
+  def op(
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): StdoutStream =
+    StdoutStream(
+      summon[OperationApi].operationCreate(
+        name = "sim.stdout_stream",
+        location = location,
+        resultsTypes = Some(Seq(outputStreamType))
+      )
+    )
+  extension (ref: StdoutStream)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given StderrStreamApi with
+  def op(
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): StderrStream =
+    StderrStream(
+      summon[OperationApi].operationCreate(
+        name = "sim.stderr_stream",
+        location = location,
+        resultsTypes = Some(Seq(outputStreamType))
+      )
+    )
+  extension (ref: StderrStream)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given PrintFormattedApi with
+  def op(
+    input:       Value,
+    clock:       Value,
+    condition:   Value,
+    stream:      Option[Value],
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): PrintFormatted =
+    PrintFormatted(
+      summon[OperationApi].operationCreate(
+        name = "sim.print",
+        location = location,
+        operands = Seq(input, clock, condition) ++ stream.toSeq
+      )
+    )
+  extension (ref: PrintFormatted) def operation: Operation = ref._operation
+end given
+
+given PrintFormattedProcApi with
+  def op(
+    input:       Value,
+    stream:      Option[Value],
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): PrintFormattedProc =
+    PrintFormattedProc(
+      summon[OperationApi].operationCreate(
+        name = "sim.proc.print",
+        location = location,
+        operands = Seq(input) ++ stream.toSeq
+      )
+    )
+  extension (ref: PrintFormattedProc) def operation: Operation = ref._operation
+end given

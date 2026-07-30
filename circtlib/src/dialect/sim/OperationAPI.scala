@@ -109,3 +109,65 @@ trait FormatConcatApi extends HasOperation[FormatConcat]:
       using Arena
     ): Value
 end FormatConcatApi
+
+class StdoutStream(val _operation: Operation)
+trait StdoutStreamApi extends HasOperation[StdoutStream]:
+  /** `sim.stdout_stream` — a handle to the standard output stream. */
+  def op(
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): StdoutStream
+
+  extension (ref: StdoutStream)
+    def result(
+      using Arena
+    ): Value
+end StdoutStreamApi
+
+class StderrStream(val _operation: Operation)
+trait StderrStreamApi extends HasOperation[StderrStream]:
+  /** `sim.stderr_stream` — a handle to the standard error stream. */
+  def op(
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): StderrStream
+
+  extension (ref: StderrStream)
+    def result(
+      using Arena
+    ): Value
+end StderrStreamApi
+
+class PrintFormatted(val _operation: Operation)
+trait PrintFormattedApi extends HasOperation[PrintFormatted]:
+  /** `sim.print` — print `input` on the rising edge of `clock` when `condition` is true. `stream` defaults to the
+    * simulation console.
+    */
+  def op(
+    input:     Value,
+    clock:     Value,
+    condition: Value,
+    stream:    Option[Value],
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): PrintFormatted
+end PrintFormattedApi
+
+class PrintFormattedProc(val _operation: Operation)
+trait PrintFormattedProcApi extends HasOperation[PrintFormattedProc]:
+  /** `sim.proc.print` — print `input` from inside a procedural region. */
+  def op(
+    input:    Value,
+    stream:   Option[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): PrintFormattedProc
+end PrintFormattedProcApi
