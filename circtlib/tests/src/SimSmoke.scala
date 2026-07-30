@@ -64,7 +64,6 @@ object SimSmoke extends TestSuite:
       val streamOut = StringBuilder()
       stream.print(streamOut ++= _)
       assert(streamOut.toString == "!sim.output_stream")
-
     test("sim format string ops"):
       given Arena         = currentArena
       val context         = summon[ContextApi].contextCreate

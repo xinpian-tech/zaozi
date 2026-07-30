@@ -51,11 +51,13 @@ final case class ZaoziArtifact(
   *     predicates.
   *   - `backend` — a ChiselSim-style poke/peek/step driver, not GAS assembly.
   *
-  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics remain rvprobe-owned;
-  * generic solver process support is shared through `smtlib`, and utlib has no dependency on this frontend.
+  * Sequence selection is supplied by `strategy`; the default is a deterministic smoke sequence that drives every
+  * Drive port once and drains every Monitor port once. This keeps the leg usable — and its tests env-independent —
+  * without pulling in Z3.
   *
-  * The default strategy is a smoke sequence: drive every Drive port once, drain every Monitor port once. It keeps this
-  * leg usable — and its tests env-independent — without pulling in Z3.
+  * An SMT-backed strategy can later model Decoupled handshake timing, backpressure, and dependency constraints while
+  * reusing this leg's alphabet, whitebox, and backend. Transaction semantics remain rvprobe-owned, and generic solver
+  * process support is shared through `smtlib`; utlib has no dependency on this frontend.
   */
 final class ZaoziFrontend(
   iface:    TransactionInterface,
@@ -83,7 +85,8 @@ final class ZaoziFrontend(
     }
 
   /** Solve this DUT's transaction sequence with the injected [[strategy]], then record it as the frontend-agnostic
-    * [[SolvedSequence]] plus the concrete transaction list the backend renders.
+    * [[SolvedSequence]] plus the concrete transaction list the backend renders. The default strategy supplies the
+    * smoke sequence; callers may inject a more constrained solver.
     */
   def solve(): ZaoziArtifact =
     val transactions = strategy(iface)
