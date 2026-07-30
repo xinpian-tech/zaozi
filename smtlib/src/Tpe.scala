@@ -110,3 +110,13 @@ trait Ref[T <: Data] extends Referable[T] with HasOperation:
     using Arena,
     TypeImpl
   ): Value = this.referImpl
+
+/** Marker for "solver picks this register freely". Never evaluated — used as a sentinel in constraint generators to
+  * skip the equality constraint and only apply the range constraint.
+  */
+object FreeReg extends Referable[SInt]:
+  private[smtlib] val _tpe: SInt = new Object with SInt
+  def refer(
+    using Arena,
+    TypeImpl
+  ): Value = throw UnsupportedOperationException("FreeReg is a placeholder — do not evaluate")
