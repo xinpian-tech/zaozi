@@ -6,7 +6,6 @@ import org.llvm.circt.scalalib.capi.conversion.{ConversionCreateApi, ConversionR
 import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HwDialect, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialect, TypeApi as SeqTypeApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SvDialect, given}
-import org.llvm.circt.scalalib.capi.firtool.{FirtoolApi, FirtoolOptions, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialect, TypeApi as SimTypeApi, given}
 import org.llvm.circt.scalalib.dialect.sim.operation.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{
