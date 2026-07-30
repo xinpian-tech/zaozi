@@ -60,6 +60,21 @@ trait HasSvEmit:
   this: Generator[?, ?, ?, ?] =>
   private val self = this.asInstanceOf[Generator[this.TPARAM, this.TLAYER, this.TINTF, this.TPROBE]]
 
+  /** Append the modules of any sub-generators this design instantiates.
+    *
+    * Zaozi's own flow elaborates each generator to a separate `.mlirbc` and links them afterwards with `firld` (that is
+    * what `Generator.instantiate` does). This emitter builds one circuit in-process instead, so every instantiated
+    * sub-module must be appended to that same circuit here — otherwise the instance references a module Verilator
+    * cannot find.
+    */
+  def appendSubmodules(
+    parameter: this.TPARAM
+  )(
+    using Arena,
+    Context,
+    Circuit
+  ): Unit = ()
+
   /** The design after `lowFIRRTLToHW`, as MLIR text. */
   def hwString(parameter: this.TPARAM): String = run(parameter, stopAfterHw = true)
 
@@ -105,6 +120,7 @@ trait HasSvEmit:
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
+      appendSubmodules(parameter)
       self.module(parameter).appendToCircuit()
       validateCircuit()
       summon[PassManager].runOnOp(summon[MlirModule].getOperation)
