@@ -1125,12 +1125,27 @@ trait RVGenerator:
     * If the program contains directives or labels, the full statement ordering is used. Otherwise falls back to legacy
     * NOP-padding for explicit-index programs.
     */
-  def toRecipeAsm(): String = {
+  /** Solve the recipe into the frontend-agnostic [[frontend.SolvedSequence]]
+    * (the SMT core's output) plus the RISC-V statement layout the GAS backend
+    * needs. The statement layout is design-specific and rides alongside the
+    * solved values — a finding worth folding into the DutFrontend contract as
+    * the abstraction matures. */
+  def solveRecipe(): (frontend.SolvedSequence, Seq[Statement]) = {
     val (opcodes, statements) = solveOpcodes()
     val args                  = solveArgs(opcodes)
-    val hasDirectives         = statements.exists { case _: Statement.Inst => false; case _ => true }
-    if hasDirectives then assembleStatementsGas(statements, opcodes, args).mkString("\n")
-    else assembleInstructionsGas(opcodes, args).mkString("\n")
+    (frontend.SolvedSequence(opcodes, args), statements)
+  }
+
+  /** Render an already-solved recipe to GAS assembly (the RISC-V backend). */
+  def renderRecipeAsm(solved: frontend.SolvedSequence, statements: Seq[Statement]): String = {
+    val hasDirectives = statements.exists { case _: Statement.Inst => false; case _ => true }
+    if hasDirectives then assembleStatementsGas(statements, solved.selections, solved.fields).mkString("\n")
+    else assembleInstructionsGas(solved.selections, solved.fields).mkString("\n")
+  }
+
+  def toRecipeAsm(): String = {
+    val (solved, statements) = solveRecipe()
+    renderRecipeAsm(solved, statements)
   }
 
   /** Unified output API.
