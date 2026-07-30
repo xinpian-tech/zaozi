@@ -2,7 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.zaozi.circtlib.tests
 
+import org.llvm.circt.scalalib.capi.conversion.{ConversionCreateApi, ConversionRegisterApi, given}
+import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HwDialect, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialect, TypeApi as SeqTypeApi, given}
+import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SvDialect, given}
+import org.llvm.circt.scalalib.capi.firtool.{FirtoolApi, FirtoolOptions, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialect, TypeApi as SimTypeApi, given}
 import org.llvm.circt.scalalib.dialect.sim.operation.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{
@@ -14,6 +18,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   TypeApi as MlirTypeApi,
   given
 }
+import org.llvm.mlir.scalalib.capi.pass.{PassManager, PassManagerApi, given}
+import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
 import utest.*
 
 import java.lang.foreign.Arena
@@ -254,3 +260,53 @@ object SimSmoke extends TestSuite:
       // plusargs.value yields (found: i1, value: i32).
       assert(seed.found.getType.equal(1.integerTypeGet))
       assert(seed.value.getType.equal(32.integerTypeGet))
+
+    test("lower sim to sv"):
+      given Arena   = currentArena
+      val context   = summon[ContextApi].contextCreate
+      currentContext = context
+      given Context = context
+      summon[SimDialect].loadDialect
+      summon[SeqDialect].loadDialect
+      summon[HwDialect].loadDialect
+      summon[SvDialect].loadDialect
+      summon[ConversionRegisterApi].lowerSimToSV
+
+      // Written in *procedural* form (a sim.triggered region holding
+      // sim.proc.print). `lower-sim-to-sv` marks the Sim dialect illegal and
+      // only has patterns for procedural ops; the non-procedural `sim.print`
+      // form is what the `sim-proceduralize` transform lowers into this shape,
+      // and that pass is not exposed through CIRCT's C API. Emitting the
+      // procedural form directly is therefore both what this binding must
+      // support and what our own instrumentation will generate.
+      val moduleText =
+        """|module {
+           |  hw.module @tb(in %clk : !seq.clock, in %en : i1, in %count : i32) {
+           |    sim.triggered %clk if %en {
+           |      %lit = sim.fmt.literal "count="
+           |      %dec = sim.fmt.dec %count : i32
+           |      %nl = sim.fmt.literal "\n"
+           |      %msg = sim.fmt.concat (%lit, %dec, %nl)
+           |      sim.proc.print %msg
+           |    }
+           |    hw.output
+           |  }
+           |}
+           |""".stripMargin
+
+      val module = summon[OperationApi].operationCreateParse(moduleText, "sim-smoke")
+
+      val before = StringBuilder()
+      module.print(before ++= _)
+      assert(before.toString.contains("sim.proc.print"))
+      assert(before.toString.contains("sim.triggered"))
+
+      given PassManager = summon[PassManagerApi].passManagerCreate
+      summon[PassManager].getAsOpPassManager.addOwnedPass(summon[ConversionCreateApi].lowerSimToSV)
+      assert(summon[PassManager].runOnOp(module).succeeded)
+
+      val after         = StringBuilder()
+      module.print(after ++= _)
+      val loweredString = after.toString
+      assert(!loweredString.contains("sim."))
+      assert(loweredString.contains("sv."))
