@@ -75,10 +75,22 @@ trait HasSvEmit:
     Circuit
   ): Unit = ()
 
-  /** The design after `lowFIRRTLToHW`, as MLIR text. */
+  /** Inject sim-dialect ops into the HW-level design, between `lowFIRRTLToHW` and `hwToSV`.
+    *
+    * Returns whether anything was injected, purely so callers can assert on it. The default does nothing.
+    */
+  def instrument(
+    parameter: this.TPARAM,
+    module:    MlirModule
+  )(
+    using Arena,
+    Context
+  ): Boolean = false
+
+  /** The design after `lowFIRRTLToHW`, as MLIR text. `instrument` has already run. */
   def hwString(parameter: this.TPARAM): String = run(parameter, stopAfterHw = true)
 
-  /** The design as SystemVerilog, with SVA-flavored cover properties. */
+  /** The design as SystemVerilog, with SVA cover properties. */
   def verilogString(parameter: this.TPARAM): String = run(parameter, stopAfterHw = false)
 
   private def run(parameter: this.TPARAM, stopAfterHw: Boolean): String =
@@ -102,20 +114,14 @@ trait HasSvEmit:
       // `cover_0: cover property (ib0);` without setting any flavor.
       given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
 
-      given PassManager = summon[PassManagerApi].passManagerCreate
-      val out           = new StringBuilder
-      val options       = summon[FirtoolOptions]
+      val out     = new StringBuilder
+      val options = summon[FirtoolOptions]
 
-      summon[PassManager].preprocessTransforms(options)
-      summon[PassManager].chirrtlToLowFIRRTL(options)
-      summon[PassManager].lowFIRRTLToHW(options, "")
-      if !stopAfterHw then
-        summon[PassManager].getAsOpPassManager.addPipeline(
-          "lower-contracts,verif-lower-symbolic-values{mode=yosys},verif-lower-tests",
-          err => throw new RuntimeException(s"verif pipeline parse error: $err")
-        )
-        summon[PassManager].hwToSV(options)
-        summon[PassManager].exportVerilog(options, out ++= _)
+      // Stage 1: FIRRTL down to HW.
+      val toHw = summon[PassManagerApi].passManagerCreate
+      toHw.preprocessTransforms(options)
+      toHw.chirrtlToLowFIRRTL(options)
+      toHw.lowFIRRTLToHW(options, "")
 
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
@@ -123,9 +129,25 @@ trait HasSvEmit:
       appendSubmodules(parameter)
       self.module(parameter).appendToCircuit()
       validateCircuit()
-      summon[PassManager].runOnOp(summon[MlirModule].getOperation)
+      if !toHw.runOnOp(summon[MlirModule].getOperation).succeeded then
+        throw new RuntimeException("FIRRTL-to-HW lowering failed")
+
+      // The design is HW-level here — the only point where sim ops are legal
+      // but the design is not yet SystemVerilog.
+      instrument(parameter, summon[MlirModule])
 
       if stopAfterHw then summon[MlirModule].getOperation.print(out ++= _)
+      else
+        // Stage 2: HW down to SV, then export.
+        val toSv = summon[PassManagerApi].passManagerCreate
+        toSv.getAsOpPassManager.addPipeline(
+          "lower-contracts,verif-lower-symbolic-values{mode=yosys},verif-lower-tests",
+          err => throw new RuntimeException(s"verif pipeline parse error: $err")
+        )
+        toSv.hwToSV(options)
+        toSv.exportVerilog(options, out ++= _)
+        if !toSv.runOnOp(summon[MlirModule].getOperation).succeeded then
+          throw new RuntimeException("HW-to-SV lowering failed")
 
       summon[Context].destroy()
       out.toString

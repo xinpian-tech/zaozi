@@ -12,7 +12,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_ModuleApi, Circuit}
-import org.llvm.mlir.scalalib.capi.ir.Context
+import org.llvm.mlir.scalalib.capi.ir.{Context, Module as MlirModule}
 
 import java.lang.foreign.Arena
 
@@ -76,6 +76,16 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
     Context,
     Circuit
   ): Unit = Fifo.module(FifoParameter(parameter.width)).appendToCircuit()
+
+  /** Make the harness end the simulation itself, via the sim dialect. */
+  override def instrument(
+    parameter: HarnessParameter,
+    module:    MlirModule
+  )(
+    using Arena,
+    Context
+  ): Boolean =
+    SimInstrument.terminateOnDone(module, moduleName(parameter))
 
   def architecture(parameter: HarnessParameter) =
     val io = summon[Interface[HarnessIO]]
@@ -174,11 +184,10 @@ object Harness:
         |    reset = 1'b0;
         |  end
         |
+        |  // `done` is observed only for the log line; the harness's own
+        |  // sim.clocked_terminate is what calls $$finish.
         |  always @(posedge clock) begin
-        |    if (!reset && done) begin
-        |      $$display("HARNESS-DONE");
-        |      $$finish;
-        |    end
+        |    if (!reset && done) $$display("HARNESS-DONE");
         |  end
         |
         |  initial begin
