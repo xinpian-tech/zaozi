@@ -374,3 +374,53 @@ given ClockedPauseApi with
     )
   extension (ref: ClockedPause) def operation: Operation = ref._operation
 end given
+
+given PlusArgsTestApi with
+  def op(
+    formatString: String,
+    location:     Location
+  )(
+    using arena:  Arena,
+    context:      Context
+  ): PlusArgsTest =
+    PlusArgsTest(
+      summon[OperationApi].operationCreate(
+        name = "sim.plusargs.test",
+        location = location,
+        namedAttributes = Seq(named("formatString", formatString.stringAttrGet)),
+        resultsTypes = Some(Seq(1.integerTypeGet))
+      )
+    )
+  extension (ref: PlusArgsTest)
+    def operation: Operation = ref._operation
+    def found(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given PlusArgsValueApi with
+  def op(
+    formatString: String,
+    resultType:   Type,
+    location:     Location
+  )(
+    using arena:  Arena,
+    context:      Context
+  ): PlusArgsValue =
+    PlusArgsValue(
+      summon[OperationApi].operationCreate(
+        name = "sim.plusargs.value",
+        location = location,
+        namedAttributes = Seq(named("formatString", formatString.stringAttrGet)),
+        resultsTypes = Some(Seq(1.integerTypeGet, resultType))
+      )
+    )
+  extension (ref: PlusArgsValue)
+    def operation: Operation = ref._operation
+    def found(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+    def value(
+      using Arena
+    ): Value = ref.operation.getResult(1)
+end given
