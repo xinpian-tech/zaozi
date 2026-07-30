@@ -38,8 +38,8 @@ trait BooleanConstantApi extends HasOperation[BooleanConstant]:
     ): Value
 end BooleanConstantApi
 
-class Clock(val _operation: Operation)
-trait ClockApi extends HasOperation[Clock]:
+class ClockedAtom(val _operation: Operation)
+trait ClockedAtomApi extends HasOperation[ClockedAtom]:
   def op(
     input:    Value,
     edge:     LTLClockEdge,
@@ -48,12 +48,12 @@ trait ClockApi extends HasOperation[Clock]:
   )(
     using Arena,
     Context
-  ):   Clock
-  extension (ref: Clock)
+  ):   ClockedAtom
+  extension (ref: ClockedAtom)
     def result(
       using Arena
     ): Value
-end ClockApi
+end ClockedAtomApi
 
 class ClockedDelay(val _operation: Operation)
 trait ClockedDelayApi extends HasOperation[ClockedDelay]:
@@ -89,55 +89,6 @@ trait ConcatApi extends HasOperation[Concat]:
     ): Value
 end ConcatApi
 
-class Delay(val _operation: Operation)
-trait DelayApi extends HasOperation[Delay]:
-  def op(
-    input:    Value,
-    delay:    Long,
-    length:   Option[Long],
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   Delay
-  extension (ref: Delay)
-    def result(
-      using Arena
-    ): Value
-end DelayApi
-
-class Eventually(val _operation: Operation)
-trait EventuallyApi extends HasOperation[Eventually]:
-  def op(
-    input:    Value,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   Eventually
-  extension (ref: Eventually)
-    def result(
-      using Arena
-    ): Value
-end EventuallyApi
-
-class GoToRepeat(val _operation: Operation)
-trait GoToRepeatApi extends HasOperation[GoToRepeat]:
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Long,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   GoToRepeat
-  extension (ref: GoToRepeat)
-    def result(
-      using Arena
-    ): Value
-end GoToRepeatApi
-
 class Implication(val _operation: Operation)
 trait ImplicationApi extends HasOperation[Implication]:
   def op(
@@ -168,23 +119,6 @@ trait IntersectApi extends HasOperation[Intersect]:
       using Arena
     ): Value
 end IntersectApi
-
-class NonConsecutiveRepeat(val _operation: Operation)
-trait NonConsecutiveRepeatApi extends HasOperation[NonConsecutiveRepeat]:
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Long,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   NonConsecutiveRepeat
-  extension (ref: NonConsecutiveRepeat)
-    def result(
-      using Arena
-    ): Value
-end NonConsecutiveRepeatApi
 
 class Not(val _operation: Operation)
 trait NotApi extends HasOperation[Not]:
@@ -233,23 +167,6 @@ trait PastApi extends HasOperation[Past]:
     ): Value
 end PastApi
 
-class Repeat(val _operation: Operation)
-trait RepeatApi extends HasOperation[Repeat]:
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Option[Long],
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   Repeat
-  extension (ref: Repeat)
-    def result(
-      using Arena
-    ): Value
-end RepeatApi
-
 class Sampled(val _operation: Operation)
 trait SampledApi extends HasOperation[Sampled]:
   def op(
@@ -264,19 +181,3 @@ trait SampledApi extends HasOperation[Sampled]:
       using Arena
     ): Value
 end SampledApi
-
-class Until(val _operation: Operation)
-trait UntilApi extends HasOperation[Until]:
-  def op(
-    input:     Value,
-    condition: Value,
-    location:  Location
-  )(
-    using Arena,
-    Context
-  ):   Until
-  extension (ref: Until)
-    def result(
-      using Arena
-    ): Value
-end UntilApi

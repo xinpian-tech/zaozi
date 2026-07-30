@@ -359,8 +359,8 @@ trait LTLAndIntrinsicApi extends HasOperation[LTLAndIntrinsic]:
     ): Value
 end LTLAndIntrinsicApi
 
-class LTLClockIntrinsic(val _operation: Operation)
-trait LTLClockIntrinsicApi extends HasOperation[LTLClockIntrinsic]:
+class LTLClockedAtomIntrinsic(val _operation: Operation)
+trait LTLClockedAtomIntrinsicApi extends HasOperation[LTLClockedAtomIntrinsic]:
   def op(
     input:    Value,
     edge:     FirrtlEventControl,
@@ -369,12 +369,12 @@ trait LTLClockIntrinsicApi extends HasOperation[LTLClockIntrinsic]:
   )(
     using Arena,
     Context
-  ):   LTLClockIntrinsic
-  extension (ref: LTLClockIntrinsic)
+  ):   LTLClockedAtomIntrinsic
+  extension (ref: LTLClockedAtomIntrinsic)
     def result(
       using Arena
     ): Value
-end LTLClockIntrinsicApi
+end LTLClockedAtomIntrinsicApi
 
 class LTLClockedDelayIntrinsic(val _operation: Operation)
 trait LTLClockedDelayIntrinsicApi extends HasOperation[LTLClockedDelayIntrinsic]:
@@ -395,6 +395,98 @@ trait LTLClockedDelayIntrinsicApi extends HasOperation[LTLClockedDelayIntrinsic]
     ): Value
 end LTLClockedDelayIntrinsicApi
 
+class LTLClockedEventuallyIntrinsic(val _operation: Operation)
+trait LTLClockedEventuallyIntrinsicApi extends HasOperation[LTLClockedEventuallyIntrinsic]:
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   LTLClockedEventuallyIntrinsic
+  extension (ref: LTLClockedEventuallyIntrinsic)
+    def result(
+      using Arena
+    ): Value
+end LTLClockedEventuallyIntrinsicApi
+
+class LTLClockedGoToRepeatIntrinsic(val _operation: Operation)
+trait LTLClockedGoToRepeatIntrinsicApi extends HasOperation[LTLClockedGoToRepeatIntrinsic]:
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    base:     Long,
+    more:     Long,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   LTLClockedGoToRepeatIntrinsic
+  extension (ref: LTLClockedGoToRepeatIntrinsic)
+    def result(
+      using Arena
+    ): Value
+end LTLClockedGoToRepeatIntrinsicApi
+
+class LTLClockedNonConsecutiveRepeatIntrinsic(val _operation: Operation)
+trait LTLClockedNonConsecutiveRepeatIntrinsicApi extends HasOperation[LTLClockedNonConsecutiveRepeatIntrinsic]:
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    base:     Long,
+    more:     Long,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   LTLClockedNonConsecutiveRepeatIntrinsic
+  extension (ref: LTLClockedNonConsecutiveRepeatIntrinsic)
+    def result(
+      using Arena
+    ): Value
+end LTLClockedNonConsecutiveRepeatIntrinsicApi
+
+class LTLClockedRepeatIntrinsic(val _operation: Operation)
+trait LTLClockedRepeatIntrinsicApi extends HasOperation[LTLClockedRepeatIntrinsic]:
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    base:     Long,
+    more:     scala.Option[Long],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   LTLClockedRepeatIntrinsic
+  extension (ref: LTLClockedRepeatIntrinsic)
+    def result(
+      using Arena
+    ): Value
+end LTLClockedRepeatIntrinsicApi
+
+class LTLClockedUntilIntrinsic(val _operation: Operation)
+trait LTLClockedUntilIntrinsicApi extends HasOperation[LTLClockedUntilIntrinsic]:
+  def op(
+    input:     Value,
+    condition: Value,
+    edge:      FirrtlEventControl,
+    clock:     Value,
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ):   LTLClockedUntilIntrinsic
+  extension (ref: LTLClockedUntilIntrinsic)
+    def result(
+      using Arena
+    ): Value
+end LTLClockedUntilIntrinsicApi
+
 class LTLConcatIntrinsic(val _operation: Operation)
 trait LTLConcatIntrinsicApi extends HasOperation[LTLConcatIntrinsic]:
   def op(
@@ -409,38 +501,6 @@ trait LTLConcatIntrinsicApi extends HasOperation[LTLConcatIntrinsic]:
       using Arena
     ): Value
 end LTLConcatIntrinsicApi
-
-class LTLEventuallyIntrinsic(val _operation: Operation)
-trait LTLEventuallyIntrinsicApi extends HasOperation[LTLEventuallyIntrinsic]:
-  def op(
-    input:    Value,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   LTLEventuallyIntrinsic
-  extension (ref: LTLEventuallyIntrinsic)
-    def result(
-      using Arena
-    ): Value
-end LTLEventuallyIntrinsicApi
-
-class LTLGoToRepeatIntrinsic(val _operation: Operation)
-trait LTLGoToRepeatIntrinsicApi extends HasOperation[LTLGoToRepeatIntrinsic]:
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Long,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   LTLGoToRepeatIntrinsic
-  extension (ref: LTLGoToRepeatIntrinsic)
-    def result(
-      using Arena
-    ): Value
-end LTLGoToRepeatIntrinsicApi
 
 class LTLImplicationIntrinsic(val _operation: Operation)
 trait LTLImplicationIntrinsicApi extends HasOperation[LTLImplicationIntrinsic]:
@@ -473,23 +533,6 @@ trait LTLIntersectIntrinsicApi extends HasOperation[LTLIntersectIntrinsic]:
     ): Value
 end LTLIntersectIntrinsicApi
 
-class LTLNonConsecutiveRepeatIntrinsic(val _operation: Operation)
-trait LTLNonConsecutiveRepeatIntrinsicApi extends HasOperation[LTLNonConsecutiveRepeatIntrinsic]:
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Long,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   LTLNonConsecutiveRepeatIntrinsic
-  extension (ref: LTLNonConsecutiveRepeatIntrinsic)
-    def result(
-      using Arena
-    ): Value
-end LTLNonConsecutiveRepeatIntrinsicApi
-
 class LTLNotIntrinsic(val _operation: Operation)
 trait LTLNotIntrinsicApi extends HasOperation[LTLNotIntrinsic]:
   def op(
@@ -519,36 +562,3 @@ trait LTLOrIntrinsicApi extends HasOperation[LTLOrIntrinsic]:
       using Arena
     ): Value
 end LTLOrIntrinsicApi
-
-class LTLRepeatIntrinsic(val _operation: Operation)
-trait LTLRepeatIntrinsicApi extends HasOperation[LTLRepeatIntrinsic]:
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     scala.Option[Long],
-    location: Location
-  )(
-    using Arena,
-    Context
-  ):   LTLRepeatIntrinsic
-  extension (ref: LTLRepeatIntrinsic)
-    def result(
-      using Arena
-    ): Value
-end LTLRepeatIntrinsicApi
-
-class LTLUntilIntrinsic(val _operation: Operation)
-trait LTLUntilIntrinsicApi extends HasOperation[LTLUntilIntrinsic]:
-  def op(
-    input:     Value,
-    condition: Value,
-    location:  Location
-  )(
-    using Arena,
-    Context
-  ):   LTLUntilIntrinsic
-  extension (ref: LTLUntilIntrinsic)
-    def result(
-      using Arena
-    ): Value
-end LTLUntilIntrinsicApi

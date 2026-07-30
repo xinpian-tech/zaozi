@@ -1170,6 +1170,8 @@ trait SVAApi:
   def always(
     property: Immediate | Sequence | Property
   )(
+    using ClockEvent
+  )(
     using Arena,
     Context,
     Block,
@@ -1183,6 +1185,8 @@ trait SVAApi:
     */
   def eventually(
     property: Immediate | Sequence | Property
+  )(
+    using ClockEvent
   )(
     using Arena,
     Context,
@@ -1220,6 +1224,8 @@ trait SVAApi:
       */
     infix def throughout(
       that: Sequence
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1415,6 +1421,8 @@ trait SVAApi:
     infix def until(
       that: Immediate | Sequence | Property
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1428,6 +1436,8 @@ trait SVAApi:
       */
     infix def untilWith(
       that: Immediate | Sequence | Property
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1473,6 +1483,8 @@ trait SVAApi:
     def ###(
       that: Sequence
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1487,6 +1499,8 @@ trait SVAApi:
     def ##(
       n:    Int
     )(that: Sequence
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1504,6 +1518,8 @@ trait SVAApi:
       max:  Option[Int]
     )(that: Sequence
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1517,6 +1533,8 @@ trait SVAApi:
       */
     def *(
       n: Int
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1539,6 +1557,8 @@ trait SVAApi:
       min: Int,
       max: Option[Int]
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1553,6 +1573,8 @@ trait SVAApi:
     def *->(
       min: Int,
       max: Int
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1569,6 +1591,8 @@ trait SVAApi:
       min: Int,
       max: Int
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1582,6 +1606,8 @@ trait SVAApi:
       */
     def ##+(
       that: Sequence
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1597,6 +1623,8 @@ trait SVAApi:
     def ##*(
       that: Sequence
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1610,6 +1638,8 @@ trait SVAApi:
       */
     infix def within(
       that: Sequence
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1625,6 +1655,8 @@ trait SVAApi:
     def |=>(
       that: Immediate | Sequence | Property
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1638,6 +1670,8 @@ trait SVAApi:
       */
     def #=#(
       that: Immediate | Sequence | Property
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1784,6 +1818,8 @@ trait SVAApi:
     infix def until(
       that: Immediate | Sequence | Property
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1797,6 +1833,8 @@ trait SVAApi:
       */
     infix def untilWith(
       that: Immediate | Sequence | Property
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -1898,6 +1936,8 @@ trait SVAApi:
     infix def until(
       that: Immediate | Sequence | Property
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -1911,6 +1951,8 @@ trait SVAApi:
       */
     infix def untilWith(
       that: Immediate | Sequence | Property
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
