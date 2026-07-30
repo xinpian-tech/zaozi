@@ -71,3 +71,12 @@ final case class SolvedStimulus(
 object SolvedStimulus:
   import SolvedTxn.given
   given upickle.default.ReadWriter[SolvedStimulus] = upickle.default.macroRW
+
+/** `@generator` synthesizes a mainargs CLI for every generator, which needs a [[mainargs.TokensReader]] for each field
+  * of the parameter. A solved stimulus is passed as JSON on that command line. Declared at package level so it is in
+  * scope wherever a generator carrying a [[SolvedStimulus]] is defined.
+  */
+given mainargs.TokensReader.Simple[SolvedStimulus] with
+  def shortName:               String                         = "stimulus"
+  def read(strs: Seq[String]): Either[String, SolvedStimulus] =
+    Right(upickle.default.read[SolvedStimulus](strs.head))

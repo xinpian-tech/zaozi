@@ -14,6 +14,14 @@ final case class Coverpoint(
 object Coverpoint:
   given upickle.default.ReadWriter[Coverpoint] = upickle.default.macroRW
 
+/** See the note on the [[SolvedStimulus]] reader — a generator's parameter fields must be readable from the synthesized
+  * mainargs CLI. A coverpoint list is passed as JSON.
+  */
+given mainargs.TokensReader.Simple[Seq[Coverpoint]] with
+  def shortName:               String                          = "coverpoints"
+  def read(strs: Seq[String]): Either[String, Seq[Coverpoint]] =
+    Right(upickle.default.read[Seq[Coverpoint]](strs.head))
+
 /** Coverpoint hit counts collected from one simulation run. */
 final case class CoverageReport(hits: Map[String, Int]):
 
