@@ -87,6 +87,9 @@ def convert(sexpr: SExpr): SMTCommand =
       SMTCommand.ApplyFunc(name, args.map(convert))
     case List(Symbol("extract") :: Symbol(high) :: Symbol(low) :: arg :: Nil)                    =>
       SMTCommand.Extract(high.toInt, low.toInt, convert(arg))
+    case List(Symbol("-") :: Number(n) :: Nil)                                                   =>
+      // Z3 prints negative integer literals as the s-expression `(- 1)`.
+      SMTCommand.IntConstant(-BigInt(n))
     case other                                                                                   => throw new Exception(s"Unknown or unimplemented expression: $other")
 // format: on
 

@@ -45,6 +45,22 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Ref[T]
 
+  /** Declare an SMT value with an explicit name (rather than the sourcecode-derived
+    * name). Required where the declared name is semantically meaningful — e.g. the
+    * generated constraints encode an index into the name (`opcode_3`, `freg_1`) and
+    * later parse the solver model back by that name.
+    */
+  def smtValue[T <: Data](
+    name:      String,
+    rangeType: T
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Ref[T]
+
   def smtFunc[T <: Data, U <: Data](
     domainTypes: Seq[T],
     rangeType:   U
@@ -60,6 +76,28 @@ trait ConstructorApi:
   // smt functions
   def smtDistinct[T <: Data, D <: Referable[T]](
     values: Seq[D]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): Ref[Bool]
+
+  def smtAnd[T <: Data, R <: Referable[T]](
+    values: R*
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): Ref[Bool]
+
+  def smtOr[T <: Data, R <: Referable[T]](
+    values: R*
   )(
     using Arena,
     Context,
