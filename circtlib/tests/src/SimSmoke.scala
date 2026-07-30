@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.zaozi.circtlib.tests
 
+import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialect, TypeApi as SeqTypeApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialect, TypeApi as SimTypeApi, given}
 import org.llvm.circt.scalalib.dialect.sim.operation.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{
@@ -105,3 +106,55 @@ object SimSmoke extends TestSuite:
       assert(scopeString.contains("sim.fmt.char"))
       assert(scopeString.contains("sim.fmt.current_time"))
       assert(scopeString.contains("sim.fmt.concat"))
+
+    test("sim print and stream ops"):
+      given Arena         = currentArena
+      val context         = summon[ContextApi].contextCreate
+      currentContext = context
+      context.allowUnregisteredDialects(true)
+      given Context       = context
+      summon[SimDialect].loadDialect
+      summon[SeqDialect].loadDialect
+      val unknownLocation = summon[LocationApi].locationUnknownGet
+
+      val clockType = summon[SeqTypeApi].clockTypeGet
+      val i1        = 1.integerTypeGet
+      val scope     = summon[OperationApi].operationCreate(
+        name = "test.scope",
+        location = unknownLocation,
+        regionBlockTypeLocations = Seq(
+          Seq((Seq(clockType, i1), Seq(unknownLocation, unknownLocation)))
+        )
+      )
+      given Block   = scope.getFirstRegion.getFirstBlock
+      val clock     = summon[Block].getArgument(0)
+      val enable    = summon[Block].getArgument(1)
+
+      val literal = summon[FormatLiteralApi].op("hello\n", unknownLocation)
+      literal.operation.appendToBlock()
+      val stdout  = summon[StdoutStreamApi].op(unknownLocation)
+      stdout.operation.appendToBlock()
+      val stderr  = summon[StderrStreamApi].op(unknownLocation)
+      stderr.operation.appendToBlock()
+
+      val plainPrint  = summon[PrintFormattedApi]
+        .op(literal.result, clock, enable, None, unknownLocation)
+      plainPrint.operation.appendToBlock()
+      val streamPrint = summon[PrintFormattedApi]
+        .op(literal.result, clock, enable, Some(stderr.result), unknownLocation)
+      streamPrint.operation.appendToBlock()
+      val procPrint   = summon[PrintFormattedProcApi]
+        .op(literal.result, Some(stdout.result), unknownLocation)
+      procPrint.operation.appendToBlock()
+
+      val out         = StringBuilder()
+      scope.print(out ++= _)
+      val scopeString = out.toString()
+
+      assert(scopeString.contains("sim.stdout_stream"))
+      assert(scopeString.contains("sim.stderr_stream"))
+      assert(scopeString.contains("sim.print"))
+      assert(scopeString.contains("sim.proc.print"))
+      // The stream-less print must not carry a `to` operand.
+      assert(scopeString.split('\n').exists(l => l.contains("sim.print") && !l.contains(" to ")))
+      assert(scopeString.split('\n').exists(l => l.contains("sim.print") && l.contains(" to ")))
