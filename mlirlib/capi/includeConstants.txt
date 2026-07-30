@@ -119,6 +119,9 @@ MlirSpeculatabilityRecursivelySpeculatable                  # header: $MLIR_INST
 MlirSpeculatabilitySpeculatable                             # header: $MLIR_INSTALL_PATH/include/mlir-c/Interfaces.h
 MLIR_PASS_DISPLAY_MODE_LIST       # header: $MLIR_INSTALL_PATH/include/mlir-c/Pass.h
 MLIR_PASS_DISPLAY_MODE_PIPELINE   # header: $MLIR_INSTALL_PATH/include/mlir-c/Pass.h
+MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL                   # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
+MLIR_CONVERSION_TARGET_LEGALITY_LEGAL                     # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
+MLIR_CONVERSION_TARGET_LEGALITY_NO_OPINION                # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
 MLIR_DIALECT_CONVERSION_FOLDING_MODE_AFTER_PATTERNS       # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
 MLIR_DIALECT_CONVERSION_FOLDING_MODE_BEFORE_PATTERNS      # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
 MLIR_DIALECT_CONVERSION_FOLDING_MODE_NEVER                # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
