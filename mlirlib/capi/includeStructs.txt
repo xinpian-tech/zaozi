@@ -21,6 +21,7 @@ MlirContext                                     # header: $MLIR_INSTALL_PATH/inc
 MlirDialect                                     # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 MlirDialectHandle                               # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 MlirDialectRegistry                             # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
+MlirIRMapping                                   # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 MlirIdentifier                                  # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 MlirLocation                                    # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 MlirModule                                      # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h

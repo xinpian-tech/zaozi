@@ -10,6 +10,7 @@ MlirValueCallback                                    # header: $MLIR_INSTALL_PAT
 MlirOperationWalkCallback                      # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 MlirShapedTypeComponentsCallback                             # header: $MLIR_INSTALL_PATH/include/mlir-c/Interfaces.h
 MlirTypesCallback                                            # header: $MLIR_INSTALL_PATH/include/mlir-c/Interfaces.h
+MlirConversionTargetDynamicLegalityCallback                # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
 MlirPDLConstraintFunction                                  # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
 MlirPDLRewriteFunction                                     # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
 MlirTypeConverterConversionCallback                        # header: $MLIR_INSTALL_PATH/include/mlir-c/Rewrite.h
