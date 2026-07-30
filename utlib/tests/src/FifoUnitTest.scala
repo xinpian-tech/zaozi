@@ -98,3 +98,31 @@ object FifoUnitTest extends TestSuite:
       val enqueues = (0 until 4).flatMap(c => stimulus.at(c, "enq"))
       assert(enqueues.forall(_.kind == TxnKind.Enqueue))
       assert(enqueues.map(_.payload).distinct.size == 4)
+
+    test("the rvprobe Zaozi frontend leg is backed by the real solver"):
+      import me.jiuyang.rvprobe.frontend.*
+      val txnIface = TransactionInterface(
+        dutName = "Fifo",
+        ports = Seq(
+          DecoupledPort("enq", PortDir.Drive, 8),
+          DecoupledPort("deq", PortDir.Monitor, 8)
+        ),
+        status = Seq(StatusSignal("empty", "occupancy"), StatusSignal("full", "occupancy"))
+      )
+      val frontend = ZaoziFrontend(
+        txnIface,
+        ZaoziStrategy.solving(4) {
+          mustEnqueue(0 until 4, "enq")
+          payloadIn(0 until 4, "enq", BigInt(5), BigInt(9))
+          mustIdle(0 until 4, "deq")
+        }
+      )
+      val artifact = frontend.solve()
+      // Four solved enqueues, no dequeues, payloads inside the declared range.
+      val enqueues = artifact.transactions.collect { case e: Transaction.Enqueue => e }
+      assert(enqueues.size == 4)
+      assert(artifact.transactions.size == 4)
+      assert(enqueues.forall(e => e.value >= BigInt(5) && e.value <= BigInt(9)))
+      // The contract still holds: the artifact renders through the backend.
+      assert(frontend.backend.kind == "chiselsim")
+      assert(frontend.generate().contains("dut.enq.bits.poke"))
