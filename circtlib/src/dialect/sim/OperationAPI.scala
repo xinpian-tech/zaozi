@@ -171,3 +171,77 @@ trait PrintFormattedProcApi extends HasOperation[PrintFormattedProc]:
     Context
   ): PrintFormattedProc
 end PrintFormattedProcApi
+
+class Triggered(val _operation: Operation)
+trait TriggeredApi extends HasOperation[Triggered]:
+  /** `sim.triggered` — a procedural region executed on the rising edge of `clock`, optionally guarded by `condition`.
+    */
+  def op(
+    clock:     Value,
+    condition: Option[Value],
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): Triggered
+
+  extension (ref: Triggered)
+    /** The single block of the triggered region — append the body here. */
+    def block(
+      using Arena
+    ): Block
+end TriggeredApi
+
+class Terminate(val _operation: Operation)
+trait TerminateApi extends HasOperation[Terminate]:
+  /** `sim.terminate` — `$finish` (success) or `$fatal` (failure). Procedural. */
+  def op(
+    success:  Boolean,
+    verbose:  Boolean,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Terminate
+end TerminateApi
+
+class ClockedTerminate(val _operation: Operation)
+trait ClockedTerminateApi extends HasOperation[ClockedTerminate]:
+  /** `sim.clocked_terminate` — terminate when `condition` holds on the rising edge of `clock`. */
+  def op(
+    clock:     Value,
+    condition: Value,
+    success:   Boolean,
+    verbose:   Boolean,
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): ClockedTerminate
+end ClockedTerminateApi
+
+class Pause(val _operation: Operation)
+trait PauseApi extends HasOperation[Pause]:
+  /** `sim.pause` — `$stop`. Procedural. */
+  def op(
+    verbose:  Boolean,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Pause
+end PauseApi
+
+class ClockedPause(val _operation: Operation)
+trait ClockedPauseApi extends HasOperation[ClockedPause]:
+  /** `sim.clocked_pause` — pause when `condition` holds on the rising edge of `clock`. */
+  def op(
+    clock:     Value,
+    condition: Value,
+    verbose:   Boolean,
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): ClockedPause
+end ClockedPauseApi

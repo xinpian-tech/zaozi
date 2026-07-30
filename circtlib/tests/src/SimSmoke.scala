@@ -158,3 +158,67 @@ object SimSmoke extends TestSuite:
       // The stream-less print must not carry a `to` operand.
       assert(scopeString.split('\n').exists(l => l.contains("sim.print") && !l.contains(" to ")))
       assert(scopeString.split('\n').exists(l => l.contains("sim.print") && l.contains(" to ")))
+
+    test("sim simulation control ops"):
+      given Arena         = currentArena
+      val context         = summon[ContextApi].contextCreate
+      currentContext = context
+      context.allowUnregisteredDialects(true)
+      given Context       = context
+      summon[SimDialect].loadDialect
+      summon[SeqDialect].loadDialect
+      val unknownLocation = summon[LocationApi].locationUnknownGet
+
+      val clockType  = summon[SeqTypeApi].clockTypeGet
+      val i1         = 1.integerTypeGet
+      val scope      = summon[OperationApi].operationCreate(
+        name = "test.scope",
+        location = unknownLocation,
+        regionBlockTypeLocations = Seq(
+          Seq((Seq(clockType, i1), Seq(unknownLocation, unknownLocation)))
+        )
+      )
+      val scopeBlock = scope.getFirstRegion.getFirstBlock
+      val clock      = scopeBlock.getArgument(0)
+      val done       = scopeBlock.getArgument(1)
+
+      val triggered = {
+        given Block = scopeBlock
+        val t       = summon[TriggeredApi].op(clock, Some(done), unknownLocation)
+        t.operation.appendToBlock()
+        t
+      }
+
+      // Body of the triggered region: print a literal, then terminate.
+      {
+        given Block = triggered.block
+        val literal = summon[FormatLiteralApi].op("done\n", unknownLocation)
+        literal.operation.appendToBlock()
+        val print   = summon[PrintFormattedProcApi].op(literal.result, None, unknownLocation)
+        print.operation.appendToBlock()
+        val term    = summon[TerminateApi].op(true, false, unknownLocation)
+        term.operation.appendToBlock()
+      }
+
+      {
+        given Block      = scopeBlock
+        val clockedTerm  = summon[ClockedTerminateApi]
+          .op(clock, done, false, true, unknownLocation)
+        clockedTerm.operation.appendToBlock()
+        val pause        = summon[PauseApi].op(true, unknownLocation)
+        pause.operation.appendToBlock()
+        val clockedPause = summon[ClockedPauseApi].op(clock, done, false, unknownLocation)
+        clockedPause.operation.appendToBlock()
+      }
+
+      val out         = StringBuilder()
+      scope.print(out ++= _)
+      val scopeString = out.toString()
+
+      assert(scopeString.contains("sim.triggered"))
+      assert(scopeString.contains("sim.proc.print"))
+      assert(scopeString.contains("sim.terminate success, quiet"))
+      assert(scopeString.contains("sim.clocked_terminate"))
+      assert(scopeString.contains("failure, verbose"))
+      assert(scopeString.contains("sim.pause verbose"))
+      assert(scopeString.contains("sim.clocked_pause"))

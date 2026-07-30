@@ -264,3 +264,113 @@ given PrintFormattedProcApi with
     )
   extension (ref: PrintFormattedProc) def operation: Operation = ref._operation
 end given
+
+given TriggeredApi with
+  def op(
+    clock:       Value,
+    condition:   Option[Value],
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Triggered =
+    Triggered(
+      summon[OperationApi].operationCreate(
+        name = "sim.triggered",
+        location = location,
+        regionBlockTypeLocations = Seq(Seq((Seq.empty, Seq.empty))),
+        operands = Seq(clock) ++ condition.toSeq
+      )
+    )
+  extension (ref: Triggered)
+    def operation: Operation = ref._operation
+    def block(
+      using Arena
+    ): Block = ref.operation.getFirstRegion.getFirstBlock
+end given
+
+given TerminateApi with
+  def op(
+    success:     Boolean,
+    verbose:     Boolean,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Terminate =
+    Terminate(
+      summon[OperationApi].operationCreate(
+        name = "sim.terminate",
+        location = location,
+        namedAttributes = Seq(
+          named("success", success.boolAttrGet),
+          named("verbose", verbose.boolAttrGet)
+        )
+      )
+    )
+  extension (ref: Terminate) def operation: Operation = ref._operation
+end given
+
+given ClockedTerminateApi with
+  def op(
+    clock:       Value,
+    condition:   Value,
+    success:     Boolean,
+    verbose:     Boolean,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): ClockedTerminate =
+    ClockedTerminate(
+      summon[OperationApi].operationCreate(
+        name = "sim.clocked_terminate",
+        location = location,
+        namedAttributes = Seq(
+          named("success", success.boolAttrGet),
+          named("verbose", verbose.boolAttrGet)
+        ),
+        operands = Seq(clock, condition)
+      )
+    )
+  extension (ref: ClockedTerminate) def operation: Operation = ref._operation
+end given
+
+given PauseApi with
+  def op(
+    verbose:     Boolean,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Pause =
+    Pause(
+      summon[OperationApi].operationCreate(
+        name = "sim.pause",
+        location = location,
+        namedAttributes = Seq(named("verbose", verbose.boolAttrGet))
+      )
+    )
+  extension (ref: Pause) def operation: Operation = ref._operation
+end given
+
+given ClockedPauseApi with
+  def op(
+    clock:       Value,
+    condition:   Value,
+    verbose:     Boolean,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): ClockedPause =
+    ClockedPause(
+      summon[OperationApi].operationCreate(
+        name = "sim.clocked_pause",
+        location = location,
+        namedAttributes = Seq(named("verbose", verbose.boolAttrGet)),
+        operands = Seq(clock, condition)
+      )
+    )
+  extension (ref: ClockedPause) def operation: Operation = ref._operation
+end given
