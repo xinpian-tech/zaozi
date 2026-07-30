@@ -179,7 +179,7 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
   // c.add rd, rs2 — use raw() because asm renderer doesn't handle c.add format
   object CAdd extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets = isRV64GC()
     def constraints() =
       // c.add rd=SP with each rs2
       (1 to 31).foreach { r =>
@@ -192,20 +192,20 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
 
   // c.mv rd, rs2 — use raw() because asm renderer doesn't handle c.mv format
   object CMv extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets = isRV64GC()
     def constraints() =
       // Enumerate key registers for c.mv rd=SP coverage
       (1 to 31).foreach { r =>
-        raw(s"c.mv x2, x$r")   // rd=SP with each rs2
+        raw(s"c.mv x2, x$r") // rd=SP with each rs2
       }
       (1 to 31).foreach { r =>
-        raw(s"c.mv x$r, x5")   // each rd with a fixed rs2
+        raw(s"c.mv x$r, x5") // each rd with a fixed rs2
       }
 
   // c.jr rs1 — jump to rs1 (rd=x0 implicit)
   // Use raw() because c.jr changes control flow
   object CJr extends RVGenerator:
-    val sets          = isRV64GC()
+    val sets = isRV64GC()
     def constraints() =
       // Enumerate all 31 non-zero registers for c.jr rs1
       (1 to 31).foreach { r =>
@@ -235,13 +235,47 @@ import me.jiuyang.rvprobe.cases.coverage.CoverageLib.*
   writeCoverageAsm(
     outputPath,
     // RV32I base
-    Slli, Srai, Srli,
-    Add, And, Or, Xor, Sll, Slt, Sltu, Sra, Srl, Sub,
-    Addi, Andi, Ori, Xori, Slti, Sltiu,
-    Auipc, Lui,
-    Lb, Lbu, Lh, Lhu, Lw, Sb, Sh, Sw,
+    Slli,
+    Srai,
+    Srli,
+    Add,
+    And,
+    Or,
+    Xor,
+    Sll,
+    Slt,
+    Sltu,
+    Sra,
+    Srl,
+    Sub,
+    Addi,
+    Andi,
+    Ori,
+    Xori,
+    Slti,
+    Sltiu,
+    Auipc,
+    Lui,
+    Lb,
+    Lbu,
+    Lh,
+    Lhu,
+    Lw,
+    Sb,
+    Sh,
+    Sw,
     // M extension
-    Mul, Mulh, Mulhu, Mulhsu, Div, Divu, Rem, Remu,
+    Mul,
+    Mulh,
+    Mulhu,
+    Mulhsu,
+    Div,
+    Divu,
+    Rem,
+    Remu,
     // C extension
-    CAdd, CMv, CJr, CJalr
+    CAdd,
+    CMv,
+    CJr,
+    CJalr
   )

@@ -143,7 +143,7 @@ object RecipeTest extends TestSuite:
 
     test("HazardPriorityMatchesRiscvDv"):
       object WawRejectsRaw extends RVGenerator with HasRVProbeTest:
-        val sets = Seq(isRV64I())
+        val sets          = Seq(isRV64I())
         def constraints() =
           instruction(0, isAddw()) {
             rdEqual(1.S) & rs1Equal(2.S) & rs2Equal(3.S)
@@ -154,7 +154,7 @@ object RecipeTest extends TestSuite:
           sequence(0, 2).coverWAW()
 
       object WarRejectsWaw extends RVGenerator with HasRVProbeTest:
-        val sets = Seq(isRV64I())
+        val sets          = Seq(isRV64I())
         def constraints() =
           instruction(0, isAddw()) {
             rdEqual(1.S) & rs1Equal(1.S) & rs2Equal(3.S)
@@ -165,7 +165,7 @@ object RecipeTest extends TestSuite:
           sequence(0, 2).coverWAR()
 
       object PureWarStaysSat extends RVGenerator with HasRVProbeTest:
-        val sets = Seq(isRV64I())
+        val sets          = Seq(isRV64I())
         def constraints() =
           instruction(0, isAddw()) {
             rdEqual(1.S) & rs1Equal(2.S) & rs2Equal(3.S)
