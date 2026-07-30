@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
+package build.utlib
+
+import mill._
+import mill.scalalib.TestModule.Utest
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+
+import build.{circtlib, rvprobe, smtlib, stdlib, testlib, v, zaozi, ZaoziScalaModule}
+
+object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
+  def scalaVersion = Task(v.scala)
+  def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode)
+  def moduleDeps   = Seq(zaozi, stdlib, smtlib, circtlib, rvprobe)
+
+  // The Zaozi DSL used by the harness generator relies on experimental
+  // features (the same flag stdlib sets).
+  override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+  override def forkArgs: T[Seq[String]] = Task(
+    super.forkArgs() ++ circtlib.forkArgs()
+  )
+
+  object tests extends ScalaTests with ScalafmtModule with Utest {
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros"))
+
+    def mvnDeps = Seq(v.utest, v.oslib)
+
+    override def moduleDeps: Seq[JavaModule] = Seq(m, testlib)
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+}
