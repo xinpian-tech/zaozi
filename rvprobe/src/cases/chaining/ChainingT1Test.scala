@@ -41,10 +41,20 @@ import me.jiuyang.rvprobe.cases.chaining.ChainingLib.*
   object D5C1 extends RVGenerator { val sets = Seq(isRVV()); def constraints() = implicitV0WAR_ALUxALU()   }
 
   val cells: Seq[(String, RVGenerator)] = Seq(
-    "D1C1" -> D1C1, "D1C2" -> D1C2, "D1C3" -> D1C3, "D1C4" -> D1C4,
-    "D1C7" -> D1C7, "D2C1" -> D2C1, "D3C1" -> D3C1,
-    "D3C2" -> D3C2, "D3C4" -> D3C4, "D3C6" -> D3C6, "D4C1" -> D4C1,
-    "D4C2" -> D4C2, "D4C4" -> D4C4, "D5C1" -> D5C1
+    "D1C1" -> D1C1,
+    "D1C2" -> D1C2,
+    "D1C3" -> D1C3,
+    "D1C4" -> D1C4,
+    "D1C7" -> D1C7,
+    "D2C1" -> D2C1,
+    "D3C1" -> D3C1,
+    "D3C2" -> D3C2,
+    "D3C4" -> D3C4,
+    "D3C6" -> D3C6,
+    "D4C1" -> D4C1,
+    "D4C2" -> D4C2,
+    "D4C4" -> D4C4,
+    "D5C1" -> D5C1
   )
 
   val cellBodies = cells.map { (name, gen) =>

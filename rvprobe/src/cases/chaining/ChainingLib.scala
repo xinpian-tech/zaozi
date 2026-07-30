@@ -35,17 +35,17 @@ object ChainingLib:
     */
   private val VectorPreamble =
     """    # Vector configuration: SEW=32, LMUL=1, vl=max
-       |    li   t2, -1
-       |    vsetvli t2, t2, e32, m1, ta, ma
-       |    # Set up valid memory base in t3
-       |    la   t3, vbuf""".stripMargin
+      |    li   t2, -1
+      |    vsetvli t2, t2, e32, m1, ta, ma
+      |    # Set up valid memory base in t3
+      |    la   t3, vbuf""".stripMargin
 
   /** Data section with a buffer for vector load/store. */
   private val DataSection =
     """    .section ".data","aw",@progbits
-       |    .align 8
-       |vbuf:
-       |    .zero 256""".stripMargin
+      |    .align 8
+      |vbuf:
+      |    .zero 256""".stripMargin
 
   private val ChainingPreamble = HTIFLib.asmTextStart()
   private val ChainingEpilogue =
@@ -149,69 +149,172 @@ object ChainingLib:
   // Naming: {dependency}_{unitA}x{unitB}
 
   // --- D1 × C1: Explicit RAW, ALU × ALU ---
-  def explicitRAW_ALUxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def explicitRAW_ALUxALU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     explicitRAW(reg, isVaddVv(), isVsubVv())
 
   // --- D1 × C2: Explicit RAW, ALU × LSU ---
   // Uses t3 (memory base) set up in VectorPreamble
-  def explicitRAW_ALUxLSU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def explicitRAW_ALUxLSU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     instruction(0, isVaddVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
     instruction(1, isVle32V()) { vdEqual(reg.S) & rs1Range(28, 29) & vmEqual(1) }
 
   // --- D1 × C3: Explicit RAW, ALU × Mask unit ---
-  def explicitRAW_MaskxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def explicitRAW_MaskxALU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     explicitRAW(reg, isVmseqVv(), isVaddVv())
 
   // --- D1 × C4: Explicit RAW, Slow × Fast ---
-  def explicitRAW_SlowxFast(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def explicitRAW_SlowxFast(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     explicitRAW(reg, isVdivVv(), isVaddVv())
 
   // --- D1 × C5: Explicit RAW, Widen × Normal ---
-  def explicitRAW_WidenxNormal(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def explicitRAW_WidenxNormal(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     explicitRAW(reg, isVwaddVv(), isVaddVv())
 
   // --- D1 × C7: Explicit RAW, Slide × Store ---
-  def explicitRAW_SlidexStore(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def explicitRAW_SlidexStore(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     instruction(0, isVslidedownVi()) { vdEqual(reg.S) & vs2Range(1, 32) & vmEqual(1) }
-    instruction(1, isVse32V())       { vs2Range(1, 32) & rs1Range(28, 29) & vmEqual(1) }
+    instruction(1, isVse32V()) { vs2Range(1, 32) & rs1Range(28, 29) & vmEqual(1) }
 
   // --- D2 × C1: Implicit v0 mask RAW, ALU × ALU ---
-  def implicitV0RAW_ALUxALU()(using Arena, Context, Block, Recipe): Unit =
+  def implicitV0RAW_ALUxALU(
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     implicitV0RAW(isVaddVv(), isVsubVv())
 
   // --- D3 × C2: WAR, Store × ALU ---
-  def war_StorexALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def war_StorexALU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     instruction(0, isVse32V()) { vs2Range(1, 32) & rs1Range(28, 29) & vmEqual(1) }
     instruction(1, isVaddVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
 
   // --- D3 × C6: WAR, Gather × ALU ---
-  def war_GatherxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def war_GatherxALU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     inst(isVrgatherVv()) { vs2Equal(reg.S) & vdRange(1, 32) & vmEqual(1) }
-    inst(isVaddVv())     { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
+    inst(isVaddVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
 
   // --- D4 × C2: WAW, Slow × Load ---
-  def waw_SlowxLoad(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def waw_SlowxLoad(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     instruction(0, isVdivVv()) { vdEqual(reg.S) & vs1Range(1, 32) & vs2Range(1, 32) & vmEqual(1) }
     instruction(1, isVle32V()) { vdEqual(reg.S) & rs1Range(28, 29) & vmEqual(1) }
 
   // --- D5 × C1: Implicit v0 WAR, ALU × ALU ---
-  def implicitV0WAR_ALUxALU()(using Arena, Context, Block, Recipe): Unit =
+  def implicitV0WAR_ALUxALU(
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     implicitV0WAR(isVaddVv(), isVsubVv())
 
   // --- D3 × C1: WAR, ALU × ALU ---
-  def war_ALUxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def war_ALUxALU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     war(reg, isVaddVv(), isVsubVv())
 
   // --- D4 × C1: WAW, ALU × ALU ---
-  def waw_ALUxALU(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def waw_ALUxALU(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     waw(reg, isVaddVv(), isVsubVv())
 
   // --- D3 × C4: WAR, Slow × Fast (divider reads, fast ALU overwrites) ---
-  def war_SlowxFast(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def war_SlowxFast(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     war(reg, isVdivVv(), isVaddVv())
 
   // --- D4 × C4: WAW, Slow × Fast ---
-  def waw_SlowxFast(reg: Int = 4)(using Arena, Context, Block, Recipe): Unit =
+  def waw_SlowxFast(
+    reg: Int = 4
+  )(
+    using Arena,
+    Context,
+    Block,
+    Recipe
+  ): Unit =
     waw(reg, isVdivVv(), isVaddVv())
 
   // ================== Complete Test Generators ==================
@@ -233,12 +336,12 @@ object ChainingLib:
     *   6. vrgather.vv + vadd.vv: WAR pair (gather reads v_src, vadd overwrites v_src with poison)
     *   7. vmsne.vv + vcpop.m: compare result against reference, count mismatches
     *
-    * The solver picks all scalar temporaries (freshReg) and vector register assignments (v_src, v_idx, etc.)
-    * to avoid conflicts. The `isGather()` OM predicate constrains instruction A to a gather variant.
+    * The solver picks all scalar temporaries (freshReg) and vector register assignments (v_src, v_idx, etc.) to avoid
+    * conflicts. The `isGather()` OM predicate constrains instruction A to a gather variant.
     *
-    * On pre-fix T1 (before commit 50986c9d): gather reads corrupted data from v_src because WriteCheck
-    * allows vadd to write while gather is still reading non-sequentially.
-    * On post-fix T1: vadd is stalled until gather completes (record.bits.gather flag).
+    * On pre-fix T1 (before commit 50986c9d): gather reads corrupted data from v_src because WriteCheck allows vadd to
+    * write while gather is still reading non-sequentially. On post-fix T1: vadd is stalled until gather completes
+    * (record.bits.gather flag).
     */
   def war_GatherxALU_full(
     vSrc:    Int = 8,
@@ -268,7 +371,7 @@ object ChainingLib:
     //    For vl=128: v_idx = {127, 126, ..., 1, 0}
     //    This forces gather to read element 0 at the LAST processing step,
     //    while sequential elementMask marks element 0 as "done" at step 0.
-    raw("addi x6, x5, -1")          // x6 = vl - 1
+    raw("addi x6, x5, -1")             // x6 = vl - 1
     raw(s"vid.v v$vIdx")
     raw(s"vxor.vx v$vIdx, v$vIdx, x6") // v_idx = vid XOR (vl-1) = reversed
 

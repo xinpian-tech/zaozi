@@ -2,27 +2,26 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.frontend
 
-import me.jiuyang.rvprobe.{RVGenerator, Statement, getMergedInstructions}
+import me.jiuyang.rvprobe.{getMergedInstructions, RVGenerator, Statement}
 
-/** The RISC-V leg's solved artifact: the frontend-agnostic [[SolvedSequence]]
-  * plus the recipe statement layout the GAS backend needs to render. */
+/** The RISC-V leg's solved artifact: the frontend-agnostic [[SolvedSequence]] plus the recipe statement layout the GAS
+  * backend needs to render.
+  */
 final case class RiscvArtifact(
   sequence:   SolvedSequence,
-  statements: Seq[Statement]
-) extends SolvedArtifact
+  statements: Seq[Statement])
+    extends SolvedArtifact
 
-/** The RISC-V leg of the [[DutFrontend]] contract — the reference implementation
-  * that validates the seam can carry a real, fully-wired frontend.
+/** The RISC-V leg of the [[DutFrontend]] contract — the reference implementation that validates the seam can carry a
+  * real, fully-wired frontend.
   *
   * It adapts the existing [[RVGenerator]] machinery:
-  *   - `alphabet` — the RISC-V instruction set from riscv-opcodes; each merged
-  *     variant becomes a [[StimulusKind]] whose `id` is the opcode index the
-  *     generated constraints use and whose `mnemonic` is the instruction name.
-  *   - `whitebox` — empty for a plain core. The T1/Chisel leg populates this from
-  *     the Object Model (the architecture-x-microarchitecture matrix).
-  *   - `solve` / `backend` — solve the recipe once into a [[RiscvArtifact]]
-  *     (via [[RVGenerator.solveRecipe]]), then render it to GAS assembly (via
-  *     `renderRecipeAsm`). No stage is re-run at render time.
+  *   - `alphabet` — the RISC-V instruction set from riscv-opcodes; each merged variant becomes a [[StimulusKind]] whose
+  *     `id` is the opcode index the generated constraints use and whose `mnemonic` is the instruction name.
+  *   - `whitebox` — empty for a plain core. The T1/Chisel leg populates this from the Object Model (the
+  *     architecture-x-microarchitecture matrix).
+  *   - `solve` / `backend` — solve the recipe once into a [[RiscvArtifact]] (via [[RVGenerator.solveRecipe]]), then
+  *     render it to GAS assembly (via `renderRecipeAsm`). No stage is re-run at render time.
   */
 final class RiscvFrontend(gen: RVGenerator) extends DutFrontend:
   type Artifact = RiscvArtifact
@@ -42,6 +41,6 @@ final class RiscvFrontend(gen: RVGenerator) extends DutFrontend:
     RiscvArtifact(sequence, statements)
 
   def backend: StimulusBackend[RiscvArtifact] = new StimulusBackend[RiscvArtifact]:
-    def kind: String = "gas-asm"
+    def kind:                          String = "gas-asm"
     def render(solved: RiscvArtifact): String =
       gen.renderRecipeAsm(solved.sequence, solved.statements)
