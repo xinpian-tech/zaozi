@@ -8,7 +8,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Operation, Value}
 
 import java.lang.foreign.Arena
 
-abstract class Wire[T <: Data] extends Writable[T] with HasOperation:
+abstract class Wire[T <: Data] extends Writable[T] with Documentable:
   private[zaozi] val _tpe:       T
   private[zaozi] val _operation: Operation
   def operation(

@@ -15,7 +15,6 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
 }
 import org.llvm.circt.scalalib.dialect.firrtl.operation
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
-  AsResetPrimApi,
   ConnectApi,
   ConstantApi,
   InstanceApi,
@@ -203,15 +202,13 @@ given ConstructorApi with
   ): Reg[T] =
     val clockScope = summon[ClockScope]
     val resetScope = summon[ResetScope]
-    val asResetOp  = summon[AsResetPrimApi].op(resetScope.reset.refer, locate)
-    asResetOp.operation.appendToBlock()
     val regResetOp = summon[RegResetApi].op(
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
       tpe = input._tpe.toMlirType,
       clock = clockScope.clock.refer,
-      reset = asResetOp.result,
+      reset = resetScope.reset.refer,
       resetValue = input.refer,
       clockEdge = clockScope.clockEdge,
       resetType = resetScope.resetType,
@@ -232,7 +229,7 @@ given ConstructorApi with
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): Node[T] =
+  ): Node[T] & Documentable =
     val nodeOp = summon[NodeApi].op(
       name = valName,
       location = locate,
@@ -240,7 +237,7 @@ given ConstructorApi with
       input = ref.refer
     )
     nodeOp.operation.appendToBlock()
-    new Node[T]:
+    new Node[T] with Documentable:
       val _tpe:       T         = ref._tpe
       val _operation: Operation = nodeOp.operation
 

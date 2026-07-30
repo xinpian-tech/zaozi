@@ -10,11 +10,11 @@
         "slang-src": "slang-src"
       },
       "locked": {
-        "lastModified": 1783445212,
-        "narHash": "sha256-ZwIZ9h9eRVHSuCFsPyG4E6TOfvq02EftAnNLmISg80g=",
+        "lastModified": 1783968423,
+        "narHash": "sha256-+FZbkj2UWPHm/BkXSZQ7fpKyFSBpu1LZdMofDf6K/y0=",
         "owner": "xinpian-tech",
         "repo": "circt-nix",
-        "rev": "520a922ef77de85cdbf64515798104292b9e748d",
+        "rev": "8d80d581db141566820d0ae2decf68095f7c1492",
         "type": "github"
       },
       "original": {
@@ -27,16 +27,16 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1783443308,
-        "narHash": "sha256-GcLkWahXAunfnGxX7YO4nngUBkrV4iYZ5hPZ5hGH3RE=",
+        "lastModified": 1784646298,
+        "narHash": "sha256-IX0e0kLg3gcHO+cSPrrwhB/6Qnl3l5ebcK95em5VHZ0=",
         "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "6588f8af605ecdf34b4c81a4fff73c6ee8dbade8",
+        "rev": "4a4a2df4bbc5d3f87ff31312659f2a2c9db0b09d",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
-        "ref": "xinpian-main",
+        "ref": "master",
         "repo": "circt",
         "type": "github"
       }

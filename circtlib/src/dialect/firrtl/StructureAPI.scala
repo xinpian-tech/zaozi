@@ -84,7 +84,8 @@ trait ModuleApi extends HasOperation[Module]:
     location:         Location,
     firrtlConvention: FirrtlConvention,
     interface:        Seq[(FirrtlBundleField, Location)],
-    layers:           Seq[Seq[String]]
+    layers:           Seq[Seq[String]],
+    comment:          scala.Option[String] = scala.None
   )(
     using arena:      Arena,
     context:          Context

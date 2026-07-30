@@ -48,3 +48,6 @@ trait HasOperation:
   def operation(
     using TypeImpl
   ): Operation
+
+/** A hardware declaration that can carry documentation into emitted RTL. */
+trait Documentable private[zaozi] extends HasOperation
