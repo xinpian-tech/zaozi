@@ -51,13 +51,17 @@ final case class ZaoziArtifact(
   *     predicates.
   *   - `backend` — a ChiselSim-style poke/peek/step driver, not GAS assembly.
   *
-  * SCOPE (honest): `solve()` currently emits a straightforward deterministic smoke sequence (drive every Drive port
-  * once, drain every Monitor port once). The SMT-backed *sequence-level* solving of transactions under Decoupled
-  * handshake timing — the "adjacency" semantics of valid/ready, backpressure, and coverRAW/WAR/WAW lifted from
-  * registers to addresses — is idea#9's L2 research core. When built, it replaces the body of `solve()` and reuses this
-  * leg's alphabet, whitebox, and backend unchanged.
+  * Sequence solving is supplied by `strategy` rather than fixed here. The SMT-backed transaction solver lives in the
+  * `utlib` module, which depends on this one, so wiring it in directly would be a dependency cycle; `utlib` injects it
+  * instead (see `me.jiuyang.utlib.ZaoziStrategy`).
+  *
+  * The default strategy is a smoke sequence: drive every Drive port once, drain every Monitor port once. It keeps this
+  * leg usable — and its tests env-independent — without pulling in Z3.
   */
-final class ZaoziFrontend(iface: TransactionInterface) extends DutFrontend:
+final class ZaoziFrontend(
+  iface:    TransactionInterface,
+  strategy: TransactionInterface => Seq[Transaction] = ZaoziFrontend.smokeStrategy)
+    extends DutFrontend:
   type Artifact = ZaoziArtifact
 
   def name: String = iface.dutName
@@ -79,18 +83,13 @@ final class ZaoziFrontend(iface: TransactionInterface) extends DutFrontend:
         def category: String = s.category
     }
 
-  /** PLACEHOLDER sequence (see class scope note): drive each Drive port once with a small distinct value, then drain
-    * each Monitor port once. The SolvedSequence records the transaction selection/fields so downstream tooling sees the
-    * same shape it will once the SMT solver is wired.
+  /** Solve this DUT's transaction sequence with the injected [[strategy]], then record it as the frontend-agnostic
+    * [[SolvedSequence]] plus the concrete transaction list the backend renders.
     */
   def solve(): ZaoziArtifact =
-    val drives   = iface.ports.filter(_.dir == PortDir.Drive)
-    val monitors = iface.ports.filter(_.dir == PortDir.Monitor)
-    val txns: Seq[Transaction] =
-      drives.zipWithIndex.map { case (p, i) => Transaction.Enqueue(p.name, BigInt(i + 1)) } ++
-        monitors.map(p => Transaction.Dequeue(p.name))
+    val txns       = strategy(iface)
     val selections = txns.zipWithIndex.map { case (_, i) => i -> i }.toMap
-    val fields = txns.zipWithIndex.collect { case (Transaction.Enqueue(p, v), i) => s"${p}_bits_$i" -> v }.toMap
+    val fields     = txns.zipWithIndex.collect { case (Transaction.Enqueue(p, v), i) => s"${p}_bits_$i" -> v }.toMap
     ZaoziArtifact(SolvedSequence(selections, fields), txns)
 
   def backend: StimulusBackend[ZaoziArtifact] = new StimulusBackend[ZaoziArtifact]:
@@ -114,3 +113,13 @@ final class ZaoziFrontend(iface: TransactionInterface) extends DutFrontend:
               |  dut.$port.ready.poke(false)""".stripMargin
       }.mkString("\n")
       s"$header\n$body"
+
+object ZaoziFrontend:
+  /** The default [[ZaoziFrontend]] strategy: drive each Drive port once with a small distinct value, then drain each
+    * Monitor port once.
+    */
+  val smokeStrategy: TransactionInterface => Seq[Transaction] = iface =>
+    val drives   = iface.ports.filter(_.dir == PortDir.Drive)
+    val monitors = iface.ports.filter(_.dir == PortDir.Monitor)
+    drives.zipWithIndex.map { case (p, i) => Transaction.Enqueue(p.name, BigInt(i + 1)) } ++
+      monitors.map(p => Transaction.Dequeue(p.name))
