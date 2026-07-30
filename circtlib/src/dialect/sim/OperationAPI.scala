@@ -245,3 +245,45 @@ trait ClockedPauseApi extends HasOperation[ClockedPause]:
     Context
   ): ClockedPause
 end ClockedPauseApi
+
+class PlusArgsTest(val _operation: Operation)
+trait PlusArgsTestApi extends HasOperation[PlusArgsTest]:
+  /** `sim.plusargs.test` — SystemVerilog `$test$plusargs`. */
+  def op(
+    formatString: String,
+    location:     Location
+  )(
+    using Arena,
+    Context
+  ): PlusArgsTest
+
+  extension (ref: PlusArgsTest)
+    /** i1: whether the switch was present on the command line. */
+    def found(
+      using Arena
+    ): Value
+end PlusArgsTestApi
+
+class PlusArgsValue(val _operation: Operation)
+trait PlusArgsValueApi extends HasOperation[PlusArgsValue]:
+  /** `sim.plusargs.value` — SystemVerilog `$value$plusargs`. */
+  def op(
+    formatString: String,
+    resultType:   Type,
+    location:     Location
+  )(
+    using Arena,
+    Context
+  ): PlusArgsValue
+
+  extension (ref: PlusArgsValue)
+    /** i1: whether the switch was present on the command line. */
+    def found(
+      using Arena
+    ): Value
+
+    /** The parsed value, of the `resultType` passed to `op`. */
+    def value(
+      using Arena
+    ): Value
+end PlusArgsValueApi

@@ -222,3 +222,35 @@ object SimSmoke extends TestSuite:
       assert(scopeString.contains("failure, verbose"))
       assert(scopeString.contains("sim.pause verbose"))
       assert(scopeString.contains("sim.clocked_pause"))
+
+    test("sim plusargs ops"):
+      given Arena         = currentArena
+      val context         = summon[ContextApi].contextCreate
+      currentContext = context
+      context.allowUnregisteredDialects(true)
+      given Context       = context
+      summon[SimDialect].loadDialect
+      val unknownLocation = summon[LocationApi].locationUnknownGet
+
+      val scope   = summon[OperationApi].operationCreate(
+        name = "test.scope",
+        location = unknownLocation,
+        regionBlockTypeLocations = Seq(Seq((Seq.empty, Seq.empty)))
+      )
+      given Block = scope.getFirstRegion.getFirstBlock
+
+      val test = summon[PlusArgsTestApi].op("verbose", unknownLocation)
+      test.operation.appendToBlock()
+      val seed = summon[PlusArgsValueApi].op("seed=%d", 32.integerTypeGet, unknownLocation)
+      seed.operation.appendToBlock()
+
+      val out         = StringBuilder()
+      scope.print(out ++= _)
+      val scopeString = out.toString()
+
+      assert(scopeString.contains("sim.plusargs.test \"verbose\""))
+      assert(scopeString.contains("sim.plusargs.value \"seed=%d\""))
+      assert(scopeString.contains("i32"))
+      // plusargs.value yields (found: i1, value: i32).
+      assert(seed.found.getType.equal(1.integerTypeGet))
+      assert(seed.value.getType.equal(32.integerTypeGet))
