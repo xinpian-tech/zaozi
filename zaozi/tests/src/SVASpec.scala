@@ -173,7 +173,7 @@ object SVASpec extends TestSuite:
             Assert(delayed)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "(@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) ib1))"
+          "(@(posedge clock) ##1 ib1)"
         )
 
       test("##n"):
@@ -190,14 +190,14 @@ object SVASpec extends TestSuite:
 
             Assert(delayed)
         SimpleSVA.mlirTest(SVASpecParameter(32))(
-          "firrtl.int.ltl.clock",
+          "firrtl.int.ltl.clocked_atom",
           "firrtl.int.ltl.clocked_delay",
           "firrtl.int.ltl.concat",
           "firrtl.int.verif.assert"
         )
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "(@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##5 (@(posedge clock) ib1))"
+          "(@(posedge clock) ##5 ib1)"
         )
 
       test("##[n:m]"):
@@ -217,7 +217,7 @@ object SVASpec extends TestSuite:
             Assert(delayed)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "(@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##[1:2] (@(posedge clock) ib1))"
+          "(@(posedge clock) ##[1:2] ib1)"
         )
 
       test("reject invalid ## ranges"):
@@ -265,7 +265,7 @@ object SVASpec extends TestSuite:
           "assert0:",
           "assert1:",
           "(@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##[+] (@(posedge clock) ib1))"
+          "(@(posedge clock) ##[+] ib1)"
         )
 
       test("##[*]"):
@@ -289,7 +289,7 @@ object SVASpec extends TestSuite:
           "assert0:",
           "assert1:",
           "(@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##[*] (@(posedge clock) ib1))"
+          "(@(posedge clock) ##[*] ib1)"
         )
 
       test("[*n]"):
@@ -306,7 +306,7 @@ object SVASpec extends TestSuite:
 
             Assert(delayed)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0)"
+          s"@(posedge clock) ib0[*1]"
         )
 
       test("[*n:m]"):
@@ -323,7 +323,7 @@ object SVASpec extends TestSuite:
 
             Assert(rep)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0)[*1:2]"
+          s"@(posedge clock) ib0[*1:2]"
         )
 
       test("[*n:$]"):
@@ -344,9 +344,9 @@ object SVASpec extends TestSuite:
             Assert(rep1, "assert1")
             Assert(rep2, "assert2")
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"assert0: assert property ((@(posedge clock) ib0)[*]);",
-          s"assert1: assert property ((@(posedge clock) ib0)[+]);",
-          s"assert2: assert property ((@(posedge clock) ib0)[*2:$$]);"
+          s"assert0: assert property (@(posedge clock) ib0[*]);",
+          s"assert1: assert property (@(posedge clock) ib0[+]);",
+          s"assert2: assert property (@(posedge clock) ib0[*2:$$]);"
         )
 
       test("[->n:m]"):
@@ -363,7 +363,7 @@ object SVASpec extends TestSuite:
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0)[->1:2]"
+          s"@(posedge clock) ib0[->1:2]"
         )
 
       test("[=n:m]"):
@@ -380,7 +380,7 @@ object SVASpec extends TestSuite:
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0)[=1:2]"
+          s"@(posedge clock) ib0[=1:2]"
         )
 
       test("and"):
@@ -418,7 +418,7 @@ object SVASpec extends TestSuite:
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0)[*3] intersect (@(posedge clock) ib1)[*2]"
+          s"(@(posedge clock) ib0[*3]) intersect (@(posedge clock) ib1[*2])"
         )
 
       test("or"):
@@ -486,7 +486,7 @@ object SVASpec extends TestSuite:
 
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(ib0[*] intersect (@(posedge clock) ib1))"
+          s"(@(posedge clock) ib0[*]) intersect (@(posedge clock) ib1)"
         )
 
       test("within"):
@@ -506,8 +506,8 @@ object SVASpec extends TestSuite:
             Assert(sequence)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "(@(posedge clock) 1'h1) ##0",
-          "(@(posedge clock) ##[*] (@(posedge clock) ib0))",
-          "(@(posedge clock) ##[*] (@(posedge clock) 1'h1))",
+          "(@(posedge clock) ##[*] ib0)",
+          "(@(posedge clock) ##[*] 1'h1)",
           "intersect (@(posedge clock) ib1)"
         )
 
@@ -563,7 +563,7 @@ object SVASpec extends TestSuite:
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "(@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) 1'h1))",
+          "(@(posedge clock) ##1 1'h1)",
           "|-> (@(posedge clock) ib1)"
         )
       test("implies"):
@@ -683,7 +683,7 @@ object SVASpec extends TestSuite:
             val prop: Sequence = io.ib0.S
 
             Assert(prop)
-        SimpleSVA.mlirTest(SVASpecParameter(32))(out => out.contains("ltl.clock") && !out.contains("ltl.repeat"))
+        SimpleSVA.mlirTest(SVASpecParameter(32))(out => out.contains("ltl.clocked_atom") && !out.contains("ltl.repeat"))
 
       test("iff"):
         @generator
@@ -740,7 +740,7 @@ object SVASpec extends TestSuite:
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "not",
           "((@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) 1'h1)) |-> not",
+          "(@(posedge clock) ##1 1'h1) |-> not",
           "(@(posedge clock) ib1))"
         )
       test("#=# property rhs"):
@@ -761,7 +761,7 @@ object SVASpec extends TestSuite:
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "not",
           "((@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) 1'h1)) |-> not not",
+          "(@(posedge clock) ##1 1'h1) |-> not not",
           "(@(posedge clock) ib1))"
         )
       test("always"):
@@ -773,14 +773,12 @@ object SVASpec extends TestSuite:
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
             val a:    Referable[Bool] = io.ib0
-            val b:    Referable[Bool] = io.ib1
             val as:   Sequence        = a.S
-            val bs:   Sequence        = b.S
             val prop: Property        = always(as)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0) until 1'h0"
+          s"@(posedge clock) ib0 until 1'h0"
         )
       test("eventually"):
         @generator
@@ -791,14 +789,13 @@ object SVASpec extends TestSuite:
             val io           = summon[Interface[SVASpecIO]]
             given ClockEvent = posedge(io.clock)
             val a:    Referable[Bool] = io.ib0
-            val b:    Referable[Bool] = io.ib1
             val as:   Sequence        = a.S
-            val bs:   Sequence        = b.S
-            val prop: Property        = eventually(as)
+            val base: Property        = !as
+            val prop: Property        = eventually(base)
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(s_eventually (@(posedge clock) ib0))"
+          s"@(posedge clock) s_eventually not ib0"
         )
       test("until"):
         @generator
@@ -816,7 +813,7 @@ object SVASpec extends TestSuite:
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          s"(@(posedge clock) ib0) until (@(posedge clock) ib1)"
+          s"@(posedge clock) ib0 until ib1"
         )
       test("untilWith"):
         @generator
@@ -834,8 +831,7 @@ object SVASpec extends TestSuite:
 
             Assert(prop)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          "(@(posedge clock) ib0) until (@(posedge clock) ib0)",
-          "and (@(posedge clock) ib1)"
+          "@(posedge clock) ib0 until ib0 and ib1"
         )
 
     test("Clock"):
@@ -853,10 +849,10 @@ object SVASpec extends TestSuite:
             Assert(a.S ### b.S ### a.S ### b.S ### a.S)
         SimpleSVA.verilogTest(SVASpecParameter(32))(
           "((@(posedge clock) ib0) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) ib1)) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) ib0)) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) ib1)) ##0",
-          "(@(posedge clock) ##1 (@(posedge clock) ib0)))"
+          "(@(posedge clock) ##1 ib1) ##0",
+          "(@(posedge clock) ##1 ib0) ##0",
+          "(@(posedge clock) ##1 ib1) ##0",
+          "(@(posedge clock) ##1 ib0))"
         )
       test("Asynchronous"):
         @generator
@@ -890,6 +886,23 @@ object SVASpec extends TestSuite:
 
         MultiClock.verilogTest(MultiClockParameter(32))(
           "((@(posedge clock0) ib0) ##0",
-          "(@(negedge clock1) ##1 (@(negedge clock1) ib1)) ##0",
-          "(@(posedge clock0) ##1 (@(posedge clock0) ib0)))"
+          "(@(posedge clock0) ##1 (@(negedge clock1) ib1)) ##0",
+          "(@(posedge clock0) ##1 ib0))"
+        )
+      test("Operator uses contextual clock"):
+        @generator
+        object MultiClock
+            extends Generator[MultiClockParameter, MultiClockLayers, MultiClockIO, MultiClockProbe]
+            with HasVerilogTest:
+          def architecture(parameter: MultiClockParameter) =
+            val io = summon[Interface[MultiClockIO]]
+            val a: Referable[Bool] = io.ib0
+
+            val atom     = posedge(io.clock0)(a.S)
+            val repeated = negedge(io.clock1)(atom * 2)
+
+            Assert(repeated)
+
+        MultiClock.verilogTest(MultiClockParameter(32))(
+          "@(negedge clock1) (@(posedge clock0) ib0)[*2]"
         )

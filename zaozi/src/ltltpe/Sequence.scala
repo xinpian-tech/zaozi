@@ -19,8 +19,7 @@ case class ClockEvent(edge: FirrtlEventControl, clock: Referable[Clock]):
 
 /** The SVA sequence, the inner bool indicate: match success or match failed. */
 trait Sequence:
-  private[zaozi] val _refer:      Value
-  private[zaozi] val _clockevent: ClockEvent
+  private[zaozi] val _refer: Value
 
   def refer(
     using Arena,

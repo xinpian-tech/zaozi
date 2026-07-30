@@ -10,34 +10,34 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLAndIntrinsicApi,
-  given_LTLClockIntrinsicApi,
+  given_LTLClockedAtomIntrinsicApi,
   given_LTLClockedDelayIntrinsicApi,
+  given_LTLClockedEventuallyIntrinsicApi,
+  given_LTLClockedGoToRepeatIntrinsicApi,
+  given_LTLClockedNonConsecutiveRepeatIntrinsicApi,
+  given_LTLClockedRepeatIntrinsicApi,
+  given_LTLClockedUntilIntrinsicApi,
   given_LTLConcatIntrinsicApi,
-  given_LTLEventuallyIntrinsicApi,
-  given_LTLGoToRepeatIntrinsicApi,
   given_LTLImplicationIntrinsicApi,
   given_LTLIntersectIntrinsicApi,
-  given_LTLNonConsecutiveRepeatIntrinsicApi,
   given_LTLNotIntrinsicApi,
   given_LTLOrIntrinsicApi,
-  given_LTLRepeatIntrinsicApi,
-  given_LTLUntilIntrinsicApi,
   given_VerifAssertApi,
   given_VerifAssumeApi,
   given_VerifCoverApi,
   LTLAndIntrinsicApi as AndApi,
-  LTLClockIntrinsicApi as ClockApi,
+  LTLClockedAtomIntrinsicApi as ClockedAtomApi,
   LTLClockedDelayIntrinsicApi as ClockedDelayApi,
+  LTLClockedEventuallyIntrinsicApi as ClockedEventuallyApi,
+  LTLClockedGoToRepeatIntrinsicApi as ClockedGoToRepeatApi,
+  LTLClockedNonConsecutiveRepeatIntrinsicApi as ClockedNonConsecutiveRepeatApi,
+  LTLClockedRepeatIntrinsicApi as ClockedRepeatApi,
+  LTLClockedUntilIntrinsicApi as ClockedUntilApi,
   LTLConcatIntrinsicApi as ConcatApi,
-  LTLEventuallyIntrinsicApi as EventuallyApi,
-  LTLGoToRepeatIntrinsicApi as GoToRepeatApi,
   LTLImplicationIntrinsicApi as ImplicationApi,
   LTLIntersectIntrinsicApi as IntersectApi,
-  LTLNonConsecutiveRepeatIntrinsicApi as NonConsecutiveRepeatApi,
   LTLNotIntrinsicApi as NotApi,
   LTLOrIntrinsicApi as OrApi,
-  LTLRepeatIntrinsicApi as RepeatApi,
-  LTLUntilIntrinsicApi as UntilApi,
   VerifAssertApi as AssertApi,
   VerifAssumeApi as AssumeApi,
   VerifCoverApi as CoverApi
@@ -69,7 +69,9 @@ given SVAApi with
     ClockEvent(FirrtlEventControl.AtNegEdge, clock)
 
   def always(
-    property: Immediate | Sequence | Property
+    property:    Immediate | Sequence | Property
+  )(
+    using clock: ClockEvent
   )(
     using Arena,
     Context,
@@ -84,13 +86,15 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     val rhs   = false.B.I
-    val op    = summon[UntilApi].op(value, rhs.refer, locate)
+    val op    = summon[ClockedUntilApi].op(value, rhs.refer, clock.edge, clock.clock.refer, locate)
     op.operation.appendToBlock()
     new Property:
       private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   def eventually(
-    property: Immediate | Sequence | Property
+    property:    Immediate | Sequence | Property
+  )(
+    using clock: ClockEvent
   )(
     using Arena,
     Context,
@@ -104,7 +108,7 @@ given SVAApi with
       case value: Immediate => value.refer
       case value: Sequence  => value.refer
       case value: Property  => value.refer
-    val op    = summon[EventuallyApi].op(value, locate)
+    val op    = summon[ClockedEventuallyApi].op(value, clock.edge, clock.clock.refer, locate)
     op.operation.appendToBlock()
     new Property:
       private[zaozi] val _refer: Value = op.operation.getResult(0)
@@ -121,11 +125,10 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      val seq = summon[ClockApi].op(ref.refer, clock.edge, clock.clock.refer, locate)
+      val seq = summon[ClockedAtomApi].op(ref.refer, clock.edge, clock.clock.refer, locate)
       seq.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = seq.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = clock
+        private[zaozi] val _refer: Value = seq.operation.getResult(0)
 
     def I(
       using Arena,
@@ -140,7 +143,9 @@ given SVAApi with
         private[zaozi] val _refer: Value = ref.refer
 
     infix def throughout(
-      that: Sequence
+      that:        Sequence
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -150,13 +155,13 @@ given SVAApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Sequence =
-      val repexpr = summon[RepeatApi].op(ref.refer, 0L, None, locate)
+      val repexpr = summon[ClockedRepeatApi]
+        .op(ref.refer, clock.edge, clock.clock.refer, 0L, None, locate)
       repexpr.operation.appendToBlock()
       val res     = summon[IntersectApi].op(Seq(repexpr.result, that.refer), locate)
       res.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = res.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+        private[zaozi] val _refer: Value = res.operation.getResult(0)
 
   extension (ref: Immediate)
     def unary_!(
@@ -203,8 +208,7 @@ given SVAApi with
       val op = summon[AndApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def &(
       that: Property
@@ -252,8 +256,7 @@ given SVAApi with
       val op = summon[OrApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |(
       that: Property
@@ -301,8 +304,7 @@ given SVAApi with
       val op = summon[IntersectApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = that._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def intersect(
       that: Property
@@ -413,7 +415,9 @@ given SVAApi with
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def until(
-      that: Immediate | Sequence | Property
+      that:        Immediate | Sequence | Property
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -427,13 +431,16 @@ given SVAApi with
         case value: Immediate => value.refer
         case value: Sequence  => value.refer
         case value: Property  => value.refer
-      val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
+      val op        = summon[ClockedUntilApi]
+        .op(ref.refer, thatValue, clock.edge, clock.clock.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def untilWith(
-      that: Immediate | Sequence | Property
+      that:        Immediate | Sequence | Property
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -449,7 +456,8 @@ given SVAApi with
         case value: Property  => value.refer
       val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
       and.operation.appendToBlock()
-      val op        = summon[UntilApi].op(ref.refer, and.result, locate)
+      val op        = summon[ClockedUntilApi]
+        .op(ref.refer, and.result, clock.edge, clock.clock.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _refer: Value = op.operation.getResult(0)
@@ -483,11 +491,12 @@ given SVAApi with
       val op = summon[ConcatApi].op(Seq(ref.refer, that.refer), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def ###(
       that: Sequence
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -499,8 +508,10 @@ given SVAApi with
     ): Sequence = ref.##(1)(that)
 
     def ##(
-      n:    Int
-    )(that: Sequence
+      n:           Int
+    )(that:        Sequence
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -511,26 +522,26 @@ given SVAApi with
       InstanceContext
     ): Sequence =
       require(n >= 0, s"delay ($n) must be greater than or equal to 0 in sequence delay")
-      val op         =
+      val op    =
         summon[ClockedDelayApi].op(
           that.refer,
-          that._clockevent.edge,
-          that._clockevent.clock.refer,
+          clock.edge,
+          clock.clock.refer,
           n.toLong,
           Some(0L),
           locate
         )
       op.operation.appendToBlock()
-      val clockevent = that._clockevent
-      val _that      = new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = clockevent
+      val _that = new Sequence:
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
       ref.##(_that)
 
     def ##(
-      min:  Int,
-      max:  Option[Int]
-    )(that: Sequence
+      min:         Int,
+      max:         Option[Int]
+    )(that:        Sequence
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -544,23 +555,23 @@ given SVAApi with
       max.foreach(value =>
         require(value >= min, s"max ($value) must be greater than or equal to min ($min) in sequence delay")
       )
-      val op         = summon[ClockedDelayApi].op(
+      val op    = summon[ClockedDelayApi].op(
         that.refer,
-        that._clockevent.edge,
-        that._clockevent.clock.refer,
+        clock.edge,
+        clock.clock.refer,
         min.toLong,
         max.map(value => (value - min).toLong),
         locate
       )
       op.operation.appendToBlock()
-      val clockevent = that._clockevent
-      val _that      = new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = clockevent
+      val _that = new Sequence:
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
       ref.##(_that)
 
     def *(
-      n: Int
+      n:           Int
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -571,15 +582,17 @@ given SVAApi with
       InstanceContext
     ): Sequence =
       require(n >= 0, s"repeat count ($n) must be greater than or equal to 0")
-      val op = summon[RepeatApi].op(ref.refer, n.toLong, Some(0L), locate)
+      val op = summon[ClockedRepeatApi]
+        .op(ref.refer, clock.edge, clock.clock.refer, n.toLong, Some(0L), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def *(
-      min: Int,
-      max: Option[Int]
+      min:         Int,
+      max:         Option[Int]
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -591,15 +604,24 @@ given SVAApi with
     ): Sequence =
       require(min >= 0, s"min ($min) must be greater than or equal to 0 in repeat")
       max.foreach(value => require(value >= min, s"max ($value) must be greater than or equal to min ($min) in repeat"))
-      val op = summon[RepeatApi].op(ref.refer, min.toLong, max.map(value => (value - min).toLong), locate)
+      val op = summon[ClockedRepeatApi]
+        .op(
+          ref.refer,
+          clock.edge,
+          clock.clock.refer,
+          min.toLong,
+          max.map(value => (value - min).toLong),
+          locate
+        )
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def *->(
-      min: Int,
-      max: Int
+      min:         Int,
+      max:         Int
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -611,20 +633,23 @@ given SVAApi with
     ): Sequence =
       require(min >= 0, s"min ($min) must be greater than or equal to 0 in goto repeat")
       require(max >= min, s"max ($max) must be greater than or equal to min ($min) in goto repeat")
-      val op = summon[GoToRepeatApi].op(
+      val op = summon[ClockedGoToRepeatApi].op(
         ref.refer,
+        clock.edge,
+        clock.clock.refer,
         min.toLong,
         (max - min).toLong,
         locate
       )
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def *=(
-      min: Int,
-      max: Int
+      min:         Int,
+      max:         Int
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -636,19 +661,22 @@ given SVAApi with
     ): Sequence =
       require(min >= 0, s"min ($min) must be greater than or equal to 0 in non-consecutive repeat")
       require(max >= min, s"max ($max) must be greater than or equal to min ($min) in non-consecutive repeat")
-      val op = summon[NonConsecutiveRepeatApi].op(
+      val op = summon[ClockedNonConsecutiveRepeatApi].op(
         ref.refer,
+        clock.edge,
+        clock.clock.refer,
         min.toLong,
         (max - min).toLong,
         locate
       )
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def ##+(
       that: Sequence
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -662,6 +690,8 @@ given SVAApi with
     def ##*(
       that: Sequence
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -674,6 +704,8 @@ given SVAApi with
     infix def within(
       that: Sequence
     )(
+      using ClockEvent
+    )(
       using Arena,
       Context,
       Block,
@@ -684,11 +716,12 @@ given SVAApi with
     ): Sequence =
       // within: ref occurs within the duration of 'that'
       // true ##[*] s1 ##[*] true intersect s2
-      given ClockEvent = ref._clockevent
       true.B.S.##*(ref).##*(true.B.S).intersect(that)
 
     def |=>(
       that: Immediate | Sequence | Property
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -700,11 +733,12 @@ given SVAApi with
     ): Property =
       // ref |=> that: implication property (weak implication)
       // ref ##1 true |-> that
-      given ClockEvent = ref._clockevent
       ref.##(1)(true.B.S) |-> that
 
     def #=#(
       that: Immediate | Sequence | Property
+    )(
+      using ClockEvent
     )(
       using Arena,
       Context,
@@ -747,8 +781,7 @@ given SVAApi with
       val op        = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def &(
       that: Property
@@ -783,8 +816,7 @@ given SVAApi with
       val op        = summon[OrApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     def |(
       that: Property
@@ -819,8 +851,7 @@ given SVAApi with
       val op        = summon[IntersectApi].op(Seq(ref.refer, thatValue), locate)
       op.operation.appendToBlock()
       new Sequence:
-        private[zaozi] val _refer:      Value      = op.operation.getResult(0)
-        private[zaozi] val _clockevent: ClockEvent = ref._clockevent
+        private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def intersect(
       that: Property
@@ -931,7 +962,9 @@ given SVAApi with
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def until(
-      that: Immediate | Sequence | Property
+      that:        Immediate | Sequence | Property
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -945,13 +978,16 @@ given SVAApi with
         case value: Immediate => value.refer
         case value: Sequence  => value.refer
         case value: Property  => value.refer
-      val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
+      val op        = summon[ClockedUntilApi]
+        .op(ref.refer, thatValue, clock.edge, clock.clock.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def untilWith(
-      that: Immediate | Sequence | Property
+      that:        Immediate | Sequence | Property
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -967,7 +1003,8 @@ given SVAApi with
         case value: Property  => value.refer
       val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
       and.operation.appendToBlock()
-      val op        = summon[UntilApi].op(ref.refer, and.result, locate)
+      val op        = summon[ClockedUntilApi]
+        .op(ref.refer, and.result, clock.edge, clock.clock.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _refer: Value = op.operation.getResult(0)
@@ -1096,7 +1133,9 @@ given SVAApi with
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def until(
-      that: Immediate | Sequence | Property
+      that:        Immediate | Sequence | Property
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -1110,13 +1149,16 @@ given SVAApi with
         case value: Immediate => value.refer
         case value: Sequence  => value.refer
         case value: Property  => value.refer
-      val op        = summon[UntilApi].op(ref.refer, thatValue, locate)
+      val op        = summon[ClockedUntilApi]
+        .op(ref.refer, thatValue, clock.edge, clock.clock.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
     infix def untilWith(
-      that: Immediate | Sequence | Property
+      that:        Immediate | Sequence | Property
+    )(
+      using clock: ClockEvent
     )(
       using Arena,
       Context,
@@ -1132,7 +1174,8 @@ given SVAApi with
         case value: Property  => value.refer
       val and       = summon[AndApi].op(Seq(ref.refer, thatValue), locate)
       and.operation.appendToBlock()
-      val op        = summon[UntilApi].op(ref.refer, and.result, locate)
+      val op        = summon[ClockedUntilApi]
+        .op(ref.refer, and.result, clock.edge, clock.clock.refer, locate)
       op.operation.appendToBlock()
       new Property:
         private[zaozi] val _refer: Value = op.operation.getResult(0)

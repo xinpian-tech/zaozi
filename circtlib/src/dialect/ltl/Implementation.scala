@@ -96,7 +96,7 @@ given BooleanConstantApi with
     ): Value = ref.operation.getResult(0)
 end given
 
-given ClockApi with
+given ClockedAtomApi with
   def op(
     input:       Value,
     edge:        LTLClockEdge,
@@ -105,19 +105,19 @@ given ClockApi with
   )(
     using arena: Arena,
     context:     Context
-  ): Clock =
-    Clock(
+  ): ClockedAtom =
+    ClockedAtom(
       summon[OperationApi].operationCreate(
-        name = "ltl.clock",
+        name = "ltl.clocked_atom",
         location = location,
         namedAttributes = Seq(
           summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.toAttribute)
         ),
         operands = Seq(input, clock),
-        inferredResultsTypes = Some(1)
+        resultsTypes = Some(Seq(sequenceType))
       )
     )
-  extension (ref: Clock)
+  extension (ref: ClockedAtom)
     def operation: Operation = ref._operation
     def result(
       using Arena
@@ -176,81 +176,6 @@ given ConcatApi with
     ): Value = ref.operation.getResult(0)
 end given
 
-given DelayApi with
-  def op(
-    input:       Value,
-    delay:       Long,
-    length:      Option[Long],
-    location:    Location
-  )(
-    using arena: Arena,
-    context:     Context
-  ): Delay =
-    Delay(
-      summon[OperationApi].operationCreate(
-        name = "ltl.delay",
-        location = location,
-        namedAttributes = integerRangeAttrs("delay", delay, "length", length),
-        operands = Seq(input),
-        resultsTypes = Some(Seq(sequenceType))
-      )
-    )
-  extension (ref: Delay)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given EventuallyApi with
-  def op(
-    input:       Value,
-    location:    Location
-  )(
-    using arena: Arena,
-    context:     Context
-  ): Eventually =
-    Eventually(
-      summon[OperationApi].operationCreate(
-        name = "ltl.eventually",
-        location = location,
-        operands = Seq(input),
-        resultsTypes = Some(Seq(propertyType))
-      )
-    )
-  extension (ref: Eventually)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given GoToRepeatApi with
-  def op(
-    input:       Value,
-    base:        Long,
-    more:        Long,
-    location:    Location
-  )(
-    using arena: Arena,
-    context:     Context
-  ): GoToRepeat =
-    GoToRepeat(
-      summon[OperationApi].operationCreate(
-        name = "ltl.goto_repeat",
-        location = location,
-        namedAttributes = integerRangeAttrs("base", base, "more", Some(more)),
-        operands = Seq(input),
-        resultsTypes = Some(Seq(sequenceType))
-      )
-    )
-  extension (ref: GoToRepeat)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
 given ImplicationApi with
   def op(
     antecedent:  Value,
@@ -292,32 +217,6 @@ given IntersectApi with
       )
     )
   extension (ref: Intersect)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given NonConsecutiveRepeatApi with
-  def op(
-    input:       Value,
-    base:        Long,
-    more:        Long,
-    location:    Location
-  )(
-    using arena: Arena,
-    context:     Context
-  ): NonConsecutiveRepeat =
-    NonConsecutiveRepeat(
-      summon[OperationApi].operationCreate(
-        name = "ltl.non_consecutive_repeat",
-        location = location,
-        namedAttributes = integerRangeAttrs("base", base, "more", Some(more)),
-        operands = Seq(input),
-        resultsTypes = Some(Seq(sequenceType))
-      )
-    )
-  extension (ref: NonConsecutiveRepeat)
     def operation: Operation = ref._operation
     def result(
       using Arena
@@ -398,32 +297,6 @@ given PastApi with
     ): Value = ref.operation.getResult(0)
 end given
 
-given RepeatApi with
-  def op(
-    input:       Value,
-    base:        Long,
-    more:        Option[Long],
-    location:    Location
-  )(
-    using arena: Arena,
-    context:     Context
-  ): Repeat =
-    Repeat(
-      summon[OperationApi].operationCreate(
-        name = "ltl.repeat",
-        location = location,
-        namedAttributes = integerRangeAttrs("base", base, "more", more),
-        operands = Seq(input),
-        resultsTypes = Some(Seq(sequenceType))
-      )
-    )
-  extension (ref: Repeat)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
 given SampledApi with
   def op(
     expression:  Value,
@@ -441,30 +314,6 @@ given SampledApi with
       )
     )
   extension (ref: Sampled)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given UntilApi with
-  def op(
-    input:       Value,
-    condition:   Value,
-    location:    Location
-  )(
-    using arena: Arena,
-    context:     Context
-  ): Until =
-    Until(
-      summon[OperationApi].operationCreate(
-        name = "ltl.until",
-        location = location,
-        operands = Seq(input, condition),
-        resultsTypes = Some(Seq(propertyType))
-      )
-    )
-  extension (ref: Until)
     def operation: Operation = ref._operation
     def result(
       using Arena

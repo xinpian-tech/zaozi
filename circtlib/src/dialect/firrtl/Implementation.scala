@@ -917,7 +917,7 @@ given LTLAndIntrinsicApi with
     ): Value = ref.operation.getResult(0)
 end given
 
-given LTLClockIntrinsicApi with
+given LTLClockedAtomIntrinsicApi with
   def op(
     input:    Value,
     edge:     FirrtlEventControl,
@@ -926,18 +926,18 @@ given LTLClockIntrinsicApi with
   )(
     using Arena,
     Context
-  ): LTLClockIntrinsic =
+  ): LTLClockedAtomIntrinsic =
     val edgeAttr = summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.attrGetEventControl)
-    LTLClockIntrinsic(
+    LTLClockedAtomIntrinsic(
       summon[OperationApi].operationCreate(
-        name = "firrtl.int.ltl.clock",
+        name = "firrtl.int.ltl.clocked_atom",
         location = location,
         namedAttributes = Seq(edgeAttr),
         operands = Seq(input, clock),
         resultsTypes = Some(Seq(1.getUInt))
       )
     )
-  extension (ref: LTLClockIntrinsic)
+  extension (ref: LTLClockedAtomIntrinsic)
     def operation: Operation = ref._operation
     def result(
       using Arena
@@ -982,6 +982,165 @@ given LTLClockedDelayIntrinsicApi with
     ): Value = ref.operation.getResult(0)
 end given
 
+given LTLClockedEventuallyIntrinsicApi with
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): LTLClockedEventuallyIntrinsic =
+    val edgeAttr = summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.attrGetEventControl)
+    LTLClockedEventuallyIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.ltl.clocked_eventually",
+        location = location,
+        namedAttributes = Seq(edgeAttr),
+        operands = Seq(input, clock),
+        resultsTypes = Some(Seq(1.getUInt))
+      )
+    )
+  extension (ref: LTLClockedEventuallyIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given LTLClockedGoToRepeatIntrinsicApi with
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    base:     Long,
+    more:     Long,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): LTLClockedGoToRepeatIntrinsic =
+    val namedAttributeApi = summon[NamedAttributeApi]
+    LTLClockedGoToRepeatIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.ltl.clocked_goto_repeat",
+        location = location,
+        namedAttributes = Seq(
+          namedAttributeApi.namedAttributeGet("edge".identifierGet, edge.attrGetEventControl),
+          namedAttributeApi.namedAttributeGet("base".identifierGet, base.integerAttrGet(64.integerTypeGet)),
+          namedAttributeApi.namedAttributeGet("more".identifierGet, more.integerAttrGet(64.integerTypeGet))
+        ),
+        operands = Seq(input, clock),
+        resultsTypes = Some(Seq(1.getUInt))
+      )
+    )
+  extension (ref: LTLClockedGoToRepeatIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given LTLClockedNonConsecutiveRepeatIntrinsicApi with
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    base:     Long,
+    more:     Long,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): LTLClockedNonConsecutiveRepeatIntrinsic =
+    val namedAttributeApi = summon[NamedAttributeApi]
+    LTLClockedNonConsecutiveRepeatIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.ltl.clocked_non_consecutive_repeat",
+        location = location,
+        namedAttributes = Seq(
+          namedAttributeApi.namedAttributeGet("edge".identifierGet, edge.attrGetEventControl),
+          namedAttributeApi.namedAttributeGet("base".identifierGet, base.integerAttrGet(64.integerTypeGet)),
+          namedAttributeApi.namedAttributeGet("more".identifierGet, more.integerAttrGet(64.integerTypeGet))
+        ),
+        operands = Seq(input, clock),
+        resultsTypes = Some(Seq(1.getUInt))
+      )
+    )
+  extension (ref: LTLClockedNonConsecutiveRepeatIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given LTLClockedRepeatIntrinsicApi with
+  def op(
+    input:    Value,
+    edge:     FirrtlEventControl,
+    clock:    Value,
+    base:     Long,
+    more:     scala.Option[Long],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): LTLClockedRepeatIntrinsic =
+    val namedAttributeApi = summon[NamedAttributeApi]
+    val attrs             =
+      Seq(
+        namedAttributeApi.namedAttributeGet("edge".identifierGet, edge.attrGetEventControl),
+        namedAttributeApi.namedAttributeGet("base".identifierGet, base.integerAttrGet(64.integerTypeGet))
+      ) ++ more
+        .map(value =>
+          namedAttributeApi.namedAttributeGet("more".identifierGet, value.integerAttrGet(64.integerTypeGet))
+        )
+        .toSeq
+    LTLClockedRepeatIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.ltl.clocked_repeat",
+        location = location,
+        namedAttributes = attrs,
+        operands = Seq(input, clock),
+        resultsTypes = Some(Seq(1.getUInt))
+      )
+    )
+  extension (ref: LTLClockedRepeatIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
+given LTLClockedUntilIntrinsicApi with
+  def op(
+    input:     Value,
+    condition: Value,
+    edge:      FirrtlEventControl,
+    clock:     Value,
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): LTLClockedUntilIntrinsic =
+    val edgeAttr = summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.attrGetEventControl)
+    LTLClockedUntilIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.ltl.clocked_until",
+        location = location,
+        namedAttributes = Seq(edgeAttr),
+        operands = Seq(input, clock, condition),
+        resultsTypes = Some(Seq(1.getUInt))
+      )
+    )
+  extension (ref: LTLClockedUntilIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
 given LTLConcatIntrinsicApi with
   def op(
     inputs:   Seq[Value],
@@ -999,59 +1158,6 @@ given LTLConcatIntrinsicApi with
       )
     )
   extension (ref: LTLConcatIntrinsic)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given LTLEventuallyIntrinsicApi with
-  def op(
-    input:    Value,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ): LTLEventuallyIntrinsic =
-    LTLEventuallyIntrinsic(
-      summon[OperationApi].operationCreate(
-        name = "firrtl.int.ltl.eventually",
-        location = location,
-        operands = Seq(input),
-        resultsTypes = Some(Seq(1.getUInt))
-      )
-    )
-  extension (ref: LTLEventuallyIntrinsic)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given LTLGoToRepeatIntrinsicApi with
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Long,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ): LTLGoToRepeatIntrinsic =
-    val namedAttributeApi = summon[NamedAttributeApi]
-    LTLGoToRepeatIntrinsic(
-      summon[OperationApi].operationCreate(
-        name = "firrtl.int.ltl.goto_repeat",
-        location = location,
-        namedAttributes = Seq(
-          namedAttributeApi.namedAttributeGet("base".identifierGet, base.integerAttrGet(64.integerTypeGet)),
-          namedAttributeApi.namedAttributeGet("more".identifierGet, more.integerAttrGet(64.integerTypeGet))
-        ),
-        operands = Seq(input),
-        resultsTypes = Some(Seq(1.getUInt))
-      )
-    )
-  extension (ref: LTLGoToRepeatIntrinsic)
     def operation: Operation = ref._operation
     def result(
       using Arena
@@ -1105,36 +1211,6 @@ given LTLIntersectIntrinsicApi with
     ): Value = ref.operation.getResult(0)
 end given
 
-given LTLNonConsecutiveRepeatIntrinsicApi with
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     Long,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ): LTLNonConsecutiveRepeatIntrinsic =
-    val namedAttributeApi = summon[NamedAttributeApi]
-    LTLNonConsecutiveRepeatIntrinsic(
-      summon[OperationApi].operationCreate(
-        name = "firrtl.int.ltl.non_consecutive_repeat",
-        location = location,
-        namedAttributes = Seq(
-          namedAttributeApi.namedAttributeGet("base".identifierGet, base.integerAttrGet(64.integerTypeGet)),
-          namedAttributeApi.namedAttributeGet("more".identifierGet, more.integerAttrGet(64.integerTypeGet))
-        ),
-        operands = Seq(input),
-        resultsTypes = Some(Seq(1.getUInt))
-      )
-    )
-  extension (ref: LTLNonConsecutiveRepeatIntrinsic)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
 given LTLNotIntrinsicApi with
   def op(
     input:    Value,
@@ -1175,65 +1251,6 @@ given LTLOrIntrinsicApi with
       )
     )
   extension (ref: LTLOrIntrinsic)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given LTLRepeatIntrinsicApi with
-  def op(
-    input:    Value,
-    base:     Long,
-    more:     scala.Option[Long],
-    location: Location
-  )(
-    using Arena,
-    Context
-  ): LTLRepeatIntrinsic =
-    val namedAttributeApi = summon[NamedAttributeApi]
-    val attrs             =
-      Seq(
-        namedAttributeApi.namedAttributeGet("base".identifierGet, base.integerAttrGet(64.integerTypeGet))
-      ) ++ more
-        .map(value =>
-          namedAttributeApi.namedAttributeGet("more".identifierGet, value.integerAttrGet(64.integerTypeGet))
-        )
-        .toSeq
-    LTLRepeatIntrinsic(
-      summon[OperationApi].operationCreate(
-        name = "firrtl.int.ltl.repeat",
-        location = location,
-        namedAttributes = attrs,
-        operands = Seq(input),
-        resultsTypes = Some(Seq(1.getUInt))
-      )
-    )
-  extension (ref: LTLRepeatIntrinsic)
-    def operation: Operation = ref._operation
-    def result(
-      using Arena
-    ): Value = ref.operation.getResult(0)
-end given
-
-given LTLUntilIntrinsicApi with
-  def op(
-    input:     Value,
-    condition: Value,
-    location:  Location
-  )(
-    using Arena,
-    Context
-  ): LTLUntilIntrinsic =
-    LTLUntilIntrinsic(
-      summon[OperationApi].operationCreate(
-        name = "firrtl.int.ltl.until",
-        location = location,
-        operands = Seq(input, condition),
-        resultsTypes = Some(Seq(1.getUInt))
-      )
-    )
-  extension (ref: LTLUntilIntrinsic)
     def operation: Operation = ref._operation
     def result(
       using Arena
