@@ -188,7 +188,7 @@ trait TxnSolver:
         summon[Module].exportSMTLIB(out ++= _)
         prepare(out.toString())
       }
-      val output = os.proc(Toolchain.z3, "-in", "-t:5000").call(stdin = smtlib, check = false).out.text()
+      val output = Toolchain.solver.solve(smtlib, seed)
       val result = parseZ3Output(output)
       if result.status != Z3Status.Sat then
         System.err.println(s"=== $stage failed: ${result.status} ===")
@@ -200,18 +200,10 @@ trait TxnSolver:
       context.destroy()
       arena.close()
 
-  /** Make the exported SMT-LIB solvable and readable by Z3.
+  /** Make the exported SMT-LIB readable by a solver.
     *
-    * Two edits, both required:
-    *   - inject the seed before `(set-logic …)` so each solve is reproducible;
-    *   - swap the trailing `(reset)` the MLIR exporter emits for `(get-model)`, without which Z3 prints only
-    *     `sat`/`unsat` and the model comes back empty.
+    * The MLIR SMT exporter ends its program with `(reset)`, which discards the model before anything can ask for it.
+    * Swapping it for `(get-model)` is what makes the assignment come back at all. Seeding is not done here — that
+    * syntax is solver-specific and belongs to the [[Solver]] backend.
     */
-  private def prepare(smtlib: String): String =
-    val options = Seq(
-      s"(set-option :smt.random_seed $seed)",
-      s"(set-option :sat.random_seed $seed)"
-    ).mkString("\n")
-    smtlib
-      .replaceFirst("""\(set-logic """, s"$options\n(set-logic ")
-      .replace("(reset)", "(get-model)")
+  private def prepare(smtlib: String): String = smtlib.replace("(reset)", "(get-model)")

@@ -829,6 +829,32 @@ given VerifAssumeApi with
   extension (ref: VerifAssume) def operation: Operation = ref._operation
 end given
 
+given PrintfApi with
+  def op(
+    clock:         Value,
+    cond:          Value,
+    formatString:  String,
+    substitutions: Seq[Value],
+    name:          String,
+    location:      Location
+  )(
+    using Arena,
+    Context
+  ): Printf =
+    Printf(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.printf",
+        location = location,
+        namedAttributes = Seq(
+          summon[NamedAttributeApi].namedAttributeGet("formatString".identifierGet, formatString.stringAttrGet),
+          summon[NamedAttributeApi].namedAttributeGet("name".identifierGet, name.stringAttrGet)
+        ),
+        operands = Seq(clock, cond) ++ substitutions
+      )
+    )
+  extension (ref: Printf) def operation: Operation = ref._operation
+end given
+
 given VerifCoverApi with
   def op(
     property: Value,

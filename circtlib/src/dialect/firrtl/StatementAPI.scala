@@ -22,6 +22,24 @@ end LayerBlockApi
 class Match(val _operation: Operation)
 class MatchingConnect(val _operation: Operation)
 class Printf(val _operation: Operation)
+trait PrintfApi            extends HasOperation[Printf]:
+  /** `firrtl.printf` — print `formatString` on the rising edge of `clock` when `cond` is high.
+    *
+    * firtool lowers this to the `sim` dialect (`sim.print` over `sim.fmt.*`), so it is the way to get a simulation
+    * trace out of a design written in the Zaozi DSL, where signals are typed references rather than IR handles.
+    */
+  def op(
+    clock:         Value,
+    cond:          Value,
+    formatString:  String,
+    substitutions: Seq[Value],
+    name:          String,
+    location:      Location
+  )(
+    using Arena,
+    Context
+  ): Printf
+end PrintfApi
 class Propassign(val _operation: Operation)
 class RefDefine(val _operation: Operation)
 trait RefDefineApi         extends HasOperation[RefDefine]:
