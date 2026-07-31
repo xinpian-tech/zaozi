@@ -2,18 +2,19 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.Incrementer" %s --
-// DEFINE: %{bmc} = circt-bmc %t-w8.contract.hw.mlir --module=Incrementer_width8_radix4_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
+// DEFINE: %{bmc} = circt-bmc %t.dir/w8.contract.hw.mlir --module=Incrementer_width8_radix4_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
 
 // width 8
-// RUN: %{test} config %t-w8.json --width 8 --radix 4
-// RUN: FileCheck %s -check-prefix=CONFIG8 --input-file=%t-w8.json
-// RUN: %{test} design %t-w8.json
-// RUN: circt-opt Incrementer_width8_radix4.mlirbc | FileCheck %s -check-prefix=CONTRACT8
-// RUN: firtool Incrementer_width8_radix4.mlirbc | FileCheck %s -check-prefix=VERILOG8
-// RUN: firtool Incrementer_width8_radix4.mlirbc --hw-pass-plugin='lower-contracts' --output-hw-mlir=%t-w8.contract.hw.mlir --disable-output
-// RUN: FileCheck %s -check-prefix=LOWERED8 --input-file=%t-w8.contract.hw.mlir
+// RUN: rm -rf %t.dir && mkdir -p %t.dir
+// RUN: %{test} config %t.dir/w8.json --width 8 --radix 4
+// RUN: FileCheck %s -check-prefix=CONFIG8 --input-file=%t.dir/w8.json
+// RUN: cd %t.dir && %{test} design %t.dir/w8.json
+// RUN: circt-opt %t.dir/Incrementer_width8_radix4.mlirbc | FileCheck %s -check-prefix=CONTRACT8
+// RUN: firtool %t.dir/Incrementer_width8_radix4.mlirbc | FileCheck %s -check-prefix=VERILOG8
+// RUN: firtool %t.dir/Incrementer_width8_radix4.mlirbc --hw-pass-plugin='lower-contracts' --output-hw-mlir=%t.dir/w8.contract.hw.mlir --disable-output
+// RUN: FileCheck %s -check-prefix=LOWERED8 --input-file=%t.dir/w8.contract.hw.mlir
 // RUN: %{bmc} | FileCheck %s -check-prefix=BMC8
-// RUN: rm %t-w8.json %t-w8.contract.hw.mlir Incrementer_width8_radix4.mlirbc -f
+// RUN: rm -rf %t.dir
 
 // CONFIG8: {"width":8}
 
