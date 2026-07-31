@@ -1196,7 +1196,7 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     summon[AssertApi]
-      .op(value, Some(valName), locate)
+      .op(value, None, Some(valName), locate)
       .operation
       .appendToBlock()
 
@@ -1216,7 +1216,7 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     summon[AssumeApi]
-      .op(value, Some(valName), locate)
+      .op(value, None, Some(valName), locate)
       .operation
       .appendToBlock()
 
@@ -1236,7 +1236,70 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     summon[CoverApi]
-      .op(value, Some(valName), locate)
+      .op(value, None, Some(valName), locate)
+      .operation
+      .appendToBlock()
+
+  def Assert(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
+    summon[AssertApi]
+      .op(value, Some(enable.refer), Some(valName), locate)
+      .operation
+      .appendToBlock()
+
+  def Assume(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
+    summon[AssumeApi]
+      .op(value, Some(enable.refer), Some(valName), locate)
+      .operation
+      .appendToBlock()
+
+  def Cover(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
+    summon[CoverApi]
+      .op(value, Some(enable.refer), Some(valName), locate)
       .operation
       .appendToBlock()
 
@@ -1257,7 +1320,7 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     summon[AssertApi]
-      .op(value, Some(label), locate)
+      .op(value, None, Some(label), locate)
       .operation
       .appendToBlock()
 
@@ -1278,7 +1341,7 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     summon[AssumeApi]
-      .op(value, Some(label), locate)
+      .op(value, None, Some(label), locate)
       .operation
       .appendToBlock()
 
@@ -1299,7 +1362,73 @@ given SVAApi with
       case value: Sequence  => value.refer
       case value: Property  => value.refer
     summon[CoverApi]
-      .op(value, Some(label), locate)
+      .op(value, None, Some(label), locate)
+      .operation
+      .appendToBlock()
+
+  def Assert(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool],
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
+    summon[AssertApi]
+      .op(value, Some(enable.refer), Some(label), locate)
+      .operation
+      .appendToBlock()
+
+  def Assume(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool],
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
+    summon[AssumeApi]
+      .op(value, Some(enable.refer), Some(label), locate)
+      .operation
+      .appendToBlock()
+
+  def Cover(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool],
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit =
+    val value = property match
+      case value: Immediate => value.refer
+      case value: Sequence  => value.refer
+      case value: Property  => value.refer
+    summon[CoverApi]
+      .op(value, Some(enable.refer), Some(label), locate)
       .operation
       .appendToBlock()
 

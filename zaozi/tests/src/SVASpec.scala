@@ -28,6 +28,7 @@ class SVASpecLayers(parameter: SVASpecParameter) extends LayerInterface(paramete
 
 class SVASpecIO(parameter: SVASpecParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
+  val reset = Flipped(Reset())
   val ib0   = Flipped(Bool())
   val ib1   = Flipped(Bool())
 
@@ -134,6 +135,41 @@ object SVASpec extends TestSuite:
           s"cover_0: cover property (ib0);",
           s"cover_1: cover property (@(posedge clock) ib0);",
           s"cover_2: cover property (not ib0 or ib0);"
+        )
+
+      test("reset enable"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io       = summon[Interface[SVASpecIO]]
+            val property = posedge(io.clock)(io.ib0.S)
+
+            Assert(property, !io.reset.asBool, "assert_enable")
+            Assume(property, !io.reset.asBool, "assume_enable")
+            Cover(property, !io.reset.asBool, "cover_enable")
+
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          "assert_enable: assert property (disable iff (reset) @(posedge clock) ib0);",
+          "assume_enable: assume property (disable iff (reset) @(posedge clock) ib0);",
+          "cover_enable: cover property (disable iff (reset) @(posedge clock) ib0);"
+        )
+
+      test("enable"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io       = summon[Interface[SVASpecIO]]
+            val property = posedge(io.clock)(io.ib0.S)
+
+            Assert(property, io.ib1, "assert_enabled")
+
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          "wire _GEN = ~ib1;",
+          "assert_enabled: assert property (disable iff (_GEN) @(posedge clock) ib0);"
         )
 
     test("Sequence"):

@@ -2022,6 +2022,42 @@ trait SVAApi:
   ): Unit
   def Assert(
     property: Immediate | Sequence | Property,
+    enable:   Referable[Bool]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assume(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Cover(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assert(
+    property: Immediate | Sequence | Property,
     label:    String
   )(
     using Arena,
@@ -2046,6 +2082,45 @@ trait SVAApi:
   ): Unit
   def Cover(
     property: Immediate | Sequence | Property,
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assert(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool],
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Assume(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool],
+    label:    String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Unit
+  def Cover(
+    property: Immediate | Sequence | Property,
+    enable:   Referable[Bool],
     label:    String
   )(
     using Arena,
