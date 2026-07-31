@@ -24,13 +24,13 @@ object HarnessTest extends TestSuite:
       val verilog = FifoHarness.verilogString(HarnessFixture.parameter)
       assert(verilog.contains("done"))
 
-    test("an unknown coverpoint name fails elaboration"):
-      val bad   = HarnessFixture.parameter.copy(
-        coverpoints = Seq(Coverpoint("cover_nonsense", "not a thing the harness knows"))
-      )
-      val threw =
-        try
-          FifoHarness.verilogString(bad)
-          false
-        catch case e: Throwable => e.getMessage != null && e.getMessage.contains("cover_nonsense")
-      assert(threw)
+    test("the catalogue covers both DUT ports and white-box probe signals"):
+      val verilog = FifoHarness.verilogString(HarnessFixture.parameter)
+      // Port-bound coverpoints.
+      assert(verilog.contains("cover_enq_fire"))
+      assert(verilog.contains("cover_full"))
+      // Probe-bound coverpoints, on signals no port exposes.
+      assert(verilog.contains("cover_probe_both_slots"))
+      assert(verilog.contains("cover_probe_pass_through"))
+      // The probe path goes through a layer bind, not through the DUT's IO.
+      assert(verilog.contains("bind Fifo"))

@@ -25,7 +25,12 @@ trait UnitTest:
   /** Sequence length, in cycles. */
   def cycles: Int
 
-  /** The coverage goals this test claims to reach. */
+  /** The coverage goals this test claims to reach.
+    *
+    * These are an *expectation*, checked against what the run reported — not an elaboration input. The harness emits
+    * its whole catalogue of coverpoints every time; a test names the subset it must hit. See
+    * `me.jiuyang.utlib.FifoHarness` for the catalogue and the signals each one binds to.
+    */
   def coverpoints: Seq[Coverpoint]
 
   /** The stimulus constraints. */
@@ -49,7 +54,7 @@ trait UnitTest:
 
   /** The elaboration parameter for this test's harness. */
   final def harnessParameter: HarnessParameter =
-    HarnessParameter(width = width, stimulus = solve(), coverpoints = coverpoints, txnTrace = txnTrace)
+    HarnessParameter(width = width, stimulus = solve(), txnTrace = txnTrace)
 
   /** Solve, elaborate, simulate. Artifacts are written under `outDir`.
     *

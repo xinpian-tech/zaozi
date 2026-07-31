@@ -28,15 +28,14 @@ object HarnessFixture:
     )
   )
 
+  /** The subset of the harness catalogue this fixture's stimulus should reach. */
   val coverpoints: Seq[Coverpoint] = Seq(
     Coverpoint("cover_enq_fire", "an enqueue handshake completed"),
     Coverpoint("cover_deq_fire", "a dequeue handshake completed"),
     Coverpoint("cover_full", "the FIFO reached full"),
-    Coverpoint("cover_empty", "the FIFO reached empty")
+    Coverpoint("cover_empty", "the FIFO reached empty"),
+    Coverpoint("cover_probe_both_slots", "both internal slots occupied (white-box)"),
+    Coverpoint("cover_probe_accepted", "the DUT internally accepted an enqueue (white-box)")
   )
 
-  val parameter: HarnessParameter = HarnessParameter(
-    width = 8,
-    stimulus = stimulus,
-    coverpoints = coverpoints
-  )
+  val parameter: HarnessParameter = HarnessParameter(width = 8, stimulus = stimulus)
