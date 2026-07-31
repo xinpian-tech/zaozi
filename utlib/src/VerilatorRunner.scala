@@ -2,11 +2,15 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.utlib
 
-/** One simulation run's outcome. */
+/** One simulation run's outcome.
+  *
+  * `tracePath` is the VCD written by the run, present only when it was asked for and the file actually appeared.
+  */
 final case class RunResult(
-  exitCode: Int,
-  stdout:   String,
-  coverage: CoverageReport)
+  exitCode:  Int,
+  stdout:    String,
+  coverage:  CoverageReport,
+  tracePath: Option[os.Path] = None)
 
 /** Builds and runs a generated harness under Verilator, then reads back coverage.
   *
@@ -16,12 +20,18 @@ final case class RunResult(
   */
 object VerilatorRunner:
 
-  def run(parameter: HarnessParameter, outDir: os.Path): RunResult =
+  /** Build and run the harness.
+    *
+    * `trace` adds a VCD of the whole design. It costs build time and disk, so it is off by default and turned on when a
+    * run needs debugging rather than for every run in a suite.
+    */
+  def run(parameter: HarnessParameter, outDir: os.Path, trace: Boolean = false): RunResult =
     Toolchain.check()
     os.makeDir.all(outDir)
-    val (harness, top) = Harness.emit(parameter, outDir)
+    val (harness, top) = Harness.emit(parameter, outDir, trace)
     val buildDir       = outDir / "obj_dir"
     val coverageFile   = outDir / "coverage.dat"
+    val traceFile      = outDir / Harness.traceFileName
 
     os.proc(
       Toolchain.verilator,
@@ -29,6 +39,9 @@ object VerilatorRunner:
       "--timing",
       "--assert",
       "--coverage-user",
+      // `--trace` is what makes $dumpfile/$dumpvars in the generated top do
+      // anything; without it they are silently ignored.
+      if trace then Seq("--trace", "--trace-structs") else Seq.empty,
       "--top-module",
       "top",
       "-Wno-fatal",
@@ -48,7 +61,12 @@ object VerilatorRunner:
       if os.exists(coverageFile) then parseCoverage(os.read(coverageFile))
       else CoverageReport(Map.empty)
 
-    RunResult(invocation.exitCode, invocation.out.text(), coverage)
+    RunResult(
+      exitCode = invocation.exitCode,
+      stdout = invocation.out.text(),
+      coverage = coverage,
+      tracePath = Option.when(trace && os.exists(traceFile))(traceFile)
+    )
 
   /** Parse a Verilator `coverage.dat` file.
     *

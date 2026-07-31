@@ -44,12 +44,20 @@ trait UnitTest:
       override val seed: Int                                         = outer.seed
     txnSolver.solve()
 
+  /** Emit a per-cycle transaction trace through `sim.print`. Off by default; it is a debugging aid, not a check. */
+  val txnTrace: Boolean = false
+
   /** The elaboration parameter for this test's harness. */
   final def harnessParameter: HarnessParameter =
-    HarnessParameter(width = width, stimulus = solve(), coverpoints = coverpoints)
+    HarnessParameter(width = width, stimulus = solve(), coverpoints = coverpoints, txnTrace = txnTrace)
 
-  /** Solve, elaborate, simulate. Artifacts are written under `outDir`. */
-  final def run(outDir: os.Path): RunResult = VerilatorRunner.run(harnessParameter, outDir)
+  /** Solve, elaborate, simulate. Artifacts are written under `outDir`.
+    *
+    * Set `trace` to also capture a VCD waveform of the run — useful when a coverpoint is unexpectedly missed and the
+    * solved stimulus alone does not explain why.
+    */
+  final def run(outDir: os.Path, trace: Boolean = false): RunResult =
+    VerilatorRunner.run(harnessParameter, outDir, trace)
 
   /** Throw with a readable summary when the run failed or missed a coverpoint. */
   final def requireCoverage(result: RunResult): Unit =
