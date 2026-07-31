@@ -2,24 +2,24 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.utlib
 
+import scala.util.chaining.scalaUtilChainingOps
+
 /** One simulation run's outcome.
   *
-  * `stdout` and `stderr` are kept apart because they carry different things: a FIRRTL `printf` lowers to a write on
-  * file descriptor 2, so the transaction trace arrives on `stderr` while `$display` from the generated top arrives on
-  * `stdout`. [[log]] is the two interleaved for when you just want to read the run.
+  * `log` is stdout and stderr as one ordered stream, captured merged at the source. That matters because the two carry
+  * different halves of the same story: a FIRRTL `printf` lowers to a write on file descriptor 2, so the transaction
+  * trace arrives on stderr, while `$display` from the generated top arrives on stdout. Concatenating them afterwards
+  * would keep both but destroy the ordering between them — exactly what you need when correlating a trace line with the
+  * cycle the run finished on.
   */
 final case class RunResult(
   exitCode: Int,
-  stdout:   String,
-  stderr:   String,
+  log:      String,
   coverage: CoverageReport,
   tracePath: Option[os.Path] = None):
 
-  /** Everything the run printed, whichever stream it used. */
-  def log: String = stdout + stderr
-
   /** Lines of the transaction trace, if the run emitted one. */
-  def traceLines: Seq[String] = log.linesIterator.filter(_.contains("[txn]")).toSeq
+  def traceLines: Seq[String] = log.linesIterator.filter(_.contains(Names.txnMarker)).toSeq
 
 /** The Verilator simulation backend.
   *
@@ -57,16 +57,24 @@ object Verilator extends Simulator:
       "-o",
       "simulation",
       request.sources.map(_.toString)
-    ).call(cwd = request.workDir, check = true)
+    ).call(cwd = request.workDir, check = false, mergeErrIntoOut = true)
+      .pipe { build =>
+        // A compile failure is reported like any other failure rather than as
+        // a raw SubprocessException, so its diagnostics reach the caller
+        // instead of only the console.
+        if build.exitCode != 0 then
+          throw new RuntimeException(
+            s"$name failed to build the testbench (exit ${build.exitCode}):\n${build.out.text()}"
+          )
+      }
 
     val invocation = os
       .proc((buildDir / "simulation").toString, s"+verilator+coverage+file+$coverageFile")
-      .call(cwd = request.workDir, check = false, stderr = os.Pipe)
+      .call(cwd = request.workDir, check = false, mergeErrIntoOut = true)
 
     RunResult(
       exitCode = invocation.exitCode,
-      stdout = invocation.out.text(),
-      stderr = invocation.err.text(),
+      log = invocation.out.text(),
       coverage = if os.exists(coverageFile) then parseCoverage(os.read(coverageFile)) else CoverageReport(Map.empty),
       tracePath = Option.when(request.trace && os.exists(traceFile))(traceFile)
     )
