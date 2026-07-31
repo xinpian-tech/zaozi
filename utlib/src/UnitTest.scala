@@ -62,13 +62,13 @@ trait UnitTest:
     * solved stimulus alone does not explain why.
     */
   final def run(outDir: os.Path, trace: Boolean = false): RunResult =
-    VerilatorRunner.run(harnessParameter, outDir, trace)
+    Simulation.run(harnessParameter, outDir, trace)
 
   /** Throw with a readable summary when the run failed or missed a coverpoint. */
   final def requireCoverage(result: RunResult): Unit =
     if result.exitCode != 0 then
       throw new AssertionError(
-        s"simulation exited with ${result.exitCode}; output was:\n${result.stdout}"
+        s"simulation exited with ${result.exitCode}; output was:\n${result.log}"
       )
     val missed = result.coverage.missed(coverpoints)
     if missed.nonEmpty then

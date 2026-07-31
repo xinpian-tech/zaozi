@@ -4,70 +4,71 @@ package me.jiuyang.utlib
 
 /** One simulation run's outcome.
   *
-  * `tracePath` is the VCD written by the run, present only when it was asked for and the file actually appeared.
+  * `stdout` and `stderr` are kept apart because they carry different things: a FIRRTL `printf` lowers to a write on
+  * file descriptor 2, so the transaction trace arrives on `stderr` while `$display` from the generated top arrives on
+  * `stdout`. [[log]] is the two interleaved for when you just want to read the run.
   */
 final case class RunResult(
-  exitCode:  Int,
-  stdout:    String,
-  coverage:  CoverageReport,
-  tracePath: Option[os.Path] = None)
+  exitCode: Int,
+  stdout:   String,
+  stderr:   String,
+  coverage: CoverageReport,
+  tracePath: Option[os.Path] = None):
 
-/** Builds and runs a generated harness under Verilator, then reads back coverage.
+  /** Everything the run printed, whichever stream it used. */
+  def log: String = stdout + stderr
+
+  /** Lines of the transaction trace, if the run emitted one. */
+  def traceLines: Seq[String] = log.linesIterator.filter(_.contains("[txn]")).toSeq
+
+/** The Verilator simulation backend.
   *
   * `--assert` is what makes Verilator elaborate the SVA `cover property` statements at all; `--coverage-user` is what
-  * makes it count them. Without both the run succeeds and reports zero coverage, which is the most confusing possible
-  * failure — so both are always passed.
+  * makes it count them. Without both, the run succeeds and reports zero coverage — the most confusing possible failure
+  * — so both are always passed.
   */
-object VerilatorRunner:
+object Verilator extends Simulator:
+  def name:   String = "verilator"
+  def envVar: String = "VERILATOR"
+  def binary: String = sys.env.getOrElse(envVar, "verilator")
 
-  /** Build and run the harness.
-    *
-    * `trace` adds a VCD of the whole design. It costs build time and disk, so it is off by default and turned on when a
-    * run needs debugging rather than for every run in a suite.
-    */
-  def run(parameter: HarnessParameter, outDir: os.Path, trace: Boolean = false): RunResult =
-    Toolchain.check()
-    os.makeDir.all(outDir)
-    val sources      = Harness.emit(parameter, outDir, trace)
-    val buildDir     = outDir / "obj_dir"
-    val coverageFile = outDir / "coverage.dat"
-    val traceFile    = outDir / Harness.traceFileName
+  def simulate(request: SimulationRequest): RunResult =
+    val buildDir     = request.workDir / "obj_dir"
+    val coverageFile = request.workDir / request.coverageFile
+    val traceFile    = request.workDir / request.traceFile
 
     os.proc(
-      Toolchain.verilator,
+      binary,
       "--binary",
       "--timing",
       "--assert",
       "--coverage-user",
       // `--trace` is what makes $dumpfile/$dumpvars in the generated top do
       // anything; without it they are silently ignored.
-      if trace then Seq("--trace", "--trace-structs") else Seq.empty,
+      if request.trace then Seq("--trace", "--trace-structs") else Seq.empty,
       "--top-module",
-      "top",
+      request.topModule,
       "-Wno-fatal",
+      // Layer bind files sit next to the main file and are pulled in by the
+      // `include` firtool emitted, so the work directory is on the include path.
+      "-I" + request.workDir.toString,
       "-Mdir",
       buildDir.toString,
       "-o",
       "simulation",
-      // Layer bind files sit next to the main file and are pulled in by the
-      // `include` firtool emitted, so the run directory is on the include path.
-      "-I" + outDir.toString,
-      sources.map(_.toString)
-    ).call(cwd = outDir, check = true)
+      request.sources.map(_.toString)
+    ).call(cwd = request.workDir, check = true)
 
     val invocation = os
       .proc((buildDir / "simulation").toString, s"+verilator+coverage+file+$coverageFile")
-      .call(cwd = outDir, check = false)
-
-    val coverage =
-      if os.exists(coverageFile) then parseCoverage(os.read(coverageFile))
-      else CoverageReport(Map.empty)
+      .call(cwd = request.workDir, check = false, stderr = os.Pipe)
 
     RunResult(
       exitCode = invocation.exitCode,
       stdout = invocation.out.text(),
-      coverage = coverage,
-      tracePath = Option.when(trace && os.exists(traceFile))(traceFile)
+      stderr = invocation.err.text(),
+      coverage = if os.exists(coverageFile) then parseCoverage(os.read(coverageFile)) else CoverageReport(Map.empty),
+      tracePath = Option.when(request.trace && os.exists(traceFile))(traceFile)
     )
 
   /** Parse a Verilator `coverage.dat` file.

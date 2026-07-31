@@ -9,7 +9,7 @@ object TraceTest extends TestSuite:
   val tests: Tests = Tests:
     test("a traced run writes a VCD containing the DUT's handshake signals"):
       val dir    = os.temp.dir(prefix = "utlib-trace")
-      val result = VerilatorRunner.run(HarnessFixture.parameter, dir, trace = true)
+      val result = Simulation.run(HarnessFixture.parameter, dir, trace = true)
       assert(result.exitCode == 0)
       assert(result.tracePath.isDefined)
 
@@ -26,7 +26,7 @@ object TraceTest extends TestSuite:
 
     test("tracing is off by default and costs nothing"):
       val dir    = os.temp.dir(prefix = "utlib-notrace")
-      val result = VerilatorRunner.run(HarnessFixture.parameter, dir)
+      val result = Simulation.run(HarnessFixture.parameter, dir)
       assert(result.exitCode == 0)
       assert(result.tracePath.isEmpty)
       assert(!os.exists(dir / Harness.traceFileName))
