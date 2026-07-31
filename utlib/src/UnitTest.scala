@@ -19,8 +19,20 @@ trait UnitTest:
   /** The DUT's transaction surface. */
   def iface: DutInterface
 
-  /** DUT payload width, in bits. */
-  def width: Int
+  /** DUT payload width, in bits — *derived* from [[iface]] rather than stated again.
+    *
+    * The solver bounds payloads by each port's `payloadWidth` while the harness renders them as literals of this width.
+    * When those were two independent declarations they could disagree, and the disagreement surfaced only after a full
+    * solve, as a width error from deep inside the Zaozi DSL that named neither of them.
+    */
+  final def width: Int =
+    val widths = iface.ports.map(_.payloadWidth).distinct
+    require(
+      widths.size == 1,
+      s"${iface.dutName}: all ports must share one payload width, got " +
+        iface.ports.map(p => s"${p.name}=${p.payloadWidth}").mkString(", ")
+    )
+    widths.head
 
   /** Sequence length, in cycles. */
   def cycles: Int
@@ -32,6 +44,9 @@ trait UnitTest:
     * `me.jiuyang.utlib.FifoHarness` for the catalogue and the signals each one binds to.
     */
   def coverpoints: Seq[Coverpoint]
+
+  /** Every coverpoint the harness can emit. An expectation outside this set is a mistake, not a coverage hole. */
+  def catalogue: Seq[Coverpoint] = FifoCoverpoints.all
 
   /** The stimulus constraints. */
   def constraints(): (Arena, Context, Block, TxnRecipe) ?=> Unit
@@ -49,7 +64,11 @@ trait UnitTest:
       override val seed: Int                                         = outer.seed
     txnSolver.solve()
 
-  /** Emit a per-cycle transaction trace through `sim.print`. Off by default; it is a debugging aid, not a check. */
+  /** Emit a per-cycle transaction trace. Off by default; it is a debugging aid, not a check.
+    *
+    * The trace is a `printf` over typed signals, which firtool lowers to `sv.fwrite` — it does not travel the sim
+    * dialect. See [[printf]].
+    */
   val txnTrace: Boolean = false
 
   /** The elaboration parameter for this test's harness. */
@@ -62,10 +81,25 @@ trait UnitTest:
     * solved stimulus alone does not explain why.
     */
   final def run(outDir: os.Path, trace: Boolean = false): RunResult =
+    validateCoverpoints()
     Simulation.run(harnessParameter, outDir, trace)
+
+  /** Reject expectations the harness could never satisfy.
+    *
+    * A mistyped name would otherwise be indistinguishable from a genuine coverage hole: it is simply never hit.
+    */
+  final def validateCoverpoints(): Unit =
+    val known   = catalogue.map(_.name).toSet
+    val unknown = coverpoints.map(_.name).filterNot(known.contains)
+    if unknown.nonEmpty then
+      throw new IllegalArgumentException(
+        s"unknown coverpoint(s): ${unknown.mkString(", ")}\n" +
+          s"the harness declares: ${catalogue.map(_.name).sorted.mkString(", ")}"
+      )
 
   /** Throw with a readable summary when the run failed or missed a coverpoint. */
   final def requireCoverage(result: RunResult): Unit =
+    validateCoverpoints()
     if result.exitCode != 0 then
       throw new AssertionError(
         s"simulation exited with ${result.exitCode}; output was:\n${result.log}"

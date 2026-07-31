@@ -26,7 +26,6 @@ object FifoUnitTest extends TestSuite:
   /** Fill the FIFO, then drain it. */
   object FillThenDrain extends UnitTest:
     def iface:  DutInterface = fifoIface
-    def width:  Int          = 8
     def cycles: Int          = 8
 
     def coverpoints: Seq[Coverpoint] = Seq(
@@ -49,7 +48,6 @@ object FifoUnitTest extends TestSuite:
   /** Back-pressure: keep the FIFO full and keep offering. */
   object Backpressure extends UnitTest:
     def iface:  DutInterface = fifoIface
-    def width:  Int          = 8
     def cycles: Int          = 6
 
     def coverpoints: Seq[Coverpoint] = Seq(
@@ -88,7 +86,6 @@ object FifoUnitTest extends TestSuite:
       // hand-written poke sequence is not.
       object Reseeded extends UnitTest:
         def iface:         DutInterface                                = FillThenDrain.iface
-        def width:         Int                                         = FillThenDrain.width
         def cycles:        Int                                         = FillThenDrain.cycles
         def coverpoints:   Seq[Coverpoint]                             = FillThenDrain.coverpoints
         def constraints(): (Arena, Context, Block, TxnRecipe) ?=> Unit = FillThenDrain.constraints()
