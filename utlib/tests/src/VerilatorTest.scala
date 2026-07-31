@@ -48,8 +48,8 @@ object VerilatorTest extends TestSuite:
       val dir    = os.temp.dir(prefix = "utlib-e2e")
       val result = Simulation.run(HarnessFixture.parameter, dir)
       assert(result.exitCode == 0)
-      assert(result.stdout.contains("HARNESS-DONE"))
-      assert(!result.stdout.contains("HARNESS-TIMEOUT"))
+      assert(result.log.contains("HARNESS-DONE"))
+      assert(!result.log.contains("HARNESS-TIMEOUT"))
       // Two enqueues fill the depth-2 FIFO, two dequeues drain it.
       assert(result.coverage.hit("cover_enq_fire"))
       assert(result.coverage.hit("cover_deq_fire"))
