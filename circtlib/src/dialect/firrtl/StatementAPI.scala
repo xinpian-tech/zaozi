@@ -49,6 +49,16 @@ trait VerifAssertApi       extends HasOperation[VerifAssert]:
   )(
     using Arena,
     Context
+  ): VerifAssert = op(property, None, label, location)
+
+  def op(
+    property: Value,
+    enable:   scala.Option[Value],
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
   ): VerifAssert
 end VerifAssertApi
 class VerifAssume(val _operation: Operation)
@@ -60,12 +70,32 @@ trait VerifAssumeApi       extends HasOperation[VerifAssume]:
   )(
     using Arena,
     Context
+  ): VerifAssume = op(property, None, label, location)
+
+  def op(
+    property: Value,
+    enable:   scala.Option[Value],
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
   ): VerifAssume
 end VerifAssumeApi
 class VerifCover(val _operation: Operation)
 trait VerifCoverApi        extends HasOperation[VerifCover]:
   def op(
     property: Value,
+    label:    scala.Option[String],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): VerifCover = op(property, None, label, location)
+
+  def op(
+    property: Value,
+    enable:   scala.Option[Value],
     label:    scala.Option[String],
     location: Location
   )(

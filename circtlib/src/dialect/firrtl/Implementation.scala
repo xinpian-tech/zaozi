@@ -786,6 +786,7 @@ end given
 given VerifAssertApi with
   def op(
     property: Value,
+    enable:   scala.Option[Value],
     label:    scala.Option[String],
     location: Location
   )(
@@ -799,7 +800,7 @@ given VerifAssertApi with
         namedAttributes = label
           .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
           .toSeq,
-        operands = Seq(property)
+        operands = Seq(property) ++ enable.toSeq
       )
     )
   extension (ref: VerifAssert) def operation: Operation = ref._operation
@@ -808,6 +809,7 @@ end given
 given VerifAssumeApi with
   def op(
     property: Value,
+    enable:   scala.Option[Value],
     label:    scala.Option[String],
     location: Location
   )(
@@ -821,7 +823,7 @@ given VerifAssumeApi with
         namedAttributes = label
           .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
           .toSeq,
-        operands = Seq(property)
+        operands = Seq(property) ++ enable.toSeq
       )
     )
   extension (ref: VerifAssume) def operation: Operation = ref._operation
@@ -830,6 +832,7 @@ end given
 given VerifCoverApi with
   def op(
     property: Value,
+    enable:   scala.Option[Value],
     label:    scala.Option[String],
     location: Location
   )(
@@ -843,7 +846,7 @@ given VerifCoverApi with
         namedAttributes = label
           .map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet))
           .toSeq,
-        operands = Seq(property)
+        operands = Seq(property) ++ enable.toSeq
       )
     )
   extension (ref: VerifCover) def operation: Operation = ref._operation
