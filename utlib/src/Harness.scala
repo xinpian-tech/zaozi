@@ -12,7 +12,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_ModuleApi, Circuit}
-import org.llvm.mlir.scalalib.capi.ir.{Context, Module as MlirModule}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule}
 
 import java.lang.foreign.Arena
 
@@ -24,17 +24,16 @@ import java.lang.foreign.Arena
   * collide.
   */
 final case class HarnessParameter(
-  width:       Int,
-  stimulus:    SolvedStimulus,
-  coverpoints: Seq[Coverpoint],
-  txnTrace:    Boolean = false)
+  width:    Int,
+  stimulus: SolvedStimulus,
+  txnTrace: Boolean = false)
     extends Parameter
 
 object HarnessParameter:
   given upickle.default.ReadWriter[HarnessParameter] = upickle.default.macroRW
 
 class HarnessLayers(parameter: HarnessParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 /** The harness's own IO: a clock domain and a `done` flag that rises once the solved sequence has been played out. The
   * generated SystemVerilog top watches `done` to end the simulation.
@@ -45,22 +44,6 @@ class HarnessIO(parameter: HarnessParameter) extends HWBundle(parameter):
   val done  = Aligned(Bool())
 
 class HarnessProbe(parameter: HarnessParameter) extends DVBundle[HarnessParameter, HarnessLayers](parameter)
-
-/** The known coverpoint vocabulary for the [[Fifo]] DUT.
-  *
-  * A test names coverpoints by string; this map is what gives those names meaning. An unknown name fails elaboration
-  * rather than silently never being hit, which would otherwise look like a coverage hole in a passing run.
-  */
-object FifoCoverpoints:
-  val known: Seq[String] = Seq(
-    "cover_enq_fire",
-    "cover_deq_fire",
-    "cover_full",
-    "cover_empty",
-    "cover_full_enq",
-    "cover_empty_deq",
-    "cover_simultaneous"
-  )
 
 /** A testbench around [[Fifo]] driven entirely by a solved stimulus.
   *
@@ -149,21 +132,61 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
     val enqFire = dut.io.enq.valid & dut.io.enq.ready
     val deqFire = dut.io.deq.valid & dut.io.deq.ready
 
-    parameter.coverpoints.foreach { point =>
-      val condition = point.name match
-        case "cover_enq_fire"     => enqFire
-        case "cover_deq_fire"     => deqFire
-        case "cover_full"         => dut.io.full
-        case "cover_empty"        => dut.io.empty
-        case "cover_full_enq"     => dut.io.full & dut.io.enq.valid
-        case "cover_empty_deq"    => dut.io.empty & dut.io.deq.ready
-        case "cover_simultaneous" => enqFire & deqFire
-        case other                =>
-          throw new IllegalArgumentException(
-            s"unknown coverpoint `$other`; FifoHarness understands ${FifoCoverpoints.known.mkString(", ")}"
-          )
-      Cover(condition.S, point.name)
-    }
+    // Coverpoints are bound to real signals, not to names. `name` survives
+    // only because it becomes the SystemVerilog cover label and is therefore
+    // the key Verilator reports back in coverage.dat — that string is
+    // irreducible; the *condition* need not be one.
+    //
+    // The ClockEvent is derived at each use site rather than once at the top:
+    // `posedge` materializes a reference op in the current region, and reusing
+    // one from an enclosing block inside a `layer` region fails FIRRTL's
+    // dominance check.
+    // `Block` is taken at the *call site*, not captured here: a helper that
+    // closes over the enclosing block would append its ops there, and a
+    // condition defined inside a `layer` region would then fail to dominate
+    // its own use.
+    def cover[T <: Referable[Bool] & HasOperation](
+      name:      String,
+      condition: T
+    )(
+      using Arena,
+      Context,
+      Block,
+      InstanceContext
+    ): Unit =
+      given ClockEvent = posedge(io.clock)
+      Cover(condition.S, name)
+
+    // Black-box view: the DUT's own ports.
+    cover("cover_enq_fire", enqFire)
+    cover("cover_deq_fire", deqFire)
+    cover("cover_full", dut.io.full)
+    cover("cover_empty", dut.io.empty)
+    cover("cover_full_enq", dut.io.full & dut.io.enq.valid)
+    cover("cover_empty_deq", dut.io.empty & dut.io.deq.ready)
+    cover("cover_simultaneous", enqFire & deqFire)
+
+    // White-box view: the DUT's internal state, read through its probe. These
+    // are signals no port exposes, which is the whole point — and they are
+    // typed references, so a typo is a compile error rather than a coverpoint
+    // that silently never fires.
+    layer("Verification"):
+      val bothSlots = Wire(Bool())
+      bothSlots <== dut.probe.isFull
+      val headOnly  = Wire(Bool())
+      headOnly <== dut.probe.valid0
+      val tailUsed  = Wire(Bool())
+      tailUsed <== dut.probe.valid1
+      val accepted  = Wire(Bool())
+      accepted <== dut.probe.enqFire
+      val released  = Wire(Bool())
+      released <== dut.probe.deqFire
+
+      cover("cover_probe_both_slots", bothSlots)
+      cover("cover_probe_head_only", headOnly & !tailUsed)
+      cover("cover_probe_accepted", accepted)
+      cover("cover_probe_released", released)
+      cover("cover_probe_pass_through", accepted & released)
 
 /** Emission of the runnable artifacts around an elaborated [[FifoHarness]]. */
 object Harness:
@@ -180,6 +203,12 @@ object Harness:
   def topString(parameter: HarnessParameter, trace: Boolean = false): String =
     val harnessModule = FifoHarness.moduleName(parameter)
     val timeout       = parameter.stimulus.cycles * 10 + 100
+    // FIRRTL layers are opt-in: firtool emits each layer's `bind` into its own
+    // `layers-<module>-<layer>.sv`, and nothing pulls it in. The testbench
+    // enables a layer by including that file — which is what makes the DUT's
+    // white-box probes, and any coverpoint bound to them, actually exist.
+    val layerIncludes = s"""|  `include "layers-$harnessModule-Verification.sv"
+                            |""".stripMargin
     val dumpBlock     =
       if !trace then ""
       else s"""|
@@ -189,6 +218,7 @@ object Harness:
                |  end
                |""".stripMargin
     s"""|// Generated by me.jiuyang.utlib.Harness — do not edit.
+        |$layerIncludes
         |module top;
         |  logic clock = 1'b0;
         |  logic reset = 1'b1;
@@ -225,11 +255,46 @@ object Harness:
   /** The VCD file the generated top writes, relative to the run directory. */
   val traceFileName: String = "trace.vcd"
 
-  /** Write `harness.sv` and `top.sv` into `outDir`; returns both paths. */
-  def emit(parameter: HarnessParameter, outDir: os.Path, trace: Boolean = false): (os.Path, os.Path) =
+  /** firtool's marker for a new output file inside a single `exportVerilog` stream. */
+  private val fileMarker = raw"""^// -+ 8< -+ FILE "([^"]+)" -+ 8< -+$$""".r
+
+  /** Split firtool's emitted Verilog into the files it asked for.
+    *
+    * A design that uses layers does not lower to one file: firtool emits the layer bind modules as separate files and
+    * has the main file `` `include `` them. In a single-`exportVerilog` stream those files arrive inline, separated by
+    * `// ----- 8< ----- FILE "name" ----- 8< -----` markers. Writing the stream verbatim to one file leaves the
+    * `` `include `` dangling and Verilator fails with "Cannot find include file".
+    *
+    * @return
+    *   the main file's content, then (name, content) for each embedded file
+    */
+  def splitEmittedVerilog(verilog: String): (String, Seq[(String, String)]) =
+    val main  = StringBuilder()
+    val files = scala.collection.mutable.ListBuffer.empty[(String, StringBuilder)]
+    verilog.linesIterator.foreach {
+      case fileMarker(name) => files += (name -> StringBuilder())
+      case line             =>
+        val sink = files.lastOption.map(_._2).getOrElse(main)
+        sink ++= line
+        sink ++= "\n"
+    }
+    (main.toString, files.toSeq.map((name, content) => name -> content.toString))
+
+  /** Write the harness, its layer bind files, and the top into `outDir`; returns every SystemVerilog path to compile.
+    */
+  def emit(parameter: HarnessParameter, outDir: os.Path, trace: Boolean = false): Seq[os.Path] =
     os.makeDir.all(outDir)
-    val harness = outDir / "harness.sv"
-    val top     = outDir / "top.sv"
-    os.write.over(harness, FifoHarness.verilogString(parameter))
+    val (mainSv, extraFiles) = splitEmittedVerilog(FifoHarness.verilogString(parameter))
+    val harness              = outDir / "harness.sv"
+    val top                  = outDir / "top.sv"
+    os.write.over(harness, mainSv)
     os.write.over(top, topString(parameter, trace))
-    (harness, top)
+    val extras               = extraFiles.map { (name, content) =>
+      val path = outDir / name
+      os.write.over(path, content)
+      path
+    }
+    // Only the main file and the top are compiled directly; the rest are
+    // pulled in by the `include` firtool put in the main file, so they just
+    // need to exist next to it.
+    Seq(harness, top)

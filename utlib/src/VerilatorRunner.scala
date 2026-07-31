@@ -28,10 +28,10 @@ object VerilatorRunner:
   def run(parameter: HarnessParameter, outDir: os.Path, trace: Boolean = false): RunResult =
     Toolchain.check()
     os.makeDir.all(outDir)
-    val (harness, top) = Harness.emit(parameter, outDir, trace)
-    val buildDir       = outDir / "obj_dir"
-    val coverageFile   = outDir / "coverage.dat"
-    val traceFile      = outDir / Harness.traceFileName
+    val sources      = Harness.emit(parameter, outDir, trace)
+    val buildDir     = outDir / "obj_dir"
+    val coverageFile = outDir / "coverage.dat"
+    val traceFile    = outDir / Harness.traceFileName
 
     os.proc(
       Toolchain.verilator,
@@ -49,8 +49,10 @@ object VerilatorRunner:
       buildDir.toString,
       "-o",
       "simulation",
-      harness.toString,
-      top.toString
+      // Layer bind files sit next to the main file and are pulled in by the
+      // `include` firtool emitted, so the run directory is on the include path.
+      "-I" + outDir.toString,
+      sources.map(_.toString)
     ).call(cwd = outDir, check = true)
 
     val invocation = os

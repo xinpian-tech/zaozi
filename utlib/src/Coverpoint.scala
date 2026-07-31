@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.utlib
 
-/** A declared coverage goal.
+/** A declared coverage goal — the *expectation* side of coverage.
   *
-  * `name` is the label attached to the emitted `verif.cover` op; it is the key the Verilator coverage report is matched
-  * against, so it must be unique within a harness and must be a valid SystemVerilog identifier.
+  * `name` matches the label a harness attached to one of its `Cover(…)` ops. That string is irreducible: it becomes a
+  * SystemVerilog cover label and is the key Verilator reports back in `coverage.dat`. The coverpoint's *condition*, by
+  * contrast, lives in the harness as ordinary typed code over real signal references — see
+  * `me.jiuyang.utlib.FifoHarness`.
   */
 final case class Coverpoint(
   name:        String,
@@ -13,14 +15,6 @@ final case class Coverpoint(
 
 object Coverpoint:
   given upickle.default.ReadWriter[Coverpoint] = upickle.default.macroRW
-
-/** See the note on the [[SolvedStimulus]] reader — a generator's parameter fields must be readable from the synthesized
-  * mainargs CLI. A coverpoint list is passed as JSON.
-  */
-given mainargs.TokensReader.Simple[Seq[Coverpoint]] with
-  def shortName:               String                          = "coverpoints"
-  def read(strs: Seq[String]): Either[String, Seq[Coverpoint]] =
-    Right(upickle.default.read[Seq[Coverpoint]](strs.head))
 
 /** Coverpoint hit counts collected from one simulation run. */
 final case class CoverageReport(hits: Map[String, Int]):

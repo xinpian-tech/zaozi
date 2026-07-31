@@ -34,7 +34,7 @@ object FifoParameter:
   given upickle.default.ReadWriter[FifoParameter] = upickle.default.macroRW
 
 class FifoLayers(parameter: FifoParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class FifoIO(parameter: FifoParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
@@ -44,7 +44,25 @@ class FifoIO(parameter: FifoParameter) extends HWBundle(parameter):
   val empty = Aligned(Bool())
   val full  = Aligned(Bool())
 
-class FifoProbe(parameter: FifoParameter) extends DVBundle[FifoParameter, FifoLayers](parameter)
+/** White-box observation points. These are what coverpoints and traces bind to: real, typed signal references rather
+  * than signals named by string. They live under a `Verification` layer, so they are DV-only and cost nothing in
+  * synthesis.
+  */
+class FifoProbe(parameter: FifoParameter) extends DVBundle[FifoParameter, FifoLayers](parameter):
+  /** Both slots occupied. */
+  val isFull = ProbeRead(Bool(), layers("Verification"))
+
+  /** Head slot occupied. */
+  val valid0 = ProbeRead(Bool(), layers("Verification"))
+
+  /** Tail slot occupied. */
+  val valid1 = ProbeRead(Bool(), layers("Verification"))
+
+  /** An enqueue was accepted this cycle. */
+  val enqFire = ProbeRead(Bool(), layers("Verification"))
+
+  /** A dequeue was accepted this cycle. */
+  val deqFire = ProbeRead(Bool(), layers("Verification"))
 
 @generator
 object Fifo extends Generator[FifoParameter, FifoLayers, FifoIO, FifoProbe] with HasSvEmit:
@@ -70,6 +88,14 @@ object Fifo extends Generator[FifoParameter, FifoLayers, FifoIO, FifoProbe] with
 
     val enqFire = io.enq.valid & !isFull
     val deqFire = valid0 & io.deq.ready
+
+    val probe = summon[Interface[FifoProbe]]
+    layer("Verification"):
+      val isFullP  = Wire(Bool()); isFullP  := isFull; probe.isFull <== isFullP
+      val valid0P  = Wire(Bool()); valid0P  := valid0; probe.valid0 <== valid0P
+      val valid1P  = Wire(Bool()); valid1P  := valid1; probe.valid1 <== valid1P
+      val enqFireP = Wire(Bool()); enqFireP := enqFire; probe.enqFire <== enqFireP
+      val deqFireP = Wire(Bool()); deqFireP := deqFire; probe.deqFire <== deqFireP
 
     when(deqFire) {
       // Head leaves; the tail shifts down into it.
