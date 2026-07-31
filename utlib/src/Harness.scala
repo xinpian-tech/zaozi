@@ -24,16 +24,23 @@ import java.lang.foreign.Arena
   * collide.
   */
 final case class HarnessParameter(
-  width:    Int,
-  stimulus: SolvedStimulus,
-  txnTrace: Boolean = false)
-    extends Parameter
+  width:         Int,
+  stimulus:      SolvedStimulus,
+  txnTrace:      Boolean = false,
+  /** Cycles the generated top waits before declaring the run wedged. Defaults to a generous multiple of the sequence
+    * length; set it small only to exercise the guard itself.
+    */
+  timeoutCycles: Option[Int] = None)
+    extends Parameter:
+
+  /** The timeout the generated top actually uses. */
+  def timeout: Int = timeoutCycles.getOrElse(stimulus.cycles * 10 + 100)
 
 object HarnessParameter:
   given upickle.default.ReadWriter[HarnessParameter] = upickle.default.macroRW
 
 class HarnessLayers(parameter: HarnessParameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("Verification"))
+  def layers = Seq(Layer(Names.verificationLayer))
 
 /** The harness's own IO: a clock domain and a `done` flag that rises once the solved sequence has been played out. The
   * generated SystemVerilog top watches `done` to end the simulation.
@@ -44,6 +51,33 @@ class HarnessIO(parameter: HarnessParameter) extends HWBundle(parameter):
   val done  = Aligned(Bool())
 
 class HarnessProbe(parameter: HarnessParameter) extends DVBundle[HarnessParameter, HarnessLayers](parameter)
+
+/** The coverpoints [[FifoHarness]] emits, as declared data.
+  *
+  * The *conditions* live in `FifoHarness.architecture` as typed code over real signals; this is only the list of labels
+  * and what they mean, which a test needs in order to state an expectation and which `UnitTest.requireCoverage`
+  * validates against so that a mistyped expectation is reported as a mistake rather than as a coverage hole.
+  *
+  * The two are kept in step by elaboration itself: `architecture` refuses to emit a cover whose name is not here, and
+  * refuses to finish with any name here left unemitted.
+  */
+object FifoCoverpoints:
+  val all: Seq[Coverpoint] = Seq(
+    Coverpoint("cover_enq_fire", "an enqueue handshake completed"),
+    Coverpoint("cover_deq_fire", "a dequeue handshake completed"),
+    Coverpoint("cover_full", "the FIFO reported full"),
+    Coverpoint("cover_empty", "the FIFO reported empty"),
+    Coverpoint("cover_full_enq", "an enqueue was offered while full (back-pressure)"),
+    Coverpoint("cover_empty_deq", "a dequeue was offered while empty"),
+    Coverpoint("cover_simultaneous", "an enqueue and a dequeue completed in the same cycle"),
+    Coverpoint("cover_probe_both_slots", "both internal slots occupied (white-box)"),
+    Coverpoint("cover_probe_head_only", "only the head slot occupied (white-box)"),
+    Coverpoint("cover_probe_accepted", "the DUT internally accepted an enqueue (white-box)"),
+    Coverpoint("cover_probe_released", "the DUT internally released a dequeue (white-box)"),
+    Coverpoint("cover_probe_pass_through", "an enqueue and a dequeue in the same cycle (white-box)")
+  )
+
+  val names: Set[String] = all.map(_.name).toSet
 
 /** A testbench around [[Fifo]] driven entirely by a solved stimulus.
   *
@@ -137,6 +171,7 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
     // closes over the enclosing block would append its ops there, and a
     // condition defined inside a `layer` region would then fail to dominate
     // its own use.
+    val emitted = scala.collection.mutable.Set.empty[String]
     def cover[T <: Referable[Bool] & HasOperation](
       name:      String,
       condition: T
@@ -146,6 +181,11 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
       Block,
       InstanceContext
     ): Unit =
+      require(
+        FifoCoverpoints.names.contains(name),
+        s"coverpoint `$name` is emitted but not declared in FifoCoverpoints.all"
+      )
+      emitted += name
       given ClockEvent = posedge(io.clock)
       Cover(condition.S, name)
 
@@ -162,7 +202,7 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
     // are signals no port exposes, which is the whole point — and they are
     // typed references, so a typo is a compile error rather than a coverpoint
     // that silently never fires.
-    layer("Verification"):
+    layer(Names.verificationLayer):
       val bothSlots = Wire(Bool())
       bothSlots <== dut.probe.isFull
       val headOnly  = Wire(Bool())
@@ -189,7 +229,7 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
         printf(
           io.clock,
           notReset,
-          "[txn] enq_valid=%d enq_bits=%d enq_ready=%d deq_ready=%d deq_valid=%d " +
+          s"${Names.txnMarker} enq_valid=%d enq_bits=%d enq_ready=%d deq_ready=%d deq_valid=%d " +
             "empty=%d full=%d probe_slots=%d%d probe_accepted=%d probe_released=%d\n",
           dut.io.enq.valid,
           dut.io.enq.bits,
@@ -204,6 +244,11 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
           released
         )
 
+    // Drift in the other direction: a declared coverpoint that nothing emits
+    // would be reported to every test as an unreachable goal.
+    val unemitted = FifoCoverpoints.names -- emitted
+    require(unemitted.isEmpty, s"declared but never emitted: ${unemitted.toSeq.sorted.mkString(", ")}")
+
 /** Emission of the runnable artifacts around an elaborated [[FifoHarness]]. */
 object Harness:
 
@@ -213,17 +258,17 @@ object Harness:
     * `sim.clocked_terminate` that [[SimInstrument]] injects. The only control flow here is the timeout guard, so a
     * harness that never raises `done` — a real failure mode when a DUT deadlocks — fails loudly instead of hanging CI.
     *
-    * When `trace` is set the top also opens a VCD via `$dumpfile`/`$dumpvars`. That needs Verilator's `--trace`, which
-    * [[VerilatorRunner]] passes in the same mode.
+    * When `trace` is set the top also opens a VCD via `$dumpfile`/`$dumpvars`. That needs the simulator's trace mode,
+    * which [[Verilator]] turns on for the same request.
     */
   def topString(parameter: HarnessParameter, trace: Boolean = false): String =
     val harnessModule = FifoHarness.moduleName(parameter)
-    val timeout       = parameter.stimulus.cycles * 10 + 100
+    val timeout       = parameter.timeout
     // FIRRTL layers are opt-in: firtool emits each layer's `bind` into its own
     // `layers-<module>-<layer>.sv`, and nothing pulls it in. The testbench
     // enables a layer by including that file — which is what makes the DUT's
     // white-box probes, and any coverpoint bound to them, actually exist.
-    val layerIncludes = s"""|  `include "layers-$harnessModule-Verification.sv"
+    val layerIncludes = s"""|  `include "layers-$harnessModule-${Names.verificationLayer}.sv"
                             |""".stripMargin
     val dumpBlock     =
       if !trace then ""
@@ -305,11 +350,7 @@ object Harness:
     val top                  = outDir / "top.sv"
     os.write.over(harness, mainSv)
     os.write.over(top, topString(parameter, trace))
-    val extras               = extraFiles.map { (name, content) =>
-      val path = outDir / name
-      os.write.over(path, content)
-      path
-    }
+    extraFiles.foreach((name, content) => os.write.over(outDir / name, content))
     // Only the main file and the top are compiled directly; the rest are
     // pulled in by the `include` firtool put in the main file, so they just
     // need to exist next to it.

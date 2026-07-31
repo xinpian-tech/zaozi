@@ -83,11 +83,14 @@ object Toolchain:
   /** Registered solver backends. */
   val solvers: Map[String, Solver] = Map(Z3.name -> Z3)
 
+  // `lazy` on purpose: an unknown backend name should surface as the readable
+  // error `select` raises, not wrapped in an ExceptionInInitializerError from
+  // static initialization.
   /** The simulator this run uses. */
-  val simulator: Simulator = select("UTLIB_SIMULATOR", simulators, Verilator)
+  lazy val simulator: Simulator = select("UTLIB_SIMULATOR", simulators, Verilator)
 
   /** The solver this run uses. */
-  val solver: Solver = select("UTLIB_SOLVER", solvers, Z3)
+  lazy val solver: Solver = select("UTLIB_SOLVER", solvers, Z3)
 
   /** Fail early if either tool is missing, rather than midway through a run. */
   def check(): Unit =

@@ -34,7 +34,7 @@ object FifoParameter:
   given upickle.default.ReadWriter[FifoParameter] = upickle.default.macroRW
 
 class FifoLayers(parameter: FifoParameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("Verification"))
+  def layers = Seq(Layer(Names.verificationLayer))
 
 class FifoIO(parameter: FifoParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
@@ -50,19 +50,19 @@ class FifoIO(parameter: FifoParameter) extends HWBundle(parameter):
   */
 class FifoProbe(parameter: FifoParameter) extends DVBundle[FifoParameter, FifoLayers](parameter):
   /** Both slots occupied. */
-  val isFull = ProbeRead(Bool(), layers("Verification"))
+  val isFull = ProbeRead(Bool(), layers(Names.verificationLayer))
 
   /** Head slot occupied. */
-  val valid0 = ProbeRead(Bool(), layers("Verification"))
+  val valid0 = ProbeRead(Bool(), layers(Names.verificationLayer))
 
   /** Tail slot occupied. */
-  val valid1 = ProbeRead(Bool(), layers("Verification"))
+  val valid1 = ProbeRead(Bool(), layers(Names.verificationLayer))
 
   /** An enqueue was accepted this cycle. */
-  val enqFire = ProbeRead(Bool(), layers("Verification"))
+  val enqFire = ProbeRead(Bool(), layers(Names.verificationLayer))
 
   /** A dequeue was accepted this cycle. */
-  val deqFire = ProbeRead(Bool(), layers("Verification"))
+  val deqFire = ProbeRead(Bool(), layers(Names.verificationLayer))
 
 @generator
 object Fifo extends Generator[FifoParameter, FifoLayers, FifoIO, FifoProbe] with HasSvEmit:
@@ -90,7 +90,7 @@ object Fifo extends Generator[FifoParameter, FifoLayers, FifoIO, FifoProbe] with
     val deqFire = valid0 & io.deq.ready
 
     val probe = summon[Interface[FifoProbe]]
-    layer("Verification"):
+    layer(Names.verificationLayer):
       val isFullP  = Wire(Bool()); isFullP  := isFull; probe.isFull <== isFullP
       val valid0P  = Wire(Bool()); valid0P  := valid0; probe.valid0 <== valid0P
       val valid1P  = Wire(Bool()); valid1P  := valid1; probe.valid1 <== valid1P

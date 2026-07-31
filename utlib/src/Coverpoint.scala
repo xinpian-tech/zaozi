@@ -2,6 +2,19 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.utlib
 
+/** Names that are shared between a DUT, its harness, and the generated testbench.
+  *
+  * Each of these is a string that has to agree across places the compiler cannot relate — a FIRRTL layer name is
+  * matched by the `include` the top emits, and a trace marker written in one file is grepped in another. Declaring them
+  * once is what keeps a rename from silently producing a dangling include or an empty trace.
+  */
+object Names:
+  /** The layer that white-box probes and probe-bound coverpoints live under. */
+  val verificationLayer: String = "Verification"
+
+  /** Prefix every transaction-trace line carries. */
+  val txnMarker: String = "[txn]"
+
 /** A declared coverage goal — the *expectation* side of coverage.
   *
   * `name` matches the label a harness attached to one of its `Cover(…)` ops. That string is irreducible: it becomes a
