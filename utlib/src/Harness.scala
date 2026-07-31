@@ -61,27 +61,19 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
     Circuit
   ): Unit = Fifo.module(FifoParameter(parameter.width)).appendToCircuit()
 
-  /** The [[Fifo]] instance's port order, as the DUT's IO declares it. Passed to the trace injector because CIRCT keeps
-    * instance port names in the module type rather than in an attribute.
+  /** Sim-dialect instrumentation: make the harness end the simulation itself.
+    *
+    * The transaction trace is *not* injected here — it is emitted during elaboration as a `printf` over typed signal
+    * references (see `architecture`), which firtool lowers to the same sim-dialect ops. Termination stays an injection
+    * because it has no FIRRTL-level equivalent to emit.
     */
-  // The clock is skipped (not an integer); so is reset, which the trace
-  // already filters on and would print as a constant 0 on every line.
-  private val dutOperandLabels = Seq("", "", "enq_valid", "enq_bits", "deq_ready")
-  private val dutResultLabels  = Seq("enq_ready", "deq_valid", "deq_bits", "empty", "full")
-
-  /** Sim-dialect instrumentation: always self-terminate, and optionally emit a per-cycle transaction trace. */
   override def instrument(
     parameter: HarnessParameter,
     module:    MlirModule
   )(
     using Arena,
     Context
-  ): Boolean =
-    val terminated = SimInstrument.terminateOnDone(module, moduleName(parameter))
-    val traced     =
-      if !parameter.txnTrace then false
-      else SimInstrument.traceOnClock(module, "dut", dutOperandLabels, dutResultLabels)
-    terminated || traced
+  ): Boolean = SimInstrument.terminateOnDone(module, moduleName(parameter))
 
   def architecture(parameter: HarnessParameter) =
     val io = summon[Interface[HarnessIO]]
@@ -187,6 +179,30 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
       cover("cover_probe_accepted", accepted)
       cover("cover_probe_released", released)
       cover("cover_probe_pass_through", accepted & released)
+
+      // Transaction trace. Every traced value is a typed reference — the DUT's
+      // ports and its white-box probes side by side — so a wrong signal is a
+      // compile error and nothing is identified positionally.
+      if parameter.txnTrace then
+        val notReset = Wire(Bool())
+        notReset := !(io.reset.asBool)
+        printf(
+          io.clock,
+          notReset,
+          "[txn] enq_valid=%d enq_bits=%d enq_ready=%d deq_ready=%d deq_valid=%d " +
+            "empty=%d full=%d probe_slots=%d%d probe_accepted=%d probe_released=%d\n",
+          dut.io.enq.valid,
+          dut.io.enq.bits,
+          dut.io.enq.ready,
+          dut.io.deq.ready,
+          dut.io.deq.valid,
+          dut.io.empty,
+          dut.io.full,
+          headOnly,
+          tailUsed,
+          accepted,
+          released
+        )
 
 /** Emission of the runnable artifacts around an elaborated [[FifoHarness]]. */
 object Harness:

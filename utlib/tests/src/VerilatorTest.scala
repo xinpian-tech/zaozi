@@ -5,7 +5,7 @@ package me.jiuyang.utlib.tests
 import me.jiuyang.utlib.*
 import utest.*
 
-object VerilatorRunnerTest extends TestSuite:
+object VerilatorTest extends TestSuite:
   /** A record in the exact shape Verilator 5.048 writes: fields joined by \u0001, key and value split by \u0002. */
   private def record(file: String, line: Int, label: String, hier: String, count: Int): String =
     val fields = Seq(
@@ -27,7 +27,7 @@ object VerilatorRunnerTest extends TestSuite:
         record("harness.sv", 137, "cover_empty", "top.harness.cover_empty", 6),
         record("harness.sv", 136, "cover_full", "top.harness.cover_full", 0)
       ).mkString("\n")
-      val report = VerilatorRunner.parseCoverage(dat)
+      val report = Verilator.parseCoverage(dat)
       assert(report.hits("cover_enq_fire") == 4)
       assert(report.hits("cover_empty") == 6)
       assert(report.hits("cover_full") == 0)
@@ -35,18 +35,18 @@ object VerilatorRunnerTest extends TestSuite:
       assert(!report.hit("cover_full"))
 
     test("parseCoverage tolerates comments and blank lines"):
-      assert(VerilatorRunner.parseCoverage("# header\n\n# another\n").hits.isEmpty)
+      assert(Verilator.parseCoverage("# header\n\n# another\n").hits.isEmpty)
 
     test("parseCoverage sums records that share a label"):
       val dat = Seq(
         record("harness.sv", 10, "cover_x", "top.a.cover_x", 2),
         record("harness.sv", 10, "cover_x", "top.b.cover_x", 3)
       ).mkString("\n")
-      assert(VerilatorRunner.parseCoverage(dat).hits("cover_x") == 5)
+      assert(Verilator.parseCoverage(dat).hits("cover_x") == 5)
 
     test("a solved stimulus runs under Verilator and hits its coverpoints"):
       val dir    = os.temp.dir(prefix = "utlib-e2e")
-      val result = VerilatorRunner.run(HarnessFixture.parameter, dir)
+      val result = Simulation.run(HarnessFixture.parameter, dir)
       assert(result.exitCode == 0)
       assert(result.stdout.contains("HARNESS-DONE"))
       assert(!result.stdout.contains("HARNESS-TIMEOUT"))
