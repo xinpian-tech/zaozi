@@ -2,6 +2,11 @@
 //| mill-jvm-version: system
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
+//| bspScriptIgnore:
+//| - ".metals"
+//| - "**/.scala-build"
+//| - "stdlib/lit/tests"
+//| - "zaozi/lit/tests"
 
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
