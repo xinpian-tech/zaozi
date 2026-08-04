@@ -251,13 +251,52 @@
         "type": "github"
       }
     },
+    "nixpkgs_6": {
+      "locked": {
+        "lastModified": 1785571196,
+        "narHash": "sha256-KoTsyMQqnXQZq8deCEnu4QkyldkwH/bpMMhUcfMdGIw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "148bab9c1c3c53136ecb44a6ea356a0ed5b39b06",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "circt-nix": "circt-nix",
         "flake-utils": "flake-utils",
         "mvn-trace-forge": "mvn-trace-forge",
         "nixpkgs": "nixpkgs_3",
-        "scala3-bsp-semantic-ls": "scala3-bsp-semantic-ls"
+        "scala3-bsp-semantic-ls": "scala3-bsp-semantic-ls",
+        "scala3-bsp-semantic-ls-zed-plugin": "scala3-bsp-semantic-ls-zed-plugin"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "scala3-bsp-semantic-ls-zed-plugin",
+          "zed-extensions",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785562362,
+        "narHash": "sha256-J15aBa3d6B1SUUAQydQ06wFjPzrrcVceb6jkdfwfGls=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "5f29c219a7655519f8a9f8c6968064b82c17cc93",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
       }
     },
     "scala3-bsp-semantic-ls": {
@@ -279,6 +318,25 @@
       "original": {
         "owner": "xinpian-tech",
         "repo": "scala3-bsp-semantic-ls",
+        "type": "github"
+      }
+    },
+    "scala3-bsp-semantic-ls-zed-plugin": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_6",
+        "zed-extensions": "zed-extensions"
+      },
+      "locked": {
+        "lastModified": 1785745912,
+        "narHash": "sha256-78VmocnNCbttpPqzviKMCKfyFjyjSaqpfoXH8GWPHpk=",
+        "owner": "xinpian-tech",
+        "repo": "scala3-bsp-semantic-ls-zed",
+        "rev": "1931b5c720b4928b3539c8ab554ab5541aa51d34",
+        "type": "github"
+      },
+      "original": {
+        "owner": "xinpian-tech",
+        "repo": "scala3-bsp-semantic-ls-zed",
         "type": "github"
       }
     },
@@ -385,6 +443,28 @@
       "original": {
         "owner": "xinpian-tech",
         "repo": "zaozi",
+        "type": "github"
+      }
+    },
+    "zed-extensions": {
+      "inputs": {
+        "nixpkgs": [
+          "scala3-bsp-semantic-ls-zed-plugin",
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1785689518,
+        "narHash": "sha256-e/qAkWM76mFcm3ddUg5Y+W1XibD8g7CcArXSy/SLTR4=",
+        "owner": "DuskSystems",
+        "repo": "nix-zed-extensions",
+        "rev": "a9b5d4350e293381ebe415d00096879d331ff540",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DuskSystems",
+        "repo": "nix-zed-extensions",
         "type": "github"
       }
     }

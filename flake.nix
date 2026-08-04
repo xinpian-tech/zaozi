@@ -9,6 +9,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     mvn-trace-forge.url = "github:Avimitin/mvn-trace-forge";
     scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
+    scala3-bsp-semantic-ls-zed-plugin.url = "github:xinpian-tech/scala3-bsp-semantic-ls-zed";
   };
 
   outputs =
@@ -18,6 +19,7 @@
     , mvn-trace-forge
     , circt-nix
     , scala3-bsp-semantic-ls
+    , scala3-bsp-semantic-ls-zed-plugin
     , ...
     }:
     let
@@ -42,23 +44,10 @@
           inherit system;
         };
         scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default;
-        zedSettings = pkgs.writeText "zaozi-zed-settings.json" ''
-          {
-            "languages": {
-              "Scala": {
-                "language_servers": ["scala3-bsp-semantic-ls"]
-              }
-            },
-            "lsp": {
-              "scala3-bsp-semantic-ls": {
-                "binary": {
-                  "path": "${scala3BspSemanticLs}/bin/scala3-bsp-semantic-ls",
-                  "arguments": []
-                }
-              }
-            }
-          }
-        '';
+        scala3BspSemanticLsZedPlugin = scala3-bsp-semantic-ls-zed-plugin.packages.${system}.default;
+        zedInstallHook = pkgs.callPackage ./nix/pkgs/zed-install-hook.nix {
+          inherit scala3BspSemanticLs scala3BspSemanticLsZedPlugin;
+        };
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -68,9 +57,16 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
+          zed-install-hook = zedInstallHook;
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          zed-settings = zedInstallHook.settings;
         };
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
+          inputsFrom = [
+            zedInstallHook
+            pkgs.zaozi.zaozi-assembly
+          ];
           nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
           ];
@@ -97,9 +93,6 @@
           # without it scalac throws StackOverflowError in pullOutFirstConstr.
           shellHook = ''
             export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Xss32m"
-            ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-              install -Dm644 ${zedSettings} .zed/settings.json
-            ''}
           '';
         };
       }
