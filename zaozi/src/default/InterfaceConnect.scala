@@ -59,12 +59,7 @@ private[zaozi] def bulkConnect(
         case ConnDir.Aligned => ConnDir.Flipped
         case ConnDir.Flipped => ConnDir.Aligned
 
-  val errors = analyzeConnectable(sinkTpe, srcTpe, "")
-  if errors.nonEmpty then
-    throw ConnectException(
-      (s"$opName failed with ${errors.size} error(s) at ${summon[sourcecode.File].value}:${summon[sourcecode.Line].value}"
-        :: errors.map(e => s"  - $e")).mkString("\n")
-    )
+  checkConnectable(sinkTpe, srcTpe, opName)
 
   fields.foreach: (f, idx) =>
     val sinkF = bulkFieldRef(sink, idx, f.name)
