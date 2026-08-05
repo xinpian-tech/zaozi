@@ -10,8 +10,10 @@ import org.llvm.mlir.CAPI.{
   mlirIntegerTypeSignedGet,
   mlirIntegerTypeUnsignedGet,
   mlirNoneTypeGet,
-  mlirTypeEqual
+  mlirTypeEqual,
+  mlirTypePrint
 }
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 import java.lang.foreign.{Arena, MemorySegment}
 
@@ -43,6 +45,11 @@ given TypeApi with
     inline def integerTypeGetWidth: Int           =
       mlirIntegerTypeGetWidth(tpe.segment)
     inline def equal(that: Type):   Boolean       = mlirTypeEqual(tpe.segment, that.segment)
+    inline def print(
+      callback:    String => Unit
+    )(
+      using arena: Arena
+    ): Unit = mlirTypePrint(tpe.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
     inline def segment:             MemorySegment = tpe._segment
     inline def sizeOf:              Int           = MlirType.sizeof().toInt
 end given

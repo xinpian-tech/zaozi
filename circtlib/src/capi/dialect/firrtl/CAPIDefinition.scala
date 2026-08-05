@@ -4,7 +4,7 @@ package org.llvm.circt.scalalib.capi.dialect.firrtl
 
 // circt-c/Dialect/Firrtl.h
 import org.llvm.mlir.scalalib.capi.support.{*, given}
-import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, Value}
+import org.llvm.mlir.scalalib.capi.ir.{Attribute, Block, Context, Location, Type, Value}
 
 import java.lang.foreign.{Arena, MemorySegment}
 
@@ -244,6 +244,7 @@ end AttributeApi
   * firrtlTypeIsAUInt
   * firrtlTypeIsAVector
   * firrtlTypeIsConst
+  * firrtlTypeIsPassive
   * }}}
   */
 trait TypeApi:
@@ -377,20 +378,25 @@ trait TypeApi:
     inline def isUInt:       Boolean
     inline def isVector:     Boolean
     inline def isConst:      Boolean
+    inline def isPassive:    Boolean
 end TypeApi
 
 /** Firrtl Utility Api
   * {{{
+  * firrtlEmitInvalidate
   * firrtlImportAnnotationsFromJSONRaw
+  * firrtlTypesAreEquivalent
   * firrtlValueFoldFlow
   * }}}
   */
 trait UtilityApi:
+  inline def emitInvalidate(block:    Block, loc:  Location, value:         Value):   Unit
   inline def importAnnotationsFromJSONRaw(
     annotationsStr: String
   )(
     using arena:    Arena,
     context:        Context
-  ):                                                             Attribute
-  inline def valueFoldFlow(value: Value, flow: FirrtlValueFlow): FirrtlValueFlow
+  ):                                                                                  Attribute
+  inline def typesAreEquivalent(dest: Type, src:   Type, requireSameWidths: Boolean): Boolean
+  inline def valueFoldFlow(value:     Value, flow: FirrtlValueFlow):                  FirrtlValueFlow
 end UtilityApi

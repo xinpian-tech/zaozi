@@ -564,7 +564,13 @@ trait TypeApi extends HasSegment[Type] with HasSizeOf[Type]:
       using arena: Arena,
       context:     Context
     ): Type
-  extension (tpe:   Type) inline def equal(that: Type): Boolean
+  extension (tpe:   Type)
+    inline def equal(that: Type): Boolean
+    inline def print(
+      callback:    String => Unit
+    )(
+      using arena: Arena
+    ):                            Unit
 end TypeApi
 
 class Attribute(val _segment: MemorySegment)
