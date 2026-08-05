@@ -217,8 +217,8 @@ object FlowMatrixSpec extends TestSuite:
           compileError("io.asBits")
       G.compileErrorTest(FMParameter(8))
 
-    // ---- structural error aggregation (whole-bundle bulk connect) ----
-    test("bulk connect aggregates every mismatched field into one exception, emitting nothing"):
+    // ---- structural error reporting (whole-bundle bulk connect) ----
+    test("bulk connect rejects mismatched bundles with one type mismatch exception, emitting nothing"):
       @generator
       object G extends Generator[FMParameter, FMLayers, FMIO, FMProbe] with HasFirrtlTest:
         def architecture(parameter: FMParameter) =
@@ -226,8 +226,9 @@ object FlowMatrixSpec extends TestSuite:
           val b = Wire(new FMWide(true, parameter.width))
           a :<>= b
       val msg = intercept[ConnectException](G.firrtlString(FMParameter(8))).getMessage
-      assert(msg.contains("p: width mismatch"))
-      assert(msg.contains("q: width mismatch"))
+      assert(msg.contains("type mismatch between"))
+      assert(msg.contains("p: uint<8>"))
+      assert(msg.contains("p: uint<16>"))
 
     test("bulk connect leaves no partial IR on a deep mismatch"):
       @generator

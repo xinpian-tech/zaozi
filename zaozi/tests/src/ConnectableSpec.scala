@@ -343,7 +343,7 @@ object ConnectableSpec extends TestSuite:
           v1 :<>= v2
       G.firrtlTest(ConnParameter(8))("connect w1, w2", "connect v1, v2")
 
-    test("every error axis accumulates into one exception"):
+    test("every error axis collapses into one type mismatch exception"):
       @generator
       object Bad extends Generator[ConnParameter, ConnLayers, EmptyIO, ConnProbe] with HasFirrtlTest:
         def architecture(parameter: ConnParameter) =
@@ -351,18 +351,13 @@ object ConnectableSpec extends TestSuite:
           val b = Wire(new MultiBadRec(true, parameter.width))
           a :<>= b
       val msg = intercept[ConnectException](Bad.firrtlString(ConnParameter(8))).getMessage
-      assert(msg.contains("11 error(s)"))
-      assert(msg.contains("missing in producer: onlyA"))
-      assert(msg.contains("missing in sink: onlyB"))
-      assert(msg.contains("w: width mismatch 8 vs 16"))
-      assert(msg.contains("k: kind mismatch UInt vs SInt"))
-      assert(msg.contains("o: orientation mismatch"))
-      assert(msg.contains("vl: vec length mismatch 2 vs 3"))
-      assert(msg.contains("ve[*].x: width mismatch"))
-      assert(msg.contains("ve[*].y: width mismatch"))
-      assert(msg.contains("sh: incompatible or unsupported types (UInt vs Vec)"))
-      assert(msg.contains("b1: kind mismatch Bool vs UInt"))
-      assert(msg.contains("ord: field order mismatch"))
+      assert(msg.contains(":<>= failed"))
+      assert(msg.contains("type mismatch between"))
+      assert(msg.contains("w: uint<8>"))
+      assert(msg.contains("w: uint<16>"))
+      assert(msg.contains("k: sint<8>"))
+      assert(msg.contains("onlyA"))
+      assert(msg.contains("onlyB"))
 
     test("probes are rejected with a pointer to <=="):
       @generator
