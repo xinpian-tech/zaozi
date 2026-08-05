@@ -90,6 +90,7 @@ firrtlAttrGetNameKind              # header: $CIRCT_INSTALL_PATH/include/circt-c
 firrtlAttrGetParamDecl             # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlAttrGetPortDirs              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlAttrGetRUW                   # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
+firrtlEmitInvalidate               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlImportAnnotationsFromJSONRaw # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetAnalog                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeGetAnyRef                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
@@ -136,6 +137,8 @@ firrtlTypeIsAString                # header: $CIRCT_INSTALL_PATH/include/circt-c
 firrtlTypeIsAUInt                  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsAVector                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlTypeIsConst                  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
+firrtlTypeIsPassive                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
+firrtlTypesAreEquivalent           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlValueFoldFlow                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 mlirGetDialectHandle__firrtl__     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 mlirGetDialectHandle__fsm__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FSM.h

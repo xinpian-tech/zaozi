@@ -46,7 +46,8 @@ import org.llvm.circt.CAPI.{
   firrtlTypeIsAString,
   firrtlTypeIsAUInt,
   firrtlTypeIsAVector,
-  firrtlTypeIsConst
+  firrtlTypeIsConst,
+  firrtlTypeIsPassive
 }
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, DialectHandle, Type, given}
@@ -207,4 +208,5 @@ given TypeApi with
     inline def isUInt:       Boolean = firrtlTypeIsAUInt(tpe.segment)
     inline def isVector:     Boolean = firrtlTypeIsAVector(tpe.segment)
     inline def isConst:      Boolean = firrtlTypeIsConst(tpe.segment)
+    inline def isPassive:    Boolean = firrtlTypeIsPassive(tpe.segment)
 end given
