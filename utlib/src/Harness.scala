@@ -172,7 +172,7 @@ object FifoHarness extends Generator[HarnessParameter, HarnessLayers, HarnessIO,
     // condition defined inside a `layer` region would then fail to dominate
     // its own use.
     val emitted = scala.collection.mutable.Set.empty[String]
-    def cover[T <: Referable[Bool] & HasOperation](
+    def cover[T <: Referable[Bool]](
       name:      String,
       condition: T
     )(
