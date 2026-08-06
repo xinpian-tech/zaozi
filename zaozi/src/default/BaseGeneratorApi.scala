@@ -109,27 +109,26 @@ object BaseGeneratorHelper:
 
   def dumpMlirbc[PARAM <: Parameter](
     moduleName:        String,
-    elaboratedModules: scala.collection.mutable.HashSet[PARAM],
+    elaboratedModules: scala.collection.mutable.HashSet[(PARAM, os.Path)],
     parameter:         PARAM,
     createModule:      (Arena, Context, Circuit) => Unit
   )(
     using Arena,
     Context
   ): Unit =
-    if !elaboratedModules.contains(parameter) then
+    val outputDirectory = Elaboration.outputDirectory
+    val elaborationKey  = parameter -> outputDirectory
+    if !elaboratedModules.contains(elaborationKey) then
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(moduleName)
       summon[Circuit].appendToModule()
       createModule(summon[Arena], summon[Context], summon[Circuit])
       me.jiuyang.zaozi.magic.validateCircuit()
 
-      val mlirbcFile =
-        os.Path(
-          sys.env.getOrElse("ZAOZI_OUTDIR", ""),
-          os.pwd
-        ) / s"${moduleName}.mlirbc"
+      os.makeDir.all(outputDirectory)
+      val mlirbcFile = outputDirectory / s"${moduleName}.mlirbc"
       val out        = os.write.outputStream(mlirbcFile, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
       summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
-      elaboratedModules.add(parameter)
+      elaboratedModules.add(elaborationKey)
 
 end BaseGeneratorHelper

@@ -51,9 +51,8 @@ final case class ZaoziArtifact(
   *     predicates.
   *   - `backend` — a ChiselSim-style poke/peek/step driver, not GAS assembly.
   *
-  * Sequence solving is supplied by `strategy` rather than fixed here. The SMT-backed transaction solver lives in the
-  * `utlib` module, which depends on this one, so wiring it in directly would be a dependency cycle; `utlib` injects it
-  * instead (see `me.jiuyang.utlib.ZaoziStrategy`).
+  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics remain rvprobe-owned;
+  * generic solver process support is shared through `smtlib`, and utlib has no dependency on this frontend.
   *
   * The default strategy is a smoke sequence: drive every Drive port once, drain every Monitor port once. It keeps this
   * leg usable — and its tests env-independent — without pulling in Z3.
@@ -87,10 +86,12 @@ final class ZaoziFrontend(
     * [[SolvedSequence]] plus the concrete transaction list the backend renders.
     */
   def solve(): ZaoziArtifact =
-    val txns       = strategy(iface)
-    val selections = txns.zipWithIndex.map { case (_, i) => i -> i }.toMap
-    val fields     = txns.zipWithIndex.collect { case (Transaction.Enqueue(p, v), i) => s"${p}_bits_$i" -> v }.toMap
-    ZaoziArtifact(SolvedSequence(selections, fields), txns)
+    val transactions = strategy(iface)
+    val selections   = transactions.zipWithIndex.map { case (_, i) => i -> i }.toMap
+    val fields       = transactions.zipWithIndex.collect { case (Transaction.Enqueue(p, v), i) =>
+      s"${p}_bits_$i" -> v
+    }.toMap
+    ZaoziArtifact(SolvedSequence(selections, fields), transactions)
 
   def backend: StimulusBackend[ZaoziArtifact] = new StimulusBackend[ZaoziArtifact]:
     def kind: String = "chiselsim"

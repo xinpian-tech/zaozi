@@ -100,6 +100,21 @@ given VerilogWrapperApi:
                   s"Invalid Verilog parameter type for '$name': ${value.getClass.getName}. Only String, BigInt, Int, Long, Double, and Boolean are supported."
                 )
         .toMap
+      val sources         = wrapper.verilogSources(parameter)
+      val annotations     = Option
+        .when(sources.nonEmpty) {
+          val files = sources.map { source =>
+            Map(
+              "content"     -> source.content.stringAttrGet,
+              "output_file" -> source.fileName.stringAttrGet
+            ).directoryAttrGet
+          }
+          Map(
+            "class" -> "circt.VerbatimBlackBoxAnno".stringAttrGet,
+            "files" -> files.arrayAttrGet
+          ).directoryAttrGet
+        }
+        .toSeq
       val extmodule       = summon[ExtModuleApi].op(
         wrapper.moduleName(parameter),
         wrapper.verilogModuleName(parameter),
@@ -107,7 +122,8 @@ given VerilogWrapperApi:
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
         wrapper.layers(parameter).nameHierarchies,
-        paramsMap
+        paramsMap,
+        annotations
       )
       extmodule
 
