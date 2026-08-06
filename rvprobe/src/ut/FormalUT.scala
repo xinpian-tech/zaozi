@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe.ut
 
+import me.jiuyang.smtlib.Z3
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
 import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Status}
@@ -17,27 +18,26 @@ import java.lang.foreign.Arena
 enum UtOutcome:
   /** The property is proven to hold for every stimulus the assumptions admit. */
   case Pass
-  /** The assumptions admit a stimulus that violates the property — the model is
-    * that counterexample (variable name -> value). */
+
+  /** The assumptions admit a stimulus that violates the property — the model is that counterexample (variable name ->
+    * value).
+    */
   case Fail(counterexample: Map[String, BigInt])
+
   /** The solver could not decide (e.g. returned `unknown`). */
   case Unknown(status: String)
 
-/** A formal unit test over the SMT layer — the formal flavor of the
-  * CIRCT-native UT framework: rvprobe's SMT machinery supplies solver-guaranteed
-  * stimulus, and the property is the verif-style oracle. No simulation, no `sim`
-  * dialect.
+/** A formal unit test over the SMT layer — the formal flavor of the CIRCT-native UT framework: rvprobe's SMT machinery
+  * supplies solver-guaranteed stimulus, and the property is the verif-style oracle. No simulation, no `sim` dialect.
   *
-  * A test declares symbolic inputs and assumptions (the constrained stimulus /
-  * preconditions) and returns the property that should hold. [[FormalUT.check]]
-  * asks the solver whether any stimulus satisfying the assumptions can violate
-  * the property:
+  * A test declares symbolic inputs and assumptions (the constrained stimulus / preconditions) and returns the property
+  * that should hold. [[FormalUT.check]] asks the solver whether any stimulus satisfying the assumptions can violate the
+  * property:
   *   - UNSAT(assumptions ∧ ¬property) ⇒ property proven ⇒ [[UtOutcome.Pass]]
-  *   - SAT                            ⇒ counterexample  ⇒ [[UtOutcome.Fail]]
+  *   - SAT ⇒ counterexample ⇒ [[UtOutcome.Fail]]
   *
-  * This generalizes the sat/unsat pattern the RISC-V spec tests already use into
-  * a reusable, DUT-agnostic harness. Wiring a real hardware DUT's transfer
-  * function into `spec` (hw -> smt) is the natural next step; today `spec` is
+  * This generalizes the sat/unsat pattern the RISC-V spec tests already use into a reusable, DUT-agnostic harness.
+  * Wiring a real hardware DUT's transfer function into `spec` (hw -> smt) is the natural next step; today `spec` is
   * expressed directly in the SMT layer.
   */
 trait FormalUT:
@@ -46,8 +46,9 @@ trait FormalUT:
   /** SMT logic to declare (default linear integer arithmetic). */
   def logic: String = "QF_LIA"
 
-  /** Build the SMT body: declare inputs via `smtValue(name, tpe)`, assert
-    * assumptions via `smtAssert`, and return the property that should hold. */
+  /** Build the SMT body: declare inputs via `smtValue(name, tpe)`, assert assumptions via `smtAssert`, and return the
+    * property that should hold.
+    */
   def spec(
     using Arena,
     Context,
@@ -62,7 +63,7 @@ object FormalUT:
     given context: Context = summon[ContextApi].contextCreate
     summon[SmtDialect].loadDialect()
     summon[FuncDialect].loadDialect()
-    given module: Module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    given module:  Module  = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
     val func = summon[FuncApi].op("func")
     given funcBlock: Block = func.block
     func.appendToModule()
@@ -83,7 +84,7 @@ object FormalUT:
       // Turn the trailing (reset) into (get-model) so a SAT result yields the
       // counterexample assignment (mirrors the RISC-V solve path).
       val z3in   = smtlib.replace("(reset)", "(get-model)")
-      val output = os.proc("z3", "-in", "-t:5000").call(stdin = z3in, check = false).out.text()
+      val output = Z3.run(z3in)
       val result = parseZ3Output(output)
       result.status match
         case Z3Status.Unsat   => UtOutcome.Pass

@@ -114,7 +114,8 @@ given ExtModuleApi with
     firrtlConvention: FirrtlConvention,
     interface:        Seq[(FirrtlBundleField, Location)],
     layers:           Seq[Seq[String]],
-    verilogParameter: Map[String, VerilogParameterType]
+    verilogParameter: Map[String, VerilogParameterType],
+    annotations:      Seq[org.llvm.mlir.scalalib.capi.ir.Attribute]
   )(
     using Arena,
     Context
@@ -182,7 +183,7 @@ given ExtModuleApi with
             // ::mlir::ArrayAttr
             namedAttributeApi.namedAttributeGet(
               "annotations".identifierGet,
-              Seq.empty.arrayAttrGet
+              annotations.arrayAttrGet
             ),
             // ::mlir::ArrayAttr
             namedAttributeApi.namedAttributeGet(
