@@ -2,10 +2,16 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
+import me.jiuyang.utlib.{ConstraintInterface, HasUT}
+import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
+
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+
+import java.lang.foreign.Arena
 
 case class AbsValParameter(width: Int) extends Parameter:
   require(width > 0, "width must be positive")
@@ -13,7 +19,7 @@ case class AbsValParameter(width: Int) extends Parameter:
 given upickle.default.ReadWriter[AbsValParameter] = upickle.default.macroRW
 
 class AbsValLayers(parameter: AbsValParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class AbsValIO(parameter: AbsValParameter) extends HWBundle(parameter):
   val A      = Flipped(Bits(parameter.width))
@@ -23,12 +29,14 @@ class AbsValProbe(parameter: AbsValParameter) extends DVBundle[AbsValParameter, 
 
 /** Two's-complement absolute value, `ABSVAL = |A|`.
   *
-  * `A` is interpreted as a width-bit signed value while the interface remains `UInt`. A clear sign bit passes `A`
+  * `A` is interpreted as a width-bit signed value while the interface remains `Bits`. A clear sign bit passes `A`
   * through; a set sign bit selects `-A`, computed as `(~A) + 1` through the handwritten incrementer instead of a
   * generic subtractor.
   */
 @generator
-object AbsVal extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]:
+object AbsVal
+    extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]
+    with HasUT[AbsValParameter, AbsValIO]:
   override def moduleName(p: AbsValParameter): String = s"AbsVal_width${p.width}"
 
   def architecture(parameter: AbsValParameter) =
@@ -44,4 +52,23 @@ object AbsVal extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValP
       Ensure((value === expected).I, "absval_matches_abs")
     }
 
+    layer("Verification"):
+      val negExpected = (0.U(parameter.width) - io.A.asUInt).asBits.bits(parameter.width - 1, 0)
+      val expected    = sign ? (negExpected, io.A)
+      Assert((absVal === expected).I, "absval_matches_abs")
+
     io.ABSVAL := checkedAbsVal
+
+  def constraints(
+    parameter: AbsValParameter
+  )(
+    using Arena,
+    Context,
+    Block,
+    ConstraintInterface[AbsValIO]
+  ): Unit =
+    val io = summon[ConstraintInterface[AbsValIO]]
+    require(io.A.cycles >= 3, "AbsVal UT requires cycles for positive, zero, and negative inputs")
+    smtAssert(io.A.at(0) > 0.S)
+    smtAssert(io.A.at(1) === 0.S)
+    smtAssert(io.A.at(2) < 0.S)

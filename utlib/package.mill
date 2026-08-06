@@ -7,14 +7,14 @@ import mill.scalalib.TestModule.Utest
 import mill.scalalib._
 import mill.scalalib.scalafmt._
 
-import build.{circtlib, rvprobe, smtlib, stdlib, testlib, v, zaozi, ZaoziScalaModule}
+import build.{circtlib, smtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
 
-object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode)
-  def moduleDeps   = Seq(zaozi, stdlib, smtlib, circtlib, rvprobe)
+  def moduleDeps   = Seq(zaozi, smtlib, circtlib)
 
-  // The Zaozi DSL used by the harness generator relies on experimental
+  // The Zaozi DSL used by the SV emission helpers relies on experimental
   // features (the same flag stdlib sets).
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
@@ -27,10 +27,12 @@ object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
 
     def mvnDeps = Seq(v.utest, v.oslib)
 
-    override def moduleDeps: Seq[JavaModule] = Seq(m, testlib)
+    override def moduleDeps: Seq[JavaModule] = Seq(m)
 
     override def forkArgs: T[Seq[String]] = Task(
-      super.forkArgs() ++ circtlib.forkArgs()
+      super.forkArgs() ++ circtlib.forkArgs() ++ Seq(
+        s"-Dzaozi.utlib.outDir=${mill.api.BuildCtx.workspaceRoot / "out" / "utlib"}"
+      )
     )
   }
 }

@@ -4,29 +4,14 @@ package me.jiuyang.utlib
 
 import scala.util.chaining.scalaUtilChainingOps
 
-/** One simulation run's outcome.
-  *
-  * `log` is stdout and stderr as one ordered stream, captured merged at the source. That matters because the two carry
-  * different halves of the same story: a FIRRTL `printf` lowers to a write on file descriptor 2, so the transaction
-  * trace arrives on stderr, while `$display` from the generated top arrives on stdout. Concatenating them afterwards
-  * would keep both but destroy the ordering between them — exactly what you need when correlating a trace line with the
-  * cycle the run finished on.
-  */
+/** One simulation run's outcome. `log` keeps stdout and stderr in their original order. */
 final case class RunResult(
-  exitCode: Int,
-  log:      String,
-  coverage: CoverageReport,
-  tracePath: Option[os.Path] = None):
+  exitCode:  Int,
+  log:       String,
+  coverage:  CoverageReport,
+  tracePath: Option[os.Path] = None)
 
-  /** Lines of the transaction trace, if the run emitted one. */
-  def traceLines: Seq[String] = log.linesIterator.filter(_.contains(Names.txnMarker)).toSeq
-
-/** The Verilator simulation backend.
-  *
-  * `--assert` is what makes Verilator elaborate the SVA `cover property` statements at all; `--coverage-user` is what
-  * makes it count them. Without both, the run succeeds and reports zero coverage — the most confusing possible failure
-  * — so both are always passed.
-  */
+/** The Verilator simulation backend. Assertions and user coverage are always enabled. */
 object Verilator extends Simulator:
   def name:   String = "verilator"
   def envVar: String = "VERILATOR"
