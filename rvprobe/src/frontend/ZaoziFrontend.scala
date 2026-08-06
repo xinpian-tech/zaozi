@@ -51,9 +51,14 @@ final case class ZaoziArtifact(
   *     predicates.
   *   - `backend` — a ChiselSim-style poke/peek/step driver, not GAS assembly.
   *
+<<<<<<< HEAD
   * Sequence selection is supplied by `strategy`; the default is a deterministic smoke sequence that drives every
   * Drive port once and drains every Monitor port once. This keeps the leg usable — and its tests env-independent —
   * without pulling in Z3.
+=======
+  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics remain rvprobe-owned;
+  * generic solver process support is shared through `smtlib`, and utlib has no dependency on this frontend.
+>>>>>>> 0c2f3cc8 (tiny fix)
   *
   * An SMT-backed strategy can later model Decoupled handshake timing, backpressure, and dependency constraints while
   * reusing this leg's alphabet, whitebox, and backend. Transaction semantics remain rvprobe-owned, and generic solver
