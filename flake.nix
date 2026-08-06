@@ -9,16 +9,19 @@
     flake-utils.url = "github:numtide/flake-utils";
     mvn-trace-forge.url = "github:Avimitin/mvn-trace-forge";
     scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
+    scala3-bsp-semantic-ls-zed-plugin.url = "github:xinpian-tech/scala3-bsp-semantic-ls-zed/zed-plugin-hook";
   };
 
   outputs =
-    inputs@{ self
-    , nixpkgs
-    , flake-utils
-    , mvn-trace-forge
-    , circt-nix
-    , scala3-bsp-semantic-ls
-    , ...
+    inputs@{
+      self,
+      nixpkgs,
+      flake-utils,
+      mvn-trace-forge,
+      circt-nix,
+      scala3-bsp-semantic-ls,
+      scala3-bsp-semantic-ls-zed-plugin,
+      ...
     }:
     let
       overlay = import ./nix/overlay.nix inputs;
@@ -32,6 +35,18 @@
     // flake-utils.lib.eachDefaultSystem (
       system:
       let
+        scala3BspSemanticLs = scala3-bsp-semantic-ls.packages."${system}".default;
+
+        zedHook =
+          let
+            hookPkg =
+              scala3-bsp-semantic-ls-zed-plugin.packages."${system}".scala3-bsp-semantic-ls-zed-plugin-hook;
+          in
+          # Use zaozi pinned LSP
+          hookPkg.override {
+            inherit scala3BspSemanticLs;
+          };
+
         pkgs = import nixpkgs {
           overlays = [
             circt-nix.overlays.default
@@ -41,24 +56,6 @@
           ];
           inherit system;
         };
-        scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default;
-        zedSettings = pkgs.writeText "zaozi-zed-settings.json" ''
-          {
-            "languages": {
-              "Scala": {
-                "language_servers": ["scala3-bsp-semantic-ls"]
-              }
-            },
-            "lsp": {
-              "scala3-bsp-semantic-ls": {
-                "binary": {
-                  "path": "${scala3BspSemanticLs}/bin/scala3-bsp-semantic-ls",
-                  "arguments": []
-                }
-              }
-            }
-          }
-        '';
       in
       {
         formatter = pkgs.nixpkgs-fmt;
@@ -70,8 +67,14 @@
           circt-install = pkgs.circt-install;
         };
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
+          inputsFrom = [
+            pkgs.zaozi.zaozi-assembly
+            zedHook
+          ];
+          nativeBuildInputs = [
+            pkgs.mtf
+            pkgs.nixd
+            pkgs.jdk25
             scala3BspSemanticLs
           ];
           env = with pkgs; {
@@ -97,9 +100,6 @@
           # without it scalac throws StackOverflowError in pullOutFirstConstr.
           shellHook = ''
             export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Xss32m"
-            ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-              install -Dm644 ${zedSettings} .zed/settings.json
-            ''}
           '';
         };
       }
