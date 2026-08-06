@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.rvprobe
 
+import me.jiuyang.smtlib.Z3
 import me.jiuyang.smtlib.tpe.{Bool, Ref}
 import me.jiuyang.smtlib.parser.{parseZ3Output, Z3Result, Z3Status}
 import me.jiuyang.smtlib.default.{*, given}
@@ -323,7 +324,7 @@ trait RVGenerator:
       given Arena  = arena
       given Module = module
       val smtlib   = mlirToSMTLIB()
-      val output   = runZ3(injectRandomSeed(smtlib).replace("(reset)", ""))
+      val output   = runZ3(smtlib.replace("(reset)", ""))
       sat = output.trim.startsWith("sat")
       sat
     finally
@@ -411,25 +412,7 @@ trait RVGenerator:
     * @return
     *   The output from Z3
     */
-  private def runZ3(smtlib: String): String = {
-    val z3Output = os
-      .proc("z3", "-in", "-t:5000")
-      .call(stdin = smtlib, check = false)
-    z3Output.out.text()
-  }
-
-  /** Inject Z3 randomization options before `(set-logic ...)` so that each solve explores a different search path.
-    * Override [[seed]] to fix the value for reproducibility.
-    */
-  private def injectRandomSeed(smtlib: String): String =
-    val options = Seq(
-      s"(set-option :smt.random_seed $seed)",
-      s"(set-option :sat.random_seed $seed)"
-    ).mkString("\n")
-    smtlib.replaceFirst(
-      """\(set-logic """,
-      s"$options\n(set-logic "
-    )
+  private def runZ3(smtlib: String): String = Z3.run(smtlib, seed)
 
   /** Dump SMT-LIB to file if `RVPROBE_DEBUG_SMTLIB` env var is set.
     *
@@ -450,9 +433,8 @@ trait RVGenerator:
     }
 
   private def toZ3Output(smtlib: String, stage: String = "unknown"): String = {
-    val randomized         = injectRandomSeed(smtlib)
     // Replace (reset) with (get-model) to get the model output
-    val smtlibWithGetModel = randomized.replace("(reset)", "(get-model)")
+    val smtlibWithGetModel = smtlib.replace("(reset)", "(get-model)")
     maybeDumpSmtlib(smtlibWithGetModel, stage)
     runZ3(smtlibWithGetModel)
   }

@@ -4,7 +4,16 @@ package org.llvm.circt.scalalib.dialect.firrtl.operation
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlConvention, FirrtlLayerConvention}
 import org.llvm.mlir.scalalib.capi.support.{*, given}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Module as MlirModule, Operation, Type, Value}
+import org.llvm.mlir.scalalib.capi.ir.{
+  Attribute,
+  Block,
+  Context,
+  Location,
+  Module as MlirModule,
+  Operation,
+  Type,
+  Value
+}
 
 import java.lang.foreign.Arena
 
@@ -61,7 +70,8 @@ trait ExtModuleApi extends HasOperation[ExtModule]:
     firrtlConvention: FirrtlConvention,
     interface:        Seq[(FirrtlBundleField, Location)],
     layers:           Seq[Seq[String]],
-    verilogParameter: Map[String, VerilogParameterType]
+    verilogParameter: Map[String, VerilogParameterType],
+    annotations:      Seq[Attribute] = Seq.empty
   )(
     using Arena,
     Context

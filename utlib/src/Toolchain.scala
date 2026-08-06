@@ -15,7 +15,7 @@ trait Tool:
 
   /** Whether the executable resolves. */
   final def available: Boolean =
-    try os.proc("which", binary).call(check = false).exitCode == 0
+    try os.proc("which", binary).call(check = false, stdout = os.Pipe, stderr = os.Pipe).exitCode == 0
     catch case _: Throwable => false
 
   /** Fail early, with a remediation hint, when the executable is missing. */
@@ -56,32 +56,14 @@ trait Simulator extends Tool:
   /** Build and run `request`, returning the outcome. */
   def simulate(request: SimulationRequest): RunResult
 
-/** An SMT solver backend.
-  *
-  * Kept behind an interface for the same reason as [[Simulator]]: seeding syntax and command-line shape are
-  * solver-specific, everything above is not.
-  */
-trait Solver extends Tool:
-  /** Solve `smtlib`, returning the solver's raw stdout.
-    *
-    * @param seed
-    *   makes the search reproducible; how it is expressed is the solver's business
-    * @param timeoutMillis
-    *   per-query wall-clock budget
-    */
-  def solve(smtlib: String, seed: Int, timeoutMillis: Int = 5000): String
-
 /** The tools this framework runs against.
   *
   * Selection is by name through the environment, so a run can be pointed at a different backend without a rebuild:
-  * `UTLIB_SIMULATOR=verilator`, `UTLIB_SOLVER=z3`.
+  * `UTLIB_SIMULATOR=verilator`.
   */
 object Toolchain:
   /** Registered simulator backends. Adding VCS means adding it to this map. */
   val simulators: Map[String, Simulator] = Map(Verilator.name -> Verilator)
-
-  /** Registered solver backends. */
-  val solvers: Map[String, Solver] = Map(Z3.name -> Z3)
 
   // `lazy` on purpose: an unknown backend name should surface as the readable
   // error `select` raises, not wrapped in an ExceptionInInitializerError from
@@ -89,13 +71,9 @@ object Toolchain:
   /** The simulator this run uses. */
   lazy val simulator: Simulator = select("UTLIB_SIMULATOR", simulators, Verilator)
 
-  /** The solver this run uses. */
-  lazy val solver: Solver = select("UTLIB_SOLVER", solvers, Z3)
-
-  /** Fail early if either tool is missing, rather than midway through a run. */
+  /** Fail early if the simulator is missing, rather than midway through a run. */
   def check(): Unit =
     simulator.check()
-    solver.check()
 
   private def select[T <: Tool](variable: String, registry: Map[String, T], default: T): T =
     sys.env.get(variable) match
