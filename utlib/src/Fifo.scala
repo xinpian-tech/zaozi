@@ -89,7 +89,7 @@ object Fifo extends Generator[FifoParameter, FifoLayers, FifoIO, FifoProbe] with
     val enqFire = io.enq.valid & !isFull
     val deqFire = valid0 & io.deq.ready
 
-    val probe = summon[Interface[FifoProbe]]
+    val probe = summon[ProbeInterface[FifoProbe]]
     layer(Names.verificationLayer):
       val isFullP  = Wire(Bool()); isFullP  := isFull; probe.isFull <== isFullP
       val valid0P  = Wire(Bool()); valid0P  := valid0; probe.valid0 <== valid0P

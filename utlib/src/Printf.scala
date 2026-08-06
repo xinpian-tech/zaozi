@@ -33,10 +33,10 @@ import java.lang.foreign.Arena
   * `format` uses FIRRTL's printf syntax (`%d`, `%x`, `%b`), with one substitution per specifier.
   */
 def printf(
-  clock:  Referable[Clock] & HasOperation,
-  cond:   Referable[Bool] & HasOperation,
+  clock:  Referable[Clock],
+  cond:   Referable[Bool],
   format: String,
-  args:   (Referable[?] & HasOperation)*
+  args:   Referable[?]*
 )(
   using Arena,
   Context,

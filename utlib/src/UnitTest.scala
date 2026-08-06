@@ -114,18 +114,17 @@ trait UnitTest:
 
   /** Solve once and persist the stimulus to `path` as JSON — a *frozen* case.
     *
-    * Freezing pins the exact solved sequence so a regression replays it via
-    * [[runStimulus]] without re-solving: fast, and immune to solver-version or
-    * seed drift. A subsequent failure then means the DUT changed, not the
-    * search. Commit the file next to the test. Returns the frozen stimulus.
+    * Freezing pins the exact solved sequence so a regression replays it via [[runStimulus]] without re-solving: fast,
+    * and immune to solver-version or seed drift. A subsequent failure then means the DUT changed, not the search.
+    * Commit the file next to the test. Returns the frozen stimulus.
     */
   final def freeze(path: os.Path): SolvedStimulus =
     val stimulus = solve()
     os.write.over(path, upickle.default.write(stimulus, indent = 2))
     stimulus
 
-  /** Elaborate and simulate a specific stimulus, bypassing the solver — the
-    * replay half of [[freeze]]. Load a frozen case with [[UnitTest.loadStimulus]].
+  /** Elaborate and simulate a specific stimulus, bypassing the solver — the replay half of [[freeze]]. Load a frozen
+    * case with [[UnitTest.loadStimulus]].
     */
   final def runStimulus(
     stimulus: SolvedStimulus,
