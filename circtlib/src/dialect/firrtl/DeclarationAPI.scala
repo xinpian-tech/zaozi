@@ -27,6 +27,16 @@ end InstanceApi
 class Mem(val _operation: Operation)
 class Node(val _operation: Operation)
 trait NodeApi     extends HasOperation[Node]:
+  inline def op(
+    name:        String,
+    location:    Location,
+    nameKind:    FirrtlNameKind,
+    input:       Value,
+    forceable:   Boolean = false
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Node
 end NodeApi
 class Object(val _operation: Operation)
 class Reg(val _operation: Operation)
@@ -37,7 +47,8 @@ trait RegApi      extends HasOperation[Reg]:
     nameKind:    FirrtlNameKind,
     tpe:         Type,
     clock:       Value,
-    clockEdge:   FirrtlEventControl
+    clockEdge:   FirrtlEventControl,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context
@@ -95,7 +106,8 @@ trait RegResetApi extends HasOperation[RegReset]:
     resetValue:    Value,
     clockEdge:     FirrtlEventControl,
     resetType:     RegResetType,
-    resetPolarity: RegResetPolarity
+    resetPolarity: RegResetPolarity,
+    forceable:     Boolean = false
   )(
     using arena:   Arena,
     context:       Context
@@ -107,7 +119,8 @@ trait WireApi     extends HasOperation[Wire]:
     name:        String,
     location:    Location,
     nameKind:    FirrtlNameKind,
-    tpe:         Type
+    tpe:         Type,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context
