@@ -38,7 +38,7 @@ trait ZaoziScalaModule extends ScalaModule {
       "-java-output-version",
       "25",
       // Emit SemanticDB so the project can be indexed by SemanticDB-based
-      // tooling (Metals, scalafix, scala3-bsp-semantic-ls). Built into the
+      // tooling (Metals, scalafix, zaozi-lsp). Built into the
       // Scala 3 compiler; -sourceroot keeps emitted URIs workspace-relative.
       "-Xsemanticdb",
       "-sourceroot",

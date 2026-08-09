@@ -8,7 +8,7 @@
     circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
     flake-utils.url = "github:numtide/flake-utils";
     mvn-trace-forge.url = "github:Avimitin/mvn-trace-forge";
-    scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
+    zaozi-lsp.url = "github:xinpian-tech/zaozi-lsp";
   };
 
   outputs =
@@ -17,7 +17,7 @@
     , flake-utils
     , mvn-trace-forge
     , circt-nix
-    , scala3-bsp-semantic-ls
+    , zaozi-lsp
     , ...
     }:
     let
@@ -41,18 +41,18 @@
           ];
           inherit system;
         };
-        scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default;
+        zaoziLsp = zaozi-lsp.packages.${system}.default;
         zedSettings = pkgs.writeText "zaozi-zed-settings.json" ''
           {
             "languages": {
               "Scala": {
-                "language_servers": ["scala3-bsp-semantic-ls"]
+                "language_servers": ["zaozi-lsp"]
               }
             },
             "lsp": {
-              "scala3-bsp-semantic-ls": {
+              "zaozi-lsp": {
                 "binary": {
-                  "path": "${scala3BspSemanticLs}/bin/scala3-bsp-semantic-ls",
+                  "path": "${zaoziLsp}/bin/zaozi-lsp",
                   "arguments": []
                 }
               }
@@ -72,7 +72,7 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
           nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
-            scala3BspSemanticLs
+            zaoziLsp
           ];
           env = with pkgs; {
             CIRCT_INSTALL_PATH = circt-install;

@@ -3,7 +3,7 @@
 .jvm-opts
 .mill-jvm-opts
 .metals/
-.scala3-bsp-semantic-ls/
+.zaozi-lsp/
 .zed/
 .vscode/
 .envrc

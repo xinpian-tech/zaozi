@@ -28,7 +28,7 @@ import java.nio.file.{Files, Path, Paths}
   * `io.selectDynamic("field")`, a transparent inline macro that expands to `subRef`/`subRefOption` calls, where `io` is
   * a `Referable[T]` or an `Interface[T]`. Vanilla SemanticDB therefore records an occurrence of
   * `Referable#selectDynamic().` (or `Interface#selectDynamic().`) at the `field` position instead of the bundle field
-  * itself, so SemanticDB-first tooling (scala3-bsp-semantic-ls, Metals, scalafix) cannot resolve go-to-definition or
+  * itself, so SemanticDB-first tooling (zaozi-lsp, Metals, scalafix) cannot resolve go-to-definition or
   * find-references for bundle fields.
   *
   * This [[StandardPlugin]] hosts the two pipeline-dispatched zaozi tooling phases (see [[initialize]] for the dispatch
@@ -63,7 +63,7 @@ class ZaoziSemanticDBPlugin extends StandardPlugin:
     *
     * The plugin jar travels on the modules' scalacOptions, so any dotty pipeline that honors `-Xplugin` loads this
     * plugin: the batch compiler (zinc/mill), the interactive presentation compiler (`InteractiveDriver` — Metals and
-    * the scala3-bsp-semantic-ls PC islands; its pipeline is only parser/typer/SetRootTree/cookComments), scaladoc's
+    * the zaozi-lsp PC islands; its pipeline is only parser/typer/SetRootTree/cookComments), scaladoc's
     * tasty inspector (ReadTasty/TastyInspectorPhase), and the REPL (full batch pipeline). Contributing a phase whose
     * `runsAfter`/`runsBefore` anchors are absent from the active plan makes `Plugins.schedule` throw
     * `NoSuchElementException: key not found: <anchor>` while propagating ordering constraints — which aborts

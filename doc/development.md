@@ -33,7 +33,7 @@ after you installed the dependencies and set the env. You can use
 
 ### Zed
 
-Install the `scala3-bsp-semantic-ls` Zed adapter through the Nix-managed Zed
+Install the `zaozi-lsp` Zed adapter through the Nix-managed Zed
 configuration, then launch Zed from the project development environment:
 
 ```shell
@@ -44,7 +44,7 @@ Depending on the Zed installation, the command may be named `zed` instead of
 `zeditor`. Trust the worktree when Zed prompts for it so project settings and
 language servers are enabled. On Linux, the development shell hook generates
 the project-level `.zed/settings.json`, selecting the
-`scala3-bsp-semantic-ls` adapter and its exact Nix store binary path. Zed does
+`zaozi-lsp` adapter and its exact Nix store binary path. Zed does
 not discover or download the server. The existing development-shell hook also
 generates `.bsp/mill-bsp.json`; the shared Mill module enables the SemanticDB
 options required by the server.
