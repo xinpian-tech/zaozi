@@ -2,22 +2,41 @@
   "nodes": {
     "circt-nix": {
       "inputs": {
+        "circt-src": "circt-src",
         "flake-compat": "flake-compat",
+        "llvm-src": "llvm-src",
         "nixpkgs": "nixpkgs",
         "slang-src": "slang-src"
       },
       "locked": {
-        "lastModified": 1785378254,
-        "narHash": "sha256-++zRS2XFCGjQCwjTf7A4QUboXxIEEIruYTC+4D7ue/8=",
+        "lastModified": 1786424114,
+        "narHash": "sha256-XXURQeU/3g8+tGdjkVGtWU3D0+sp6bx+lX6g4G+czIc=",
         "owner": "xinpian-tech",
         "repo": "circt-nix",
-        "rev": "03880ddceed5eb4d88e3e89e50c398172d068615",
+        "rev": "af47017089200cf4c5ee8d11d89a76a26c1cc486",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
         "ref": "xinpian-main",
         "repo": "circt-nix",
+        "type": "github"
+      }
+    },
+    "circt-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786387434,
+        "narHash": "sha256-1jBFiuhFcfz70d7Q8cThDYY31qbfSUFJGnpd29bDiYA=",
+        "owner": "xinpian-tech",
+        "repo": "circt",
+        "rev": "a2621cd17dc88a9864b8f8a35353e61fb2ba6753",
+        "type": "github"
+      },
+      "original": {
+        "owner": "xinpian-tech",
+        "ref": "master",
+        "repo": "circt",
         "type": "github"
       }
     },
@@ -128,6 +147,23 @@
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "llvm-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783919289,
+        "narHash": "sha256-epMcDIyD3zwgH4r4DqvXW0pUHTanXhm+CPaGE53WD7s=",
+        "owner": "llvm",
+        "repo": "llvm-project",
+        "rev": "b1c56fb53a9c76d6b045ede49083b647ae049ffe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "llvm",
+        "repo": "llvm-project",
+        "rev": "b1c56fb53a9c76d6b045ede49083b647ae049ffe",
         "type": "github"
       }
     },
