@@ -80,6 +80,63 @@ final class UTGenerator[
       case RefuteOutcome.Refuted(cex)          =>
         PropertyOutcome.Falsified(cex, runStimulus(cex, outDir, trace))
 
+  /** Drive coverage closed: solve, simulate, and re-solve toward whatever is still missed.
+    *
+    * Round 0 plays the baseline stimulus. Each following round takes the first still-missed
+    * goal, conjoins its hint with the DUT's constraints, bumps the seed, and simulates the
+    * result — a run targeting one goal often hits others on the way, so hits accumulate
+    * across rounds. A goal whose hint is unsatisfiable is recorded and abandoned: retrying a
+    * proven-UNSAT query with a different seed cannot help. The loop stops when every goal is
+    * hit, every pursuable goal is abandoned, or `maxRounds` hinted rounds have run.
+    */
+  def closeCoverage(
+    goals:     Seq[CoverageGoal[I]],
+    maxRounds: Int = 4,
+    outDir:    os.Path = outputDirectory,
+    trace:     Boolean = false
+  ): CoverageClosure[I] =
+    require(goals.nonEmpty, "closeCoverage needs at least one goal")
+    require(maxRounds >= 1, "maxRounds must be positive")
+    val rounds = Seq.newBuilder[CoverageRound[I]]
+    var hits   = Map.empty[String, Int]
+
+    def record(run: RunResult): Unit =
+      hits = run.coverage.hits.foldLeft(hits) { case (acc, (name, count)) =>
+        acc.updated(name, acc.getOrElse(name, 0) + count)
+      }
+
+    val baseline = solve()
+    val baseRun  = runStimulus(baseline, outDir / "round0", trace)
+    record(baseRun)
+    rounds += CoverageRound(None, seed, Some(baseline), Some(baseRun))
+
+    var abandoned = Set.empty[String]
+    def pursuable  = goals.filter(goal => hits.getOrElse(goal.name, 0) == 0 && !abandoned.contains(goal.name))
+
+    var round = 1
+    var queue = pursuable
+    while round <= maxRounds && queue.nonEmpty do
+      val goal      = queue.head
+      val roundSeed = seed + round
+      ConstraintSolver.solveWith(dut, parameter, cycles, roundSeed, solverBackend)(goal.hint) match
+        case Some(stimulus) =>
+          val run = runStimulus(stimulus, outDir / s"round$round", trace)
+          record(run)
+          rounds += CoverageRound(Some(goal.name), roundSeed, Some(stimulus), Some(run))
+        case None           =>
+          abandoned += goal.name
+          rounds += CoverageRound(Some(goal.name), roundSeed, None, None)
+      round += 1
+      // Rotate so one stubborn goal does not starve the rest of the budget.
+      val remaining = pursuable
+      queue = remaining.filterNot(_.name == goal.name) ++ remaining.filter(_.name == goal.name)
+
+    CoverageClosure(
+      rounds.result(),
+      hits,
+      goals.map(_.name).filterNot(name => hits.getOrElse(name, 0) > 0).toSet
+    )
+
   /** Elaborate, link and lower the generic harness without running a simulator. */
   def simulationRequest(
     stimulus:  SolvedStimulus[I],

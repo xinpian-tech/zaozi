@@ -57,14 +57,30 @@ private[utlib] object ConstraintSolver:
   )(
     property: (Arena, Context, Block, ConstraintInterface[I]) ?=> Referable[SMTBool]
   ): RefuteOutcome[I] =
-    val (status, stimulus, _, _) = query(dut, parameter, cycles, seed, solverBackend)(Some(property))
+    val negated: (Arena, Context, Block, ConstraintInterface[I]) ?=> Unit = smtAssert(!property)
+    val (status, stimulus, _, _) = query(dut, parameter, cycles, seed, solverBackend)(Some(negated))
     status match
       case Z3Status.Sat   => RefuteOutcome.Refuted(stimulus.get)
       case Z3Status.Unsat => RefuteOutcome.Holds()
       case other          => RefuteOutcome.Undecided(other.toString)
 
-  /** Build the SMT query — width bounds, the DUT's own constraints, and optionally a negated
-    * property — run the backend, and turn a SAT model into a [[SolvedStimulus]].
+  /** Solve with extra constraints conjoined — `None` when they make the query unsatisfiable
+    * (or undecidable), rather than an exception: callers iterating over goals treat that as a
+    * per-goal outcome, not a failure of the loop.
+    */
+  def solveWith[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
+    dut:           Generator[PARAM, L, I, P] & HasUT[PARAM, I],
+    parameter:     PARAM,
+    cycles:        Int,
+    seed:          Int,
+    solverBackend: Solver = Z3
+  )(
+    augment: (Arena, Context, Block, ConstraintInterface[I]) ?=> Unit
+  ): Option[SolvedStimulus[I]] =
+    query(dut, parameter, cycles, seed, solverBackend)(Some(augment))._2
+
+  /** Build the SMT query — width bounds, the DUT's own constraints, and optionally extra
+    * assertions — run the backend, and turn a SAT model into a [[SolvedStimulus]].
     */
   private def query[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[
     PARAM,
@@ -76,7 +92,7 @@ private[utlib] object ConstraintSolver:
     seed:          Int,
     solverBackend: Solver
   )(
-    negated: Option[(Arena, Context, Block, ConstraintInterface[I]) ?=> Referable[SMTBool]]
+    augment: Option[(Arena, Context, Block, ConstraintInterface[I]) ?=> Unit]
   ): (Z3Status, Option[SolvedStimulus[I]], String, String) =
     solverBackend.check()
     given arena:   Arena   = Arena.ofConfined()
@@ -107,7 +123,9 @@ private[utlib] object ConstraintSolver:
             case _                                                   =>
               smtAssert(value >= 0.S & value < (1 << port.width).S)
         dut.constraints(parameter)
-        negated.foreach(property => smtAssert(!property))
+        augment match
+          case Some(extra) => extra: Unit
+          case None        => ()
         smtCheck
       }
 
