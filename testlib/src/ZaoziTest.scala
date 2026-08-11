@@ -6,16 +6,19 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.magic.validateCircuit
 import me.jiuyang.zaozi.reftpe.*
+import org.llvm.circt.scalalib.capi.conversion.{given_ConversionCreateApi, ConversionCreateApi}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.DialectApi as FirrtlDialectApi
 import org.llvm.circt.scalalib.capi.dialect.sv.DialectApi as SvDialectApi
 import org.llvm.circt.scalalib.capi.dialect.emit.DialectApi as EmitDialectApi
 import org.llvm.circt.scalalib.capi.dialect.ltl.DialectApi as LTLDialectApi
+import org.llvm.circt.scalalib.capi.dialect.seq.DialectApi as SeqDialectApi
 import org.llvm.circt.scalalib.capi.dialect.verif.DialectApi as VerifDialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
 import org.llvm.circt.scalalib.capi.firtool.given_FirtoolOptionsApi
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_CircuitApi, given_ModuleApi, Circuit, CircuitApi}
 import org.llvm.circt.scalalib.capi.dialect.emit.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.ltl.given_DialectApi
+import org.llvm.circt.scalalib.capi.dialect.seq.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.sv.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.verif.given_DialectApi
 import org.llvm.circt.scalalib.capi.firtool.FirtoolApi
@@ -127,6 +130,8 @@ trait HasVerilogTest:
   this: Generator[?, ?, ?, ?] =>
   private val self = this.asInstanceOf[Generator[this.TPARAM, this.TLAYER, this.TINTF, this.TPROBE]]
 
+  protected def lowerLTLToCoreForVerilog: Boolean = false
+
   def verilogString(
     parameter: this.TPARAM
   ): String =
@@ -136,10 +141,12 @@ trait HasVerilogTest:
       given Context        = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
       summon[LTLDialectApi].loadDialect
+      summon[SeqDialectApi].loadDialect
       summon[SvDialectApi].loadDialect
       summon[EmitDialectApi].loadDialect
       summon[VerifDialectApi].loadDialect
       summon[VerifDialectApi].registerPasses
+      summon[SeqDialectApi].registerPasses
       given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
 
       given PassManager  = summon[PassManagerApi].passManagerCreate
@@ -153,6 +160,13 @@ trait HasVerilogTest:
         "lower-contracts,verif-lower-symbolic-values{mode=yosys},verif-lower-tests",
         err => throw new RuntimeException(s"verif pipeline parse error: $err")
       )
+      if lowerLTLToCoreForVerilog then
+        val hwModulePasses = summon[PassManager].getNestedUnder("hw.module")
+        hwModulePasses.addOwnedPass(summon[ConversionCreateApi].lowerLTLToCore)
+        hwModulePasses.addPipeline(
+          "lower-seq-shiftreg",
+          err => throw new RuntimeException(s"Seq pipeline parse error: $err")
+        )
       summon[PassManager].hwToSV(firtoolOptions)
       // TODO: we need a pass for export verilog on a MLIRModule, not it export empty string.
       summon[PassManager].exportVerilog(firtoolOptions, out ++= _)

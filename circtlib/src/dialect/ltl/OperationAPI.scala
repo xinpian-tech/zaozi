@@ -150,8 +150,8 @@ trait OrApi extends HasOperation[Or]:
     ): Value
 end OrApi
 
-class Past(val _operation: Operation)
-trait PastApi extends HasOperation[Past]:
+class ClockedPast(val _operation: Operation)
+trait ClockedPastApi extends HasOperation[ClockedPast]:
   def op(
     input:    Value,
     delay:    Long,
@@ -160,12 +160,12 @@ trait PastApi extends HasOperation[Past]:
   )(
     using Arena,
     Context
-  ):   Past
-  extension (ref: Past)
+  ):   ClockedPast
+  extension (ref: ClockedPast)
     def result(
       using Arena
     ): Value
-end PastApi
+end ClockedPastApi
 
 class Sampled(val _operation: Operation)
 trait SampledApi extends HasOperation[Sampled]:

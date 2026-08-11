@@ -172,6 +172,33 @@ object SVASpec extends TestSuite:
           "assert_enabled: assert property (disable iff (_GEN) @(posedge clock) ib0);"
         )
 
+      test("past"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasMlirTest
+            with HasVerilogTest:
+          override protected def lowerLTLToCoreForVerilog: Boolean = true
+
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val previous     = past(io.ib0)
+
+            Assert(previous.S iff io.ib1.S, "past_boolean_value")
+
+        SimpleSVA.mlirTest(SVASpecParameter(32))(
+          """|%0 = firrtl.int.ltl.clocked_past %ib0, 1, %clock
+             |%previous = firrtl.node interesting_name %0
+             |%1 = firrtl.int.ltl.clocked_atom %previous, posedge %clock
+             |%2 = firrtl.int.ltl.clocked_atom %ib1, posedge %clock
+             |%3 = firrtl.int.ltl.or %1, %2
+             |%4 = firrtl.int.ltl.not %3
+             |%5 = firrtl.int.ltl.and %1, %2
+             |%6 = firrtl.int.ltl.or %4, %5
+             |firrtl.int.verif.assert %6 {label = "past_boolean_value"}""".stripMargin
+        )
+
     test("Sequence"):
       test("##"):
         @generator

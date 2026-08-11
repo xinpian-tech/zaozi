@@ -985,6 +985,34 @@ given LTLClockedDelayIntrinsicApi with
     ): Value = ref.operation.getResult(0)
 end given
 
+given LTLClockedPastIntrinsicApi with
+  def op(
+    input:    Value,
+    clock:    Value,
+    delay:    Long,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): LTLClockedPastIntrinsic =
+    val delayAttr = summon[NamedAttributeApi]
+      .namedAttributeGet("delay".identifierGet, delay.integerAttrGet(64.integerTypeGet))
+    LTLClockedPastIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.ltl.clocked_past",
+        location = location,
+        namedAttributes = Seq(delayAttr),
+        operands = Seq(input, clock),
+        resultsTypes = Some(Seq(1.getUInt))
+      )
+    )
+  extension (ref: LTLClockedPastIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
 given LTLClockedEventuallyIntrinsicApi with
   def op(
     input:    Value,

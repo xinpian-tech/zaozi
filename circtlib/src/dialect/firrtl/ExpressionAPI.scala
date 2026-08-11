@@ -395,6 +395,23 @@ trait LTLClockedDelayIntrinsicApi extends HasOperation[LTLClockedDelayIntrinsic]
     ): Value
 end LTLClockedDelayIntrinsicApi
 
+class LTLClockedPastIntrinsic(val _operation: Operation)
+trait LTLClockedPastIntrinsicApi extends HasOperation[LTLClockedPastIntrinsic]:
+  def op(
+    input:    Value,
+    clock:    Value,
+    delay:    Long,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   LTLClockedPastIntrinsic
+  extension (ref: LTLClockedPastIntrinsic)
+    def result(
+      using Arena
+    ): Value
+end LTLClockedPastIntrinsicApi
+
 class LTLClockedEventuallyIntrinsic(val _operation: Operation)
 trait LTLClockedEventuallyIntrinsicApi extends HasOperation[LTLClockedEventuallyIntrinsic]:
   def op(

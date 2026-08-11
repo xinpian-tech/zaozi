@@ -1247,6 +1247,26 @@ trait SVAApi:
     InstanceContext
   ): Property
 
+  /** SVA: `$past(value, delay)`.
+    *
+    * Returns the boolean sampled `delay` clock events earlier. A past value is undefined until that many clock events
+    * have occurred, so assertions using it must guard their initial cycles.
+    */
+  def past[T <: Referable[Bool]](
+    value: T,
+    delay: Int = 1
+  )(
+    using ClockEvent
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Node[Bool]
+
   extension [T <: Referable[Bool]](ref: T)
     def S(
       using ClockEvent

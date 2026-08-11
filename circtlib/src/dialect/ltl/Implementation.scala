@@ -269,7 +269,7 @@ given OrApi with
     ): Value = ref.operation.getResult(0)
 end given
 
-given PastApi with
+given ClockedPastApi with
   def op(
     input:       Value,
     delay:       Long,
@@ -278,10 +278,10 @@ given PastApi with
   )(
     using arena: Arena,
     context:     Context
-  ): Past =
-    Past(
+  ): ClockedPast =
+    ClockedPast(
       summon[OperationApi].operationCreate(
-        name = "ltl.past",
+        name = "ltl.clocked_past",
         location = location,
         namedAttributes = Seq(
           summon[NamedAttributeApi].namedAttributeGet("delay".identifierGet, i64Attr(delay))
@@ -290,7 +290,7 @@ given PastApi with
         resultsTypes = Some(Seq(input.getType))
       )
     )
-  extension (ref: Past)
+  extension (ref: ClockedPast)
     def operation: Operation = ref._operation
     def result(
       using Arena

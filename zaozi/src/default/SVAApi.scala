@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlEventControl, FirrtlNameKind}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLAndIntrinsicApi,
   given_LTLClockedAtomIntrinsicApi,
@@ -15,6 +15,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLClockedEventuallyIntrinsicApi,
   given_LTLClockedGoToRepeatIntrinsicApi,
   given_LTLClockedNonConsecutiveRepeatIntrinsicApi,
+  given_LTLClockedPastIntrinsicApi,
   given_LTLClockedRepeatIntrinsicApi,
   given_LTLClockedUntilIntrinsicApi,
   given_LTLConcatIntrinsicApi,
@@ -22,6 +23,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLIntersectIntrinsicApi,
   given_LTLNotIntrinsicApi,
   given_LTLOrIntrinsicApi,
+  given_NodeApi,
   given_VerifAssertApi,
   given_VerifAssumeApi,
   given_VerifCoverApi,
@@ -31,6 +33,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   LTLClockedEventuallyIntrinsicApi as ClockedEventuallyApi,
   LTLClockedGoToRepeatIntrinsicApi as ClockedGoToRepeatApi,
   LTLClockedNonConsecutiveRepeatIntrinsicApi as ClockedNonConsecutiveRepeatApi,
+  LTLClockedPastIntrinsicApi as ClockedPastApi,
   LTLClockedRepeatIntrinsicApi as ClockedRepeatApi,
   LTLClockedUntilIntrinsicApi as ClockedUntilApi,
   LTLConcatIntrinsicApi as ConcatApi,
@@ -38,6 +41,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   LTLIntersectIntrinsicApi as IntersectApi,
   LTLNotIntrinsicApi as NotApi,
   LTLOrIntrinsicApi as OrApi,
+  NodeApi,
   VerifAssertApi as AssertApi,
   VerifAssumeApi as AssumeApi,
   VerifCoverApi as CoverApi
@@ -60,7 +64,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
 
 import java.lang.foreign.Arena
 
-export given_SVAApi.{always, eventually, negedge, posedge, Assert, Assume, Cover}
+export given_SVAApi.{always, eventually, negedge, past, posedge, Assert, Assume, Cover}
 
 given SVAApi with
   def posedge(clock: Referable[Clock]): ClockEvent =
@@ -112,6 +116,39 @@ given SVAApi with
     op.operation.appendToBlock()
     new Property:
       private[zaozi] val _refer: Value = op.operation.getResult(0)
+
+  def past[T <: Referable[Bool]](
+    value:       T,
+    delay:       Int = 1
+  )(
+    using clock: ClockEvent
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Node[Bool] =
+    require(delay > 0, s"past delay must be positive, got $delay")
+
+    val sampledClock = clock.edge match
+      case FirrtlEventControl.AtPosEdge => clock.clock
+      case FirrtlEventControl.AtNegEdge => (!clock.clock.asBool).asClock
+
+    val sampled = summon[ClockedPastApi].op(value.refer, sampledClock.refer, delay, locate)
+    sampled.operation.appendToBlock()
+    val node    = summon[NodeApi].op(
+      name = valName,
+      location = locate,
+      nameKind = FirrtlNameKind.Interesting,
+      input = sampled.result
+    )
+    node.operation.appendToBlock()
+    new Node[Bool]:
+      val _tpe:   Bool  = new Object with Bool
+      val _refer: Value = node.operation.getResult(0)
 
   extension [T <: Referable[Bool]](ref: T)
     def S(
