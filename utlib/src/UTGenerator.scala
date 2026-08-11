@@ -3,6 +3,7 @@
 package me.jiuyang.utlib
 
 import me.jiuyang.smtlib.{Solver, Z3}
+import me.jiuyang.smtlib.tpe.{Bool as SMTBool, Referable}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 
@@ -12,7 +13,7 @@ import org.llvm.circt.scalalib.capi.dialect.verif.{
   given_DialectApi as given_VerifDialectApi,
   DialectApi as VerifDialectApi
 }
-import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, ContextApi, given}
 
 import java.lang.foreign.Arena
 
@@ -59,6 +60,25 @@ final class UTGenerator[
     traceFile: String = "trace.vcd"
   ): RunResult =
     Simulation.run(simulationRequest(stimulus, outDir, trace, traceFile))
+
+  /** Check a property over the constrained stimulus space; replay any counterexample.
+    *
+    * The property ranges over the same per-cycle input symbols as [[HasUT.constraints]], so a
+    * SAT model of `constraints ∧ ¬property` *is* a stimulus. It is replayed through the
+    * simulator — with tracing on, so the waveform documents the violation — before being
+    * reported as [[PropertyOutcome.Falsified]].
+    */
+  def check(
+    property: (Arena, Context, Block, ConstraintInterface[I]) ?=> Referable[SMTBool],
+    outDir:   os.Path = outputDirectory,
+    trace:    Boolean = true
+  ): PropertyOutcome[I] =
+    import ConstraintSolver.RefuteOutcome
+    ConstraintSolver.refute(dut, parameter, cycles, seed, solverBackend)(property) match
+      case RefuteOutcome.Holds()               => PropertyOutcome.Proven()
+      case RefuteOutcome.Undecided(status)     => PropertyOutcome.Unknown(status)
+      case RefuteOutcome.Refuted(cex)          =>
+        PropertyOutcome.Falsified(cex, runStimulus(cex, outDir, trace))
 
   /** Elaborate, link and lower the generic harness without running a simulator. */
   def simulationRequest(
