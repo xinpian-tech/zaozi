@@ -37,6 +37,19 @@ final class UTGenerator[
 
   def solve(): SolvedStimulus[I] = ConstraintSolver.solve(dut, parameter, cycles, seed, solverBackend)
 
+  /** Solve with previously observed stimuli biasing the search (see [[TraceBias]]): `Away`
+    * diversifies from what simulation already exercised, `Toward` warm-starts around a
+    * reference trace. Hard constraints are untouched — this cannot admit a stimulus the
+    * constraints reject, only choose among the admitted ones.
+    */
+  def solveBiased(
+    bias:       TraceBias,
+    references: Seq[SolvedStimulus[I]],
+    roundSeed:  Int = seed
+  ): SolvedStimulus[I] =
+    require(references.nonEmpty, "solveBiased needs at least one reference stimulus")
+    ConstraintSolver.solveBiased(dut, parameter, cycles, roundSeed, solverBackend)(bias, references.map(_.data))
+
   def freeze(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
     val stimulus = solve()
     os.makeDir.all(path / os.up)
@@ -136,6 +149,47 @@ final class UTGenerator[
       hits,
       goals.map(_.name).filterNot(name => hits.getOrElse(name, 0) > 0).toSet
     )
+
+  /** Close coverage with no author-written hints: every round re-solves biased *away* from
+    * all previously played stimuli, so the solver walks fresh corners of the constrained
+    * space until the goals are hit or the budget runs out. This is the trace-in-the-solve
+    * counterpart of [[closeCoverage]]: the knowledge of where to go next comes from the
+    * traces already seen, not from the test author.
+    */
+  def closeCoverageByDiversity(
+    goals:     Seq[String],
+    maxRounds: Int = 16,
+    outDir:    os.Path = outputDirectory,
+    trace:     Boolean = false
+  ): CoverageClosure[I] =
+    require(goals.nonEmpty, "closeCoverageByDiversity needs at least one goal")
+    require(maxRounds >= 1, "maxRounds must be positive")
+    val rounds = Seq.newBuilder[CoverageRound[I]]
+    var hits   = Map.empty[String, Int]
+
+    def record(run: RunResult): Unit =
+      hits = run.coverage.hits.foldLeft(hits) { case (acc, (name, count)) =>
+        acc.updated(name, acc.getOrElse(name, 0) + count)
+      }
+    def missed = goals.filter(goal => hits.getOrElse(goal, 0) == 0)
+
+    val baseline = solve()
+    val baseRun  = runStimulus(baseline, outDir / "round0", trace)
+    record(baseRun)
+    rounds += CoverageRound(None, seed, Some(baseline), Some(baseRun))
+
+    var played = Vector(baseline)
+    var round  = 1
+    while round <= maxRounds && missed.nonEmpty do
+      val roundSeed = seed + round
+      val stimulus  = solveBiased(TraceBias.Away, played, roundSeed)
+      val run       = runStimulus(stimulus, outDir / s"round$round", trace)
+      record(run)
+      played :+= stimulus
+      rounds += CoverageRound(None, roundSeed, Some(stimulus), Some(run))
+      round += 1
+
+    CoverageClosure(rounds.result(), hits, missed.toSet)
 
   /** Elaborate, link and lower the generic harness without running a simulator. */
   def simulationRequest(

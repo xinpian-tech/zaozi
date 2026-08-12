@@ -36,7 +36,7 @@ private[utlib] object ConstraintSolver:
     seed:          Int,
     solverBackend: Solver = Z3
   ): SolvedStimulus[I] =
-    val (status, stimulus, smtlib, output) = query(dut, parameter, cycles, seed, solverBackend)(None)
+    val (status, stimulus, smtlib, output) = query(dut, parameter, cycles, seed, solverBackend)(None, None)
     if status != Z3Status.Sat then
       throw new RuntimeException(
         s"UT constraint solving failed with status $status\n\nSMT-LIB:\n$smtlib\n\nSolver output:\n$output"
@@ -58,11 +58,32 @@ private[utlib] object ConstraintSolver:
     property: (Arena, Context, Block, ConstraintInterface[I]) ?=> Referable[SMTBool]
   ): RefuteOutcome[I] =
     val negated: (Arena, Context, Block, ConstraintInterface[I]) ?=> Unit = smtAssert(!property)
-    val (status, stimulus, _, _) = query(dut, parameter, cycles, seed, solverBackend)(Some(negated))
+    val (status, stimulus, _, _) = query(dut, parameter, cycles, seed, solverBackend)(Some(negated), None)
     status match
       case Z3Status.Sat   => RefuteOutcome.Refuted(stimulus.get)
       case Z3Status.Unsat => RefuteOutcome.Holds()
       case other          => RefuteOutcome.Undecided(other.toString)
+
+  /** Solve under a trace-valued soft bias: hard constraints unchanged, reference stimuli
+    * entering as MaxSMT soft assertions (see [[TraceBias]]).
+    */
+  def solveBiased[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
+    dut:           Generator[PARAM, L, I, P] & HasUT[PARAM, I],
+    parameter:     PARAM,
+    cycles:        Int,
+    seed:          Int,
+    solverBackend: Solver = Z3
+  )(
+    bias:       TraceBias,
+    references: Seq[StimulusData]
+  ): SolvedStimulus[I] =
+    val (status, stimulus, smtlib, output) =
+      query(dut, parameter, cycles, seed, solverBackend)(None, Some(bias -> references))
+    if status != Z3Status.Sat then
+      throw new RuntimeException(
+        s"biased UT constraint solving failed with status $status\n\nSMT-LIB:\n$smtlib\n\nSolver output:\n$output"
+      )
+    stimulus.get
 
   /** Solve with extra constraints conjoined — `None` when they make the query unsatisfiable
     * (or undecidable), rather than an exception: callers iterating over goals treat that as a
@@ -77,7 +98,7 @@ private[utlib] object ConstraintSolver:
   )(
     augment: (Arena, Context, Block, ConstraintInterface[I]) ?=> Unit
   ): Option[SolvedStimulus[I]] =
-    query(dut, parameter, cycles, seed, solverBackend)(Some(augment))._2
+    query(dut, parameter, cycles, seed, solverBackend)(Some(augment), None)._2
 
   /** Build the SMT query — width bounds, the DUT's own constraints, and optionally extra
     * assertions — run the backend, and turn a SAT model into a [[SolvedStimulus]].
@@ -92,7 +113,8 @@ private[utlib] object ConstraintSolver:
     seed:          Int,
     solverBackend: Solver
   )(
-    augment: Option[(Arena, Context, Block, ConstraintInterface[I]) ?=> Unit]
+    augment: Option[(Arena, Context, Block, ConstraintInterface[I]) ?=> Unit],
+    soft:    Option[(TraceBias, Seq[StimulusData])]
   ): (Z3Status, Option[SolvedStimulus[I]], String, String) =
     solverBackend.check()
     given arena:   Arena   = Arena.ofConfined()
@@ -132,7 +154,11 @@ private[utlib] object ConstraintSolver:
       val smtlib =
         val out = new StringBuilder
         summon[Module].exportSMTLIB(out ++= _)
-        out.toString.replace("(reset)", "(get-model)")
+        val exported = out.toString.replace("(reset)", "(get-model)")
+        soft match
+          case None                     => exported
+          case Some(direction -> refs)  =>
+            exported.replace("(check-sat)", softAssertions(constraintInterface, direction, refs) + "(check-sat)")
       val output = solverBackend.run(smtlib, seed)
       val result = parseZ3Output(output)
 
@@ -152,3 +178,38 @@ private[utlib] object ConstraintSolver:
     finally
       context.destroy()
       arena.close()
+
+  /** Render reference stimuli as MaxSMT soft assertions over the solve's input symbols.
+    *
+    * The MLIR SMT dialect has no soft-assertion op, so — like the `(get-model)` swap above —
+    * the bias is spliced into the exported SMT-LIB text, immediately before `(check-sat)`.
+    * Every symbol referenced is already declared: the width-bound loop touches every
+    * (port, cycle) pair before export.
+    */
+  private def softAssertions(
+    constraintInterface: ConstraintInterface[?],
+    direction:           TraceBias,
+    references:          Seq[StimulusData]
+  ): String =
+    val ports = constraintInterface.inputPorts.map(_.name).toSet
+    val lines = for
+      reference       <- references
+      _                = require(
+                           reference.cycles == constraintInterface.cycles,
+                           s"reference stimulus has ${reference.cycles} cycles, the solve has ${constraintInterface.cycles}"
+                         )
+      _                = require(
+                           reference.inputs.keySet == ports,
+                           s"reference inputs ${reference.inputs.keySet.toSeq.sorted.mkString(", ")} " +
+                             s"do not match the DUT inputs ${ports.toSeq.sorted.mkString(", ")}"
+                         )
+      (port, values)  <- reference.inputs.toSeq.sortBy(_._1)
+      (value, cycle)  <- values.zipWithIndex
+    yield
+      val symbol  = constraintInterface.variableName(port, cycle)
+      val literal = if value < 0 then s"(- ${-value})" else value.toString
+      val agree   = s"(= $symbol $literal)"
+      direction match
+        case TraceBias.Toward => s"(assert-soft $agree :weight 1)"
+        case TraceBias.Away   => s"(assert-soft (not $agree) :weight 1)"
+    lines.mkString("", "\n", "\n")
