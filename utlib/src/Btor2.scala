@@ -41,10 +41,26 @@ final class Btor2Design private (
   def stateNamed(name:  String): Option[Long] = stateByName.get(name)
   def sortWidth(nodeId: Long):   Int          = sortBits(stateSort(nodeId))
 
-  private def sortForWidth(width: Int): Long =
+  private[utlib] def sortForWidth(width: Int): Long =
     sortBits.collectFirst { case (id, `width`) => id }.getOrElse(
       throw new IllegalStateException(s"no `sort bitvec $width` in the model to reuse")
     )
+
+  /** The largest node id in use, so a builder can allocate fresh ids above it. */
+  private[utlib] def topId: Long = maxId
+
+  /** Every `<id> <op> ...` line as (op, result, remaining-operands). */
+  private[utlib] def opLines: Seq[(String, Long, Seq[String])] =
+    lines.iterator.flatMap { line =>
+      line.trim.split("\\s+").toList match
+        case id :: op :: rest => id.toLongOption.map(i => (op, i, rest))
+        case _                => None
+    }.toSeq
+
+  /** Append pre-rendered btor2 lines. */
+  private[utlib] def appended(newLines: Seq[String]): Btor2Design = append(newLines)
+
+  private[utlib] def isState(id: Long): Boolean = stateSort.contains(id)
 
   def text: String = lines.mkString("\n") + "\n"
 

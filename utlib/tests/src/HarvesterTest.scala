@@ -75,3 +75,14 @@ object HarvesterTest extends TestSuite:
       Harvester.validateTailSet(design, struct, threshold = 14, tail = tail, kmax = 35) match
         case _: Btor2Result.UnreachableWithin | _: Btor2Result.Proven => ()
         case other => throw new java.lang.AssertionError(s"invariant not certified: $other")
+
+    test("emitting the harvested invariant in the checker's sampled frame closes p530"):
+      val design = Btor2.parse(os.read(resources / "p530.btor2"))
+      val struct = Harvester.locateBtor2(design, bound = 14)
+
+      // The full automatic chain: the discovered tail set, emitted one frame delayed as the
+      // SVA checker samples it, closes the property no HWMCC solver cracked in two years.
+      val closed = Harvester.closeSampled(design, struct, tail = Set(6, 7))
+      Btor2.check(closed, kmax = 20, kind = true) match
+        case Btor2Result.Proven(k) => assert(k <= 2)
+        case other                 => throw new java.lang.AssertionError(s"p530 did not close: $other")
