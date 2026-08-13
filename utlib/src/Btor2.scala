@@ -50,32 +50,78 @@ final class Btor2Design private (
 
   private def append(newLines: Seq[String]): Btor2Design = new Btor2Design(lines ++ newLines)
 
+  /** Result sort id of any node whose line is `<id> <op> <sortid> ...`. */
+  private val resultSort: Map[Long, Long] =
+    lines.iterator.flatMap { line =>
+      line.trim.split("\\s+") match
+        case Array(id, op, sort, _*) if op != "sort" && sort.toLongOption.isDefined =>
+          id.toLongOption.zip(sort.toLongOption)
+        case _                                                                      => None
+    }.toMap
+
+  /** Bit width of any node's result, or -1 if unknown (e.g. it carries no sort). */
+  private[utlib] def sortWidthOf(nodeId: Long): Int =
+    resultSort.get(nodeId).flatMap(sortBits.get).getOrElse(-1)
+
+  /** Sort id of any node's result — states and computed nodes alike. */
+  private def sortOf(nodeId: Long): Long =
+    resultSort.getOrElse(nodeId, stateSort(nodeId))
+
+  /** Every `<id> <op> <sort> <a> <b>` line, as (op, result, a, b). Used to locate nodes by
+    * the comparisons they feed.
+    */
+  private[utlib] def binaryOps: Seq[(String, Long, Long, Long)] =
+    lines.iterator.flatMap { line =>
+      line.trim.split("\\s+") match
+        case Array(id, op, _, a, b) =>
+          for i <- id.toLongOption; x <- a.toLongOption; y <- b.toLongOption yield (op, i, x, y)
+        case _                      => None
+    }.toSeq
+
+  private val lineByResult: Map[Long, Array[String]] =
+    lines.iterator.flatMap { line =>
+      val toks = line.trim.split("\\s+")
+      toks.headOption.flatMap(_.toLongOption).map(_ -> toks)
+    }.toMap
+
+  /** Value of a constant node, following the zero-extend (`uext`) that btor2 inserts when a
+    * narrow enum constant is compared against a wider signal — the enum `eq` dispatch reads a
+    * `uext` of the constant, not the constant itself.
+    */
+  private[utlib] def constOf(nodeId: Long): Option[BigInt] =
+    lineByResult.get(nodeId).flatMap {
+      case Array(_, "constd", _, v)      => v.toIntOption.map(BigInt(_))
+      case Array(_, "const", _, bits)    => scala.util.Try(BigInt(bits, 2)).toOption
+      case Array(_, "uext", _, op, _)    => op.toLongOption.flatMap(constOf)
+      case _                             => None
+    }
+
   /** Materialize `pred` into fresh btor2 nodes; return the extended design and the boolean
     * node id carrying the predicate's truth.
     */
   private def emit(pred: Btor2Pred): (Btor2Design, Long) =
-    val bool1  = sortForWidth(1)
-    val target = pred.state
-    val sort   = stateSort(target)
-    val width  = sortBits(sort)
-    var next   = maxId
-    val out    = scala.collection.mutable.ListBuffer.empty[String]
+    val bool1 = sortForWidth(1)
+    var next  = maxId
+    val out   = scala.collection.mutable.ListBuffer.empty[String]
     def fresh(node: String => String): Long =
       next += 1; out += node(next.toString); next
 
-    val boolId = pred match
-      case Btor2Pred.Ult(_, v) =>
-        val c = fresh(id => s"$id constd $sort $v")
-        fresh(id => s"$id ult $bool1 $target $c")
-      case Btor2Pred.Uge(_, v) =>
-        val c  = fresh(id => s"$id constd $sort $v")
-        val lt = fresh(id => s"$id ult $bool1 $target $c")
-        fresh(id => s"$id not $bool1 $lt")
-      case Btor2Pred.Eq(_, v)  =>
-        val c = fresh(id => s"$id constd $sort $v")
-        fresh(id => s"$id eq $bool1 $target $c")
+    def go(p: Btor2Pred): Long = p match
+      case Btor2Pred.Cmp(node, op, v) =>
+        val sort = sortOf(node)
+        op match
+          case CmpOp.Ult =>
+            val c = fresh(id => s"$id constd $sort $v"); fresh(id => s"$id ult $bool1 $node $c")
+          case CmpOp.Uge =>
+            val c = fresh(id => s"$id constd $sort $v"); val lt = fresh(id => s"$id ult $bool1 $node $c")
+            fresh(id => s"$id not $bool1 $lt")
+          case CmpOp.Eq  =>
+            val c = fresh(id => s"$id constd $sort $v"); fresh(id => s"$id eq $bool1 $node $c")
+      case Btor2Pred.Not(p0)          => val a = go(p0); fresh(id => s"$id not $bool1 $a")
+      case Btor2Pred.And(l, r)        => val a = go(l); val b = go(r); fresh(id => s"$id and $bool1 $a $b")
+      case Btor2Pred.Or(l, r)         => val a = go(l); val b = go(r); fresh(id => s"$id or $bool1 $a $b")
 
-    val _ = width
+    val boolId = go(pred)
     (append(out.toSeq), boolId)
 
   /** Add `pred` as an assumption constraining every reachable state. */
@@ -92,16 +138,21 @@ final class Btor2Design private (
 object Btor2Design:
   private[utlib] def fromLines(lines: Vector[String]): Btor2Design = new Btor2Design(lines)
 
-/** A predicate over one state node and a constant, for building btor2 comparison nodes. */
-enum Btor2Pred:
-  case Ult(node: Long, value: BigInt)
-  case Uge(node: Long, value: BigInt)
-  case Eq(node: Long, value: BigInt)
+/** Unsigned comparison of a btor2 node against a constant. */
+enum CmpOp:
+  case Ult, Uge, Eq
 
-  def state: Long = this match
-    case Ult(s, _) => s
-    case Uge(s, _) => s
-    case Eq(s, _)  => s
+/** A small predicate AST over btor2 nodes, lowered to fresh comparison/boolean nodes. */
+enum Btor2Pred:
+  case Cmp(node: Long, op: CmpOp, value: BigInt)
+  case Not(p: Btor2Pred)
+  case And(l: Btor2Pred, r: Btor2Pred)
+  case Or(l: Btor2Pred, r: Btor2Pred)
+
+object Btor2Pred:
+  def ult(node: Long, v: BigInt): Btor2Pred = Cmp(node, CmpOp.Ult, v)
+  def uge(node: Long, v: BigInt): Btor2Pred = Cmp(node, CmpOp.Uge, v)
+  def eq(node:  Long, v: BigInt): Btor2Pred = Cmp(node, CmpOp.Eq, v)
 
 /** btormc's verdict for a single-bad model. */
 enum Btor2Result:

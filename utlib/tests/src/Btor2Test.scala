@@ -39,11 +39,11 @@ object Btor2Test extends TestSuite:
       assert(Btor2.check(design, kmax = 20) == Btor2Result.Reachable(10))
 
       // Constrain counter < 5: the target at 10 is then unreachable.
-      val constrained = design.withConstraint(Btor2Pred.Ult(counter, 5))
+      val constrained = design.withConstraint(Btor2Pred.ult(counter, 5))
       assert(Btor2.check(constrained, kmax = 20) == Btor2Result.UnreachableWithin(20))
 
     test("a predicate can be checked as a fresh bad without touching the original"):
       val design = Btor2.parse(toy)
       val cnt    = design.stateNamed("counter").get
-      // "counter >= 12" is reachable (at depth 12); "counter >= 5 while counter < 5" is not.
-      assert(Btor2.checkPred(design, Btor2Pred.Uge(cnt, 12), kmax = 20) == Btor2Result.Reachable(12))
+      // "counter >= 12" is reachable at depth 12.
+      assert(Btor2.checkPred(design, Btor2Pred.uge(cnt, 12), kmax = 20) == Btor2Result.Reachable(12))

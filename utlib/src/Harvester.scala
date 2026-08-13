@@ -32,6 +32,16 @@ final case class Harvest(
   counters: Seq[CounterFact],
   fsms:     Seq[FsmFact])
 
+/** The counter and FSM located in a flattened btor2 by structural role, where register names
+  * are gone: the counter is the node an `ult`-against-the-property-bound reads, the FSM is the
+  * node the most `eq`-against-distinct-constants read.
+  */
+final case class Btor2Structure(
+  counterNode: Long,
+  bound:       BigInt,
+  fsmNode:     Long,
+  fsmStates:   Set[Int])
+
 object Harvester:
 
   def harvest(mlir: os.Path, module: String): Harvest =
@@ -40,6 +50,65 @@ object Harvester:
       counters = design.registers.flatMap(counterFact(design, _)),
       fsms = design.registers.flatMap(fsmFact(design, _))
     )
+
+  /** Locate the counter and FSM in a flattened btor2 by the comparisons they feed: the
+    * counter is the 4-bit node an `ult`-against-`bound` reads (the property's own bound), the
+    * FSM is the 4-bit node the most `eq`-against-distinct-constants read.
+    */
+  def locateBtor2(design: Btor2Design, bound: BigInt): Btor2Structure =
+    val ops = design.binaryOps
+    val counterNode = ops.collectFirst {
+      case ("ult", _, a, c) if design.constOf(c).contains(bound) && design.sortWidthOf(a) == 4 => a
+    }.getOrElse(throw new IllegalStateException(s"no `ult _ <const $bound>` locating the counter"))
+
+    val eqConstants = ops.collect {
+      case ("eq", _, a, c) if design.sortWidthOf(a) == 4 => design.constOf(c).map(a -> _)
+    }.flatten
+    val (fsmNode, states) = eqConstants
+      .groupMap(_._1)(_._2.toInt)
+      .view
+      .mapValues(_.toSet)
+      .maxByOption(_._2.size)
+      .getOrElse(throw new IllegalStateException("no 4-bit node dispatched by eq-against-constants (no FSM)"))
+    require(states.size >= 5, s"strongest eq-dispatch has only ${states.size} states; not an FSM")
+
+    Btor2Structure(counterNode, bound, fsmNode, states)
+
+  /** Discover, by bounded reachability, the set of FSM states in which the counter can reach
+    * `threshold` — the tail set. A state is included only if `counter >= threshold ∧ fsm == s`
+    * is reachable within `kmax`; a bounded miss excludes it. Sound as a discovery step because
+    * the resulting invariant is separately certified by [[validateTailSet]].
+    */
+  def sieveTailSet(
+    design:     Btor2Design,
+    struct:     Btor2Structure,
+    threshold:  BigInt,
+    kmax:       Int,
+    candidates: Set[Int] = null
+  ): Set[Int] =
+    Option(candidates).getOrElse(struct.fsmStates).filter { s =>
+      val pred = Btor2Pred.And(
+        Btor2Pred.uge(struct.counterNode, threshold),
+        Btor2Pred.eq(struct.fsmNode, s)
+      )
+      Btor2.checkPred(design, pred, kmax) match
+        case Btor2Result.Reachable(_) => true
+        case _                        => false
+    }
+
+  /** Certify `counter >= threshold ⟶ fsm ∈ tail` as an invariant by BMC-as-bad: its negation
+    * must be unreachable to `kmax`.
+    */
+  def validateTailSet(
+    design:    Btor2Design,
+    struct:    Btor2Structure,
+    threshold: BigInt,
+    tail:      Set[Int],
+    kmax:      Int
+  ): Btor2Result =
+    val inTail = tail.map(s => Btor2Pred.eq(struct.fsmNode, s)).reduce(Btor2Pred.Or.apply)
+    val negation = Btor2Pred.And(Btor2Pred.uge(struct.counterNode, threshold), Btor2Pred.Not(inTail))
+    Btor2.checkPred(design, negation, kmax)
 
   /** A counter's driver cone contains only the register itself, constants, `comb.add` /
     * `comb.sub` of the register with a constant, and the `comb.mux`es that select among them.

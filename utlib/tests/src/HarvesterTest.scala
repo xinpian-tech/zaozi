@@ -50,3 +50,28 @@ object HarvesterTest extends TestSuite:
       // a constant state (S_IDLE = 0).
       assert(fsm.width == 4)
       assert(fsm.resetState.contains(0))
+
+    test("on the p530 btor2 the harvester locates the nodes and discovers the tail set"):
+      val design = Btor2.parse(os.read(resources / "p530.btor2"))
+      // The property's own bound is 14 (a_max_seq_len_pop: instr_cnt_q < 14).
+      val struct = Harvester.locateBtor2(design, bound = 14)
+
+      // The FSM is dispatched against the eight seq_state_e values; the counter feeds the
+      // `< 14` comparison. Register names are gone from the flattened btor2 — these are found
+      // purely by the comparisons they feed.
+      assert(struct.fsmStates == Set(1, 2, 3, 4, 5, 6, 7))
+      assert(struct.counterNode != struct.fsmNode)
+
+      // Discover, with no hints, which states admit a counter of 14: the popret(z) tail
+      // states S_A0 = 6 and S_RET = 7, but not the plain-POP state S_POP = 2. The counter
+      // first reaches 14 at depth 35, so the sieve bound must clear that. Probing a
+      // representative subset keeps the test tractable; the exhaustive eight-state sieve is
+      // in docs/superpowers/research/2026-08-13-cv32e40x-hard-case.md.
+      val tail = Harvester.sieveTailSet(design, struct, threshold = 14, kmax = 40, candidates = Set(2, 6, 7))
+      assert(tail == Set(6, 7))
+
+      // The discovered invariant `counter >= 14 -> fsm in {6,7}` is certified by BMC-as-bad:
+      // its negation is unreachable through depth 35.
+      Harvester.validateTailSet(design, struct, threshold = 14, tail = tail, kmax = 35) match
+        case _: Btor2Result.UnreachableWithin | _: Btor2Result.Proven => ()
+        case other => throw new java.lang.AssertionError(s"invariant not certified: $other")
