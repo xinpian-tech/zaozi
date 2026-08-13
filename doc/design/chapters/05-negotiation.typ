@@ -2,139 +2,143 @@
 
 = 协商算法 <ch-negotiation>
 
-协商读入设计规格，输出协商结果或一个错误。它是实现互连模型（@ch-interconnect）的算法：规格给出总线、agent、bind 与落点，协商据此为每个 agent 求解接口、为每条总线算出地址图与可达关系，并装配出交给各 fabric 的清单（@sec-manifest）。贯穿本章的两个词沿前几章的定义：bind 把一个 agent——确切说，它的模块侧*节点*，即 agent 在协议上的接入点——接到总线的一个具名节点上（@sec-attach）；为这次 bind 求解出的那条点对点链路，是协议意义上的一条*边*（@sec-protocol-object）。协商的全部计算发生在这些边上。本章把协商拆成一列顺序执行的遍，规定每一遍的输入、输出与失败模式，然后给出参数传播的精确语义与协议参数的计算规则。
+协商将 `DesignSpec` 转换为 `ResolvedDesign`。设计协议的核心算法是在两张方向相反的参数依赖 DAG 上传播：`Down` 按拓扑序前进，`Up` 按反向拓扑序返回；两遍完成后，每条 bind 独立求解。本章同时规定验证求解、生成器参数计算、跨层规划与错误语义。
 
-== 遍的流水线 <sec-passes>
+== 协商流程 <sec-passes>
 
-#图([协商的遍。每一遍读入上一遍的产物；箭头是唯一的数据流。校验拦截结构错误；中间四遍（两遍传播、边求解、协议参数）算出全部参数；清单装配把结果按总线打包；随后三遍规划端口、连线与层（@ch-hierarchy、#ref(<ch-verification>)详述），最终装配为协商结果。])[
+#图([协商流程。稳定拓扑排序同时服务于 `Down` 正向传播和 `Up` 反向传播；两遍互不以对方的结果为输入，结束后才逐边求解。])[
   #syn-diagram(
-    spacing: (5.5mm, 11mm),
-    node((0, 0), [校验 \ #text(size: 8pt, fill: c-dim)[结构合法性]], name: <v>),
-    node((1, 0), [下行传播 \ #text(size: 8pt, fill: c-dim)[@sec-propagation]], name: <pd>),
-    node((2, 0), [上行传播], name: <pu>),
-    node((3, 0), [边求解 \ #text(size: 8pt, fill: c-dim)[@sec-settle-pp]], name: <se>),
-    node((4, 0), [协议参数], name: <pp>),
-    node((0, 1), [清单装配 \ #text(size: 8pt, fill: c-dim)[@sec-manifest]], name: <ma>),
-    node((1, 1), [打洞规划 \ #text(size: 8pt, fill: c-dim)[@sec-punch-planning]], name: <ph>),
-    node((2, 1), [连线计划 \ #text(size: 8pt, fill: c-dim)[@ch-hierarchy]], name: <wp>),
-    node((3, 1), [层合并 \ #text(size: 8pt, fill: c-dim)[@sec-layers]], name: <lm>),
-    node((4.15, 1), [协商结果 \ `ResolvedDesign`], name: <r>, shape: fletcher.shapes.pill, fill: c-fill),
-    edge(<v>, <pd>, "-|>"),
-    edge(<pd>, <pu>, "-|>"),
-    edge(<pu>, <se>, "-|>"),
-    edge(<se>, <pp>, "-|>"),
-    edge(<pp>, (4.75, 0), (4.75, 0.5), (-0.7, 0.5), (-0.7, 1), <ma>, "-|>"),
-    edge(<ma>, <ph>, "-|>"),
-    edge(<ph>, <wp>, "-|>"),
-    edge(<wp>, <lm>, "-|>"),
-    edge(<lm>, <r>, "-|>"),
+    spacing: (7mm, 10mm),
+    node((0, 0.5), [结构校验], name: <v>),
+    node((1, 0.5), [参数依赖拓扑排序], name: <topo>),
+    node((2, 0), [`Down` 正向传播], name: <d>, fill: rgb("#edf5ff")),
+    node((2, 1), [`Up` 反向传播], name: <u>, fill: rgb("#fff1ef")),
+    node((3, 0.5), [设计边与验证求解], name: <e>),
+    node((4, 0.5), [`EdgeView` 与完整参数], name: <p>),
+    node((5, 0.5), [端口、连线与层计划], name: <w>),
+    node((6, 0.5), [`ResolvedDesign`], name: <r>, shape: fletcher.shapes.pill, fill: c-fill),
+    edge(<v>, <topo>, "-|>"),
+    edge(<topo>, <d>, "-|>"),
+    edge(<topo>, <u>, "-|>"),
+    edge(<d>, <e>, "-|>"),
+    edge(<u>, <e>, "-|>"),
+    edge(<e>, <p>, "-|>"),
+    edge(<p>, <w>, "-|>"),
+    edge(<w>, <r>, "-|>"),
   )
 ]
 
-*校验*在一切计算之前拦截结构错误，只做两项。其一，bind 两端协议一致——agent 的模块侧节点与它 bind 的具名节点必须服从同一协议，类型系统已在构建期拦截绝大多数，此处是防御性复查。其二，bind 合法——每个 agent 恰好 bind 一次，且落在该总线 fabric 确实暴露的一个具名节点上（节点名必须存在、坐标糖不得越出拓扑；一个具名节点可被多个 agent 共享，空置也合法，@sec-placement）。两项任一不成立都在此报出（@sec-error-semantics）。参数流无环不在校验之列——它由结构保证，无从违反，见下。
+具体阶段依次为：
 
-参数流天然无环。下行与上行传播（@sec-propagation）各是一次单遍扫描，沿参数流的拓扑序推进，这要求流动图无环——它由结构保证，无需检查。每个 agent 的声明都来自它自身的用户参数，不读任何协商结果；总线只做单向的聚合（agent 声明 → 总线 → 回传各 agent），agent 消费回传值，却从不把它喂回自己的声明；桥也一样——它在每条总线上声明的是自己有界的参数（转发窗口、注入的标识空间），不会把甲总线的聚合当作自己在乙总线的声明。于是依赖图恒为有向无环图：自给的声明在源头，聚合在其下游，没有任何参数是自己下游的函数，环无从表达。这也解释了物理上带环的互连为何不成问题：一条边承载完整的双向物理链路（@sec-protocol-interface），环形、网状拓扑的回路属于 fabric 内部，不出现在 agent 结构上；两个模块互为主从时，是两次方向相反的 bind、两条独立的边；物理链路上的回路，落到参数依赖图上仍是无环的。
++ 固化协议与生成器注册表，校验名称、节点方向、bind、协议匹配和模块内部参数依赖；
++ 由 bind 与模块内部参数依赖构造 `Down` 参数依赖 DAG，并执行稳定拓扑排序；
++ 按该顺序执行 `Down` 正向传播，按逆序执行 `Up` 反向传播；
++ 逐条设计边调用 `negotiate`，并按探针汇执行验证协议的 `resolve`；
++ 解析显式跨协议引用，按模块装配 `EdgeView`，计算协议参数与完整参数，并执行生成器能力校验；
++ 规划跨层端口、连线与 FIRRTL 层，装配 `ResolvedDesign`。
 
-*清单装配*把求解结果落成交接物。每条总线收拢自己的结果——每个 agent 的方向、求解接口、地址区域或标识空间、域归属，连同落点：协商不读它、不改它，原样抄入（@sec-placement）——组成 agent 表与可达表，即这条总线的清单（@sec-manifest）。这一遍没有任何求解：每个 agent 在它的具名节点上恰好一个端口，端口的数目、位置与次序在 bind 写下时已经确定，装配只是收拢成表。装配完成随即运行该总线 fabric 的能力校验——校验只依据清单与策略（@sec-manifest），不必等到例化：承载不了的清单在协商期就报出（@sec-error-semantics）。
+同一阶段中相互独立的端口参数函数、边求解或验证求解可以并行执行。函数输入按相关节点的声明顺序排列；稳定拓扑序决定求值和诊断次序，导出与错误排序采用第 9 章的规范。
 
-遍与遍之间是不可变数据。这带来两个直接可用的能力：任何一遍的输出都可以独立 dump 检查（@ch-tooling），任何一遍都可以在没有后续遍的情况下单元测试。
+== 验证端点声明 <sec-dv-declarations>
 
-== 参数传播 <sec-propagation>
+#term[探针源][DV source]由生成器模块声明，提供验证协议的 `Down` 与 FIRRTL 层路径。#term[探针汇][DV sink]由验证生成器模块声明，收集显式连接到该汇的全部探针源。验证端点的稳定标识由所属模块和端点名组成；验证 bind 的稳定标识由探针汇和探针源共同组成。探针源声明记录标识、协议、层路径和源码位置；探针汇声明记录标识、协议和源码位置。构建期创建探针端点时，框架把这些声明写入 `DesignSpec`。
 
-传播在总线的 agent 结构上做两遍，方向相反。下行承载发起者一侧的供给：每个发起 agent 在自己的边上给出 `Down`——它占用的标识空间、将发出的操作与流量；总线收齐后聚合，为每条响应者边产出一份 `Down`。上行承载响应者一侧的供给与要求：每个响应 agent 在自己的边上给出 `Up`——它服务的地址区域、它要求的保序、它接受的最大传输尺寸；总线聚合出整张地址图与可达关系，为每条发起者边产出一份 `Up`。两遍结束后，每条边两端各有一份就绪的参数——一份 `Down` 与一份 `Up`，其一来自 agent 自身的声明，另一来自总线的聚合——恰好是求解的一对入参（@sec-settle-pp）。
+== 已求解记录 <sec-resolved-records>
 
-聚合发生在总线，也只发生在总线。一条总线收齐它全部 agent 的声明，算出整张地址图与可达关系，并为每个 agent 的边产出对侧参数：每个响应者边上的 `Down` 概括了所有能到达它的发起者——标识空间的并、操作种类的并；每个发起者边上的 `Up` 概括了它能到达的全部地址与那些响应者的公共约束。叶子 agent 只声明自己：处理器报告自己的并发标识数，存储控制器报告自己的地址区域与位宽能力，谁都不需要看见邻居——"看见全体"只是总线的职责。
+每条设计 bind 产生一个 `ResolvedEdge`。记录包含 `BindId`、源与目标 `ModuleNodeId`、对应协议对象与 `ProtocolId`、传播得到的 `Down` 和 `Up`、逐边求得的 `Edge` 以及 `interfaceOf(edge)` 返回的 `ProtocolBundle`。全部记录按 bind 声明顺序保存。
 
-桥以一个普通 agent 的身份参与（@sec-flat-nest）。连接两条总线的桥，在一条总线上作为响应 agent 声明它转发的地址窗口，在另一条总线上作为发起 agent 声明它注入的标识空间；这些声明都是桥自身的参数，不来自任何聚合。两条总线各自收齐各自 agent 的声明、各自独立协商——没有跨总线的递归聚合，也没有总线树：桥在每条总线上都只是一个带着自身声明的叶子 agent。跨总线的位宽与时钟域转换在桥内完成，不进入传播：桥在两条总线上的接口各自定案，两侧不一致时就地转换（@sec-ic-phases）。
+`ResolvedDVGroup` 保存一个探针汇、验证协议对象、按声明顺序排列的验证 bind、源端 `Down` 与层路径、`resolve` 得到的 `Edge` 以及完整 `DVInterfaces`。`ResolvedProtocolReference` 保存引用名、引用方、目标 `ModuleNodeId`、目标协议对象与该节点唯一一条边的 `Edge`。这些协议值按 @sec-protocol-object 和 @sec-dv-protocol 的 codec 规则编码、解码。
 
-#table(
-  columns: (auto, 1fr, 1fr),
-  table.header([参与者], [下行], [上行]),
-  [发起者 agent], [边上的 `Down` 就是自身声明：标识空间、操作种类、流量。], [无产出；接收总线聚合出的 `Up`。],
-  [响应者 agent], [无产出；接收总线聚合出的 `Down`。], [边上的 `Up` 就是自身声明：地址区域、保序要求、传输尺寸。],
-  [总线], [聚合全体发起者的声明，为每条响应者边产出一份 `Down`。], [聚合全体响应者的声明——地址图与可达关系在此定案——为每条发起者边产出一份 `Up`。],
-)
+每个模块节点恰好对应一条设计边，因此跨协议引用以 `ModuleNodeId` 唯一确定目标边。引用声明同时给出期望的 `ProtocolId`。
 
-三条纪律使传播保持可判定与可测试：
+== 生成器参数记录 <sec-generator-records>
 
-+ *同一规格得同一组参数。*agent 的声明、总线的聚合与分发都只由各自的输入决定，与求解函数同此约束（@sec-protocol-object）；同一规格永远传播出同一组参数。
-+ *聚合只在总线一处。*单个 agent 的变换不读相邻 agent：每个 agent 的声明只由它自身给出——桥的声明就是它转发的地址窗口这类自身参数。因此 agent 可以自由复用与并行求值，总线也无需理解任何 agent 的内部。
-+ *计数即契约。*框架核对每一步的产出数量：总线必须为每条响应者边恰好产出一份 `Down`、每条发起者边恰好产出一份 `Up`。违约立即报错，指出总线与期望/实际数量（@sec-error-semantics），在此截停，错位的参数不再向下游传播。
+生成器注册表记录生成器标识、生成器实现和完整参数 codec。已求解生成器模块记录模块标识、注册表条目、`EdgeView`、协议参数和完整参数。
 
-#图([两遍传播。下行（蓝）：发起 agent 在各自边上给出声明（①），总线聚合后为每条响应者边产出一份（②）；上行（红，虚线）：响应 agent 给出声明（③），总线聚合出地址图，为每条发起者边产出一份（④）。桥 `periph` 作为一个普通 agent 参与，它的 `Up` 就是它自身声明的转发窗口。两遍之后每条边集齐一对参数，进入求解。])[
+`EdgeView` 按本模块的节点声明顺序保存条目。每个条目记录节点方向、该节点唯一的 `ResolvedEdge`，以及该节点显式声明且已经解析的跨协议引用；`EdgeView` 还包含按验证端点声明顺序装配的 `VerificationView`。
+
+`GeneratorEntry` 保存生成器及其 `FullParam` codec。`ResolvedGeneratorModule.entry` 选定完整参数类型，`fullParam` 采用该条目的 `FullParam`。`EdgeView` 在双向传播和逐边求解后装配，供本模块的 `computeProtocolParam` 使用。
+
+== 结构校验与稳定拓扑序
+
+结构校验先固化协议注册表与生成器注册表。同一作用域内的实例名和端点名分别唯一；每个 `ProtocolId` 对应一个协议对象，每个 `GeneratorId` 对应一个生成器实现与 `FullParam` codec。
+
+每条设计 bind 的源、目标节点必须存在。源节点方向为输出，目标节点方向为输入，两端协议匹配；每个输出节点恰好作为一次 bind 的源，每个输入节点恰好作为一次 bind 的目标。节点的数量在构建期已经固定，结构校验分别核对每个输出节点在 bind 源中出现一次、每个输入节点在 bind 目标中出现一次。
+
+模块内部只保存一份从本模块输入节点指向输出节点的参数依赖边集；每条依赖带声明顺序和源码位置。输出节点的前驱与输入节点的后继都从该边集派生，按节点声明顺序排列。重复依赖边非法。每个输出节点必须携带 `dFn`，每个输入节点必须携带 `uFn`，函数字段不可选。构建 API 在记录一条依赖边时，原子地生成两个带协议类型的读取句柄：输出节点的函数用其中一个读取输入节点的 `Down`，输入节点的函数用另一个读取输出节点的 `Up`；原始节点句柄不能读取参数。读取句柄中的协议对象为关联类型提供见证，函数结果采用本节点协议的 `Down` 或 `Up` 类型。由此，函数可读集合与唯一保存的依赖边集来自同一次声明。空依赖时函数仍然存在，只是不持有其它节点的读取句柄。
+
+`Down` 参数依赖 DAG 包含沿 bind 方向的依赖和模块内部参数依赖。稳定拓扑排序在多个节点均可选择时，采用模块的层次树先序和节点声明顺序打破平局。检测到环时，错误包含环上的全部 `ModuleNodeId`、`BindId`、模块内部参数依赖和源码位置。`Up` DAG 是它的反向图，直接使用同一拓扑序的逆序。
+
+验证连接另行核对探针源与探针汇的协议、源的唯一 bind 及祖先关系（@sec-dv-routing）。
+
+== `Down` 与 `Up` 传播 <sec-propagation>
+
+对每个输出节点 $o$，令 $"pred"(o)$ 为本模块中显式声明会影响它的输入节点序列；对每个输入节点 $i$，令 $"succ"(i)$ 为依赖关系中由它影响的输出节点序列。
+
+- 当 $"pred"(o)$ 中各输入节点的 `Down` 都已到达时，调用 `dFn_o`；函数按节点声明顺序读取这些值，得到输出节点 $o$ 的唯一 `Down`，随后沿 $o$ 所在的 bind 传给目标输入节点。
+- 当 $"succ"(i)$ 中各输出节点的 `Up` 都已到达时，调用 `uFn_i`；函数按节点声明顺序读取这些值，得到输入节点 $i$ 的唯一 `Up`，随后沿 $i$ 所在的 bind 传回源输出节点。
+
+$"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"succ"(i)$ 为空时，`uFn_i` 对称地产生初始 `Up`。每个函数返回一个参数值或一项传播错误。函数输入仅包括显式依赖的参数值和构建期已经确定的用户参数；同一输入产生同一结果。
+
+以内存互连为例，Xbar 或 NoC 为每个下游输出节点声明它可由哪些上游输入节点到达。该输出节点的 `dFn` 可以聚合这些输入节点的事务身份需求，计算 ID 扩展、节点编号或内部表项容量；每个上游输入节点的 `uFn` 则聚合其可达输出节点的地址区域、操作能力和位宽约束。地址重叠、不可达或身份空间无法分配等冲突由正在执行的端口参数函数报告 N2。
+
+#图([同一组 bind 与模块内部参数依赖上的两遍传播。Xbar 模块显式声明两个输入节点和两个输出节点；每个节点仍只对应一条 bind。蓝色 `Down` 沿实线 bind 与点线内部参数依赖前进，红色 `Up` 反向返回。])[
   #syn-diagram(
-    spacing: (26mm, 7mm),
-    node((0, 0), [cpu \ #text(size: 8pt, fill: c-dim)[发起者]], name: <cpu>),
-    node((0, 1.3), [dma \ #text(size: 8pt, fill: c-dim)[发起者]], name: <dma>),
-    node((1, 0.65), [总线 `sys` \ #text(size: 8pt, fill: c-dim)[聚合·分发·地址图]], name: <bus>, stroke: (dash: "dashed")),
-    node((2, 0), [dram \ #text(size: 8pt, fill: c-dim)[响应者]], name: <dram>),
-    node((2, 1.3), [`periph` \ #text(size: 8pt, fill: c-dim)[桥 agent]], name: <per>),
-    edge(<cpu>, <bus>, "-|>", stroke: c-down, label: text(fill: c-down, size: 8pt)[① `Down`], label-side: left),
-    edge(<dma>, <bus>, "-|>", stroke: c-down, label: text(fill: c-down, size: 8pt)[① `Down`], label-side: right),
-    edge(<bus>, <dram>, "-|>", stroke: c-down, label: text(fill: c-down, size: 8pt)[② 聚合 `Down`], label-side: left),
-    edge(<bus>, <per>, "-|>", stroke: c-down, label: text(fill: c-down, size: 8pt)[② 聚合 `Down`], label-side: right),
-    edge(<dram>, <bus>, "--|>", stroke: c-up, bend: 26deg, label: text(fill: c-up, size: 8pt)[③ `Up`]),
-    edge(<per>, <bus>, "--|>", stroke: c-up, bend: -26deg, label: text(fill: c-up, size: 8pt)[③ `Up`（转发窗口）]),
-    edge(<bus>, <cpu>, "--|>", stroke: c-up, bend: 26deg, label: text(fill: c-up, size: 8pt)[④ 聚合 `Up`]),
-    edge(<bus>, <dma>, "--|>", stroke: c-up, bend: -26deg, label: text(fill: c-up, size: 8pt)[④ 聚合 `Up`]),
+    spacing: (14mm, 8mm),
+    node((0, 0), [A 输出], name: <a>),
+    node((0, 1.2), [B 输出], name: <b>),
+    node((1.4, 0), [X.in0], name: <i0>, fill: c-fill),
+    node((1.4, 1.2), [X.in1], name: <i1>, fill: c-fill),
+    node((2.8, 0), [X.out0], name: <o0>, fill: c-fill),
+    node((2.8, 1.2), [X.out1], name: <o1>, fill: c-fill),
+    node((4.2, 0), [C 输入], name: <c>),
+    node((4.2, 1.2), [D 输入], name: <d>),
+    edge(<a>, <i0>, "-|>", stroke: c-down, label: text(fill: c-down, size: 8pt)[bind]),
+    edge(<b>, <i1>, "-|>", stroke: c-down),
+    edge(<i0>, <o0>, "..>", stroke: c-down),
+    edge(<i0>, <o1>, "..>", stroke: c-down),
+    edge(<i1>, <o0>, "..>", stroke: c-down),
+    edge(<i1>, <o1>, "..>", stroke: c-down),
+    edge(<o0>, <c>, "-|>", stroke: c-down),
+    edge(<o1>, <d>, "-|>", stroke: c-down),
+    edge(<c>, <o0>, "--|>", stroke: c-up, bend: 20deg, label: text(fill: c-up, size: 8pt)[`Up`]),
+    edge(<d>, <o1>, "--|>", stroke: c-up, bend: -20deg),
+    edge(<i0>, <a>, "--|>", stroke: c-up, bend: 20deg),
+    edge(<i1>, <b>, "--|>", stroke: c-up, bend: -20deg),
   )
 ]
 
-== 边求解与协议参数 <sec-settle-pp>
+== 边求解、验证求解与生成器参数 <sec-settle-pp>
 
-*边求解*对每个 agent 的边独立调用其协议的 `negotiate(down, up)`（@sec-protocol-object）：发起侧事实与响应侧事实在此合成边参数——这条链路的定论。求解失败即协商停止，错误附带该 agent 与 bind 行的书写位置。求解成功后，清单里该 agent 的接口由 `interfaceOf` 从边参数导出（@sec-protocol-interface），打洞规划与例化期的端口校验（@sec-generator-contract）引用的也是同一份数据。逐边独立意味着求解天然可并行，也意味着一条边的失败报告不含任何别的边的噪声。
+*边求解*在两遍传播全部完成后，为每个 `BindId` 调用一次 `negotiate(down, up)`（@sec-protocol-object）。失败结果包含两个节点、两份参数快照及 bind 的源码位置；成功结果通过 `interfaceOf` 得到非空 `ProtocolBundle`。各设计边之间可以并行求解。
 
-*协议参数*是协商结果进入生成器的唯一通道（@sec-two-layer-params）。每个生成器模块声明一个推导函数：
+*验证求解*按 `DVSinkId` 分组。每组按 `DVBindId` 的声明顺序收集非空 `Down` 序列及相同顺序的 `LayerPath`。每个探针汇调用一次 `DVProtocol.resolve(downs)`，再调用 `interfacesOf(edge, layers)`。框架核对 `sources`、`sinkPaths` 的数量、结构、精确覆盖、单向 `Probe` 约束及 FIRRTL 层路径（@sec-dv-protocol、@sec-dv-routing）。
 
-```scala
-def computeProtocolParam(view: EdgeView): ProtocolParam
-```
+*跨协议引用*在目标设计边求解后解析。引用声明给出目标 `ModuleNodeId` 与期望的 `ProtocolId`；目标不存在、节点未 bind、协议不符或目标边未求解时报告 N7。
 
-#term[边视图][`EdgeView`]是该*模块*的只读视图：模块内每个节点——该模块的每一重 agent 身份——映射到它求解出的那条边，每项含边参数、对端身份（总线与具名节点）与 bind 行位置，按节点的声明序排列。排序与条目身份都只来自声明序与落点（@sec-placement），因此协议参数的计算和其余一切同样确定。协议参数随后与用户参数合并为完整参数（@sec-two-layer-params），这份确定性直接支撑模块去重的正确性（@sec-dedup）。
+*生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeProtocolParam(EdgeView)` 计算自有类型的协议参数，并可依据 `EdgeView` 与用户参数执行能力校验；框架随后调用 `combine(userParam, protocolParam)` 得到 `FullParam`。注册表条目、`EdgeView`、协议参数和完整参数一并存入 `ResolvedGeneratorModule`（@sec-two-layer-params、@sec-generator-module）。
 
-#图([边视图。生成器模块 M 的两个节点各自 bind 在一条总线上，各有恰好一条已求解的边（绿）；框架把"节点 → 边"的映射收拢成只读视图，交给 `computeProtocolParam` 折算出协议参数。])[
-  #syn-diagram(
-    spacing: (17mm, 8mm),
-    node((0.1, 0.35), [节点 a], name: <na>, shape: fletcher.shapes.circle),
-    node((0.1, 1.15), [节点 b], name: <nb>, shape: fletcher.shapes.circle),
-    node(enclose: (<na>, <nb>), stroke: c-hier, inset: 14pt, snap: false, name: <m>),
-    node((0.1, -0.55), text(size: 8pt, fill: c-hier)[生成器模块 M], stroke: none),
-    node((-1.35, 0.35), text(size: 7.5pt, fill: c-dim)[总线 `sys` 上的边], stroke: none),
-    node((-1.35, 1.15), text(size: 7.5pt, fill: c-dim)[总线 `periph` 上的边], stroke: none),
-    edge((-0.75, 0.35), <na>, "-|>", stroke: c-edge),
-    edge((-0.75, 1.15), <nb>, "-|>", stroke: c-edge),
-    node((1.55, 0.75), [`EdgeView`], name: <ev>, fill: c-fill),
-    edge(<m>, <ev>, "..>"),
-    node((3.05, 0.75), [协议参数], name: <pp>),
-    edge(<ev>, <pp>, "-|>", label: text(size: 7.5pt)[`computeProtocolParam`], label-side: left),
-  )
-]
-
-#决策([协议参数的依赖界限是本模块])[
-  `computeProtocolParam` 的可见范围仅限*本模块*节点的边，不含其他模块，也不含全图。理由：一旦允许跨模块读取，A 的参数便可依赖 B 的边、B 又依赖 C——这张依赖网不出现在规格里，也不出现在任何声明中，只存在于各模块推导函数的调用链里。此时报错信息无法追溯参数值的来源：其推导链横跨任意多个模块的任意多层函数。经验上被这条界限排除的需求只有两类，且各有对应的表达方式：需要*全体接入者信息*的，应建模为总线的聚合（信息经传播抵达本模块的边，@sec-propagation）；需要*全局分配*的（如自动编址），属于构建期的规格前处理或协议库的图算法，不属于协商内核。
+#决策([协议参数只读取本模块的已求解数据])[
+  `computeProtocolParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用和验证端点结果。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
 ] <dec-pp-local>
-
-#开放([显式多轮协商])[
-  若未来出现既非总线聚合、又非规格前处理能表达的全局计算，候选方案是显式的多轮协商：第一轮的协商结果作为第二轮规格构造的输入。它保持每一轮内部的确定性与界限，代价是使用者要自行保证轮间收敛。v1 不提供，等待真实用例。
-] <open-multi-round>
 
 == 错误语义 <sec-error-semantics>
 
-协商的返回类型是 `Either[NegotiationError, ResolvedDesign]`：失败时返回*一个*错误，协商随即停止：错误发生后，后续计算的输入已经不成立，继续执行所"收集"到的报错多是第一个错误的衍生物，与真实成因混在一起，反而妨碍定位。遍间不存在带错继续的问题：失败遍之后的遍不再运行。
+`NegotiationError` 包含类别、主体的稳定标识、全部相关源码位置（`SourceLocation`）及参数快照。文本格式见@ch-tooling。
 
-因此单个错误必须自带定位所需的*全部*上下文：类别（见下表）、主体（总线/agent/bind/模块的稳定标识）、全部相关书写位置（`SourceLocation`——重叠的双方都在其中）、以及当时的参数快照。一个错误的报告是完整的，框架一次只报一个。文本格式规范见@ch-tooling。
-
-错误类别按报出它的遍组织，每类给出触发条件与报告的必含要素：
+协商返回 `Either[NonEmptyVector[NegotiationError], ResolvedDesign]`。传播只执行全部依赖值都已就绪的节点；同一就绪前沿及其它互不依赖分支中的失败可以一并收集，受失败值阻断的后继不执行，也不产生衍生错误。`Down` 与 `Up` 两遍互不依赖，各自继续执行仍可求值的分支。当前阶段可确定的全部失败按第 9 章的规范化顺序排列后返回，后续阶段停止执行。
 
 #table(
   columns: (auto, auto, 1fr, 1fr),
-  table.header([类别], [报出的遍], [触发条件], [报告必含]),
-  [*N1* 协议不一致], [校验], [bind 两端协议不同：agent 的模块侧节点与它 bind 的具名节点不服从同一协议。类型系统在构建期已拦截绝大多数，此处防御性复查。], [两端各自的协议名；agent 与总线的标识；bind 行位置。],
-  [*N2* 地址重叠或不可达], [传播], [同一总线上两个响应 agent 的地址区域相交；或某发起 agent 要求到达的地址无 agent 服务、也无默认 agent 可兜。], [重叠：两个 agent、两段区域及其交集；不可达：发起 agent 与落空的地址；当时的地址图快照。],
-  [*N3* 接口求解失败], [边求解], [某 agent 边上的 `negotiate(down, up)` 返回参数冲突。], [agent 与总线的标识；两侧 `Down`、`Up` 快照；协议给出的冲突描述；bind 行位置。],
-  [*N4* 落点非法], [校验], [bind 引用的节点名在该总线的 fabric 上不存在；或坐标糖越出 fabric 拓扑。], [引用的名字或坐标；该 fabric 实际暴露的具名节点全集；涉事 bind 行位置。],
-  [*N5* 能力校验失败], [清单装配], [fabric 承载不下装配好的清单：端口数、标识宽度或地址图形状超出实现上限（@sec-manifest）。], [清单中超限的那一项；被违反的那条限制及其上限值；总线与 fabric 策略。],
-  [*N6* 计数契约违约], [传播], [总线聚合或分发的产出份数与 agent 边的条数不符：某条响应者边未收到恰好一份 `Down`，或某条发起者边未收到恰好一份 `Up`（@sec-propagation）。], [违约的总线；期望份数与实际份数。],
+  table.header([类别], [产生阶段], [触发条件], [报告必含]),
+  [*N1* 协议标识或类型不一致], [校验], [不同协议对象声明同一 `ProtocolId`；`ProtocolKind` 与协议种类不符；bind 两端协议不匹配；或端口参数函数的输入、结果类型与相关节点协议不一致。], [冲突的协议对象与 `ProtocolId`；相关模块节点和参数函数；源码位置。],
+  [*N2* 参数传播失败], [`Down` 或 `Up` 传播], [`dFn` 或 `uFn` 返回约束冲突，例如地址区域重叠、请求地址不可达或事务身份空间无法分配。], [模块、输出或输入节点、传播方向、相关依赖与 bind、有序输入快照、冲突描述和源码位置。],
+  [*N3* 边或验证求解失败], [边与验证求解], [设计边的 `negotiate` 或探针汇的 `resolve` 返回参数冲突。], [设计边：`BindId`、`Down`、`Up` 与源码位置；探针汇：`DVSinkId`、有序 `Down` 与相关源码位置；协议给出的冲突描述。],
+  [*N4* 节点或 bind 非法], [校验], [节点引用不存在；输出节点未恰好作为一次 bind 的源；输入节点未恰好作为一次 bind 的目标；或 bind 两端方向不符。], [相关 `ModuleNodeId`、`BindId`、实际 bind 次数和源码位置。],
+  [*N5* 生成器能力校验失败], [生成器参数], [本模块已求解边要求的端口数、接口参数、拓扑条件或资源容量超出生成器用户参数给出的实现上限。], [生成器模块、相关节点与 `BindId`、所需值、实现上限和用户参数。],
+  [*N6* 接口映射违约], [边或验证求解], [设计 `ProtocolBundle` 非法；或 `DVInterfaces` 的数量、路径、结构、精确覆盖、单向 `Probe` 或层路径契约不成立。], [节点或 `DVSinkId`；期望与实际结构；无效路径；相关 bind 的源码位置。],
+  [*N7* 跨协议引用失败], [`EdgeView` 装配], [目标 `ModuleNodeId` 不存在、未 bind、协议标识与声明不符，或目标边没有成功求解。], [引用方、目标 `ModuleNodeId`、期望与实际协议标识、引用声明的源码位置。],
+  [*N8* 验证拓扑非法], [校验], [探针汇的源集合为空；探针源的 bind 数量异于一；源与汇协议不匹配；汇生成器父结构模块与源模块的严格祖先关系缺失。], [`DVSourceId`、`DVSinkId` 与 `DVBindId`；协议标识与模块路径；全部相关源码位置。],
+  [*N9* 结构名称或参数依赖非法], [校验与拓扑排序], [同一作用域内的实例名或端点名重复；模块内部参数依赖重复、端点或方向非法；或参数依赖图存在环。], [冲突的稳定标识；相关模块、节点、bind 与模块内部参数依赖；环上的完整路径；全部相关源码位置。],
+  [*N10* 生成器标识冲突], [校验], [两个注册表条目使用同一 `GeneratorId`，但生成器实现或 `FullParam` codec 不同。], [`GeneratorId`；冲突的生成器实现与 codec schema；相关模块及源码位置。],
 )
-
-至此结构定形、参数落定、清单装配完毕。剩下的问题是把结果安置进模块层次——下一章。

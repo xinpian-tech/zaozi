@@ -2,52 +2,47 @@
 
 = 工具与产物 <ch-tooling>
 
-协商的全部中间态与结果都是普通数据（@sec-passes）。正因为是普通数据，它们能被导出成文件、画成图、拿去做静态评估，错误也能按统一版式打印。本章规定这些产物的格式骨架与确定性承诺：格式细节允许随实现演进；*确定性承诺不允许*。
+协商的中间态与结果均为可检查的数据（@sec-passes），可用于导出、可视化与错误报告。本章规定这些工具产物的内容和规范化顺序。
 
 == 导出 <sec-export>
 
-协商结果可按需导出四份 JSON，各自独立成立：
+`ResolvedDesign` 可按需导出四份 JSON：
 
-- *拓扑*（`topology.json`）：模块树、总线、agent、bind。每个实体带稳定标识与书写位置。
-- *边*（`edges.json`）：每条边的两端（agent 标识与它所落的具名节点）、协议名、协议自述的渲染元数据（@sec-protocol-object 的 `render`）。
-- *计划*（`plan.json`）：端口与连线规划的全部产物——每个模块的端口计划、连线计划与层声明（@sec-punch-planning、@sec-layers）。任一端口的来源均可在此文件中追溯。
-- *参数*（`params.json`）：每个生成器模块的完整参数序列化——单个 IP 独立例化与测试时，命令行输入的就是这份文件（@sec-generator-contract）；审计与复现共用一份数据。
+- *拓扑*（`topology.json`）：模块树、模块节点、设计 bind、模块内部参数依赖，以及探针源、探针汇与验证 bind。模块、节点、bind 和验证端点包含各自的稳定标识；一条模块内部参数依赖由有序二元组“输入 `ModuleNodeId`、输出 `ModuleNodeId`”唯一标识。各项同时保存声明顺序和源码位置（`SourceLocation`）。
+- *求解结果*（`edges.json`）包含两组记录：
+  - `designEdges` 按 bind 声明顺序保存 `BindId`、源与目标节点、`ProtocolId`、传播得到的 `Down` 与 `Up`、`Edge`、`ProtocolBundle` 及协议 `render` 元数据；
+  - `dvResults` 按 `DVSinkId` 保存 `ProtocolId`、有序 `DVBindId`、按相同顺序排列的验证协议 `Down` 与 `LayerPath`、验证 `Edge`、`DVInterfaces` 及 `DVProtocol.render` 元数据（@sec-protocol-object、@sec-dv-protocol）。
+- *计划*（`plan.json`）：每个模块的跨层端口计划、连线计划与层声明；每项计划以 `Design(BindId)` 或 `Verification(DVBindId)` 标记来源，并记录 bind 的源码位置（@sec-punch-planning、@sec-layers）。
+- *整机参数*（`params.json`）：每个生成器模块一条记录，包含模块标识、生成器标识和该实例的 `FullParam` 值；生成器标识确定对应的 `FullParam` schema。
 
-```json
-{ "modules": [ { "id": 3, "name": "l2", "parent": 1, "kind": "generator" } ],
-  "buses":   [ { "id": 7, "name": "mbus", "fabric": "crossbar" } ],
-  "agents":  [ { "id": 12, "owner": 3, "role": "responder",
-                 "valName": "banks", "protocol": "membus/1.0" } ],
-  "binds":   [ { "agent": 12, "bus": 7, "node": "n_l2",
-                 "at": "Soc.scala:41" } ] }
-```
+`ModuleId` 直接编码为实例名数组；`ModuleNodeId` 与 `BindId` 按 @sec-attach 的组成字段编码为 JSON 对象。模块内部参数依赖保存输入、输出两个 `ModuleNodeId`，重复的有序端点对在结构校验中非法。`DVSourceId`、`DVSinkId` 与 `DVBindId` 同样按 @sec-dv-declarations 的组成字段编码。导出记录保留模块、模块节点、bind、参数依赖、协议标识、源码位置和稳定标识之间的对应关系。
 
-导出属于"可选可序列化"一类（@sec-serialization-list）：供人与工具消费，不构成版本兼容契约。唯一始终受契约保护的是参数导出，因为它是生成器的正式输入。
+单个生成器定义一个 `FullParam` 的序列化 schema；单个 IP 独立例化时，命令行输入是一份符合该 schema 的 `FullParam` 值（@sec-generator-contract）。`params.json` 采用整机多实例结构，其中每条记录携带一个可作为生成器输入的 `FullParam` 值。
+
+调用方按需选择四份整机导出文件；工具版本确定其容器格式（@sec-serialization-list）。硬件边界的兼容契约由生成器版本对应的 `FullParam` schema 及单个 `FullParam` 值的序列化格式构成。
 
 == 可视化 <sec-visualization>
 
-从同一数据可导出两种图（GraphML / DOT）：*协商前视图*呈现意图——总线、agent 与 bind；*协商后视图*呈现事实——求解出的边、地址图与求解参数的摘要标注。层次树映射为嵌套子图，边的颜色与标签取自协议的渲染元数据。#ref(<ch-interconnect>)的两级设计例题里那些图，工具都应能从对应规格自动重现。
-
-== 静态评估 <sec-static-eval>
-
-协商结果连同拓扑构成一个可直接分析的性能模型（@req-perf）。以带宽评估为例：一段链路的供给能力是求解位宽与所在时钟域频率的乘积；它承载的需求是全部流经它的发起者所声明流量之和（哪些发起者流经哪一段，由地址集合与拓扑决定）；逐段比对两者，即得瓶颈与富余。评估所需的每一项事实——位宽、频率、流量声明——都是协商参数，随协商结果一并导出（@sec-export）。
-
-两条边界必须写明。其一，评估发生在协商*之后*，对结果做只读分析，可以自由地跨协议、跨模块取数——这不违反@dec-pp-local：该决策约束的是协商*期间*协议参数的推导范围，不约束对协商结果的消费。其二，静态评估核对的是声明层面的预算与上界，回答"设计的声明是否自洽"；实际负载下的表现仍需动态仿真，评估不替代它。
+从同一数据可导出两种图（GraphML 与 DOT）：*协商前视图*包含模块、输入与输出节点、有向 bind 和模块内部参数依赖；*协商后视图*为每条边增加 `Down`、`Up`、`Edge` 与参数摘要。层次树映射为嵌套子图，边的颜色与标签取自协议的渲染元数据。
 
 == 错误报告 <sec-error-format>
 
-错误报告（@sec-error-semantics）的文本渲染遵守统一版式：首行是类别与一句话结论；中间列出该错误的全部相关书写位置，每行一个事实；末行给出可行动的修复方向。示例（地址重叠）：
+错误报告（@sec-error-semantics）的首行给出类别与结论，随后列出相关源码位置（`SourceLocation`）、触发条件与参数值，末行给出修复方向。例如，地址重叠错误必须同时指出冲突的两个目标节点、各自服务区间、相交区间和收窄地址范围的修复方向。
 
-```text
-error[地址重叠] 两个响应 agent 的地址区域相交
-  总线 soc.mbus 上：
-    Soc.scala:41   dram   服务 0x8000_0000 – 0xFFFF_FFFF
-    Soc.scala:47   sram   服务 0x9000_0000 – 0x9000_FFFF
-  相交区间 0x9000_0000 – 0x9000_FFFF 无法唯一译码。收窄任一 agent 的地址区域，使二者不相交。
-```
+涉及参数、数量或容量时附相应快照；修复建议限一句话。
 
-版式的三条强制规则：*全部*位置都列出（歧义的双方、重叠的两段），用户无需自行查找其余位置；涉及数量或容量的错误（如能力校验）附当前快照；修复建议限一句话，不展开成教程。
+== 规范化顺序 <sec-determinism>
 
-== 确定性承诺 <sec-determinism>
+模块、端口、子实例与连线的 FIRRTL 发射顺序及结构键采用 @sec-dedup 的规范。
 
-同一规格两次协商，全部导出逐字节相同；两次例化，FIRRTL 逐字节相同——Syntheke 侧的全部次序都有规定，生成器侧由其"同参同模块"契约保证（@sec-generator-contract）。集合的序列化次序规定为：模块按层次树先序、节点按声明序、连接按声明序、边按端口索引、层按名字典序；任何 dump 中出现无序集合都是缺陷。这条承诺是审计比对、重放既往构建与模块去重（@sec-dedup）的基础。
+JSON 中模块按显式子实例声明顺序执行层次树先序导出；完整参数记录采用同一模块顺序。
+
+设计边采用 bind 声明顺序；模块内部参数依赖的输入采用节点声明顺序；`EdgeView` 采用模块的层次树先序，内部节点采用节点声明顺序，每个节点保存其唯一的设计边。
+
+探针端点按所属模块先序及端点声明顺序导出；每个 `dvResults` 条目中的 `DVBindId`、验证协议 `Down`、`LayerPath` 及 `DVInterfaces.sources` 均继承该汇的 bind 声明顺序。
+
+Bundle 字段保留协议定义顺序；FIRRTL 层声明树的同级节点和映射键按名字典序。
+
+每个错误先将相关 `SourceLocation` 按规范化文件路径、行号与列号排序。同一协商阶段产生的错误再按四项键排序：错误类别编号、主体稳定标识的规范化编码、排好序的 `SourceLocation` 列表、错误描述与参数快照的规范化编码。协商 API 按此顺序返回错误集合（@sec-error-semantics）。
+
+`SourceLocation.file` 采用相对于设计源码根目录、分隔符统一为 `/` 的路径，行列号使用十进制。源码位置作为诊断字段；实体身份由稳定标识确定，导出顺序由上述规范确定。规范化编码使同一规格与同一工具版本产生逐字节相同的导出。

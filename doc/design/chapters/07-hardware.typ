@@ -2,30 +2,37 @@
 
 = 硬件边界 <ch-hardware>
 
-前六章都在协商这一侧，算出一份参数。参数要变成电路，得交给 zaozi 生成器——协商与硬件生成分属两界，之间只有一道窄接口：一份可序列化的参数。这道接口定得好，单个 IP 才能凭一份参数脱离框架独立例化、独立测试、复现（@req-ip）。本章规定它：生成器模块与 zaozi 的契约、节点如何落到真实接口字段、例化期的装配次序。
+协商结果通过一份可序列化的完整参数交给 zaozi 生成器。单个 IP 可以使用同一参数独立例化、测试和复现（@req-ip）。本章规定生成器契约、模块节点与生成器端口的对应关系，以及例化次序。
 
 == 生成器的契约 <sec-generator-contract>
 
-Syntheke 对硬件构造只有一个假设：存在#term[生成器][generator]——即以一份参数为唯一输入、以一个电路模块为输出的工厂函数。这个假设展开为四条，每条都有其存在的理由：
+生成器以完整参数为输入并产出电路模块，必须满足以下契约：
 
-+ 消费*一个可序列化参数*，产出一个电路模块——参数写成文件后，每个 IP 即可凭这份固定参数独立例化、独立测试，协商结果可归档、可事后重放（@sec-serialization-boundary）。
-+ 模块的硬件接口、探针接口、层结构都*只看参数就能算出*——协商期据此规划端口（@sec-punch-planning）、核对端口结构（@sec-generator-module）；接口形状若要等到例化期才能确定，这两件事都无从谈起。
-+ 同一参数必然产出同一模块——模块去重（@sec-dedup）的全部依据就这一条：参数相等即模块相等，不需要比对电路。
-+ 生成器可以脱离任何框架独立运行（命令行两步：先把参数写成 JSON 文件，再按这份文件生成电路）——生成器不知道 Syntheke 存在，Syntheke 只是它众多调用者之一；两者之间的全部往来就是那一份参数，再无其他接口。
++ 硬件接口、探针接口、FIRRTL 层结构与电路体都由完整参数确定。跨层端口规划使用 `ResolvedEdge` 中的 `ProtocolBundle`；生成器从 `FullParam` 重建实际端口后，以同一 `ProtocolBundle` 作为期望结构进行校验。
++ 同一 `GeneratorId` 与相同完整参数产生结构相同的模块，模块去重据此使用二者作为结构键（@sec-dedup）。
++ 生成器 API 以完整参数为输入；将完整参数写成 JSON 后，可以直接调用生成器完成独立例化与测试。
 
-zaozi 的生成器恰好满足这四条。
+每个生成器发布一个 `GeneratorId` 和 `FullParam` codec；codec 提供 schema、规范化编码与解码。完整的 `GeneratorId` 确定生成器实现和 codec schema（@sec-dedup）。
 
-#图([序列化边界的两侧。生成器模块持有用户参数与两段变换（合并、协议参数推导）；生成器持有对参数的四个函数。二者之间只有完整参数往来。])[
+`GeneratorId`、`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器登记到生成器注册表，注册表将 `GeneratorId` 映射到 `GeneratorEntry`。同一 `GeneratorId` 的所有模块引用同一个条目；两个条目使用相同 `GeneratorId` 而生成器实现或 codec 不同时报告 N10。
+
+`ResolvedGeneratorModule.entry` 确定完整参数的类型，`fullParam` 采用该条目的 `FullParam`。记录按模块的层次树先序存入 `ResolvedDesign`。例化从条目取得生成器，参数导出从同一条目取得 codec。
+
+单个 IP 从参数文件例化时，由生成器库提供包含该 `GeneratorId` 条目的注册表。
+
+`computeProtocolParam` 将框架提供的 `EdgeView` 转换为生成器自有的 `ProtocolParam`，`combine` 再生成 `FullParam`。独立例化根据 `GeneratorId` 找到注册项，并用该项的 codec 解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与验证端点的名称、方向和接口结构。对于构建期动态声明的端点，`computeProtocolParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，`combine` 在 `FullParam` 中保留复现这些接口所需的值；若端点名称由 `GeneratorId` 对应的固定接口 schema 决定，`FullParam` 只需保存决定接口结构的参数。
+
+#图([序列化边界。框架侧的生成器模块保存用户参数、参数合并函数、协议参数推导函数与模块节点声明；zaozi 侧的生成器从完整参数确定接口、FIRRTL 层结构与电路体。])[
   #syn-canvas({
     import cetz.draw: *
     rect((0, 0), (5.0, 3.4), stroke: 0.7pt, radius: 0.1)
-    content((2.5, 3.05), [*生成器模块*（协商域）])
-    for (y, t) in ((2.35, [用户参数（构建期写定）]), (1.65, [`combine : (UP, PP) => FP`]), (0.95, [`computeProtocolParam`]), (0.25, [节点声明（即端口）])) {
+    content((2.5, 3.05), [*生成器模块*（框架侧）])
+    for (y, t) in ((2.35, [用户参数（构建期声明）]), (1.65, [`combine : (UP, PP) => FP`]), (0.95, [`computeProtocolParam`]), (0.25, [模块节点声明])) {
       content((2.5, y), text(size: 8.5pt, t))
     }
     rect((7.6, 0), (12.4, 3.4), stroke: 0.7pt, radius: 0.1)
-    content((10.0, 3.05), [*生成器*（硬件域）])
-    for (y, t) in ((2.35, [硬件接口 $=f("参数")$]), (1.65, [探针接口 $=f("参数")$]), (0.95, [层结构 $=f("参数")$]), (0.25, [电路体 $=f("参数")$])) {
+    content((10.0, 3.05), [*生成器*（zaozi 侧）])
+    for (y, t) in ((2.35, [硬件接口 $=f("完整参数")$]), (1.65, [探针接口 $=f("完整参数")$]), (0.95, [层结构 $=f("完整参数")$]), (0.25, [电路体 $=f("完整参数")$])) {
       content((10.0, y), text(size: 8.5pt, t))
     }
     line((6.3, -0.3), (6.3, 3.7), stroke: 2.2pt)
@@ -37,45 +44,43 @@ zaozi 的生成器恰好满足这四条。
 
 == 生成器模块的声明 <sec-generator-module>
 
-生成器模块（@sec-module-kinds）在构建期声明五件事，缺一不可：
+生成器模块（@sec-module-kinds）在构建期声明契约数据与函数，包括用户参数、生成器注册表条目、输入与输出节点列表、模块内部参数依赖、验证端点列表、协议参数推导函数，以及用户参数和协议参数到完整参数的合成函数。节点声明记录节点标识、名称、方向、协议、相应的 `dFn` 或 `uFn`、跨协议引用和源码位置。跨协议引用声明记录引用名、目标 `ModuleNodeId`、期望协议和源码位置。
 
-```scala
-abstract class GeneratorModule[UP, PP, FP, I](
-  val generator: Generator[FP, ?, I, ?],   // 恰好一个生成器
-  val userParam: UP,                       // 用户参数
-  val combine:   (UP, PP) => FP,           // 双层合并
-):
-  def computeProtocolParam(view: EdgeView): PP   // 协商结果的推导
-  // 声明具名节点（名 + 协议 + 角色）；节点即生成器的一个端口，无需另行对应接口字段。
-```
+协商器为每个生成器模块装配 `EdgeView`，再调用该模块的 `computeProtocolParam`。
 
-*节点即端口，不再有单独的"硬件绑定"这一层。*旧式设计把节点（协商图上的接入点）与生成器的 IO 字段当作两样东西，要一个映射函数把前者对到后者的哪个字段；这个映射之所以非平凡，一是因为一个节点可能展开成多个端口（基数），二是因为一个接口可能有多个同协议字段。基数已经取消——一个节点恰好一个端口；而"多个同协议端口"由不同的节点*名字*区分。于是映射退化为按名对应：生成器的每个具名节点，例化后就是它 IO 上同名的那个端口，节点求解出的接口（由 `interfaceOf` 从边参数导出，@sec-protocol-interface）就是该端口的线形状。例化期框架据此登记每条边的硬件端点，供连线计划引用。
+`nodes` 按声明顺序返回本模块的全部设计模块节点；`parameterDependencies` 按声明顺序返回本模块从输入节点到输出节点的依赖边，每条记录包含两端 `ModuleNodeId` 与 `SourceLocation`。`OutputNodeSpec` 必须携带 `dFn`，`InputNodeSpec` 必须携带 `uFn`，函数字段不可选。构建 API 每声明一条依赖边，就同时返回两个带协议类型的读取句柄，分别供输出节点函数读取输入 `Down`、供输入节点函数读取输出 `Up`；原始节点句柄没有读取操作。因此函数可读集合与 `parameterDependencies` 由同一次调用产生，不能分开声明。函数返回类型由本节点协议确定。无前驱或无后继时同一个函数从用户参数产生边界初值。处理器、存储、桥、Xbar、NoC、直连和时钟树均通过这套公开构造方法声明节点和模块内部参数依赖。
+
+`DesignBuilder` 根据当前模块的 `ModuleId` 与节点名派生 `ModuleNodeId`。同一模块内节点名唯一；每个节点恰好参与一次设计 bind。节点在生成器 IO 中对应一个以节点声明名命名、由节点方向确定根方向的顶层 Bundle（@sec-port-naming）。
+
+每条跨协议引用记录本模块的目标 `ModuleNodeId`、期望的 `ProtocolId` 和该引用的 `SourceLocation`。每个节点唯一关联一条边，因此目标节点唯一确定所引用的 `Edge`。
+
+`EdgeView` 是双向传播和逐边求解完成后按模块投影的数据。它按节点给出方向及唯一的已求解边；该边包含 `Down`、`Up`、`Edge` 与 `ProtocolBundle`。引用方节点条目另行包含显式跨协议引用的解析结果。
+
+`dvSources` 与 `dvSinks` 声明验证端点（@sec-dv-declarations）。解析后的条目由 `VerificationView` 按声明顺序提供，并经 `computeProtocolParam` 进入完整参数；字段契约见 @sec-generator-records。
+
+每条设计边在源、目标生成器 IO 中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在结构校验中报告 N9。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
 
 #决策([端口结构校验在例化期进行])[
-  生成器为每个节点产出的端口，其硬件类型必须与该节点边参数的 `interfaceOf(edge)` 结构一致（字段名、宽度、翻转逐层相同）。校验放在例化期、以结构比对完成：协议边参数与硬件类型因此不在类型系统层面耦合——那种耦合会把每个协议库与每个生成器库绑在一起，任何一侧演化都牵动另一侧的类型签名。失配报错携带节点身份、连接位置、期望与实际形状的差异路径。
+  生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input，探针源为 Output，探针汇为 Input；字段名称、顺序和 `flip`，`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、bind 的源码位置（`SourceLocation`）以及期望结构与实际结构的差异路径。
 ] <dec-binding-check>
 
-#开放([类型级端口校验强化])[
-  在结构校验之上，可以为愿意付出耦合代价的协议库提供可选的类型类见证（协议 `Edge` 与端口硬件类型的对应关系），把一部分失配提前到编译期。属于协议库的可选增强，不进入内核契约。
-] <open-typed-binding>
+端口失配属于 `ElaborationError`，与 @sec-error-semantics 定义的 `NegotiationError` 分开报告。
 
 == 例化流程 <sec-elaboration-flow>
 
 例化期对层次树自底向上执行，每个模块一步：
 
-+ *生成器模块*：取协商期算好的协议参数，合并 $"FP" = "combine"("UP", "PP")$；调用生成器（其缓存保证同参不重复生成）；按名把各节点对到生成器同名的端口，登记每条边的硬件端点。
-+ *结构模块*：按#ref(<ch-hierarchy>)的端口与连线计划发射端口、子实例与连线。连线是 bundle 级整体连接，交由 zaozi 按字段方向处理——Syntheke 不逐字段枚举。
++ *生成器模块*：读取 `ResolvedDesign` 中的完整参数并调用生成器；按 @dec-binding-check 校验设计节点、探针源和探针汇端口，并登记设计边与验证 bind 的硬件端点。
++ *结构模块*：按#ref(<ch-hierarchy>)的端口与连线计划发射端口、子实例与连线。连线按 Bundle 整体连接，由 zaozi 根据字段方向展开。
 
-次序保证引用先于使用：连到子实例端口时，子模块必已发射。整个例化期没有一次决策——它只是协商结果的忠实展开，任何在此阶段才暴露的问题（端口失配除外）都应视为协商期的缺陷，并在协商期修正。
+自底向上的次序保证子模块先于父模块发射，父模块生成连线时可以直接引用子实例端口。
 
 == 序列化范围 <sec-serialization-list>
 
 #table(
   columns: (auto, 1fr, 1fr),
   table.header([类别], [内容], [约束]),
-  [*必须可序列化*], [完整参数（用户参数 $+$ 协议参数合并后）。], [进入生成器的唯一对象；也是单个 IP 独立例化时的命令行输入（@req-ip）。],
-  [*可选可序列化*], [拓扑、边参数、端口与连线计划、层树。], [供 dump、可视化、审计（@ch-tooling）；格式演进不构成兼容性契约。],
-  [*从不序列化*], [参数变换函数、合成与推导函数——一切闭包。], [闭包活在单次进程内。硬要写进文件，只能把代码存成文本、加载时再求值，那已经是宏系统，复现性与可审计性同时丧失。],
+  [*必须可序列化*], [完整参数（用户参数 $+$ 协议参数合并后）。], [生成器以完整参数为输入；单个 IP 独立例化使用同一参数作为命令行输入（@req-ip）。],
+  [*可序列化、按需导出*], [稳定标识、设计边的 `Down`、`Up` 与 `Edge`、验证协议的 `Down` 与 `Edge`、`DVInterfaces`、`InterfacePath`、`ProtocolBundle`、`EdgeView`、端口与连线计划、FIRRTL 层声明树和诊断信息表。], [`ResolvedDesign` 使用这些数据类型；工具文件按需生成（@ch-tooling）。],
+  [*进程内函数*], [参数变换、合并与推导函数。], [这些闭包的生命周期限于当前设计进程；生成器输入采用完整参数值。],
 )
-
-协商与硬件的接口至此讲完。还有一类同样跨越模块层次的信号——为验证而生的探针——留待下一章。

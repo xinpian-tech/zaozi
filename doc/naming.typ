@@ -124,9 +124,6 @@ syntheke-protocols
 
 包路径：
 
-```scala
-org.chipsalliance.syntheke
-```
 
 === 它的缺点
 
@@ -337,11 +334,6 @@ diplomacy-protocols
 
 代码里继续使用清晰的工程词，不把诗意命名强塞进 API：
 
-```scala
-val spec     = design { ... }
-val resolved = Negotiator.negotiate(spec)
-Elaborator.elaborate(resolved, circuit)
-```
 
 文档则可以说：
 
@@ -387,34 +379,17 @@ README 第一段：
 
 因此这组名字：
 
-```scala
-WrapperModule
-TerminatorModule
-```
 
 没有准确描述 sealed hierarchy 的判别条件。
 
 我会优先考虑：
 
-```scala
-WrapperModule     // 0 Generator
-GeneratorModule   // exactly 1 Generator
-```
 
 或者更强调“把协定兑现为硬件”：
 
-```scala
-StructuralModule
-RealizerModule
-```
 
 其中最不花哨、最不容易误解的是：
 
-```scala
-sealed trait DiplomaticModule
-trait WrapperModule extends DiplomaticModule
-abstract class GeneratorModule[...] extends DiplomaticModule
-```
 
 `GeneratorModule` 的名字恰好对应你的类型级不变量，读代码的人不需要先理解“terminator”在这里的特殊含义。
 

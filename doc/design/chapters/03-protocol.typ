@@ -2,146 +2,123 @@
 
 = 协议抽象 <ch-protocol>
 
-协商图上流动的一切参数都由#term[协议][protocol]定义。协议回答三个问题：边的哪一端声明什么（下行与上行各承载谁的声明）、两份声明如何求解、求解结果对应什么硬件形状。
+本章定义设计协议的 `Down`、`Up`、`Edge` 类型、逐边求解和硬件接口。模块内部的参数传播见第 2 章和第 5 章。
 
-== 一条边上的三种参数 <sec-three-param-kinds>
+== 边上传播的参数与求解结果 <sec-three-param-kinds>
 
-#ref(<req-negotiation>)要求一切参数由供给与消费双方共同确定；承载它的机制，就是"参数沿边双向流动"——全文档的中心机制。本节把"双向"拆开定义：两个方向各承载哪一端的什么声明，方向本身又由什么决定。
+每条设计 bind 都有源节点与目标节点。bind 方向规定 `Down` 的传播方向：
 
-一条连接的两端从来不对称。#ref(<ch-motivation>)的例子里：发起者知道自己有多少并发事务、会发出哪些操作与多大流量，响应者无从得知；响应者知道自己供给哪段地址、支持哪些操作，发起者同样无从得知。这个形状不限于总线：设备知道自己供出几根中断线，中断控制器不知道；时钟源知道自己能产生哪些频率，用钟模块不知道；存储宏知道自己的深度与宽度，自测控制器不知道。*每一端都掌握对方决定接口形状所必需、而对方无法本地得知的事实。*这就是参数必须双向流动的原因——每条边上有两份声明，相向传播：
+- #term[下行参数][downward parameter]（类型 `Down`）：`negotiate` 的第一项输入，沿 bind 方向从源节点传向目标节点。
+- #term[上行参数][upward parameter]（类型 `Up`）：`negotiate` 的第二项输入，逆 bind 方向从目标节点传向源节点。
 
-- #term[下行参数][downward parameter]（类型 `Down`）：*上游端*的声明，沿边的方向流动。
-- #term[上行参数][upward parameter]（类型 `Up`）：*下游端*的声明，逆边的方向流动。
+bind 与模块内部参数依赖共同形成 `Down` 参数依赖 DAG；每条内部依赖都从输入节点指向输出节点。反转这些依赖得到 `Up` 参数依赖 DAG。协商器按拓扑序计算各输出节点的 `dFn`，再按反向拓扑序计算各输入节点的 `uFn`。
 
-"双向"指这两份互补声明的交换：两端各陈述事实，声明在两个方向上各传一份；它与信号方向、数据通路方向无关。
-
-边的方向——哪一端算上游——是每个协议的第一个设计决定，本文称之为#term[两端指认][end-role identification]：写明两端各是什么角色、各自声明什么，再规定哪一端作为上游。两端各是*协商的一方*：每一端的声明里既有供给（我提供什么），也有需求（我要求什么）。总线上，响应者供出地址空间与操作服务，发起者同时供出流量构成、并要求其操作被支持；时钟源供出频率能力，用钟者带来必须被满足的约束。"协商"的准确含义正在于此：双方各出条款，边参数是双方达成的一致。下表给出一组领域在本模型下的两端指认：
+传播的初始值由参数 DAG 的边界节点提供。以 AXI 内存互连为例，无前驱依赖的输出节点可以声明要求可达的地址范围、本地事务 ID 位宽、操作集合与数据位宽能力；无后继依赖的输入节点可以声明服务地址区域、支持的操作、数据位宽能力与可接受的下游 ID 位宽。中间模块的端口参数函数继续变换这些值。以 CHI 类协议为例，同一机制会传播节点编号、每个请求节点的事务标签空间、转发事务携带的原始请求者身份以及数据缓冲标识能力。常见协议的传播方向与边界声明如下：
 
 #table(
   columns: (auto, auto, 1fr, 1fr),
-  table.header([协议域], [上游 → 下游], [下行声明（上游端的供给与需求）], [上行声明（下游端的供给与需求）]),
-  [内存总线], [发起者 → 响应者], [并发标识数、将发出的操作种类、流量需求], [供给的地址集合、支持的操作、位宽能力],
+  table.header([应用场景], [源 → 目标], [边界输出节点的初始 `Down`], [边界输入节点的初始 `Up`]),
+  [内存互连], [发起者 → 响应者], [要求可达的地址范围、事务身份需求、将发出的操作种类、数据位宽能力], [供给的地址集合、支持的操作、数据位宽能力、可接受的事务身份能力],
   [中断], [设备 → 中断控制器], [供出的中断线数量与触发语义], [可汇聚的线数、支持的触发类型、编号空间],
-  [时钟], [时钟源 → 用钟模块], [可产生的频率集合、时钟间的同源关系], [需求的频率范围、抖动与关系约束],
-  [复位], [复位源 → 被复位模块], [复位类型（同步/异步）、极性与施加时序], [可接受的类型、需要的保持拍数],
-  [电源], [电源域 → 用电模块], [电压档位、可供预算、可用的电源状态], [功耗需求、状态转换需求],
-  [调试], [调试模块 → 处理器核], [访问机制与可寻址范围], [可调试资源：断点与触发器数量、编号需求],
-  [踪迹], [处理器核 → 踪迹汇聚器], [踪迹流的格式与峰值带宽], [缓冲深度、可分配的端口带宽],
-  [存储自测（MBIST）], [存储宏 → 自测控制器], [几何参数（深度、宽度、分块）与测试接口形态], [可调度的接口数、支持的测试算法],
+  [时钟], [时钟源 → 时钟接收端], [可产生的频率集合、时钟间的同源关系], [所需频率范围、抖动与关系约束],
+  [复位], [复位源 → 被复位模块], [复位类型（同步或异步）、极性与施加时序], [可接受的类型、需要的保持拍数],
+  [电源], [供电端 → 负载模块], [电压档位、可供预算、可用的电源状态], [功耗需求、状态转换需求],
+  [Debug], [Debug 控制器 → 处理器核], [访问机制与可寻址范围], [断点与触发器数量、编号需求],
+  [Trace], [处理器核 → Trace 汇聚器], [Trace 格式与源标识范围], [缓冲深度、可分配的端口编号],
+  [MBIST], [存储宏 → MBIST 控制器], [存储几何参数与测试接口形态], [可调度的接口数、支持的测试算法],
 )
 
-这张表可以继续延长——电源管理握手、传感监测、安全属性分发都是同一形状。纳入的判据有两条：其一，*两端各持对方需要的事实*；其二，*这些事实在 RTL 构造期即已确定*。第二条划出本模型的边界：扫描链这类结构虽然形状相似（扫描段报长度、控制器做调度），但链的长度与分段要到综合与版图阶段才成形，RTL 构造期给不出可协商的声明，因此超出本模型的协商范围。下行与上行只是"沿边"与"逆边"的名字，哪一端声明什么才是两端指认的实质。上游端的选取有两条并用的惯例：驱动或发起的一方作上游（时钟源、复位源、电源域、总线发起者、调试模块）；声明汇聚的场合让多对一中的"一"位于下游（设备汇向中断控制器、存储宏汇向自测控制器、核汇向踪迹汇聚器）。惯例之外，协议一经指认即为规范。
+两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interfaceOf(edge)` 生成该边的硬件接口，`render(edge)` 生成可视化元数据。边的 `Down`、`Up`、`Edge` 同时作为两端节点的唯一已求解连接进入相应生成器模块的 `EdgeView`（@sec-two-layer-params、@sec-settle-pp）。
 
-两股流在边上相遇，由协议的求解函数合成#term[边参数][edge parameter]（类型 `Edge`）——这条链路的最终参数，双方从此都以它为准。此后一切都从边参数导出：硬件接口的确切形状、协议检查器的配置、可视化标注，乃至下游模块的协议参数（@sec-two-layer-params）。
-
-#图([一条边上的参数流。下行（蓝）是上游端的声明，上行（红）是下游端的声明；求解函数把两份声明合成这条边的最终参数（绿）。])[
+#图([一条边的求解输入。`Down`（蓝）沿 bind 方向传递，`Up`（红）沿相反方向传递；`negotiate` 将二者合成 `Edge`（绿）。])[
   #syn-diagram(
     spacing: (34mm, 8mm),
-    node((0, 0), [上游节点], name: <s>),
-    node((1, 0), [下游节点], name: <k>),
+    node((0, 0), [源节点], name: <s>),
+    node((1, 0), [目标节点], name: <k>),
     edge(<s>, <k>, "-|>", stroke: c-down, label: text(fill: c-down)[`Down` 下行], label-side: left),
     edge(<k>, <s>, "-|>", stroke: c-up, bend: 32deg, label: text(fill: c-up)[`Up` 上行], label-side: left),
-    node((0.5, 1.45), text(fill: c-edge)[`Edge = negotiate(Down, Up)`], stroke: c-edge, fill: rgb("#f2f9f4"), name: <e>),
+    node((0.5, 1.45), text(fill: c-edge)[边参数由双向输入合成], stroke: c-edge, fill: rgb("#f2f9f4"), name: <e>),
     edge(<e>, (0.5, 0), "..>", stroke: c-edge),
   )
 ]
 
 == 协议对象 <sec-protocol-object>
 
-协议是一个普通对象，用三个抽象类型携带边上的三种参数：
+协议对象定义一条边上的三种关联类型：`Down`、`Up` 与 `Edge`。`Codec[A]` 提供类型 `A` 的 schema、规范化编码与解码。`ProtocolBundle` 是协议接口的非空顶层 Bundle 描述，字段结构见 @sec-protocol-interface。模块端口参数函数发现的传播冲突由 `dFn` 或 `uFn` 返回，单边约束冲突由 `negotiate` 返回；第 5 章把它们连同主体标识和源码位置包装为 `NegotiationError`。
 
-```scala
-trait Protocol:
-  type Down   // 下行参数
-  type Up     // 上行参数
-  type Edge   // 求解后的边参数
+协议对象必须给出协议标识、下行参数、上行参数、边参数、逐边求解函数、接口描述函数、三种参数的 codec 和可视化渲染函数。协议标识由协议种类、名称和版本组成；可视化渲染结果由显示标签和一组属性构成。
 
-  def negotiate(d: Down, u: Up): Either[TermViolation, Edge]
-  def interfaceOf(e: Edge): ProtocolInterface   // 协议接口
-  def name: String
-  def render(e: Edge): RenderedEdge = ...       // 可视化元数据
-```
+`Down`、`Up` 与 `Edge` 关联到同一个协议值。给定协议值 `p`，`p.negotiate` 的参数类型是 `p.Down` 与 `p.Up`，成功结果类型是 `p.Edge`。bind 的源节点输出协议与目标节点输入协议均为 `p`，因此该边上的参数和求解调用共享同一组类型；未经显式转换的跨协议连接表现为类型错误。`Protocol.id.kind` 对设计协议固定为 `Design`。
 
-`Down/Up/Edge` 定义为协议对象的*抽象类型*：边上的全部类型信息由一个协议值一次性给出，节点、连接、算法的签名只需携带 `P <: Protocol` 一个类型参数，把 `Down/Up/Edge` 及两侧变体都收在这个协议值里。协议库作者定义一个对象；使用者引用一个名字。类型之外，协议定义必须以文字写明它的两端指认（@sec-three-param-kinds 表的格式）：谁是上游、两端各是什么角色、`Down` 与 `Up` 各承载哪端的哪些供给与需求。缺少这段指认，使用者只能靠猜测确定连接方向。
+`DesignBuilder` 维护一份协议注册表，并在 `DesignSpec` 固化时保存其不可变副本。一个 `ProtocolId` 在同一设计中只对应一个协议对象；同一对象可以被多处引用，不同对象声明相同 `ProtocolId` 则在结构校验中报告标识冲突。模块节点使用注册表中与该 `ProtocolId` 对应的同一个协议对象；兼容性按 `ProtocolId` 判断，关联类型调用使用注册表保存的该对象。
 
-`negotiate` 承担的职责对应三条必须遵守的性质：
+双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(TermViolation)`。协商器为失败结果补充相关节点、bind 与模块的源码位置（@ch-interconnect、@ch-negotiation）。
 
-+ *每种组合都有结果。*任何一对参数都能求解：不兼容的组合（下游不支持上游要发的操作、地址集越界……）求解为一个描述性的参数冲突，协商器把它转为带两端书写位置的报错。
-+ *确定性。*求解只看这两个入参——没有全局配置、没有时间戳、没有随机性；同一规格永远求解出同一设计。
-+ *逐边局部。*每次求解只看本边的一对参数。所有需要"看见多个 agent"的计算——把全体 agent 的声明汇聚成一张地址图——都发生在总线上的协商，由总线对 agent 声明的聚合表达（@ch-interconnect、@ch-negotiation）。这条分工线让求解函数保持简单，也让传播算法无需理解任何协议的内部结构。
+`ProtocolId`、`Down`、`Up` 与 `Edge` 均不可变、可序列化。相应 `Codec` 用于在工具文件中编码、解码协议数据。读取工具文件时，调用方提供包含相应 `ProtocolId` 条目的注册表。`ProtocolId` 显式包含协议种类、名称与版本；任何会改变 `negotiate`、接口、渲染结果或 codec schema 的变更都必须更新版本。
 
-#不变量[一条连接的两端服从同一协议，因此每条边恰有一个 `Down`、一个 `Up`、一个 `Edge`，与恰好一次求解。]
+`RenderedValue` 是可序列化的可视化数据。同一 `RenderedValue` 内的属性名唯一，属性按名称排序后编码。
 
-跨协议的转换由一个显式的#term[混合 adaptor 节点][mixed adaptor node]表达：它的入侧服从协议 A、出侧服从协议 B，携带跨协议的参数变换 `A.Down => B.Down` 与 `B.Up => A.Up`。转换的硬件实现是一个普通的生成器模块。这样，协议转换是图上的一等节点，转换发生的位置在图上直接可见。
+跨协议转换由显式的#term[协议转换模块][protocol converter]表达。该模块声明一个协议 A 的输入节点和一个协议 B 的输出节点，并在二者之间声明参数依赖：输出节点的 `dFn` 执行 `A.Down => B.Down`，输入节点的 `uFn` 执行 `B.Up => A.Up`。两侧 bind 分别按协议 A 与协议 B 调用 `negotiate`；参数转换与硬件转换位于同一个生成器模块。
 
 == 协议接口 <sec-protocol-interface>
 
-协议还要给出：给定一条已求解的边，这条链路对应的硬件形状。它用一个纯数据的描述表达——#term[协议接口][protocol interface]：
+每条已求解的设计边都对应一个实际硬件接口。顶层接口由 `ProtocolBundle` 表示，字段类型由 `ProtocolInterface` 递归描述。接口描述支持 Bundle、定长 Vec、无符号整数、有符号整数、布尔、时钟、复位和带层路径的探针字段。每个字段记录名称、方向翻转标记和内部类型。
 
-```scala
-enum ProtocolInterface:
-  case Bundle(fields: Vector[Field])   // Field = (name, flip, ProtocolInterface)
-  case Vec(size: Int, element: ProtocolInterface)
-  case UInt(width: Int)
-  case SInt(width: Int)
-  case Bool, Clock, Reset
-  case Probe(inner: ProtocolInterface, layer: LayerPath)   // 探针形状，见验证协议一章
-```
+`LayerPath` 是从 FIRRTL 层根开始的非空名称序列，例如 `verification.cosim` 对应 `["verification", "cosim"]`。
 
-协议接口有两个消费者，也只有两个：
+每个 Bundle 层级的字段名必须唯一；`NonEmptyVector` 保证每个 Bundle 至少有一个字段，`NonEmptyString` 保证字段名至少包含一个字符，`PosInt` 保证 Vec 长度与整数位宽均为正数。
 
-+ *结构模块的端口发射。*结构模块没有生成器，它的端口完全由框架从穿越它的边推导（@ch-hierarchy）；推导的依据就是每条边的 `interfaceOf(edge)`，翻译为 FIRRTL 类型后发射。
-+ *端口结构的校验。*生成器模块的每个节点即生成器的一个端口；例化期框架把端口的实际类型与协议接口逐层比对，失配即报错并指出节点与连接位置（@ch-hardware）。
+协议接口用于两项工作：
 
-#决策([协议接口必选])[
-  每个协议必须实现 `interfaceOf`。没有它，跨层次打洞与端口校验都无从谈起；允许缺省只会把失败推迟到例化期更晦涩的位置。确有协议不落任何导线——例如只交换地址映射、时钟约定这类纯信息的协商——返回空 `Bundle` 即可。
++ *结构模块的端口发射。*框架从穿越结构模块的边推导端口（@ch-hierarchy）；推导的依据是每条边的 `interfaceOf(edge)`，翻译为 FIRRTL 类型后发射。
++ *端口结构的校验。*每条已求解边在两端生成器上各对应一个端口；例化期框架把端口的实际类型与协议接口逐层比对，失配即报错并指出节点与 bind（@ch-hardware）。
+
+#决策([每个设计协议必须实现 `interfaceOf`])[
+  每个设计协议（`Protocol`）必须实现 `interfaceOf`，为每个成功求解的 `Edge` 返回一个 `ProtocolBundle`。跨层端口与生成器端口校验均以这份结构为准。
 ] <dec-pi-required>
 
-注意协议接口是协商域里可序列化的普通数据；它到硬件类型的翻译发生在例化期的边界上，方向单一。协商域因此完全不依赖硬件构造库。
+`ProtocolInterface` 是可序列化数据。协商期处理该数据，例化期将其翻译为 FIRRTL 类型。
+
+设计协议的接口由 `Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock` 与 `Reset` 构成。验证协议的接口以 `Probe` 包装每个信号叶，并在 `Probe` 中记录 `LayerPath`。
+
+`ProtocolBundle` 描述源端视角的字段结构。框架为源模块端口赋予 Output 根方向，为目标模块端口赋予 Input 根方向；`flip = false` 跟随根方向，`flip = true` 取反。字段顺序是接口结构的一部分。
 
 == 参数的双层结构 <sec-two-layer-params>
 
-一个生成器最终消费的参数从两个来源合并而来：
+一个生成器最终使用的参数从两个来源合并而来：
 
-- #term[用户参数][user parameter]（`UserParam`）：构建期由设计者写下的意图——容量、关联度、基地址、功能开关。它在协商开始前就完全确定。
-- #term[协议参数][protocol parameter]（`ProtocolParam`）：协商期由框架计算的环境事实——对端的集合、每条边的最终参数。设计者*声明如何从边推导它*（@sec-settle-pp 的 `computeProtocolParam`），但不亲手给值。
+- #term[用户参数][user parameter]（`UserParam`）：构建期声明的容量、关联度、基地址与功能开关。它在协商开始前就完全确定。
+- #term[协议参数][protocol parameter]（`ProtocolParam`）：`computeProtocolParam` 在协商期从该生成器模块的只读求解结果计算得到的生成器自有参数（@sec-settle-pp）。
 
-两者由生成器模块声明的合成函数合并为#term[完整参数][full parameter]（`FullParam`），即 @sec-serialization-boundary 里唯一穿越序列化边界的对象：
+协商期调用生成器模块声明的合成函数，将两者合并为该模块的 `FullParam` 并存入 `ResolvedDesign`。完整参数穿越 @sec-serialization-boundary 定义的序列化边界：
 
-#图([参数的双层合并。用户参数写于构建期，协议参数算于协商期，二者在例化期合并为交给生成器的完整参数。])[
+#图([参数的双层合并。用户参数写于构建期，协议参数算于协商期，二者在协商期合并为完整参数，并在例化期交给生成器。])[
   #syn-canvas({
     import cetz.draw: *
     rect((0, 2.1), (3.6, 3.0), stroke: 0.7pt, radius: 0.08, fill: rgb("#f0f6fd"))
-    content((1.8, 2.55), [用户参数 \ #text(size: 8pt, fill: c-dim)[构建期 · 人写]])
+    content((1.8, 2.55), [用户参数 \ #text(size: 8pt, fill: c-dim)[构建期声明]])
     rect((0, 0.6), (3.6, 1.5), stroke: 0.7pt, radius: 0.08, fill: rgb("#f2f9f4"))
-    content((1.8, 1.05), [协议参数 \ #text(size: 8pt, fill: c-dim)[协商期 · 算出]])
+    content((1.8, 1.05), [协议参数 \ #text(size: 8pt, fill: c-dim)[协商期生成]])
     line((3.75, 2.55), (5.1, 1.95), mark: (end: ">"))
     line((3.75, 1.05), (5.1, 1.65), mark: (end: ">"))
     content((4.35, 2.65), text(size: 8pt)[`combine`])
     rect((5.2, 1.25), (8.9, 2.35), stroke: 1pt, radius: 0.08)
-    content((7.05, 1.8), [完整参数 \ #text(size: 8pt, fill: c-dim)[例化期 · 可序列化]])
+    content((7.05, 1.8), [完整参数 \ #text(size: 8pt, fill: c-dim)[例化期输入 · 可序列化]])
     line((9.05, 1.8), (10.35, 1.8), mark: (end: ">"), stroke: 1.1pt + c-edge)
     content((11.15, 1.8), [生成器])
   })
 ]
 
-这个双层结构是#ref(<ch-motivation>)顺序死锁的解法：旧困境"构造 A 需要知道 B 的属性"被拆解为——构建期只写用户参数（无相互依赖），协商期由图算出所有环境事实，例化期生成器一次性拿到二者之和。生成器内部再不需要任何"先猜后断言"。
-
-同一生成器、同一完整参数，必然生成同一模块；zaozi 按参数缓存并去重模块。协议参数参与合并意味着：两个用户参数相同、但协商环境不同的实例，其完整参数不同，自然生成两个不同的模块——去重的正确性不需要任何额外机制维护。
+zaozi 以 `GeneratorId` 与完整参数的规范化序列化作为模块缓存键。用户参数相同而协议参数不同的实例具有不同缓存键，并分别生成模块定义。
 
 == 验证协议 <sec-dv-protocol>
 
-探针协议的两端指认（沿用 @sec-three-param-kinds 的格式）：探针源供出观测点，是上游；探针汇收集全部观测点供验证环境使用，是下游。特殊之处在于只有一股流——上游端的下行声明；汇不向源回传任何参数，因为被观察者不需要知道谁在观察它。验证协议因此是设计协议的退化形态，只有 `Down` 与 `Edge`：
+验证协议规定探针源为上游、探针汇为下游。其参数契约由探针源的 `Down` 和汇端聚合后的 `Edge` 组成；探针汇通过 `resolve` 聚合全部声明并生成 `Edge`。求解结果同时给出各探针源沿途使用的接口、汇端聚合接口，以及每个源接口在汇端接口中的路径。路径由字段选择和 Vec 索引组成。
 
-```scala
-trait DVProtocol:
-  type Down   // 探针源（上游端）的声明
-  type Edge   // 汇端聚合后的结果
+`NonNegativeInt` 表示大于或等于零的整数。
 
-  def resolve(downs: Seq[Down]): Either[TermViolation, Edge]
-  def interfaceOf(e: Edge): ProtocolInterface
-```
+`resolve` 的输入按探针 bind 声明顺序排列，且每个探针汇至少连接一个源。框架以相同顺序把各探针源声明的 `LayerPath` 传给 `interfacesOf`。返回值中的 `sources` 与输入一一对应；`sink` 是汇端接口；`sinkPaths(i)` 在 `sink` 中选择与 `sources(i)` 结构完全相同的 Bundle。空路径选择 `sink` 根 Bundle；非空路径用 `Field` 进入具名字段、用 `Index` 进入 Vec 元素，并且最后一段必须落在 Bundle。所有路径必须有效、互异且互不重叠，其选中 Bundle 的信号叶必须精确覆盖 `sink` 的全部信号叶。
 
-`resolve` 在汇端一次性看到全部到达的声明并聚合——与设计协议逐边求解不同，因为探针汇的职责本来就是收集全体。`DVProtocol` 与 `Protocol` 是并列的两个契约，*没有*子类型关系：强行共用一套类型，只会使 `Up` 与 `negotiate` 失去意义。一个协议库要同时服务设计连接与验证探针时，分别给出两个对象即可（内部尽可复用共同的参数定义）。验证协议的连接规则、层机制与打洞细节见@ch-verification。
+验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验（@sec-dv-routing）。
 
-至此，参数的静态结构已经完整：协议给出类型与求解，接口给出形状，双层参数给出来源与去向。下一章处理另一半问题——图本身的形状如何确定：一条连接究竟代表几条边。
+`Down`、`Edge`、`DVInterfaces`、`InterfacePath` 与 `LayerPath` 为不可变、可序列化的数据。`downCodec` 与 `edgeCodec` 提供两个关联类型的 schema 与规范化编码；其余三种类型采用框架定义的 schema。`DVProtocol.id.kind` 固定为 `Verification`；任何会改变求解函数、接口、渲染结果或 codec schema 的变更都必须更新版本。验证协议与设计协议共用注册表，`ProtocolKind` 为二者建立各自的标识空间。

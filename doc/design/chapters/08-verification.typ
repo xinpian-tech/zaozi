@@ -2,16 +2,21 @@
 
 = 验证协议 <ch-verification>
 
-验证环境需要观察设计深处的信号：流水线的架构状态供协同仿真比对、总线事务供记分板检查、断言散布在各级。直接从模块内部引出信号破坏封装；在顶层以层次路径字符串引用信号则脆弱且无法参与协商。Syntheke 的方案与设计侧一致：*探针也是图*——用验证协议的节点、同一个 `<-` 声明连接，走同一套打洞与协商机制（@req-verification、@sec-attach），并全程带有*层路径*标注——每个探针声明它所属的 FIRRTL 层名（一条命名链，如 `verification.cosim`），据此在发布构建中被整体移除，机制见 @sec-layers。
+验证环境需要观察设计内部的信号，例如供协同仿真比对的架构状态、供记分板检查的互连事务与各级断言。Syntheke 将这些观察关系表示为探针源、探针汇和显式连接；跨模块边界的信号由框架统一规划端口和连线。每个探针还声明一条 FIRRTL 层路径，例如 `verification.cosim`，用于控制对应验证逻辑的生成与移除（@req-verification、@sec-layers）。
 
 == 探针源、探针汇与参数流 <sec-dv-model>
 
-- #term[探针源][DV source]：位于生成器模块，给出验证协议的下行声明（@sec-dv-protocol）；它就是生成器的一个*探针端口*节点。生成器的探针接口（@sec-generator-contract）暴露只读引用，只供观察。
-- #term[探针汇][DV sink]：位于层次树上方的某个模块——通常是顶层附近的验证壳。收齐全部到达的声明后，由协议的 `resolve` 聚合出边参数，据此确定汇端聚合接口的形状。
+第 5 章定义探针源、探针汇、验证 bind 及其声明类型（@sec-dv-declarations）。探针源和探针汇分别对应生成器 IO 中以其声明名命名的顶层 Bundle，内部字段采用 `Probe` 观测信号；验证生成器以求解后的汇端 Bundle 为输入，并实现协同仿真、记分板或断言逻辑（@sec-generator-contract）。
 
-参数只有一股流：探针源（上游端）的下行声明，汇端不回传——被观察者不需要知道谁在观察它。探针连接因此与设计侧的 bind 是*同一个* `<-`：都创建一条边、走同一套下行传播与逐边求解（@ch-negotiation）；差别只在验证协议不设上行，而探针汇（收齐后由 `resolve` 聚合）扮演设计侧总线那样的角色。此处需要区分两种"方向"：下行与上行相对*边*而言（@sec-three-param-kinds）；而探针边的*路由*沿层次树向上（@sec-dv-routing）。参数沿边下行、边本身向层次上方走线，两者互相独立、各自成立。
+实现类和构造器由框架密封；`DesignBuilder` 根据当前生成器模块的 `ModuleId` 与名称派生端点标识。探针源的私有实现保存构造方法接收的 `protocol.Down`。`sink <- source` 产生 `DVBindId` 与 bind 的 `SourceLocation`；每个源恰好 bind 一次，每个汇至少连接一个源，同一汇的全部端点使用注册表中的同一个 `DVProtocol` 对象。
 
-#图([探针的层次路由。两个深处的探针源（紫）沿层次树向上打洞，汇聚于顶层验证壳的探针汇。沿途每个边界出现带层路径标注的探针端口。])[
+探针连接与设计连接共享 `<-` 声明语法和跨层路由。验证协议以探针汇为求解单位：框架按 bind 声明顺序收集该汇的 `NonEmptyVector[Down]`，再调用一次该汇协议的 `resolve`（@sec-dv-protocol）。
+
+`resolve` 成功后，框架以 bind 声明顺序收集各源的层路径，并调用 `interfacesOf(edge, layers)` 返回 `DVInterfaces`。其中 `sources: NonEmptyVector[ProtocolBundle]` 与输入的 `Down` 按位置一一对应，供各探针源及其跨层端口使用；`sink: ProtocolBundle` 是探针汇的聚合接口；`sinkPaths(i)` 指定第 $i$ 个源在 `sink` 中的目标 Bundle。三者共同定义每个探针源与 `sink` 中选定 Bundle 的连接。
+
+每个源的 `VerificationView` 条目包含 `DVSourceId`、`DVBindId`、带 `ProtocolId` 的聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeProtocolParam` 分别读取这些条目并生成协议参数（@sec-settle-pp、@sec-generator-module）。
+
+#图([探针的层次路由。两个探针源（紫）沿层次树向上连接到顶层验证模块的探针汇；跨越的模块边界均产生带层路径标注的端口。])[
   #syn-diagram(
     spacing: (15mm, 7.5mm),
     node((0, 0.4), [源 α], name: <s1>, shape: fletcher.shapes.circle, stroke: c-dv),
@@ -33,28 +38,24 @@
 == 连接与路由规则 <sec-dv-routing>
 
 #决策([探针连接必须逐条显式枚举])[
-  验证观察点必须被*显式枚举*，不提供任何通配收集。设计侧的 agent 数量随 bind 增删而自动变化（@sec-attach），服务于集成的敏捷；验证的覆盖范围则要稳定可控——"自动收集所有可用探针"式的通配会让它随设计漂移而无声变化，这在验证方法学上是缺陷。每条探针连接都是一条独立、可审计的显式声明。同构多核之类的批量场景不构成反例：构建期是普通宿主语言代码，对核列表循环生成 $N$ 条 `<-` 即可。循环与通配有本质区别——循环枚举的是设计者显式持有的列表，规格中记录的仍是 $N$ 条独立、可审计的连接；通配的匹配范围由框架的图搜索隐式决定，覆盖范围才会随设计漂移。
+  每个观察点由一条独立的 `<-` 声明连接到探针汇。批量连接由宿主语言循环展开；`DesignSpec` 记录展开后的各条 bind 及其声明顺序。
 ] <dec-dv-once>
 
-#决策([探针汇必须是探针源的严格祖先])[
-  兄弟模块之间的横向探针连接非法。理由有三：其一，沿层次树向上的路由让每条探针的走线路径唯一且无环，不需要任何布线决策；其二，一个模块有哪些探针端口只取决于其*内部*内容，与例化它的环境无关——同一个核，在被监听与不被监听的两颗芯片里仍是同一个模块，去重（@sec-dedup）不被观察者破坏；若允许横向连接，核的端口形状将随环境变化，模块复用随之不再成立；其三，探针汇集中于祖先模块，与验证环境的组织方式（顶层协同仿真、子系统级测试台）一致。需要横向观察时，把汇提升到公共祖先，再由汇端分发。
+#决策([探针汇生成器的父模块必须是源模块的严格祖先])[
+  设探针汇生成器的父结构模块为 $W$。$W$ 必须是每个探针源模块的严格祖先；汇生成器是 $W$ 的直接子模块。每条硬件路径由源到 $W$ 的唯一上行路径及 $W$ 到汇生成器的连接组成。兄弟模块之间的观察应把汇生成器放在二者公共祖先之下。
 ] <dec-dv-ancestor>
 
-路由与打洞与设计侧共用机制（@sec-punch-planning），仅两点不同：路径必为直线（源到祖先，无 LCA 分叉）；端口带层路径标注——探针端口的类型是 `Probe(inner, layer)`（@sec-protocol-interface，其中 `layer` 即 @sec-layers 定义的层路径），方向永远向上。
+探针路由复用设计侧的跨层端口规划（@sec-punch-planning）。第 $i$ 条 bind 的沿途端口使用已求解 `DVInterfaces.sources(i)`，源端及其沿途转发端口以 Output 为根方向。该 Output 路径最终连接到汇生成器中由 `sinkPaths(i)` 指定的 Input Bundle。验证接口中的 `flip` 固定为 `false`；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
 
 == FIRRTL 层与探针移除 <sec-layers>
 
-在发布构建中整体移除探针硬件，由 FIRRTL 层机制提供；Syntheke 在其中只负责把层的*声明*放置正确：每个探针源声明它所属的#term[层路径][layer path]——一条命名链，如 `verification.cosim`、`verification.assert`；层次树上每个模块的*层声明*由框架合并计算：
+每个探针源声明一条#term[层路径][layer path]，例如 `verification.cosim` 或 `verification.assert`。框架将穿过同一模块的探针层路径合并为前缀树：
 
 $ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针端口"} $
 
-#图([层的前缀树合并。子树里出现过 `verification.cosim` 与 `verification.assert.fatal` 两条层路径，模块的层声明是二者的前缀树并。])[
+#图([层的前缀树合并。子树包含 `verification.cosim` 与 `verification.assert.fatal` 两条层路径，模块的层声明是二者的前缀树并。])[
   #syn-canvas({
     import cetz.draw: *
-    let tree(x0, nodes, edges) = {
-      for (p, t) in nodes { content(p, text(size: 8.5pt, t)) }
-      for (a, b) in edges { line(a, b, stroke: 0.55pt + gray) }
-    }
     // 左树
     content((0.9, 2.6), text(size: 8.5pt)[`verification`])
     content((0.9, 1.6), text(size: 8.5pt)[`cosim`])
@@ -80,14 +81,14 @@ $ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针�
   })
 ]
 
-关闭某条层路径后，该层的端口、连线与层内逻辑由 FIRRTL 编译流程整体移除，设计侧电路逐位不变——移除是 FIRRTL 的语义，此处不再展开。Syntheke 在其中承担且仅承担两件事：把探针端口与连线放进正确的层（打洞产物带层标注），以及核对生成器声明的层结构与探针源声明的层路径一致（生成器的层接口与探针源的层路径由同一参数推导，@sec-generator-contract；一致性在协商期检查）。
+跨层端口与连线写入对应的 FIRRTL 层；关闭层路径时，FIRRTL 编译流程移除其中的验证逻辑。验证求解期核对 `DVInterfaces` 中的 `Probe` 层标注与探针源声明；例化期再把生成器的实际 Probe 端口与已求解 `ProtocolBundle` 比对。`DVInterfaces` 违反接口映射契约时报告 N6；生成器实际 Probe 端口与 `ProtocolBundle` 失配时报告 `ElaborationError`（@sec-error-semantics、@sec-generator-contract）。
 
-#决策([同路径合并，同路径异协议报错])[
-  多个探针源声明相同层路径是常态（全芯片的 `cosim` 探针都在一条层里），前缀树并自然合并。但同一层路径下若出现*不同验证协议*的探针汇流到*同一个汇*，`resolve` 的输入将不再同质——这是声明冲突，协商期报错，指出两侧源的位置。不同协议应使用不同汇（可以共层）。
+#决策([层路径按前缀合并])[
+  相同层路径合并为同一声明。连接到同一探针汇的全部 bind 采用该汇的同一个 `DVProtocol`；检查发现其他协议时，报告相关 bind 的 `SourceLocation`。不同探针汇可以在同一层路径下使用不同协议。
 ] <dec-layer-merge>
 
-== 汇端形状 <sec-sink-shape>
+== 探针汇接口结构 <sec-sink-shape>
 
-汇端的聚合接口由 `resolve` 的结果经 `interfaceOf` 给出，典型形状是"每个到达的源一个子 bundle"，顺序继承打洞路径的确定性排序（子实例声明序 × 节点声明序 × 端口索引）。验证壳因此可以按稳定的名字索引每一路探针；增删一个源只增删它自己的那一路。
+验证生成器的顶层端口采用 `DVInterfaces.sink`；第 $i$ 条 `DVBindId` 把 `sources(i)` 连接到 `sinkPaths(i)` 选定的 Bundle。
 
-至此设计与验证两条通路都已闭合。最后一章交代工具面——协商产物如何被看见。
+验证协商的 `Edge`、`DVInterfaces`、端口计划与层声明均进入 `ResolvedDesign`，供例化与工具导出使用。
