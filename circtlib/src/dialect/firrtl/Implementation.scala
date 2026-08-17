@@ -973,6 +973,38 @@ given LTLAndIntrinsicApi with
     ): Value = ref.operation.getResult(0)
 end given
 
+given DPICallIntrinsicApi with
+  def op(
+    functionName: String,
+    result:       Type,
+    clock:        Value,
+    enable:       Value,
+    inputs:       Seq[Value],
+    location:     Location
+  )(
+    using Arena,
+    Context
+  ): DPICallIntrinsic =
+    DPICallIntrinsic(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.int.dpi.call",
+        location = location,
+        namedAttributes = Seq(
+          summon[NamedAttributeApi].namedAttributeGet("functionName".identifierGet, functionName.stringAttrGet),
+          summon[NamedAttributeApi]
+            .namedAttributeGet("operandSegmentSizes".identifierGet, Seq(1, 1, inputs.size).denseI32ArrayGet)
+        ),
+        operands = Seq(clock, enable) ++ inputs,
+        resultsTypes = Some(Seq(result))
+      )
+    )
+  extension (ref: DPICallIntrinsic)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
 given LTLClockedAtomIntrinsicApi with
   def op(
     input:    Value,
