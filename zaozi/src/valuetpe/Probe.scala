@@ -15,6 +15,9 @@ trait RProbe[T <: CanProbe & Data] extends Data:
   private[zaozi] val _baseType: T
   private[zaozi] val _color:    LayerTree
 
+  /** The probed data type — a read-only probe of `baseType`. */
+  def baseType: T = _baseType
+
   final def toMlirType(
     using Arena,
     Context,
@@ -24,6 +27,9 @@ trait RProbe[T <: CanProbe & Data] extends Data:
 trait RWProbe[T <: CanProbe & Data] extends Data:
   private[zaozi] val _baseType: T
   private[zaozi] val _color:    LayerTree
+
+  /** The probed data type — a read/write (forceable) probe of `baseType`. */
+  def baseType: T = _baseType
 
   final def toMlirType(
     using Arena,
