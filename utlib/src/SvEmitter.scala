@@ -31,6 +31,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   ContextApi,
   Module as MlirModule,
   ModuleApi as MlirModuleApi,
+  Operation,
   OperationApi,
   WalkEnum,
   WalkResultEnum
@@ -88,6 +89,11 @@ private[utlib] object SvEmitter:
 
   /** Direct verification operations in combinational modules have no clock. A procedural region makes CIRCT emit legal
     * immediate SystemVerilog assertions and covers.
+    *
+    * Clocked verification ops — whose property comes from `ltl.*` (e.g. `ltl.clock`) — must be
+    * left alone: they emit as module-level concurrent `cover property` statements, and wrapping
+    * one in a procedural block is exactly the "concurrent assertion inside always" construct
+    * Verilator rejects (IEEE 1800 16.14.6).
     */
   private def proceduralizeUnclockedVerification(
     module: MlirModule
@@ -96,10 +102,14 @@ private[utlib] object SvEmitter:
     Context
   ): Unit =
     val names = Set("verif.assert", "verif.assume", "verif.cover")
+    def clocked(operation: Operation): Boolean =
+      val property = operation.getOperand(0)
+      property.isOpResult && property.opResultGetOwner.getName.str.startsWith("ltl.")
     module.getOperation.walk(
       { operation =>
         if names.contains(operation.getName.str)
           && operation.getParentOperation.getName.str != "sv.alwayscomb"
+          && !clocked(operation)
         then
           val parentBlock = operation.getBlock
           val alwaysComb  = summon[OperationApi].operationCreate(
