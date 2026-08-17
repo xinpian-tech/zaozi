@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
+// SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
 import me.jiuyang.utlib.*
