@@ -6,14 +6,22 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_PrintfApi, given_StopApi, PrintfApi, StopApi}
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{
+  given_DPICallIntrinsicApi,
+  given_PrintfApi,
+  given_StopApi,
+  DPICallIntrinsicApi,
+  PrintfApi,
+  StopApi
+}
 import org.llvm.mlir.scalalib.capi.ir.{
   given_BlockApi,
   given_LocationApi,
   given_OperationApi,
   Block,
   Context,
-  LocationApi
+  LocationApi,
+  Value
 }
 
 import java.lang.foreign.Arena
@@ -92,3 +100,41 @@ def stop(
     )
     .operation
     .appendToBlock()
+
+/** Call an external DPI function on the rising edge of `clock` while `enable` is high, passing
+  * `inputs` and returning a single `resultType` value — the seam for handing each cycle to an
+  * external C/Rust/Python frontend. firtool lowers it to a SystemVerilog `import "DPI-C"` and
+  * a clocked call; the returned node can be connected like any other signal.
+  */
+def dpiCall(
+  functionName: String,
+  resultType:   Bits,
+  clock:        Referable[Clock],
+  enable:       Referable[Bool],
+  inputs:       Referable[?]*
+)(
+  using Arena,
+  Context,
+  Block,
+  TypeImpl,
+  sourcecode.File,
+  sourcecode.Line,
+  sourcecode.Name.Machine,
+  InstanceContext
+): Node[Bits] =
+  val op = summon[DPICallIntrinsicApi].op(
+    functionName = functionName,
+    result = resultType.toMlirType,
+    clock = clock.refer,
+    enable = enable.refer,
+    inputs = inputs.map(_.refer),
+    location = summon[LocationApi].locationFileLineColGet(
+      summon[sourcecode.File].value,
+      summon[sourcecode.Line].value,
+      0
+    )
+  )
+  op.operation.appendToBlock()
+  new Node[Bits]:
+    val _tpe:   Bits  = resultType
+    val _refer: Value = op.result

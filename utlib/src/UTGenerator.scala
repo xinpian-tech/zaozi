@@ -122,9 +122,48 @@ final class UTGenerator[
       coverageFile = "coverage.dat"
     )
 
-  private def elaborate(
-    harness:   DefaultUTHarnessGenerator[PARAM, L, I, P],
-    parameter: DefaultUTHarnessParameter,
+  /** Elaborate and lower the DPI closed-loop harness: each cycle it hands the DUT's observed
+    * outputs to the external DPI function and drives the DUT's input with the value returned.
+    * `cSources` implement `<dut>_tick`; they are compiled into the Verilator model.
+    */
+  def dpiSimulationRequest(
+    outDir:    os.Path = outputDirectory,
+    runCycles: Int = cycles,
+    cSources:  Seq[os.Path] = Seq.empty
+  ): SimulationRequest =
+    os.makeDir.all(outDir)
+    val harnessParameter = DpiHarnessParameter(dpi.spec, runCycles, timeoutCycles)
+    val harness          = new DpiHarnessGenerator(dut, parameter)
+    val topModule        = harness.moduleName(harnessParameter)
+    val moduleDir        = outDir / s"dpi_mlir_${harnessParameter.hashCode.toHexString}"
+    os.makeDir.all(moduleDir)
+
+    elaborate(harness, harnessParameter, moduleDir)
+    val modules = os.list(moduleDir).filter(_.ext == "mlirbc").sortBy(_.last)
+    require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
+    val linked  = moduleDir / "linked.mlir"
+    os.proc(
+      Seq("firld", s"--base-circuit=$topModule", "--no-mangle") ++ modules.map(_.toString) ++ Seq("-o", linked.toString)
+    ).call()
+
+    val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
+    val driverPath = outDir / s"${Driver.topModuleName}.sv"
+    os.write.over(driverPath, Driver.topString(topModule, trace = false, traceFile = "trace.vcd"))
+    SimulationRequest(
+      sources = Seq(emitted.primary, driverPath) ++ cSources,
+      workDir = outDir,
+      topModule = Driver.topModuleName,
+      trace = false,
+      traceFile = "trace.vcd",
+      coverageFile = "coverage.dat"
+    )
+
+  private def elaborate[HP <: Parameter, HL <: LayerInterface[HP], HI <: HWInterface[HP], HProbe <: DVInterface[
+    HP,
+    HL
+  ]](
+    harness:   Generator[HP, HL, HI, HProbe],
+    parameter: HP,
     outDir:    os.Path
   ): Unit =
     val arena = Arena.ofConfined()

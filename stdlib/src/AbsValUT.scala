@@ -24,5 +24,27 @@ object AbsValUT:
     val contract  = generator.freezeDpi(outDir / "AbsValDPI.json")
     os.write.over(outDir / "AbsValDPIShim.mlir", DpiShim.mlirString(contract))
     generator.simulationRequest(generator.solve(), outDir)
-    println(s"UT testbench, DPI contract and shim emitted for ${AbsVal.moduleName(parameter)} in $outDir")
+
+    // The DPI closed loop: emit the harness that hands each cycle to the external frontend,
+    // and a tiny C frontend that drives A and observes the DUT's ABSVAL — placed next to the
+    // emitted SV so Verilator compiles them together.
+    val dpiDir = outDir / "dpi"
+    os.makeDir.all(dpiDir)
+    os.write.over(
+      dpiDir / "dpi_frontend.c",
+      s"""|#include <stdio.h>
+          |extern "C" {
+          |static int cyc = 0;
+          |void ${AbsVal.moduleName(parameter)}_tick(char ABSVAL, char* A) {
+          |  int drv = (cyc == 0) ? 5 : (cyc == 1) ? -3 : 7;
+          |  printf("DPI-LOOP cyc=%d observed ABSVAL=%d -> drive A=%d\\n", cyc, (int)(unsigned char)ABSVAL, drv);
+          |  *A = (char)drv;
+          |  cyc++;
+          |}
+          |}
+          |""".stripMargin
+    )
+    generator.dpiSimulationRequest(dpiDir, runCycles = 4, cSources = Seq(dpiDir / "dpi_frontend.c"))
+
+    println(s"UT testbench, DPI contract, shim and closed-loop harness emitted for ${AbsVal.moduleName(parameter)} in $outDir")
     println(contract.toJson)
