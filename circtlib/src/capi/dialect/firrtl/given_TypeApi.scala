@@ -47,7 +47,8 @@ import org.llvm.circt.CAPI.{
   firrtlTypeIsAUInt,
   firrtlTypeIsAVector,
   firrtlTypeIsConst,
-  firrtlTypeIsPassive
+  firrtlTypeIsPassive,
+  firrtlTypesAreEquivalent
 }
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, DialectHandle, Type, given}
@@ -209,4 +210,8 @@ given TypeApi with
     inline def isVector:     Boolean = firrtlTypeIsAVector(tpe.segment)
     inline def isConst:      Boolean = firrtlTypeIsConst(tpe.segment)
     inline def isPassive:    Boolean = firrtlTypeIsPassive(tpe.segment)
+    inline def isEquivalentTo(
+      that:              Type,
+      requireSameWidths: Boolean
+    ): Boolean = firrtlTypesAreEquivalent(tpe.segment, that.segment, requireSameWidths)
 end given

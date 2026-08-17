@@ -245,6 +245,7 @@ end AttributeApi
   * firrtlTypeIsAVector
   * firrtlTypeIsConst
   * firrtlTypeIsPassive
+  * firrtlTypesAreEquivalent
   * }}}
   */
 trait TypeApi:
@@ -379,24 +380,17 @@ trait TypeApi:
     inline def isVector:     Boolean
     inline def isConst:      Boolean
     inline def isPassive:    Boolean
+    inline def isEquivalentTo(
+      that:              Type,
+      requireSameWidths: Boolean
+    ):                       Boolean
 end TypeApi
 
-/** Firrtl Utility Api
+/** Firrtl Value Api
   * {{{
   * firrtlEmitInvalidate
-  * firrtlImportAnnotationsFromJSONRaw
-  * firrtlTypesAreEquivalent
-  * firrtlValueFoldFlow
   * }}}
   */
-trait UtilityApi:
-  inline def emitInvalidate(block:    Block, loc:  Location, value:         Value):   Unit
-  inline def importAnnotationsFromJSONRaw(
-    annotationsStr: String
-  )(
-    using arena:    Arena,
-    context:        Context
-  ):                                                                                  Attribute
-  inline def typesAreEquivalent(dest: Type, src:   Type, requireSameWidths: Boolean): Boolean
-  inline def valueFoldFlow(value:     Value, flow: FirrtlValueFlow):                  FirrtlValueFlow
-end UtilityApi
+trait ValueApi:
+  extension (value: Value) inline def emitInvalidate(block: Block, loc: Location): Unit
+end ValueApi

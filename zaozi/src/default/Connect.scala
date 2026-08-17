@@ -6,7 +6,7 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.{Interface, Readable, Referable, Writable}
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.capi.dialect.firrtl.{UtilityApi, given}
+import org.llvm.circt.scalalib.capi.dialect.firrtl.given
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ConnectApi, SubfieldApi, SubindexApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
@@ -47,7 +47,7 @@ private[zaozi] def checkConnectable(
   if isAnalog(sink) || isAnalog(src) then throw ConnectException(analogNotConnectable)
   val sinkTpe = sink.toMlirType
   val srcTpe = src.toMlirType
-  if !summon[UtilityApi].typesAreEquivalent(sinkTpe, srcTpe, requireSameWidths = true) then
+  if !sinkTpe.isEquivalentTo(srcTpe, requireSameWidths = true) then
     val message = StringBuilder(
       s"$opName failed at ${summon[sourcecode.File].value}:${summon[sourcecode.Line].value}: type mismatch between "
     )
