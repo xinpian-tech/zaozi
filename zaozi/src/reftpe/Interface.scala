@@ -12,7 +12,8 @@ import scala.language.dynamics
 final class Interface[T <: HWInterface[?]] private[zaozi] (
   private[zaozi] val _tpe:   T,
   private[zaozi] val _ports: IArray[Value])
-    extends Dynamic:
+    extends Writable[T],
+      Dynamic:
 
   def getType: T = _tpe
 

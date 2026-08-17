@@ -3,19 +3,21 @@
 package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.reftpe.{Interface, Referable, Writable}
+import me.jiuyang.zaozi.reftpe.{Interface, Readable, Referable}
 import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
 import java.lang.foreign.Arena
 
-private def bulkShape(x: Interface[?] | Referable[?]): Data = x match
+private def bulkShape(x: Readable[?]): Data = x match
   case iface: Interface[?] => iface.getType
   case r:     Referable[?] => r.getType
+  case other =>
+    throw ConnectException(s"unsupported connect endpoint representation: ${other.getClass.getName}")
 
 private def bulkFieldRef(
-  x:    Interface[?] | Referable[?],
+  x:    Readable[?],
   idx:  Int,
   name: String
 )(
@@ -24,15 +26,16 @@ private def bulkFieldRef(
   Context,
   TypeImpl,
   sourcecode.File,
-  sourcecode.Line,
-  sourcecode.Name.Machine
+  sourcecode.Line
 ): Referable[Data] = x match
   case iface: Interface[?] => iface.portRef(idx)
   case r:     Referable[?] => r.subRef(name)
+  case other =>
+    throw ConnectException(s"unsupported connect endpoint representation: ${other.getClass.getName}")
 
 private[zaozi] def bulkConnect(
-  sink: Interface[?] | Referable[?],
-  src:  Interface[?] | Referable[?],
+  sink: Readable[?],
+  src:  Readable[?],
   dir:  ConnDir
 )(
   using Arena,
@@ -40,8 +43,7 @@ private[zaozi] def bulkConnect(
   Block,
   TypeImpl,
   sourcecode.File,
-  sourcecode.Line,
-  sourcecode.Name.Machine
+  sourcecode.Line
 ): Unit =
   val opName  = dir match
     case ConnDir.Bi      => ":<>="
@@ -66,84 +68,3 @@ private[zaozi] def bulkConnect(
     val srcF  = bulkFieldRef(src, idx, f.name)
     if f.isFlipped then connect(srcF, sinkF, effectiveDir(true))
     else connect(sinkF, srcF, dir)
-
-extension [T <: HWInterface[?]](sink: Interface[T])
-  def :<>=(
-    src: Interface[T] | Referable[T]
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Unit = bulkConnect(sink, src, ConnDir.Bi)
-  def :<=(
-    src: Interface[T] | Referable[T]
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Unit = bulkConnect(sink, src, ConnDir.Aligned)
-  def :>=(
-    src: Interface[T] | Referable[T]
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Unit = bulkConnect(sink, src, ConnDir.Flipped)
-  def dontCare(
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line
-  ): Unit = interfaceDontCare(sink)
-
-extension [T <: HWInterface[?]](sink: Writable[T])
-  def :<>=(
-    src: Interface[T]
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Unit = bulkConnect(sink, src, ConnDir.Bi)
-  def :<=(
-    src: Interface[T]
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Unit = bulkConnect(sink, src, ConnDir.Aligned)
-
-extension [T <: HWInterface[?]](sink: Referable[T])
-  def :>=(
-    src: Interface[T]
-  )(
-    using Arena,
-    Context,
-    Block,
-    TypeImpl,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
-  ): Unit = bulkConnect(sink, src, ConnDir.Flipped)

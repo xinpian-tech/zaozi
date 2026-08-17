@@ -115,7 +115,7 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
 ): Expr[Any] =
   import quotes.reflect.*
 
-  val (arena, typeImpl, context, block, file, line, valName, _) = summonContextualParameters
+  val (arena, typeImpl, context, block, file, line, _, _) = summonContextualParameters
 
   resolveFieldShape[T](fieldName) match
     case FieldShape.Aligned(elem)  =>
@@ -128,7 +128,6 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
             given org.llvm.mlir.scalalib.capi.ir.Block   = $block
             given sourcecode.File                        = $file
             given sourcecode.Line                        = $line
-            given sourcecode.Name.Machine                = $valName
             $ref
               .subRef($fieldName)
               .asInstanceOf[me.jiuyang.zaozi.reftpe.Ref[tpe & me.jiuyang.zaozi.valuetpe.Data]]
@@ -143,7 +142,6 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
             given org.llvm.mlir.scalalib.capi.ir.Block   = $block
             given sourcecode.File                        = $file
             given sourcecode.Line                        = $line
-            given sourcecode.Name.Machine                = $valName
             $ref
               .subRefOption($fieldName)
               .asInstanceOf[Option[me.jiuyang.zaozi.reftpe.Ref[tpe & me.jiuyang.zaozi.valuetpe.Data]]]

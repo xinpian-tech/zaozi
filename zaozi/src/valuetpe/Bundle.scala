@@ -32,8 +32,7 @@ trait Bundle extends Aggregate with Connectable with DynamicSubfield:
     Block,
     Context,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   )(
     using TypeImpl
   ): Ref[E] = this.getRefViaFieldValNameImpl(
@@ -49,8 +48,7 @@ trait Bundle extends Aggregate with Connectable with DynamicSubfield:
     Block,
     Context,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   )(
     using TypeImpl
   ): Option[Ref[E]] = this.getOptionRefViaFieldValNameImpl(

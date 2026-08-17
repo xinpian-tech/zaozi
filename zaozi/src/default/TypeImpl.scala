@@ -288,8 +288,7 @@ given TypeImpl with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[E] = getOptionRefViaFieldValNameImpl(refer, fieldValName).getOrElse:
@@ -302,8 +301,7 @@ given TypeImpl with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Option[Ref[E]] =
@@ -331,8 +329,7 @@ given TypeImpl with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[E] = getOptionRefViaFieldValNameImpl(refer, fieldValName).getOrElse:
@@ -345,8 +342,7 @@ given TypeImpl with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Option[Ref[E]] =
@@ -374,8 +370,7 @@ given TypeImpl with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[Data] =
@@ -404,8 +399,7 @@ given TypeImpl with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[Data] =

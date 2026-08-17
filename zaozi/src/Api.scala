@@ -595,7 +595,7 @@ trait DontCare[D <: Data, SINK <: Writable[D]]:
 final class ConnectException(message: String) extends Exception(message)
 
 trait Connect[A <: Connectable]:
-  extension [SINK <: Writable[A]](sink:  SINK)
+  extension [SINK <: Referable[A] & Writable[A]](sink: SINK)
     def :=[SRC <: Referable[A]](
       src: SRC
     )(
@@ -606,6 +606,7 @@ trait Connect[A <: Connectable]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
+  extension [SINK <: Writable[A]](sink:                SINK)
     def :<>=[SRC <: Writable[A]](
       src: SRC
     )(
@@ -616,7 +617,7 @@ trait Connect[A <: Connectable]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
-    def :<=[SRC <: Referable[A]](
+    def :<=[SRC <: Readable[A]](
       src: SRC
     )(
       using Arena,
@@ -626,7 +627,7 @@ trait Connect[A <: Connectable]:
       sourcecode.File,
       sourcecode.Line
     ): Unit
-  extension [SINK <: Referable[A]](sink: SINK)
+  extension [SINK <: Readable[A]](sink:                SINK)
     def :>=[SRC <: Writable[A]](
       src: SRC
     )(
@@ -2316,8 +2317,7 @@ trait TypeImpl:
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[E]
@@ -2329,8 +2329,7 @@ trait TypeImpl:
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Option[Ref[E]]
@@ -2343,8 +2342,7 @@ trait TypeImpl:
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[E]
@@ -2356,8 +2354,7 @@ trait TypeImpl:
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Option[Ref[E]]
@@ -2371,8 +2368,7 @@ trait TypeImpl:
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[Data]
@@ -2386,8 +2382,7 @@ trait TypeImpl:
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     )(
       using TypeImpl
     ): Ref[Data]

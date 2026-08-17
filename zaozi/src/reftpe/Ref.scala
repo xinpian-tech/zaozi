@@ -8,7 +8,7 @@ import org.llvm.mlir.scalalib.capi.ir.Value
 
 import java.lang.foreign.Arena
 
-abstract class Ref[T <: Data] extends Writable[T]:
+abstract class Ref[T <: Data] extends Referable[T], Writable[T]:
   private[zaozi] val _tpe:   T
   private[zaozi] val _refer: Value
 

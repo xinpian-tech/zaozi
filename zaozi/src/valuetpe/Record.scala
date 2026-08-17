@@ -33,8 +33,7 @@ trait Record extends Aggregate with Connectable with UntypedDynamicSubfield:
     Block,
     Context,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   )(
     using TypeImpl
   ): Ref[Data] = this.getUntypedRefViaFieldValNameImpl(
