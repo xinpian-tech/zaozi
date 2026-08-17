@@ -36,29 +36,25 @@ final class UTGenerator[
 
   def solve(): SolvedStimulus[I] = ConstraintSolver.solve(dut, parameter, cycles, seed, solverBackend)
 
-  /** The DPI contract for this DUT, derived from its IO (drive side) and Probe (probe side).
-    * This is the typed transaction interface, serializable to JSON.
+  /** The DPI contract as a dependent type on this DUT's `(I, P)`: `dpi.drive.<port>` and
+    * `dpi.probe.<point>` are checked at compile time against the DUT's IO and Probe, and
+    * `dpi.spec` is the serializable specification derived from those interfaces.
     */
-  def dpi: DPI =
+  def dpi: DPI[I, P] =
     val arena = Arena.ofConfined()
     try
       given Arena   = arena
       given Context = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
-      DPI.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter))
+      new DPI[I, P](DPISpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
     finally arena.close()
 
-  /** The DPI contract as a dependent type on this DUT's `(I, P)`: `typedDpi.drive.<port>` and
-    * `typedDpi.probe.<point>` are checked at compile time against the DUT's IO and Probe.
-    */
-  def typedDpi: TypedDPI[I, P] = new TypedDPI[I, P](dpi)
-
-  /** Solve once and also write the DPI contract next to the stimulus. */
-  def freezeDpi(path: os.Path = outputDirectory / "dpi.json"): DPI =
-    val contract = dpi
+  /** Materialize the DPI spec and write it as JSON next to the stimulus. */
+  def freezeDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
+    val spec = dpi.spec
     os.makeDir.all(path / os.up)
-    os.write.over(path, contract.toJson)
-    contract
+    os.write.over(path, spec.toJson)
+    spec
 
   def freeze(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
     val stimulus = solve()

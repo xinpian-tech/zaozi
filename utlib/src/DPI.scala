@@ -41,15 +41,15 @@ object DPIPort:
   import DPIRole.given
   given upickle.default.ReadWriter[DPIPort] = upickle.default.macroRW
 
-/** The DPI contract for one DUT: the typed transaction interface the testbench drives and
-  * observes, serialized as the single source shared by the sim-dialect frontend, the JSON
-  * interchange, and (later) an external Rust/Python DPI frontend.
+/** The DPI contract specification for one DUT: the typed transaction interface the testbench
+  * drives and observes, serialized as the single source shared by the sim-dialect frontend,
+  * the JSON interchange, and (later) an external Rust/Python DPI frontend.
   *
   * It is derived from the DUT's own types — its IO (the [[DPIRole.Drive]] side) and its Probe
-  * (the [[DPIRole.Probe]] side) — so the contract is a function of `(I, P)`, not written by
-  * hand.
+  * (the [[DPIRole.Probe]] side) — so the spec is a function of `(I, P)`, not written by hand.
+  * [[DPI]] is the type-level view on top of it.
   */
-final case class DPI(
+final case class DPISpec(
   dut:   String,
   ports: Seq[DPIPort]):
 
@@ -60,13 +60,13 @@ final case class DPI(
 
   def toJson: String = upickle.default.write(this, indent = 2)
 
-object DPI:
+object DPISpec:
   import DPIPort.given
-  given upickle.default.ReadWriter[DPI] = upickle.default.macroRW
+  given upickle.default.ReadWriter[DPISpec] = upickle.default.macroRW
 
-  def fromJson(text: String): DPI = upickle.default.read[DPI](text)
+  def fromJson(text: String): DPISpec = upickle.default.read[DPISpec](text)
 
-  /** Derive the contract from a DUT's IO and Probe interfaces.
+  /** Derive the spec from a DUT's IO and Probe interfaces.
     *
     * Drive/clock/reset come from the IO's flipped (input) fields; the probe points come from
     * the Probe. Aligned IO outputs are intentionally not part of the contract — a DUT that
@@ -81,7 +81,7 @@ object DPI:
     using Arena,
     Context,
     TypeImpl
-  ): DPI =
+  ): DPISpec =
     io.toMlirType
     probe.toMlirType
     val driven = io.elements.collect {
@@ -96,7 +96,7 @@ object DPI:
         case other         => other
       DPIPort(field.name, DPIRole.Probe, base.width, isSigned(base))
     }
-    DPI(dut, (driven ++ probed).toSeq)
+    DPISpec(dut, (driven ++ probed).toSeq)
 
   private def roleOfInput(data: Data): DPIRole = data match
     case _: Clock => DPIRole.Clock
@@ -107,32 +107,32 @@ object DPI:
     case _: SInt => true
     case _       => false
 
-/** Drive ports of a [[TypedDPI]], addressed by name and checked at compile time against the
-  * DUT's IO type `I`: `contract.drive.A` resolves only if `A` is a field of the DUT's IO.
+/** Drive ports of a [[DPI]], addressed by name and checked at compile time against the DUT's
+  * IO type `I`: `dpi.drive.A` resolves only if `A` is a field of the DUT's IO.
   */
-final class DriveAccess[I <: HWInterface[?]] private[utlib] (value: DPI) extends Dynamic:
+final class DriveAccess[I <: HWInterface[?]] private[utlib] (spec: DPISpec) extends Dynamic:
   def field(name: String): DPIPort =
-    value.ports.find(p => p.name == name && p.role != DPIRole.Probe).getOrElse(
-      throw new NoSuchElementException(s"${value.dut}: no drive port '$name'")
+    spec.ports.find(p => p.name == name && p.role != DPIRole.Probe).getOrElse(
+      throw new NoSuchElementException(s"${spec.dut}: no drive port '$name'")
     )
   transparent inline def selectDynamic(name: String): DPIPort = ${ dpiDriveSelectDynamic[I]('this, 'name) }
 
-/** Probe ports of a [[TypedDPI]], addressed by name and checked at compile time against the
-  * DUT's Probe type `P`.
+/** Probe ports of a [[DPI]], addressed by name and checked at compile time against the DUT's
+  * Probe type `P`.
   */
-final class ProbeAccess[P <: DVInterface[?, ?]] private[utlib] (value: DPI) extends Dynamic:
+final class ProbeAccess[P <: DVInterface[?, ?]] private[utlib] (spec: DPISpec) extends Dynamic:
   def field(name: String): DPIPort =
-    value.probe.find(_.name == name).getOrElse(
-      throw new NoSuchElementException(s"${value.dut}: no probe port '$name'")
+    spec.probe.find(_.name == name).getOrElse(
+      throw new NoSuchElementException(s"${spec.dut}: no probe port '$name'")
     )
   transparent inline def selectDynamic(name: String): DPIPort = ${ dpiProbeSelectDynamic[P]('this, 'name) }
 
 /** The DPI contract as a dependent type on the DUT's interfaces `(I, P)`.
   *
-  * The underlying [[value]] is the serializable contract; `drive`/`probe` give typed,
+  * The underlying [[spec]] is the serializable contract; `drive`/`probe` give typed,
   * compile-time-checked access so that referring to a port the DUT does not have is a
   * compile error rather than a runtime lookup miss.
   */
-final class TypedDPI[I <: HWInterface[?], P <: DVInterface[?, ?]] private[utlib] (val value: DPI):
-  val drive: DriveAccess[I] = new DriveAccess[I](value)
-  val probe: ProbeAccess[P] = new ProbeAccess[P](value)
+final class DPI[I <: HWInterface[?], P <: DVInterface[?, ?]] private[utlib] (val spec: DPISpec):
+  val drive: DriveAccess[I] = new DriveAccess[I](spec)
+  val probe: ProbeAccess[P] = new ProbeAccess[P](spec)

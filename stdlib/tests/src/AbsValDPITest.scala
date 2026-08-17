@@ -16,8 +16,8 @@ object AbsValDPITest extends TestSuite:
 
   val tests: Tests = Tests:
     test("typed drive and probe ports resolve against the DUT interfaces"):
-      val contract = generator.typedDpi
-      assert(contract.value.dut == "AbsVal_width8")
+      val contract = generator.dpi
+      assert(contract.spec.dut == "AbsVal_width8")
 
       // `A` is the DUT's input — a Drive port, checked against AbsValIO at compile time.
       assert(contract.drive.A.role == DPIRole.Drive)
