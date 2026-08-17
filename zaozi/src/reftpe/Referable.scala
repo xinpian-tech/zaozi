@@ -66,6 +66,23 @@ trait Referable[T <: Data] extends Dynamic:
   ): Option[Ref[Data]] =
     _tpe.asInstanceOf[DynamicSubfield].getOptionRefViaFieldValName[Data](refer, name)
 
+  /** Select a subfield by a *runtime* name, typed as `T`. Unlike `selectDynamic`, which needs
+    * the name at compile time, this takes a `String` value — for generic code iterating over a
+    * bundle's fields (e.g. a contract's ports).
+    */
+  def subfield[T <: Data](
+    name: String
+  )(
+    using Arena,
+    Block,
+    Context,
+    TypeImpl,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): Ref[T] =
+    subRef(name).asInstanceOf[Ref[T]]
+
   transparent inline def selectDynamic(name: String):                                  Any = ${ referableSelectDynamic('this, 'name) }
   transparent inline def applyDynamic(name: String)(inline args: Any*):                Any = ${
     referableApplyDynamic('this, 'name, 'args)
