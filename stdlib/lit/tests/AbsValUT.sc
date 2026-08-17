@@ -10,6 +10,8 @@
 // width 8
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 // RUN: %{ut} %t.dir --width 8
+// The DPI contract is derived from the DUT's IO (Drive) and Probe (Probe), not hand-written.
+// RUN: FileCheck %s -check-prefix=DPI8 --input-file=%t.dir/AbsValDPI.json
 // RUN: cd %t.dir && verilator --binary --timing --assert --top-module ut_top -Wno-fatal generated.sv ut_top.sv -o simtb
 // The sim-dialect print lowers to $fwrite on stderr, so fold it into stdout for FileCheck.
 // RUN: %t.dir/obj_dir/simtb 2>&1 | FileCheck %s -check-prefix=RUN8
@@ -17,3 +19,9 @@
 
 // RUN8: HARNESS-DONE
 // RUN8-NOT: HARNESS-TIMEOUT
+
+// DPI8:      "dut": "AbsVal_width8"
+// DPI8:      "name": "A"
+// DPI8-NEXT: "role": "Drive"
+// DPI8:      "name": "absval"
+// DPI8-NEXT: "role": "Probe"

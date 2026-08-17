@@ -21,5 +21,7 @@ object AbsValUT:
 
     val parameter = AbsValParameter(width)
     val generator = UTGenerator(AbsVal, parameter, cycles = 3, outputDirectory = outDir)
+    val contract  = generator.freezeDpi(outDir / "AbsValDPI.json")
     generator.simulationRequest(generator.solve(), outDir)
-    println(s"UT testbench emitted for ${AbsVal.moduleName(parameter)} in $outDir")
+    println(s"UT testbench and DPI contract emitted for ${AbsVal.moduleName(parameter)} in $outDir")
+    println(contract.toJson)
