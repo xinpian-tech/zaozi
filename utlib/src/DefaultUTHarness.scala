@@ -21,7 +21,15 @@ private[utlib] final case class DefaultUTHarnessParameter(
 private[utlib] class DefaultUTHarnessLayers(parameter: DefaultUTHarnessParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
 
-private[utlib] class DefaultUTHarnessIO(parameter: DefaultUTHarnessParameter) extends HWBundle(parameter)
+private[utlib] class DefaultUTHarnessIO(parameter: DefaultUTHarnessParameter) extends HWBundle(parameter):
+  /** Driven by the minimal generated driver top; the harness generates everything else. */
+  val clock = Flipped(Clock())
+  val reset = Flipped(Reset())
+
+  /** Rises for one cycle once the solved stimulus has been fully played; the harness ends the
+    * simulation on it, and the driver top can observe it.
+    */
+  val done = Aligned(Bool())
 
 private[utlib] class DefaultUTHarnessProbe(parameter: DefaultUTHarnessParameter)
     extends DVBundle[DefaultUTHarnessParameter, DefaultUTHarnessLayers](parameter)
@@ -57,13 +65,8 @@ private[utlib] final class DefaultUTHarnessGenerator[
     throw new UnsupportedOperationException("the internal UT harness is elaborated through UTGenerator")
 
   def architecture(parameter: DefaultUTHarnessParameter) =
-    val controllerParameter = SimulationControllerParameter(
-      parameter.timeoutCycles,
-      parameter.trace,
-      parameter.traceFile
-    )
-    val controller          = SimulationController.instantiate(controllerParameter)
-    val instance            = dut.instantiate(dutParameter)
+    val io       = summon[Interface[DefaultUTHarnessIO]]
+    val instance = dut.instantiate(dutParameter)
 
     val dutInterface = dut.interface(dutParameter)
     dutInterface.toMlirType
@@ -73,16 +76,36 @@ private[utlib] final class DefaultUTHarnessGenerator[
     require(clocks.size <= 1, s"${parameter.stimulus.dut}: the default UT harness supports at most one clock input")
     require(resets.size <= 1, s"${parameter.stimulus.dut}: the default UT harness supports at most one reset input")
 
-    clocks.foreach(field => instance.io.field[Clock](field.name) := controller.io.clock)
-    resets.foreach(field => instance.io.field[Reset](field.name) := controller.io.reset)
+    clocks.foreach(field => instance.io.field[Clock](field.name) := io.clock)
+    resets.foreach(field => instance.io.field[Reset](field.name) := io.reset)
 
-    given ClockScope = ClockScope.posedge(controller.io.clock)
-    given ResetScope = ResetScope.syncActiveHigh(controller.io.reset)
+    given ClockScope = ClockScope.posedge(io.clock)
+    given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    val stages = (0 to parameter.stimulus.cycles).map(index => RegInit((index == 0).B))
-    (parameter.stimulus.cycles to 1 by -1).foreach(index => stages(index) := stages(index - 1))
+    // A one-hot pulse travels stage 0 -> cycles; `done` is the pulse leaving the last stage.
+    // Extended by one span to `timeoutCycles` so a stuck DUT still terminates the run.
+    val lastStage = parameter.timeoutCycles
+    val stages    = (0 to lastStage).map(index => RegInit((index == 0).B))
+    (lastStage to 1 by -1).foreach(index => stages(index) := stages(index - 1))
     stages(0) := false.B
-    controller.io.done := stages(parameter.stimulus.cycles)
+
+    val done    = stages(parameter.stimulus.cycles)
+    val timeout = stages(lastStage)
+    io.done := done
+
+    // The harness ends its own simulation via FIRRTL printf/stop, which firtool lowers to the
+    // sim dialect and then to `always @(posedge clock)` / $fwrite / $finish — a generated SV
+    // testbench, no hand-written controller.
+    val notReset = Wire(Bool())
+    notReset := !(io.reset.asBool)
+    val doneNow = Wire(Bool())
+    doneNow := done & notReset
+    val timeoutNow = Wire(Bool())
+    timeoutNow := timeout & notReset
+    printf(io.clock, doneNow, "HARNESS-DONE\n")
+    stop(io.clock, doneNow, 0)
+    printf(io.clock, timeoutNow, "HARNESS-TIMEOUT\n")
+    stop(io.clock, timeoutNow, 1)
 
     val numericInputs =
       inputFields.filterNot(field => field.dataType.isInstanceOf[Clock] || field.dataType.isInstanceOf[Reset])

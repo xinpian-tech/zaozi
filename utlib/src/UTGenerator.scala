@@ -91,16 +91,12 @@ final class UTGenerator[
     ).call()
 
     val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
-    val controller = emitted.splitFiles.getOrElse(
-      SimulationController.verilogSourceName,
-      throw IllegalStateException(
-        s"CIRCT did not emit ${SimulationController.verilogSourceName} from the inline Verilog source"
-      )
-    )
+    val driverPath = outDir / s"${Driver.topModuleName}.sv"
+    os.write.over(driverPath, Driver.topString(topModule, trace, traceFile))
     SimulationRequest(
-      sources = Seq(emitted.primary, controller),
+      sources = Seq(emitted.primary, driverPath),
       workDir = outDir,
-      topModule = topModule,
+      topModule = Driver.topModuleName,
       trace = trace,
       traceFile = traceFile,
       coverageFile = "coverage.dat"
