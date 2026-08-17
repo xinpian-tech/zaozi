@@ -58,6 +58,24 @@ trait RefReleaseApi        extends HasOperation[RefRelease]:
 end RefReleaseApi
 class Skip(val _operation: Operation)
 class Stop(val _operation: Operation)
+trait StopApi extends HasOperation[Stop]:
+  /** `firrtl.stop` — end the simulation on the rising edge of `clock` when `cond` is high: `$finish` when `exitCode`
+    * is zero, `$fatal` otherwise.
+    *
+    * firtool lowers this to the `sim` dialect (`sim.terminate`), so it is the way to end a simulation from a design
+    * written in the Zaozi DSL — the counterpart to [[Printf]] for control rather than output.
+    */
+  def op(
+    clock:    Value,
+    cond:     Value,
+    exitCode: Int,
+    name:     String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Stop
+end StopApi
 class VerifAssert(val _operation: Operation)
 trait VerifAssertApi       extends HasOperation[VerifAssert]:
   def op(

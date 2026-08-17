@@ -856,6 +856,32 @@ given PrintfApi with
   extension (ref: Printf) def operation: Operation = ref._operation
 end given
 
+given StopApi with
+  def op(
+    clock:    Value,
+    cond:     Value,
+    exitCode: Int,
+    name:     String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Stop =
+    Stop(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.stop",
+        location = location,
+        namedAttributes = Seq(
+          summon[NamedAttributeApi]
+            .namedAttributeGet("exitCode".identifierGet, exitCode.toLong.integerAttrGet(32.integerTypeGet)),
+          summon[NamedAttributeApi].namedAttributeGet("name".identifierGet, name.stringAttrGet)
+        ),
+        operands = Seq(clock, cond)
+      )
+    )
+  extension (ref: Stop) def operation: Operation = ref._operation
+end given
+
 given VerifCoverApi with
   def op(
     property: Value,
