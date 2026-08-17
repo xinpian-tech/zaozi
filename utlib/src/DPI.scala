@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.utlib
 
+import scala.language.dynamics
+
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.valuetpe.*
+import me.jiuyang.utlib.magic.{dpiDriveSelectDynamic, dpiProbeSelectDynamic}
 
 import org.llvm.mlir.scalalib.capi.ir.Context
 
@@ -103,3 +106,33 @@ object DPI:
   private def isSigned(data: Data): Boolean = data match
     case _: SInt => true
     case _       => false
+
+/** Drive ports of a [[TypedDPI]], addressed by name and checked at compile time against the
+  * DUT's IO type `I`: `contract.drive.A` resolves only if `A` is a field of the DUT's IO.
+  */
+final class DriveAccess[I <: HWInterface[?]] private[utlib] (value: DPI) extends Dynamic:
+  def field(name: String): DPIPort =
+    value.ports.find(p => p.name == name && p.role != DPIRole.Probe).getOrElse(
+      throw new NoSuchElementException(s"${value.dut}: no drive port '$name'")
+    )
+  transparent inline def selectDynamic(name: String): DPIPort = ${ dpiDriveSelectDynamic[I]('this, 'name) }
+
+/** Probe ports of a [[TypedDPI]], addressed by name and checked at compile time against the
+  * DUT's Probe type `P`.
+  */
+final class ProbeAccess[P <: DVInterface[?, ?]] private[utlib] (value: DPI) extends Dynamic:
+  def field(name: String): DPIPort =
+    value.probe.find(_.name == name).getOrElse(
+      throw new NoSuchElementException(s"${value.dut}: no probe port '$name'")
+    )
+  transparent inline def selectDynamic(name: String): DPIPort = ${ dpiProbeSelectDynamic[P]('this, 'name) }
+
+/** The DPI contract as a dependent type on the DUT's interfaces `(I, P)`.
+  *
+  * The underlying [[value]] is the serializable contract; `drive`/`probe` give typed,
+  * compile-time-checked access so that referring to a port the DUT does not have is a
+  * compile error rather than a runtime lookup miss.
+  */
+final class TypedDPI[I <: HWInterface[?], P <: DVInterface[?, ?]] private[utlib] (val value: DPI):
+  val drive: DriveAccess[I] = new DriveAccess[I](value)
+  val probe: ProbeAccess[P] = new ProbeAccess[P](value)
