@@ -8,7 +8,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Operation, Value, given}
 
 import java.lang.foreign.Arena
 
-abstract class Wire[T <: Data] extends Writable[T]:
+abstract class Wire[T <: Data] extends Referable[T], Writable[T]:
   private[zaozi] val _tpe:   T
   private[zaozi] val _refer: Value
 

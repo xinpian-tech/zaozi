@@ -3,7 +3,7 @@
 package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.reftpe.{Referable, Writable}
+import me.jiuyang.zaozi.reftpe.{Interface, Readable, Referable, Writable}
 import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{UtilityApi, given}
@@ -98,7 +98,7 @@ private[zaozi] def subindexValue(
   op.operation.getResult(0)
 
 given [A <: Connectable]: Connect[A] with
-  extension [SINK <: Writable[A]](sink:  SINK)
+  extension [SINK <: Referable[A] & Writable[A]](sink: SINK)
     def :=[SRC <: Referable[A]](
       src: SRC
     )(
@@ -113,6 +113,7 @@ given [A <: Connectable]: Connect[A] with
         case _: Analog => throw ConnectException(analogNotConnectable)
         case _ => ()
       rawConnect(sink.refer, src.refer)
+  extension [SINK <: Writable[A]](sink:                SINK)
     def :<>=[SRC <: Writable[A]](
       src: SRC
     )(
@@ -123,7 +124,7 @@ given [A <: Connectable]: Connect[A] with
       sourcecode.File,
       sourcecode.Line
     ): Unit = connect(sink, src, ConnDir.Bi)
-    def :<=[SRC <: Referable[A]](
+    def :<=[SRC <: Readable[A]](
       src: SRC
     )(
       using Arena,
@@ -133,7 +134,7 @@ given [A <: Connectable]: Connect[A] with
       sourcecode.File,
       sourcecode.Line
     ): Unit = connect(sink, src, ConnDir.Aligned)
-  extension [SINK <: Referable[A]](sink: SINK)
+  extension [SINK <: Readable[A]](sink:                SINK)
     def :>=[SRC <: Writable[A]](
       src: SRC
     )(
@@ -149,6 +150,21 @@ given [A <: Connectable]: Connect[A] with
   * within such a subtree all leaves share one accumulated flip.
   */
 private[zaozi] def connect(
+  sink: Readable[?],
+  src:  Readable[?],
+  dir:  ConnDir
+)(
+  using Arena,
+  Context,
+  Block,
+  TypeImpl,
+  sourcecode.File,
+  sourcecode.Line
+): Unit = (sink, src) match
+  case (sink: Referable[?], src: Referable[?]) => connectReferable(sink, src, dir)
+  case _                                       => bulkConnect(sink, src, dir)
+
+private def connectReferable(
   sink: Referable[?],
   src:  Referable[?],
   dir:  ConnDir

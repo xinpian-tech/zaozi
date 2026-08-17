@@ -25,8 +25,7 @@ trait DynamicSubfield:
     Block,
     Context,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   )(
     using TypeImpl
   ): Ref[E]
@@ -39,8 +38,7 @@ trait DynamicSubfield:
     Block,
     Context,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   )(
     using TypeImpl
   ): Option[Ref[E]]
@@ -54,8 +52,7 @@ trait UntypedDynamicSubfield:
     Block,
     Context,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   )(
     using TypeImpl
   ): Ref[Data]

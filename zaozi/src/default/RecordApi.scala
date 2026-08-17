@@ -42,8 +42,7 @@ given [T <: Record | ProbeRecord]: RecordApi[T] with
       Block,
       Context,
       sourcecode.File,
-      sourcecode.Line,
-      sourcecode.Name.Machine
+      sourcecode.Line
     ): Ref[T] = ref._tpe.getUntypedRefViaFieldValName(ref.refer, fieldName).asInstanceOf[Ref[T]]
 
 end given

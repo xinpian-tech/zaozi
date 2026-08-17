@@ -17,7 +17,11 @@ type Propagated[R <: Referable[?], RET <: Data] = R match
   case Const[?] => Const[RET]
   case _        => Node[RET]
 
-trait Referable[T <: Data] extends Dynamic:
+trait Readable[T <: Data]
+
+trait Writable[T <: Data] extends Readable[T]
+
+trait Referable[T <: Data] extends Readable[T], Dynamic:
   private[zaozi] val _tpe:   T
   private[zaozi] val _refer: Value
 
@@ -48,8 +52,7 @@ trait Referable[T <: Data] extends Dynamic:
     Context,
     TypeImpl,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   ): Ref[Data] =
     _tpe.asInstanceOf[DynamicSubfield].getRefViaFieldValName[Data](refer, name)
 
@@ -61,8 +64,7 @@ trait Referable[T <: Data] extends Dynamic:
     Context,
     TypeImpl,
     sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Line
   ): Option[Ref[Data]] =
     _tpe.asInstanceOf[DynamicSubfield].getOptionRefViaFieldValName[Data](refer, name)
 
@@ -73,5 +75,3 @@ trait Referable[T <: Data] extends Dynamic:
   transparent inline def applyDynamicNamed(name: String)(inline args: (String, Any)*): Any = ${
     referableApplyDynamicNamed('this, 'name, 'args)
   }
-
-trait Writable[T <: Data] extends Referable[T]

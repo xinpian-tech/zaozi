@@ -3,24 +3,13 @@
 package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.reftpe.{Interface, Writable}
+import me.jiuyang.zaozi.reftpe.{Interface, Referable, Writable}
 import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{UtilityApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
 import java.lang.foreign.Arena
-
-private[zaozi] def interfaceDontCare(
-  sink: Interface[?]
-)(
-  using Arena,
-  Context,
-  Block,
-  sourcecode.File,
-  sourcecode.Line
-): Unit =
-  sink._ports.foreach(port => summon[UtilityApi].emitInvalidate(summon[Block], locate, port))
 
 given [D <: Data, SINK <: Writable[D]]: DontCare[D, SINK] with
   extension (ref: SINK)
@@ -31,5 +20,10 @@ given [D <: Data, SINK <: Writable[D]]: DontCare[D, SINK] with
       Block,
       sourcecode.File,
       sourcecode.Line
-    ): Unit =
-      summon[UtilityApi].emitInvalidate(summon[Block], locate, ref.refer)
+    ): Unit = ref match
+      case iface: Interface[?] =>
+        iface._ports.foreach(port => summon[UtilityApi].emitInvalidate(summon[Block], locate, port))
+      case r:     Referable[?] =>
+        summon[UtilityApi].emitInvalidate(summon[Block], locate, r.refer)
+      case other               =>
+        throw ConnectException(s"unsupported dontCare sink representation: ${other.getClass.getName}")
