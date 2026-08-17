@@ -48,6 +48,11 @@ final class UTGenerator[
       DPI.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter))
     finally arena.close()
 
+  /** The DPI contract as a dependent type on this DUT's `(I, P)`: `typedDpi.drive.<port>` and
+    * `typedDpi.probe.<point>` are checked at compile time against the DUT's IO and Probe.
+    */
+  def typedDpi: TypedDPI[I, P] = new TypedDPI[I, P](dpi)
+
   /** Solve once and also write the DPI contract next to the stimulus. */
   def freezeDpi(path: os.Path = outputDirectory / "dpi.json"): DPI =
     val contract = dpi
