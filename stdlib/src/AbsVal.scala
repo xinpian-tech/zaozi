@@ -23,12 +23,12 @@ class AbsValIO(parameter: AbsValParameter) extends HWBundle(parameter):
   val A      = Flipped(Bits(parameter.width))
   val ABSVAL = Aligned(Bits(parameter.width))
 
-/** The DV observation surface: the input and the result, exposed for the UT contract. A
-  * combinational DUT has no white-box state, so the probe simply mirrors its IO.
+/** The DV observation surface: the input and the result, exposed for the UT contract. A combinational DUT has no
+  * white-box state, so the probe simply mirrors its IO.
   */
 class AbsValProbe(parameter: AbsValParameter) extends DVBundle[AbsValParameter, AbsValLayers](parameter):
-  val a      = ProbeRead(Bits(parameter.width), layers("Verification"))
-  val absval = ProbeRead(Bits(parameter.width), layers("Verification"))
+  val A      = ProbeRead(Bits(parameter.width), layers("Verification"))
+  val ABSVAL = ProbeRead(Bits(parameter.width), layers("Verification"))
 
 /** Two's-complement absolute value, `ABSVAL = |A|`.
   *
@@ -59,7 +59,7 @@ object AbsVal extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValP
       val expected    = sign ? (negExpected, io.A)
       Assert((absVal === expected).I, "absval_matches_abs")
 
-      val aP = Wire(Bits(parameter.width)); aP := io.A; probe.a <== aP
-      val absvalP = Wire(Bits(parameter.width)); absvalP := absVal; probe.absval <== absvalP
+      val aP      = Wire(Bits(parameter.width)); aP      := io.A; probe.A <== aP
+      val absvalP = Wire(Bits(parameter.width)); absvalP := absVal; probe.ABSVAL <== absvalP
 
     io.ABSVAL := checkedAbsVal

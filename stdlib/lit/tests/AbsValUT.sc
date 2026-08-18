@@ -29,7 +29,7 @@
 // DPI8:      "dut": "AbsValUT_width8"
 // DPI8:      "name": "A"
 // DPI8-NEXT: "role": "Drive"
-// DPI8:      "name": "absval"
+// DPI8:      "name": "ABSVAL"
 // DPI8-NEXT: "role": "Probe"
 
 // SHIM8: import "DPI-C"
