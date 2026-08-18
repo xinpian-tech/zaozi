@@ -29,7 +29,7 @@
   [事务身份需求], [transaction identity requirement], [协议用于区分节点、区分同一节点的并发事务、返回应答路由及索引内部资源的身份约束集合（@sec-three-params、@sec-three-param-kinds）。],
   [`ProtocolBundle`], [`ProtocolBundle`], [协议端口的顶层 Bundle 描述，其根及嵌套 Bundle 均含至少一个字段（@sec-protocol-interface）。],
   [验证接口], [`DVInterfaces`], [`sources` 与有序 `Down` 一一对应，`sink` 描述聚合接口，`sinkPaths` 给出每个源到 `sink` 中选定 Bundle 的映射（@sec-dv-protocol）。],
-  [用户参数、协议参数与完整参数], [user, protocol, and full parameter], [分别为构建期声明、协商期生成，以及二者合并后交给生成器的参数（@sec-explicit-phase、@sec-serialization-boundary、@sec-two-layer-params）。],
+  [用户参数、协议参数与完整参数], [user, protocol, and full parameter], [用户参数是每个模块构造时给定、先于节点存在的参数；协议参数由协商结果算出；完整参数是二者合并后交给生成器的参数（@sec-module-kinds、@sec-explicit-phase、@sec-serialization-boundary、@sec-two-layer-params）。],
   [结构模块], [`WrapperModule`], [包含子模块、设计 bind 与验证 bind；模块节点归属生成器模块，端口、连线和层声明由框架发射（@sec-module-kinds、@sec-wrapper-emission）。],
   [生成器], [generator], [以可序列化完整参数为输入并返回电路模块的 zaozi 工厂函数（@sec-module-kinds、@sec-generator-contract）。],
   [生成器标识], [`GeneratorId`], [由生成器限定名与版本组成，并在注册表中对应带 `FullParam` codec 的 `GeneratorEntry`（@sec-generator-records、@sec-generator-contract）。],
