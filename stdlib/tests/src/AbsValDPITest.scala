@@ -6,13 +6,13 @@ import me.jiuyang.utlib.*
 
 import utest.*
 
-/** The DPI contract as a dependent type on AbsVal's `(IO, Probe)`: drive/probe ports resolve
-  * by name and are checked at compile time against the DUT's own interface types.
+/** The DPI contract as a dependent type on AbsVal's `(IO, Probe)`: drive/probe ports resolve by name and are checked at
+  * compile time against the DUT's own interface types.
   */
 object AbsValDPITest extends TestSuite:
   private val outputRoot = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
   private val generator  =
-    UTGenerator(AbsValUT, AbsValParameter(8), cycles = 3, outputDirectory = outputRoot / "AbsValDPI")
+    UTGenerator(AbsValUT, AbsValParameter(8), outputDirectory = outputRoot / "AbsValDPI")
 
   val tests: Tests = Tests:
     test("typed drive and probe ports resolve against the DUT interfaces"):

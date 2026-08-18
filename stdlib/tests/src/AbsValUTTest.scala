@@ -6,30 +6,17 @@ import me.jiuyang.utlib.*
 
 import utest.*
 
-/** The three artifacts the UT flow produces for [[AbsValUT]] — the solved stimulus, the DPI contract, and the flat
-  * lib-model SystemVerilog. No simulator is run: the framework stops at these stored artifacts, and driving them is an
-  * external concern.
+/** The two artifacts the UT flow produces for [[AbsValUT]] — the DPI contract and the flat lib-model SystemVerilog,
+  * both derived from `(IO, Probe)`. No simulator is run and no stimulus is solved: the framework stops at these stored
+  * artifacts, and both generating stimulus and driving them are external concerns.
   */
 object AbsValUTTest extends TestSuite:
   private val outputRoot = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
 
   private def generator(dir: String): UTGenerator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe] =
-    UTGenerator(AbsValUT, AbsValParameter(8), cycles = 3, outputDirectory = outputRoot / dir)
+    UTGenerator(AbsValUT, AbsValParameter(8), outputDirectory = outputRoot / dir)
 
   val tests: Tests = Tests:
-    test("saveStimulus solves the constraints into per-cycle JSON"):
-      val gen  = generator("AbsValUT-stimulus")
-      val path = gen.outputDirectory / "stimulus.json"
-      gen.saveStimulus(path)
-      val data = upickle.default.read[ujson.Value](os.read(path))
-      assert(data("dut").str == "AbsValUT_width8")
-      assert(data("cycles").num.toInt == 3)
-      // The constraints are A[0] > 0, A[1] == 0, A[2] < 0. Values serialize as decimal strings.
-      val a    = data("inputs")("A").arr.map(_.str.toInt)
-      assert(a(0) > 0)
-      assert(a(1) == 0)
-      assert(a(2) < 0)
-
     test("saveDpi writes the contract derived from (IO, Probe)"):
       val gen  = generator("AbsValUT-dpi")
       val path = gen.outputDirectory / "AbsValDPI.json"

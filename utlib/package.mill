@@ -7,12 +7,12 @@ import mill.scalalib.TestModule.Utest
 import mill.scalalib._
 import mill.scalalib.scalafmt._
 
-import build.{circtlib, smtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
+import build.{circtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
 
 object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode)
-  def moduleDeps   = Seq(zaozi, smtlib, circtlib)
+  def moduleDeps   = Seq(zaozi, circtlib)
 
   // The Zaozi DSL used by the SV emission helpers relies on experimental
   // features (the same flag stdlib sets).
