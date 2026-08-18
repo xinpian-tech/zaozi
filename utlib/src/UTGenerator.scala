@@ -16,7 +16,19 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
 
 import java.lang.foreign.Arena
 
-/** Constraint solving and the default simulation harness for one Zaozi generator. */
+/** The emitted lib-model artifact: the flat SystemVerilog whose ports are the DPI contract (each drive port and
+  * clock/reset an input, each probe point a `probe_<name>` output), plus the layer bind / probe-ref split files. It is
+  * ready for an external tool to drive; `topModule` is the top.
+  */
+final case class LibModel(topModule: String, sources: Seq[os.Path])
+
+/** Turns one Zaozi generator's UT into stored artifacts, and stops there.
+  *
+  * The framework's job is to reduce a DUT-plus-constraints to data and IR — the solved per-cycle stimulus
+  * ([[saveStimulus]]), the DPI contract ([[saveDpi]]), and the flat lib-model SystemVerilog ([[emitLib]]). Driving a
+  * simulator with those artifacts is deliberately an external concern: nothing here runs a simulator or emits a
+  * testbench.
+  */
 final class UTGenerator[
   PARAM <: Parameter,
   L <: LayerInterface[PARAM],
@@ -28,11 +40,9 @@ final class UTGenerator[
   val cycles:          Int,
   val outputDirectory: os.Path,
   val seed:            Int,
-  val solverBackend:   Solver,
-  val timeoutCycles: Int):
+  val solverBackend: Solver):
 
   require(cycles > 0, "cycles must be positive")
-  require(timeoutCycles > cycles + 4, "timeoutCycles must leave room for reset and all stimulus cycles")
 
   def solve(): SolvedStimulus[I] = ConstraintSolver.solve(dut, parameter, cycles, seed, solverBackend)
 
@@ -49,13 +59,7 @@ final class UTGenerator[
       new DPI[I, P](DPISpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
     finally arena.close()
 
-  /** Materialize the DPI spec and write it as JSON next to the stimulus. */
-  def saveDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
-    val spec = dpi.spec
-    os.makeDir.all(path / os.up)
-    os.write.over(path, spec.toJson)
-    spec
-
+  /** Solve the constraints and store the per-cycle stimulus as JSON (`{dut, cycles, inputs}`). */
   def saveStimulus(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
     val stimulus = solve()
     os.makeDir.all(path / os.up)
@@ -65,56 +69,20 @@ final class UTGenerator[
   def loadStimulus(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
     SolvedStimulus(upickle.default.read[StimulusData](os.read(path)))
 
-  def run(
-    outDir:    os.Path = outputDirectory,
-    trace:     Boolean = false,
-    traceFile: String = "trace.vcd"
-  ): RunResult =
-    runStimulus(solve(), outDir, trace, traceFile)
+  /** Materialize the DPI spec and write it as JSON next to the stimulus. */
+  def saveDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
+    val spec = dpi.spec
+    os.makeDir.all(path / os.up)
+    os.write.over(path, spec.toJson)
+    spec
 
-  def runStimulus(
-    stimulus:  SolvedStimulus[I],
-    outDir:    os.Path = outputDirectory,
-    trace:     Boolean = false,
-    traceFile: String = "trace.vcd"
-  ): RunResult =
-    require(
-      stimulus.dut == dut.moduleName(parameter),
-      s"stimulus is for ${stimulus.dut}, not ${dut.moduleName(parameter)}"
-    )
-    require(stimulus.cycles == cycles, s"stimulus has ${stimulus.cycles} cycles, expected $cycles")
-    require(traceFile.nonEmpty, "traceFile must not be empty")
-
-    // Replaying the solved stimulus is just one frontend of the single lib model: build the
-    // lib harness, then drive it with a frontend fed the solver's per-cycle values.
-    val lib       = libSimulationRequest(outDir)
-    val spec      = dpi.spec
-    val replaySeq = (0 until stimulus.cycles).map(cycle =>
-      spec.drive.map(port => port.name -> stimulus.io.field(port.name).at(cycle)).toMap
-    )
-    val cpp       = Frontend.driver(
-      spec,
-      lib.topModule,
-      replaySeq,
-      label = "REPLAY",
-      trace = Option.when(trace)(traceFile),
-      coverageFile = Some(lib.coverageFile),
-      finishMarker = Some("HARNESS-DONE")
-    )
-    val cppPath   = outDir / "frontend_run.cpp"
-    os.write.over(cppPath, cpp)
-    Simulation.run(lib.copy(cppSources = Seq(cppPath), trace = trace, traceFile = traceFile))
-
-  /** Elaborate and lower the single lib harness: a flat SystemVerilog module whose ports *are* the DPI contract (drive
-    * ports and clock/reset as inputs, each probe point as a `probe_<name>` output). It has no internal loop — an
-    * external frontend (see [[Frontend]]) owns the loop, poking the drive ports and peeking the probe ports. Verilator
-    * builds this into the Verilated model; `topModule` is that model's top.
-    *
-    * The returned request's `sources` are ready to hand to `verilator --cc --exe <frontend.cpp>`. The split files
-    * (layer binds and probe-ref exposers) are included because reading the DUT's probe lowers to a hierarchical
-    * reference into the verification layer's bind.
+  /** Elaborate and lower the lib model: a flat SystemVerilog module whose ports *are* the DPI contract (drive ports and
+    * clock/reset as inputs, each probe point as a `probe_<name>` output). It has no internal loop — an external tool
+    * drives it, poking the drive ports and peeking the probe ports. The split files (layer binds and probe-ref
+    * exposers) are emitted alongside because reading the DUT's probe lowers to a hierarchical reference into the
+    * verification layer's bind. Returns the top module and every SystemVerilog source written under `outDir`.
     */
-  def libSimulationRequest(outDir: os.Path = outputDirectory): SimulationRequest =
+  def emitLib(outDir: os.Path = outputDirectory): LibModel =
     os.makeDir.all(outDir)
     val harnessParameter = LibHarnessParameter(dpi.spec)
     val harness          = new LibHarnessGenerator(dut, parameter)
@@ -131,15 +99,7 @@ final class UTGenerator[
     ).call()
 
     val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
-    SimulationRequest(
-      sources = Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq,
-      cppSources = Seq.empty,
-      workDir = outDir,
-      topModule = topModule,
-      trace = false,
-      traceFile = "trace.vcd",
-      coverageFile = "coverage.dat"
-    )
+    LibModel(topModule, Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq)
 
   private def elaborate[
     HP <: Parameter,
@@ -173,15 +133,6 @@ object UTGenerator:
     cycles:          Int,
     outputDirectory: os.Path,
     seed:            Int = 0,
-    solverBackend:   Solver = Z3,
-    timeoutCycles:   Option[Int] = None
+    solverBackend:   Solver = Z3
   ): UTGenerator[PARAM, L, I, P] =
-    new UTGenerator(
-      dut,
-      parameter,
-      cycles,
-      outputDirectory,
-      seed,
-      solverBackend,
-      timeoutCycles.getOrElse(cycles + 16)
-    )
+    new UTGenerator(dut, parameter, cycles, outputDirectory, seed, solverBackend)
