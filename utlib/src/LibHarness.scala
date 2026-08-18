@@ -16,7 +16,7 @@ private[utlib] final case class LibHarnessParameter(spec: DPISpec) extends Param
 private[utlib] class LibHarnessLayers(parameter: LibHarnessParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
 
-/** The harness ports *are* the DPI contract, flattened for poke/peek by an external frontend:
+/** The harness ports *are* the DPI contract, flattened for poke/peek by an external tool:
   *   - clock/reset (when the DUT has them) and every drive port become inputs the frontend pokes;
   *   - every probe point becomes an output port `probe_<name>` the frontend peeks.
   *
@@ -43,10 +43,10 @@ private[utlib] object LibHarness:
   /** How a probe point named `name` appears as a top-level output port. */
   def probePort(name: String): String = s"probe_$name"
 
-/** The single harness of the UT flow: it turns the DUT's `(drive, probe)` contract into a flat SystemVerilog module
-  * whose ports the external frontend pokes and peeks. It contains no loop, no clock oscillator and no done/timeout
-  * logic — the frontend owns the loop. Verilator builds this module into the "library" (the Verilated model); a
-  * frontend is just one caller of it, so replaying the solver's stimulus is only one frontend among many.
+/** Lowers the DUT's `(drive, probe)` contract into a flat SystemVerilog module whose ports *are* the contract: each
+  * drive port and clock/reset an input, each probe point a `probe_<name>` output. It has no loop, clock oscillator, or
+  * done/timeout logic — an external tool drives it, poking the inputs and peeking the probe outputs. This is the
+  * `emitLib` artifact; driving it (and running any simulator) is out of the framework's scope.
   */
 private[utlib] final class LibHarnessGenerator[
   PARAM <: Parameter,

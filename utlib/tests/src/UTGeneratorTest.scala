@@ -74,7 +74,7 @@ object UTGeneratorTest extends TestSuite:
     )
 
   val tests: Tests = Tests:
-    test("the default harness drives Bool, Bits, UInt, and SInt inputs"):
+    test("the solver produces per-cycle values for Bool, Bits, UInt, and SInt inputs"):
       val dut      = generator(MixedInputParameter(4))
       val stimulus = dut.solve()
       assert(dut.outputDirectory == outputRoot / MixedInput.moduleName(dut.parameter))
@@ -83,9 +83,14 @@ object UTGeneratorTest extends TestSuite:
       assert(stimulus.io.uint.values == Vector(9))
       assert(stimulus.io.sint.values == Vector(-1))
 
-      val result = dut.runStimulus(stimulus)
-      assert(result.exitCode == 0)
-      assert(result.log.contains("HARNESS-DONE"))
+    test("saveStimulus stores the solved stimulus as JSON"):
+      val dut  = generator(MixedInputParameter(4))
+      val path = dut.outputDirectory / "stimulus.json"
+      dut.saveStimulus(path)
+      val data = upickle.default.read[ujson.Value](os.read(path))
+      assert(data("dut").str == MixedInput.moduleName(dut.parameter))
+      assert(data("cycles").num.toInt == 1)
+      assert(data("inputs")("sint").arr.map(_.str.toInt) == collection.mutable.ArrayBuffer(-1))
 
     test("the SMT integer backend rejects unsupported port widths"):
       val dut     = generator(MixedInputParameter(31))
