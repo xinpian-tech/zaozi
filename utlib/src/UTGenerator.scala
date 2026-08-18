@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.utlib
 
-import me.jiuyang.smtlib.{Solver, Z3}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 
@@ -22,12 +21,12 @@ import java.lang.foreign.Arena
   */
 final case class LibModel(topModule: String, sources: Seq[os.Path])
 
-/** Turns one Zaozi generator's UT into stored artifacts, and stops there.
+/** Turns one Zaozi UT module into artifacts, and stops there.
   *
-  * The framework's job is to reduce a DUT-plus-constraints to data and IR — the solved per-cycle stimulus
-  * ([[saveStimulus]]), the DPI contract ([[saveDpi]]), and the flat lib-model SystemVerilog ([[emitLib]]). Driving a
-  * simulator with those artifacts is deliberately an external concern: nothing here runs a simulator or emits a
-  * testbench.
+  * The framework's job is to reduce a DUT-plus-verification-intent to data and IR — the DPI contract ([[saveDpi]]) and
+  * the flat lib-model SystemVerilog ([[emitLib]]) — both derived from the module's `(IO, Probe)`. Generating stimulus
+  * (from the module's SVA assertions) and driving a simulator with these artifacts are deliberately external concerns:
+  * nothing here solves, runs a simulator, or emits a testbench.
   */
 final class UTGenerator[
   PARAM <: Parameter,
@@ -35,16 +34,9 @@ final class UTGenerator[
   I <: HWInterface[PARAM],
   P <: DVInterface[PARAM, L]
 ] private (
-  val dut:             Generator[PARAM, L, I, P] & HasUT[PARAM, I],
-  val parameter:       PARAM,
-  val cycles:          Int,
-  val outputDirectory: os.Path,
-  val seed:            Int,
-  val solverBackend: Solver):
-
-  require(cycles > 0, "cycles must be positive")
-
-  def solve(): SolvedStimulus[I] = ConstraintSolver.solve(dut, parameter, cycles, seed, solverBackend)
+  val dut:       Generator[PARAM, L, I, P] & HasUT[PARAM, I],
+  val parameter: PARAM,
+  val outputDirectory: os.Path):
 
   /** The DPI contract as a dependent type on this DUT's `(I, P)`: `dpi.drive.<port>` and `dpi.probe.<point>` are
     * checked at compile time against the DUT's IO and Probe, and `dpi.spec` is the serializable specification derived
@@ -59,17 +51,7 @@ final class UTGenerator[
       new DPI[I, P](DPISpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
     finally arena.close()
 
-  /** Solve the constraints and store the per-cycle stimulus as JSON (`{dut, cycles, inputs}`). */
-  def saveStimulus(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
-    val stimulus = solve()
-    os.makeDir.all(path / os.up)
-    os.write.over(path, upickle.default.write(stimulus.data, indent = 2))
-    stimulus
-
-  def loadStimulus(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
-    SolvedStimulus(upickle.default.read[StimulusData](os.read(path)))
-
-  /** Materialize the DPI spec and write it as JSON next to the stimulus. */
+  /** Materialize the DPI spec and write it as JSON. */
   def saveDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
     val spec = dpi.spec
     os.makeDir.all(path / os.up)
@@ -130,9 +112,6 @@ object UTGenerator:
   def apply[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     dut:             Generator[PARAM, L, I, P] & HasUT[PARAM, I],
     parameter:       PARAM,
-    cycles:          Int,
-    outputDirectory: os.Path,
-    seed:            Int = 0,
-    solverBackend:   Solver = Z3
+    outputDirectory: os.Path
   ): UTGenerator[PARAM, L, I, P] =
-    new UTGenerator(dut, parameter, cycles, outputDirectory, seed, solverBackend)
+    new UTGenerator(dut, parameter, outputDirectory)

@@ -4,21 +4,10 @@ package me.jiuyang.utlib
 
 import me.jiuyang.zaozi.{HWInterface, Parameter}
 
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
-
-import java.lang.foreign.Arena
-
-/** Input constraints owned by a hardware generator.
+/** Marks a Zaozi generator as a unit-test module.
   *
-  * Implementations append SMT operations to the current block. [[ConstraintInterface]] provides typed access to the DUT
-  * inputs and memoizes one symbolic value for each input and cycle.
+  * The framework derives the DPI contract and the flat lib model from the module's `(IO, Probe)`. The verification
+  * intent — SVA assertions and assumptions — lives in the module's own architecture under the verification layer, not
+  * in a separate method.
   */
-trait HasUT[PARAM <: Parameter, I <: HWInterface[PARAM]]:
-  def constraints(
-    parameter: PARAM
-  )(
-    using Arena,
-    Context,
-    Block,
-    ConstraintInterface[I]
-  ): Unit
+trait HasUT[PARAM <: Parameter, I <: HWInterface[PARAM]]
