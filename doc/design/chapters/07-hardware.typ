@@ -12,6 +12,8 @@
 + 同一 `GeneratorId` 与相同完整参数产生结构相同的模块，模块去重据此使用二者作为结构键（@sec-dedup）。
 + 生成器 API 以完整参数为输入；将完整参数写成 JSON 后，可以直接调用生成器完成独立例化与测试。
 
+生成器没有隐式时钟与复位：时钟和复位一律声明为时钟协议、复位协议的输入节点，与其它节点一样对应端口和一次 bind。
+
 每个生成器发布一个 `GeneratorId` 和 `FullParam` codec；codec 提供 schema、规范化编码与解码。完整的 `GeneratorId` 确定生成器实现和 codec schema（@sec-dedup）。
 
 `GeneratorId`、`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器登记到生成器注册表，注册表将 `GeneratorId` 映射到 `GeneratorEntry`。同一 `GeneratorId` 的所有模块引用同一个条目；两个条目使用相同 `GeneratorId` 而生成器实现或 codec 不同时报告 N10。
@@ -52,7 +54,7 @@
 
 `DesignBuilder` 根据当前模块的 `ModuleId` 与节点名派生 `ModuleNodeId`。同一模块内节点名唯一；每个节点恰好参与一次设计 bind。节点在生成器 IO 中对应一个以节点声明名命名、由节点方向确定根方向的顶层 Bundle（@sec-port-naming）。
 
-每条跨协议引用记录本模块的目标 `ModuleNodeId`、期望的 `ProtocolId` 和该引用的 `SourceLocation`。每个节点唯一关联一条边，因此目标节点唯一确定所引用的 `Edge`。
+跨协议引用只能指向本模块的节点，用来声明本节点属于哪个时钟节点和电源节点：模块声明统一的时钟、电源输入节点，数据节点引用它们，求解后得到对应边的 `Edge`，每个端口的时钟域与电源域由此可知。引用只提供信息，框架不检查 bind 两端是否同域；跨域必须经过桥（@sec-bridge-boundary）。
 
 `EdgeView` 是双向传播和逐边求解完成后按模块投影的数据。它按节点给出方向及唯一的已求解边；该边包含 `Down`、`Up`、`Edge` 与 `ProtocolBundle`。引用方节点条目另行包含显式跨协议引用的解析结果。
 

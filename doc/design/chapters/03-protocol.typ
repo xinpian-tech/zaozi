@@ -77,6 +77,8 @@ bind 与模块内部参数依赖共同形成 `Down` 参数依赖 DAG；每条内
   每个设计协议（`Protocol`）必须实现 `interfaceOf`，为每个成功求解的 `Edge` 返回一个 `ProtocolBundle`。跨层端口与生成器端口校验均以这份结构为准。
 ] <dec-pi-required>
 
+没有连线的关系不作为协议。设备树、寄存器映射、UPF 等整机元数据由工具从导出数据生成（@sec-export）。
+
 `ProtocolInterface` 是可序列化数据。协商期处理该数据，例化期将其翻译为 FIRRTL 类型。
 
 设计协议的接口由 `Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock` 与 `Reset` 构成。验证协议的接口以 `Probe` 包装每个信号叶，并在 `Probe` 中记录 `LayerPath`。

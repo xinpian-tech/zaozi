@@ -19,7 +19,7 @@
 
 单个生成器定义一个 `FullParam` 的序列化 schema；单个 IP 独立例化时，命令行输入是一份符合该 schema 的 `FullParam` 值（@sec-generator-contract）。`params.json` 采用整机多实例结构，其中每条记录携带一个可作为生成器输入的 `FullParam` 值。
 
-调用方按需选择四份整机导出文件；工具版本确定其容器格式（@sec-serialization-list）。硬件边界的兼容契约由生成器版本对应的 `FullParam` schema 及单个 `FullParam` 值的序列化格式构成。
+调用方按需选择四份整机导出文件；工具版本确定其容器格式（@sec-serialization-list）。设备树、寄存器映射、UPF 等整机产物由工具从这些导出生成。硬件边界的兼容契约由生成器版本对应的 `FullParam` schema 及单个 `FullParam` 值的序列化格式构成。
 
 == 可视化 <sec-visualization>
 

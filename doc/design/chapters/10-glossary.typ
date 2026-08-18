@@ -33,7 +33,7 @@
   [生成器标识], [`GeneratorId`], [由生成器限定名与版本组成，并在注册表中对应带 `FullParam` codec 的 `GeneratorEntry`（@sec-generator-records、@sec-generator-contract）。],
   [生成器模块], [`GeneratorModule`], [通过注册表条目绑定恰好一个生成器的叶模块；每个设计节点及验证端点对应其 IO 中的顶层 Bundle（@sec-module-kinds、@sec-generator-module）。],
   [bind], [—], [显式连接声明；设计 bind 从源模块节点指向目标模块节点，验证 bind 连接探针源与探针汇（@sec-attach、@sec-dv-model）。],
-  [跨协议引用], [cross-protocol reference], [模块显式引用一个 `ModuleNodeId`；该节点唯一的目标边求解后解析为带协议标识的 `Edge`（@sec-resolved-records、@sec-settle-pp）。],
+  [跨协议引用], [cross-protocol reference], [节点对本模块时钟或电源输入节点的引用；求解后得到该节点边的 `Edge`，只提供域信息（@sec-resolved-records、@sec-settle-pp、@sec-generator-module）。],
   [边视图], [`EdgeView`], [求解完成后按模块和节点整理的“节点到唯一设计边”映射及验证结果（@sec-generator-records、@sec-settle-pp）。],
   [跨层端口规划], [cross-hierarchy port planning], [根据连接两端的层次路径生成所需的转发端口计划与逐层连线计划（@sec-punch-planning）。],
   [结构键], [structural key], [模块去重使用的规范化键（@sec-dedup）。],

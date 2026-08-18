@@ -114,13 +114,15 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 *验证求解*按 `DVSinkId` 分组。每组按 `DVBindId` 的声明顺序收集非空 `Down` 序列及相同顺序的 `LayerPath`。每个探针汇调用一次 `DVProtocol.resolve(downs)`，再调用 `interfacesOf(edge, layers)`。框架核对 `sources`、`sinkPaths` 的数量、结构、精确覆盖、单向 `Probe` 约束及 FIRRTL 层路径（@sec-dv-protocol、@sec-dv-routing）。
 
-*跨协议引用*在目标设计边求解后解析。引用声明给出目标 `ModuleNodeId` 与期望的 `ProtocolId`；目标不存在、节点未 bind、协议不符或目标边未求解时报告 N7。
+*跨协议引用*在目标边求解后解析。目标必须是本模块的节点，通常是时钟或电源输入节点（@sec-generator-module）；目标不存在、不在本模块、未 bind、协议不符或目标边未求解时报告 N7。
 
 *生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeProtocolParam(EdgeView)` 计算自有类型的协议参数，并可依据 `EdgeView` 与用户参数执行能力校验；框架随后调用 `combine(userParam, protocolParam)` 得到 `FullParam`。注册表条目、`EdgeView`、协议参数和完整参数一并存入 `ResolvedGeneratorModule`（@sec-two-layer-params、@sec-generator-module）。
 
 #决策([协议参数只读取本模块的已求解数据])[
   `computeProtocolParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用和验证端点结果。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
 ] <dec-pp-local>
+
+单次协商没有整机回读：`dFn` 只读 `Down`，`uFn` 只读 `Up`，生成器拿不到整张连接图的汇总，例如整机地址映射。这类产物由工具从导出数据生成（@sec-export）；生成器需要它时（例如 boot ROM 镜像），作为用户参数进入下一轮构建。
 
 == 错误语义 <sec-error-semantics>
 
@@ -137,7 +139,7 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
   [*N4* 节点或 bind 非法], [校验], [节点引用不存在；输出节点未恰好作为一次 bind 的源；输入节点未恰好作为一次 bind 的目标；或 bind 两端方向不符。], [相关 `ModuleNodeId`、`BindId`、实际 bind 次数和源码位置。],
   [*N5* 生成器能力校验失败], [生成器参数], [本模块已求解边要求的端口数、接口参数、拓扑条件或资源容量超出生成器用户参数给出的实现上限。], [生成器模块、相关节点与 `BindId`、所需值、实现上限和用户参数。],
   [*N6* 接口映射违约], [边或验证求解], [设计 `ProtocolBundle` 非法；或 `DVInterfaces` 的数量、路径、结构、精确覆盖、单向 `Probe` 或层路径契约不成立。], [节点或 `DVSinkId`；期望与实际结构；无效路径；相关 bind 的源码位置。],
-  [*N7* 跨协议引用失败], [`EdgeView` 装配], [目标 `ModuleNodeId` 不存在、未 bind、协议标识与声明不符，或目标边没有成功求解。], [引用方、目标 `ModuleNodeId`、期望与实际协议标识、引用声明的源码位置。],
+  [*N7* 跨协议引用失败], [`EdgeView` 装配], [目标 `ModuleNodeId` 不存在或不属于引用方模块、未 bind、协议标识与声明不符，或目标边没有成功求解。], [引用方、目标 `ModuleNodeId`、期望与实际协议标识、引用声明的源码位置。],
   [*N8* 验证拓扑非法], [校验], [探针汇的源集合为空；探针源的 bind 数量异于一；源与汇协议不匹配；汇生成器父结构模块与源模块的严格祖先关系缺失。], [`DVSourceId`、`DVSinkId` 与 `DVBindId`；协议标识与模块路径；全部相关源码位置。],
   [*N9* 结构名称或参数依赖非法], [校验与拓扑排序], [同一作用域内的实例名或端点名重复；模块内部参数依赖重复、端点或方向非法；或参数依赖图存在环。], [冲突的稳定标识；相关模块、节点、bind 与模块内部参数依赖；环上的完整路径；全部相关源码位置。],
   [*N10* 生成器标识冲突], [校验], [两个注册表条目使用同一 `GeneratorId`，但生成器实现或 `FullParam` codec 不同。], [`GeneratorId`；冲突的生成器实现与 codec schema；相关模块及源码位置。],
