@@ -84,15 +84,14 @@ private[utlib] final class DpiHarnessGenerator[
     val notReset = Wire(Bool())
     notReset := !(io.reset.asBool)
 
-    // The DPI frontend observes the DUT's functional outputs and drives its inputs. Reads are
-    // of the DUT instance's aligned output ports — plain signals in scope. (The layer-bound
-    // white-box Probe is an observation-only surface; a value under a verification layer
-    // cannot legally feed the functional drive path, so the closed loop observes real ports.)
-    val observed = dutInterface.elements.collect {
-      case f if !f.isFlipped && isNumeric(f.dataType) =>
-        val w = Wire(Bits(f.dataType.width))
-        w := instance.io.field[Bits](f.name)
-        w
+    // The DPI frontend observes the DUT through its Probe — its designated observation
+    // surface. Each probe point is read into a wire and handed to the DPI function; the probe
+    // itself drives nothing.
+    given LayerTree = Layer("Verification").toLayerTree
+    val observed = spec.probe.map { port =>
+      val w = Wire(Bits(port.width))
+      w <== instance.probe(using summon[TypeImpl]).subfield[RProbe[Bits]](port.name)
+      w
     }
 
     // Hand the observed outputs to the external frontend and drive the DUT input with the
@@ -110,7 +109,3 @@ private[utlib] final class DpiHarnessGenerator[
     stop(io.clock, doneNow, 0)
     printf(io.clock, timeoutNow, "HARNESS-TIMEOUT\n")
     stop(io.clock, timeoutNow, 1)
-
-  private def isNumeric(data: Data): Boolean = data match
-    case _: Bool | _: Bits | _: UInt | _: SInt => true
-    case _                                     => false
