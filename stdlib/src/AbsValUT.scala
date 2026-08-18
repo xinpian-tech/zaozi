@@ -35,9 +35,11 @@ object AbsValUT:
       s"""|#include <stdio.h>
           |extern "C" {
           |static int cyc = 0;
-          |void ${AbsVal.moduleName(parameter)}_tick(char ABSVAL, char* A) {
+          |// Observes the DUT via its probe (a = input echo, absval = |A|); drives A.
+          |void ${AbsVal.moduleName(parameter)}_tick(char a, char absval, char* A) {
           |  int drv = (cyc == 0) ? 5 : (cyc == 1) ? -3 : 7;
-          |  printf("DPI-LOOP cyc=%d observed ABSVAL=%d -> drive A=%d\\n", cyc, (int)(unsigned char)ABSVAL, drv);
+          |  printf("DPI-LOOP cyc=%d probe a=%d absval=%d -> drive A=%d\\n",
+          |         cyc, (int)a, (int)(unsigned char)absval, drv);
           |  *A = (char)drv;
           |  cyc++;
           |}

@@ -149,8 +149,10 @@ final class UTGenerator[
     val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
     val driverPath = outDir / s"${Driver.topModuleName}.sv"
     os.write.over(driverPath, Driver.topString(topModule, trace = false, traceFile = "trace.vcd"))
+    // The split files (layer binds and probe-ref exposers) must be compiled: reading the
+    // DUT's probe lowers to a hierarchical reference into the verification layer's bind.
     SimulationRequest(
-      sources = Seq(emitted.primary, driverPath) ++ cSources,
+      sources = (Seq(emitted.primary, driverPath) ++ emitted.splitFiles.values.toSeq) ++ cSources,
       workDir = outDir,
       topModule = Driver.topModuleName,
       trace = false,
