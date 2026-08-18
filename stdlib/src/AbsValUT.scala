@@ -2,51 +2,72 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.*
+import me.jiuyang.utlib.{ConstraintInterface, HasUT}
+import me.jiuyang.smtlib.default.{*, given}
+import me.jiuyang.zaozi.*
+import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.reftpe.*
+import me.jiuyang.zaozi.valuetpe.*
 
-/** The command-line entry the `AbsValUT.sc` lit test drives: solve the UT constraints for
-  * [[AbsVal]] and emit the generated SystemVerilog testbench — the harness (with its
-  * sim-dialect-lowered `$fwrite`/`$finish` control) and the minimal clock/reset driver top —
-  * into the given directory.
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+
+import java.lang.foreign.Arena
+
+case class AbsValUTParameter(width: Int) extends Parameter:
+  require(width > 0, "width must be positive")
+
+given upickle.default.ReadWriter[AbsValUTParameter] = upickle.default.macroRW
+
+class AbsValUTLayers(parameter: AbsValUTParameter) extends LayerInterface(parameter):
+  def layers = Seq(Layer("Verification"))
+
+/** What the UT drives: the DUT's input. Observation is through the Probe, not through IO. */
+class AbsValUTIO(parameter: AbsValUTParameter) extends HWBundle(parameter):
+  val A = Flipped(Bits(parameter.width))
+
+/** The observation contract: forwarded from the wrapped [[AbsVal]]'s own Probe. */
+class AbsValUTProbe(parameter: AbsValUTParameter) extends DVBundle[AbsValUTParameter, AbsValUTLayers](parameter):
+  val a      = ProbeRead(Bits(parameter.width), layers("Verification"))
+  val absval = ProbeRead(Bits(parameter.width), layers("Verification"))
+
+/** The unit-test module for [[AbsVal]].
   *
-  * Running the simulation itself belongs in the lit test, which invokes Verilator over the
-  * emitted SV and checks for `HARNESS-DONE`. Nothing here runs a simulator; it stops at SV
-  * emission, mirroring how `AbsVal`'s own `design` step stops at `.mlirbc`.
+  * The verification concern lives here, not in the DUT: this module instantiates the plain
+  * `AbsVal`, drives its input, forwards its observation Probe, and declares the stimulus
+  * `constraints`. So `AbsVal` stays a reusable DUT with no UT coupling, and `AbsValUT` is the
+  * thing the framework harnesses (`extends HasUT`).
   */
-object AbsValUT:
-  def main(args: Array[String]): Unit =
-    val positional = args.filterNot(_.startsWith("--"))
-    val outDir     = os.Path(positional.head, os.pwd)
-    val width      = args.sliding(2).collectFirst { case Array("--width", w) => w.toInt }.getOrElse(8)
+@generator
+object AbsValUT
+    extends Generator[AbsValUTParameter, AbsValUTLayers, AbsValUTIO, AbsValUTProbe]
+    with HasUT[AbsValUTParameter, AbsValUTIO]:
+  override def moduleName(p: AbsValUTParameter): String = s"AbsValUT_width${p.width}"
 
-    val parameter = AbsValParameter(width)
-    val generator = UTGenerator(AbsVal, parameter, cycles = 3, outputDirectory = outDir)
-    val contract  = generator.freezeDpi(outDir / "AbsValDPI.json")
-    os.write.over(outDir / "AbsValDPIShim.mlir", DpiShim.mlirString(contract))
-    generator.simulationRequest(generator.solve(), outDir)
+  def architecture(parameter: AbsValUTParameter) =
+    val io       = summon[Interface[AbsValUTIO]]
+    val instance = AbsVal.instantiate(AbsValParameter(parameter.width))
+    instance.io.A := io.A
 
-    // The DPI closed loop: emit the harness that hands each cycle to the external frontend,
-    // and a tiny C frontend that drives A and observes the DUT's ABSVAL — placed next to the
-    // emitted SV so Verilator compiles them together.
-    val dpiDir = outDir / "dpi"
-    os.makeDir.all(dpiDir)
-    os.write.over(
-      dpiDir / "dpi_frontend.c",
-      s"""|#include <stdio.h>
-          |extern "C" {
-          |static int cyc = 0;
-          |// Observes the DUT via its probe (a = input echo, absval = |A|); drives A.
-          |void ${AbsVal.moduleName(parameter)}_tick(char a, char absval, char* A) {
-          |  int drv = (cyc == 0) ? 5 : (cyc == 1) ? -3 : 7;
-          |  printf("DPI-LOOP cyc=%d probe a=%d absval=%d -> drive A=%d\\n",
-          |         cyc, (int)a, (int)(unsigned char)absval, drv);
-          |  *A = (char)drv;
-          |  cyc++;
-          |}
-          |}
-          |""".stripMargin
-    )
-    generator.dpiSimulationRequest(dpiDir, runCycles = 4, cSources = Seq(dpiDir / "dpi_frontend.c"))
+    val probe = summon[ProbeInterface[AbsValUTProbe]]
+    layer("Verification"):
+      // Read the DUT's probe and re-expose it as this module's observation contract.
+      val aW = Wire(Bits(parameter.width))
+      aW <== instance.probe(using summon[TypeImpl]).a
+      probe.a <== aW
+      val absvalW = Wire(Bits(parameter.width))
+      absvalW <== instance.probe(using summon[TypeImpl]).absval
+      probe.absval <== absvalW
 
-    println(s"UT testbench, DPI contract, shim and closed-loop harness emitted for ${AbsVal.moduleName(parameter)} in $outDir")
-    println(contract.toJson)
+  def constraints(
+    parameter: AbsValUTParameter
+  )(
+    using Arena,
+    Context,
+    Block,
+    ConstraintInterface[AbsValUTIO]
+  ): Unit =
+    val io = summon[ConstraintInterface[AbsValUTIO]]
+    require(io.A.cycles >= 3, "AbsVal UT requires cycles for positive, zero, and negative inputs")
+    smtAssert(io.A.at(0) > 0.S)
+    smtAssert(io.A.at(1) === 0.S)
+    smtAssert(io.A.at(2) < 0.S)
