@@ -36,9 +36,9 @@ final class UTGenerator[
 
   def solve(): SolvedStimulus[I] = ConstraintSolver.solve(dut, parameter, cycles, seed, solverBackend)
 
-  /** The DPI contract as a dependent type on this DUT's `(I, P)`: `dpi.drive.<port>` and
-    * `dpi.probe.<point>` are checked at compile time against the DUT's IO and Probe, and
-    * `dpi.spec` is the serializable specification derived from those interfaces.
+  /** The DPI contract as a dependent type on this DUT's `(I, P)`: `dpi.drive.<port>` and `dpi.probe.<point>` are
+    * checked at compile time against the DUT's IO and Probe, and `dpi.spec` is the serializable specification derived
+    * from those interfaces.
     */
   def dpi: DPI[I, P] =
     val arena = Arena.ofConfined()
@@ -122,20 +122,21 @@ final class UTGenerator[
       coverageFile = "coverage.dat"
     )
 
-  /** Elaborate and lower the DPI closed-loop harness: each cycle it hands the DUT's observed
-    * outputs to the external DPI function and drives the DUT's input with the value returned.
-    * `cSources` implement `<dut>_tick`; they are compiled into the Verilator model.
+  /** Elaborate and lower the single lib harness: a flat SystemVerilog module whose ports *are* the DPI contract (drive
+    * ports and clock/reset as inputs, each probe point as a `probe_<name>` output). It has no internal loop — an
+    * external frontend (see [[Frontend]]) owns the loop, poking the drive ports and peeking the probe ports. Verilator
+    * builds this into the Verilated model; `topModule` is that model's top.
+    *
+    * The returned request's `sources` are ready to hand to `verilator --cc --exe <frontend.cpp>`. The split files
+    * (layer binds and probe-ref exposers) are included because reading the DUT's probe lowers to a hierarchical
+    * reference into the verification layer's bind.
     */
-  def dpiSimulationRequest(
-    outDir:    os.Path = outputDirectory,
-    runCycles: Int = cycles,
-    cSources:  Seq[os.Path] = Seq.empty
-  ): SimulationRequest =
+  def libSimulationRequest(outDir: os.Path = outputDirectory): SimulationRequest =
     os.makeDir.all(outDir)
-    val harnessParameter = DpiHarnessParameter(dpi.spec, runCycles, timeoutCycles)
-    val harness          = new DpiHarnessGenerator(dut, parameter)
+    val harnessParameter = LibHarnessParameter(dpi.spec)
+    val harness          = new LibHarnessGenerator(dut, parameter)
     val topModule        = harness.moduleName(harnessParameter)
-    val moduleDir        = outDir / s"dpi_mlir_${harnessParameter.hashCode.toHexString}"
+    val moduleDir        = outDir / s"lib_mlir_${harnessParameter.hashCode.toHexString}"
     os.makeDir.all(moduleDir)
 
     elaborate(harness, harnessParameter, moduleDir)
@@ -146,25 +147,25 @@ final class UTGenerator[
       Seq("firld", s"--base-circuit=$topModule", "--no-mangle") ++ modules.map(_.toString) ++ Seq("-o", linked.toString)
     ).call()
 
-    val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
-    val driverPath = outDir / s"${Driver.topModuleName}.sv"
-    os.write.over(driverPath, Driver.topString(topModule, trace = false, traceFile = "trace.vcd"))
-    // The split files (layer binds and probe-ref exposers) must be compiled: reading the
-    // DUT's probe lowers to a hierarchical reference into the verification layer's bind.
+    val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
     SimulationRequest(
-      sources = (Seq(emitted.primary, driverPath) ++ emitted.splitFiles.values.toSeq) ++ cSources,
+      sources = Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq,
       workDir = outDir,
-      topModule = Driver.topModuleName,
+      topModule = topModule,
       trace = false,
       traceFile = "trace.vcd",
       coverageFile = "coverage.dat"
     )
 
-  private def elaborate[HP <: Parameter, HL <: LayerInterface[HP], HI <: HWInterface[HP], HProbe <: DVInterface[
-    HP,
-    HL
-  ]](
-    harness:   Generator[HP, HL, HI, HProbe],
+  private def elaborate[
+    HP <: Parameter,
+    HL <: LayerInterface[HP],
+    HI <: HWInterface[HP],
+    HProbe <: DVInterface[
+      HP,
+      HL
+    ]
+  ](harness:   Generator[HP, HL, HI, HProbe],
     parameter: HP,
     outDir:    os.Path
   ): Unit =
