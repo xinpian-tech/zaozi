@@ -83,6 +83,20 @@ final class UTGenerator[
     val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
     LibModel(topModule, Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq)
 
+  /** Generate the DPI-export wrapper for the lib model: an SV module exposing `export "DPI-C"` poke/peek per contract
+    * port, plus a C lifecycle shim. Together with [[emitLib]]'s sources these build (`verilator --lib-create`) into a
+    * `.so` an external driver loads and calls. `libTop` is the lib model's top module (from [[emitLib]]).
+    */
+  def emitDpiWrapper(libTop: String, outDir: os.Path = outputDirectory): DpiWrapper =
+    os.makeDir.all(outDir)
+    val spec       = dpi.spec
+    val wrapperTop = DpiWrapper.top(spec)
+    val svPath     = outDir / s"$wrapperTop.sv"
+    val capiPath   = outDir / s"${wrapperTop}_capi.cpp"
+    os.write.over(svPath, DpiWrapper.svString(libTop, spec))
+    os.write.over(capiPath, DpiWrapper.capiString(spec))
+    DpiWrapper(wrapperTop, Seq(svPath, capiPath))
+
   private def elaborate[
     HP <: Parameter,
     HL <: LayerInterface[HP],
