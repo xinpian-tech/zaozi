@@ -13,60 +13,45 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 import java.lang.foreign.Arena
 
-case class AbsValUTParameter(width: Int) extends Parameter:
-  require(width > 0, "width must be positive")
-
-given upickle.default.ReadWriter[AbsValUTParameter] = upickle.default.macroRW
-
-class AbsValUTLayers(parameter: AbsValUTParameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("Verification"))
-
-/** What the UT drives: the DUT's input. Observation is through the Probe, not through IO. */
-class AbsValUTIO(parameter: AbsValUTParameter) extends HWBundle(parameter):
-  val A = Flipped(Bits(parameter.width))
-
-/** The observation contract: forwarded from the wrapped [[AbsVal]]'s own Probe. */
-class AbsValUTProbe(parameter: AbsValUTParameter) extends DVBundle[AbsValUTParameter, AbsValUTLayers](parameter):
-  val a      = ProbeRead(Bits(parameter.width), layers("Verification"))
-  val absval = ProbeRead(Bits(parameter.width), layers("Verification"))
-
 /** The unit-test module for [[AbsVal]].
   *
-  * The verification concern lives here, not in the DUT: this module instantiates the plain
-  * `AbsVal`, drives its input, forwards its observation Probe, and declares the stimulus
-  * `constraints`. So `AbsVal` stays a reusable DUT with no UT coupling, and `AbsValUT` is the
-  * thing the framework harnesses (`extends HasUT`).
+  * It reuses the DUT's own type parameters — same Parameter, Layers, IO and Probe — so the UT simply *is* an
+  * AbsVal-shaped module that wraps the plain DUT: it passes the DUT interface straight through, forwards the DUT's
+  * observation Probe, and adds the stimulus `constraints`. The verification concern lives here (`extends HasUT`), which
+  * keeps `AbsVal` a reusable DUT with no UT coupling.
   */
 @generator
 object AbsValUT
-    extends Generator[AbsValUTParameter, AbsValUTLayers, AbsValUTIO, AbsValUTProbe]
-    with HasUT[AbsValUTParameter, AbsValUTIO]:
-  override def moduleName(p: AbsValUTParameter): String = s"AbsValUT_width${p.width}"
+    extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]
+    with HasUT[AbsValParameter, AbsValIO]:
+  override def moduleName(p: AbsValParameter): String = s"AbsValUT_width${p.width}"
 
-  def architecture(parameter: AbsValUTParameter) =
-    val io       = summon[Interface[AbsValUTIO]]
-    val instance = AbsVal.instantiate(AbsValParameter(parameter.width))
+  def architecture(parameter: AbsValParameter) =
+    val io       = summon[Interface[AbsValIO]]
+    val instance = AbsVal.instantiate(parameter)
+    // Pass the DUT's interface straight through.
     instance.io.A := io.A
+    io.ABSVAL     := instance.io.ABSVAL
 
-    val probe = summon[ProbeInterface[AbsValUTProbe]]
+    val probe = summon[ProbeInterface[AbsValProbe]]
     layer("Verification"):
       // Read the DUT's probe and re-expose it as this module's observation contract.
-      val aW = Wire(Bits(parameter.width))
-      aW <== instance.probe(using summon[TypeImpl]).a
-      probe.a <== aW
+      val aW      = Wire(Bits(parameter.width))
+      aW <== instance.probe.A
+      probe.A <== aW
       val absvalW = Wire(Bits(parameter.width))
-      absvalW <== instance.probe(using summon[TypeImpl]).absval
-      probe.absval <== absvalW
+      absvalW <== instance.probe.ABSVAL
+      probe.ABSVAL <== absvalW
 
   def constraints(
-    parameter: AbsValUTParameter
+    parameter: AbsValParameter
   )(
     using Arena,
     Context,
     Block,
-    ConstraintInterface[AbsValUTIO]
+    ConstraintInterface[AbsValIO]
   ): Unit =
-    val io = summon[ConstraintInterface[AbsValUTIO]]
+    val io = summon[ConstraintInterface[AbsValIO]]
     require(io.A.cycles >= 3, "AbsVal UT requires cycles for positive, zero, and negative inputs")
     smtAssert(io.A.at(0) > 0.S)
     smtAssert(io.A.at(1) === 0.S)
