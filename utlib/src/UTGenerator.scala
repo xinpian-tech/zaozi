@@ -50,13 +50,13 @@ final class UTGenerator[
     finally arena.close()
 
   /** Materialize the DPI spec and write it as JSON next to the stimulus. */
-  def freezeDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
+  def saveDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
     val spec = dpi.spec
     os.makeDir.all(path / os.up)
     os.write.over(path, spec.toJson)
     spec
 
-  def freeze(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
+  def saveStimulus(path: os.Path = outputDirectory / "stimulus.json"): SolvedStimulus[I] =
     val stimulus = solve()
     os.makeDir.all(path / os.up)
     os.write.over(path, upickle.default.write(stimulus.data, indent = 2))
