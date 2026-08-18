@@ -61,6 +61,8 @@ Syntheke 把以参数为输入并返回电路模块的 zaozi 工厂称为#term[�
 
 *bind* 是连接声明：把一个模块的输出节点接到另一个模块（或同一模块）的输入节点，写作 `目标输入节点 <- 源输出节点`。bind 有两种：#term[设计 bind][design bind]连接两个模块节点，本章及 @ch-protocol、@ch-interconnect 讨论的都是它；#term[验证 bind][verification bind]把一个探针源接到一个探针汇，见 @ch-verification。不加限定的 bind 指设计 bind。
 
+bind 写在结构模块的构建体里，声明它的结构模块必须是两端节点所在模块的祖先，可以不是最近的祖先；两端节点可以在它之下的任意深度，包括孙子模块及更深。也就是说，模块只连接自己子树内部的节点；要连到子树外面，由外层模块来写。bind 记录声明它的结构模块，结构校验核对这一祖先关系（@sec-structural-check）。设计 bind 与验证 bind 都遵守这条规则。
+
 方向按 `Down` 的传播定义：输出节点是 bind 的源，输入节点是 bind 的目标。每条 bind 在协商期得到三项参数：源节点算出的下行参数 `Down`、目标节点算出的上行参数 `Up`，以及由协议把二者合成的#term[边参数][edge parameter] `Edge`（@sec-three-param-kinds）。一条 bind 连同它求出的参数称为一条#term[边][edge]；设计 bind 对应设计边，验证 bind 对应验证边；bind 与边在不强调求解结果时统称连接。每个模块节点恰好参与一次设计 bind：输出节点恰好作为一次 bind 的源，输入节点恰好作为一次 bind 的目标。
 
 模块显式声明输入节点到输出节点的#term[模块内部参数依赖][module-internal parameter dependency]：一条依赖表示该输入节点的 `Down` 参与计算该输出节点的 `Down`，反过来该输出节点的 `Up` 参与计算该输入节点的 `Up`。每个输出节点带一个函数 `dFn`：读取本节点所依赖的各输入节点的 `Down` 和本模块的用户参数，返回该输出节点唯一的 `Down`。每个输入节点带一个函数 `uFn`：读取依赖本节点的各输出节点的 `Up` 和用户参数，返回该输入节点唯一的 `Up`。`dFn` 与 `uFn` 统称#term[端口参数函数][port parameter functions]。不依赖任何输入节点的输出节点和不被任何输出节点依赖的输入节点称为#term[边界节点][boundary node]，它们的函数只从用户参数产生初值。函数能读哪些节点由依赖声明决定，声明方式见 @sec-generator-module；求值顺序见 @sec-propagation。同一个函数可以读不同协议的节点。Xbar、NoC 以多个具名节点表示多个端口，以内部参数依赖表示端口之间的参数影响关系；每个节点仍只参与一条 bind。

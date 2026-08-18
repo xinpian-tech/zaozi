@@ -12,7 +12,7 @@
 
 验证端点的稳定标识由所属模块和端点名组成（`DVSourceId`、`DVSinkId`）；验证 bind 的稳定标识 `DVBindId` 由探针汇和探针源共同组成。实现类和构造器由框架密封；`DesignBuilder` 根据当前生成器模块的 `ModuleId` 与名称派生端点标识。探针源的私有实现保存构造方法接收的 `protocol.Down`。
 
-验证 bind 与设计 bind 共用 `<-` 声明语法：`sink <- source` 产生 `DVBindId` 与 bind 的 `SourceLocation`。每个源恰好 bind 一次，每个汇至少连接一个源，同一汇的全部端点使用注册表中的同一个 `DVProtocol` 对象。
+验证 bind 与设计 bind 共用 `<-` 声明语法和声明位置规则（@sec-node-conn-proto）：`sink <- source` 产生 `DVBindId`，并记录声明它的结构模块与 `SourceLocation`。每个源恰好 bind 一次，每个汇至少连接一个源，同一汇的全部端点使用注册表中的同一个 `DVProtocol` 对象。
 
 探针源和探针汇分别对应生成器的一个顶层端口，端口名就是声明名，端口内部的字段都是 `Probe`；验证生成器以求解后的汇端端口为输入，并实现协同仿真、记分板或断言逻辑（@sec-generator-contract）。
 
