@@ -6,9 +6,9 @@ SoC 设计把处理器核、缓存、DMA、内存控制器和外设等独立模�
 
 根本原因在于：IP 生成器的参数不是由单个模块独立决定的，而是由整个 SoC，甚至 Chiplet、Chip-to-Chip 级别设计的连接图共同决定的。模块之间的连接关系影响全局功能和约束，因此参数生成与参数校验必须在系统级完成。
 
-Syntheke 用基于 Scala 的嵌入式领域专用语言（embedded domain-specific language，eDSL）描述 SoC：处理器、DMA、存储、外设、Xbar、NoC、时钟树和电源网格都是显式例化的生成器模块，模块之间用显式的连接相连；框架在连接图上推导每个模块的接口参数，然后才生成硬件。概念模型见 @ch-model；与 Diplomacy 的关系见 @sec-diplomacy。
+Syntheke 用基于 Scala 的嵌入式领域专用语言（embedded domain-specific language，eDSL）描述 SoC：处理器、DMA、存储、外设、Xbar（crossbar）、NoC、时钟树和电源网格都是设计里显式例化的模块，每个模块的硬件由一个生成器按参数产生；模块之间用显式的连接相连；框架先在连接图上推导出每个模块的接口参数，然后才生成硬件。概念模型见 @ch-model；与 Diplomacy 的关系见 @sec-diplomacy。
 
-从定位上看，Syntheke 与 SystemRDL 等 SoC 集成专用语言相似，都是为了描述和生成复杂 SoC 的系统结构；作为 Scala eDSL，它有更高的灵活性和抽象能力。Syntheke 还把时钟、复位、电源和 IO 这些物理设计的关键需求，建模为对应协议下的显式生成器模块，纳入同一套集成结构。
+从定位上看，Syntheke 与 SystemRDL 等 SoC 集成专用语言相似，都是为了描述和生成复杂 SoC 的系统结构；作为 Scala eDSL，它有更高的灵活性和抽象能力。Syntheke 还把时钟、复位、电源和 IO 这些物理设计的关键需求，建模为带有相应协议的显式模块，纳入同一套集成结构。
 
 == 一个例子：位宽、地址与事务身份 <sec-three-params>
 
@@ -75,9 +75,9 @@ Syntheke 用基于 Scala 的嵌入式领域专用语言（embedded domain-specif
 
 == 显式协商阶段 <sec-explicit-phase>
 
-接口参数是连接图的函数，因此参数协商应当是硬件生成流程中一个显式的、可单独运行和检验的阶段：先把模块、连接和各端的参数声明记录成显式数据；在其上推导每条连接的最终参数；全部连接都求解成功后，才以确定的完整参数调用硬件生成器。三个阶段的划分见 @sec-triptych。
+接口参数是连接图的函数，因此参数协商应当是硬件生成流程中一个显式的、可单独运行和检验的阶段。流程分三步：先把模块、连接和各端的参数声明记录成显式数据，这一步称为构建；然后在这些数据上推导每条连接的最终参数，称为协商；全部连接都求解成功后，才把每个模块的全部参数交给硬件生成器生成电路，称为例化。三个阶段的划分见 @sec-triptych。
 
-Syntheke 只负责选择生成器、计算完整参数并生成端口与连线计划；硬件逻辑由 zaozi 生成器#footnote[zaozi 是独立的硬件构造库：使用 Scala 3，并通过基于 MLIR 的 CIRCT 产出 FIRRTL。生成器契约见 @sec-generator-contract。]产出。协商可单独执行和测试；协商数据可按 @sec-export 导出，完整参数可序列化归档。
+Syntheke 只负责选择生成器、算出交给每个生成器的参数、规划模块之间的端口与连线；硬件逻辑由 zaozi 生成器#footnote[zaozi 是独立的硬件构造库：使用 Scala 3，并通过基于 MLIR 的 CIRCT 产出 FIRRTL。生成器契约见 @sec-generator-contract。]产出。协商可单独执行和测试；协商数据可按 @sec-export 导出；交给生成器的参数可序列化归档（@sec-serialization-boundary）。
 
 == 六条需求 <sec-requirements>
 

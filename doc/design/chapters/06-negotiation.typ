@@ -34,14 +34,14 @@
 + 由 bind 与模块内部参数依赖构造 `Down` 参数依赖 DAG，并执行稳定拓扑排序；
 + 按该顺序执行 `Down` 正向传播，按逆序执行 `Up` 反向传播；
 + 逐条设计边调用 `negotiate`，并按探针汇执行验证协议的 `resolve`；
-+ 解析跨协议引用，按模块装配 `EdgeView`，计算协议参数与完整参数，并执行生成器能力校验；
++ 解析跨协议引用（@sec-settle-pp），按模块装配 `EdgeView`，计算协议参数与完整参数，并执行生成器能力校验；
 + 规划跨层端口、连线与 FIRRTL 层，装配 `ResolvedDesign`。
 
 同一阶段中相互独立的端口参数函数、边求解或验证求解可以并行执行。函数输入按相关节点的声明顺序排列；稳定拓扑序决定求值和诊断次序，导出与错误排序采用 @ch-tooling 的规范。
 
 == 结构校验与稳定拓扑序 <sec-structural-check>
 
-结构校验先固化协议注册表与生成器注册表。同一作用域内的实例名和端点名分别唯一；每个 `ProtocolId` 对应一个协议对象，每个 `GeneratorId` 对应一个生成器实现与 `FullParam` codec。
+结构校验先固化协议注册表与生成器注册表。同一模块内的子实例名唯一，节点名与验证端点名唯一；每个 `ProtocolId` 对应一个协议对象，每个 `GeneratorId` 对应一个生成器实现与 `FullParam` codec。
 
 每条设计 bind 的源、目标节点必须存在。源节点方向为输出，目标节点方向为输入，两端协议匹配；每个输出节点恰好作为一次 bind 的源，每个输入节点恰好作为一次 bind 的目标。节点的数量在构建期已经固定，结构校验分别核对每个输出节点在 bind 源中出现一次、每个输入节点在 bind 目标中出现一次。
 
@@ -94,9 +94,9 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 *验证求解*按 `DVSinkId` 分组，每个探针汇调用一次 `resolve` 与 `interfacesOf`，并核对返回接口的契约（@sec-dv-protocol）。
 
-*跨协议引用*在目标边求解后解析。目标必须是本模块的节点，通常是时钟或电源输入节点（@sec-generator-module）；目标不存在、不在本模块、未 bind、协议不符或目标边未求解时报告 N7。
+*跨协议引用*是一个节点对本模块另一个节点的引用，用来声明本节点属于哪个时钟节点、电源节点（@sec-generator-module）；它在目标边求解后解析为目标边的 `Edge`。目标必须是本模块的节点；目标不存在、不在本模块、未 bind、协议不符或目标边未求解时报告 N7。
 
-*生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeProtocolParam(EdgeView)` 计算自有类型的协议参数，并可依据 `EdgeView` 与用户参数执行能力校验；框架随后调用 `combine(userParam, protocolParam)` 得到 `FullParam`。注册表条目、`EdgeView`、协议参数和完整参数一并存入 `ResolvedGeneratorModule`（@sec-two-layer-params、@sec-generator-module）。
+*生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeProtocolParam(EdgeView)` 计算自有类型的协议参数，并可依据 `EdgeView` 与用户参数执行能力校验；框架随后调用 `combine(userParam, protocolParam)` 得到 `FullParam`。注册表条目、`EdgeView`、协议参数和完整参数一并存入 `ResolvedGeneratorModule`（@sec-generator-records、@sec-two-layer-params、@sec-generator-module）。
 
 #决策([协议参数只读取本模块的已求解数据])[
   `computeProtocolParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用和验证端点结果。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。

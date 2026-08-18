@@ -2,9 +2,9 @@
 
 = 验证协议 <ch-verification>
 
-验证环境需要观察设计内部的信号，例如供协同仿真比对的架构状态、供记分板检查的互连事务与各级断言。Syntheke 将这些观察关系表示为探针源、探针汇和显式的验证 bind；跨模块边界的信号由框架统一规划端口和连线（@ch-hierarchy）。每个探针还声明一条 FIRRTL 层路径，例如 `verification.cosim`，用于控制对应验证逻辑的生成与移除（@req-verification、@sec-layers）。
+验证环境需要观察设计内部的信号，例如供协同仿真比对的架构状态、供记分板检查的互连事务与各级断言。Syntheke 用三样东西表示这类观察关系：被观察模块上声明的观察点，称为探针源；实现验证逻辑的生成器模块（称为验证生成器模块）上声明的收集入口，称为探针汇；以及把探针源接到探针汇的验证 bind。信号本身以 FIRRTL 的探针（`Probe`，对内部信号的只读引用）形式引出，跨模块边界的部分由框架统一规划端口和连线（@ch-hierarchy）。每个探针源还声明一条 FIRRTL 层路径，例如 `verification.cosim`，用于控制对应验证逻辑的生成与移除（@req-verification、@sec-layers）。
 
-验证协议是设计协议之外的第二种协议：设计协议在一条 bind 的两端之间双向传播、逐边求解；验证协议由探针汇一次聚合它的全部探针源。两种协议共用注册表，`ProtocolKind` 为二者建立各自的标识空间。
+验证协议是设计协议之外的第二种协议：设计协议在一条 bind 的两端之间双向传播、逐边求解；验证协议由探针汇一次聚合它的全部探针源，代码里对应的协议对象是 `DVProtocol`。两种协议共用注册表，`ProtocolKind` 为二者建立各自的标识空间。
 
 == 探针源、探针汇与验证 bind <sec-dv-declarations>
 
@@ -14,7 +14,7 @@
 
 验证 bind 与设计 bind 共用 `<-` 声明语法：`sink <- source` 产生 `DVBindId` 与 bind 的 `SourceLocation`。每个源恰好 bind 一次，每个汇至少连接一个源，同一汇的全部端点使用注册表中的同一个 `DVProtocol` 对象。
 
-探针源和探针汇分别对应生成器 IO 中以其声明名命名的顶层 Bundle，内部字段采用 `Probe` 观测信号；验证生成器以求解后的汇端 Bundle 为输入，并实现协同仿真、记分板或断言逻辑（@sec-generator-contract）。
+探针源和探针汇分别对应生成器的一个顶层端口，端口名就是声明名，端口内部的字段都是 `Probe`；验证生成器以求解后的汇端端口为输入，并实现协同仿真、记分板或断言逻辑（@sec-generator-contract）。
 
 #图([探针的层次路由。两个探针源（紫）沿层次树向上连接到顶层验证模块的探针汇；跨越的模块边界均产生带层路径标注的端口。])[
   #syn-diagram(
@@ -37,15 +37,15 @@
 
 == 验证协议对象与求解 <sec-dv-protocol>
 
-验证协议规定探针源为上游、探针汇为下游。其参数契约由探针源的 `Down` 和汇端聚合后的 `Edge` 组成；探针汇通过 `resolve` 聚合全部声明并生成 `Edge`。求解结果同时给出各探针源沿途使用的接口、汇端聚合接口，以及每个源接口在汇端接口中的路径。路径由字段选择和 Vec 索引组成。
+验证协议规定探针源为上游、探针汇为下游。它的参数只有两种：探针源声明的 `Down`，以及探针汇把全部源的 `Down` 聚合后得到的 `Edge`；聚合由验证协议对象的函数 `resolve` 完成。求解结果同时给出各探针源沿途使用的接口、汇端聚合接口，以及每个源接口在汇端接口中的路径（`InterfacePath`）。路径由字段选择和 Vec 索引组成。
 
 `NonNegativeInt` 表示大于或等于零的整数。
 
 框架以探针汇为求解单位：按 bind 声明顺序收集该汇的 `NonEmptyVector[Down]`，调用一次该汇协议的 `resolve`；成功后以相同顺序收集各源的层路径，调用 `interfacesOf(edge, layers)` 得到 `DVInterfaces`。返回值中的 `sources` 与输入一一对应，供各探针源及其跨层端口使用；`sink` 是探针汇的聚合接口；`sinkPaths(i)` 在 `sink` 中选择与 `sources(i)` 结构完全相同的 Bundle。空路径选择 `sink` 根 Bundle；非空路径用 `Field` 进入具名字段、用 `Index` 进入 Vec 元素，并且最后一段必须落在 Bundle。所有路径必须有效、互异且互不重叠，其选中 Bundle 的信号叶必须精确覆盖 `sink` 的全部信号叶。
 
-验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验。`DVInterfaces` 违反以上契约时报告 N6（@sec-error-semantics）。
+验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验。`DVInterfaces` 违反以上契约时，报告接口映射违约错误（N6，@sec-error-semantics）。
 
-每个源的 `VerificationView` 条目包含 `DVSourceId`、`DVBindId`、带 `ProtocolId` 的聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeProtocolParam` 分别读取这些条目并生成协议参数（@sec-settle-pp、@sec-generator-module）。
+求解结果按模块整理进 `EdgeView` 的验证部分 `VerificationView`：每个源的条目包含 `DVSourceId`、`DVBindId`、带 `ProtocolId` 的聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeProtocolParam` 分别读取这些条目并生成协议参数（@sec-settle-pp、@sec-generator-module）。
 
 `Down`、`Edge`、`DVInterfaces`、`InterfacePath` 与 `LayerPath` 为不可变、可序列化的数据。`downCodec` 与 `edgeCodec` 提供两个关联类型的 schema 与规范化编码；其余三种类型采用框架定义的 schema。`DVProtocol.id.kind` 固定为 `Verification`；任何会改变求解函数、接口、渲染结果或 codec schema 的变更都必须更新版本。
 
@@ -59,9 +59,9 @@
   设探针汇生成器的父结构模块为 $W$。$W$ 必须是每个探针源模块的严格祖先；汇生成器是 $W$ 的直接子模块。每条硬件路径由源到 $W$ 的唯一上行路径及 $W$ 到汇生成器的连接组成。兄弟模块之间的观察应把汇生成器放在二者公共祖先之下。
 ] <dec-dv-ancestor>
 
-探针路由复用设计侧的跨层端口规划（@sec-punch-planning）。第 $i$ 条 bind 的沿途端口使用已求解 `DVInterfaces.sources(i)`，源端及其沿途转发端口以 Output 为根方向。该 Output 路径最终连接到汇生成器中由 `sinkPaths(i)` 指定的 Input Bundle。验证接口中的 `flip` 固定为 `false`；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
+探针路由复用设计侧的跨层端口规划（@sec-punch-planning）。第 $i$ 条 bind 沿途各层生成的转发端口（@sec-punch-planning）使用已求解 `DVInterfaces.sources(i)` 的结构，源端及这些转发端口以 Output 为根方向。该 Output 路径最终连接到汇生成器中由 `sinkPaths(i)` 指定的 Input Bundle。验证接口中的 `flip` 固定为 `false`；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
 
-结构校验核对探针源与探针汇的协议、源的唯一 bind 及祖先关系，违反时报告 N8（@sec-error-semantics）。
+结构校验核对探针源与探针汇的协议、源的唯一 bind 及祖先关系，违反时报告验证拓扑非法错误（N8，@sec-error-semantics）。
 
 == FIRRTL 层与探针移除 <sec-layers>
 
@@ -97,7 +97,7 @@ $ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针�
   })
 ]
 
-跨层端口与连线写入对应的 FIRRTL 层；关闭层路径时，FIRRTL 编译流程移除其中的验证逻辑。验证求解期核对 `DVInterfaces` 中的 `Probe` 层标注与探针源声明；例化期再把生成器的实际 Probe 端口与已求解 `ProtocolBundle` 比对，失配时报告 `ElaborationError`（@sec-generator-contract）。
+跨层端口与连线写入对应的 FIRRTL 层；关闭层路径时，FIRRTL 编译流程移除其中的验证逻辑。验证求解期核对 `DVInterfaces` 中的 `Probe` 层标注与探针源声明；例化期再把生成器的实际 Probe 端口与已求解 `ProtocolBundle` 比对，失配时报告例化期错误 `ElaborationError`（@sec-generator-contract）。
 
 #决策([层路径按前缀合并])[
   相同层路径合并为同一声明。连接到同一探针汇的全部 bind 采用该汇的同一个 `DVProtocol`；检查发现其他协议时，报告相关 bind 的 `SourceLocation`。不同探针汇可以在同一层路径下使用不同协议。

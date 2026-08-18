@@ -2,7 +2,7 @@
 
 = 概念模型 <ch-model>
 
-@ch-motivation 把参数协商定义为硬件生成流程中的独立阶段（@sec-explicit-phase）。为使该阶段可单独执行和测试，构建结果必须显式表示设计并在进入协商前固化。本章定义模块、层次树、连接结构、节点与 bind、稳定标识、构建阶段和三阶段流水线。
+@ch-motivation 把参数协商定义为硬件生成流程中的独立阶段（@sec-explicit-phase）。为使该阶段可单独执行和测试，构建结果必须显式表示设计并在进入协商前固化。本章依次定义模块、层次树与连接结构、节点与 bind、稳定标识、构建阶段、三阶段流水线和序列化边界。
 
 == 模块的两种形态 <sec-module-kinds>
 
@@ -12,19 +12,17 @@ Syntheke 把以参数为输入并返回电路模块的 zaozi 工厂称为#term[�
 
 模块类型是包含以下两个分支的密封类型：
 
-- #term[结构模块][`WrapperModule`]　生成器数量为零，可以包含子模块、设计 bind 与验证 bind。其电路内容由子实例、端口与连线组成；跨层转发端口和连线由框架规划并发射（@ch-hierarchy）。
-- #term[生成器模块][`GeneratorModule`]　子模块数量为零，绑定恰好一个生成器。硬件逻辑与辅助逻辑由该生成器实现；端口声明和生成器 IO 的对应契约见 @sec-generator-module。
+- #term[结构模块][`WrapperModule`]　不带生成器，只用来组织层次：它例化子模块，并在其中声明模块之间的连接（@sec-node-conn-proto）和验证探针的连接（@ch-verification）。它的电路只有子模块实例、端口和连线；穿过它的连接需要哪些端口和连线，由框架算出并生成（@ch-hierarchy）。
+- #term[生成器模块][`GeneratorModule`]　没有子模块，绑定恰好一个生成器，硬件逻辑全部由该生成器实现。它带一份#term[用户参数][user parameter]：构建期给定、不依赖连接关系的参数，例如容量、关联度、基地址和功能开关（@sec-two-layer-params）。它的端口与生成器端口的对应契约见 @sec-generator-module。
 
 == 层次树与连接结构 <sec-two-graphs>
 
-#term[协议][protocol]定义一条边上 `Down`、`Up` 与 `Edge` 的数据类型、逐边求解函数和硬件接口（@ch-protocol）。参数如何穿过生成器模块，由模块输入、输出节点之间的 `dFn` 与 `uFn` 定义（@sec-node-conn-proto、@sec-propagation）。
-
 一个 Syntheke 设计由两套结构共同描述：
 
-- #term[层次树][hierarchy tree]　顶点是模块。它表达*所有权*：模块例化关系、命名空间嵌套和物理模块边界。这棵树只包含设计显式例化的模块，最终一一对应生成电路的模块层次。Xbar、NoC、直连、时钟树和电源网格等互连实现由生成器模块产生。
-- #term[连接结构][connection structure]　生成器模块声明具名输入节点和输出节点，显式 bind 从一个输出节点指向一个输入节点。每个节点唯一关联一条 bind 和已求解边，并对应所属生成器的一个端口；每条 bind 则具有源、目标两个节点和两个端口。模块还声明从输入节点到输出节点的模块内部参数依赖；这些依赖与 bind 共同决定参数的传播顺序（@sec-propagation）。
+- #term[层次树][hierarchy tree]　顶点是模块。它表达*所有权*：模块例化关系、命名空间嵌套和物理模块边界。这棵树只包含设计显式例化的模块，最终一一对应生成电路的模块层次。Xbar、NoC、直连、时钟树和电源网格等互连实现也是树上的生成器模块。
+- #term[连接结构][connection structure]　生成器模块声明具名的输入节点和输出节点，每个节点就是该模块的一个协议端口；bind 把一个输出节点接到一个输入节点。模块还声明本模块内部哪些输入节点的参数会影响哪些输出节点，称为模块内部参数依赖。节点、bind 与内部依赖的定义见 @sec-node-conn-proto。
 
-连接可以跨越任意层级。一个位于层次树深处的模块节点，可以 bind 到另一棵子树中的模块节点；连接结构给出“两端模块节点”的关系，层次树给出两端生成器模块之间的模块路径。协商阶段沿该路径统一规划跨层端口与连线（@ch-hierarchy）。
+连接可以跨越任意层级。一个位于层次树深处的模块节点，可以 bind 到另一棵子树中的模块节点；连接结构给出“两端节点”的关系，层次树给出两端生成器模块之间的模块路径。协商阶段沿该路径统一规划跨层端口与连线（@ch-hierarchy）。
 
 #图([层次树与连接结构。方框嵌套是层次树；圆点与绿色实线是模块节点及 bind，灰色点线是模块内部参数依赖。A、B 分别连接 Xbar 模块 R 的两个输入节点，R 的输出节点连接 C；每个圆点只对应一个端口和一条 bind。])[
   #syn-diagram(
@@ -59,37 +57,41 @@ Syntheke 把以参数为输入并返回电路模块的 zaozi 工厂称为#term[�
 
 == 模块节点、bind 与协议 <sec-node-conn-proto>
 
-模块节点由生成器模块声明，分为输入节点和输出节点。方向按 `Down` 的传播定义：输出节点是 bind 的源，输入节点是 bind 的目标。节点记录名称、方向、协议和源码位置；它同时标识生成器 IO 中的一个顶层端口。
+#term[模块节点][module node]由生成器模块声明，分为输入节点和输出节点，记录名称、方向、协议和源码位置；每个节点同时对应生成器的一个顶层端口。#term[协议][protocol]规定一条连接上传播的参数类型和求解规则（@ch-protocol）；每个节点属于一个协议。
 
-模块显式声明输入节点到输出节点的参数依赖。每个输出节点带一个 `dFn`：读取它所依赖的输入节点的 `Down` 和本模块的用户参数，返回该输出节点唯一的 `Down`。每个输入节点带一个 `uFn`：读取依赖它的输出节点的 `Up` 和用户参数，返回该输入节点唯一的 `Up`。没有前驱的输出节点和没有后继的输入节点，函数只从用户参数产生初值。函数能读哪些节点由依赖声明决定，声明方式见 @sec-generator-module；求值顺序见 @sec-propagation。同一个函数可以读不同协议的节点。Xbar、NoC 以多个具名节点表示多个端口，以模块内部参数依赖表示端口之间的参数影响关系；每个节点仍只参与一条 bind。
+*bind* 是连接声明：把一个模块的输出节点接到另一个模块（或同一模块）的输入节点，写作 `目标输入节点 <- 源输出节点`。bind 有两种：#term[设计 bind][design bind]连接两个模块节点，本章及 @ch-protocol、@ch-interconnect 讨论的都是它；#term[验证 bind][verification bind]把一个探针源接到一个探针汇，见 @ch-verification。不加限定的 bind 指设计 bind。
+
+方向按 `Down` 的传播定义：输出节点是 bind 的源，输入节点是 bind 的目标。每条 bind 在协商期得到三项参数：源节点算出的下行参数 `Down`、目标节点算出的上行参数 `Up`，以及由协议把二者合成的#term[边参数][edge parameter] `Edge`（@sec-three-param-kinds）。一条 bind 连同它求出的参数称为一条#term[边][edge]；设计 bind 对应设计边，验证 bind 对应验证边；bind 与边在不强调求解结果时统称连接。每个模块节点恰好参与一次设计 bind：输出节点恰好作为一次 bind 的源，输入节点恰好作为一次 bind 的目标。
+
+模块显式声明输入节点到输出节点的#term[模块内部参数依赖][module-internal parameter dependency]：一条依赖表示该输入节点的 `Down` 参与计算该输出节点的 `Down`，反过来该输出节点的 `Up` 参与计算该输入节点的 `Up`。每个输出节点带一个函数 `dFn`：读取本节点所依赖的各输入节点的 `Down` 和本模块的用户参数，返回该输出节点唯一的 `Down`。每个输入节点带一个函数 `uFn`：读取依赖本节点的各输出节点的 `Up` 和用户参数，返回该输入节点唯一的 `Up`。`dFn` 与 `uFn` 统称#term[端口参数函数][port parameter functions]。不依赖任何输入节点的输出节点和不被任何输出节点依赖的输入节点称为#term[边界节点][boundary node]，它们的函数只从用户参数产生初值。函数能读哪些节点由依赖声明决定，声明方式见 @sec-generator-module；求值顺序见 @sec-propagation。同一个函数可以读不同协议的节点。Xbar、NoC 以多个具名节点表示多个端口，以内部参数依赖表示端口之间的参数影响关系；每个节点仍只参与一条 bind。
 
 #不变量[全部模块节点均由生成器模块声明。]
 
-bind 从一个输出节点连接到一个输入节点，写作 `目标输入节点 <- 源输出节点`（@sec-attach）。每条 bind 在连接结构中产生一条有向边，并在协商期得到一项 `Down`、一项 `Up` 和一个#term[边参数][edge parameter] `Edge`。每个模块节点恰好参与一次设计 bind：输出节点恰好作为一次 bind 的源，输入节点恰好作为一次 bind 的目标。
-
 #不变量[一条设计 bind 的源输出节点与目标输入节点必须使用同一协议。跨协议参数变换由具有不同输入、输出协议的显式生成器模块承担（@sec-protocol-object）。]
 
-#不变量[bind 与模块内部参数依赖组成的有向图必须无环。结构校验发现环时，报告环上的模块节点、bind、内部依赖及其源码位置（@sec-propagation）。]
+#不变量[bind 与模块内部参数依赖组成的有向图必须无环；这张图称为#term[参数依赖 DAG][parameter dependency DAG]（@sec-propagation）。协商开始时的结构校验（@sec-structural-check）发现环时，报告环上的模块节点、bind、内部依赖及其源码位置。]
 
 == 稳定标识 <sec-identity>
 
-实体标识由已命名结构派生：`ModuleId` 是从设计根开始的实例名路径；`ModuleNodeId` 由 `module: ModuleId` 与 `name: NonEmptyString` 组成；`BindId` 由声明顺序和源、目标 `ModuleNodeId` 组成。同一模块内节点名唯一。每个节点唯一关联一条 bind，因此 `ModuleNodeId` 可以确定该节点所在的 `BindId` 和已求解边；一条 bind 同时关联源、目标两个节点。验证端点的标识见 @sec-dv-declarations。
+实体标识由已命名结构派生：`ModuleId` 是从设计根开始的实例名路径；`ModuleNodeId` 由 `module: ModuleId` 与 `name: NonEmptyString` 组成；`BindId` 由声明顺序和源、目标 `ModuleNodeId` 组成。同一模块内节点名唯一。每个节点唯一关联一条 bind，因此 `ModuleNodeId` 可以确定该节点所在的 `BindId` 和已求解边；一条 bind 同时关联源、目标两个节点。探针源与探针汇（合称验证端点）的标识见 @sec-dv-declarations。
 
 每个模块、节点、bind、内部参数依赖和验证端点都记录声明处的 `SourceLocation`（源码文件、行与列）。源码位置只用于诊断，实体身份由稳定标识确定。
 
 == 构建阶段 <sec-build>
 
-构建期声明节点和记录连接需要框架提供的构建上下文 `DesignBuilder`。设计入口注入该上下文。生成器模块在其中声明用户参数、生成器注册表条目、输入与输出节点、模块内部参数依赖和验证端点（@sec-generator-module）；结构模块在其中例化子模块并记录 bind。条件拓扑与循环生成的子系统由宿主语言控制流表达。bind 算子 `<-` 只能在该上下文中记录连接。设计体返回时，构建器固化为不可变的 `DesignSpec`，构建上下文的生命周期随之结束。
+构建期声明节点和记录连接需要框架提供的构建上下文 `DesignBuilder`。设计入口注入该上下文。生成器模块在其中声明用户参数、所用的生成器、输入与输出节点、模块内部参数依赖和验证端点（@sec-generator-module）；结构模块在其中例化子模块并记录 bind。条件拓扑与循环生成的子系统由宿主语言控制流表达。bind 算子 `<-` 只能在该上下文中记录连接。设计体返回时，构建器固化为不可变的 `DesignSpec`，构建上下文的生命周期随之结束。
+
+设计维护两张注册表：协议注册表登记设计用到的每个协议对象，键 `ProtocolId` 由协议种类、名称与版本组成；生成器注册表登记每个生成器，键 `GeneratorId` 由生成器限定名与版本组成。同一个键在一个设计里只对应一个对象。
 
 `DesignSpec` 包含三组内容：
 
 - 固化后的模块树，以及树中各模块的不可变输入、输出节点规格、模块内部参数依赖、验证端点和有向 bind；节点规格保存方向、协议及相应的 `dFn` 或 `uFn`，每条内部依赖保存声明顺序和源码位置；
-- 协议注册表，其键 `ProtocolId` 由协议种类、名称与版本组成；生成器注册表，其键 `GeneratorId` 由生成器限定名与版本组成；
+- 两张注册表的不可变副本；
 - 按稳定标识索引的 `SourceLocation`，以及模块、节点、内部参数依赖、验证端点与 bind 的声明顺序。
 
 == 三阶段流水线 <sec-triptych>
 
-设计生成分为三个阶段，前一阶段的输出作为后一阶段的输入。这套流程称为#term[Triptych 流水线][the Triptych pipeline]：
+设计生成分为三个阶段，前一阶段的输出作为后一阶段的输入。这套流程称为#term[Triptych 流水线][the Triptych pipeline]；执行协商阶段的框架部分称为#term[协商器][negotiator]。
 
 #图([Triptych 流水线。矩形表示阶段，胶囊表示阶段间的不可变产物。])[
   #syn-diagram(
@@ -114,12 +116,12 @@ bind 从一个输出节点连接到一个输入节点，写作 `目标输入节�
   [构建],
   [使用宿主语言代码例化模块树、声明节点和连接（@sec-build）。产物是设计规格 `DesignSpec`。],
   [协商],
-  [读入设计规格，对参数依赖 DAG 做拓扑排序，正向传播 `Down`、反向传播 `Up`，逐边调用协议求解，计算各生成器模块的协议参数与完整参数，并规划跨模块的端口与连线（@ch-negotiation）；产出协商结果 `ResolvedDesign`，或一组协商错误（@sec-error-semantics）。],
+  [读入设计规格，对参数依赖 DAG 做拓扑排序，正向传播 `Down`、反向传播 `Up`，逐边调用协议求解，计算各生成器模块的协议参数与完整参数（@sec-two-layer-params），并规划跨模块的端口与连线（@ch-negotiation）；产出协商结果 `ResolvedDesign`，或一组协商错误（@sec-error-semantics）。],
   [例化],
-  [读入协商结果：以各生成器模块的完整参数调用 zaozi 生成器，发射结构模块，执行连线计划（@ch-hardware）；产出 FIRRTL 电路。],
+  [读入协商结果：以各生成器模块的完整参数调用 zaozi 生成器，生成结构模块的电路（本文称发射），执行连线计划（@ch-hardware）；产出 FIRRTL 电路。],
 )
 
-`ResolvedDesign` 保留对应的 `DesignSpec`，并增加按 bind 声明顺序排列的设计边、按探针汇分组的验证求解数据、各生成器模块的 `EdgeView` 和已求解参数记录、跨层端口计划、连线计划和 FIRRTL 层声明树。每条设计边保存源节点、目标节点、协议、`Down`、`Up`、`Edge` 与接口结构；每个节点在所属模块的 `EdgeView` 中映射到这条唯一的边。具体契约见 @sec-resolved-records。每条生成器记录绑定注册表条目、协议参数和完整参数，例化阶段据此调用生成器。工具导出通过协议注册表调用 @ch-protocol 定义的编解码与渲染函数。
+`ResolvedDesign` 保留对应的 `DesignSpec`，并加上协商的全部结果：每条边求出的参数和接口、每个生成器模块的完整参数、跨层端口与连线的计划、FIRRTL 层声明；字段见 @sec-resolved-records 与 @sec-generator-records。例化阶段据此调用生成器；工具导出通过协议注册表调用 @ch-protocol 定义的编解码与渲染函数。
 
 协商阶段检查 `DesignSpec` 的结构、协议与参数约束（@req-iteration）；例化阶段检查生成器实际端口与协议接口（@dec-binding-check）。拓扑、声明或 IP 的变化触发新一轮三阶段。
 

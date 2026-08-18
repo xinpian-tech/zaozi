@@ -15,7 +15,7 @@
 - *计划*（`plan.json`）：每个模块的跨层端口计划、连线计划与层声明；每项计划以 `Design(BindId)` 或 `Verification(DVBindId)` 标记来源，并记录 bind 的源码位置（@sec-punch-planning、@sec-layers）。
 - *整机参数*（`params.json`）：每个生成器模块一条记录，包含模块标识、生成器标识和该实例的 `FullParam` 值；生成器标识确定对应的 `FullParam` schema。
 
-`ModuleId` 直接编码为实例名数组；`ModuleNodeId` 与 `BindId` 按 @sec-attach 的组成字段编码为 JSON 对象。模块内部参数依赖保存输入、输出两个 `ModuleNodeId`，重复的有序端点对在结构校验中非法。`DVSourceId`、`DVSinkId` 与 `DVBindId` 同样按 @sec-dv-declarations 的组成字段编码。导出记录保留模块、模块节点、bind、参数依赖、协议标识、源码位置和稳定标识之间的对应关系。
+`ModuleId` 直接编码为实例名数组；`ModuleNodeId` 与 `BindId` 按 @sec-identity 的组成字段编码为 JSON 对象。模块内部参数依赖保存输入、输出两个 `ModuleNodeId`，重复的有序端点对在结构校验中非法。`DVSourceId`、`DVSinkId` 与 `DVBindId` 同样按 @sec-dv-declarations 的组成字段编码。导出记录保留模块、模块节点、bind、参数依赖、协议标识、源码位置和稳定标识之间的对应关系。
 
 单个生成器定义一个 `FullParam` 的序列化 schema；单个 IP 独立例化时，命令行输入是一份符合该 schema 的 `FullParam` 值（@sec-generator-contract）。`params.json` 采用整机多实例结构，其中每条记录携带一个可作为生成器输入的 `FullParam` 值。
 

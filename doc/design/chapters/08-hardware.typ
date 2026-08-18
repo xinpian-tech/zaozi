@@ -50,9 +50,9 @@
 
 协商器为每个生成器模块装配 `EdgeView`，再调用该模块的 `computeProtocolParam`。
 
-`nodes` 按声明顺序返回本模块的全部设计模块节点；`parameterDependencies` 按声明顺序返回本模块从输入节点到输出节点的依赖边，每条记录包含两端 `ModuleNodeId` 与 `SourceLocation`。`OutputNodeSpec` 必须携带 `dFn`，`InputNodeSpec` 必须携带 `uFn`，函数字段不可选。构建 API 每声明一条依赖边，就同时返回两个带协议类型的读取句柄，分别供输出节点函数读取输入 `Down`、供输入节点函数读取输出 `Up`；原始节点句柄没有读取操作。因此函数可读集合与 `parameterDependencies` 由同一次调用产生，不能分开声明。函数返回类型由本节点协议确定。无前驱或无后继时同一个函数从用户参数产生边界初值。处理器、存储、桥、Xbar、NoC、直连和时钟树均通过这套公开构造方法声明节点和模块内部参数依赖。
+`nodes` 按声明顺序返回本模块的全部设计模块节点；`parameterDependencies` 按声明顺序返回本模块从输入节点到输出节点的依赖边，每条记录包含两端 `ModuleNodeId` 与 `SourceLocation`。`OutputNodeSpec` 必须携带 `dFn`，`InputNodeSpec` 必须携带 `uFn`，函数字段不可选。构建 API 每声明一条依赖边，就同时返回两个带协议类型的读取句柄（只能读取指定节点参数的句柄），分别供输出节点函数读取输入 `Down`、供输入节点函数读取输出 `Up`；原始节点句柄没有读取操作。因此函数可读集合与 `parameterDependencies` 由同一次调用产生，不能分开声明。函数返回类型由本节点协议确定。边界节点的函数从用户参数产生初值。处理器、存储、桥、Xbar、NoC、直连和时钟树均通过这套公开构造方法声明节点和模块内部参数依赖。
 
-`DesignBuilder` 根据当前模块的 `ModuleId` 与节点名派生 `ModuleNodeId`。同一模块内节点名唯一；每个节点恰好参与一次设计 bind。节点在生成器 IO 中对应一个以节点声明名命名、由节点方向确定根方向的顶层 Bundle（@sec-port-naming）。
+`DesignBuilder` 根据当前模块的 `ModuleId` 与节点名派生 `ModuleNodeId`。同一模块内节点名唯一；每个节点恰好参与一次设计 bind。节点在生成器的端口中对应一个以节点声明名命名、由节点方向确定根方向的顶层 Bundle（@sec-port-naming）。
 
 跨协议引用只能指向本模块的节点，用来声明本节点属于哪个时钟节点和电源节点：模块声明统一的时钟、电源输入节点，数据节点引用它们，求解后得到对应边的 `Edge`，每个端口的时钟域与电源域由此可知。引用只提供信息，框架不检查 bind 两端是否同域；跨域必须经过桥（@sec-bridge-boundary）。
 
@@ -60,7 +60,7 @@
 
 `dvSources` 与 `dvSinks` 声明验证端点（@sec-dv-declarations）。解析后的条目由 `VerificationView` 按声明顺序提供，并经 `computeProtocolParam` 进入完整参数；字段契约见 @sec-generator-records。
 
-每条设计边在源、目标生成器 IO 中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在结构校验中报告 N9。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
+每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在结构校验中报告 N9。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
 
 #决策([端口结构校验在例化期进行])[
   生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input，探针源为 Output，探针汇为 Input；字段名称、顺序和 `flip`，`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、bind 的源码位置（`SourceLocation`）以及期望结构与实际结构的差异路径。
