@@ -2,7 +2,7 @@
 
 = 协议抽象 <ch-protocol>
 
-本章定义设计协议的 `Down`、`Up`、`Edge` 类型、逐边求解和硬件接口。模块内部的参数传播见第 2 章和第 5 章。
+本章定义设计协议的 `Down`、`Up`、`Edge` 类型、逐边求解和硬件接口。模块内部的参数传播见 @sec-node-conn-proto 与 @sec-propagation；验证协议见 @ch-verification。
 
 == 边上传播的参数与求解结果 <sec-three-param-kinds>
 
@@ -11,9 +11,7 @@
 - #term[下行参数][downward parameter]（类型 `Down`）：`negotiate` 的第一项输入，沿 bind 方向从源节点传向目标节点。
 - #term[上行参数][upward parameter]（类型 `Up`）：`negotiate` 的第二项输入，逆 bind 方向从目标节点传向源节点。
 
-bind 与模块内部参数依赖共同形成 `Down` 参数依赖 DAG；每条内部依赖都从输入节点指向输出节点。反转这些依赖得到 `Up` 参数依赖 DAG。协商器按拓扑序计算各输出节点的 `dFn`，再按反向拓扑序计算各输入节点的 `uFn`。
-
-传播的初始值由参数 DAG 的边界节点提供。以 AXI 内存互连为例，无前驱依赖的输出节点可以声明要求可达的地址范围、本地事务 ID 位宽、操作集合与数据位宽能力；无后继依赖的输入节点可以声明服务地址区域、支持的操作、数据位宽能力与可接受的下游 ID 位宽。中间模块的端口参数函数继续变换这些值。以 CHI 类协议为例，同一机制会传播节点编号、每个请求节点的事务标签空间、转发事务携带的原始请求者身份以及数据缓冲标识能力。常见协议的传播方向与边界声明如下：
+两者的传播顺序见 @sec-propagation。传播的初始值由参数 DAG 的边界节点提供。以 AXI 内存互连为例，无前驱依赖的输出节点可以声明要求可达的地址范围、本地事务 ID 位宽、操作集合与数据位宽能力；无后继依赖的输入节点可以声明服务地址区域、支持的操作、数据位宽能力与可接受的下游 ID 位宽。中间模块的端口参数函数继续变换这些值。以 CHI 类协议为例，同一机制会传播节点编号、每个请求节点的事务标签空间、转发事务携带的原始请求者身份以及数据缓冲标识能力。常见协议的传播方向与边界声明如下：
 
 #table(
   columns: (auto, auto, 1fr, 1fr),
@@ -44,7 +42,7 @@ bind 与模块内部参数依赖共同形成 `Down` 参数依赖 DAG；每条内
 
 == 协议对象 <sec-protocol-object>
 
-协议对象定义一条边上的三种关联类型：`Down`、`Up` 与 `Edge`。`Codec[A]` 提供类型 `A` 的 schema、规范化编码与解码。`ProtocolBundle` 是协议接口的非空顶层 Bundle 描述，字段结构见 @sec-protocol-interface。模块端口参数函数发现的传播冲突由 `dFn` 或 `uFn` 返回，单边约束冲突由 `negotiate` 返回；第 5 章把它们连同主体标识和源码位置包装为 `NegotiationError`。
+协议对象定义一条边上的三种关联类型：`Down`、`Up` 与 `Edge`。`Codec[A]` 提供类型 `A` 的 schema、规范化编码与解码。`ProtocolBundle` 是协议接口的非空顶层 Bundle 描述，字段结构见 @sec-protocol-interface。模块端口参数函数发现的传播冲突由 `dFn` 或 `uFn` 返回，单边约束冲突由 `negotiate` 返回；@ch-negotiation 把它们连同主体标识和源码位置包装为 `NegotiationError`。
 
 协议对象必须给出协议标识、下行参数、上行参数、边参数、逐边求解函数、接口描述函数、三种参数的 codec 和可视化渲染函数。协议标识由协议种类、名称和版本组成；可视化渲染结果由显示标签和一组属性构成。
 
@@ -112,15 +110,3 @@ bind 与模块内部参数依赖共同形成 `Down` 参数依赖 DAG；每条内
 ]
 
 zaozi 以 `GeneratorId` 与完整参数的规范化序列化作为模块缓存键。用户参数相同而协议参数不同的实例具有不同缓存键，并分别生成模块定义。
-
-== 验证协议 <sec-dv-protocol>
-
-验证协议规定探针源为上游、探针汇为下游。其参数契约由探针源的 `Down` 和汇端聚合后的 `Edge` 组成；探针汇通过 `resolve` 聚合全部声明并生成 `Edge`。求解结果同时给出各探针源沿途使用的接口、汇端聚合接口，以及每个源接口在汇端接口中的路径。路径由字段选择和 Vec 索引组成。
-
-`NonNegativeInt` 表示大于或等于零的整数。
-
-`resolve` 的输入按探针 bind 声明顺序排列，且每个探针汇至少连接一个源。框架以相同顺序把各探针源声明的 `LayerPath` 传给 `interfacesOf`。返回值中的 `sources` 与输入一一对应；`sink` 是汇端接口；`sinkPaths(i)` 在 `sink` 中选择与 `sources(i)` 结构完全相同的 Bundle。空路径选择 `sink` 根 Bundle；非空路径用 `Field` 进入具名字段、用 `Index` 进入 Vec 元素，并且最后一段必须落在 Bundle。所有路径必须有效、互异且互不重叠，其选中 Bundle 的信号叶必须精确覆盖 `sink` 的全部信号叶。
-
-验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验（@sec-dv-routing）。
-
-`Down`、`Edge`、`DVInterfaces`、`InterfacePath` 与 `LayerPath` 为不可变、可序列化的数据。`downCodec` 与 `edgeCodec` 提供两个关联类型的 schema 与规范化编码；其余三种类型采用框架定义的 schema。`DVProtocol.id.kind` 固定为 `Verification`；任何会改变求解函数、接口、渲染结果或 codec schema 的变更都必须更新版本。验证协议与设计协议共用注册表，`ProtocolKind` 为二者建立各自的标识空间。
