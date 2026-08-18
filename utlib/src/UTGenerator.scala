@@ -78,49 +78,32 @@ final class UTGenerator[
     trace:     Boolean = false,
     traceFile: String = "trace.vcd"
   ): RunResult =
-    Simulation.run(simulationRequest(stimulus, outDir, trace, traceFile))
-
-  /** Elaborate, link and lower the generic harness without running a simulator. */
-  def simulationRequest(
-    stimulus:  SolvedStimulus[I],
-    outDir:    os.Path = outputDirectory,
-    trace:     Boolean = false,
-    traceFile: String = "trace.vcd"
-  ): SimulationRequest =
     require(
       stimulus.dut == dut.moduleName(parameter),
       s"stimulus is for ${stimulus.dut}, not ${dut.moduleName(parameter)}"
     )
     require(stimulus.cycles == cycles, s"stimulus has ${stimulus.cycles} cycles, expected $cycles")
     require(traceFile.nonEmpty, "traceFile must not be empty")
-    os.makeDir.all(outDir)
 
-    val harnessParameter = DefaultUTHarnessParameter(stimulus.data, timeoutCycles, trace, traceFile)
-    val harness          = new DefaultUTHarnessGenerator(dut, parameter)
-    val topModule        = harness.moduleName(harnessParameter)
-    val moduleDir        = outDir / s"mlir_${harnessParameter.hashCode.toHexString}"
-    os.makeDir.all(moduleDir)
-
-    elaborate(harness, harnessParameter, moduleDir)
-    val modules = os.list(moduleDir).filter(_.ext == "mlirbc").sortBy(_.last)
-    require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
-    val linked  = moduleDir / "linked.mlir"
-    os.proc(
-      Seq("firld", s"--base-circuit=$topModule", "--no-mangle") ++
-        modules.map(_.toString) ++ Seq("-o", linked.toString)
-    ).call()
-
-    val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
-    val driverPath = outDir / s"${Driver.topModuleName}.sv"
-    os.write.over(driverPath, Driver.topString(topModule, trace, traceFile))
-    SimulationRequest(
-      sources = Seq(emitted.primary, driverPath),
-      workDir = outDir,
-      topModule = Driver.topModuleName,
-      trace = trace,
-      traceFile = traceFile,
-      coverageFile = "coverage.dat"
+    // Replaying the solved stimulus is just one frontend of the single lib model: build the
+    // lib harness, then drive it with a frontend fed the solver's per-cycle values.
+    val lib       = libSimulationRequest(outDir)
+    val spec      = dpi.spec
+    val replaySeq = (0 until stimulus.cycles).map(cycle =>
+      spec.drive.map(port => port.name -> stimulus.io.field(port.name).at(cycle)).toMap
     )
+    val cpp       = Frontend.driver(
+      spec,
+      lib.topModule,
+      replaySeq,
+      label = "REPLAY",
+      trace = Option.when(trace)(traceFile),
+      coverageFile = Some(lib.coverageFile),
+      finishMarker = Some("HARNESS-DONE")
+    )
+    val cppPath   = outDir / "frontend_run.cpp"
+    os.write.over(cppPath, cpp)
+    Simulation.run(lib.copy(cppSources = Seq(cppPath), trace = trace, traceFile = traceFile))
 
   /** Elaborate and lower the single lib harness: a flat SystemVerilog module whose ports *are* the DPI contract (drive
     * ports and clock/reset as inputs, each probe point as a `probe_<name>` output). It has no internal loop — an
@@ -150,6 +133,7 @@ final class UTGenerator[
     val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
     SimulationRequest(
       sources = Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq,
+      cppSources = Seq.empty,
       workDir = outDir,
       topModule = topModule,
       trace = false,

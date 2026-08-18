@@ -27,13 +27,19 @@ private[utlib] class LibHarnessIO(parameter: LibHarnessParameter) extends HWReco
   private val spec = parameter.spec
   val clock        = spec.clock.map(p => Flipped(p.name, Clock())).toSeq
   val reset        = spec.reset.map(p => Flipped(p.name, Reset())).toSeq
-  val drives       = spec.drive.map(p => Flipped(p.name, Bits(p.width)))
+  val drives       = spec.drive.map(p => Flipped(LibHarness.drivePort(p.name), Bits(p.width)))
   val probes       = spec.probe.map(p => Aligned(LibHarness.probePort(p.name), Bits(p.width)))
 
 private[utlib] class LibHarnessProbe(parameter: LibHarnessParameter)
     extends DVBundle[LibHarnessParameter, LibHarnessLayers](parameter)
 
 private[utlib] object LibHarness:
+  /** How a drive port named `name` appears as a top-level input port. Prefixed so it never collides with a probe of the
+    * same name and is always a valid C++ identifier (a DUT input called `bool` would otherwise clash with the C++
+    * keyword in the frontend).
+    */
+  def drivePort(name: String): String = s"drive_$name"
+
   /** How a probe point named `name` appears as a top-level output port. */
   def probePort(name: String): String = s"probe_$name"
 
@@ -68,10 +74,27 @@ private[utlib] final class LibHarnessGenerator[
     val instance = dut.instantiate(dutParameter)
     val spec     = parameter.spec
 
-    // Forward the clock/reset/drive input ports to the DUT's same-named inputs.
+    val dutInterface = dut.interface(dutParameter)
+    dutInterface.toMlirType
+    val inputFields  = dutInterface.elements.filter(_.isFlipped)
+
+    // Forward clock/reset straight through.
     spec.clock.foreach(p => instance.io.field[Clock](p.name) := io.field[Clock](p.name))
     spec.reset.foreach(p => instance.io.field[Reset](p.name) := io.field[Reset](p.name))
-    spec.drive.foreach(p => instance.io.field[Bits](p.name) := io.field[Bits](p.name))
+
+    // Each drive port is a flat `Bits` input the frontend pokes; cast it to the DUT input's
+    // actual type (Bool / UInt / SInt / Bits) so the connect is well-typed.
+    spec.drive.foreach { p =>
+      val poked = io.field[Bits](LibHarness.drivePort(p.name))
+      val field = inputFields
+        .find(_.name == p.name)
+        .getOrElse(throw new IllegalStateException(s"drive port ${p.name} is not an input of ${spec.dut}"))
+      field.dataType match
+        case _: Bool => instance.io.field[Bool](p.name) := poked.asBool
+        case _: SInt => instance.io.field[SInt](p.name) := poked.asSInt
+        case _: UInt => instance.io.field[UInt](p.name) := poked.asUInt
+        case _ => instance.io.field[Bits](p.name) := poked
+    }
 
     // Read each probe point through the Verification layer and expose it as the matching
     // output port. The probe is observation-only — it drives nothing in the DUT.
