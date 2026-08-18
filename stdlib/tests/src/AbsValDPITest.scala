@@ -12,12 +12,12 @@ import utest.*
 object AbsValDPITest extends TestSuite:
   private val outputRoot = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
   private val generator  =
-    UTGenerator(AbsVal, AbsValParameter(8), cycles = 3, outputDirectory = outputRoot / "AbsValDPI")
+    UTGenerator(AbsValUT, AbsValUTParameter(8), cycles = 3, outputDirectory = outputRoot / "AbsValDPI")
 
   val tests: Tests = Tests:
     test("typed drive and probe ports resolve against the DUT interfaces"):
       val contract = generator.dpi
-      assert(contract.spec.dut == "AbsVal_width8")
+      assert(contract.spec.dut == "AbsValUT_width8")
 
       // `A` is the DUT's input — a Drive port, checked against AbsValIO at compile time.
       assert(contract.drive.A.role == DPIRole.Drive)

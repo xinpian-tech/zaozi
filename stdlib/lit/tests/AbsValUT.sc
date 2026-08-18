@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{ut} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.AbsValUT" %s --
+// DEFINE: %{ut} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.AbsValUTRun" %s --
 
 // The UT flow runs entirely from this lit test: the Scala entry solves the constraints and
 // emits the generated SV testbench (harness + minimal clock/reset driver), then Verilator
@@ -26,15 +26,15 @@
 // RUN8: HARNESS-DONE
 // RUN8-NOT: HARNESS-TIMEOUT
 
-// DPI8:      "dut": "AbsVal_width8"
+// DPI8:      "dut": "AbsValUT_width8"
 // DPI8:      "name": "A"
 // DPI8-NEXT: "role": "Drive"
 // DPI8:      "name": "absval"
 // DPI8-NEXT: "role": "Probe"
 
 // SHIM8: import "DPI-C"
-// SHIM8-SAME: AbsVal_width8_tick
-// SHIM8: AbsVal_width8_tick(
+// SHIM8-SAME: AbsValUT_width8_tick
+// SHIM8: AbsValUT_width8_tick(
 
 // The frontend drives A=-3 and the DUT computes |A|=3 one cycle later: a genuine closed loop.
 // stdout (DPI-LOOP) and stderr (HARNESS-DONE) interleave, so match order-independently.

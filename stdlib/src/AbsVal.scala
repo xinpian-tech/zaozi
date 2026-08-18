@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{ConstraintInterface, HasUT}
-import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -39,9 +37,7 @@ class AbsValProbe(parameter: AbsValParameter) extends DVBundle[AbsValParameter, 
   * generic subtractor.
   */
 @generator
-object AbsVal
-    extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]
-    with HasUT[AbsValParameter, AbsValIO]:
+object AbsVal extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]:
   override def moduleName(p: AbsValParameter): String = s"AbsVal_width${p.width}"
 
   def architecture(parameter: AbsValParameter) =
@@ -67,17 +63,3 @@ object AbsVal
       val absvalP = Wire(Bits(parameter.width)); absvalP := absVal; probe.absval <== absvalP
 
     io.ABSVAL := checkedAbsVal
-
-  def constraints(
-    parameter: AbsValParameter
-  )(
-    using Arena,
-    Context,
-    Block,
-    ConstraintInterface[AbsValIO]
-  ): Unit =
-    val io = summon[ConstraintInterface[AbsValIO]]
-    require(io.A.cycles >= 3, "AbsVal UT requires cycles for positive, zero, and negative inputs")
-    smtAssert(io.A.at(0) > 0.S)
-    smtAssert(io.A.at(1) === 0.S)
-    smtAssert(io.A.at(2) < 0.S)
