@@ -27,10 +27,17 @@ trait Tool:
           s"or set $envVar to an absolute path."
       )
 
-/** What a [[Simulator]] is asked to build and run. */
+/** What a [[Simulator]] is asked to build and run.
+  *
+  * The top module is the lib harness; its ports are the DPI contract. `cppSources` is the frontend that owns the loop
+  * (poke drive, advance, peek probe) — it is compiled and linked against the Verilated model, and it, not the
+  * simulator, writes the waveform and coverage.
+  */
 final case class SimulationRequest(
   /** SystemVerilog sources to compile, in order. */
   sources:      Seq[os.Path],
+  /** C++ frontend sources that own the simulation loop, linked against the Verilated model. */
+  cppSources:   Seq[os.Path],
   /** Directory to build and run in; auxiliary files are resolved relative to it. */
   workDir:      os.Path,
   /** Name of the top module to elaborate. */

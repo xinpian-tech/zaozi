@@ -11,25 +11,33 @@ final case class RunResult(
   coverage:  CoverageReport,
   tracePath: Option[os.Path] = None)
 
-/** The Verilator simulation backend. Assertions and user coverage are always enabled. */
+/** The Verilator simulation backend. Assertions and user coverage are always enabled.
+  *
+  * The DUT is built as a Verilated model (`--cc --exe`) and the request's C++ frontend, linked against it, owns the
+  * loop: it pokes the drive ports, advances the model, and peeks the probe ports, and it writes the waveform and
+  * coverage before it exits.
+  */
 object Verilator extends Simulator:
   def name:   String = "verilator"
   def envVar: String = "VERILATOR"
   def binary: String = sys.env.getOrElse(envVar, "verilator")
 
   def simulate(request: SimulationRequest): RunResult =
+    require(request.cppSources.nonEmpty, s"$name: the lib flow needs a C++ frontend to own the loop")
     val buildDir     = request.workDir / "obj_dir"
     val coverageFile = request.workDir / request.coverageFile
     val traceFile    = request.workDir / request.traceFile
 
     os.proc(
       binary,
-      "--binary",
+      "--cc",
+      "--exe",
+      "--build",
       "--timing",
       "--assert",
       "--coverage-user",
-      // `--trace` is what makes $dumpfile/$dumpvars in the generated top do
-      // anything; without it they are silently ignored.
+      // `--trace` is what lets the frontend's VerilatedVcdC produce a dump; without it the
+      // trace calls compile to no-ops.
       if request.trace then Seq("--trace", "--trace-structs") else Seq.empty,
       "--top-module",
       request.topModule,
@@ -41,7 +49,7 @@ object Verilator extends Simulator:
       buildDir.toString,
       "-o",
       "simulation",
-      request.sources.map(_.toString)
+      (request.sources ++ request.cppSources).map(_.toString)
     ).call(cwd = request.workDir, check = false, mergeErrIntoOut = true)
       .pipe { build =>
         // A compile failure is reported like any other failure rather than as
@@ -53,8 +61,9 @@ object Verilator extends Simulator:
           )
       }
 
+    // The frontend owns the loop and writes coverage/trace itself, so the model is run plainly.
     val invocation = os
-      .proc((buildDir / "simulation").toString, s"+verilator+coverage+file+$coverageFile")
+      .proc((buildDir / "simulation").toString)
       .call(cwd = request.workDir, check = false, mergeErrIntoOut = true)
 
     RunResult(
