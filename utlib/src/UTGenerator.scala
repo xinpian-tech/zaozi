@@ -83,6 +83,36 @@ final class UTGenerator[
     val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
     LibModel(topModule, Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq)
 
+  /** Emit the Model-B testbench: the sim-dialect harness (which calls `import "DPI-C" <dut>_tick` each cycle), a tiny
+    * clock-oscillator top ([[Driver]] — the only hand-written SV), and the generated `<dut>_tick` callback. Build them
+    * with `verilator --binary`; the top is [[Driver.topModuleName]] and the run reads `stimulus.txt` for the per-cycle
+    * drive.
+    */
+  def emitTestbench(outDir: os.Path = outputDirectory, runCycles: Int = 4, timeoutCycles: Int = 16): Testbench =
+    os.makeDir.all(outDir)
+    val spec             = abi.spec
+    val harnessParameter = DpiHarnessParameter(spec, runCycles, timeoutCycles)
+    val harness          = new DpiHarnessGenerator(dut, parameter)
+    val harnessTop       = harness.moduleName(harnessParameter)
+    val moduleDir        = outDir / s"tb_mlir_${harnessParameter.hashCode.toHexString}"
+    os.makeDir.all(moduleDir)
+
+    elaborate(harness, harnessParameter, moduleDir)
+    val modules = os.list(moduleDir).filter(_.ext == "mlirbc").sortBy(_.last)
+    require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
+    val linked  = moduleDir / "linked.mlir"
+    os.proc(
+      Seq("firld", s"--base-circuit=$harnessTop", "--no-mangle") ++ modules
+        .map(_.toString) ++ Seq("-o", linked.toString)
+    ).call()
+
+    val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
+    val driverPath = outDir / s"${Driver.topModuleName}.sv"
+    os.write.over(driverPath, Driver.topString(harnessTop, trace = false, traceFile = "trace.vcd"))
+    val capiPath   = outDir / s"${spec.dut}_tick.c"
+    os.write.over(capiPath, Testbench.tickCapi(spec))
+    Testbench(Driver.topModuleName, Seq(emitted.primary, driverPath) ++ emitted.splitFiles.values.toSeq :+ capiPath)
+
   private def elaborate[
     HP <: Parameter,
     HL <: LayerInterface[HP],
