@@ -23,10 +23,10 @@ final case class LibModel(topModule: String, sources: Seq[os.Path])
 
 /** Turns one Zaozi UT module into artifacts, and stops there.
   *
-  * The framework's job is to reduce a DUT-plus-verification-intent to data and IR — the ABI contract ([[saveAbi]]) and
-  * the flat lib-model SystemVerilog ([[emitLib]]) — both derived from the module's `(IO, Probe)`. Generating stimulus
-  * (from the module's SVA assertions) and driving a simulator with these artifacts are deliberately external concerns:
-  * nothing here solves, runs a simulator, or emits a testbench.
+  * The framework's job is to reduce a DUT-plus-verification-intent to data and IR — the ABI contract ([[savePorts]])
+  * and the flat lib-model SystemVerilog ([[emitLib]]) — both derived from the module's `(IO, Probe)`. Generating
+  * stimulus (from the module's SVA assertions) and driving a simulator with these artifacts are deliberately external
+  * concerns: nothing here solves, runs a simulator, or emits a testbench.
   */
 final class UTGenerator[
   PARAM <: Parameter,
@@ -39,21 +39,21 @@ final class UTGenerator[
   val outputDirectory: os.Path):
 
   /** The ABI contract as a dependent type on this DUT's `(I, P)`: `abi.drive.<port>` and `abi.probe.<point>` are
-    * checked at compile time against the DUT's IO and Probe, and `abi.spec` is the serializable specification derived
+    * checked at compile time against the DUT's IO and Probe, and `ports.spec` is the serializable specification derived
     * from those interfaces.
     */
-  def abi: Abi[I, P] =
+  def ports: Ports[I, P] =
     val arena = Arena.ofConfined()
     try
       given Arena   = arena
       given Context = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
-      new Abi[I, P](AbiSpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
+      new Ports[I, P](PortSpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
     finally arena.close()
 
   /** Materialize the DPI spec and write it as JSON. */
-  def saveAbi(path: os.Path = outputDirectory / "abi.json"): AbiSpec =
-    val spec = abi.spec
+  def savePorts(path: os.Path = outputDirectory / "port.json"): PortSpec =
+    val spec = ports.spec
     os.makeDir.all(path / os.up)
     os.write.over(path, spec.toJson)
     spec
@@ -66,7 +66,7 @@ final class UTGenerator[
     */
   def emitLib(outDir: os.Path = outputDirectory): LibModel =
     os.makeDir.all(outDir)
-    val harnessParameter = LibHarnessParameter(abi.spec)
+    val harnessParameter = LibHarnessParameter(ports.spec)
     val harness          = new LibHarnessGenerator(dut, parameter)
     val topModule        = harness.moduleName(harnessParameter)
     val moduleDir        = outDir / s"lib_mlir_${harnessParameter.hashCode.toHexString}"
@@ -89,7 +89,7 @@ final class UTGenerator[
     */
   def emitDpiWrapper(libTop: String, outDir: os.Path = outputDirectory): DpiWrapper =
     os.makeDir.all(outDir)
-    val spec       = abi.spec
+    val spec       = ports.spec
     val wrapperTop = DpiWrapper.top(spec)
     val svPath     = outDir / s"$wrapperTop.sv"
     val capiPath   = outDir / s"${wrapperTop}_capi.cpp"
