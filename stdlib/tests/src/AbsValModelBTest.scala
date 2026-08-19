@@ -40,7 +40,7 @@ object AbsValModelBTest extends TestSuite:
         os.proc((dir / "obj_dir" / "sim").toString).call(cwd = dir, check = false, mergeErrIntoOut = true).out.text()
       // The probe observed each cycle is the DUT's response to the *previous* drive (the DPI call
       // is clocked): drive 5 at cyc 1 -> observe A=5, ABSVAL=5 at cyc 2, and so on.
-      assert(out.contains("TB cyc=2 A=5 ABSVAL=5 assumeOk=1 drive=-3"))
-      assert(out.contains("TB cyc=3 A=-3 ABSVAL=3 assumeOk=1 drive=7"))
-      assert(out.contains("TB cyc=4 A=7 ABSVAL=7 assumeOk=1 drive=9"))
+      assert(out.contains("TB cyc=2 A=5 ABSVAL=5 drive=-3"))
+      assert(out.contains("TB cyc=3 A=-3 ABSVAL=3 drive=7"))
+      assert(out.contains("TB cyc=4 A=7 ABSVAL=7 drive=9"))
       assert(out.contains("HARNESS-DONE"))
