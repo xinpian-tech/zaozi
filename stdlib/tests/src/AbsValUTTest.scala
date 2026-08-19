@@ -17,10 +17,10 @@ object AbsValUTTest extends TestSuite:
     UTGenerator(AbsValUT, AbsValParameter(8), outputDirectory = outputRoot / dir)
 
   val tests: Tests = Tests:
-    test("saveDpi writes the contract derived from (IO, Probe)"):
+    test("saveAbi writes the contract derived from (IO, Probe)"):
       val gen  = generator("AbsValUT-dpi")
-      val path = gen.outputDirectory / "AbsValDPI.json"
-      val spec = gen.saveDpi(path)
+      val path = gen.outputDirectory / "abi.json"
+      val spec = gen.saveAbi(path)
       assert(spec.dut == "AbsValUT_width8")
       assert(os.read(path).contains("\"role\": \"Drive\""))
 

@@ -7,7 +7,7 @@ import scala.language.dynamics
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.valuetpe.*
-import me.jiuyang.utlib.magic.{dpiDriveSelectDynamic, dpiProbeSelectDynamic}
+import me.jiuyang.utlib.magic.{abiDriveSelectDynamic, abiProbeSelectDynamic}
 
 import org.llvm.mlir.scalalib.capi.ir.Context
 
@@ -19,56 +19,56 @@ import java.lang.foreign.Arena
   *   - [[Drive]] is a DUT input the testbench feeds each cycle (from the DUT's IO).
   *   - [[Probe]] is a DV observation point the testbench samples (from the DUT's Probe).
   */
-enum DPIRole:
+enum AbiRole:
   case Clock, Reset, Drive, Probe
 
-object DPIRole:
-  given upickle.default.ReadWriter[DPIRole] =
-    upickle.default.readwriter[String].bimap[DPIRole](_.toString, DPIRole.valueOf)
+object AbiRole:
+  given upickle.default.ReadWriter[AbiRole] =
+    upickle.default.readwriter[String].bimap[AbiRole](_.toString, AbiRole.valueOf)
 
-/** One signal on the DPI contract: its stable name (the DPI/JSON key), how it crosses the boundary, and its bit width
+/** One signal on the ABI contract: its stable name (the DPI/JSON key), how it crosses the boundary, and its bit width
   * and signedness (which map to a DPI-C type on the software backend and to the solver's per-port type on the Zaozi
   * side).
   */
-final case class DPIPort(
+final case class AbiPort(
   name:   String,
-  role:   DPIRole,
+  role:   AbiRole,
   width:  Int,
   signed: Boolean)
 
-object DPIPort:
-  import DPIRole.given
-  given upickle.default.ReadWriter[DPIPort] = upickle.default.macroRW
+object AbiPort:
+  import AbiRole.given
+  given upickle.default.ReadWriter[AbiPort] = upickle.default.macroRW
 
-/** The DPI contract specification for one DUT: the typed transaction interface the testbench drives and observes,
+/** The ABI contract specification for one DUT: the typed transaction interface the testbench drives and observes,
   * serialized as the single source shared by the sim-dialect frontend, the JSON interchange, and (later) an external
   * Rust/Python DPI frontend.
   *
-  * It is derived from the DUT's own types — its IO (the [[DPIRole.Drive]] side) and its Probe (the [[DPIRole.Probe]]
-  * side) — so the spec is a function of `(I, P)`, not written by hand. [[DPI]] is the type-level view on top of it.
+  * It is derived from the DUT's own types — its IO (the [[AbiRole.Drive]] side) and its Probe (the [[AbiRole.Probe]]
+  * side) — so the spec is a function of `(I, P)`, not written by hand. [[Abi]] is the type-level view on top of it.
   */
-final case class DPISpec(
+final case class AbiSpec(
   dut:   String,
-  ports: Seq[DPIPort],
+  ports: Seq[AbiPort],
   abiVersion: String):
 
-  def drive: Seq[DPIPort]    = ports.filter(_.role == DPIRole.Drive)
-  def probe: Seq[DPIPort]    = ports.filter(_.role == DPIRole.Probe)
-  def clock: Option[DPIPort] = ports.find(_.role == DPIRole.Clock)
-  def reset: Option[DPIPort] = ports.find(_.role == DPIRole.Reset)
+  def drive: Seq[AbiPort]    = ports.filter(_.role == AbiRole.Drive)
+  def probe: Seq[AbiPort]    = ports.filter(_.role == AbiRole.Probe)
+  def clock: Option[AbiPort] = ports.find(_.role == AbiRole.Clock)
+  def reset: Option[AbiPort] = ports.find(_.role == AbiRole.Reset)
 
   def toJson: String = upickle.default.write(this, indent = 2)
 
-object DPISpec:
-  import DPIPort.given
-  given upickle.default.ReadWriter[DPISpec] = upickle.default.macroRW
+object AbiSpec:
+  import AbiPort.given
+  given upickle.default.ReadWriter[AbiSpec] = upickle.default.macroRW
 
   /** The DPI ABI version this contract targets. See `doc/dpi-abi.md`. Consumers must reject a contract whose
     * `abiVersion` they do not understand.
     */
   val AbiVersion: String = "1.0"
 
-  def fromJson(text: String): DPISpec = upickle.default.read[DPISpec](text)
+  def fromJson(text: String): AbiSpec = upickle.default.read[AbiSpec](text)
 
   /** Derive the spec from a DUT's IO and Probe interfaces.
     *
@@ -84,12 +84,12 @@ object DPISpec:
     using Arena,
     Context,
     TypeImpl
-  ): DPISpec =
+  ): AbiSpec =
     io.toMlirType
     probe.toMlirType
     val driven = io.elements.collect {
       case field if field.isFlipped =>
-        DPIPort(field.name, roleOfInput(field.dataType), field.dataType.width, isSigned(field.dataType))
+        AbiPort(field.name, roleOfInput(field.dataType), field.dataType.width, isSigned(field.dataType))
     }
     val probed = probe.elements.map { field =>
       // A probe field's type wraps the observed data; unwrap to the base type for width/sign.
@@ -97,47 +97,47 @@ object DPISpec:
         case p: RProbe[?]  => p.baseType
         case p: RWProbe[?] => p.baseType
         case other => other
-      DPIPort(field.name, DPIRole.Probe, base.width, isSigned(base))
+      AbiPort(field.name, AbiRole.Probe, base.width, isSigned(base))
     }
-    DPISpec(dut, (driven ++ probed).toSeq, DPISpec.AbiVersion)
+    AbiSpec(dut, (driven ++ probed).toSeq, AbiSpec.AbiVersion)
 
-  private def roleOfInput(data: Data): DPIRole = data match
-    case _: Clock => DPIRole.Clock
-    case _: Reset => DPIRole.Reset
-    case _ => DPIRole.Drive
+  private def roleOfInput(data: Data): AbiRole = data match
+    case _: Clock => AbiRole.Clock
+    case _: Reset => AbiRole.Reset
+    case _ => AbiRole.Drive
 
   private def isSigned(data: Data): Boolean = data match
     case _: SInt => true
     case _ => false
 
-/** Drive ports of a [[DPI]], addressed by name and checked at compile time against the DUT's IO type `I`: `dpi.drive.A`
+/** Drive ports of a [[Abi]], addressed by name and checked at compile time against the DUT's IO type `I`: `abi.drive.A`
   * resolves only if `A` is a field of the DUT's IO.
   */
-final class DriveAccess[I <: HWInterface[?]] private[utlib] (spec: DPISpec) extends Dynamic:
-  def field(name: String):                            DPIPort =
+final class DriveAccess[I <: HWInterface[?]] private[utlib] (spec: AbiSpec) extends Dynamic:
+  def field(name: String):                            AbiPort =
     spec.ports
-      .find(p => p.name == name && p.role != DPIRole.Probe)
+      .find(p => p.name == name && p.role != AbiRole.Probe)
       .getOrElse(
         throw new NoSuchElementException(s"${spec.dut}: no drive port '$name'")
       )
-  transparent inline def selectDynamic(name: String): DPIPort = ${ dpiDriveSelectDynamic[I]('this, 'name) }
+  transparent inline def selectDynamic(name: String): AbiPort = ${ abiDriveSelectDynamic[I]('this, 'name) }
 
-/** Probe ports of a [[DPI]], addressed by name and checked at compile time against the DUT's Probe type `P`.
+/** Probe ports of a [[Abi]], addressed by name and checked at compile time against the DUT's Probe type `P`.
   */
-final class ProbeAccess[P <: DVInterface[?, ?]] private[utlib] (spec: DPISpec) extends Dynamic:
-  def field(name: String):                            DPIPort =
+final class ProbeAccess[P <: DVInterface[?, ?]] private[utlib] (spec: AbiSpec) extends Dynamic:
+  def field(name: String):                            AbiPort =
     spec.probe
       .find(_.name == name)
       .getOrElse(
         throw new NoSuchElementException(s"${spec.dut}: no probe port '$name'")
       )
-  transparent inline def selectDynamic(name: String): DPIPort = ${ dpiProbeSelectDynamic[P]('this, 'name) }
+  transparent inline def selectDynamic(name: String): AbiPort = ${ abiProbeSelectDynamic[P]('this, 'name) }
 
-/** The DPI contract as a dependent type on the DUT's interfaces `(I, P)`.
+/** The ABI contract as a dependent type on the DUT's interfaces `(I, P)`.
   *
   * The underlying [[spec]] is the serializable contract; `drive`/`probe` give typed, compile-time-checked access so
   * that referring to a port the DUT does not have is a compile error rather than a runtime lookup miss.
   */
-final class DPI[I <: HWInterface[?], P <: DVInterface[?, ?]] private[utlib] (val spec: DPISpec):
+final class Abi[I <: HWInterface[?], P <: DVInterface[?, ?]] private[utlib] (val spec: AbiSpec):
   val drive: DriveAccess[I] = new DriveAccess[I](spec)
   val probe: ProbeAccess[P] = new ProbeAccess[P](spec)

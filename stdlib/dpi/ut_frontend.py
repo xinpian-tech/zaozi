@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2026 xinpian-tech
 """Generic DPI-export frontend: drive a Verilated lib model from Python.
 
-Usage: ut_frontend.py <lib.so> <dpi.json> <stimulus.json>
+Usage: ut_frontend.py <lib.so> <abi.json> <stimulus.json>
 
 The lib `.so` (built with `verilator --lib-create` from the lib model plus its
 DPI-export wrapper) exposes, as plain C symbols, the DPI ABI (see `doc/dpi-abi.md`):

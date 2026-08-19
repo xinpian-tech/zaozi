@@ -16,7 +16,7 @@ final case class DpiWrapper(top: String, sources: Seq[os.Path])
 
 private[utlib] object DpiWrapper:
   /** The wrapper's top module name (and the scope the C shim binds). */
-  def top(spec: DPISpec): String = s"${spec.dut}_dpi"
+  def top(spec: AbiSpec): String = s"${spec.dut}_dpi"
 
   /** A port wider than 64 bits crosses as a packed vector (`svBitVecVal*`) rather than a scalar. */
   private def isWide(width: Int): Boolean = width > 64
@@ -34,13 +34,13 @@ private[utlib] object DpiWrapper:
     if width <= 8 then "char" else if width <= 16 then "short" else if width <= 32 then "int" else "long long"
 
   /** The lib model's port name for a contract input: drive ports are prefixed, clock/reset keep their name. */
-  private def libInput(port: DPIPort): String =
-    if port.role == DPIRole.Drive then s"drive_${port.name}" else port.name
+  private def libInput(port: AbiPort): String =
+    if port.role == AbiRole.Drive then s"drive_${port.name}" else port.name
 
-  private def libProbe(port: DPIPort): String = s"probe_${port.name}"
+  private def libProbe(port: AbiPort): String = s"probe_${port.name}"
 
   /** The SV wrapper: instantiate `libTop` and export a poke per input, a peek per probe. */
-  def svString(libTop: String, spec: DPISpec): String =
+  def svString(libTop: String, spec: AbiSpec): String =
     val inputs     = spec.clock.toSeq ++ spec.reset.toSeq ++ spec.drive
     val inputDecls = inputs.map(p => s"  logic [${p.width - 1}:0] ${libInput(p)};").mkString("\n")
     val probeDecls = spec.probe.map(p => s"  wire  [${p.width - 1}:0] ${libProbe(p)};").mkString("\n")
@@ -86,7 +86,7 @@ private[utlib] object DpiWrapper:
     * `export "DPI-C"` function. Handle-first keeps the ABI multi-instance-shaped; the actual concurrency a backend
     * allows is its own concern (Verilator shares one scope per top name, so it is single-instance in practice).
     */
-  def capiString(spec: DPISpec): String =
+  def capiString(spec: AbiSpec): String =
     val t      = top(spec)
     val inputs = spec.clock.toSeq ++ spec.reset.toSeq ++ spec.drive
     // Wide ports (> 64 bit) cross as `svBitVecVal*` (packed uint32 chunks); scalars pass by value.

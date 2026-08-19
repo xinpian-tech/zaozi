@@ -11,12 +11,12 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 import java.lang.foreign.Arena
 
-private[utlib] final case class LibHarnessParameter(spec: DPISpec) extends Parameter
+private[utlib] final case class LibHarnessParameter(spec: AbiSpec) extends Parameter
 
 private[utlib] class LibHarnessLayers(parameter: LibHarnessParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
 
-/** The harness ports *are* the DPI contract, flattened for poke/peek by an external tool:
+/** The harness ports *are* the ABI contract, flattened for poke/peek by an external tool:
   *   - clock/reset (when the DUT has them) and every drive port become inputs the frontend pokes;
   *   - every probe point becomes an output port `probe_<name>` the frontend peeks.
   *

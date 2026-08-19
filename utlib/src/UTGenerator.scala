@@ -15,7 +15,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
 
 import java.lang.foreign.Arena
 
-/** The emitted lib-model artifact: the flat SystemVerilog whose ports are the DPI contract (each drive port and
+/** The emitted lib-model artifact: the flat SystemVerilog whose ports are the ABI contract (each drive port and
   * clock/reset an input, each probe point a `probe_<name>` output), plus the layer bind / probe-ref split files. It is
   * ready for an external tool to drive; `topModule` is the top.
   */
@@ -23,7 +23,7 @@ final case class LibModel(topModule: String, sources: Seq[os.Path])
 
 /** Turns one Zaozi UT module into artifacts, and stops there.
   *
-  * The framework's job is to reduce a DUT-plus-verification-intent to data and IR — the DPI contract ([[saveDpi]]) and
+  * The framework's job is to reduce a DUT-plus-verification-intent to data and IR — the ABI contract ([[saveAbi]]) and
   * the flat lib-model SystemVerilog ([[emitLib]]) — both derived from the module's `(IO, Probe)`. Generating stimulus
   * (from the module's SVA assertions) and driving a simulator with these artifacts are deliberately external concerns:
   * nothing here solves, runs a simulator, or emits a testbench.
@@ -38,27 +38,27 @@ final class UTGenerator[
   val parameter: PARAM,
   val outputDirectory: os.Path):
 
-  /** The DPI contract as a dependent type on this DUT's `(I, P)`: `dpi.drive.<port>` and `dpi.probe.<point>` are
-    * checked at compile time against the DUT's IO and Probe, and `dpi.spec` is the serializable specification derived
+  /** The ABI contract as a dependent type on this DUT's `(I, P)`: `abi.drive.<port>` and `abi.probe.<point>` are
+    * checked at compile time against the DUT's IO and Probe, and `abi.spec` is the serializable specification derived
     * from those interfaces.
     */
-  def dpi: DPI[I, P] =
+  def abi: Abi[I, P] =
     val arena = Arena.ofConfined()
     try
       given Arena   = arena
       given Context = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
-      new DPI[I, P](DPISpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
+      new Abi[I, P](AbiSpec.derive(dut.moduleName(parameter), dut.interface(parameter), dut.probe(parameter)))
     finally arena.close()
 
   /** Materialize the DPI spec and write it as JSON. */
-  def saveDpi(path: os.Path = outputDirectory / "dpi.json"): DPISpec =
-    val spec = dpi.spec
+  def saveAbi(path: os.Path = outputDirectory / "abi.json"): AbiSpec =
+    val spec = abi.spec
     os.makeDir.all(path / os.up)
     os.write.over(path, spec.toJson)
     spec
 
-  /** Elaborate and lower the lib model: a flat SystemVerilog module whose ports *are* the DPI contract (drive ports and
+  /** Elaborate and lower the lib model: a flat SystemVerilog module whose ports *are* the ABI contract (drive ports and
     * clock/reset as inputs, each probe point as a `probe_<name>` output). It has no internal loop — an external tool
     * drives it, poking the drive ports and peeking the probe ports. The split files (layer binds and probe-ref
     * exposers) are emitted alongside because reading the DUT's probe lowers to a hierarchical reference into the
@@ -66,7 +66,7 @@ final class UTGenerator[
     */
   def emitLib(outDir: os.Path = outputDirectory): LibModel =
     os.makeDir.all(outDir)
-    val harnessParameter = LibHarnessParameter(dpi.spec)
+    val harnessParameter = LibHarnessParameter(abi.spec)
     val harness          = new LibHarnessGenerator(dut, parameter)
     val topModule        = harness.moduleName(harnessParameter)
     val moduleDir        = outDir / s"lib_mlir_${harnessParameter.hashCode.toHexString}"
@@ -89,7 +89,7 @@ final class UTGenerator[
     */
   def emitDpiWrapper(libTop: String, outDir: os.Path = outputDirectory): DpiWrapper =
     os.makeDir.all(outDir)
-    val spec       = dpi.spec
+    val spec       = abi.spec
     val wrapperTop = DpiWrapper.top(spec)
     val svPath     = outDir / s"$wrapperTop.sv"
     val capiPath   = outDir / s"${wrapperTop}_capi.cpp"
