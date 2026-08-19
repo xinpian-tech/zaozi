@@ -34,7 +34,7 @@ final class UTGenerator[
   I <: HWInterface[PARAM],
   P <: DVInterface[PARAM, L]
 ] private (
-  val dut:       Generator[PARAM, L, I, P] & HasUT[PARAM, I],
+  val dut:       Generator[PARAM, L, I, P] & UT[PARAM, I],
   val parameter: PARAM,
   val outputDirectory: os.Path):
 
@@ -124,7 +124,7 @@ final class UTGenerator[
 
 object UTGenerator:
   def apply[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
-    dut:             Generator[PARAM, L, I, P] & HasUT[PARAM, I],
+    dut:             Generator[PARAM, L, I, P] & UT[PARAM, I],
     parameter:       PARAM,
     outputDirectory: os.Path
   ): UTGenerator[PARAM, L, I, P] =

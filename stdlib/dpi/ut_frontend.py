@@ -6,11 +6,12 @@
 Usage: ut_frontend.py <lib.so> <dpi.json> <stimulus.json>
 
 The lib `.so` (built with `verilator --lib-create` from the lib model plus its
-DPI-export wrapper) exposes, as plain C symbols, `sim_new` / `sim_eval` /
-`sim_delete` and one `poke_<input>` / `peek_probe_<name>` per contract port. This
-frontend reads the DPI contract for the port names, roles and widths, then owns
-the loop: each cycle it pokes the drive ports from the stimulus, steps the model
-with `sim_eval` (time is advanced by the model, not by DPI), and peeks the probes.
+DPI-export wrapper) exposes, as plain C symbols, the DPI ABI (see `doc/dpi-abi.md`):
+`sim_new` / `sim_eval` / `sim_delete`, and handle-first `dpi_poke_<input>(h, v)` /
+`dpi_peek_probe_<name>(h)` per contract port. This frontend reads the DPI contract
+for the port names, roles and widths, then owns the loop: each cycle it pokes the
+drive ports from the stimulus, steps the model with `sim_eval` (time is advanced by
+the model, not by DPI), and peeks the probes.
 
 It is the single generic consumer — nothing here is DUT-specific. `stimulus.json`
 is `{ "<drive-port>": [v0, v1, ...], ... }`; where those values come from (a
@@ -19,6 +20,8 @@ solver, SVA-assertion sampling, a fixed vector) is out of scope.
 import ctypes
 import json
 import sys
+
+ABI_VERSION = "1.0"
 
 
 def ctype_for(width, signed):
@@ -36,8 +39,12 @@ def main():
     lib = ctypes.CDLL(lib_path)
     spec = json.load(open(dpi_path))
     stim = json.load(open(stim_path))
-    ports = spec["ports"]
 
+    got = spec.get("abiVersion", "?")
+    if got != ABI_VERSION:
+        sys.exit(f"DPI ABI mismatch: contract is {got}, frontend speaks {ABI_VERSION}")
+
+    ports = spec["ports"]
     drives = [p for p in ports if p["role"] == "Drive"]
     probes = [p for p in ports if p["role"] == "Probe"]
     clock = next((p for p in ports if p["role"] == "Clock"), None)
@@ -47,12 +54,14 @@ def main():
     lib.sim_delete.argtypes = [ctypes.c_void_p]
 
     def poke(lib_name, width):
-        f = getattr(lib, "poke_" + lib_name)
-        f.argtypes = [ctype_for(width, True)]  # poke by value; SV truncates to the port width
+        # dpi_poke_<lib_name>(void* handle, value); SV truncates to the port width.
+        f = getattr(lib, "dpi_poke_" + lib_name)
+        f.argtypes = [ctypes.c_void_p, ctype_for(width, True)]
         return f
 
     def peek(port):
-        f = getattr(lib, "peek_probe_" + port["name"])
+        f = getattr(lib, "dpi_peek_probe_" + port["name"])
+        f.argtypes = [ctypes.c_void_p]
         f.restype = ctype_for(port["width"], port["signed"])
         return f
 
@@ -64,15 +73,15 @@ def main():
     cycles = len(stim[drives[0]["name"]]) if drives else 0
     for cyc in range(cycles):
         for p in drives:
-            drive_poke[p["name"]](stim[p["name"]][cyc])
+            drive_poke[p["name"]](model, stim[p["name"]][cyc])
         if clock_poke:  # sequential DUT: a full clock edge per cycle
-            clock_poke(0)
+            clock_poke(model, 0)
             lib.sim_eval(model)
-            clock_poke(1)
+            clock_poke(model, 1)
             lib.sim_eval(model)
         else:  # combinational DUT: one settle
             lib.sim_eval(model)
-        observed = " ".join(f"{p['name']}={probe_peek[p['name']]()}" for p in probes)
+        observed = " ".join(f"{p['name']}={probe_peek[p['name']](model)}" for p in probes)
         print(f"PY cyc={cyc + 1} {observed}")
     lib.sim_delete(model)
 

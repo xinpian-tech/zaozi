@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.HasUT
+import me.jiuyang.utlib.UT
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -12,13 +12,13 @@ import me.jiuyang.zaozi.valuetpe.*
   *
   * It reuses the DUT's own type parameters — same Parameter, Layers, IO and Probe — so the UT simply *is* an
   * AbsVal-shaped module that wraps the plain DUT: it passes the DUT interface straight through and forwards the DUT's
-  * observation Probe. It is marked [[HasUT]]; the verification intent (SVA assertions) lives in this architecture,
-  * keeping `AbsVal` a reusable DUT with no UT coupling.
+  * observation Probe. It is marked [[UT]]; the verification intent (SVA assertions) lives in this architecture, keeping
+  * `AbsVal` a reusable DUT with no UT coupling.
   */
 @generator
 object AbsValUT
     extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]
-    with HasUT[AbsValParameter, AbsValIO]:
+    with UT[AbsValParameter, AbsValIO]:
   override def moduleName(p: AbsValParameter): String = s"AbsValUT_width${p.width}"
 
   def architecture(parameter: AbsValParameter) =

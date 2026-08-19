@@ -10,4 +10,4 @@ import me.jiuyang.zaozi.{HWInterface, Parameter}
   * intent — SVA assertions and assumptions — lives in the module's own architecture under the verification layer, not
   * in a separate method.
   */
-trait HasUT[PARAM <: Parameter, I <: HWInterface[PARAM]]
+trait UT[PARAM <: Parameter, I <: HWInterface[PARAM]]
