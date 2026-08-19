@@ -39,12 +39,18 @@ what it wants observed through its Probe.
 
 Each port maps to a DPI-C scalar, and to the matching C type:
 
-| width | SV DPI type | svdpi type   | C type      | ctypes        |
-|-------|-------------|--------------|-------------|---------------|
-| 1..8  | `byte`      | `svByte`     | `char`      | `c_byte/c_ubyte`  |
-| 9..16 | `shortint`  | `svShortInt` | `short`     | `c_short/c_ushort`|
-| 17..32| `int`       | `svInt`      | `int`       | `c_int/c_uint`    |
-| 33..64| `longint`   | `svLongInt`  | `long long` | `c_longlong/c_ulonglong` |
+| width  | SV DPI type   | svdpi type      | C type          | ctypes            |
+|--------|---------------|-----------------|-----------------|-------------------|
+| 1..8   | `byte`        | `svByte`        | `char`          | `c_byte/c_ubyte`  |
+| 9..16  | `shortint`    | `svShortInt`    | `short`         | `c_short/c_ushort`|
+| 17..32 | `int`         | `svInt`         | `int`           | `c_int/c_uint`    |
+| 33..64 | `longint`     | `svLongInt`     | `long long`     | `c_longlong/c_ulonglong` |
+| >64    | `bit [W-1:0]` | `svBitVecVal*`  | `svBitVecVal*`  | array of `c_uint32` |
+
+A port wider than 64 bits is a **packed vector** — it crosses as `svBitVecVal*`, an array of
+`ceil(W/32)` little-endian `uint32` chunks (not an open array). Wide `poke` takes
+`const svBitVecVal*`; wide `peek` writes through an output `svBitVecVal*` (SV cannot return a
+packed vector by value). A wide AXI data word (`WDATA[511:0]`) is exactly this case.
 
 Signedness is a display/interpretation choice: `poke` accepts a signed value (SV
 truncates to the port width); `peek` returns the raw bits, and the frontend reinterprets
@@ -82,15 +88,19 @@ One cycle:
 The stimulus source (a solver, SVA-assertion sampling, a fixed vector) is out of scope
 for this ABI; `ut_frontend.py` reads it as `{ "<drive-port>": [v0, v1, ...] }`.
 
-## Extension points (reserved, not yet implemented)
+## Extension points
 
-- **Ports wider than 64 bits** — map to a packed vector `bit [W-1:0]` → `svBitVecVal*`
-  (canonical little-endian `uint32` chunks, `ceil(W/32)` of them). Passed by pointer; no
-  allocation. A minor ABI version will define the C signatures.
-- **Arrays / dynamic length** (batching a whole waveform, a variable-width bus) — map to an
-  open array `svOpenArrayHandle`. The simulator owns the storage; the C side never
-  allocates it, and reads it through `svSize` / `svLow` / `svHigh` / `svGetArrElemPtr*`
-  (packed-element layout is canonical, so no `memcpy`). Reserved for a future minor version.
+- **Ports wider than 64 bits** — *implemented* (see the type mapping): packed vector →
+  `svBitVecVal*`.
+- **Transaction-level / variable-length arrays** (a whole variable-length AXI burst in one call,
+  a dynamic array, a queue) — *reserved*. These map to an open array `svOpenArrayHandle`: the
+  simulator owns the storage; the C side never allocates it and reads it through `svSize` /
+  `svLow` / `svHigh` / `svGetArrElemPtr*` (packed-element layout is canonical, so no `memcpy`).
+  Pin-level driving does **not** need this — the frontend drives each fixed-width signal per
+  cycle and implements the protocol (handshakes, burst counting) itself; open arrays are only for
+  a *transaction-level* DPI that passes a whole variable-length transaction at once. Note:
+  exported open arrays internal-fault Verilator 5.050, so this fits the DPI **import** direction
+  (the standard one for open arrays) or a sized-array-plus-length convention.
 
 ## Backend / portability notes
 

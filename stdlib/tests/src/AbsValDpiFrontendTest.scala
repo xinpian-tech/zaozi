@@ -19,45 +19,45 @@ object AbsValDpiFrontendTest extends TestSuite:
   private val frontend     = os.Path(sys.props("zaozi.stdlib.dpiFrontend"), os.pwd)
   private val verilatorBin = sys.env.getOrElse("VERILATOR", "verilator")
 
+  /** Emit the artifacts for a given width, build the `.so`, drive it from Python, return stdout. */
+  private def drive(dir: os.Path, width: Int, stimulusJson: String): String =
+    os.remove.all(dir)
+    val gen     = UTGenerator(AbsValUT, AbsValParameter(width), outputDirectory = dir)
+    gen.saveDpi(dir / "AbsValDPI.json")
+    val lib     = gen.emitLib(dir)
+    val wrapper = gen.emitDpiWrapper(lib.topModule, dir)
+    os.write.over(dir / "stimulus.json", stimulusJson)
+    os.proc(
+      verilatorBin,
+      "--cc",
+      "--lib-create",
+      "Vsim",
+      "--build",
+      "--timing",
+      "-Wno-fatal",
+      "-I" + dir.toString,
+      "--top-module",
+      wrapper.top,
+      (lib.sources ++ wrapper.sources).map(_.toString)
+    ).call(cwd = dir, check = true, mergeErrIntoOut = true)
+    val so      = dir / "obj_dir" / "libVsim.so"
+    assert(os.exists(so))
+    os.proc("python3", frontend.toString, so.toString, dir / "AbsValDPI.json", dir / "stimulus.json")
+      .call(cwd = dir, check = true, mergeErrIntoOut = true)
+      .out
+      .text()
+
   val tests: Tests = Tests:
-    test("Python drives the DUT through the generated export \"DPI-C\" wrapper"):
-      val dir = outputRoot / "AbsValUT-dpi-frontend"
-      os.remove.all(dir)
-      val gen = UTGenerator(AbsValUT, AbsValParameter(8), outputDirectory = dir)
-
-      // Artifacts: the DPI contract, the lib model, and the export-"DPI-C" wrapper + C shim.
-      gen.saveDpi(dir / "AbsValDPI.json")
-      val lib     = gen.emitLib(dir)
-      val wrapper = gen.emitDpiWrapper(lib.topModule, dir)
-      // A demo stimulus: positive, negative, positive. (Where stimulus comes from is external.)
-      os.write.over(dir / "stimulus.json", """{ "A": [5, -3, 7] }""")
-
-      // Build the lib model + wrapper into a shared library the frontend loads.
-      os.proc(
-        verilatorBin,
-        "--cc",
-        "--lib-create",
-        "Vsim",
-        "--build",
-        "--timing",
-        "-Wno-fatal",
-        "-I" + dir.toString,
-        "--top-module",
-        wrapper.top,
-        (lib.sources ++ wrapper.sources).map(_.toString)
-      ).call(cwd = dir, check = true, mergeErrIntoOut = true)
-
-      val so = dir / "obj_dir" / "libVsim.so"
-      assert(os.exists(so))
-
-      val run = os
-        .proc("python3", frontend.toString, so.toString, dir / "AbsValDPI.json", dir / "stimulus.json")
-        .call(cwd = dir, check = true, mergeErrIntoOut = true)
-      val out = run.out.text()
-
+    test("Python drives an 8-bit DUT through the generated export \"DPI-C\" wrapper"):
+      val out = drive(outputRoot / "AbsValUT-dpi-8", 8, """{ "A": [5, -3, 7] }""")
       // |A|: A echoes the driven input, ABSVAL is its magnitude. The probe ports are unsigned
-      // `Bits` in the contract, so the driven -3 reads back as its 8-bit value 253 while ABSVAL
-      // (the DUT interprets A as signed) is 3 — the frontend honours each port's `signed` flag.
+      // `Bits`, so the driven -3 reads back as its 8-bit value 253 while ABSVAL is 3.
       assert(out.contains("PY cyc=1 A=5 ABSVAL=5"))
       assert(out.contains("PY cyc=2 A=253 ABSVAL=3"))
       assert(out.contains("PY cyc=3 A=7 ABSVAL=7"))
+
+    test("Python drives a 128-bit DUT — wide ports cross as svBitVecVal"):
+      val wide = (BigInt(1) << 70) + 5 // > 64 bits, positive (bit 127 clear), so |A| == A
+      val out  = drive(outputRoot / "AbsValUT-dpi-128", 128, s"""{ "A": [5, $wide] }""")
+      assert(out.contains("PY cyc=1 A=5 ABSVAL=5"))
+      assert(out.contains(s"PY cyc=2 A=$wide ABSVAL=$wide"))
