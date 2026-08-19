@@ -8,16 +8,24 @@ import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
+/** The observation surface of the UT: the DUT's `(A, ABSVAL)` forwarded, plus `assumeOk` — the input-constraint
+  * predicate. The constraint is written once and used twice: as an SVA `Assume` (formal-usable) and as this probe,
+  * which a constrained-random frontend samples against.
+  */
+class AbsValUTProbe(parameter: AbsValParameter) extends DVBundle[AbsValParameter, AbsValLayers](parameter):
+  val A        = ProbeRead(Bits(parameter.width), layers("Verification"))
+  val ABSVAL   = ProbeRead(Bits(parameter.width), layers("Verification"))
+  val assumeOk = ProbeRead(Bits(1), layers("Verification"))
+
 /** The unit-test module for [[AbsVal]].
   *
-  * It reuses the DUT's own type parameters — same Parameter, Layers, IO and Probe — so the UT simply *is* an
-  * AbsVal-shaped module that wraps the plain DUT: it passes the DUT interface straight through and forwards the DUT's
-  * observation Probe. It is marked [[UT]]; the verification intent (SVA assertions) lives in this architecture, keeping
-  * `AbsVal` a reusable DUT with no UT coupling.
+  * It wraps the plain DUT — passing its interface through and forwarding its observation Probe — and adds the
+  * verification intent (`extends UT`): an input constraint expressed as SVA. Here the constraint is "A is odd", and the
+  * frontend generates stimulus that satisfies it.
   */
 @generator
 object AbsValUT
-    extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe]
+    extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValUTProbe]
     with UT[AbsValParameter, AbsValIO]:
   override def moduleName(p: AbsValParameter): String = s"AbsValUT_width${p.width}"
 
@@ -28,12 +36,19 @@ object AbsValUT
     instance.io.A := io.A
     io.ABSVAL     := instance.io.ABSVAL
 
-    val probe = summon[ProbeInterface[AbsValProbe]]
+    val probe = summon[ProbeInterface[AbsValUTProbe]]
     layer("Verification"):
-      // Read the DUT's probe and re-expose it as this module's observation contract.
+      // Re-expose the DUT's probe as this module's observation contract.
       val aW      = Wire(Bits(parameter.width))
       aW <== instance.probe.A
       probe.A <== aW
       val absvalW = Wire(Bits(parameter.width))
       absvalW <== instance.probe.ABSVAL
       probe.ABSVAL <== absvalW
+
+      // The input constraint, as SVA — and mirrored to a probe the frontend samples against.
+      val odd = io.A.bit(0) // A is odd
+      Assume(odd.I)
+      val okW = Wire(Bits(1))
+      okW := odd.asBits
+      probe.assumeOk <== okW

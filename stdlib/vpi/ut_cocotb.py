@@ -69,7 +69,9 @@ def main():
         verilog_sources=sources,
         hdl_toplevel=toplevel,
         build_dir=os.path.join(workdir, "cocotb_build"),
-        build_args=["-I" + workdir, "-Wno-fatal"],
+        # The SVA `assume` is a formal constraint; disable it in simulation (it would trip at
+        # startup on X/0). The `assumeOk` probe stays available for constrained-random generation.
+        build_args=["-I" + workdir, "-Wno-fatal", "--no-assert"],
     )
     runner.test(hdl_toplevel=toplevel, test_module="ut_cocotb")
 
