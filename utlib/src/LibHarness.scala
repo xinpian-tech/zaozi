@@ -11,7 +11,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 import java.lang.foreign.Arena
 
-private[utlib] final case class LibHarnessParameter(spec: PortSpec) extends Parameter
+private[utlib] final case class LibHarnessParameter(spec: AbiSpec) extends Parameter
 
 private[utlib] class LibHarnessLayers(parameter: LibHarnessParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))

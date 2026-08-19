@@ -48,9 +48,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
 
     override def forkArgs: T[Seq[String]] = Task(
       super.forkArgs() ++ circtlib.forkArgs() ++ Seq(
-        s"-Dzaozi.utlib.outDir=${mill.api.BuildCtx.workspaceRoot / "out" / "utlib"}",
-        s"-Dzaozi.stdlib.dpiFrontend=${mill.api.BuildCtx.workspaceRoot / "stdlib" / "dpi" / "ut_frontend.py"}",
-        s"-Dzaozi.stdlib.cocotbFrontend=${mill.api.BuildCtx.workspaceRoot / "stdlib" / "vpi" / "ut_cocotb.py"}"
+        s"-Dzaozi.utlib.outDir=${mill.api.BuildCtx.workspaceRoot / "out" / "utlib"}"
       )
     )
   }
