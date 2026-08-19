@@ -3,16 +3,16 @@
 **Version: 1.0**
 
 This is the stable interface between a generated lib model and an external driver
-(the "frontend"). A UT module's `(IO, Probe)` yields a DPI **contract** (`dpi.json`);
+(the "frontend"). A UT module's `(IO, Probe)` yields a DPI **contract** (`abi.json`);
 from that contract the framework lowers a lib model (`generated.sv`) and generates a
 DPI-export wrapper (`<dut>_dpi.sv` + `<dut>_dpi_capi.cpp`). Built together with
 `verilator --lib-create` they become a shared library the frontend loads and drives.
 The frontend owns the loop; the framework only produces artifacts.
 
-The ABI is versioned. `dpi.json` carries `abiVersion`; a consumer must reject a
+The ABI is versioned. `abi.json` carries `abiVersion`; a consumer must reject a
 contract whose `abiVersion` it does not understand.
 
-## The contract — `dpi.json`
+## The contract — `abi.json`
 
 ```json
 {

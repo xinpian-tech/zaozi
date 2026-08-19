@@ -23,7 +23,7 @@ object AbsValDpiFrontendTest extends TestSuite:
   private def drive(dir: os.Path, width: Int, stimulusJson: String): String =
     os.remove.all(dir)
     val gen     = UTGenerator(AbsValUT, AbsValParameter(width), outputDirectory = dir)
-    gen.saveDpi(dir / "AbsValDPI.json")
+    gen.saveAbi(dir / "abi.json")
     val lib     = gen.emitLib(dir)
     val wrapper = gen.emitDpiWrapper(lib.topModule, dir)
     os.write.over(dir / "stimulus.json", stimulusJson)
@@ -42,7 +42,7 @@ object AbsValDpiFrontendTest extends TestSuite:
     ).call(cwd = dir, check = true, mergeErrIntoOut = true)
     val so      = dir / "obj_dir" / "libVsim.so"
     assert(os.exists(so))
-    os.proc("python3", frontend.toString, so.toString, dir / "AbsValDPI.json", dir / "stimulus.json")
+    os.proc("python3", frontend.toString, so.toString, dir / "abi.json", dir / "stimulus.json")
       .call(cwd = dir, check = true, mergeErrIntoOut = true)
       .out
       .text()
