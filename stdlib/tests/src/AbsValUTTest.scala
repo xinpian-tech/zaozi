@@ -13,7 +13,7 @@ import utest.*
 object AbsValUTTest extends TestSuite:
   private val outputRoot = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
 
-  private def generator(dir: String): UTGenerator[AbsValParameter, AbsValLayers, AbsValIO, AbsValProbe] =
+  private def generator(dir: String): UTGenerator[AbsValParameter, AbsValLayers, AbsValIO, AbsValUTProbe] =
     UTGenerator(AbsValUT, AbsValParameter(8), outputDirectory = outputRoot / dir)
 
   val tests: Tests = Tests:
