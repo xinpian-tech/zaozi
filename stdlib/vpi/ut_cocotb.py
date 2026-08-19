@@ -1,67 +1,60 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 xinpian-tech
-"""Generic VPI frontend (cocotb binding): drive a lib model from Python via VPI.
+"""VPI frontend: a [[backend.Backend]] realized over cocotb's VPI signal access.
 
-This is the second binding of the ABI contract (`abi.json`), alongside the DPI
-one (`ut_frontend.py`). Where the DPI binding calls generated `export "DPI-C"`
-symbols, cocotb drives the lib model's ports directly through VPI —
-`dut.drive_<name>.value = ...` / `int(dut.probe_<name>.value)` — so it needs no
-DPI wrapper, only the lib model (`generated.sv` + layer/ref split files).
+The same operation ABI (poke/peek/step) as the DPI frontend, but poke/peek go
+straight to the lib model's ports through VPI (`dut.drive_<name>.value` /
+`int(dut.probe_<name>.value)`) — no DPI wrapper, only the lib model. The shared
+drivers (`backend.replay`, `crv.generate`) run unchanged.
 
-Run as a script it acts as the cocotb *runner*: it builds the lib model with
-Verilator and launches the cocotb test below. The test reads the same contract
-and per-cycle stimulus the DPI frontend does, and owns the loop.
+Run as a script it is the cocotb *runner*: build the lib model with Verilator and
+launch the cocotb test below, whose mode/paths come from environment variables.
 
-    ut_cocotb.py <workdir> <toplevel> <abi.json> <stimulus.json> <sv sources...>
+    ut_cocotb.py <workdir> <toplevel> <port.json> <stimulus.json> <sv sources...>
 """
 import json
 import os
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend"))
+import backend as be  # noqa: E402
+import crv  # noqa: E402
+
 import cocotb
 from cocotb.triggers import Timer
 
 
+class CocotbBackend(be.Backend):
+    def __init__(self, dut, ports):
+        super().__init__(ports)
+        self.dut = dut
+
+    def poke(self, port, value):
+        getattr(self.dut, be.lib_input(port)).value = value & ((1 << port["width"]) - 1)
+
+    def peek(self, port):
+        raw = int(getattr(self.dut, be.lib_probe(port)).value)
+        return be.as_signed(raw, port["width"], port["signed"])
+
+    async def _eval(self):
+        await Timer(1, unit="ns")
+
+
 @cocotb.test()
-async def drive(dut):
-    spec = json.load(open(os.environ["ABI_JSON"]))
-    stim = json.load(open(os.environ["STIMULUS_JSON"]))
-    ports = spec["ports"]
-    drives = [p for p in ports if p["role"] == "Drive"]
-    probes = [p for p in ports if p["role"] == "Probe"]
-    clock = next((p for p in ports if p["role"] == "Clock"), None)
-
-    cycles = len(stim[drives[0]["name"]]) if drives else 0
-    for cyc in range(cycles):
-        for p in drives:
-            getattr(dut, "drive_" + p["name"]).value = stim[p["name"]][cyc] & ((1 << p["width"]) - 1)
-        if clock is not None:  # sequential DUT: a full clock edge per cycle
-            c = getattr(dut, clock["name"])
-            c.value = 0
-            await Timer(1, unit="ns")
-            c.value = 1
-            await Timer(1, unit="ns")
-        else:  # combinational DUT: let it settle
-            await Timer(1, unit="ns")
-        observed = []
-        for p in probes:
-            raw = int(getattr(dut, "probe_" + p["name"]).value)
-            if p["signed"] and (raw >> (p["width"] - 1)) & 1:
-                raw -= 1 << p["width"]
-            observed.append(f"{p['name']}={raw}")
-        print(f"PY cyc={cyc + 1} " + " ".join(observed))
+async def run(dut):
+    spec = json.load(open(os.environ["PORT_JSON"]))
+    b = CocotbBackend(dut, spec["ports"])
+    if os.environ.get("UT_MODE") == "generate":
+        stim = await crv.generate(b, int(os.environ["CYCLES"]), int(os.environ["SEED"]))
+        json.dump(stim, open(os.environ["OUT_JSON"], "w"), indent=2)
+    else:
+        await be.replay(b, json.load(open(os.environ["STIMULUS_JSON"])))
 
 
-def main():
-    workdir, toplevel, abi_json, stim_json = sys.argv[1:5]
-    sources = sys.argv[5:]
-    os.environ["ABI_JSON"] = abi_json
-    os.environ["STIMULUS_JSON"] = stim_json
-    # The cocotb subprocess imports this file as the test module.
+def _run(workdir, toplevel, sources):
     here = os.path.dirname(os.path.abspath(__file__))
     os.environ["PYTHONPATH"] = here + os.pathsep + os.environ.get("PYTHONPATH", "")
-
     from cocotb_tools.runner import get_runner
 
     runner = get_runner("verilator")
@@ -74,6 +67,20 @@ def main():
         build_args=["-I" + workdir, "-Wno-fatal", "--no-assert"],
     )
     runner.test(hdl_toplevel=toplevel, test_module="ut_cocotb")
+
+
+def main():
+    args = sys.argv[1:]
+    if args and args[0] == "generate":
+        # generate <workdir> <toplevel> <port.json> <cycles> <seed> <out.json> <sources...>
+        _, workdir, toplevel, port_json, cycles, seed, out_json, *sources = args
+        os.environ.update(UT_MODE="generate", PORT_JSON=port_json, CYCLES=cycles, SEED=seed, OUT_JSON=out_json)
+        _run(workdir, toplevel, sources)
+    else:
+        rest = args[1:] if (args and args[0] == "drive") else args
+        workdir, toplevel, port_json, stim_json, *sources = rest
+        os.environ.update(PORT_JSON=port_json, STIMULUS_JSON=stim_json)
+        _run(workdir, toplevel, sources)
 
 
 if __name__ == "__main__":

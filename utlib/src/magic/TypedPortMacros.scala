@@ -7,24 +7,24 @@ import scala.quoted.*
 /** Compile-time check that `name` is a field of the DUT's IO before resolving a drive port — driving a port the DUT
   * does not have fails to compile.
   */
-def abiDriveSelectDynamic[I <: me.jiuyang.zaozi.HWInterface[?]: Type](
+def portDriveSelectDynamic[I <: me.jiuyang.zaozi.HWInterface[?]: Type](
   access:    Expr[me.jiuyang.utlib.DriveAccess[I]],
   fieldName: Expr[String]
 )(
   using Quotes
-): Expr[me.jiuyang.utlib.AbiPort] =
+): Expr[me.jiuyang.utlib.Port] =
   checkField[I](fieldName, "drive port")
   '{ $access.field($fieldName) }
 
 /** Compile-time check that `name` is a field of the DUT's Probe before resolving a probe port — observing a probe the
   * DUT does not expose fails to compile.
   */
-def abiProbeSelectDynamic[P <: me.jiuyang.zaozi.DVInterface[?, ?]: Type](
+def portProbeSelectDynamic[P <: me.jiuyang.zaozi.DVInterface[?, ?]: Type](
   access:    Expr[me.jiuyang.utlib.ProbeAccess[P]],
   fieldName: Expr[String]
 )(
   using Quotes
-): Expr[me.jiuyang.utlib.AbiPort] =
+): Expr[me.jiuyang.utlib.Port] =
   checkField[P](fieldName, "probe port")
   '{ $access.field($fieldName) }
 

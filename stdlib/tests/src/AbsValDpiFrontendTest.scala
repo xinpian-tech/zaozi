@@ -22,12 +22,12 @@ object AbsValDpiFrontendTest extends TestSuite:
 
   /** Emit the artifacts for `width` and build the lib model + DPI wrapper into `libVsim.so`. `extraArgs` lets a caller
     * pass e.g. `--no-assert` (CRV searches the space, so the SVA `assume` must not fire). Returns the `.so` and the
-    * `abi.json`.
+    * `port.json`.
     */
   private def build(dir: os.Path, width: Int, extraArgs: Seq[String] = Seq.empty): (os.Path, os.Path) =
     os.remove.all(dir)
     val gen     = UTGenerator(AbsValUT, AbsValParameter(width), outputDirectory = dir)
-    gen.saveAbi(dir / "abi.json")
+    gen.savePorts(dir / "port.json")
     val lib     = gen.emitLib(dir)
     val wrapper = gen.emitDpiWrapper(lib.topModule, dir)
     os.proc(
@@ -46,7 +46,7 @@ object AbsValDpiFrontendTest extends TestSuite:
     ).call(cwd = dir, check = true, mergeErrIntoOut = true)
     val so      = dir / "obj_dir" / "libVsim.so"
     assert(os.exists(so))
-    (so, dir / "abi.json")
+    (so, dir / "port.json")
 
   private def run(dir: os.Path, args: os.Shellable*): String =
     os.proc("python3", frontend.toString, args).call(cwd = dir, check = true, mergeErrIntoOut = true).out.text()
