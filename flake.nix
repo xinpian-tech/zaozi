@@ -42,6 +42,8 @@
           inherit system;
         };
         scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default;
+        # cocotb only supports Python <= 3.13; pin 3.12 for the VPI frontend binding.
+        cocotbPython = pkgs.python312.withPackages (ps: with ps; [ cocotb ]);
         zedSettings = pkgs.writeText "zaozi-zed-settings.json" ''
           {
             "languages": {
@@ -71,10 +73,12 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator z3 ] ++ lib.optionals stdenv.isLinux [
+          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator z3 cocotbPython ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
           ];
           env = with pkgs; {
+            # The cocotb-capable interpreter for the VPI frontend (tests invoke it explicitly).
+            COCOTB_PYTHON = "${cocotbPython}/bin/python3";
             CIRCT_INSTALL_PATH = circt-install;
             MLIR_INSTALL_PATH = mlir-install;
             JEXTRACT_INSTALL_PATH = jextract;
