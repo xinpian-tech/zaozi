@@ -3,16 +3,16 @@
 **Version: 1.0**
 
 This is the stable interface between a generated lib model and an external driver
-(the "frontend"). A UT module's `(IO, Probe)` yields a DPI **contract** (`port.json`);
+(the "frontend"). A UT module's `(IO, Probe)` yields a DPI **contract** (`abi.json`);
 from that contract the framework lowers a lib model (`generated.sv`) and generates a
 DPI-export wrapper (`<dut>_dpi.sv` + `<dut>_dpi_capi.cpp`). Built together with
 `verilator --lib-create` they become a shared library the frontend loads and drives.
 The frontend owns the loop; the framework only produces artifacts.
 
-The ABI is versioned. `port.json` carries `version`; a consumer must reject a
-contract whose `version` it does not understand.
+The ABI is versioned. `abi.json` carries `abiVersion`; a consumer must reject a
+contract whose `abiVersion` it does not understand.
 
-## The contract — `port.json`
+## The contract — `abi.json`
 
 ```json
 {
@@ -22,13 +22,13 @@ contract whose `version` it does not understand.
     { "name": "A",      "role": "Probe", "width": 8, "signed": false },
     { "name": "ABSVAL", "role": "Probe", "width": 8, "signed": false }
   ],
-  "version": "1.0"
+  "abiVersion": "1.0"
 }
 ```
 
 - **`name`** — the stable logical name (a Drive and a Probe may share it).
 - **`role`** — `Drive` / `Clock` / `Reset` (module inputs), or `Probe` (observed points).
-- **`width`** — bit width. This ABI version defines widths **1..64** only (see Extension points).
+- **`width`** — bit width. This ABI abiVersion defines widths **1..64** only (see Extension points).
 - **`signed`** — how the frontend should interpret the value; it does not change the wire.
 
 Drive/Clock/Reset are derived from the DUT IO's flipped (input) fields; Probe points
