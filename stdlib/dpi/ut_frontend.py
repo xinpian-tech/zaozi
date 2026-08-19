@@ -34,6 +34,25 @@ def ctype_for(width, signed):
     return ctypes.c_longlong if signed else ctypes.c_ulonglong
 
 
+def chunks_of(width):
+    return (width + 31) // 32
+
+
+def to_chunks(value, width):
+    v = value & ((1 << width) - 1)
+    return [(v >> (32 * i)) & 0xFFFFFFFF for i in range(chunks_of(width))]
+
+
+def from_chunks(buf, width, signed):
+    v = 0
+    for i in range(chunks_of(width)):
+        v |= (buf[i] & 0xFFFFFFFF) << (32 * i)
+    v &= (1 << width) - 1
+    if signed and (v >> (width - 1)) & 1:
+        v -= 1 << width
+    return v
+
+
 def main():
     lib_path, dpi_path, stim_path = sys.argv[1], sys.argv[2], sys.argv[3]
     lib = ctypes.CDLL(lib_path)
@@ -53,17 +72,36 @@ def main():
     lib.sim_eval.argtypes = [ctypes.c_void_p]
     lib.sim_delete.argtypes = [ctypes.c_void_p]
 
+    u32p = ctypes.POINTER(ctypes.c_uint32)
+
     def poke(lib_name, width):
         # dpi_poke_<lib_name>(void* handle, value); SV truncates to the port width.
         f = getattr(lib, "dpi_poke_" + lib_name)
-        f.argtypes = [ctypes.c_void_p, ctype_for(width, True)]
-        return f
+        if width <= 64:
+            f.argtypes = [ctypes.c_void_p, ctype_for(width, True)]
+            return lambda h, v: f(h, v)
+        # A wide port crosses as a packed vector: uint32 chunks, little-endian.
+        f.argtypes = [ctypes.c_void_p, u32p]
+        n = chunks_of(width)
+        return lambda h, v: f(h, (ctypes.c_uint32 * n)(*to_chunks(v, width)))
 
     def peek(port):
+        width, signed = port["width"], port["signed"]
         f = getattr(lib, "dpi_peek_probe_" + port["name"])
-        f.argtypes = [ctypes.c_void_p]
-        f.restype = ctype_for(port["width"], port["signed"])
-        return f
+        if width <= 64:
+            f.argtypes = [ctypes.c_void_p]
+            f.restype = ctype_for(width, signed)
+            return lambda h: f(h)
+        f.argtypes = [ctypes.c_void_p, u32p]
+        f.restype = None
+        n = chunks_of(width)
+
+        def do(h):
+            buf = (ctypes.c_uint32 * n)()
+            f(h, buf)
+            return from_chunks(buf, width, signed)
+
+        return do
 
     drive_poke = {p["name"]: poke("drive_" + p["name"], p["width"]) for p in drives}
     probe_peek = {p["name"]: peek(p) for p in probes}
