@@ -66,6 +66,19 @@ object HarvesterTest extends TestSuite:
           assert(values.contains(BigInt(0))) // the reset state S_IDLE
         case other                                => throw new java.lang.AssertionError(s"unexpected FSM invariants: $other")
 
+    test("InvariantEngine lowers and injects any invariant generically, by btor2 state name"):
+      // circt-generated btor2 keeps register names as `state` symbols, so signals resolve by name.
+      val design   = Btor2.parse("1 sort bitvec 1\n2 sort bitvec 4\n3 state 2 cnt\n")
+      val nodeOf   = InvariantEngine.byStateName(design)
+      assert(nodeOf("cnt") == 3L)
+      // A Range and an Implies both lower and inject through the one shared path.
+      val invs     = Seq(
+        Invariant.Range("cnt", 0, 7),
+        Invariant.Implies(Invariant.Range("cnt", 4, 15), Invariant.MemberOf("cnt", Set(BigInt(6), BigInt(7))))
+      )
+      val injected = InvariantEngine.inject(design, invs, nodeOf)
+      assert(injected.opLines.count(_._1 == "constraint") == 2)
+
     test("on the p530 btor2 the harvester locates the nodes and discovers the tail set"):
       val design = Btor2.parse(os.read(resources / "p530.btor2"))
       // The property's own bound is 14 (a_max_seq_len_pop: instr_cnt_q < 14).

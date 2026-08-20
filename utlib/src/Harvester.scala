@@ -21,6 +21,9 @@ enum Invariant:
   /** `signal ∈ values`. */
   case MemberOf(signal: String, values: Set[BigInt])
 
+  /** `antecedent → consequent` — a relational invariant (e.g. p530's counter↔FSM tail set). */
+  case Implies(antecedent: Invariant, consequent: Invariant)
+
 /** A recognized hardware construct is an *open* interface, not a closed box: besides its own state register (`name`) it
   * names the external `controlInputs` its next-state logic depends on (module inputs and other registers).
   * `intrinsicInvariants` are those sound over the state alone from the construct's shape; relational invariants that
@@ -256,9 +259,14 @@ object Harvester:
     tail:      Set[Int],
     kmax:      Int
   ): Btor2Result =
-    val inTail   = tail.map(s => Btor2Pred.eq(struct.fsmNode, s)).reduce(Btor2Pred.Or.apply)
-    val negation = Btor2Pred.And(Btor2Pred.uge(struct.counterNode, threshold), Btor2Pred.Not(inTail))
-    Btor2.checkPred(design, negation, kmax)
+    // The tail set is the relational invariant `counter ≥ threshold → fsm ∈ tail`, certified through
+    // the construct-generic engine.
+    val width = design.sortWidthOf(struct.counterNode)
+    val inv   = Invariant.Implies(
+      Invariant.Range("counter", threshold, (BigInt(1) << width) - 1),
+      Invariant.MemberOf("fsm", tail.map(BigInt(_)))
+    )
+    InvariantEngine.certify(design, inv, Map("counter" -> struct.counterNode, "fsm" -> struct.fsmNode), kmax)
 
   /** A counter's driver cone contains only the register itself, constants, `comb.add` / `comb.sub` of the register with
     * a constant, and the `comb.mux`es that select among them.
