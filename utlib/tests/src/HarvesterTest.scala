@@ -57,6 +57,15 @@ object HarvesterTest extends TestSuite:
       // explicit as controlInputs rather than dropped.
       assert(fsm.controlInputs.nonEmpty)
 
+      // Each construct emits its intrinsic invariants directly (the per-construct template),
+      // instead of the invariant living hard-coded in the p530 sieve/close.
+      assert(counter.intrinsicInvariants.contains(Invariant.Range("instr_cnt_q", 0, 15)))
+      fsm.intrinsicInvariants match
+        case Seq(Invariant.MemberOf(sig, values)) =>
+          assert(sig == "seq_state_q")
+          assert(values.contains(BigInt(0))) // the reset state S_IDLE
+        case other                                => throw new java.lang.AssertionError(s"unexpected FSM invariants: $other")
+
     test("on the p530 btor2 the harvester locates the nodes and discovers the tail set"):
       val design = Btor2.parse(os.read(resources / "p530.btor2"))
       // The property's own bound is 14 (a_max_seq_len_pop: instr_cnt_q < 14).

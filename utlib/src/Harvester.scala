@@ -11,8 +11,29 @@ package me.jiuyang.utlib
   * each counter updates.
   */
 
+/** A strengthening invariant over named design signals, transported to the certify/inject engine. Kept construct- and
+  * backend-agnostic so the engine consumes any construct's invariants uniformly.
+  */
+enum Invariant:
+  /** `lo ≤ signal ≤ hi`. */
+  case Range(signal: String, lo: BigInt, hi: BigInt)
+
+  /** `signal ∈ values`. */
+  case MemberOf(signal: String, values: Set[BigInt])
+
+/** A recognized hardware construct is an *open* interface, not a closed box: besides its own state register (`name`) it
+  * names the external `controlInputs` its next-state logic depends on (module inputs and other registers).
+  * `intrinsicInvariants` are those sound over the state alone from the construct's shape; relational invariants that
+  * cross `controlInputs` (e.g. p530's counter↔FSM tail set) stay with certification / generator contracts.
+  */
+sealed trait Construct:
+  def name:                String
+  def width:               Int
+  def controlInputs:       Set[String]
+  def intrinsicInvariants: Seq[Invariant]
+
 /** A register whose next value is its own value, its value plus a constant, or a constant — the increment/clear/hold
-  * shape of a bounded counter.
+  * shape of a bounded counter. Its intrinsic invariant is its width range.
   */
 final case class CounterFact(
   name:          String,
@@ -20,28 +41,23 @@ final case class CounterFact(
   increments:    Boolean,
   clears:        Boolean,
   controlInputs: Set[String])
-    extends Construct
+    extends Construct:
+  def intrinsicInvariants: Seq[Invariant] = Seq(Invariant.Range(name, 0, (BigInt(1) << width) - 1))
 
 /** A register selected against its own value by equality tests and reset to a constant state — a finite state machine.
-  * `controlInputs` are the transition conditions (the external signals that gate the next-state), made explicit rather
-  * than dropped.
+  * `controlInputs` are the transition conditions (external signals that gate the next-state), made explicit rather than
+  * dropped; `states` are the enum values it is dispatched against. Its intrinsic invariant is that the state stays
+  * within that enum (plus the reset state).
   */
 final case class FsmFact(
   name:          String,
   width:         Int,
   resetState:    Option[Int],
+  states:        Set[Int],
   controlInputs: Set[String])
-    extends Construct
-
-/** A recognized hardware construct is an *open* interface, not a closed box: besides its own `state` register it names
-  * the external `controlInputs` its next-state logic depends on (module inputs and other registers). Invariants over
-  * the state alone are intrinsic (sound by the construct's shape); relational ones that cross `controlInputs` are left
-  * to certification or generator contracts.
-  */
-sealed trait Construct:
-  def name:          String
-  def width:         Int
-  def controlInputs: Set[String]
+    extends Construct:
+  def intrinsicInvariants: Seq[Invariant] =
+    Seq(Invariant.MemberOf(name, states.map(BigInt(_)) ++ resetState.map(BigInt(_))))
 
 /** Recognizes one construct family on a register from the design's HW-dialect MLIR. Adding a family is adding a
   * `Recognizer`; the certify/inject engine downstream is shared.
@@ -278,14 +294,18 @@ object Harvester:
     * design (the `case` dispatch, now `comb.icmp eq`).
     */
   private def fsmFact(design: MlirDesign, reg: MlirRegister): Option[FsmFact] =
-    val self       = reg.name
-    val holds      = design.node(reg.driver) match
+    val self   = reg.name
+    val holds  = design.node(reg.driver) match
       case Some(MlirNode("comb.mux", operands, _)) => operands.lastOption.contains(self)
       case _                                       => false
-    val dispatched = design.nodes.exists { node =>
-      node.op == "comb.icmp" && node.operands.contains(self) &&
-      design.icmpPredicate(node.result).exists(pred => pred == "eq" || pred == "ceq")
-    }
-    Option.when(holds && dispatched)(
-      FsmFact(self.stripPrefix("%"), reg.width, reg.resetValue, controlInputs(design, reg))
+    // The enum values the register is dispatched against — the `case` labels, now the constants
+    // its `comb.icmp eq`s compare it to.
+    val states = design.nodes.collect {
+      case node
+          if node.op == "comb.icmp" && node.operands.contains(self) &&
+            design.icmpPredicate(node.result).exists(pred => pred == "eq" || pred == "ceq") =>
+        node.operands.filterNot(_ == self).flatMap(design.constantValue).map(_.toInt)
+    }.flatten.toSet
+    Option.when(holds && states.nonEmpty)(
+      FsmFact(self.stripPrefix("%"), reg.width, reg.resetValue, states, controlInputs(design, reg))
     )
