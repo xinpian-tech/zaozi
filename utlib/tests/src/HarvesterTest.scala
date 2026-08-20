@@ -8,10 +8,9 @@ import utest.*
 
 /** The structure harvester on real third-party RTL: the CV32E40X Zc sequencer.
   *
-  * Stage 1 (this suite): with no hints, recognize the module's FSM register and its bounded
-  * counter register, and classify the counter's update as the increment/clear/hold shape a
-  * counter-bound invariant relies on. This is the structural half of harvesting the fact
-  * that closes HWMCC's p530.
+  * Stage 1 (this suite): with no hints, recognize the module's FSM register and its bounded counter register, and
+  * classify the counter's update as the increment/clear/hold shape a counter-bound invariant relies on. This is the
+  * structural half of harvesting the fact that closes HWMCC's p530.
   */
 object HarvesterTest extends TestSuite:
   private val outputRoot = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
@@ -20,7 +19,7 @@ object HarvesterTest extends TestSuite:
   private lazy val sequencerMlir: os.Path =
     val outDir = outputRoot / "harvester"
     os.makeDir.all(outDir)
-    val out = outDir / "sequencer.mlir"
+    val out    = outDir / "sequencer.mlir"
     os.proc(
       "circt-verilog",
       "--ir-hw",
@@ -35,21 +34,28 @@ object HarvesterTest extends TestSuite:
     test("the harvester recognizes the sequencer's FSM and bounded counter"):
       val harvest = Harvester.harvest(sequencerMlir, "cv32e40x_sequencer")
 
-      val counter = harvest.counters.find(_.name == "instr_cnt_q").getOrElse(
-        throw new java.lang.AssertionError(s"instr_cnt_q not recognized; found ${harvest.counters.map(_.name)}")
-      )
+      val counter = harvest.counters
+        .find(_.name == "instr_cnt_q")
+        .getOrElse(
+          throw new java.lang.AssertionError(s"instr_cnt_q not recognized; found ${harvest.counters.map(_.name)}")
+        )
       // Its update is exactly the increment/clear/hold shape.
       assert(counter.width == 4)
       assert(counter.increments)
       assert(counter.clears)
 
-      val fsm = harvest.fsms.find(_.name == "seq_state_q").getOrElse(
-        throw new java.lang.AssertionError(s"seq_state_q not recognized; found ${harvest.fsms.map(_.name)}")
-      )
+      val fsm = harvest.fsms
+        .find(_.name == "seq_state_q")
+        .getOrElse(
+          throw new java.lang.AssertionError(s"seq_state_q not recognized; found ${harvest.fsms.map(_.name)}")
+        )
       // Its next value is selected against its own value by equality tests, and it resets to
       // a constant state (S_IDLE = 0).
       assert(fsm.width == 4)
       assert(fsm.resetState.contains(0))
+      // The FSM is an open interface: its next-state depends on external signals, now made
+      // explicit as controlInputs rather than dropped.
+      assert(fsm.controlInputs.nonEmpty)
 
     test("on the p530 btor2 the harvester locates the nodes and discovers the tail set"):
       val design = Btor2.parse(os.read(resources / "p530.btor2"))
@@ -74,7 +80,7 @@ object HarvesterTest extends TestSuite:
       // its negation is unreachable through depth 35.
       Harvester.validateTailSet(design, struct, threshold = 14, tail = tail, kmax = 35) match
         case _: Btor2Result.UnreachableWithin | _: Btor2Result.Proven => ()
-        case other => throw new java.lang.AssertionError(s"invariant not certified: $other")
+        case other                                                    => throw new java.lang.AssertionError(s"invariant not certified: $other")
 
     test("emitting the harvested invariant in the checker's sampled frame closes p530"):
       val design = Btor2.parse(os.read(resources / "p530.btor2"))
