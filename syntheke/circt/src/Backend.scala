@@ -11,10 +11,10 @@ import java.lang.foreign.Arena
 
 /** Binds one syntheke [[GeneratorEntry]] to the hardware implementation that enacts it (doc @sec-generator-contract).
   *
-  * A backend consumes the serializable full parameter and produces the generator's circuit: `instantiate` creates
-  * the instance operation inside the wrapper module currently under emission and dumps the generator's own module
-  * (and its transitive children) as per-module `.mlirbc` circuits, which the elaborator links into the design
-  * circuit afterwards.
+  * A backend consumes the serializable full parameter and produces the generator's circuit: `instantiate` creates the
+  * instance operation inside the wrapper module currently under emission and dumps the generator's own module (and its
+  * transitive children) as per-module `.mlirbc` circuits, which the elaborator links into the design circuit
+  * afterwards.
   */
 trait GeneratorBackend:
   def id: GeneratorId
@@ -27,7 +27,11 @@ trait GeneratorBackend:
     fullParam:    Any,
     instanceName: String,
     loc:          SourceLocation
-  )(using Arena, Context, Block): Operation
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Operation
 
 /** The zaozi backend: a syntheke generator entry enacted by a zaozi [[Generator]].
   *
@@ -40,7 +44,7 @@ final class ZaoziBackend[
   L <: LayerInterface[PARAM],
   I <: HWInterface[PARAM],
   P <: DVInterface[PARAM, L]
-](val entry: GeneratorEntry[FP],
+](val entry:     GeneratorEntry[FP],
   val generator: Generator[PARAM, L, I, P],
   toParam:       FP => PARAM)
     extends GeneratorBackend:
@@ -55,7 +59,11 @@ final class ZaoziBackend[
     fullParam:    Any,
     instanceName: String,
     loc:          SourceLocation
-  )(using Arena, Context, Block): Operation =
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Operation =
     given sourcecode.File         = sourcecode.File(loc.file)
     given sourcecode.Line         = sourcecode.Line(loc.line)
     given sourcecode.Name.Machine = sourcecode.Name.Machine(instanceName)

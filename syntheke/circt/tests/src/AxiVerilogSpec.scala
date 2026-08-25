@@ -17,18 +17,18 @@ import me.jiuyang.syntheke.tests.axi.{
   TransferSizes
 }
 import me.jiuyang.zaozi.{DVRecord, Generator, HWRecord, LayerInterface, Parameter}
-import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
 import me.jiuyang.zaozi.reftpe.Interface
 import me.jiuyang.zaozi.valuetpe.{Bundle, Data, Record}
 import upickle.default.ReadWriter
 import utest.*
 
 /** End-to-end enactment of the motivation SoC: negotiate over [[Axi4]], bind every generator entry to a zaozi
-  * generator, elaborate wrapper modules through the CIRCT C-API, link the per-module circuits, and lower to
-  * Verilog with the in-process firtool pipeline.
+  * generator, elaborate wrapper modules through the CIRCT C-API, link the per-module circuits, and lower to Verilog
+  * with the in-process firtool pipeline.
   *
-  * The zaozi architectures are placeholder bodies (`dontCare()`): real IP logic is orthogonal to what syntheke
-  * enacts — ports, hierarchy, wiring and parameters are all real and checked (@dec-binding-check).
+  * The zaozi architectures are placeholder bodies (`dontCare()`): real IP logic is orthogonal to what syntheke enacts —
+  * ports, hierarchy, wiring and parameters are all real and checked (@dec-binding-check).
   */
 
 // ============ AXI bundle shapes mirroring Axi4.interfaceOf exactly ============
@@ -36,6 +36,16 @@ import utest.*
 final case class AxiShape(addrBits: Int, dataBits: Int, idBits: Int) derives ReadWriter
 object AxiShape:
   def of(e: AxiEdgeParams): AxiShape = AxiShape(e.addrBits, e.dataBits, e.idBits)
+
+// The @generator macro derives a mainargs CLI for every Parameter; nested fields read as JSON tokens.
+private def jsonTokens[T: ReadWriter](name: String): mainargs.TokensReader.Simple[T] =
+  new mainargs.TokensReader.Simple[T]:
+    def shortName = name
+    def read(strs: Seq[String]): Either[String, T] =
+      try Right(upickle.default.read[T](strs.last))
+      catch case e: Exception => Left(e.getMessage)
+given mainargs.TokensReader.Simple[AxiShape] = jsonTokens("axi-shape")
+given mainargs.TokensReader.Simple[Vector[(String, AxiShape)]] = jsonTokens("axi-ports")
 
 class AxBits(s: AxiShape) extends Record:
   val id    = Aligned("id", UInt(s.idBits))
@@ -74,67 +84,71 @@ class AxiPortRecord(s: AxiShape) extends Record:
 // ============ zaozi generators, one per syntheke generator entry ============
 
 case class CoreP(name: String, idBits: Int, maxFlight: Int, port: AxiShape) extends Parameter derives ReadWriter
-class CorePLayers(p: CoreP) extends LayerInterface(p):
+class CorePLayers(p: CoreP)                                                 extends LayerInterface(p):
   def layers = Seq.empty
-class CorePProbe(p: CoreP) extends DVRecord[CoreP, CorePLayers](p)
-class CorePIO(p: CoreP) extends HWRecord(p):
+class CorePProbe(p: CoreP)                                                  extends DVRecord[CoreP, CorePLayers](p)
+class CorePIO(p: CoreP)                                                     extends HWRecord(p):
   val mem = Aligned("mem", new AxiPortRecord(p.port))
-@generator
-object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
+@zaoziGenerator
+object CoreGen                                                              extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
   def architecture(p: CoreP) = summon[Interface[CorePIO]].dontCare()
 
-case class XbarP(name: String, arbitration: String, inputs: Vector[(String, AxiShape)], outputs: Vector[(String, AxiShape)])
+case class XbarP(
+  name:        String,
+  arbitration: String,
+  inputs:      Vector[(String, AxiShape)],
+  outputs:     Vector[(String, AxiShape)])
     extends Parameter derives ReadWriter
-class XbarPLayers(p: XbarP) extends LayerInterface(p):
+class XbarPLayers(p: XbarP)                                                 extends LayerInterface(p):
   def layers = Seq.empty
-class XbarPProbe(p: XbarP) extends DVRecord[XbarP, XbarPLayers](p)
-class XbarPIO(p: XbarP) extends HWRecord(p):
+class XbarPProbe(p: XbarP)                                                  extends DVRecord[XbarP, XbarPLayers](p)
+class XbarPIO(p: XbarP)                                                     extends HWRecord(p):
   val ins  = p.inputs.map((n, s) => Flipped(n, new AxiPortRecord(s)))
   val outs = p.outputs.map((n, s) => Aligned(n, new AxiPortRecord(s)))
-@generator
-object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
+@zaoziGenerator
+object XbarGen                                                              extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
   def architecture(p: XbarP) = summon[Interface[XbarPIO]].dontCare()
 
 case class L2P(capacityKiB: Int, up: AxiShape, down: AxiShape) extends Parameter derives ReadWriter
-class L2PLayers(p: L2P) extends LayerInterface(p):
+class L2PLayers(p: L2P)                                        extends LayerInterface(p):
   def layers = Seq.empty
-class L2PProbe(p: L2P) extends DVRecord[L2P, L2PLayers](p)
-class L2PIO(p: L2P) extends HWRecord(p):
+class L2PProbe(p: L2P)                                         extends DVRecord[L2P, L2PLayers](p)
+class L2PIO(p: L2P)                                            extends HWRecord(p):
   val in  = Flipped("in", new AxiPortRecord(p.up))
   val out = Aligned("out", new AxiPortRecord(p.down))
-@generator
-object L2Gen extends Generator[L2P, L2PLayers, L2PIO, L2PProbe]:
+@zaoziGenerator
+object L2Gen                                                   extends Generator[L2P, L2PLayers, L2PIO, L2PProbe]:
   def architecture(p: L2P) = summon[Interface[L2PIO]].dontCare()
 
 case class DramP(ranks: Int, port: AxiShape) extends Parameter derives ReadWriter
-class DramPLayers(p: DramP) extends LayerInterface(p):
+class DramPLayers(p: DramP)                  extends LayerInterface(p):
   def layers = Seq.empty
-class DramPProbe(p: DramP) extends DVRecord[DramP, DramPLayers](p)
-class DramPIO(p: DramP) extends HWRecord(p):
+class DramPProbe(p: DramP)                   extends DVRecord[DramP, DramPLayers](p)
+class DramPIO(p: DramP)                      extends HWRecord(p):
   val in = Flipped("in", new AxiPortRecord(p.port))
-@generator
-object DramGen extends Generator[DramP, DramPLayers, DramPIO, DramPProbe]:
+@zaoziGenerator
+object DramGen                               extends Generator[DramP, DramPLayers, DramPIO, DramPProbe]:
   def architecture(p: DramP) = summon[Interface[DramPIO]].dontCare()
 
 case class BridgeP(wide: AxiShape, narrow: AxiShape) extends Parameter derives ReadWriter
-class BridgePLayers(p: BridgeP) extends LayerInterface(p):
+class BridgePLayers(p: BridgeP)                      extends LayerInterface(p):
   def layers = Seq.empty
-class BridgePProbe(p: BridgeP) extends DVRecord[BridgeP, BridgePLayers](p)
-class BridgePIO(p: BridgeP) extends HWRecord(p):
+class BridgePProbe(p: BridgeP)                       extends DVRecord[BridgeP, BridgePLayers](p)
+class BridgePIO(p: BridgeP)                          extends HWRecord(p):
   val in  = Flipped("in", new AxiPortRecord(p.wide))
   val out = Aligned("out", new AxiPortRecord(p.narrow))
-@generator
-object BridgeGen extends Generator[BridgeP, BridgePLayers, BridgePIO, BridgePProbe]:
+@zaoziGenerator
+object BridgeGen                                     extends Generator[BridgeP, BridgePLayers, BridgePIO, BridgePProbe]:
   def architecture(p: BridgeP) = summon[Interface[BridgePIO]].dontCare()
 
 case class SlaveP(name: String, base: Long, size: Long, port: AxiShape) extends Parameter derives ReadWriter
-class SlavePLayers(p: SlaveP) extends LayerInterface(p):
+class SlavePLayers(p: SlaveP)                                           extends LayerInterface(p):
   def layers = Seq.empty
-class SlavePProbe(p: SlaveP) extends DVRecord[SlaveP, SlavePLayers](p)
-class SlavePIO(p: SlaveP) extends HWRecord(p):
+class SlavePProbe(p: SlaveP)                                            extends DVRecord[SlaveP, SlavePLayers](p)
+class SlavePIO(p: SlaveP)                                               extends HWRecord(p):
   val in = Flipped("in", new AxiPortRecord(p.port))
-@generator
-object SlaveGen extends Generator[SlaveP, SlavePLayers, SlavePIO, SlavePProbe]:
+@zaoziGenerator
+object SlaveGen                                                         extends Generator[SlaveP, SlavePLayers, SlavePIO, SlavePProbe]:
   def architecture(p: SlaveP) = summon[Interface[SlavePIO]].dontCare()
 
 // ============ the SoC: same topology as AxiSocSpec, FullParam = the zaozi parameter ============
@@ -162,9 +176,15 @@ object AxiVerilogSpec extends TestSuite:
 
   def shapeOf(view: EdgeView, node: String): AxiShape = AxiShape.of(view(node).edge.edgeAs(Axi4))
 
-  def axiXbarBody(ins: Vector[String], outs: Vector[String], name: String, arbitration: String)(using
-    gs:  GeneratorScope[XbarP],
-    loc: SourceLocation
+  def axiXbarBody(
+    ins:         Vector[String],
+    outs:        Vector[String],
+    name:        String,
+    arbitration: String
+  )(
+    using
+    gs:          GeneratorScope[XbarP],
+    loc:         SourceLocation
   ): (Vector[InwardNodeBuilder[Axi4.type]], Vector[OutwardNodeBuilder[Axi4.type]]) =
     val inBs  = ins.map(inward(Axi4)(_))
     val outBs = outs.map(outward(Axi4)(_))
@@ -182,7 +202,13 @@ object AxiVerilogSpec extends TestSuite:
     }(identity)
     (inBs, outBs)
 
-  def core(name: String, idBits: Int, maxFlight: Int)(using ws: WrapperScope): OutwardNodeBuilder[Axi4.type] =
+  def core(
+    name:      String,
+    idBits:    Int,
+    maxFlight: Int
+  )(
+    using ws:  WrapperScope
+  ): OutwardNodeBuilder[Axi4.type] =
     var out: OutwardNodeBuilder[Axi4.type] = null
     generator(name, coreEntry) {
       out = outward(Axi4)("mem").dFn(_ =>
@@ -192,8 +218,14 @@ object AxiVerilogSpec extends TestSuite:
     }
     out
 
-  def mmioSlave(name: String, base: Long, size: Long, idCapacityBits: Int)(using
-    ws: WrapperScope
+  def mmioSlave(
+    name:           String,
+    base:           Long,
+    size:           Long,
+    idCapacityBits: Int
+  )(
+    using
+    ws:             WrapperScope
   ): InwardNodeBuilder[Axi4.type] =
     var in: InwardNodeBuilder[Axi4.type] = null
     generator(name, slaveEntry) {
@@ -331,7 +363,7 @@ object AxiVerilogSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildSoc()).toOption.get
       val design   = Elaborator.elaborate(resolved, backends) match
         case Right(d)   => d
-        case Left(errs) => throw new AssertionError(errs.map(_.show).mkString("\n"))
+        case Left(errs) => sys.error(errs.map(_.show).mkString("\n"))
 
       assert(design.circuitName == "Top")
       // The FIRRTL artifact holds the whole linked design: root, wrappers, and zaozi-generated modules.
@@ -351,15 +383,15 @@ object AxiVerilogSpec extends TestSuite:
     }
 
     test("a backend interface that differs from the settled bundle is a binding-check error") {
-      val resolved   = Negotiator.negotiate(buildSoc()).toOption.get
-      val mangled    = backends.map {
+      val resolved = Negotiator.negotiate(buildSoc()).toOption.get
+      val mangled  = backends.map {
         case b: ZaoziBackend[?, ?, ?, ?, ?] if b.id == dramEntry.id =>
           ZaoziBackend(
             dramEntry,
             DramGen,
             (fp: DramP) => fp.copy(port = fp.port.copy(dataBits = fp.port.dataBits * 2))
           )
-        case b                                                      => b
+        case b => b
       }
       Elaborator.elaborate(resolved, mangled) match
         case Right(_)   => assert(false)

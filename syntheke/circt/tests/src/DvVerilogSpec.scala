@@ -10,15 +10,29 @@ import me.jiuyang.syntheke.tests.{Trace, Wid}
 import upickle.default.ReadWriter
 import utest.*
 
-import org.llvm.circt.scalalib.capi.dialect.firrtl.given_ValueApi
-import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlConvention, FirrtlNameKind, ValueApi as FirrtlValueApi}
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{
+  given_FirrtlDirectionApi,
+  given_FirrtlNameKindApi,
+  given_TypeApi,
+  given_ValueApi
+}
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{
+  FirrtlConvention,
+  FirrtlLayerConvention,
+  FirrtlNameKind,
+  ValueApi as FirrtlValueApi
+}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.given
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   Circuit,
   CircuitApi,
   InstanceApi,
+  Layer as CirctLayer,
+  LayerApi,
   ModuleApi,
   OpenSubfieldApi,
+  RefCastApi,
   RefDefineApi,
   RefSendApi,
   WireApi
@@ -49,18 +63,18 @@ import java.nio.file.StandardOpenOption.*
 /** Verification enactment end-to-end: probe sources in a deep cluster route through framework-planned dangles and
   * per-leaf `ref.define` to an ancestor sink, confined to FIRRTL layers.
   *
-  * zaozi's probe interfaces are output-only today, so both endpoint generators here use a [[StubBackend]] that
-  * builds its module through the CIRCT C-API directly: outputs invalidated, probe sources defined from dummy wires,
-  * probe sink inputs left unread. The framework side — planning, dangles, defines, layers, linking, firtool — is
-  * exactly the production path.
+  * zaozi's probe interfaces are output-only today, so both endpoint generators here use a [[StubBackend]] that builds
+  * its module through the CIRCT C-API directly: outputs invalidated, probe sources defined from dummy wires, probe sink
+  * inputs left unread. The framework side — planning, dangles, defines, layers, linking, firtool — is exactly the
+  * production path.
   */
 
 /** Serializable stub description: every port of the generator with its settled interface. */
 final case class StubPort(name: String, isInput: Boolean, interface: ProtocolInterface) derives ReadWriter
 final case class StubFull(kind: String, ports: Vector[StubPort]) derives ReadWriter
 
-/** A [[GeneratorBackend]] that enacts a [[StubFull]] by building the module with circtlib operations, dumping it
-  * as a per-module `.mlirbc` circuit exactly like the zaozi flow.
+/** A [[GeneratorBackend]] that enacts a [[StubFull]] by building the module with circtlib operations, dumping it as a
+  * per-module `.mlirbc` circuit exactly like the zaozi flow.
   */
 final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) extends GeneratorBackend:
   def id: GeneratorId = entry.id
@@ -74,7 +88,11 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
     fullParam:    Any,
     instanceName: String,
     loc:          SourceLocation
-  )(using Arena, Context, Block): Operation =
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Operation =
     val p          = fullParam.asInstanceOf[StubFull]
     val name       = moduleName(fullParam)
     val unknownLoc = summon[LocationApi].locationUnknownGet
@@ -85,7 +103,20 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(unknownLoc)
       given Circuit    = summon[CircuitApi].op(name)
       summon[Circuit].appendToModule()
-      val module       = summon[ModuleApi].op(
+      // The per-module circuit must define every layer the module's colored probes mention.
+      def emitLayerDefs(tree: LayerTree, parent: Option[CirctLayer]): Unit =
+        tree.children.toVector.sortBy(_._1).foreach { (n, sub) =>
+          val op = summon[LayerApi].op(n, unknownLoc, FirrtlLayerConvention.Bind)
+          parent match
+            case None    => summon[Circuit].block.appendOwnedOperation(op.operation)
+            case Some(p) => p.block.appendOwnedOperation(op.operation)
+          emitLayerDefs(sub, Some(op))
+        }
+      emitLayerDefs(
+        layers.foldLeft(LayerTree.empty)((t, p) => t.add(LayerPath(p))),
+        None
+      )
+      val module = summon[ModuleApi].op(
         name,
         unknownLoc,
         FirrtlConvention.Scalarized,
@@ -108,8 +139,6 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
                 )
                 wire.operation.appendToBlock()
                 wire.result.emitInvalidate(summon[Block], unknownLoc)
-                val send = summon[RefSendApi].op(wire.result, unknownLoc)
-                send.operation.appendToBlock()
                 val dst  = path.segments.foldLeft(port) { (v, seg) =>
                   seg match
                     case InterfacePath.Segment.Field(n) =>
@@ -118,7 +147,12 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
                       sub.result
                     case InterfacePath.Segment.Index(_) => throw new UnsupportedOperationException("vec probes")
                 }
-                summon[RefDefineApi].op(dst, send.result, unknownLoc).operation.appendToBlock()
+                val send = summon[RefSendApi].op(wire.result, unknownLoc)
+                send.operation.appendToBlock()
+                // Color the uncolored probe to the port leaf's layer-colored probe type.
+                val cast = summon[RefCastApi].op(send.result, dst.getType, unknownLoc)
+                cast.operation.appendToBlock()
+                summon[RefDefineApi].op(dst, cast.result, unknownLoc).operation.appendToBlock()
               case _                                                => ()
           }
           // Non-probe ports: invalidate every writable leaf in one shot.
@@ -127,11 +161,12 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
       }
       module.appendToCircuit()
       val file = outDir / s"$name.mlirbc"
-      val out  = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
+      val out = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
       try summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
       finally out.close()
 
-    val instOp = summon[InstanceApi].op(name, instanceName, FirrtlNameKind.Interesting, unknownLoc, fields, layers.map(_.toSeq))
+    val instOp =
+      summon[InstanceApi].op(name, instanceName, FirrtlNameKind.Interesting, unknownLoc, fields, layers.map(_.toSeq))
     instOp.operation.appendToBlock()
     instOp.operation
 
@@ -145,9 +180,9 @@ object DvVerilogSpec extends TestSuite:
   def entry(name: String) =
     new GeneratorEntry[StubFull](GeneratorId(s"demo.dv.$name", "1"), Codec.fromReadWriter[StubFull](ujson.Str(name)))
 
-  val srcEntry  = entry("Src")
-  val memEntry  = entry("Mem")
-  val snkEntry  = entry("Cosim")
+  val srcEntry = entry("Src")
+  val memEntry = entry("Mem")
+  val snkEntry = entry("Cosim")
   val backends: Seq[GeneratorBackend] =
     Seq(StubBackend(srcEntry, outDir), StubBackend(memEntry, outDir), StubBackend(snkEntry, outDir))
 
@@ -161,7 +196,10 @@ object DvVerilogSpec extends TestSuite:
         view.nodes.map(nv =>
           StubPort(nv.node.name, nv.direction == NodeDirection.Inward, nv.edge.interface)
         ) ++ view.verification.sources.map(s => StubPort(s.source.name, false, s.interface))
-          ++ view.verification.sinks.map(s => StubPort(s.sink.name, true, s.interfaces.sink))
+        // FIRRTL forbids input probes: the sink receives the probe-stripped (resolved) interface.
+          ++ view.verification.sinks.map(s =>
+            StubPort(s.sink.name, true, ProtocolBundle.stripProbes(s.interfaces.sink))
+          )
       )
     )
 
@@ -199,7 +237,7 @@ object DvVerilogSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildDesign()).toOption.get
       val design   = Elaborator.elaborate(resolved, backends) match
         case Right(d)   => d
-        case Left(errs) => throw new AssertionError(errs.map(_.show).mkString("\n"))
+        case Left(errs) => sys.error(errs.map(_.show).mkString("\n"))
 
       // The layer tree is declared once at circuit level; the cluster carries probe dangle ports.
       assert(design.firrtl.contains("layer verification"))

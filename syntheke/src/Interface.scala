@@ -45,6 +45,17 @@ type ProtocolBundle = ProtocolInterface.Bundle
 object ProtocolBundle:
   def apply(fields: ProtocolInterface.Field*): ProtocolBundle = ProtocolInterface.Bundle(fields.toVector)
 
+  /** Replace every probe leaf by its inner type: the shape a probe sink receives after `ref.resolve` at its parent
+    * wrapper. FIRRTL forbids input probe ports, so sink generator ports use the stripped interface; the probe-typed
+    * contract stays the protocol-level truth.
+    */
+  def stripProbes(tpe: ProtocolInterface): ProtocolInterface = tpe match
+    case ProtocolInterface.Bundle(fields) =>
+      ProtocolInterface.Bundle(fields.map(f => f.copy(tpe = stripProbes(f.tpe))))
+    case ProtocolInterface.Vec(n, e)      => ProtocolInterface.Vec(n, stripProbes(e))
+    case ProtocolInterface.Probe(i, _)    => stripProbes(i)
+    case leaf                             => leaf
+
   /** All signal leaves of an interface with their paths and probe layers. */
   def leaves(tpe: ProtocolInterface, prefix: InterfacePath = InterfacePath.root)
     : Vector[(InterfacePath, ProtocolInterface)] =

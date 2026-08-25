@@ -39,10 +39,14 @@ Deviations from the document's surface syntax:
 - Dangle-port name segments encode to FIRRTL-legal identifiers by joining with
   `_` and escaping `_` → `$u`, `-` → `$m`, `$` → `$$` (the document leaves the
   concrete reversible encoding to the implementation).
-- zaozi's probe interfaces are output-only, so probe-*sink* generator modules
-  (input ref ports) currently need a non-zaozi `GeneratorBackend`; the
-  framework side of verification routing (dangles, per-leaf `ref.define`,
-  layer declarations) is fully enacted.
+- FIRRTL forbids input probe ports, so a probe *sink* generator's ports carry
+  the probe-*stripped* (resolved) interface: the enclosing wrapper
+  `ref.resolve`s every probe inside a layerblock and feeds plain data into the
+  sink instance, which is itself instantiated under that layerblock (the bind
+  pattern). The probe-typed `DVInterfaces.sink` stays the protocol-level
+  contract; `ProtocolBundle.stripProbes` is the boundary rule. This also means
+  a sink is expressible in zaozi as ordinary data inputs — the demo uses a
+  raw-CAPI `StubBackend` only to keep its body trivial.
 
 ```scala
 import me.jiuyang.syntheke.*

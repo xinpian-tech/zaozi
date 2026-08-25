@@ -5,12 +5,15 @@ package me.jiuyang.syntheke.circt
 import scala.collection.mutable
 
 import me.jiuyang.syntheke.*
+import me.jiuyang.zaozi.default.runOnOpOrThrow
 
 import org.llvm.circt.scalalib.capi.dialect.emit.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.emit.DialectApi as EmitDialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   given_FirrtlBundleFieldApi,
+  given_FirrtlDirectionApi,
+  given_FirrtlNameKindApi,
   given_TypeApi,
   DialectApi as FirrtlDialectApi,
   FirrtlBundleField,
@@ -20,6 +23,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   FirrtlNameKind,
   TypeApi as FirrtlTypeApi
 }
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.ltl.DialectApi as LTLDialectApi
 import org.llvm.circt.scalalib.capi.dialect.sv.given_DialectApi
@@ -36,9 +40,12 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
+  LayerBlockApi,
   ModuleApi,
   OpenSubfieldApi,
-  RefDefineApi
+  RefDefineApi,
+  RefResolveApi,
+  SubfieldApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
@@ -86,11 +93,11 @@ enum ElaborationError:
   case Unsupported(detail: String)
 
   def show: String = this match
-    case MissingBackend(m, g)        => s"missing backend for generator ${g.show} at ${m.show}"
-    case PortMismatch(m, e, d, loc)  => s"port mismatch at ${m.show}#$e: $d (${loc.show})"
-    case MissingModule(name)         => s"instantiated module '$name' has no definition"
-    case InvalidCircuit(d)           => s"invalid circuit: $d"
-    case Unsupported(d)              => s"unsupported: $d"
+    case MissingBackend(m, g)       => s"missing backend for generator ${g.show} at ${m.show}"
+    case PortMismatch(m, e, d, loc) => s"port mismatch at ${m.show}#$e: $d (${loc.show})"
+    case MissingModule(name)        => s"instantiated module '$name' has no definition"
+    case InvalidCircuit(d)          => s"invalid circuit: $d"
+    case Unsupported(d)             => s"unsupported: $d"
 
 /** The enacted design: FIRRTL and Verilog text plus the module-name assignment. */
 final case class ElaboratedDesign(
@@ -101,11 +108,10 @@ final case class ElaboratedDesign(
 
 /** The Elaborate phase, CIRCT backend (doc @ch-hardware, @sec-wrapper-emission, @sec-elaboration-flow).
   *
-  * Wrapper modules are emitted directly through the CIRCT C-API from the negotiated plans: dangle ports, one
-  * instance per child, bundle-level connects, and layer declarations. Generator modules are enacted by their
-  * [[GeneratorBackend]] (zaozi), which dumps per-module `.mlirbc` circuits; the elaborator links those into the
-  * design circuit, verifies it, and runs the firtool pipeline to Verilog — no textual FIRRTL is ever constructed
-  * by hand.
+  * Wrapper modules are emitted directly through the CIRCT C-API from the negotiated plans: dangle ports, one instance
+  * per child, bundle-level connects, and layer declarations. Generator modules are enacted by their
+  * [[GeneratorBackend]] (zaozi), which dumps per-module `.mlirbc` circuits; the elaborator links those into the design
+  * circuit, verifies it, and runs the firtool pipeline to Verilog — no textual FIRRTL is ever constructed by hand.
   */
 object Elaborator:
 
@@ -132,8 +138,8 @@ object Elaborator:
     }
     if errors.nonEmpty then return Left(errors.toVector)
 
-    val arena             = Arena.ofConfined()
-    var context:  Context = null
+    val arena = Arena.ofConfined()
+    var context: Context = null
     try
       given Arena   = arena
       given Context = summon[ContextApi].contextCreate
@@ -167,7 +173,7 @@ object Elaborator:
             case Some(p) => p.block.appendOwnedOperation(op.operation)
           emitLayers(sub, Some(op))
         }
-      emitLayers(resolved.layerDecls.values.foldLeft(LayerTree.empty)(_ merge _), None)
+      emitLayers(resolved.layerDecls.values.foldLeft(LayerTree.empty)(_.merge(_)), None)
 
       // ============ wrapper modules: one firrtl.module per structural key ============
       dd.definitions.foreach { d =>
@@ -189,16 +195,50 @@ object Elaborator:
             portFields.map(f => (f, unknownLoc)),
             leafPaths(resolved.layerDecls.getOrElse(rep, LayerTree.empty))
           )
-          given Block = module.block
+          given Block    = module.block
 
           val childValues = mutable.Map.empty[(String, String), Value]
+          // Probe sinks are enacted under a layerblock: FIRRTL has no input probe ports, so the wrapper resolves
+          // every probe and feeds plain data into the sink instance, which lives inside the layer (bind pattern).
+          val sinkBlocks  = mutable.Map.empty[String, Block]
           w.children.foreach { c =>
             val childId = rep / c
             spec.modules(childId) match
               case gm: GeneratorModuleSpec =>
-                val rgm    = resolved.generatorModule(childId).get
-                val instOp = backendOf(gm.entry.id).instantiate(rgm.fullParam, c, gm.loc)
-                val names  = instOp.getInherentAttributeByName("portNames")
+                val rgm        = resolved.generatorModule(childId).get
+                val sinkLayers = rgm.view.verification.sinks
+                  .flatMap(sv => resolved.dvGroups.find(_.sink == sv.sink).toVector.flatMap(_.layers))
+                  .distinct
+                val instBlock: Block =
+                  if rgm.view.verification.sinks.isEmpty then summon[Block]
+                  else if rgm.view.nodes.nonEmpty then
+                    errors += ElaborationError.Unsupported(
+                      s"sink generator ${childId.show} mixes probe sinks with design nodes"
+                    )
+                    summon[Block]
+                  else if sinkLayers.sizeIs != 1 then
+                    errors += ElaborationError.Unsupported(
+                      s"sink generator ${childId.show} collects probes from ${sinkLayers.size} distinct layers"
+                    )
+                    summon[Block]
+                  else
+                    // Layerblocks nest structurally: `layerblock @a { layerblock @a::@b { … } }`.
+                    var blk = summon[Block]
+                    sinkLayers.head.segments.indices.foreach { i =>
+                      val lb = summon[LayerBlockApi].op(sinkLayers.head.segments.take(i + 1), unknownLoc)
+                      locally {
+                        given Block = blk
+                        lb.operation.appendToBlock()
+                      }
+                      blk = lb.block
+                    }
+                    sinkBlocks(c) = blk
+                    blk
+                val instOp = locally {
+                  given Block = instBlock
+                  backendOf(gm.entry.id).instantiate(rgm.fullParam, c, gm.loc)
+                }
+                val names = instOp.getInherentAttributeByName("portNames")
                 val count  = names.arrayAttrGetNumElements
                 val byName = Seq
                   .tabulate(count)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
@@ -226,9 +266,11 @@ object Elaborator:
                           gm.loc
                         )
                 }
-                // Verification endpoints are ports too: probe sources and sinks by declared name.
-                (rgm.view.verification.sources.map(s => s.source.name -> s.interface) ++
-                  rgm.view.verification.sinks.map(s => s.sink.name -> s.interfaces.sink)).foreach { (name, bundle) =>
+                // Verification endpoints are ports too: probe sources keep their probe types; sink ports carry
+                // the probe-stripped interface (the shape after ref.resolve at this wrapper).
+                (rgm.view.verification.sources.map(s => s.source.name -> (s.interface: ProtocolInterface)) ++
+                  rgm.view.verification.sinks
+                    .map(s => s.sink.name -> ProtocolBundle.stripProbes(s.interfaces.sink))).foreach { (name, bundle) =>
                   byName.get(name) match
                     case None    =>
                       errors += ElaborationError.PortMismatch(
@@ -266,7 +308,8 @@ object Elaborator:
                   leafPaths(resolved.layerDecls.getOrElse(childId, LayerTree.empty))
                 )
                 instOp.operation.appendToBlock()
-                childPorts.zipWithIndex.foreach((p, i) => childValues((c, p.name.encoded)) = instOp.operation.getResult(i))
+                childPorts.zipWithIndex
+                  .foreach((p, i) => childValues((c, p.name.encoded)) = instOp.operation.getResult(i))
           }
 
           def baseOf(e: LocalEndpoint): Either[String, Value] = e match
@@ -279,14 +322,22 @@ object Elaborator:
             case LocalEndpoint.ChildPort(_, _, sub) => sub
             case _                                  => InterfacePath.root
 
-          /** Walk named fields with `firrtl.opensubfield`; verification bundles are open bundles. */
-          def navigate(base: Value, path: InterfacePath): Either[String, Value] =
+          /** Walk named fields; open bundles (probe-carrying) use `opensubfield`, plain data `subfield`. */
+          def navigate(
+            base: Value,
+            path: InterfacePath,
+            open: Boolean
+          )(
+            using Block
+          ): Either[String, Value] =
             path.segments.foldLeft(Right(base): Either[String, Value]) {
               case (Right(v), InterfacePath.Segment.Field(n)) =>
                 val idx = v.getType.getBundleFieldIndex(n)
                 if idx < 0 then Left(s"no field '$n' while navigating a verification path")
                 else
-                  val sub = summon[OpenSubfieldApi].op(v, idx, unknownLoc)
+                  val sub =
+                    if open then summon[OpenSubfieldApi].op(v, idx, unknownLoc)
+                    else summon[SubfieldApi].op(v, idx, unknownLoc)
                   sub.operation.appendToBlock()
                   Right(sub.result)
               case (Right(_), InterfacePath.Segment.Index(i)) =>
@@ -303,18 +354,37 @@ object Elaborator:
                     summon[ConnectApi].op(src, dst, unknownLoc).operation.appendToBlock()
                   case (l, r)                   => Seq(l, r).foreach(_.left.foreach(fail))
               case PlanOrigin.Verification(bind) =>
-                // All-probe bundles connect with per-leaf ref.define (doc @sec-dv-routing).
                 val group  = resolved.dvGroups.find(_.binds.contains(bind)).get
                 val bundle = group.interfaces.sources(group.binds.indexOf(bind))
                 (baseOf(wp.from), baseOf(wp.to)) match
                   case (Right(srcBase), Right(dstBase)) =>
-                    ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
-                      val defined = for
-                        src <- navigate(srcBase, InterfacePath(subOf(wp.from).segments ++ leafPath.segments))
-                        dst <- navigate(dstBase, InterfacePath(subOf(wp.to).segments ++ leafPath.segments))
-                      yield summon[RefDefineApi].op(dst, src, unknownLoc).operation.appendToBlock()
-                      defined.left.foreach(fail)
-                    }
+                    wp.to match
+                      case LocalEndpoint.ThisPort(_)             =>
+                        // Pass-through across this boundary: per-leaf ref.define (doc @sec-dv-routing).
+                        ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
+                          val wired = for
+                            src <- navigate(srcBase, leafPath, open = true)
+                            dst <- navigate(dstBase, leafPath, open = true)
+                          yield summon[RefDefineApi].op(dst, src, unknownLoc).operation.appendToBlock()
+                          wired.left.foreach(fail)
+                        }
+                      case LocalEndpoint.ChildPort(inst, _, sub) =>
+                        // The sink end: resolve each probe inside the sink's layerblock and connect the data.
+                        sinkBlocks.get(inst) match
+                          case None     => fail(s"sink instance '$inst' has no layer block")
+                          case Some(lb) =>
+                            given Block = lb
+                            ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
+                              val wired = for
+                                src <- navigate(srcBase, leafPath, open = true)
+                                dst <- navigate(dstBase, InterfacePath(sub.segments ++ leafPath.segments), open = false)
+                              yield {
+                                val res = summon[RefResolveApi].op(src, unknownLoc)
+                                res.operation.appendToBlock()
+                                summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
+                              }
+                              wired.left.foreach(fail)
+                            }
                   case (l, r)                           => Seq(l, r).foreach(_.left.foreach(fail))
           }
 
@@ -324,6 +394,20 @@ object Elaborator:
       if errors.nonEmpty then return Left(NormalizedErrors(errors.toVector))
 
       // ============ link the per-module circuits dumped by the backends ============
+      // Demand-driven: parse exactly the `<moduleName>.mlirbc` files of modules that are referenced but not yet
+      // defined, transitively — stale or unrelated files in the dump directory are never touched.
+      def collectRefs(root: Operation): Set[String] =
+        val out = mutable.Set.empty[String]
+        root.walk(
+          op =>
+            if op.getName.str == "firrtl.instance" then
+              out += op.getInherentAttributeByName("moduleName").flatSymbolRefAttrGetValue
+            WalkResultEnum.Advance
+          ,
+          WalkEnum.PreOrder
+        )
+        out.toSet
+
       val defined = mutable.Set.empty[String]
       summon[Circuit].operation.walk(
         op =>
@@ -333,37 +417,53 @@ object Elaborator:
         ,
         WalkEnum.PreOrder
       )
-      val pending = mutable.Map.empty[String, Operation]
-      os.list(mlirbcDir).filter(_.ext == "mlirbc").sortBy(_.last).foreach { f =>
-        val parsed = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(f))
-        parsed.getOperation.walk(
-          op =>
-            if op.getName.str == "firrtl.module" then
-              val sym = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-              if !defined(sym) && !pending.contains(sym) then pending(sym) = op
-              WalkResultEnum.Skip
-            else WalkResultEnum.Advance
-          ,
-          WalkEnum.PreOrder
-        )
-      }
-      pending.toVector.sortBy(_._1).foreach { (sym, op) =>
-        op.removeFromParent()
-        summon[Circuit].block.appendOwnedOperation(op)
-        defined += sym
-      }
 
-      // Every instantiated module must now have a definition.
-      val referenced = mutable.Set.empty[String]
-      summon[Circuit].operation.walk(
-        op =>
-          if op.getName.str == "firrtl.instance" then
-            referenced += op.getInherentAttributeByName("moduleName").flatSymbolRefAttrGetValue
-          WalkResultEnum.Advance
-        ,
-        WalkEnum.PreOrder
-      )
-      (referenced -- defined).toVector.sorted.foreach(sym => errors += ElaborationError.MissingModule(sym))
+      val unresolved = mutable.Set.empty[String]
+      val needed     = mutable.Set.from(collectRefs(summon[Circuit].operation) -- defined)
+      while needed.nonEmpty do
+        val sym = needed.head
+        needed -= sym
+        if !defined(sym) && !unresolved(sym) then
+          val file = mlirbcDir / s"$sym.mlirbc"
+          if !os.exists(file) then unresolved += sym
+          else
+            val moved = mutable.ArrayBuffer.empty[Operation]
+            try
+              // Manual block iteration: operations obtained through direct calls live in our arena, unlike the
+              // transient wrappers a walk callback receives.
+              def isNullOp(op: Operation): Boolean           =
+                op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
+              def opsIn(first: Operation): Vector[Operation] =
+                val buf = mutable.ArrayBuffer.empty[Operation]
+                var cur = first
+                while !isNullOp(cur) do
+                  buf += cur
+                  cur = cur.getNextInBlock
+                buf.toVector
+              val parsed = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(file))
+              if parsed._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0 then unresolved += sym
+              else
+                val topOps     = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
+                val circuitOps = topOps.filter(_.getName.str == "firrtl.circuit")
+                val moduleOps  = circuitOps
+                  .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
+                  .filter(_.getName.str == "firrtl.module")
+                moduleOps.foreach { op =>
+                  val s2 = op.getInherentAttributeByName("sym_name").stringAttrGetValue
+                  if !defined(s2) then
+                    op.removeFromParent()
+                    summon[Circuit].block.appendOwnedOperation(op)
+                    defined += s2
+                    moved += op
+                }
+            catch
+              case e: Exception =>
+                unresolved += sym
+                errors += ElaborationError.InvalidCircuit(s"while linking $file: $e")
+            if !defined(sym) then unresolved += sym
+            moved.foreach(op => needed ++= (collectRefs(op) -- defined -- unresolved))
+
+      unresolved.toVector.sorted.foreach(sym => errors += ElaborationError.MissingModule(sym))
       if errors.nonEmpty then return Left(NormalizedErrors(errors.toVector))
 
       if !summon[MlirModule].getOperation.verify then
