@@ -10,12 +10,12 @@ package me.jiuyang.syntheke
   */
 
 /** Non-empty name sequence from the FIRRTL layer root, e.g. `verification.cosim`. */
-final case class LayerPath(segments: Vector[String]):
+final case class LayerPath(segments: Vector[String]) derives upickle.default.ReadWriter:
   require(segments.nonEmpty, "LayerPath must be non-empty")
   require(segments.forall(_.nonEmpty), "LayerPath segments must be non-empty strings")
   def show: String = segments.mkString(".")
 
-sealed trait ProtocolInterface derives CanEqual
+sealed trait ProtocolInterface derives CanEqual, upickle.default.ReadWriter
 
 object ProtocolInterface:
   final case class Bundle(fields: Vector[Field])              extends ProtocolInterface:
@@ -34,7 +34,7 @@ object ProtocolInterface:
   /** Read-only reference to an internal signal, confined to a FIRRTL layer. */
   final case class Probe(inner: ProtocolInterface, layer: LayerPath) extends ProtocolInterface
 
-  final case class Field(name: String, flip: Boolean, tpe: ProtocolInterface):
+  final case class Field(name: String, flip: Boolean, tpe: ProtocolInterface) derives upickle.default.ReadWriter:
     require(name.nonEmpty, "field name must be non-empty")
 
 /** The top-level Bundle of a protocol port: the root and every nested Bundle carry at least one field (invariant
@@ -56,7 +56,7 @@ object ProtocolBundle:
       case leaf                             => Vector(prefix -> leaf)
 
 /** A path from an interface root: named-field selections and Vec indices (doc @sec-dv-protocol). */
-final case class InterfacePath(segments: Vector[InterfacePath.Segment]):
+final case class InterfacePath(segments: Vector[InterfacePath.Segment]) derives upickle.default.ReadWriter:
   def field(name:       String):        InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Field(name))
   def index(i:          Int):           InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Index(i))
   def isPrefixOf(other: InterfacePath): Boolean       = other.segments.startsWith(segments)
@@ -67,7 +67,7 @@ final case class InterfacePath(segments: Vector[InterfacePath.Segment]):
 
 object InterfacePath:
   val root: InterfacePath = InterfacePath(Vector.empty)
-  enum Segment derives CanEqual:
+  enum Segment derives CanEqual, upickle.default.ReadWriter:
     case Field(name: String)
     case Index(i: Int)
 

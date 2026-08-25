@@ -147,18 +147,7 @@ object Elaborator:
 
       val unknownLoc = summon[LocationApi].locationUnknownGet
 
-      def translate(t: ProtocolInterface): MlirType = t match
-        case ProtocolInterface.Bundle(fields) =>
-          fields
-            .map(f => summon[FirrtlBundleFieldApi].createFirrtlBundleField(f.name, f.flip, translate(f.tpe)))
-            .getBundle
-        case ProtocolInterface.Vec(n, e)      => translate(e).getVector(n)
-        case ProtocolInterface.UInt(w)        => w.getUInt
-        case ProtocolInterface.SInt(w)        => w.getSInt
-        case ProtocolInterface.Bool           => 1.getUInt
-        case ProtocolInterface.Clock          => summon[FirrtlTypeApi].getClock
-        case ProtocolInterface.Reset          => summon[FirrtlTypeApi].getReset
-        case ProtocolInterface.Probe(i, l)    => translate(i).getRef(false, l.segments)
+      def translate(t: ProtocolInterface): MlirType = Translate.tpe(t)
 
       def leafPaths(t: LayerTree, prefix: Vector[String] = Vector.empty): Vector[Vector[String]] =
         if t.children.isEmpty then (if prefix.isEmpty then Vector.empty else Vector(prefix))
