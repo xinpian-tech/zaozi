@@ -107,4 +107,6 @@ $ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针�
 
 验证生成器的顶层端口采用 `DVInterfaces.sink`；第 $i$ 条 `DVBindId` 把 `sources(i)` 连接到 `sinkPaths(i)` 选定的 Bundle。
 
+FIRRTL 不允许输入方向的 `Probe` 端口。例化时，汇生成器端口采用 `DVInterfaces.sink` 逐叶去掉 `Probe` 后的数据结构；其父结构模块在对应层的 layerblock 内对每个探针执行 `ref.resolve`，汇生成器实例与这些连线一并置于该层块中。协议层面的接口契约仍以带 `Probe` 的 `DVInterfaces` 为准。
+
 验证协商的 `Edge`、`DVInterfaces`、端口计划与层声明均进入 `ResolvedDesign`，供例化与工具导出使用。
