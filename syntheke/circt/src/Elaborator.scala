@@ -36,7 +36,9 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
-  ModuleApi
+  ModuleApi,
+  OpenSubfieldApi,
+  RefDefineApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
@@ -116,9 +118,6 @@ object Elaborator:
     val backendOf = backends.map(b => b.id -> b).toMap
     val spec      = resolved.spec
     val dd        = Dedup.dedup(resolved)
-
-    if resolved.dvGroups.nonEmpty then
-      return Left(Vector(ElaborationError.Unsupported("verification probes are not yet enacted by the CIRCT elaborator")))
 
     // Module names: generator modules are named by their backend (stable per canonical FullParam, matching the
     // structural key); wrapper modules by the dedup naming rules.
@@ -238,6 +237,28 @@ object Elaborator:
                           gm.loc
                         )
                 }
+                // Verification endpoints are ports too: probe sources and sinks by declared name.
+                (rgm.view.verification.sources.map(s => s.source.name -> s.interface) ++
+                  rgm.view.verification.sinks.map(s => s.sink.name -> s.interfaces.sink)).foreach { (name, bundle) =>
+                  byName.get(name) match
+                    case None    =>
+                      errors += ElaborationError.PortMismatch(
+                        childId,
+                        name,
+                        "declared verification endpoint has no matching generator port",
+                        gm.loc
+                      )
+                    case Some(i) =>
+                      val expected = translate(bundle)
+                      val actual   = instOp.getResult(i).getType
+                      if !expected.isEquivalentTo(actual, true) then
+                        errors += ElaborationError.PortMismatch(
+                          childId,
+                          name,
+                          "verification port type differs from the settled interface",
+                          gm.loc
+                        )
+                }
               case _:  WrapperModuleSpec   =>
                 val childPorts = resolved.portPlans.filter(_.module == childId)
                 val fields     = childPorts.map { p =>
@@ -259,21 +280,53 @@ object Elaborator:
                 childPorts.zipWithIndex.foreach((p, i) => childValues((c, p.name.encoded)) = instOp.operation.getResult(i))
           }
 
-          def valueOf(e: LocalEndpoint): Either[String, Value] = e match
-            case LocalEndpoint.ThisPort(name)             =>
+          def baseOf(e: LocalEndpoint): Either[String, Value] = e match
+            case LocalEndpoint.ThisPort(name)           =>
               portIndex.get(name.encoded).map(i => module.getIO(i)).toRight(s"missing port ${name.encoded}")
-            case LocalEndpoint.ChildPort(inst, port, sub) =>
-              if sub.segments.nonEmpty then Left("verification sub-path endpoints are not supported yet")
-              else childValues.get((inst, port.encoded)).toRight(s"missing child port $inst.${port.encoded}")
+            case LocalEndpoint.ChildPort(inst, port, _) =>
+              childValues.get((inst, port.encoded)).toRight(s"missing child port $inst.${port.encoded}")
+
+          def subOf(e: LocalEndpoint): InterfacePath = e match
+            case LocalEndpoint.ChildPort(_, _, sub) => sub
+            case _                                  => InterfacePath.root
+
+          /** Walk named fields with `firrtl.opensubfield`; verification bundles are open bundles. */
+          def navigate(base: Value, path: InterfacePath): Either[String, Value] =
+            path.segments.foldLeft(Right(base): Either[String, Value]) {
+              case (Right(v), InterfacePath.Segment.Field(n)) =>
+                val idx = v.getType.getBundleFieldIndex(n)
+                if idx < 0 then Left(s"no field '$n' while navigating a verification path")
+                else
+                  val sub = summon[OpenSubfieldApi].op(v, idx, unknownLoc)
+                  sub.operation.appendToBlock()
+                  Right(sub.result)
+              case (Right(_), InterfacePath.Segment.Index(i)) =>
+                Left(s"Vec index [$i] in a verification path is not supported yet")
+              case (l @ Left(_), _)                           => l
+            }
 
           resolved.wirePlans.filter(_.module == rep).foreach { wp =>
-            (valueOf(wp.from), valueOf(wp.to)) match
-              case (Right(src), Right(dst)) =>
-                summon[ConnectApi].op(src, dst, unknownLoc).operation.appendToBlock()
-              case (l, r)                   =>
-                Seq(l, r).collect { case Left(detail) => detail }.foreach { detail =>
-                  errors += ElaborationError.InvalidCircuit(s"${d.name}: $detail")
-                }
+            def fail(detail: String): Unit = errors += ElaborationError.InvalidCircuit(s"${d.name}: $detail")
+            wp.origin match
+              case PlanOrigin.Design(_)          =>
+                (baseOf(wp.from), baseOf(wp.to)) match
+                  case (Right(src), Right(dst)) =>
+                    summon[ConnectApi].op(src, dst, unknownLoc).operation.appendToBlock()
+                  case (l, r)                   => Seq(l, r).foreach(_.left.foreach(fail))
+              case PlanOrigin.Verification(bind) =>
+                // All-probe bundles connect with per-leaf ref.define (doc @sec-dv-routing).
+                val group  = resolved.dvGroups.find(_.binds.contains(bind)).get
+                val bundle = group.interfaces.sources(group.binds.indexOf(bind))
+                (baseOf(wp.from), baseOf(wp.to)) match
+                  case (Right(srcBase), Right(dstBase)) =>
+                    ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
+                      val defined = for
+                        src <- navigate(srcBase, InterfacePath(subOf(wp.from).segments ++ leafPath.segments))
+                        dst <- navigate(dstBase, InterfacePath(subOf(wp.to).segments ++ leafPath.segments))
+                      yield summon[RefDefineApi].op(dst, src, unknownLoc).operation.appendToBlock()
+                      defined.left.foreach(fail)
+                    }
+                  case (l, r)                           => Seq(l, r).foreach(_.left.foreach(fail))
           }
 
           module.appendToCircuit()
