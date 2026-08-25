@@ -7,17 +7,47 @@ import mill.scalalib._
 import mill.scalalib.TestModule.Utest
 import mill.scalalib.scalafmt._
 
-import build.{v, ZaoziPublishModule, ZaoziScalaModule}
+import build.{circtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
 
 // Syntheke: treaty-driven topology and parameter negotiation framework.
-// Build and Negotiate are pure computation over plain data — this module
-// depends on no MLIR/CIRCT native code; the Elaborate phase binds to zaozi
-// in a separate module.
-object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule {
+// Build and Negotiate are pure computation over plain data — the base module
+// depends on no MLIR/CIRCT native code; the Elaborate phase lives in the
+// nested `circt` module, which binds generator modules to zaozi and emits
+// wrapper modules directly through the CIRCT C-API.
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.oslib, v.upickle, v.sourcecode)
 
   object tests extends ScalaTests with ScalafmtModule with Utest {
     def mvnDeps = Seq(v.utest)
+  }
+
+  object circt extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(m, zaozi)
+
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+
+    object tests extends ScalaTests with ScalafmtModule with Utest {
+      override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros"))
+
+      def mvnDeps = Seq(v.utest)
+
+      // Reuse the Axi4 protocol library defined in the negotiation test suite.
+      override def moduleDeps = super.moduleDeps ++ Seq(m.tests)
+
+      override def forkArgs: T[Seq[String]] = Task(
+        super.forkArgs() ++ circtlib.forkArgs()
+      )
+
+      // zaozi's BaseGeneratorHelper dumps per-module .mlirbc circuits into ZAOZI_OUTDIR.
+      override def forkEnv: T[Map[String, String]] = Task(
+        super.forkEnv() ++ Map("ZAOZI_OUTDIR" -> Task.dest.toString)
+      )
+    }
   }
 }
