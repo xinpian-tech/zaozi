@@ -38,9 +38,9 @@ one serializable parameter object and know nothing about the graph.
 ```
    Phase 1: Build                Phase 2: Negotiate             Phase 3: Elaborate
 ┌──────────────────────┐     ┌──────────────────────────┐   ┌──────────────────────┐
-│ a Scala DSL drafts   │ ──▶ │ resolve cardinalities    │──▶│ instantiate zaozi    │
-│ the design spec:     │     │ propagate parameters     │   │ generators, punch    │
-│ module tree, nodes,  │     │ down and up the graph    │   │ hierarchy ports,     │
+│ a Scala DSL drafts   │ ──▶ │ check the structure      │──▶│ instantiate zaozi    │
+│ the design spec:     │     │ propagate parameters     │   │ generators, generate │
+│ module tree, nodes,  │     │ down and up the graph    │   │ dangle ports,        │
 │ connections, probes  │     │ settle every edge        │   │ wire everything,     │
 │                      │     │ plan ports and wires     │   │ emit FIRRTL via MLIR │
 └──────────────────────┘     └──────────────────────────┘   └──────────────────────┘
@@ -51,9 +51,9 @@ one serializable parameter object and know nothing about the graph.
   hierarchy, protocol nodes, connections between them, and verification probes.
   Nothing is elaborated; the spec is plain data plus deferred callbacks.
 - **Negotiate** — a pure function turns the spec into a *resolved design*:
-  connection multiplicities are solved, parameters flow downstream and
-  upstream, per-edge parameters are settled, and every hierarchy-crossing port
-  and wire is planned. Errors are values, reported in bulk with source
+  the structure is checked, parameters flow downstream and upstream, per-edge
+  parameters are settled, and every hierarchy-crossing dangle port and wire is
+  planned. Errors are values, reported in bulk with source
   locations.
 - **Elaborate** — the resolved design is enacted: zaozi generators are
   instantiated with their final serializable parameters, structural wrapper
@@ -64,13 +64,16 @@ one serializable parameter object and know nothing about the graph.
 - **Protocol** — a negotiation contract: the type of parameters flowing
   downward (source → sink), the type flowing upward (sink → source), and a
   function that settles one edge from the pair.
-- **Node** — a point where a module participates in a protocol. Node roles
-  (source, sink, adapter, nexus, …) determine how many edges a node accepts and
-  how parameters transform across it.
-- **Two graphs** — the *module hierarchy* (ownership and namespacing) and the
-  *negotiation graph* (nodes and edges) are distinct; edges may cross hierarchy
-  levels, and Syntheke plans the ports punched through every boundary on the
-  path.
+- **Node** — a named port a generator module declares, either an *inward node*
+  or an *outward node*. Unlike Diplomacy's `MixedNode`, a node here has one side
+  only: it takes part in exactly one bind and yields exactly one edge and one
+  generator port. A module declares explicitly which of its inward nodes feed
+  which of its outward nodes; `dFn` and `uFn` transform the parameters along
+  those declared dependencies.
+- **Two structures** — the *hierarchy tree* (ownership and namespacing) and the
+  *connection structure* (nodes, binds, and module-internal parameter
+  dependencies) are distinct; binds may cross hierarchy levels, and Syntheke
+  plans the dangle ports generated at every boundary on the path.
 - **Wrapper vs. generator modules** — a design module either composes children
   (no hardware of its own) or owns exactly one zaozi generator (all hardware
   inside). The two are separated at the type level; there is no mixed form.
@@ -79,9 +82,16 @@ one serializable parameter object and know nothing about the graph.
   (computed by the negotiator). The folded result is the only object that
   crosses the boundary into zaozi, and the only thing that must serialize.
 - **Verification probes** — design-verification taps are first-class protocol
-  nodes: probe sources flow strictly upward to an ancestor sink, ports are
-  punched automatically along the way, and probe hardware is confined to
+  nodes: probe sources flow strictly upward to an ancestor sink, dangle ports
+  are generated automatically along the way, and probe hardware is confined to
   CIRCT layers so it can be dropped from a release build.
+
+Where Syntheke means the same thing as Diplomacy, it uses Diplomacy's name:
+inward/outward nodes, `Down` and `Up` parameters, edges, `dFn` and `uFn`,
+`render`, dangle ports. Where the names differ — `Protocol` instead of
+`NodeImp`, `<-` instead of `:=`, wrapper and generator modules instead of one
+`LazyModule` — the difference is deliberate and is tabulated in the design
+document's *与 Diplomacy 的关系* section.
 
 ## Documentation
 
