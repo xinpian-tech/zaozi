@@ -4,14 +4,19 @@
 
 Syntheke (from Greek *συνθήκη* — "treaty, agreement"; Chinese name **合契**) is a
 treaty-driven topology and parameter negotiation framework for SoC generators,
-implemented in pure Scala 3. This module contains the **Build** and
-**Negotiate** phases of the Triptych pipeline; both are pure computation over
-plain data and depend on no MLIR/CIRCT native code. The **Elaborate** phase
-(zaozi generator invocation, wrapper emission, wiring) binds to the rest of
-this monorepo in a separate module.
+implemented in pure Scala 3.
+
+- **`syntheke`** (this module) — the **Build** and **Negotiate** phases of the
+  Triptych pipeline plus the tooling exports. Pure computation over plain data;
+  no MLIR/CIRCT native dependency.
+- **`syntheke.circt`** — the **Elaborate** phase: generator modules are enacted
+  by zaozi through a `GeneratorBackend`, wrapper modules are emitted directly
+  through the CIRCT C-API from the negotiated plans, the per-module `.mlirbc`
+  circuits are linked, and the in-process firtool pipeline lowers the design to
+  Verilog. No textual FIRRTL is ever constructed by hand.
 
 The design contract is the Syntheke design document (`syntheke` repository,
-`doc/design/`, Chinese). Correspondence:
+branch `init`, `doc/design/`, Chinese). Correspondence:
 
 | design document | here |
 |---|---|
@@ -22,6 +27,10 @@ The design contract is the Syntheke design document (`syntheke` repository,
 | 协商算法（结构校验、稳定拓扑序、双向传播、逐边求解、`EdgeView`、N1–N10） | `Negotiator.scala` |
 | 跨层端口规划、端口命名、FIRRTL 层 | `Planner.scala` |
 | 已求解记录 (`ResolvedDesign`, `ResolvedEdge`, `EdgeView`, …) | `Resolved.scala` |
+| 模块身份与去重 (@sec-dedup 结构键、模块命名) | `Dedup.scala` |
+| 工具产物（topology/edges/plan/params JSON, @ch-tooling） | `Export.scala` |
+| 可视化（DOT 与 GraphML, @sec-visualization） | `Viz.scala` |
+| 生成器契约、端口结构校验 (@dec-binding-check)、例化流程 | `circt/src/Backend.scala`, `circt/src/Elaborator.scala` |
 
 Deviations from the document's surface syntax:
 
@@ -30,6 +39,10 @@ Deviations from the document's surface syntax:
 - Dangle-port name segments encode to FIRRTL-legal identifiers by joining with
   `_` and escaping `_` → `$u`, `-` → `$m`, `$` → `$$` (the document leaves the
   concrete reversible encoding to the implementation).
+- zaozi's probe interfaces are output-only, so probe-*sink* generator modules
+  (input ref ports) currently need a non-zaozi `GeneratorBackend`; the
+  framework side of verification routing (dangles, per-leaf `ref.define`,
+  layer declarations) is fully enacted.
 
 ```scala
 import me.jiuyang.syntheke.*
@@ -47,5 +60,13 @@ val spec = Design {
   }
   in <-- out
 }
-Negotiator.negotiate(spec) // Either[Vector[NegotiationError], ResolvedDesign]
+val resolved = Negotiator.negotiate(spec) // Either[Vector[NegotiationError], ResolvedDesign]
+
+// Elaborate (syntheke.circt): bind entries to zaozi generators, get Verilog.
+// Elaborator.elaborate(resolved.toOption.get, backends) // Either[Vector[ElaborationError], ElaboratedDesign]
 ```
+
+The AXI4 demo (`tests/src/axi/`, `circt/tests/src/`) mirrors rocket-chip's
+`amba.axi4` parameter model over the design document's motivation SoC:
+id-space prefixing in the crossbar, upward address aggregation, a 128→32
+width bridge, per-edge conflict reporting, and end-to-end Verilog.
