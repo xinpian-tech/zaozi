@@ -77,6 +77,18 @@
    工作量可控），还是全面对齐 HAVEN 的 19 IP（需要 SV blackbox 导入 zaozi，工作量大）？
 3. **LLM 与预算**：用哪些模型、每任务 k 取多少、修复轮上限？
 
+## 进度（2026-08-26）
+
+§4 基础设施状态：1 SMT 腿 ✅（FormalUT/circt-bmc + Stimulus 桥 + pruneForBmc +
+寄存器初态钉定 + --rising-clocks-only）；2 时序 ✅（TwoBeatUT，zaozi ltltpe 表面
+本就完整）；3 跨事务 ✅（Txn.history + AccumUT）；4 外部 SV IP ✅（SvImport +
+ExtAccumUT，机制原型）；LLM 入口 ✅（experiments 模块 + ut_harness.py + PROMPT.md，
+接 mcc311/haven——其 VCS/URG 封装同时解决 §5 问题 1 的 A1 仿真器）。
+待办：覆盖率腿（走 haven 的 VCS/URG 为主，verilator 备胎未做）；HAVEN IP 实际移植；
+LLM 实验 prompt 模板按 PROMPT.md 展开。四类约束（值/时序/跨事务/外部 IP）各有
+绿的端到端测试：AbsValFormalGen / TwoBeatFormalGen / AccumFormalGen /
+ExtAccumFormalGen。
+
 ## 参考
 
 - HAVEN: Hybrid Automated Verification ENgine for UVM Testbench Synthesis with
