@@ -116,7 +116,7 @@ object FormalUTTest extends TestSuite:
           |""".stripMargin
       )
       val out = os.read(FormalUT.delayInputs(hw, "top", Seq("A")))
-      assert(out.contains("%A__d = seq.compreg %A, %clock initial %A__d_init : i8"))
+      assert(out.contains("%A__d = seq.compreg %A, %clock initial %A__d__init : i8"))
       assert(out.contains("comb.add %A__d, %c1_i8 : i8"))
       // the port declaration itself keeps the original name
       assert(out.contains("in %A : i8"))
