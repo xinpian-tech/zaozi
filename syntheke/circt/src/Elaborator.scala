@@ -244,51 +244,88 @@ object Elaborator:
                   .tabulate(count)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
                   .toMap
                 byName.foreach((n, i) => childValues((c, n)) = instOp.getResult(i))
-                // Binding check (@dec-binding-check): each settled node must be a generator port of the
-                // exact settled interface type.
-                rgm.view.nodes.foreach { nv =>
-                  byName.get(nv.node.name) match
-                    case None    =>
-                      errors += ElaborationError.PortMismatch(
-                        childId,
-                        nv.node.name,
-                        "declared node has no matching generator port",
-                        gm.loc
+
+                // The single binding checkpoint (@dec-binding-check). Everything the settled design promises about
+                // this generator's ports is verified here, and only here: presence, root direction, and exact
+                // interface structure (with the first divergence path on mismatch); ports the generator declares
+                // beyond the settled design are rejected too.
+                val dirs = instOp.getInherentAttributeByName("portDirections")
+
+                def typeText(t: MlirType): String =
+                  val sb = new StringBuilder
+                  t.print(sb ++= _)
+                  sb.result()
+
+                /** First path where the two types diverge, with the local shapes; None when equivalent. */
+                def firstDiff(exp: MlirType, act: MlirType, path: String): Option[String] =
+                  if exp.isEquivalentTo(act, true) then None
+                  else if exp.isBundle && act.isBundle then
+                    val (ne, na) = (exp.getBundleNumFields.toInt, act.getBundleNumFields.toInt)
+                    if ne != na then Some(s"$path: $ne fields expected, generator has $na")
+                    else
+                      (0 until ne).view.flatMap { i =>
+                        val (fe, fa) = (exp.getBundleFieldByIndex(i), act.getBundleFieldByIndex(i))
+                        if fe.getName != fa.getName then
+                          Some(s"$path: field $i is '${fa.getName}', expected '${fe.getName}'")
+                        else if fe.getIsFlip != fa.getIsFlip then
+                          Some(s"$path.${fe.getName}: flip is ${fa.getIsFlip}, expected ${fe.getIsFlip}")
+                        else firstDiff(fe.getType, fa.getType, s"$path.${fe.getName}")
+                      }.headOption.orElse(Some(s"$path: ${typeText(exp)} vs ${typeText(act)}"))
+                  else if exp.isVector && act.isVector then
+                    if exp.getVectorElementNum != act.getVectorElementNum then
+                      Some(
+                        s"$path: Vec[${exp.getVectorElementNum}] expected, generator has Vec[${act.getVectorElementNum}]"
                       )
-                    case Some(i) =>
-                      val expected = translate(nv.edge.interface)
-                      val actual   = instOp.getResult(i).getType
-                      if !expected.isEquivalentTo(actual, true) then
-                        errors += ElaborationError.PortMismatch(
-                          childId,
-                          nv.node.name,
-                          "generator port type differs from the settled ProtocolBundle",
-                          gm.loc
-                        )
-                }
-                // Verification endpoints are ports too: probe sources keep their probe types; sink ports carry
-                // the probe-stripped interface (the shape after ref.resolve at this wrapper).
-                (rgm.view.verification.sources.map(s => s.source.name -> (s.interface: ProtocolInterface)) ++
-                  rgm.view.verification.sinks
-                    .map(s => s.sink.name -> ProtocolBundle.stripProbes(s.interfaces.sink))).foreach { (name, bundle) =>
+                    else firstDiff(exp.getVectorElementType, act.getVectorElementType, s"$path[]")
+                  else Some(s"$path: expected ${typeText(exp)}, generator has ${typeText(act)}")
+
+                def checkPort(name: String, expectOutput: Boolean, expectedInterface: ProtocolInterface): Unit =
                   byName.get(name) match
                     case None    =>
                       errors += ElaborationError.PortMismatch(
                         childId,
                         name,
-                        "declared verification endpoint has no matching generator port",
+                        "declared endpoint has no matching generator port",
                         gm.loc
                       )
                     case Some(i) =>
-                      val expected = translate(bundle)
-                      val actual   = instOp.getResult(i).getType
-                      if !expected.isEquivalentTo(actual, true) then
+                      val actualOutput = dirs.denseBoolArrayGetElement(i)
+                      if actualOutput != expectOutput then
                         errors += ElaborationError.PortMismatch(
                           childId,
                           name,
-                          "verification port type differs from the settled interface",
+                          s"port direction is ${
+                              if actualOutput then "output" else "input"
+                            }, expected ${if expectOutput then "output" else "input"}",
                           gm.loc
                         )
+                      firstDiff(translate(expectedInterface), instOp.getResult(i).getType, name).foreach { diff =>
+                        errors += ElaborationError.PortMismatch(
+                          childId,
+                          name,
+                          s"port type differs from the settled interface at $diff",
+                          gm.loc
+                        )
+                      }
+
+                rgm.view.nodes.foreach { nv =>
+                  checkPort(nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
+                }
+                // Probe sources keep their probe types; sink ports carry the probe-stripped interface
+                // (the shape after ref.resolve at this wrapper).
+                rgm.view.verification.sources.foreach(s => checkPort(s.source.name, true, s.interface))
+                rgm.view.verification.sinks
+                  .foreach(s => checkPort(s.sink.name, false, ProtocolBundle.stripProbes(s.interfaces.sink)))
+                val declared = rgm.view.nodes.map(_.node.name).toSet ++
+                  rgm.view.verification.sources.map(_.source.name) ++
+                  rgm.view.verification.sinks.map(_.sink.name)
+                (byName.keySet -- declared).toVector.sorted.foreach { extra =>
+                  errors += ElaborationError.PortMismatch(
+                    childId,
+                    extra,
+                    "generator port has no corresponding declared endpoint",
+                    gm.loc
+                  )
                 }
               case _:  WrapperModuleSpec   =>
                 val childPorts = resolved.portPlans.filter(_.module == childId)
