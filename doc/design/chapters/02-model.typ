@@ -120,7 +120,7 @@ bind 写在结构模块的构建体里，声明它的结构模块必须是两端
   [构建],
   [使用宿主语言代码例化模块树、声明节点和连接（@sec-build）。产物是设计规格 `DesignSpec`。],
   [协商],
-  [读入设计规格，对参数依赖 DAG 做拓扑排序，正向传播 `Down`、反向传播 `Up`，逐边调用协议求解，计算各生成器模块的协议参数与完整参数（@sec-two-layer-params），并规划跨模块的端口与连线（@ch-negotiation）；产出协商结果 `ResolvedDesign`，或一组协商错误（@sec-error-semantics）。],
+  [读入设计规格，对参数依赖 DAG 做拓扑排序，正向传播 `Down`、反向传播 `Up`，逐边调用协议求解，计算各生成器模块的协议参数与完整参数（@sec-two-layer-params），并规划跨模块的端口与连线（@ch-negotiation）；产出协商结果 `ResolvedDesign`；发现首个错误立即终止并报告（@sec-error-semantics）。],
   [例化],
   [读入协商结果：以各生成器模块的完整参数调用 zaozi 生成器，生成结构模块的电路（本文称发射），执行连线计划（@ch-hardware）；产出 FIRRTL 电路。],
 )

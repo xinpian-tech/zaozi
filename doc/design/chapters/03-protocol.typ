@@ -48,7 +48,7 @@
 
 协议注册表（@sec-build）由 `DesignBuilder` 维护，并在 `DesignSpec` 固化时保存其不可变副本。一个 `ProtocolId` 在同一设计中只对应一个协议对象；同一对象可以被多处引用，不同对象声明相同 `ProtocolId` 则在结构校验中报告标识冲突。模块节点使用注册表中与该 `ProtocolId` 对应的同一个协议对象；兼容性按 `ProtocolId` 判断。
 
-双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(TermViolation)`，`TermViolation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置包装为 `NegotiationError`。
+双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(TermViolation)`，`TermViolation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置包装为 `NegotiationError`，并立即终止协商（@sec-error-semantics）。
 
 `ProtocolId`、`Down`、`Up` 与 `Edge` 均不可变、可序列化。相应 `Codec` 用于在工具文件中编码、解码协议数据；读取工具文件时，调用方提供包含相应 `ProtocolId` 条目的注册表。任何会改变 `negotiate`、接口、渲染结果或 codec schema 的变更都必须更新协议版本。
 
