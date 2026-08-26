@@ -30,43 +30,48 @@ import java.lang.foreign.Arena
   */
 object Sem:
 
-  /** The fire-cycle kinds — semantically distinct roles that share one lowering (a predicate at the fire cycle). */
-  enum Kind:
-    case Value, State
+  /** The four kinds as phantom types: an intent's type parameter is the union of the kinds it composes, so the
+    * composition structure itself is visible to (and checkable by) the compiler.
+    */
+  object Kinds:
+    sealed trait Value
+    sealed trait Relation
+    sealed trait State
+    sealed trait Temporal
 
-  sealed trait Intent:
-    infix def &&(that: Intent): Intent = Intent.And(this, that)
+  sealed trait Intent[+K]:
+    infix def &&[K2](that: Intent[K2]): Intent[K | K2] = Intent.And(this, that)
 
   object Intent:
-    final case class Immediate(kind: Kind, cond: Referable[Bool])           extends Intent
-    final case class Relation(window: Txn.TxnWindow, cond: Referable[Bool]) extends Intent
-    final case class Temporal(seq: Sequence, clock: ClockEvent)             extends Intent
-    final case class And(l: Intent, r: Intent)                              extends Intent
+    final case class Immediate[K] private[Sem] (cond: Referable[Bool])          extends Intent[K]
+    final case class Relation(window: Txn.TxnWindow[?], cond: Referable[Bool])  extends Intent[Kinds.Relation]
+    final case class Temporal(seq: Sequence, clock: ClockEvent)                 extends Intent[Kinds.Temporal]
+    final case class And[K](l: Intent[?], r: Intent[?])                         extends Intent[K]
 
   /** 值语义 — a predicate over the driven object's fields at the fire cycle. */
-  def value(cond: Referable[Bool]): Intent = Intent.Immediate(Kind.Value, cond)
+  def value(cond: Referable[Bool]): Intent[Kinds.Value] = Intent.Immediate[Kinds.Value](cond)
 
   /** 关系语义 — a predicate over different beats of the stream, drawn from `window`. The window rides along in the
     * intent node; the lowering conjoins its `ready` guard, so the relation only fires once the whole window is real
     * history.
     */
-  def relation(window: Txn.TxnWindow)(cond: Txn.TxnWindow => Referable[Bool]): Intent =
+  def relation[D <: Int](window: Txn.TxnWindow[D])(cond: Txn.TxnWindow[D] => Referable[Bool]): Intent[Kinds.Relation] =
     Intent.Relation(window, cond(window))
 
   /** 状态语义 — a predicate over an observation of design state (outputs, probes, status registers). */
-  def state(cond: Referable[Bool]): Intent = Intent.Immediate(Kind.State, cond)
+  def state(cond: Referable[Bool]): Intent[Kinds.State] = Intent.Immediate[Kinds.State](cond)
 
   /** 时序语义 — a clocked sequence matching forward from the fire cycle. The clock is captured here so the lowering
     * can lift any composed immediate kinds onto the same clock.
     */
-  def temporal(seq: Sequence)(using clock: ClockEvent): Intent = Intent.Temporal(seq, clock)
+  def temporal(seq: Sequence)(using clock: ClockEvent): Intent[Kinds.Temporal] = Intent.Temporal(seq, clock)
 
-  private[utlib] def flatten(intent: Intent): (Seq[Intent.Immediate | Intent.Relation], Seq[Intent.Temporal]) =
+  private[utlib] def flatten(intent: Intent[?]): (Seq[Intent.Immediate[?] | Intent.Relation], Seq[Intent.Temporal]) =
     intent match
-      case i: Intent.Immediate => (Seq(i), Seq.empty)
-      case r: Intent.Relation  => (Seq(r), Seq.empty)
-      case t: Intent.Temporal  => (Seq.empty, Seq(t))
-      case Intent.And(l, r)    =>
+      case i: Intent.Immediate[?] => (Seq(i), Seq.empty)
+      case r: Intent.Relation     => (Seq(r), Seq.empty)
+      case t: Intent.Temporal     => (Seq.empty, Seq(t))
+      case Intent.And(l, r)       =>
         val (li, ls) = flatten(l)
         val (ri, rs) = flatten(r)
         (li ++ ri, ls ++ rs)
@@ -76,7 +81,7 @@ object Sem:
   */
 object Generate:
   def apply(
-    intent: Sem.Intent,
+    intent: Sem.Intent[?],
     label:  String
   )(
     using Arena,
@@ -91,7 +96,7 @@ object Generate:
     require(immediates.nonEmpty || temporals.nonEmpty, "an intent needs at least one semantic")
     val imm                     = immediates
       .map {
-        case Sem.Intent.Immediate(_, cond)     => cond
+        case Sem.Intent.Immediate(cond)        => cond
         case Sem.Intent.Relation(window, cond) => window.ready & cond
       }
       .reduceOption(_ & _)

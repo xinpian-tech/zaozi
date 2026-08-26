@@ -99,21 +99,34 @@ object Txn:
 
   /** The typed view [[Sem.relation]] draws from: `past(1)` is the previous beat, `past(depth)` the oldest, and
     * `ready` is the reality guard — high once every slot holds a real beat.
+    *
+    * The declared depth is a *type*: `past(i)` on a literal index outside `[1, D]` fails to compile.
     */
-  final class TxnWindow private[utlib] (
-    hist:                        Seq[Referable[Bits]],
+  final class TxnWindow[D <: Int] private[utlib] (
+    private[utlib] val slots:    Seq[Referable[Bits]],
     val depth:                   Int,
     private[utlib] val readyRef: Referable[Bool]):
-    def past(i: Int): Referable[Bits] =
+    inline def past(inline i: Int): Referable[Bits] =
+      inline if i < 1 then scala.compiletime.error("past(i) starts at 1 — the previous beat")
+      else
+        inline if i > scala.compiletime.constValue[D] then
+          scala.compiletime.error("past(i) reaches beyond the window's declared depth")
+        else pastUnchecked(i)
+
+    /** The runtime-checked accessor, for indices not known at compile time. */
+    def pastUnchecked(i: Int): Referable[Bits] =
       require(i >= 1 && i <= depth, s"past($i) is outside the declared window depth $depth")
-      hist(i - 1)
+      slots(i - 1)
+
     def ready: Referable[Bool] = readyRef
 
-  /** Declare a `depth`-beat window over `sig` — the capture machinery of [[history]] behind a typed accessor. */
-  def window(
+  /** Declare a `depth`-beat window over `sig` — the capture machinery of [[history]] behind the typed accessor. The
+    * literal depth becomes the window's type parameter.
+    */
+  def window[D <: Int & Singleton](
     sig:   Referable[Bits],
     width: Int,
-    depth: Int
+    depth: D
   )(
     using ClockScope,
     ResetScope
@@ -125,7 +138,7 @@ object Txn:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): TxnWindow =
+  ): TxnWindow[D] =
     val (hist, beats) = history(sig, width, depth)
     val cw            = 32 - Integer.numberOfLeadingZeros(depth)
-    new TxnWindow(hist, depth, beats === depth.U(cw))
+    new TxnWindow[D](hist, depth, beats === depth.U(cw))
