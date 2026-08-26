@@ -201,7 +201,8 @@ object FormalUT:
     require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
     val linked    = moduleDir / "linked.mlir"
     os.proc(
-      Seq("firld", s"--base-circuit=$top", "--no-mangle") ++ modules.map(_.toString) ++ Seq("-o", linked.toString)
+      Seq(circtTool("firld"), s"--base-circuit=$top", "--no-mangle") ++ modules.map(_.toString) ++
+        Seq("-o", linked.toString)
     ).call()
     (firtoolToHw(linked), top)
 
