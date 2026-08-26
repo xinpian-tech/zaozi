@@ -23,13 +23,15 @@ object Stimulus:
     os.write.over(path, fromTrace(trace, spec))
     path
 
-  /** The drive signal's per-cycle values: exact name first, else a unique case-insensitive match (circt-bmc prints the
-    * lowered port name, which can differ in case from the ABI's).
+  /** The drive signal's per-cycle values: exact name first, else the `<name>__d_next` a delayed drive is traced as
+    * (see `FormalUT.delayInputs` — the register's next value IS the stimulus at the same row), else a unique
+    * case-insensitive match (circt-bmc prints the lowered port name, which can differ in case from the ABI's).
     */
   private def lookup(trace: Trace, name: String): Vector[BigInt] =
     val caseInsensitive = trace.values.collect { case (k, v) if k.equalsIgnoreCase(name) => v }.toSeq
     trace.values
       .get(name)
+      .orElse(trace.values.get(s"${name}__d_next"))
       .orElse(Option.when(caseInsensitive.sizeIs == 1)(caseInsensitive.head))
       .getOrElse(
         throw IllegalArgumentException(

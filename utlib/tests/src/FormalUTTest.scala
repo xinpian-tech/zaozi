@@ -102,6 +102,25 @@ object FormalUTTest extends TestSuite:
         case FormalUT.Bmc.Violated(t) => assert(t.cycles == 2 && t.values("a") == Vector(BigInt(0), BigInt(5)))
         case other                    => assert(false)
 
+    test("delayInputs models the DPI drive register: one pinned flop between the port and its uses"):
+      val hw = writeModule(
+        outputRoot / "FormalUT-delay",
+        "top",
+        """module {
+          |  hw.module @top(in %clock : !seq.clock, in %reset : i1, in %A : i8, out X : i8) {
+          |    %c1_i8 = hw.constant 1 : i8
+          |    %0 = comb.add %A, %c1_i8 : i8
+          |    hw.output %0 : i8
+          |  }
+          |}
+          |""".stripMargin
+      )
+      val out = os.read(FormalUT.delayInputs(hw, "top", Seq("A")))
+      assert(out.contains("%A__d = seq.compreg %A, %clock initial %A__d_init : i8"))
+      assert(out.contains("comb.add %A__d, %c1_i8 : i8"))
+      // the port declaration itself keeps the original name
+      assert(out.contains("in %A : i8"))
+
     test("pruneForBmc strips the probe/layer artifacts circt-bmc cannot ingest"):
       // The shape firtool -ir-hw emits for a zaozi UT with a layered probe: ref macros, hierpaths, the bound
       // *_Verification module full of sv.xmr, its {doNotPrint} bind instance, emit.file blocks, and namehints.

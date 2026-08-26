@@ -32,9 +32,10 @@ object UTCli:
     bound:     Int,
     outDir:    os.Path
   ): ujson.Value =
-    FormalUT.generateGenerator(dut, parameter, bound, outDir) match
+    val spec = UTGenerator(dut, parameter, outDir).abi.spec
+    // The drive ports are delayed in the model so witness time equals replay time (see FormalUT.delayInputs).
+    FormalUT.generateGenerator(dut, parameter, bound, outDir, delayedDrives = spec.drive.map(_.name)) match
       case GenerateOutcome.Generated(txn) =>
-        val spec     = UTGenerator(dut, parameter, outDir).abi.spec
         val stimulus = Stimulus.save(txn, spec, outDir / "stimulus.txt")
         ujson.Obj(
           "status"       -> "generated",

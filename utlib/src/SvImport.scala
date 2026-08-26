@@ -22,7 +22,7 @@ object SvImport:
     )
     adaptForBmc(raw)
 
-  /** Two adaptations on the imported IR, both textual on the printed form:
+  /** Adaptations on the imported IR, textual on the printed form:
     *
     *   1. Clock ports arrive as plain `i1` fed through an internal `seq.to_clock`, while a zaozi wrapper's extern
     *      instance drives `!seq.clock` — retype the port and use it directly.
@@ -43,7 +43,17 @@ object SvImport:
         .map(_.replace(s"in $port : i1", s"in $port : !seq.clock"))
         .map(_.replaceAll(raw"${java.util.regex.Pattern.quote(converted)}\b", port))
 
-    // 2. Reset-less firregs: pin the initial state to zero.
+    // 2. Four-state comparison predicates (case/wildcard equality from `==`/`===` on logic types): under the
+    //    two-state semantics the bounded model works in, they coincide with plain eq/ne — and circt-bmc cannot
+    //    lower the four-state forms.
+    lines = lines.map(
+      _.replace("comb.icmp ceq ", "comb.icmp eq ")
+        .replace("comb.icmp cne ", "comb.icmp ne ")
+        .replace("comb.icmp weq ", "comb.icmp eq ")
+        .replace("comb.icmp wne ", "comb.icmp ne ")
+    )
+
+    // 3. Reset-less firregs: pin the initial state to zero.
     val firreg = raw"^(\s*)(%[\w.$$]+) = seq\.firreg (%[\w.$$]+) clock (%[\w.$$]+) : (\S+)$$".r
     lines = lines.flatMap {
       case l @ firreg(ind, r, in, clk, ty) =>

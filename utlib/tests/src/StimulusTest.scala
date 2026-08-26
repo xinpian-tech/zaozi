@@ -34,6 +34,10 @@ object StimulusTest extends TestSuite:
       val t = Trace(1, Map("a" -> Vector(BigInt(7))))
       assert(Stimulus.fromTrace(t, spec(signed = false)) == "7\n")
 
+    test("a delayed drive is read from its <name>__d_next trace signal"):
+      val t = Trace(2, Map("A__d_next" -> Vector(BigInt(3), BigInt(5)), "A__d_state" -> Vector(BigInt(0), BigInt(3))))
+      assert(Stimulus.fromTrace(t, spec(signed = false)) == "3\n5\n")
+
     test("a trace missing the drive signal fails with the port name in the message"):
       val t = Trace(1, Map("other" -> Vector(BigInt(1))))
       val e = intercept[IllegalArgumentException](Stimulus.fromTrace(t, spec(signed = false)))

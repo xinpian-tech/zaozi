@@ -78,12 +78,13 @@ object FormalUT:
     L <: LayerInterface[PARAM],
     I <: HWInterface[PARAM],
     P <: DVInterface[PARAM, L]
-  ](dut:       Generator[PARAM, L, I, P],
-    parameter: PARAM,
-    bound:     Int,
-    outDir:    os.Path
+  ](dut:           Generator[PARAM, L, I, P],
+    parameter:     PARAM,
+    bound:         Int,
+    outDir:        os.Path,
+    delayedDrives: Seq[String] = Seq.empty
   ): CheckOutcome =
-    val (hw, top) = elaborateToHw(dut, parameter, outDir)
+    val (hw, top) = elaborateToHw(dut, parameter, outDir, delayedDrives)
     check(hw, top, bound)
 
   /** Generate a transaction directly from a zaozi UT generator whose SVA asserts `¬constraint`. */
@@ -92,26 +93,81 @@ object FormalUT:
     L <: LayerInterface[PARAM],
     I <: HWInterface[PARAM],
     P <: DVInterface[PARAM, L]
-  ](dut:       Generator[PARAM, L, I, P],
-    parameter: PARAM,
-    bound:     Int,
-    outDir:    os.Path
+  ](dut:           Generator[PARAM, L, I, P],
+    parameter:     PARAM,
+    bound:         Int,
+    outDir:        os.Path,
+    delayedDrives: Seq[String] = Seq.empty
   ): GenerateOutcome =
-    val (hw, top) = elaborateToHw(dut, parameter, outDir)
+    val (hw, top) = elaborateToHw(dut, parameter, outDir, delayedDrives)
     generate(hw, top, bound)
 
   /** Lower a zaozi generator to the pruned HW module circt-bmc reads, without running it — the composition point for
     * flows that post-process the model first (e.g. [[SvImport.mergeForBmc]] splicing an imported IP over an extern).
+    *
+    * `delayedDrives` names the top module's drive ports to route through [[delayInputs]] — pass the ABI drive port(s)
+    * whenever the witness will replay on the Model B testbench, so model time equals testbench time.
     */
   def lowerGenerator[
     PARAM <: Parameter,
     L <: LayerInterface[PARAM],
     I <: HWInterface[PARAM],
     P <: DVInterface[PARAM, L]
-  ](dut:       Generator[PARAM, L, I, P],
-    parameter: PARAM,
-    outDir:    os.Path
-  ): (os.Path, String) = elaborateToHw(dut, parameter, outDir)
+  ](dut:           Generator[PARAM, L, I, P],
+    parameter:     PARAM,
+    outDir:        os.Path,
+    delayedDrives: Seq[String] = Seq.empty
+  ): (os.Path, String) = elaborateToHw(dut, parameter, outDir, delayedDrives)
+
+  /** Model the Model B testbench's drive path: the tick callback's return value crosses a registered DPI boundary, so
+    * the DUT sees stimulus line N only during cycle (N, N+1] — one cycle later than a bare input port would suggest.
+    * Routing each drive port through one zero-initialized register makes the bounded model's time axis equal the
+    * testbench's, so a witness row IS the stimulus line with the same index. Constraints that only relate stimulus
+    * values to each other survive without this (the whole stream shifts uniformly); constraints coupled to the DUT's
+    * own startup dynamics do not.
+    */
+  private[utlib] def delayInputs(hwMlir: os.Path, top: String, drives: Seq[String]): os.Path =
+    if drives.isEmpty then return hwMlir
+    val lines     = os.read(hwMlir).split("\n", -1).toVector
+    val headerIdx = lines.indexWhere(_.contains(s"hw.module @$top("))
+    require(headerIdx >= 0, s"top module @$top not found in $hwMlir")
+    var depth     = 0
+    var endIdx    = headerIdx
+    var found     = false
+    for i <- headerIdx until lines.length if !found do
+      depth += lines(i).count(_ == '{') - lines(i).count(_ == '}')
+      if depth == 0 then
+        endIdx = i
+        found = true
+    val header   = lines(headerIdx)
+    // A clockless (combinational) top has no registered sampling to align — the delay is correctly a no-op.
+    val clockOpt = raw"in (%[\w.$$]+) : !seq\.clock".r.findFirstMatchIn(header).map(_.group(1))
+    if clockOpt.isEmpty then return hwMlir
+    val clock    = clockOpt.get
+
+    val inserted = drives.flatMap { d =>
+      val ty = raw"in %${java.util.regex.Pattern.quote(d)} : (i\d+)".r
+        .findFirstMatchIn(header)
+        .map(_.group(1))
+        .getOrElse(throw IllegalArgumentException(s"drive port %$d not found on @$top"))
+      val z  = if ty == "i1" then "false" else s"0 : $ty"
+      Vector(
+        s"    %${d}__d_init = seq.initial() {",
+        s"      %${d}__d_c = hw.constant $z",
+        s"      seq.yield %${d}__d_c : $ty",
+        s"    } : () -> !seq.immutable<$ty>",
+        s"    %${d}__d = seq.compreg %$d, $clock initial %${d}__d_init : $ty"
+      )
+    }
+    val body     = lines.slice(headerIdx + 1, endIdx).map { l =>
+      drives.foldLeft(l)((acc, d) => acc.replaceAll(raw"%${java.util.regex.Pattern.quote(d)}\b", s"%${d}__d"))
+    }
+    val out      = hwMlir / os.up / s"${hwMlir.last}.delayed.mlir"
+    os.write.over(
+      out,
+      (lines.take(headerIdx + 1) ++ inserted ++ body ++ lines.drop(endIdx)).mkString("\n")
+    )
+    out
 
   // ---- the circt-bmc engine ----------------------------------------------------------------------------------------
 
@@ -204,9 +260,10 @@ object FormalUT:
     L <: LayerInterface[PARAM],
     I <: HWInterface[PARAM],
     P <: DVInterface[PARAM, L]
-  ](dut:       Generator[PARAM, L, I, P],
-    parameter: PARAM,
-    outDir:    os.Path
+  ](dut:           Generator[PARAM, L, I, P],
+    parameter:     PARAM,
+    outDir:        os.Path,
+    delayedDrives: Seq[String] = Seq.empty
   ): (os.Path, String) =
     os.makeDir.all(outDir)
     val top       = dut.moduleName(parameter)
@@ -220,7 +277,7 @@ object FormalUT:
       Seq(CirctTools("firld"), s"--base-circuit=$top", "--no-mangle") ++ modules.map(_.toString) ++
         Seq("-o", linked.toString)
     ).call()
-    (stripContracts(pruneForBmc(firtoolToHw(linked))), top)
+    (stripContracts(delayInputs(pruneForBmc(firtoolToHw(linked)), top, delayedDrives)), top)
 
   /** Lower a FIRRTL module (with zaozi's `circt.verif.*` / `circt.ltl.*` intrinsics) to the HW dialect circt-bmc reads
     * (`verif.assert` / `verif.assume` + `ltl.*`), via `firtool -ir-hw`.
