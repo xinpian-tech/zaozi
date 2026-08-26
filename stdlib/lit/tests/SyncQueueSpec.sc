@@ -51,6 +51,8 @@
 // ASYNC: wire [[QUEUE_RESET:[_A-Za-z0-9]+]] = ~resetN;
 // ASYNC: always @(posedge clock or posedge [[QUEUE_RESET]]) begin
 // ASYNC: if ([[QUEUE_RESET]]) begin
+// ASYNC: Incrementer_width2_radix4
+// ASYNC: BrentKungAdder_width2_radix4
 // ASYNC: Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue ram (
 // ASYNC-NOT: Verification
 // ASYNC-NOT: GTECH_
@@ -61,6 +63,8 @@
 // SYNC-NOT: always @(posedge clock or
 // SYNC: always @(posedge clock) begin
 // SYNC: if (~resetN) begin
+// SYNC: Incrementer_width2_radix4
+// SYNC: BrentKungAdder_width2_radix4
 // SYNC: Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse ram (
 // SYNC-NOT: Verification
 // SYNC-NOT: GTECH_
