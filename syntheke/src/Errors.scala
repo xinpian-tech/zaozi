@@ -5,8 +5,8 @@ package me.jiuyang.syntheke
 /** Negotiation errors (doc @sec-error-semantics).
   *
   * Every error carries a category, the stable identifiers of its subjects, all relevant source locations, and parameter
-  * snapshots where applicable. Negotiation returns either a non-empty vector of these, normalized by
-  * [[NegotiationError.normalize]], or a [[ResolvedDesign]].
+  * snapshots where applicable. Negotiation fails fast: the first error found is thrown as a [[NegotiationException]] on
+  * the spot.
   */
 enum NegotiationError:
   /** N1: protocol identity or type inconsistency. */
@@ -111,10 +111,8 @@ enum NegotiationError:
     case NegotiationError.GeneratorConflict(g, locs)                  =>
       s"N10 generator conflict: ${g.show} at ${locs.map(_.show).mkString(",")}"
 
-object NegotiationError:
-  /** Normalized reporting order: category, then the shown text. */
-  def normalize(errors: Vector[NegotiationError]): Vector[NegotiationError] =
-    errors.sortBy(e => (e.category, e.show))
+/** Thrown by [[Negotiator.negotiate]] at the first error found. */
+final class NegotiationException(val error: NegotiationError) extends RuntimeException(error.show)
 
 /** The subject of a settle-phase failure: a design bind or a probe sink. */
 enum SettleSubject derives CanEqual:

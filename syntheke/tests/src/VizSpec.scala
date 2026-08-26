@@ -17,7 +17,7 @@ object VizSpec extends TestSuite:
       assert(pre.contains("style=dashed"))                      // internal parameter dependencies
       assert(pre.contains("\"sysXbar#mem\" -> \"mem.l2#in\";")) // a cross-hierarchy bind
 
-      val resolved = Negotiator.negotiate(spec).toOption.get
+      val resolved = Negotiator.negotiate(spec)
       val post     = Viz.dot(resolved)
       assert(post.contains("[label=\"AXI4 128b\"]")) // rendered edge summary
       assert(post.contains("[label=\"AXI4 32b\"]"))

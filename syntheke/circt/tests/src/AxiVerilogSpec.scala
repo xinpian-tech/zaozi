@@ -360,10 +360,8 @@ object AxiVerilogSpec extends TestSuite:
   val tests = Tests {
 
     test("the AXI SoC elaborates through zaozi and the CIRCT pipeline to Verilog") {
-      val resolved = Negotiator.negotiate(buildSoc()).toOption.get
-      val design   = Elaborator.elaborate(resolved, backends) match
-        case Right(d)   => d
-        case Left(errs) => sys.error(errs.map(_.show).mkString("\n"))
+      val resolved = Negotiator.negotiate(buildSoc())
+      val design   = Elaborator.elaborate(resolved, backends)
 
       assert(design.circuitName == "Top")
       // The FIRRTL artifact holds the whole linked design: root, wrappers, and zaozi-generated modules.
@@ -383,7 +381,7 @@ object AxiVerilogSpec extends TestSuite:
     }
 
     test("a backend interface that differs from the settled bundle is a binding-check error") {
-      val resolved = Negotiator.negotiate(buildSoc()).toOption.get
+      val resolved = Negotiator.negotiate(buildSoc())
       val mangled  = backends.map {
         case b: ZaoziBackend[?, ?, ?, ?, ?] if b.id == dramEntry.id =>
           ZaoziBackend(
@@ -393,12 +391,11 @@ object AxiVerilogSpec extends TestSuite:
           )
         case b => b
       }
-      Elaborator.elaborate(resolved, mangled) match
-        case Right(_)   => assert(false)
-        case Left(errs) =>
-          assert(errs.exists {
-            case ElaborationError.PortMismatch(m, "in", _, _) => m == ModuleId.root / "mem" / "dram"
-            case _                                            => false
-          })
+      val e        = intercept[ElaborationException](Elaborator.elaborate(resolved, mangled))
+      e.error match
+        case ElaborationError.PortMismatch(m, "in", detail, _) =>
+          assert(m == ModuleId.root / "mem" / "dram")
+          assert(detail.contains("in.w.bits.data")) // the first-divergence path names the widened leaf
+        case other                                             => assert(false)
     }
   }

@@ -64,10 +64,10 @@ val spec = Design {
   }
   in <-- out
 }
-val resolved = Negotiator.negotiate(spec) // Either[Vector[NegotiationError], ResolvedDesign]
+val resolved = Negotiator.negotiate(spec) // ResolvedDesign; throws NegotiationException at the first error
 
 // Elaborate (syntheke.circt): bind entries to zaozi generators, get Verilog.
-// Elaborator.elaborate(resolved.toOption.get, backends) // Either[Vector[ElaborationError], ElaboratedDesign]
+// Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error
 ```
 
 The AXI4 demo (`tests/src/axi/`, `circt/tests/src/`) mirrors rocket-chip's

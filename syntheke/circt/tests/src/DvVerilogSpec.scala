@@ -234,10 +234,8 @@ object DvVerilogSpec extends TestSuite:
   val tests = Tests {
 
     test("probe routing elaborates: dangles, per-leaf defines, layers, Verilog") {
-      val resolved = Negotiator.negotiate(buildDesign()).toOption.get
-      val design   = Elaborator.elaborate(resolved, backends) match
-        case Right(d)   => d
-        case Left(errs) => sys.error(errs.map(_.show).mkString("\n"))
+      val resolved = Negotiator.negotiate(buildDesign())
+      val design   = Elaborator.elaborate(resolved, backends)
 
       // The layer tree is declared once at circuit level; the cluster carries probe dangle ports.
       assert(design.firrtl.contains("layer verification"))

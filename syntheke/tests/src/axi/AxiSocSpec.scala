@@ -278,7 +278,7 @@ object AxiSocSpec extends TestSuite:
   val tests = Tests {
 
     test("the whole SoC settles; widths, addresses and id spaces follow the graph") {
-      val resolved = Negotiator.negotiate(buildSoc()).toOption.get
+      val resolved = Negotiator.negotiate(buildSoc())
       assert(resolved.edges.sizeIs == 9)
 
       // DRAM edge: 3 inputs -> 2 prefix bits over max local 3 bits; l2 appends its writeback master.
@@ -308,7 +308,7 @@ object AxiSocSpec extends TestSuite:
     }
 
     test("the xbar's FullParam is a serializable route table and id map") {
-      val resolved = Negotiator.negotiate(buildSoc()).toOption.get
+      val resolved = Negotiator.negotiate(buildSoc())
       val xbar     = resolved.generatorModule(root / "sysXbar").get
       val decoded  = xbarEntry.fullParamCodec.decode(xbar.encodedFullParam).toOption.get
       assert(decoded.arbitration == "roundRobin")
@@ -327,7 +327,7 @@ object AxiSocSpec extends TestSuite:
     }
 
     test("the settled interface is the five AXI4 channels with correct widths and flips") {
-      val resolved         = Negotiator.negotiate(buildSoc()).toOption.get
+      val resolved         = Negotiator.negotiate(buildSoc())
       val interface        = resolved.edges.find(_.bind.target == ModuleNodeId(root / "mem" / "dram", "in")).get.interface
       assert(interface.fields.map(_.name) == Vector("aw", "w", "b", "ar", "r"))
       assert(interface.fields.map(_.flip) == Vector(false, false, true, false, true))
@@ -351,7 +351,7 @@ object AxiSocSpec extends TestSuite:
     }
 
     test("the sysXbar -> mem/l2 edge plans a dangle port through the mem boundary") {
-      val resolved = Negotiator.negotiate(buildSoc()).toOption.get
+      val resolved = Negotiator.negotiate(buildSoc())
       val mem      = root / "mem"
       val dangles  = resolved.portPlans.filter(_.module == mem)
       assert(dangles.map(p => p.name.encoded -> p.direction) == Vector("inst_l2_node_in_in" -> PortDirection.Input))
@@ -362,33 +362,25 @@ object AxiSocSpec extends TestSuite:
     }
 
     test("render metadata reaches the edges export") {
-      val resolved    = Negotiator.negotiate(buildSoc()).toOption.get
+      val resolved    = Negotiator.negotiate(buildSoc())
       val designEdges = Export.edges(resolved)("designEdges").arr
       assert(designEdges.exists(e => e("render")("label") == ujson.Str("AXI4 128b")))
       assert(designEdges.exists(e => e("render")("attributes")("masters") == ujson.Str("core0+core1+dma+l2.wb")))
     }
 
-    test("a narrow dram id capacity fails exactly the edges that overflow it") {
-      // Capacity 4: the xbar passes min(4, 8) - 2 = 2 id bits upstream, so core1 (3 local bits) fails;
-      // downstream the remapped id space needs 5 bits > 4, failing both memory-branch edges.
-      val errors  = Negotiator.negotiate(buildSoc(dramIdCapacity = 4)).swap.toOption.get
-      assert(errors.forall(_.category == 3))
-      val targets = errors.collect { case NegotiationError.SettleFailed(SettleSubject.Design(bind), _, _) =>
-        bind.target
-      }
-      assert(
-        targets.toSet == Set(
-          ModuleNodeId(root / "sysXbar", "in1"),   // core1's edge
-          ModuleNodeId(root / "mem" / "l2", "in"), // the widened id space entering the memory branch
-          ModuleNodeId(root / "mem" / "dram", "in") // and reaching the controller itself
-        )
-      )
+    test("a narrow dram id capacity fails fast at the first overflowing edge") {
+      // Capacity 4: settlement runs in bind declaration order, and the first bind is l2 -> dram, whose remapped
+      // id space (l2.wb appended) needs 5 bits > 4.
+      val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(dramIdCapacity = 4)))
+      e.error match
+        case NegotiationError.SettleFailed(SettleSubject.Design(bind), _, _) =>
+          assert(bind.target == ModuleNodeId(root / "mem" / "dram", "in"))
+        case other                                                           => assert(false)
     }
 
     test("overlapping peripheral addresses are caught during upward aggregation as N2") {
-      val errors = Negotiator.negotiate(buildSoc(gpioBase = 0x10000800L)).swap.toOption.get
-      assert(errors.sizeIs == 1)
-      errors.head match
+      val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(gpioBase = 0x10000800L)))
+      e.error match
         case NegotiationError.PropagationFailed(_, node, NodeDirection.Inward, _, _, violation, _) =>
           assert(node == ModuleNodeId(root / "periphXbar", "in"))
           assert(violation.message.contains("overlap"))

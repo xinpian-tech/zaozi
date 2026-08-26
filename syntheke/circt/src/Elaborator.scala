@@ -99,6 +99,9 @@ enum ElaborationError:
     case InvalidCircuit(d)          => s"invalid circuit: $d"
     case Unsupported(d)             => s"unsupported: $d"
 
+/** Thrown by [[Elaborator.elaborate]] at the first error found. */
+final class ElaborationException(val error: ElaborationError) extends RuntimeException(error.show)
+
 /** The enacted design: FIRRTL and Verilog text plus the module-name assignment. */
 final case class ElaboratedDesign(
   circuitName: String,
@@ -115,12 +118,13 @@ final case class ElaboratedDesign(
   */
 object Elaborator:
 
+  private def fail(error: ElaborationError): Nothing = throw ElaborationException(error)
+
   def elaborate(
     resolved:  ResolvedDesign,
     backends:  Seq[GeneratorBackend],
     mlirbcDir: os.Path = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
-  ): Either[Vector[ElaborationError], ElaboratedDesign] =
-    val errors    = mutable.ArrayBuffer.empty[ElaborationError]
+  ): ElaboratedDesign =
     val backendOf = backends.map(b => b.id -> b).toMap
     val spec      = resolved.spec
     val dd        = Dedup.dedup(resolved)
@@ -133,10 +137,9 @@ object Elaborator:
         case g: GeneratorModuleSpec =>
           backendOf.get(g.entry.id) match
             case Some(b) => moduleNames(id) = b.moduleName(resolved.generatorModule(id).get.fullParam)
-            case None    => errors += ElaborationError.MissingBackend(id, g.entry.id)
+            case None    => fail(ElaborationError.MissingBackend(id, g.entry.id))
         case _: WrapperModuleSpec   => moduleNames(id) = dd.nameOf(id)
     }
-    if errors.nonEmpty then return Left(errors.toVector)
 
     val arena = Arena.ofConfined()
     var context: Context = null
@@ -212,15 +215,16 @@ object Elaborator:
                 val instBlock: Block =
                   if rgm.view.verification.sinks.isEmpty then summon[Block]
                   else if rgm.view.nodes.nonEmpty then
-                    errors += ElaborationError.Unsupported(
-                      s"sink generator ${childId.show} mixes probe sinks with design nodes"
+                    fail(
+                      ElaborationError
+                        .Unsupported(s"sink generator ${childId.show} mixes probe sinks with design nodes")
                     )
-                    summon[Block]
                   else if sinkLayers.sizeIs != 1 then
-                    errors += ElaborationError.Unsupported(
-                      s"sink generator ${childId.show} collects probes from ${sinkLayers.size} distinct layers"
+                    fail(
+                      ElaborationError.Unsupported(
+                        s"sink generator ${childId.show} collects probes from ${sinkLayers.size} distinct layers"
+                      )
                     )
-                    summon[Block]
                   else
                     // Layerblocks nest structurally: `layerblock @a { layerblock @a::@b { … } }`.
                     var blk = summon[Block]
@@ -282,29 +286,35 @@ object Elaborator:
                 def checkPort(name: String, expectOutput: Boolean, expectedInterface: ProtocolInterface): Unit =
                   byName.get(name) match
                     case None    =>
-                      errors += ElaborationError.PortMismatch(
-                        childId,
-                        name,
-                        "declared endpoint has no matching generator port",
-                        gm.loc
+                      fail(
+                        ElaborationError.PortMismatch(
+                          childId,
+                          name,
+                          "declared endpoint has no matching generator port",
+                          gm.loc
+                        )
                       )
                     case Some(i) =>
                       val actualOutput = dirs.denseBoolArrayGetElement(i)
                       if actualOutput != expectOutput then
-                        errors += ElaborationError.PortMismatch(
-                          childId,
-                          name,
-                          s"port direction is ${
-                              if actualOutput then "output" else "input"
-                            }, expected ${if expectOutput then "output" else "input"}",
-                          gm.loc
+                        fail(
+                          ElaborationError.PortMismatch(
+                            childId,
+                            name,
+                            s"port direction is ${
+                                if actualOutput then "output" else "input"
+                              }, expected ${if expectOutput then "output" else "input"}",
+                            gm.loc
+                          )
                         )
                       firstDiff(translate(expectedInterface), instOp.getResult(i).getType, name).foreach { diff =>
-                        errors += ElaborationError.PortMismatch(
-                          childId,
-                          name,
-                          s"port type differs from the settled interface at $diff",
-                          gm.loc
+                        fail(
+                          ElaborationError.PortMismatch(
+                            childId,
+                            name,
+                            s"port type differs from the settled interface at $diff",
+                            gm.loc
+                          )
                         )
                       }
 
@@ -320,11 +330,13 @@ object Elaborator:
                   rgm.view.verification.sources.map(_.source.name) ++
                   rgm.view.verification.sinks.map(_.sink.name)
                 (byName.keySet -- declared).toVector.sorted.foreach { extra =>
-                  errors += ElaborationError.PortMismatch(
-                    childId,
-                    extra,
-                    "generator port has no corresponding declared endpoint",
-                    gm.loc
+                  fail(
+                    ElaborationError.PortMismatch(
+                      childId,
+                      extra,
+                      "generator port has no corresponding declared endpoint",
+                      gm.loc
+                    )
                   )
                 }
               case _:  WrapperModuleSpec   =>
@@ -383,13 +395,13 @@ object Elaborator:
             }
 
           resolved.wirePlans.filter(_.module == rep).foreach { wp =>
-            def fail(detail: String): Unit = errors += ElaborationError.InvalidCircuit(s"${d.name}: $detail")
+            def failWire(detail: String): Unit = fail(ElaborationError.InvalidCircuit(s"${d.name}: $detail"))
             wp.origin match
               case PlanOrigin.Design(_)          =>
                 (baseOf(wp.from), baseOf(wp.to)) match
                   case (Right(src), Right(dst)) =>
                     summon[ConnectApi].op(src, dst, unknownLoc).operation.appendToBlock()
-                  case (l, r)                   => Seq(l, r).foreach(_.left.foreach(fail))
+                  case (l, r)                   => Seq(l, r).foreach(_.left.foreach(failWire))
               case PlanOrigin.Verification(bind) =>
                 val group  = resolved.dvGroups.find(_.binds.contains(bind)).get
                 val bundle = group.interfaces.sources(group.binds.indexOf(bind))
@@ -403,12 +415,12 @@ object Elaborator:
                             src <- navigate(srcBase, leafPath, open = true)
                             dst <- navigate(dstBase, leafPath, open = true)
                           yield summon[RefDefineApi].op(dst, src, unknownLoc).operation.appendToBlock()
-                          wired.left.foreach(fail)
+                          wired.left.foreach(failWire)
                         }
                       case LocalEndpoint.ChildPort(inst, _, sub) =>
                         // The sink end: resolve each probe inside the sink's layerblock and connect the data.
                         sinkBlocks.get(inst) match
-                          case None     => fail(s"sink instance '$inst' has no layer block")
+                          case None     => failWire(s"sink instance '$inst' has no layer block")
                           case Some(lb) =>
                             given Block = lb
                             ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
@@ -420,15 +432,14 @@ object Elaborator:
                                 res.operation.appendToBlock()
                                 summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
                               }
-                              wired.left.foreach(fail)
+                              wired.left.foreach(failWire)
                             }
-                  case (l, r)                           => Seq(l, r).foreach(_.left.foreach(fail))
+                  case (l, r)                           => Seq(l, r).foreach(_.left.foreach(failWire))
           }
 
           module.appendToCircuit()
         }
       }
-      if errors.nonEmpty then return Left(NormalizedErrors(errors.toVector))
 
       // ============ link the per-module circuits dumped by the backends ============
       // Demand-driven: parse exactly the `<moduleName>.mlirbc` files of modules that are referenced but not yet
@@ -455,56 +466,47 @@ object Elaborator:
         WalkEnum.PreOrder
       )
 
-      val unresolved = mutable.Set.empty[String]
-      val needed     = mutable.Set.from(collectRefs(summon[Circuit].operation) -- defined)
+      // Manual block iteration: operations obtained through direct calls live in our arena, unlike the
+      // transient wrappers a walk callback receives.
+      def isNullOp(op: Operation): Boolean           =
+        op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
+      def opsIn(first: Operation): Vector[Operation] =
+        val buf = mutable.ArrayBuffer.empty[Operation]
+        var cur = first
+        while !isNullOp(cur) do
+          buf += cur
+          cur = cur.getNextInBlock
+        buf.toVector
+
+      val needed = mutable.Set.from(collectRefs(summon[Circuit].operation) -- defined)
       while needed.nonEmpty do
         val sym = needed.head
         needed -= sym
-        if !defined(sym) && !unresolved(sym) then
-          val file = mlirbcDir / s"$sym.mlirbc"
-          if !os.exists(file) then unresolved += sym
-          else
-            val moved = mutable.ArrayBuffer.empty[Operation]
-            try
-              // Manual block iteration: operations obtained through direct calls live in our arena, unlike the
-              // transient wrappers a walk callback receives.
-              def isNullOp(op: Operation): Boolean           =
-                op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
-              def opsIn(first: Operation): Vector[Operation] =
-                val buf = mutable.ArrayBuffer.empty[Operation]
-                var cur = first
-                while !isNullOp(cur) do
-                  buf += cur
-                  cur = cur.getNextInBlock
-                buf.toVector
-              val parsed = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(file))
-              if parsed._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0 then unresolved += sym
-              else
-                val topOps     = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
-                val circuitOps = topOps.filter(_.getName.str == "firrtl.circuit")
-                val moduleOps  = circuitOps
-                  .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
-                  .filter(_.getName.str == "firrtl.module")
-                moduleOps.foreach { op =>
-                  val s2 = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-                  if !defined(s2) then
-                    op.removeFromParent()
-                    summon[Circuit].block.appendOwnedOperation(op)
-                    defined += s2
-                    moved += op
-                }
-            catch
-              case e: Exception =>
-                unresolved += sym
-                errors += ElaborationError.InvalidCircuit(s"while linking $file: $e")
-            if !defined(sym) then unresolved += sym
-            moved.foreach(op => needed ++= (collectRefs(op) -- defined -- unresolved))
-
-      unresolved.toVector.sorted.foreach(sym => errors += ElaborationError.MissingModule(sym))
-      if errors.nonEmpty then return Left(NormalizedErrors(errors.toVector))
+        if !defined(sym) then
+          val file       = mlirbcDir / s"$sym.mlirbc"
+          if !os.exists(file) then fail(ElaborationError.MissingModule(sym))
+          val parsed     = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(file))
+          if parsed._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0 then
+            fail(ElaborationError.InvalidCircuit(s"cannot parse $file"))
+          val topOps     = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
+          val circuitOps = topOps.filter(_.getName.str == "firrtl.circuit")
+          val moduleOps  = circuitOps
+            .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
+            .filter(_.getName.str == "firrtl.module")
+          val moved      = moduleOps.filter { op =>
+            val s2 = op.getInherentAttributeByName("sym_name").stringAttrGetValue
+            if defined(s2) then false
+            else
+              op.removeFromParent()
+              summon[Circuit].block.appendOwnedOperation(op)
+              defined += s2
+              true
+          }
+          if !defined(sym) then fail(ElaborationError.MissingModule(sym))
+          moved.foreach(op => needed ++= (collectRefs(op) -- defined))
 
       if !summon[MlirModule].getOperation.verify then
-        return Left(Vector(ElaborationError.InvalidCircuit("MLIR verification of the linked circuit failed")))
+        fail(ElaborationError.InvalidCircuit("MLIR verification of the linked circuit failed"))
 
       // ============ artifacts: FIRRTL text, then the firtool pipeline to Verilog ============
       val fir = new StringBuilder
@@ -524,10 +526,7 @@ object Elaborator:
         s"firtool lowering pipeline for circuit '$circuitName'"
       )
 
-      Right(ElaboratedDesign(circuitName, fir.toString, verilog.toString, moduleNames.toMap))
+      ElaboratedDesign(circuitName, fir.toString, verilog.toString, moduleNames.toMap)
     finally
       if context != null then context.destroy()
       arena.close()
-
-  private def NormalizedErrors(errors: Vector[ElaborationError]): Vector[ElaborationError] =
-    errors.sortBy(_.show)

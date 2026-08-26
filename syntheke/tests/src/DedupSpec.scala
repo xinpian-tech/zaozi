@@ -46,7 +46,7 @@ object DedupSpec extends TestSuite:
   val tests = Tests {
 
     test("identical generator parameters and wrapper contents share one definition") {
-      val resolved   = Negotiator.negotiate(buildTwinSoc(sameParam = true)).toOption.get
+      val resolved   = Negotiator.negotiate(buildTwinSoc(sameParam = true))
       val result     = Dedup.dedup(resolved)
       val a          = ModuleId.root / "clusterA"
       val b          = ModuleId.root / "clusterB"
@@ -62,7 +62,7 @@ object DedupSpec extends TestSuite:
     }
 
     test("different full parameters split definitions and same-name keys get preorder suffixes") {
-      val resolved = Negotiator.negotiate(buildTwinSoc(sameParam = false)).toOption.get
+      val resolved = Negotiator.negotiate(buildTwinSoc(sameParam = false))
       val result   = Dedup.dedup(resolved)
       val a        = ModuleId.root / "clusterA"
       val b        = ModuleId.root / "clusterB"

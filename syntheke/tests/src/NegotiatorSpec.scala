@@ -102,7 +102,7 @@ object NegotiatorSpec extends TestSuite:
   val tests = Tests {
 
     test("negotiation settles every edge and computes generator parameters") {
-      val resolved = Negotiator.negotiate(buildSoc(c1Capacity = 64)).toOption.get
+      val resolved = Negotiator.negotiate(buildSoc(c1Capacity = 64))
 
       // Downstream widths: max(32, 24) = 32 on both xbar outputs.
       val edgeValues = resolved.edges.map(e => e.bind.source.show -> e.edgeAs(Wid)).toMap
@@ -122,7 +122,7 @@ object NegotiatorSpec extends TestSuite:
     }
 
     test("cross-hierarchy edge plans an Input dangle port on the intermediate wrapper") {
-      val resolved  = Negotiator.negotiate(buildSoc(c1Capacity = 64)).toOption.get
+      val resolved  = Negotiator.negotiate(buildSoc(c1Capacity = 64))
       val sub       = ModuleId.root / "sub"
       val dangles   = resolved.portPlans.filter(_.module == sub)
       assert(dangles.map(_.name.encoded) == Vector("inst_c0_node_in_in"))
@@ -149,27 +149,21 @@ object NegotiatorSpec extends TestSuite:
       )
     }
 
-    test("capacity conflicts are reported per edge as N3, in bulk") {
-      // The 16-wide c1 constrains, through the xbar's uFns, every edge that can reach it:
-      // prod -> in0 (32 > 16), dma -> in1 (24 > 16), out1 -> c1 (32 > 16). Only out0 -> c0 settles.
-      val errors        = Negotiator.negotiate(buildSoc(c1Capacity = 16)).swap.toOption.get
-      assert(errors.sizeIs == 3)
-      val failedSources = errors.collect { case NegotiationError.SettleFailed(SettleSubject.Design(bind), _, _) =>
-        bind.source.show
-      }
-      assert(
-        failedSources.toSet == Set(
-          ModuleNodeId(ModuleId.root / "prod", "out").show,
-          ModuleNodeId(ModuleId.root / "dma", "out").show,
-          ModuleNodeId(ModuleId.root / "xbar", "out1").show
-        )
-      )
+    test("a capacity conflict fails fast at the first bind that cannot settle") {
+      // The 16-wide c1 constrains, through the xbar's uFns, every edge that can reach it; settlement runs in bind
+      // declaration order, so prod -> in0 (32 > 16) throws first.
+      val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(c1Capacity = 16)))
+      e.error match
+        case NegotiationError.SettleFailed(SettleSubject.Design(bind), violation, _) =>
+          assert(bind.source == ModuleNodeId(ModuleId.root / "prod", "out"))
+          assert(violation.message.contains("32"))
+        case other                                                                   => assert(false)
     }
 
     test("propagation failure is reported as N2 and downstream is blocked without derived errors") {
       var out: OutwardNodeBuilder[Wid.type] = null
       var in:  InwardNodeBuilder[Wid.type]  = null
-      val spec   = Design {
+      val spec = Design {
         generator("bad", intEntry("Bad")) {
           out = outward(Wid)("out").dFn(_ => Left(PropagationViolation("no width available")))
           parametersConst(0)
@@ -180,9 +174,8 @@ object NegotiatorSpec extends TestSuite:
         }
         in <-- out
       }
-      val errors = Negotiator.negotiate(spec).swap.toOption.get
-      assert(errors.sizeIs == 1)
-      errors.head match
+      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
+      e.error match
         case NegotiationError.PropagationFailed(_, node, NodeDirection.Outward, _, _, violation, _) =>
           assert(node == ModuleNodeId(ModuleId.root / "bad", "out"))
           assert(violation.message == "no width available")
@@ -194,7 +187,7 @@ object NegotiatorSpec extends TestSuite:
       var aIn:  InwardNodeBuilder[Wid.type]  = null
       var bOut: OutwardNodeBuilder[Wid.type] = null
       var bIn:  InwardNodeBuilder[Wid.type]  = null
-      val spec   = Design {
+      val spec = Design {
         generator("a", intEntry("A")) {
           val i      = inward(Wid)("in")
           val o      = outward(Wid)("out")
@@ -216,18 +209,20 @@ object NegotiatorSpec extends TestSuite:
         bIn <-- aOut
         aIn <-- bOut
       }
-      val errors = Negotiator.negotiate(spec).swap.toOption.get
-      assert(errors.exists {
-        case NegotiationError.IllegalStructure(detail, _, _) => detail.contains("cycle")
-        case _                                               => false
-      })
+      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
+      e.error match
+        case NegotiationError.IllegalStructure(detail, ids, _) =>
+          assert(detail.contains("cycle"))
+          // Only the four nodes on the cycle, none blocked downstream.
+          assert(ids.sizeIs == 4)
+        case other                                             => assert(false)
     }
 
     test("binding one node twice is reported as N4") {
       var out: OutwardNodeBuilder[Wid.type] = null
       var in0: InwardNodeBuilder[Wid.type]  = null
       var in1: InwardNodeBuilder[Wid.type]  = null
-      val spec   = Design {
+      val spec = Design {
         generator("p", intEntry("P")) {
           out = outward(Wid)("out").dFn(_ => Right(8))
           parametersConst(0)
@@ -240,16 +235,10 @@ object NegotiatorSpec extends TestSuite:
         in0 <-- out
         in1 <-- out
       }
-      val errors = Negotiator.negotiate(spec).swap.toOption.get
-      assert(errors.exists {
-        case NegotiationError.IllegalBind(detail, _, _, _) => detail.contains("source of 2 binds")
-        case _                                             => false
-      })
-      // in0 / in1: one of them stays unbound is NOT the case here — both are bound once; only the source doubles.
-      assert(!errors.exists {
-        case NegotiationError.IllegalBind(detail, _, _, _) => detail.contains("target of")
-        case _                                             => false
-      })
+      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
+      e.error match
+        case NegotiationError.IllegalBind(detail, _, _, _) => assert(detail.contains("source of 2 binds"))
+        case other                                         => assert(false)
     }
 
     test("probe sources route to an ancestor sink with layers and sink sub-paths") {
@@ -280,7 +269,7 @@ object NegotiatorSpec extends TestSuite:
         snk <-- src0
         snk <-- src1
       }
-      val resolved = Negotiator.negotiate(spec).toOption.get
+      val resolved = Negotiator.negotiate(spec)
       val group    = resolved.dvGroups.head
       assert(group.edgeAs(Trace) == Vector(8, 4))
       assert(group.interfaces.sinkPaths == Vector(InterfacePath.root.field("src0"), InterfacePath.root.field("src1")))
@@ -306,7 +295,7 @@ object NegotiatorSpec extends TestSuite:
     }
 
     test("the four tooling exports carry stable identifiers and canonical order") {
-      val resolved = Negotiator.negotiate(buildSoc(c1Capacity = 64)).toOption.get
+      val resolved = Negotiator.negotiate(buildSoc(c1Capacity = 64))
       val topology = Export.topology(resolved.spec)
       assert(topology("modules").arr.head("id") == ujson.Arr()) // root first: hierarchy preorder
       assert(topology("binds").arr.size == 4)
@@ -327,7 +316,7 @@ object NegotiatorSpec extends TestSuite:
       var snk:  DVSinkRef[Trace.type]        = null
       var pOut: OutwardNodeBuilder[Wid.type] = null
       var cIn:  InwardNodeBuilder[Wid.type]  = null
-      val spec   = Design {
+      val spec = Design {
         generator("core", intEntry("Core")) {
           pOut = outward(Wid)("mem").dFn(_ => Right(32))
           src = dvSource(Trace)("rob", 8, layer)
@@ -346,10 +335,9 @@ object NegotiatorSpec extends TestSuite:
         cIn <-- pOut
         snk <-- src
       }
-      val errors = Negotiator.negotiate(spec).swap.toOption.get
-      assert(errors.exists {
-        case NegotiationError.IllegalVerification(detail, _, _, _) => detail.contains("strict ancestor")
-        case _                                                     => false
-      })
+      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
+      e.error match
+        case NegotiationError.IllegalVerification(detail, _, _, _) => assert(detail.contains("strict ancestor"))
+        case other                                                 => assert(false)
     }
   }

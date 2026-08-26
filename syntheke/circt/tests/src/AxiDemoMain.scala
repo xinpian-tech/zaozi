@@ -8,12 +8,8 @@ import me.jiuyang.syntheke.circt.*
 /** Dump the AXI demo SoC's artifacts: `Top.fir`, `Top.sv`, plus the tooling JSON exports and DOT graph. */
 object AxiDemoMain:
   def main(args: Array[String]): Unit =
-    val resolved = Negotiator.negotiate(AxiVerilogSpec.buildSoc()) match
-      case Right(r)   => r
-      case Left(errs) => sys.error(errs.map(_.show).mkString("\n"))
-    val design   = Elaborator.elaborate(resolved, AxiVerilogSpec.backends) match
-      case Right(d)   => d
-      case Left(errs) => sys.error(errs.map(_.show).mkString("\n"))
+    val resolved = Negotiator.negotiate(AxiVerilogSpec.buildSoc())
+    val design   = Elaborator.elaborate(resolved, AxiVerilogSpec.backends)
     val dir      = os.Path(args.headOption.getOrElse(os.pwd.toString), os.pwd)
     os.write.over(dir / "Top.fir", design.firrtl)
     os.write.over(dir / "Top.sv", design.verilog)
