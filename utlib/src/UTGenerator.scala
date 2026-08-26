@@ -77,7 +77,7 @@ final class UTGenerator[
     require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
     val linked  = moduleDir / "linked.mlir"
     os.proc(
-      Seq("firld", s"--base-circuit=$topModule", "--no-mangle") ++ modules.map(_.toString) ++ Seq("-o", linked.toString)
+      Seq(CirctTools("firld"), s"--base-circuit=$topModule", "--no-mangle") ++ modules.map(_.toString) ++ Seq("-o", linked.toString)
     ).call()
 
     val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
@@ -102,7 +102,7 @@ final class UTGenerator[
     require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
     val linked  = moduleDir / "linked.mlir"
     os.proc(
-      Seq("firld", s"--base-circuit=$harnessTop", "--no-mangle") ++ modules
+      Seq(CirctTools("firld"), s"--base-circuit=$harnessTop", "--no-mangle") ++ modules
         .map(_.toString) ++ Seq("-o", linked.toString)
     ).call()
 

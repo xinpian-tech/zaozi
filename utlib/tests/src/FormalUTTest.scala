@@ -101,3 +101,49 @@ object FormalUTTest extends TestSuite:
       FormalUT.parseTrace(trace) match
         case FormalUT.Bmc.Violated(t) => assert(t.cycles == 2 && t.values("a") == Vector(BigInt(0), BigInt(5)))
         case other                    => assert(false)
+
+    test("pruneForBmc strips the probe/layer artifacts circt-bmc cannot ingest"):
+      // The shape firtool -ir-hw emits for a zaozi UT with a layered probe: ref macros, hierpaths, the bound
+      // *_Verification module full of sv.xmr, its {doNotPrint} bind instance, emit.file blocks, and namehints.
+      val dirty =
+        """module {
+          |  hw.hierpath private @nla [@Top::@sym]
+          |  sv.macro.decl @ref_Top_A
+          |  hw.hierpath private @xmrPath [@Top::@verification, @Top_Verification::@sym_0]
+          |  emit.file "ref_Top.sv" {
+          |    sv.macro.def @ref_Top_A "{{0}}"([@xmrPath])
+          |  }
+          |  hw.module private @Top_Verification() {
+          |    %0 = sv.xmr.ref @xmrPath : !hw.inout<i8>
+          |    hw.output
+          |  }
+          |  om.class @Top_Class(%basepath: !om.basepath) {
+          |    %0 = om.basepath_create %basepath @nla
+          |    om.class.fields
+          |  }
+          |  hw.module @Top(in %A : i8) {
+          |    %true = hw.constant true
+          |    %w_layerCapture = hw.wire %true sym @sym_9  : i1
+          |    %0 = comb.extract %A from 0 {sv.namehint = "_GEN_1"} : (i8) -> i1
+          |    %1 = comb.xor bin %0, %true {sv.namehint = "_GEN_2"} : i1
+          |    verif.assert %1 label "gen_a_odd" : i1
+          |    hw.instance "verification" sym @verification @Top_Verification() -> () {doNotPrint}
+          |    hw.output
+          |  }
+          |}
+          |""".stripMargin
+      val dir     = outputRoot / "FormalUT-prune"
+      os.remove.all(dir)
+      os.makeDir.all(dir)
+      os.write.over(dir / "dirty.mlir", dirty)
+      val pruned  = os.read(FormalUT.pruneForBmc(dir / "dirty.mlir"))
+      assert(pruned.contains("verif.assert %1 label \"gen_a_odd\""))
+      assert(pruned.contains("hw.module @Top(in %A : i8)"))
+      assert(!pruned.contains("sv."))
+      assert(!pruned.contains("emit.file"))
+      assert(!pruned.contains("hw.hierpath"))
+      assert(!pruned.contains("Top_Verification"))
+      assert(!pruned.contains("doNotPrint"))
+      assert(!pruned.contains("om.class"))
+      // The wire itself stays (its value may feed logic); only the now-danging inner sym goes.
+      assert(pruned.contains("%w_layerCapture = hw.wire %true : i1"))

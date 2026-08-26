@@ -111,7 +111,7 @@ object FormalUT:
   private def run(hwModule: os.Path, top: String, bound: Int): Bmc =
     val out = os
       .proc(
-        circtTool("circt-bmc"),
+        CirctTools("circt-bmc"),
         hwModule.toString,
         "-b",
         bound.toString,
@@ -201,17 +201,77 @@ object FormalUT:
     require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
     val linked    = moduleDir / "linked.mlir"
     os.proc(
-      Seq(circtTool("firld"), s"--base-circuit=$top", "--no-mangle") ++ modules.map(_.toString) ++
+      Seq(CirctTools("firld"), s"--base-circuit=$top", "--no-mangle") ++ modules.map(_.toString) ++
         Seq("-o", linked.toString)
     ).call()
-    (firtoolToHw(linked), top)
+    (stripContracts(pruneForBmc(firtoolToHw(linked))), top)
 
   /** Lower a FIRRTL module (with zaozi's `circt.verif.*` / `circt.ltl.*` intrinsics) to the HW dialect circt-bmc reads
     * (`verif.assert` / `verif.assume` + `ltl.*`), via `firtool -ir-hw`.
     */
   private[utlib] def firtoolToHw(firrtl: os.Path): os.Path =
     val out = firrtl / os.up / s"${firrtl.last}.hw.mlir"
-    os.write.over(out, os.proc(circtTool("firtool"), firrtl.toString, "-ir-hw").call(check = true).out.text())
+    os.write.over(out, os.proc(CirctTools("firtool"), firrtl.toString, "-ir-hw").call(check = true).out.text())
+    out
+
+  /** Remove `verif.contract` regions via `circt-opt --strip-contracts`: a DUT's own contract is design metadata proven
+    * in its own flow, not part of the bounded model, and circt-bmc rejects the contract region's use of the contract
+    * result. `--canonicalize` then folds the (de-symed) `hw.wire`s away — circt-bmc marks `hw.wire` illegal and runs no
+    * canonicalization of its own.
+    */
+  private def stripContracts(hwMlir: os.Path): os.Path =
+    val out = hwMlir / os.up / s"${hwMlir.last}.nocontract.mlir"
+    os.write.over(
+      out,
+      os.proc(CirctTools("circt-opt"), hwMlir.toString, "--strip-contracts", "--canonicalize").call(check = true).out.text()
+    )
+    out
+
+  /** Strip what circt-bmc cannot ingest from a `firtool -ir-hw` module.
+    *
+    * A zaozi UT's layered probes lower to observation plumbing the bounded model does not need: bound `*_Verification`
+    * modules full of `sv.xmr` refs, `sv.macro.*`/`emit.file` ref-macro machinery, the `hw.hierpath`s pointing into
+    * them, the `{doNotPrint}` bind instances, and `sv.namehint` attributes. circt-bmc registers none of the `sv`/`emit`
+    * dialects, so any survivor is a parse error. Formal intent must live as `verif.*` in the module body — a layered
+    * assert sits in a pruned module and is dropped with it.
+    *
+    * The prune is structural on the printed IR: top-level entities are delimited by brace depth, and an `hw.module`
+    * whose body holds `sv.` ops is a lowered layer, not logic.
+    */
+  private[utlib] def pruneForBmc(hwMlir: os.Path): os.Path =
+    val lines    = os.read(hwMlir).split("\n", -1).toVector
+    // Top-level entities: contiguous line ranges at brace depth 1 (directly under the outer `module {`).
+    val entities = scala.collection.mutable.ArrayBuffer.empty[(Int, Int)] // [start, end] inclusive
+    var depth    = 0
+    var start    = -1
+    for (l, i) <- lines.zipWithIndex do
+      val net = l.count(_ == '{') - l.count(_ == '}')
+      if depth == 1 && start < 0 && l.trim.nonEmpty && l.trim != "}" then start = i
+      depth += net
+      if start >= 0 && depth <= 1 then
+        entities += ((start, i))
+        start = -1
+
+    // An `sv.` OP starts the line or follows `= `; `{sv.namehint = ...}` is only an attribute.
+    val svOp = raw"(^|= )sv\.".r
+
+    def dropEntity(range: (Int, Int)): Boolean =
+      val head = lines(range._1).trim
+      head.startsWith("sv.")
+      || head.startsWith("emit.file")
+      || head.startsWith("hw.hierpath")
+      || head.startsWith("om.") // Object Model metadata references the dropped hierpaths and carries no logic
+      || (head.startsWith("hw.module") && (range._1 to range._2).exists(i => svOp.findFirstIn(lines(i).trim).nonEmpty))
+
+    val keptRanges = entities.filterNot(dropEntity).toVector
+    val body       = keptRanges
+      .flatMap((s, e) => lines.slice(s, e + 1))
+      .filterNot(_.contains("{doNotPrint}"))
+      .map(_.replaceAll(""" \{sv\.namehint = "[^"]*"\}""", "").replaceAll("""sv\.namehint = "[^"]*", """, ""))
+      // With the hierpaths gone an inner sym has no user, and circt-bmc refuses an `hw.wire` that carries one.
+      .map(l => if l.contains("hw.wire") then l.replaceAll(""" sym @[\w.]+\s+""", " ") else l)
+    val out        = hwMlir / os.up / s"${hwMlir.last}.bmc.mlir"
+    os.write.over(out, (Vector(lines.head) ++ body ++ Vector("}", "")).mkString("\n"))
     out
 
   private def elaborate[
@@ -237,17 +297,6 @@ object FormalUT:
     finally arena.close()
 
   // ---- tool resolution ---------------------------------------------------------------------------------------------
-
-  /** Resolve a CIRCT tool from `CIRCT_INSTALL_PATH` (the flake-provided install) when set, else fall back to `PATH`. A
-    * forked test JVM's `PATH` can lag the devshell, but `CIRCT_INSTALL_PATH` is threaded in explicitly.
-    */
-  private def circtTool(name: String): String =
-    sys.env
-      .get("CIRCT_INSTALL_PATH")
-      .map(p => os.Path(p) / "bin" / name)
-      .filter(os.exists)
-      .map(_.toString)
-      .getOrElse(name)
 
   /** Locate a `libz3.so` for circt-bmc's JIT: `ZAOZI_LIBZ3` if set, else the first one in the Nix store. */
   private def defaultLibz3(): os.Path =
