@@ -12,7 +12,7 @@ package me.jiuyang.syntheke
 /** Non-empty name sequence from the FIRRTL layer root, e.g. `verification.cosim`. */
 final case class LayerPath(segments: Vector[String]) derives upickle.default.ReadWriter:
   require(segments.nonEmpty, "LayerPath must be non-empty")
-  require(segments.forall(_.nonEmpty), "LayerPath segments must be non-empty strings")
+  segments.foreach(DeclaredName.require(_, "LayerPath segment"))
   def show: String = segments.mkString(".")
 
 sealed trait ProtocolInterface derives CanEqual, upickle.default.ReadWriter

@@ -310,5 +310,22 @@ object NegotiatorSpec extends TestSuite:
         }
       }
       assert(dup.getMessage.contains("duplicate endpoint name 'x'"))
+
+      // Names become FIRRTL symbols verbatim; the shape rule rejects them at the declaration.
+      val badInstance = intercept[IllegalArgumentException] {
+        Design { wrapper("a.b") {} }
+      }
+      assert(badInstance.getMessage.contains("'a.b' is not a legal name"))
+      val badEndpoint = intercept[IllegalArgumentException] {
+        Design {
+          generator("g", intEntry("G")) {
+            parametersConst(0)
+            inward(Wid)("dv-source").uFn(_ => Right(1))
+          }
+        }
+      }
+      assert(badEndpoint.getMessage.contains("'dv-source' is not a legal name"))
+      val badLayer    = intercept[IllegalArgumentException] { LayerPath(Vector("verification", "")) }
+      assert(badLayer.getMessage.contains("not a legal name"))
     }
   }

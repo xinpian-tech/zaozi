@@ -138,6 +138,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
   private val children = mutable.ArrayBuffer.empty[String]
 
   private def addChild(name: String): ModuleId =
+    DeclaredName.require(name, s"instance name in ${id.show}")
     require(!children.contains(name), s"duplicate child instance name '$name' in ${id.show}")
     children += name
     val childId = id / name
@@ -196,6 +197,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   private val params = mutable.ArrayBuffer.empty[(EdgeView => Either[CapabilityViolation, Any], Any => Any)]
 
   private def reserveName(name: String): Unit =
+    DeclaredName.require(name, s"endpoint name in ${id.show}")
     val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name) || dvSnks.exists(_.name == name)
     require(!taken, s"duplicate endpoint name '$name' in ${id.show}")
 
