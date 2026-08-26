@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
+import me.jiuyang.utlib.{Generate, Probes, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -90,9 +90,5 @@ object HavenAluUT
 
     val probe = summon[ProbeInterface[HavenAluUTProbe]]
     layer("Verification"):
-      val resultP = Wire(Bits(32))
-      resultP := instance.io.result
-      probe.RESULT <== resultP
-      val doneP   = Wire(Bits(1))
-      doneP := instance.io.done.asBits
-      probe.DONE <== doneP
+      Probes.expose(probe.RESULT, Bits(32), instance.io.result)
+      Probes.expose(probe.DONE, Bits(1), instance.io.done.asBits)

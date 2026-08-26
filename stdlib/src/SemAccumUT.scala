@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
+import me.jiuyang.utlib.{Generate, Probes, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.ltltpe.*
@@ -54,6 +54,4 @@ object SemAccumUT
 
     val probe = summon[ProbeInterface[AccumUTProbe]]
     layer("Verification"):
-      val sumP = Wire(Bits(parameter.width))
-      sumP := instance.io.SUM
-      probe.SUM <== sumP
+      Probes.expose(probe.SUM, Bits(parameter.width), instance.io.SUM)

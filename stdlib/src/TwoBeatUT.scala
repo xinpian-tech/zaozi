@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Generate, Sem, UT}
+import me.jiuyang.utlib.{Generate, Probes, Sem, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.ltltpe.*
@@ -49,9 +49,7 @@ object TwoBeat extends Generator[TwoBeatParameter, TwoBeatLayers, TwoBeatIO, Two
 
     val probe = summon[ProbeInterface[TwoBeatUTProbe]]
     layer("Verification"):
-      val seenP = Wire(Bool())
-      seenP := io.SEEN
-      probe.SEEN <== seenP
+      Probes.expose(probe.SEEN, Bool(), io.SEEN)
 
 /** The temporal formal-CRV example: the generation constraint is a *sequence* — C = `(A==3) ### (A==5)` (##1 in SVA terms) (the two-beat
   * pattern), written in zaozi's typed SVA surface. The body asserts ¬C so the circt-bmc violation trace is a
@@ -81,6 +79,4 @@ object TwoBeatUT
 
     val probe = summon[ProbeInterface[TwoBeatUTProbe]]
     layer("Verification"):
-      val seenP = Wire(Bool())
-      seenP := instance.io.SEEN
-      probe.SEEN <== seenP
+      Probes.expose(probe.SEEN, Bool(), instance.io.SEEN)

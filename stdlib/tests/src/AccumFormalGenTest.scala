@@ -10,18 +10,14 @@ import utest.*
   * sum 12) → circt-bmc witness → stimulus → replay, where the accumulator's SUM confirms the generated beats.
   */
 object AccumFormalGenTest extends TestSuite:
-  private val outputRoot   = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
-  private val verilatorBin = sys.env.getOrElse("VERILATOR", "verilator")
+  import FormalGenHarness.*
 
   val tests: Tests = Tests:
     test("cross-beat constraint → witness → replay: three distinct beats summing to 12"):
-      val dir   = outputRoot / "Accum-formalgen"
-      os.remove.all(dir)
+      val dir = freshDir("Accum-formalgen")
       val param = AccumParameter(8)
 
-      val txn = FormalUT.generateGenerator(AccumUT, param, bound = 4, dir) match
-        case GenerateOutcome.Generated(t) => t
-        case other                        => throw java.lang.AssertionError(s"expected Generated, got $other")
+      val txn = solved(FormalUT.generateGenerator(AccumUT, param, bound = 4, dir))
       assert(txn.cycles >= 3)
 
       val gen  = UTGenerator(AccumUT, param, outputDirectory = dir)
@@ -30,20 +26,6 @@ object AccumFormalGenTest extends TestSuite:
       assert(a.distinct.size == 3)
       assert(a.sum % 256 == 12)
 
-      val tb = gen.emitTestbench(dir, runCycles = txn.cycles + 1)
-      os.proc(
-        verilatorBin,
-        "--binary",
-        "--timing",
-        "--no-assert",
-        "--top-module",
-        tb.top,
-        "-Wno-fatal",
-        "-I" + dir.toString,
-        tb.sources.map(_.toString),
-        "-o",
-        "sim"
-      ).call(cwd = dir, check = true, mergeErrIntoOut = true)
-      val out =
-        os.proc((dir / "obj_dir" / "sim").toString).call(cwd = dir, check = false, mergeErrIntoOut = true).out.text()
+      val tb  = gen.emitTestbench(dir, runCycles = txn.cycles + 1)
+      val out = buildAndReplay(tb, dir)
       assert(out.contains("SUM=12"))

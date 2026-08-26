@@ -10,18 +10,14 @@ import utest.*
   * to a single witness and replayed: two distinct nonzero beats summing to 9, then a 1, then a 2, ending at SUM 12.
   */
 object SemAccumFormalGenTest extends TestSuite:
-  private val outputRoot   = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
-  private val verilatorBin = sys.env.getOrElse("VERILATOR", "verilator")
+  import FormalGenHarness.*
 
   val tests: Tests = Tests:
     test("a four-kind intent pins the witness: distinct nonzero pair summing 9, then 1, then 2"):
-      val dir   = outputRoot / "SemAccum-formalgen"
-      os.remove.all(dir)
+      val dir = freshDir("SemAccum-formalgen")
       val param = AccumParameter(8)
 
-      val txn = FormalUT.generateGenerator(SemAccumUT, param, bound = 7, dir, delayedDrives = Seq("A")) match
-        case GenerateOutcome.Generated(t) => t
-        case other                        => throw java.lang.AssertionError(s"expected Generated, got $other")
+      val txn = solved(FormalUT.generateGenerator(SemAccumUT, param, bound = 7, dir, delayedDrives = Seq("A")))
 
       val gen  = UTGenerator(SemAccumUT, param, outputDirectory = dir)
       val stim = Stimulus.save(txn, gen.abi.spec, dir / "stimulus.txt")
@@ -33,20 +29,6 @@ object SemAccumFormalGenTest extends TestSuite:
       }
       assert(hit)
 
-      val tb = gen.emitTestbench(dir, runCycles = txn.cycles + 2)
-      os.proc(
-        verilatorBin,
-        "--binary",
-        "--timing",
-        "--no-assert",
-        "--top-module",
-        tb.top,
-        "-Wno-fatal",
-        "-I" + dir.toString,
-        tb.sources.map(_.toString),
-        "-o",
-        "sim"
-      ).call(cwd = dir, check = true, mergeErrIntoOut = true)
-      val out =
-        os.proc((dir / "obj_dir" / "sim").toString).call(cwd = dir, check = false, mergeErrIntoOut = true).out.text()
+      val tb  = gen.emitTestbench(dir, runCycles = txn.cycles + 2)
+      val out = buildAndReplay(tb, dir)
       assert(out.contains("SUM=12"))

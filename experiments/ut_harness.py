@@ -27,6 +27,12 @@ from pathlib import Path
 ZAOZI = Path(__file__).resolve().parent.parent
 SLOT = ZAOZI / "experiments" / "src" / "Generated.scala"
 ERROR_HEAD = re.compile(r"\[error\]\s+(\S+\.scala):(\d+):(\d+)")
+TASK_PREFIX = re.compile(r"^\d+\]\s?")
+
+
+def strip_prefix(raw: str) -> str:
+    """Drop mill's task-id prefix from an output line."""
+    return TASK_PREFIX.sub("", raw)
 
 
 def mill(*args: str) -> subprocess.CompletedProcess:
@@ -40,7 +46,7 @@ def parse_type_errors(output: str) -> list[dict]:
     errors: list[dict] = []
     current: dict | None = None
     for raw in output.splitlines():
-        line = re.sub(r"^\d+\]\s?", "", raw)  # strip mill's task-id prefix
+        line = strip_prefix(raw)
         head = ERROR_HEAD.search(line)
         if head:
             current = {
@@ -80,10 +86,9 @@ def main() -> None:
     out_dir = args.out.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     run = mill("experiments.run", str(out_dir))
-    for raw in run.stdout.splitlines():
-        line = re.sub(r"^\d+\]\s?", "", raw)
-        if line.startswith("UTCLI-RESULT "):
-            emit({"phase": "solve", "ok": True, "result": json.loads(line[len("UTCLI-RESULT "):])}, 0)
+    report = out_dir / "report.json"
+    if run.returncode == 0 and report.exists():
+        emit({"phase": "solve", "ok": True, "result": json.loads(report.read_text())}, 0)
     emit({"phase": "run", "ok": False, "detail": run.stdout[-2000:]}, 3)
 
 

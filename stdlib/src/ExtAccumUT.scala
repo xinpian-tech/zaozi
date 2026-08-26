@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
+import me.jiuyang.utlib.{Generate, Probes, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -104,6 +104,4 @@ object ExtAccumUT
 
     val probe = summon[ProbeInterface[ExtAccumUTProbe]]
     layer("Verification"):
-      val sumP = Wire(Bits(parameter.width))
-      sumP := instance.io.sum
-      probe.SUM <== sumP
+      Probes.expose(probe.SUM, Bits(parameter.width), instance.io.sum)

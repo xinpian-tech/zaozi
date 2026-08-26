@@ -11,19 +11,15 @@ import utest.*
   * two-beat pattern.
   */
 object TwoBeatFormalGenTest extends TestSuite:
-  private val outputRoot   = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
-  private val verilatorBin = sys.env.getOrElse("VERILATOR", "verilator")
+  import FormalGenHarness.*
 
   val tests: Tests = Tests:
     test("sequence constraint → multi-cycle witness → replay: SEEN pulses on the generated pattern"):
-      val dir   = outputRoot / "TwoBeat-formalgen"
-      os.remove.all(dir)
+      val dir = freshDir("TwoBeat-formalgen")
       val param = TwoBeatParameter(8)
 
       // 1. Solve: the module asserts ¬((A==3) ## (A==5)); a violation is a trace containing the pattern.
-      val txn = FormalUT.generateGenerator(TwoBeatUT, param, bound = 4, dir) match
-        case GenerateOutcome.Generated(t) => t
-        case other                        => throw java.lang.AssertionError(s"expected Generated, got $other")
+      val txn = solved(FormalUT.generateGenerator(TwoBeatUT, param, bound = 4, dir))
       assert(txn.cycles >= 2)
 
       // 2. Bridge, checking the witness really holds the adjacent 3 → 5 pair.
@@ -33,20 +29,6 @@ object TwoBeatFormalGenTest extends TestSuite:
       assert(a.sliding(2).exists { case Seq(x, y) => x == 3 && y == 5; case _ => false })
 
       // 3. Replay: the DUT observes the pattern — SEEN=1 on the cycle after the (3, 5) beat lands.
-      val tb = gen.emitTestbench(dir, runCycles = txn.cycles + 1)
-      os.proc(
-        verilatorBin,
-        "--binary",
-        "--timing",
-        "--no-assert",
-        "--top-module",
-        tb.top,
-        "-Wno-fatal",
-        "-I" + dir.toString,
-        tb.sources.map(_.toString),
-        "-o",
-        "sim"
-      ).call(cwd = dir, check = true, mergeErrIntoOut = true)
-      val out =
-        os.proc((dir / "obj_dir" / "sim").toString).call(cwd = dir, check = false, mergeErrIntoOut = true).out.text()
+      val tb  = gen.emitTestbench(dir, runCycles = txn.cycles + 1)
+      val out = buildAndReplay(tb, dir)
       assert(out.contains("SEEN=1"))

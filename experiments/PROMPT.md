@@ -65,8 +65,8 @@ Generate(
   "gen_three_distinct_sum12"
 )
 ```
-The window's reality guard is conjoined automatically — a relation can never fire on fake history. `w.past(i)`
-outside the declared depth is rejected.
+The window's reality guard is conjoined automatically — a relation can never fire on fake history, and the
+declared depth is a type: `w.past(3)` on a depth-2 window fails to COMPILE.
 
 ### Temporal semantics (时序) — ordering between events
 
@@ -87,9 +87,10 @@ References the DUT's outputs, probes, or status registers — what the design ha
 ### Constraints through an external SystemVerilog IP
 
 Wrap the IP as a `VerilogWrapper` (see `stdlib/src/ExtAccumUT.scala`), instantiate it in the UT, and state
-value/state semantics over its ports. In a sequential UT add `Assume((!io.reset.asBool).I, "rst_low")` and feed
+value/state semantics over its ports. In a sequential UT add `Txn.assumeResetLow(io.reset)` and feed
 `Txn.firstCycle()` into the IP's reset so it initializes itself. `bound` must cover the cycles the intent needs
-(a k-beat relation needs bound ≥ k+1).
+(a k-beat relation needs bound ≥ k+1). Probe re-export is one line per signal:
+`Probes.expose(probe.SUM, Bits(width), instance.io.sum)` inside `layer("Verification")`.
 
 ## Worked examples (all in-tree, all green)
 

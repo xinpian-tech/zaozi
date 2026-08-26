@@ -11,13 +11,11 @@ import utest.*
   * Verilator.
   */
 object ExtAccumFormalGenTest extends TestSuite:
-  private val outputRoot   = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
-  private val verilatorBin = sys.env.getOrElse("VERILATOR", "verilator")
+  import FormalGenHarness.*
 
   val tests: Tests = Tests:
     test("constraint through imported SV → witness → replay: SUM reaches 9 after two beats"):
-      val dir   = outputRoot / "ExtAccum-formalgen"
-      os.remove.all(dir)
+      val dir = freshDir("ExtAccum-formalgen")
       val param = ExtAccumParameter(8)
 
       // 1. Lower the typed wrapper (extern inside), import the IP, splice, solve.
@@ -27,9 +25,7 @@ object ExtAccumFormalGenTest extends TestSuite:
       val (wrapperHw, top) = FormalUT.lowerGenerator(ExtAccumUT, param, dir)
       val ip               = SvImport.toHw(Seq(svFile), dir / "imported")
       val merged           = SvImport.mergeForBmc(wrapperHw, ip)
-      val txn              = FormalUT.generate(merged, top, bound = 4) match
-        case GenerateOutcome.Generated(t) => t
-        case other                        => throw java.lang.AssertionError(s"expected Generated, got $other")
+      val txn = solved(FormalUT.generate(merged, top, bound = 4))
       assert(txn.cycles >= 2)
 
       // 2. Bridge: the first two beats must sum to 9 — the constraint solved through the IP's own adder.
@@ -39,20 +35,6 @@ object ExtAccumFormalGenTest extends TestSuite:
       assert((a.take(2).sum % 256) == 9)
 
       // 3. Replay against the same RTL (verilogSources carries it into the emitted testbench set).
-      val tb = gen.emitTestbench(dir, runCycles = txn.cycles + 1)
-      os.proc(
-        verilatorBin,
-        "--binary",
-        "--timing",
-        "--no-assert",
-        "--top-module",
-        tb.top,
-        "-Wno-fatal",
-        "-I" + dir.toString,
-        (tb.sources :+ svFile).map(_.toString),
-        "-o",
-        "sim"
-      ).call(cwd = dir, check = true, mergeErrIntoOut = true)
-      val out =
-        os.proc((dir / "obj_dir" / "sim").toString).call(cwd = dir, check = false, mergeErrIntoOut = true).out.text()
+      val tb  = gen.emitTestbench(dir, runCycles = txn.cycles + 1)
+      val out = buildAndReplay(tb, dir, extraSources = Seq(svFile))
       assert(out.contains("SUM=9"))

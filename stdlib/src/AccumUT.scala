@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
+import me.jiuyang.utlib.{Generate, Probes, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -42,9 +42,7 @@ object Accum extends Generator[AccumParameter, AccumLayers, AccumIO, AccumUTProb
 
     val probe = summon[ProbeInterface[AccumUTProbe]]
     layer("Verification"):
-      val sumP = Wire(Bits(parameter.width))
-      sumP := sum
-      probe.SUM <== sumP
+      Probes.expose(probe.SUM, Bits(parameter.width), sum)
 
 /** The cross-transaction formal-CRV example: the constraint relates *three different beats* of one stimulus —
   * C = "the first three beats are pairwise distinct and sum to 12". [[Txn.history]] materializes the two prior beats
@@ -82,6 +80,4 @@ object AccumUT
 
     val probe = summon[ProbeInterface[AccumUTProbe]]
     layer("Verification"):
-      val sumP = Wire(Bits(parameter.width))
-      sumP := instance.io.SUM
-      probe.SUM <== sumP
+      Probes.expose(probe.SUM, Bits(parameter.width), instance.io.SUM)
