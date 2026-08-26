@@ -5,6 +5,7 @@ package me.jiuyang.stdlib.dwbb
 import scala.util.chaining.*
 
 import me.jiuyang.stdlib.*
+import me.jiuyang.stdlib.queue.*
 import me.jiuyang.stdlib.default.{*, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
@@ -21,7 +22,7 @@ case class DwbbFifoParameter(
   entries:          Int,
   pipe:             Boolean = false,
   flow:             Boolean = false,
-  useAsyncReset:    Boolean = false,
+  asyncReset:       Boolean = false,
   resetMem:         Boolean = false,
   almostEmptyLevel: Int = 1,
   almostFullLevel:  Int = 1)
@@ -69,7 +70,7 @@ object DwbbFifo
     ae_level = parameter.almostEmptyLevel,
     af_level = parameter.almostFullLevel,
     err_mode = 2,
-    rst_mode = (parameter.useAsyncReset, parameter.resetMem) match
+    rst_mode = (parameter.asyncReset, parameter.resetMem) match
       case (false, false) => 3
       case (false, true)  => 1
       case (true, false)  => 2
@@ -94,7 +95,7 @@ given QueueImpl with
         parameter.entries,
         parameter.pipe,
         parameter.flow,
-        parameter.useAsyncReset,
+        parameter.asyncReset,
         parameter.resetMem,
         parameter.almostEmptyLevel,
         parameter.almostFullLevel
