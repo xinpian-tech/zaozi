@@ -217,6 +217,39 @@ object FormalUT:
     os.write.over(out, os.proc(CirctTools("firtool"), firrtl.toString, "-ir-hw").call(check = true).out.text())
     out
 
+  /** Pin each sync-reset register's initial state to its reset value, within one top-level entity's lines.
+    *
+    * circt-bmc leaves register initial state FREE — a solver can then satisfy a cross-cycle constraint by inventing
+    * pre-loaded history instead of driving real inputs. Its externalize-registers pass does honor `seq.compreg …
+    * initial %v` when `%v` is a `seq.initial`-wrapped constant, so a
+    * `seq.firreg %in clock %clk reset sync %rst, %cst` (the lowering of zaozi's `RegInit` under a sync active-high
+    * reset) is rewritten to that form, with the sync reset itself re-expressed as a mux on the register input. Async
+    * resets and non-constant reset values are left alone — free init, as before. hw.module bodies are graph regions,
+    * so the inserted lines need no dominance ordering.
+    */
+  private def pinRegisterInit(block: Vector[String]): Vector[String] =
+    // 1-bit constants print bare (`hw.constant true`); wider ones carry the type (`hw.constant 0 : i8`).
+    val constDef = raw"(%[\w.$$]+) = hw.constant ([-\d]+ : [\w<>]+|true|false)".r
+    val consts   = block.flatMap(l => constDef.findFirstMatchIn(l.trim).map(m => m.group(1) -> m.group(2))).toMap
+    def constTy(text: String): String = if text == "true" || text == "false" then "i1" else text.split(" : ").last
+    val firreg   =
+      raw"^(\s*)(%[\w.$$]+) = seq\.firreg (%[\w.$$]+) clock (%[\w.$$]+)(?: sym @[\w.]+)? reset sync (%[\w.$$]+), (%[\w.$$]+)(?: \{[^}]*\})? : (\S+)$$".r
+    block.flatMap {
+      case l @ firreg(ind, r, in, clk, rst, rv, ty) =>
+        consts.get(rv) match
+          case Some(constText) if constTy(constText) == ty =>
+            Vector(
+              s"$ind${r}__init = seq.initial() {",
+              s"$ind  ${r}__c = hw.constant $constText",
+              s"$ind  seq.yield ${r}__c : $ty",
+              s"$ind} : () -> !seq.immutable<$ty>",
+              s"$ind${r}__mux = comb.mux $rst, $rv, $in : $ty",
+              s"$ind$r = seq.compreg ${r}__mux, $clk initial ${r}__init : $ty"
+            )
+          case _                                           => Vector(l)
+      case l                                               => Vector(l)
+    }
+
   /** Remove `verif.contract` regions via `circt-opt --strip-contracts`: a DUT's own contract is design metadata proven
     * in its own flow, not part of the bounded model, and circt-bmc rejects the contract region's use of the contract
     * result. `--canonicalize` then folds the (de-symed) `hw.wire`s away — circt-bmc marks `hw.wire` illegal and runs no
@@ -268,7 +301,7 @@ object FormalUT:
 
     val keptRanges = entities.filterNot(dropEntity).toVector
     val body       = keptRanges
-      .flatMap((s, e) => lines.slice(s, e + 1))
+      .flatMap((s, e) => pinRegisterInit(lines.slice(s, e + 1)))
       .filterNot(_.contains("{doNotPrint}"))
       .map(_.replaceAll(""" \{sv\.namehint = "[^"]*"\}""", "").replaceAll("""sv\.namehint = "[^"]*", """, ""))
       // With the hierpaths gone an inner sym has no user, and circt-bmc refuses an `hw.wire` that carries one.

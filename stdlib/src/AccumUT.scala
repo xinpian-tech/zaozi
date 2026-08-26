@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
+package me.jiuyang.stdlib
+
+import me.jiuyang.utlib.{Txn, UT}
+import me.jiuyang.zaozi.*
+import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.reftpe.*
+import me.jiuyang.zaozi.valuetpe.*
+
+case class AccumParameter(width: Int) extends Parameter:
+  require(width > 0, "width must be positive")
+
+given upickle.default.ReadWriter[AccumParameter] = upickle.default.macroRW
+
+class AccumLayers(parameter: AccumParameter) extends LayerInterface(parameter):
+  def layers = Seq(Layer("Verification"))
+
+class AccumIO(parameter: AccumParameter) extends HWBundle(parameter):
+  val clock = Flipped(Clock())
+  val reset = Flipped(Reset())
+  val A     = Flipped(Bits(parameter.width))
+  val SUM   = Aligned(Bits(parameter.width))
+
+class AccumUTProbe(parameter: AccumParameter) extends DVBundle[AccumParameter, AccumLayers](parameter):
+  val SUM = ProbeRead(Bits(parameter.width), layers("Verification"))
+
+/** A running modulo-2^width accumulator: `SUM += A` each cycle. */
+@generator
+object Accum extends Generator[AccumParameter, AccumLayers, AccumIO, AccumUTProbe]:
+  override def moduleName(p: AccumParameter): String = s"Accum_width${p.width}"
+
+  def architecture(parameter: AccumParameter) =
+    val io = summon[Interface[AccumIO]]
+
+    given ClockScope = ClockScope.posedge(io.clock)
+    given ResetScope = ResetScope.syncActiveHigh(io.reset)
+
+    val sum = RegInit(0.B(parameter.width))
+    sum    := (sum.asUInt + io.A.asUInt).asBits.bits(parameter.width - 1, 0)
+    io.SUM := sum
+
+    val probe = summon[ProbeInterface[AccumUTProbe]]
+    layer("Verification"):
+      val sumP = Wire(Bits(parameter.width))
+      sumP := sum
+      probe.SUM <== sumP
+
+/** The cross-transaction formal-CRV example: the constraint relates *three different beats* of one stimulus —
+  * C = "the first three beats are pairwise distinct and sum to 12". [[Txn.history]] materializes the two prior beats
+  * as typed state, turning the cross-object relation into a plain boolean over `(hist(1), hist(0), A)` guarded by the
+  * beat counter; the body asserts ¬C and the BMC violation is the three-beat transaction.
+  */
+@generator
+object AccumUT
+    extends Generator[AccumParameter, AccumLayers, AccumIO, AccumUTProbe]
+    with UT[AccumParameter, AccumIO]:
+  override def moduleName(p: AccumParameter): String = s"AccumUT_width${p.width}"
+
+  def architecture(parameter: AccumParameter) =
+    val io       = summon[Interface[AccumIO]]
+    val instance = Accum.instantiate(parameter)
+    instance.io.clock := io.clock
+    instance.io.reset := io.reset
+    instance.io.A     := io.A
+    io.SUM            := instance.io.SUM
+
+    given ClockScope = ClockScope.posedge(io.clock)
+    given ResetScope = ResetScope.syncActiveHigh(io.reset)
+
+    // ¬C in the module body: hist(1) is the beat two cycles back, hist(0) one cycle back, io.A the current one.
+    val (hist, beats) = Txn.history(io.A, parameter.width, 2)
+    val window        = beats === 2.U(2)
+    val distinct      = !(hist(1) === hist(0)) & !(hist(1) === io.A) & !(hist(0) === io.A)
+    val sum3          = (hist(1).asUInt + hist(0).asUInt + io.A.asUInt).asBits.bits(parameter.width - 1, 0)
+    val sumIs12       = sum3 === 12.U(parameter.width).asBits
+    Assert((!(window & distinct & sumIs12)).I, "gen_three_distinct_sum12")
+
+    val probe = summon[ProbeInterface[AccumUTProbe]]
+    layer("Verification"):
+      val sumP = Wire(Bits(parameter.width))
+      sumP := instance.io.SUM
+      probe.SUM <== sumP

@@ -121,8 +121,10 @@ object FormalUTTest extends TestSuite:
           |    %0 = om.basepath_create %basepath @nla
           |    om.class.fields
           |  }
-          |  hw.module @Top(in %A : i8) {
+          |  hw.module @Top(in %clk : !seq.clock, in %rst : i1, in %A : i8) {
           |    %true = hw.constant true
+          |    %c0_i8 = hw.constant 0 : i8
+          |    %r = seq.firreg %A clock %clk sym @sym_5 reset sync %rst, %c0_i8 {clockEdge = 0 : i32, resetPolarity = 0 : i32} : i8
           |    %w_layerCapture = hw.wire %true sym @sym_9  : i1
           |    %0 = comb.extract %A from 0 {sv.namehint = "_GEN_1"} : (i8) -> i1
           |    %1 = comb.xor bin %0, %true {sv.namehint = "_GEN_2"} : i1
@@ -138,7 +140,7 @@ object FormalUTTest extends TestSuite:
       os.write.over(dir / "dirty.mlir", dirty)
       val pruned  = os.read(FormalUT.pruneForBmc(dir / "dirty.mlir"))
       assert(pruned.contains("verif.assert %1 label \"gen_a_odd\""))
-      assert(pruned.contains("hw.module @Top(in %A : i8)"))
+      assert(pruned.contains("hw.module @Top(in %clk : !seq.clock, in %rst : i1, in %A : i8)"))
       assert(!pruned.contains("sv."))
       assert(!pruned.contains("emit.file"))
       assert(!pruned.contains("hw.hierpath"))
@@ -147,3 +149,9 @@ object FormalUTTest extends TestSuite:
       assert(!pruned.contains("om.class"))
       // The wire itself stays (its value may feed logic); only the now-danging inner sym goes.
       assert(pruned.contains("%w_layerCapture = hw.wire %true : i1"))
+      // A sync-reset firreg becomes a compreg whose initial value is pinned to the reset constant — otherwise
+      // circt-bmc leaves the initial state free and a witness can carry fake history.
+      assert(!pruned.contains("seq.firreg"))
+      assert(pruned.contains("%r = seq.compreg %r__mux, %clk initial %r__init : i8"))
+      assert(pruned.contains("%r__mux = comb.mux %rst, %c0_i8, %A : i8"))
+      assert(pruned.contains("seq.initial()"))

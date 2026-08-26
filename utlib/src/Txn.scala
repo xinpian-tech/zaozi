@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
+package me.jiuyang.utlib
+
+import me.jiuyang.zaozi.*
+import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.reftpe.*
+import me.jiuyang.zaozi.valuetpe.*
+
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+
+import java.lang.foreign.Arena
+
+/** Transaction-level capture: the machinery that lets a constraint relate *different* transactions of one stimulus.
+  *
+  * A cross-transaction constraint ("all payloads distinct", "the sum of the three beats is K", "beat i+1 references
+  * beat i's result") is a relation between values at different cycles. [[history]] materializes that time axis as
+  * typed state — a reset-initialized shift register of the signal's past beats plus a saturating beat counter — so the
+  * relation becomes a plain boolean predicate over `(hist(n), …, hist(0), sig)`, guarded by "enough beats seen", and
+  * solves through the same `assert ¬C` reading as every other constraint. Reset-initialized on purpose: an
+  * uninitialized history register would be a free variable the solver could fill with fake history.
+  *
+  * A beat is a clock cycle here; handshake-qualified beats (`valid && ready`) are the caller's own gating.
+  */
+object Txn:
+
+  /** The last `depth` beats of `sig` — `hist(0)` is one beat old, `hist(depth - 1)` the oldest — and a beat counter
+    * saturating at `depth`, so `beats === depth` means the whole window is real history.
+    */
+  def history(
+    sig:   Referable[Bits],
+    width: Int,
+    depth: Int
+  )(
+    using ClockScope,
+    ResetScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): (Seq[Referable[Bits]], Referable[UInt]) =
+    require(depth > 0, "history depth must be positive")
+    val hist = Seq.fill(depth)(RegInit(0.B(width)))
+    hist.head      := sig
+    hist.sliding(2).foreach {
+      case Seq(newer, older) => older := newer
+      case _                 => ()
+    }
+
+    val cw    = 32 - Integer.numberOfLeadingZeros(depth)
+    val beats = RegInit(0.U(cw))
+    val next  = (beats + 1.U(cw)).asBits.bits(cw - 1, 0).asUInt
+    beats := ((beats === depth.U(cw)) ? (beats, next))
+    (hist, beats)
