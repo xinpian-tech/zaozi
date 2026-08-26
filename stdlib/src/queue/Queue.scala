@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Yuhang Zeng <unlsycn@unlsycn.com>
-package me.jiuyang.stdlib
+package me.jiuyang.stdlib.queue
 
+import me.jiuyang.stdlib.{Decoupled, HardwareDataType}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
@@ -15,11 +16,12 @@ case class QueueParameter[D <: HardwareDataType](
   entries:          Int,
   pipe:             Boolean = false,
   flow:             Boolean = false,
-  useAsyncReset:    Boolean = false,
+  asyncReset:       Boolean = false,
   resetMem:         Boolean = false,
   almostEmptyLevel: Int = 1,
   almostFullLevel:  Int = 1)
-    extends Parameter
+    extends Parameter:
+  require(entries >= 2, "Queue entries must be at least 2")
 
 class QueueIO[D <: HardwareDataType](
   parameter: QueueParameter[D]

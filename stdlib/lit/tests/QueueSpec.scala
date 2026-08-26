@@ -3,13 +3,14 @@
 
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class DwbbFifoTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
-// RUN: %{test} config %t.dir/config.json --width 16 --useAsyncReset false
+// RUN: %{test} config %t.dir/config.json --width 16 --asyncReset false
 // RUN: cd %t.dir && %{test} design %t.dir/config.json
 // RUN: firld %t.dir/*.mlirbc --base-circuit DwbbFifoTop_2a94835e --no-mangle | firtool --format=mlir | FileCheck %s
 // RUN: rm -rf %t.dir
 
 import me.jiuyang.stdlib.*
 import me.jiuyang.stdlib.dwbb.{*, given}
+import me.jiuyang.stdlib.queue.*
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.magic.macros.generator
@@ -21,7 +22,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule}
 import java.lang.foreign.Arena
 import mainargs.TokensReader
 
-case class QueueSpecParameter(width: Int, useAsyncReset: Boolean) extends Parameter
+case class QueueSpecParameter(width: Int, asyncReset: Boolean) extends Parameter
 given upickle.default.ReadWriter[QueueSpecParameter] = upickle.default.macroRW
 
 class QueueSpecLayers(parameter: QueueSpecParameter) extends LayerInterface(parameter):
@@ -40,8 +41,8 @@ class QueueSpecLayers(parameter: QueueSpecParameter) extends LayerInterface(para
 class QueueSpecIO(parameter: QueueSpecParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
   val reset = Flipped(Reset())
-  val i     = Flipped(Decoupled(UInt(parameter.width)))
-  val o     = Aligned(Decoupled(UInt(parameter.width)))
+  val i     = Flipped(Decoupled(Bits(parameter.width)))
+  val o     = Aligned(Decoupled(Bits(parameter.width)))
 
 class QueueSpecProbe(parameter: QueueSpecParameter) extends DVBundle[QueueSpecParameter, QueueSpecLayers](parameter)
 
@@ -71,7 +72,7 @@ class QueueSpecProbe(parameter: QueueSpecParameter) extends DVBundle[QueueSpecPa
 object DwbbFifoTop extends Generator[QueueSpecParameter, QueueSpecLayers, QueueSpecIO, QueueSpecProbe]:
   def architecture(parameter: QueueSpecParameter) =
     val io   = summon[Interface[QueueSpecIO]]
-    val fifo = Queue(QueueParameter(io.i.bits.getType, 32, useAsyncReset = parameter.useAsyncReset))
+    val fifo = Queue(QueueParameter(io.i.bits.getType, 32, asyncReset = parameter.asyncReset))
 
     fifo.clock     := io.clock
     fifo.reset     := io.reset
