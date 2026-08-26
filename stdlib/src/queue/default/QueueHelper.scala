@@ -22,6 +22,7 @@ private[default] object QueueHelper:
   def effectiveDepth(depth: Int): Int =
     if (1 << bitWidth(depth)) == depth then depth else depth + 2 - (depth % 2)
 
+  /** Convert a binary pointer to reflected Gray code (`binary ^ (binary >> 1)`). */
   def binaryToGray(
     binary: Referable[UInt],
     width:  Int
@@ -37,6 +38,7 @@ private[default] object QueueHelper:
     val shifted = (false.B.asBits ## binary.asBits.bits(width - 1, 1)).asUInt
     (binary.asBits ^ shifted.asBits).asUInt
 
+  /** Convert reflected Gray code to binary using a prefix XOR from the most-significant bit. */
   def grayToBinary(
     gray:  Referable[UInt],
     width: Int
@@ -56,16 +58,23 @@ private[default] object QueueHelper:
 
 /** Compile-time geometry for mapping an arbitrary logical depth onto a power-of-two binary pointer space. */
 private[default] final case class PointerGeometry(depth: Int):
+  // The pointer width must represent both every occupancy value through `depth` and the physical RAM address range.
   val addressWidth: Int = QueueHelper.bitWidth(depth)
   val pointerWidth: Int = QueueHelper.bitWidth(depth + 1)
 
+  // Center the largest permitted pointer modulus in the binary ring; leftOverCount is the reserved span skipped at
+  // wraparound. Power-of-two depths consume the ring naturally and leave no reserved span.
   val realLeftOver:  Int = (1 << pointerWidth) - depth
   val modulus:       Int =
     if realLeftOver == depth then depth * 2 else depth + 2 - (depth % 2)
   val leftOverCount: Int = (1 << pointerWidth) - modulus
-  val shift:         Int =
+
+  // Factor the reserved span as `residual << shift`. The controller corrects only the high portion of occupancy and
+  // preserves the low `shift` bits, matching the reference arithmetic structure.
+  val shift:    Int =
     if leftOverCount == 0 then 0 else Integer.numberOfTrailingZeros(leftOverCount)
-  val residual:      Int =
+  val residual: Int =
     if shift == 0 then leftOverCount else leftOverCount >> shift
 
+  // The exact half-ring case already represents a power-of-two logical depth and needs no address/count remapping.
   val needsCorrection: Boolean = leftOverCount != 0 && realLeftOver != depth

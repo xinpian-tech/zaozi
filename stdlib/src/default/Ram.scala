@@ -7,10 +7,21 @@ import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-case class RamParameter(width: Int, depth: Int, asyncReset: Boolean, resetMem: Boolean) extends Parameter:
+/** Register-backed single-write-port RAM configuration. */
+case class RamParameter(
+  /** Number of bits stored in each RAM entry. */
+  width:      Int,
+  /** Number of addressable RAM entries. */
+  depth:      Int,
+  /** Use asynchronous active-low reset when true, or synchronous active-low reset when false. */
+  asyncReset: Boolean,
+  /** Reset all RAM entries to zero when true; otherwise storage has no reset behavior. */
+  resetMem:   Boolean)
+    extends Parameter:
   require(width >= 1 && width <= 2048, s"Ram width must be 1..2048, got $width")
   require(depth >= 2 && depth <= 1024, s"Ram depth must be 2..1024, got $depth")
 
+  /** Number of bits used by the read and write addresses. */
   def addressWidth: Int = math.max(1, Integer.SIZE - Integer.numberOfLeadingZeros(depth - 1))
 
 given upickle.default.ReadWriter[RamParameter] = upickle.default.macroRW
@@ -19,14 +30,29 @@ class RamLayers(parameter: RamParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
 class RamIO(parameter: RamParameter) extends HWBundle(parameter):
-  val clock        = Flipped(Clock())
-  val resetN       = Flipped(Reset())
-  val chipSelectN  = Flipped(Bool())
-  val writeN       = Flipped(Bool())
-  val readAddress  = Flipped(UInt(parameter.addressWidth))
+  /** Clock used for writes and optional storage reset. */
+  val clock = Flipped(Clock())
+
+  /** Active-low reset used only when `resetMem` is enabled. */
+  val resetN = Flipped(Reset())
+
+  /** Active-low qualifier for writes. */
+  val chipSelectN = Flipped(Bool())
+
+  /** Active-low write enable. */
+  val writeN = Flipped(Bool())
+
+  /** Address selected by the combinational read port. */
+  val readAddress = Flipped(UInt(parameter.addressWidth))
+
+  /** Address written on the active clock edge. */
   val writeAddress = Flipped(UInt(parameter.addressWidth))
-  val readData     = Aligned(UInt(parameter.width))
-  val writeData    = Flipped(UInt(parameter.width))
+
+  /** Combinational data from `readAddress`. */
+  val readData = Aligned(UInt(parameter.width))
+
+  /** Data written when both `chipSelectN` and `writeN` are low. */
+  val writeData = Flipped(UInt(parameter.width))
 
 class RamProbe(parameter: RamParameter) extends DVBundle[RamParameter, RamLayers](parameter)
 
