@@ -16,7 +16,7 @@
 
 每个生成器发布一个 `GeneratorId` 和 `FullParam` codec；codec 提供 schema、规范化编码与解码。完整的 `GeneratorId` 确定生成器实现和 codec schema（@sec-dedup）。
 
-`GeneratorId`、`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器登记到生成器注册表，注册表将 `GeneratorId` 映射到 `GeneratorEntry`。同一 `GeneratorId` 的所有模块引用同一个条目；两个条目使用相同 `GeneratorId` 而生成器实现或 codec 不同时报告 N10。
+`GeneratorId`、`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器登记到生成器注册表，注册表将 `GeneratorId` 映射到 `GeneratorEntry`。同一 `GeneratorId` 的所有模块引用同一个条目；两个条目使用相同 `GeneratorId` 而生成器实现或 codec 不同时报告生成器标识冲突（@sec-error-semantics）。
 
 `ResolvedGeneratorModule.entry` 确定完整参数的类型，`fullParam` 采用该条目的 `FullParam`。记录按模块的层次树先序存入 `ResolvedDesign`。例化从条目取得生成器，参数导出从同一条目取得 codec。
 
@@ -60,13 +60,13 @@
 
 `dvSources` 与 `dvSinks` 声明验证端点（@sec-dv-declarations）。解析后的条目由 `VerificationView` 按声明顺序提供，并经 `computeProtocolParam` 进入完整参数；字段契约见 @sec-generator-records。
 
-每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在结构校验中报告 N9。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
+每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在声明处当场报错（@sec-error-semantics）。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
 
 #决策([端口结构校验在例化期进行])[
   生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input，探针源为 Output，探针汇为 Input；字段名称、顺序和 `flip`，`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、bind 的源码位置（`SourceLocation`）以及期望结构与实际结构的差异路径。
 ] <dec-binding-check>
 
-端口失配属于 `ElaborationError`，与 @sec-error-semantics 定义的 `NegotiationError` 分开报告。
+端口失配在实施阶段报出，与 @sec-error-semantics 的协商错误分属不同异常。
 
 == 例化流程 <sec-elaboration-flow>
 
