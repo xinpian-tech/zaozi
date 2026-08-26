@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Txn, UT}
+import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -93,11 +93,16 @@ object HavenSpiUT
 
     Assume((!io.reset.asBool).I, "rst_low")
 
-    // ¬C: no Wishbone write of 0xA5 to the data register (adr 2) ever completes — a *completed* write means the
-    // request (cyc∧stb∧we, address, data) is still held on the cycle ack rises, i.e. the FIFO-push condition.
-    val hit = instance.io.ack_o & io.A.bit(0) & io.A.bit(1) & io.A.bit(4) &
-      (io.A.bits(3, 2) === 2.U(2).asBits) & (io.A.bits(12, 5) === 165.U(8).asBits)
-    Assert((!hit).I, "gen_spi_write_a5")
+    // C as typed value ∧ state semantics: the held write request (value — the driven Wishbone fields) meets the
+    // design's acknowledgement (state — the registered ack). A *completed* write means the request is still held
+    // on the cycle ack rises, i.e. the FIFO-push condition.
+    Generate(
+      Sem.value(
+        io.A.bit(0) & io.A.bit(1) & io.A.bit(4) &
+          (io.A.bits(3, 2) === 2.U(2).asBits) & (io.A.bits(12, 5) === 165.U(8).asBits)
+      ) && Sem.state(instance.io.ack_o),
+      "gen_spi_write_a5"
+    )
 
     val probe = summon[ProbeInterface[HavenSpiUTProbe]]
     layer("Verification"):

@@ -25,62 +25,82 @@ object Generated extends UTExperiment:
     UTCli.generateReport(<YourUT>, <ItsParameter>, bound = <cycles to unroll>, outDir)
 ```
 
-## Expressing a constraint
+## Expressing a constraint: the four typed semantic kinds
 
-A constraint C ("what the generated stimulus must satisfy") is stated as its negation: `Assert(!C)` in the module
-body. The solver's counterexample IS a stimulus satisfying C. Rules that matter:
-
-- The `Assert` carrying ¬C goes in the module **body**, never inside `layer("Verification"){}` — layers hold
-  observation plumbing and are stripped from the formal model.
-- A UT module `extends Generator[...] with UT[...]`, wraps its DUT via `<DUT>.instantiate(parameter)`, passes IO
-  through, and re-exposes the DUT's probe inside the Verification layer (that part IS layered).
-- `bound` must cover the cycles the constraint needs (a k-beat relation needs bound ≥ k+1).
-
-### Value constraints (single beat)
+Verification intent is written as a typed `Sem.Intent` — four kinds of meaning, composed with `&&`, lowered by
+`Generate(intent, label)` in the module **body** (never inside `layer("Verification"){}` — layers are stripped from
+the formal model). The solver's counterexample IS a stimulus satisfying the whole intent. Composition uses
+fire-cycle semantics: value/relation/state conjuncts hold at the cycle the scenario fires; each temporal sequence
+matches forward from that cycle.
 
 ```scala
-// C = "A is odd" — asserted as ¬C:
-Assert((!io.A.bit(0)).I, "gen_a_odd")
+Generate(
+  Sem.value(...)                 // 值语义: predicate over the driven object's fields
+    && Sem.relation(w) { w => ... } // 关系语义: relates different beats, from a declared window
+    && Sem.state(...)            // 状态语义: predicate over design state (DUT outputs / status)
+    && Sem.temporal(...),        // 时序语义: clocked SVA sequence (needs `given ClockEvent`)
+  "label"
+)
 ```
-`.I` marks an immediate (combinational) assertion. Comparisons: `===`, `>`/`<` (via `.asSInt`/`.asUInt`),
-bit access `.bit(i)` / `.bits(hi, lo)`, boolean `!`, `&`, `|`.
 
-### Temporal constraints (patterns across cycles)
+### Value semantics (值) — one object's fields
 
 ```scala
-given ClockEvent = posedge(io.clock)
-val beat = (io.A === three).S ### (io.A === five).S   // ### = SVA ##1 (next cycle); ## = same-cycle fusion
-Assert(!beat, "gen_two_beat")                          // ¬C over the clocked sequence
+Generate(Sem.value(io.A.bit(0)), "gen_a_odd")   // C = "A is odd"
 ```
-`.S` lifts a boolean to a clocked sequence atom; combinators: `###` (1-cycle delay concat), `##(n)`, `*` (repeat),
-`|->` (implication), `throughout`, `until`, `iff`.
+Comparisons: `===`, `>`/`<` (via `.asSInt`/`.asUInt`), bit access `.bit(i)` / `.bits(hi, lo)`, boolean `!`, `&`, `|`.
 
-### Cross-transaction constraints (relations between beats)
+### Relation semantics (关系) — between different beats
 
 ```scala
 given ClockScope = ClockScope.posedge(io.clock)
 given ResetScope = ResetScope.syncActiveHigh(io.reset)
-val (hist, beats) = Txn.history(io.A, width, 2)        // hist(0) = 1 beat ago, hist(1) = 2 beats ago
-val window   = beats === 2.U(2)                        // guard: the whole window is real history
-val distinct = !(hist(1) === hist(0)) & !(hist(1) === io.A) & !(hist(0) === io.A)
-val sum3     = (hist(1).asUInt + hist(0).asUInt + io.A.asUInt).asBits.bits(width - 1, 0)
-Assert((!(window & distinct & (sum3 === 12.U(width).asBits))).I, "gen_three_distinct_sum12")
+val w = Txn.window(io.A, width, 2)              // w.past(1) = previous beat, w.past(2) = two back
+Generate(
+  Sem.relation(w) { w =>
+    val distinct = !(w.past(2) === w.past(1)) & !(w.past(2) === io.A) & !(w.past(1) === io.A)
+    val sum3     = (w.past(2).asUInt + w.past(1).asUInt + io.A.asUInt).asBits.bits(width - 1, 0)
+    distinct & (sum3 === 12.U(width).asBits)
+  },
+  "gen_three_distinct_sum12"
+)
 ```
+The window's reality guard is conjoined automatically — a relation can never fire on fake history. `w.past(i)`
+outside the declared depth is rejected.
+
+### Temporal semantics (时序) — ordering between events
+
+```scala
+given ClockEvent = posedge(io.clock)
+Generate(Sem.temporal((io.A === three).S ### (io.A === five).S), "gen_two_beat")
+```
+`.S` lifts a boolean to a clocked sequence atom (a `ClockEvent` must be in scope — an unclocked temporal constraint
+does not compile); combinators: `###` (SVA ##1), `##(n)`, `*` (repeat), `|->`, `throughout`, `until`, `iff`.
+
+### State semantics (状态) — conditions on design state
+
+```scala
+Generate(Sem.state(instance.io.done & (instance.io.result === 48879.U(32).asBits)), "gen_alu_xor_beef")
+```
+References the DUT's outputs, probes, or status registers — what the design has *become*, not what is driven.
 
 ### Constraints through an external SystemVerilog IP
 
-Wrap the IP as a `VerilogWrapper` (see `stdlib/src/ExtAccumUT.scala`), instantiate it in the UT, and state the
-relation over its outputs. In a sequential UT also add `Assume((!io.reset.asBool).I, "rst_low")` so the model
-tracks the post-reset run.
+Wrap the IP as a `VerilogWrapper` (see `stdlib/src/ExtAccumUT.scala`), instantiate it in the UT, and state
+value/state semantics over its ports. In a sequential UT add `Assume((!io.reset.asBool).I, "rst_low")` and feed
+`Txn.firstCycle()` into the IP's reset so it initializes itself. `bound` must cover the cycles the intent needs
+(a k-beat relation needs bound ≥ k+1).
 
 ## Worked examples (all in-tree, all green)
 
-| Constraint class | UT module | Test |
+| Semantic kinds | UT module | Test |
 |---|---|---|
 | value | `stdlib/src/AbsValOddUT.scala` | `AbsValFormalGenTest` |
 | temporal | `stdlib/src/TwoBeatUT.scala` | `TwoBeatFormalGenTest` |
-| cross-transaction | `stdlib/src/AccumUT.scala` | `AccumFormalGenTest` |
-| external SV IP | `stdlib/src/ExtAccumUT.scala` | `ExtAccumFormalGenTest` |
+| relation | `stdlib/src/AccumUT.scala` | `AccumFormalGenTest` |
+| **all four composed** | `stdlib/src/SemAccumUT.scala` | `SemAccumFormalGenTest` |
+| state, through an external SV IP | `stdlib/src/ExtAccumUT.scala`, `HavenAluUT.scala` | `ExtAccumFormalGenTest`, `HavenAluFormalGenTest` |
+| value ∧ state on a bus protocol | `stdlib/src/HavenSpiUT.scala` | `HavenSpiFormalGenTest` |
 
 ## Result semantics
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Txn, UT}
+import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -68,13 +68,17 @@ object AccumUT
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    // ¬C in the module body: hist(1) is the beat two cycles back, hist(0) one cycle back, io.A the current one.
-    val (hist, beats) = Txn.history(io.A, parameter.width, 2)
-    val window        = beats === 2.U(2)
-    val distinct      = !(hist(1) === hist(0)) & !(hist(1) === io.A) & !(hist(0) === io.A)
-    val sum3          = (hist(1).asUInt + hist(0).asUInt + io.A.asUInt).asBits.bits(parameter.width - 1, 0)
-    val sumIs12       = sum3 === 12.U(parameter.width).asBits
-    Assert((!(window & distinct & sumIs12)).I, "gen_three_distinct_sum12")
+    // C as typed relation semantics: the three beats (two past, one current) are pairwise distinct and sum to
+    // 12 — the window's reality guard is conjoined automatically.
+    val w = Txn.window(io.A, parameter.width, 2)
+    Generate(
+      Sem.relation(w) { w =>
+        val distinct = !(w.past(2) === w.past(1)) & !(w.past(2) === io.A) & !(w.past(1) === io.A)
+        val sum3     = (w.past(2).asUInt + w.past(1).asUInt + io.A.asUInt).asBits.bits(parameter.width - 1, 0)
+        distinct & (sum3 === 12.U(parameter.width).asBits)
+      },
+      "gen_three_distinct_sum12"
+    )
 
     val probe = summon[ProbeInterface[AccumUTProbe]]
     layer("Verification"):

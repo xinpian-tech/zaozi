@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.UT
+import me.jiuyang.utlib.{Generate, Sem, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.ltltpe.*
@@ -74,11 +74,10 @@ object TwoBeatUT
     val three = 3.U(parameter.width).asBits
     val five  = 5.U(parameter.width).asBits
 
-    // ¬C in the module body (a layered assert would be pruned on the formal path): the two-beat pattern never
-    // occurs — its BMC violation is a trace containing A==3 followed by A==5.
+    // C as typed temporal semantics: the two-beat pattern A==3 then A==5. (In the module body — a layered
+    // assert would be pruned on the formal path.)
     given ClockEvent = posedge(io.clock)
-    val beat         = (io.A === three).S ### (io.A === five).S
-    Assert(!beat, "gen_two_beat")
+    Generate(Sem.temporal((io.A === three).S ### (io.A === five).S), "gen_two_beat")
 
     val probe = summon[ProbeInterface[TwoBeatUTProbe]]
     layer("Verification"):

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.UT
+import me.jiuyang.utlib.{Generate, Sem, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -85,9 +85,8 @@ object HavenAluUT
 
     Assume((!io.reset.asBool).I, "rst_low")
 
-    // ¬C: the ALU never completes with 0xBEEF.
-    val hit = instance.io.done & (instance.io.result === 48879.U(32).asBits)
-    Assert((!hit).I, "gen_alu_xor_beef")
+    // C as typed state semantics: the ALU's completion state — done with result 0xBEEF.
+    Generate(Sem.state(instance.io.done & (instance.io.result === 48879.U(32).asBits)), "gen_alu_xor_beef")
 
     val probe = summon[ProbeInterface[HavenAluUTProbe]]
     layer("Verification"):

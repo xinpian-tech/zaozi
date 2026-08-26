@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.UT
+import me.jiuyang.utlib.{Generate, Sem, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*

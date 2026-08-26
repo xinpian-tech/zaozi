@@ -79,3 +79,36 @@ object Txn:
     val next  = (beats + 1.U(cw)).asBits.bits(cw - 1, 0).asUInt
     beats := ((beats === depth.U(cw)) ? (beats, next))
     (hist, beats)
+
+  /** The typed view [[Sem.relation]] draws from: `past(1)` is the previous beat, `past(depth)` the oldest, and
+    * `ready` is the reality guard — high once every slot holds a real beat.
+    */
+  final class TxnWindow private[utlib] (
+    hist:                        Seq[Referable[Bits]],
+    val depth:                   Int,
+    private[utlib] val readyRef: Referable[Bool]):
+    def past(i: Int): Referable[Bits] =
+      require(i >= 1 && i <= depth, s"past($i) is outside the declared window depth $depth")
+      hist(i - 1)
+    def ready: Referable[Bool] = readyRef
+
+  /** Declare a `depth`-beat window over `sig` — the capture machinery of [[history]] behind a typed accessor. */
+  def window(
+    sig:   Referable[Bits],
+    width: Int,
+    depth: Int
+  )(
+    using ClockScope,
+    ResetScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): TxnWindow =
+    val (hist, beats) = history(sig, width, depth)
+    val cw            = 32 - Integer.numberOfLeadingZeros(depth)
+    new TxnWindow(hist, depth, beats === depth.U(cw))
