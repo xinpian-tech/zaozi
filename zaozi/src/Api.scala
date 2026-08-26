@@ -1027,7 +1027,8 @@ trait GetLength[E <: Data, V <: Vec[E]]:
     ): Int
 
 trait BitsApi
-    extends AsSInt[Bits]
+    extends AsBits[Bits]
+    with AsSInt[Bits]
     with AsUInt[Bits]
     with AsBool[Bits]
     with AsBundle[Bits]

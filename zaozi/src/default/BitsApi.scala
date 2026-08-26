@@ -41,6 +41,16 @@ import java.lang.foreign.Arena
 
 given BitsApi with
   extension [LHS <: Referable[Bits]](ref: LHS)
+    def asBits(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Propagated[LHS, Bits] = propagate[LHS, Bits](ref, ref.getType, ref.refer)
+
     def asSInt(
       using Arena,
       Context,
