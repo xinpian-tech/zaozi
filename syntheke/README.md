@@ -24,7 +24,7 @@ branch `init`, `doc/design/`, Chinese). Correspondence:
 | 协议接口 (`ProtocolBundle`, `InterfacePath`, `LayerPath`) | `Interface.scala` |
 | 协议对象 (`Protocol`, `DVProtocol`, `Codec`, `render`) | `Protocol.scala` |
 | 构建阶段 (`DesignSpec`, 模块与节点规格) | `Spec.scala`, `Builder.scala`, `Dsl.scala` |
-| 协商算法（结构校验、稳定拓扑序、双向传播、逐边求解、`EdgeView`、N1–N10） | `Negotiator.scala` |
+| 协商算法（结构校验、稳定拓扑序、双向传播、逐边求解、`EdgeView`、遇错即抛） | `Negotiator.scala` |
 | 跨层端口规划、端口命名、FIRRTL 层 | `Planner.scala` |
 | 已求解记录 (`ResolvedDesign`, `ResolvedEdge`, `EdgeView`, …) | `Resolved.scala` |
 | 模块身份与去重 (@sec-dedup 结构键、模块命名) | `Dedup.scala` |
@@ -52,15 +52,13 @@ Deviations from the document's surface syntax:
 import me.jiuyang.syntheke.*
 
 val spec = Design {
-  var out: OutwardNodeBuilder[Wid.type] = null
-  var in:  InwardNodeBuilder[Wid.type]  = null
-  generator("prod", prodEntry) {
-    out = outward(Wid)("out").dFn(_ => Right(32))
+  val out = generator("prod", prodEntry) {
     parametersConst(0)
+    outward(Wid)("out").dFn(_ => Right(32))
   }
-  generator("cons", consEntry) {
-    in = inward(Wid)("in").uFn(_ => Right(64))
+  val in  = generator("cons", consEntry) {
     parametersConst(0)
+    inward(Wid)("in").uFn(_ => Right(64))
   }
   in <-- out
 }

@@ -204,27 +204,23 @@ object DvVerilogSpec extends TestSuite:
     )
 
   def buildDesign(): DesignSpec =
-    var srcOut: OutwardNodeBuilder[Wid.type] = null
-    var memIn:  InwardNodeBuilder[Wid.type]  = null
-    var rob:    DVSourceRef[Trace.type]      = null
-    var lsu:    DVSourceRef[Trace.type]      = null
-    var taps:   DVSinkRef[Trace.type]        = null
     Design {
-      wrapper("cluster") {
+      val (srcOut, rob, lsu) = wrapper("cluster") {
         generator("src", srcEntry) {
-          srcOut = outward(Wid)("mem").dFn(_ => Right(32))
-          rob = dvSource(Trace)("rob", 8, layerCosim)
-          lsu = dvSource(Trace)("lsu", 4, layerCosim)
+          val out = outward(Wid)("mem").dFn(_ => Right(32))
+          val rob = dvSource(Trace)("rob", 8, layerCosim)
+          val lsu = dvSource(Trace)("lsu", 4, layerCosim)
           parameters(stubParams("Src"))(identity)
+          (out, rob, lsu)
         }
       }
-      generator("mem", memEntry) {
-        memIn = inward(Wid)("in").uFn(_ => Right(64))
+      val memIn              = generator("mem", memEntry) {
         parameters(stubParams("Mem"))(identity)
+        inward(Wid)("in").uFn(_ => Right(64))
       }
-      generator("cosim", snkEntry) {
-        taps = dvSink(Trace)("taps")
+      val taps               = generator("cosim", snkEntry) {
         parameters(stubParams("Cosim"))(identity)
+        dvSink(Trace)("taps")
       }
       memIn <-- srcOut
       taps <-- rob

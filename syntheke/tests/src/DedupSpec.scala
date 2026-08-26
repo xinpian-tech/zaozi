@@ -12,33 +12,34 @@ object DedupSpec extends TestSuite:
 
   /** Two identical clusters: each wraps one consumer with the same generator and full parameter. */
   def buildTwinSoc(sameParam: Boolean): DesignSpec =
-    var prodOut:  OutwardNodeBuilder[Wid.type] = null
-    var prodOut2: OutwardNodeBuilder[Wid.type] = null
-    var aIn:      InwardNodeBuilder[Wid.type]  = null
-    var bIn:      InwardNodeBuilder[Wid.type]  = null
     val consEntry = intEntry("Cons")
     val prodEntry = intEntry("Prod")
     Design {
-      generator("p0", prodEntry) {
-        prodOut = outward(Wid)("out").dFn(_ => Right(32))
-        parametersConst(0)
-      }
-      generator("p1", prodEntry) {
-        prodOut2 = outward(Wid)("out").dFn(_ => Right(32))
-        parametersConst(0)
-      }
-      wrapper("clusterA") {
-        generator("cons", consEntry) {
-          aIn = inward(Wid)("in").uFn(_ => Right(64))
-          parametersConst(7)
+      def producer(
+        name: String
+      )(
+        using WrapperScope
+      ) =
+        generator(name, prodEntry) {
+          parametersConst(0)
+          outward(Wid)("out").dFn(_ => Right(32))
         }
-      }
-      wrapper("clusterB") {
-        generator("cons", consEntry) {
-          bIn = inward(Wid)("in").uFn(_ => Right(64))
-          parametersConst(if sameParam then 7 else 8)
+      def cluster(
+        name: String,
+        fp:   Int
+      )(
+        using WrapperScope
+      ) =
+        wrapper(name) {
+          generator("cons", consEntry) {
+            parametersConst(fp)
+            inward(Wid)("in").uFn(_ => Right(64))
+          }
         }
-      }
+      val prodOut  = producer("p0")
+      val prodOut2 = producer("p1")
+      val aIn      = cluster("clusterA", 7)
+      val bIn      = cluster("clusterB", if sameParam then 7 else 8)
       aIn <-- prodOut
       bIn <-- prodOut2
     }

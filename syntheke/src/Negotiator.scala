@@ -2,7 +2,12 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke
 
-import scala.collection.mutable
+import scala.collection.immutable.SortedSet
+
+/** Thrown by [[Negotiator.negotiate]] at the first error found. The message states the problem directly, with the
+  * stable identifiers of the subjects, the relevant source locations, and parameter snapshots where applicable (doc @sec-error-semantics).
+  */
+final class NegotiationException(message: String) extends RuntimeException(message)
 
 /** The Negotiate phase (doc @ch-negotiation).
   *
@@ -10,9 +15,11 @@ import scala.collection.mutable
   * forward propagation and `Up` backward propagation, per-edge and per-sink settlement, cross-protocol reference
   * resolution, [[EdgeView]] assembly, generator parameter computation, and cross-hierarchy planning.
   *
-  * Fail fast: the first error found is thrown as a [[NegotiationException]] on the spot (doc @sec-error-semantics).
-  * Protocol and port parameter functions still report conflicts as values (`Left`); the negotiator turns them into the
-  * throw. Exceptions escaping user code are bugs in that code and propagate untouched.
+  * Fail fast: the first error found is thrown as a [[NegotiationException]] on the spot. Protocol and port parameter
+  * functions still report conflicts as values (`Left`); the negotiator turns them into the throw. Exceptions escaping
+  * user code are bugs in that code and propagate untouched. Checks live only where the builder and the type system
+  * cannot reach: name uniqueness, dependency well-formedness and reference targets are enforced at declaration; bind
+  * ends share one protocol object by construction.
   */
 object Negotiator:
 
@@ -32,7 +39,10 @@ object Negotiator:
       layerDecls = layers
     )
 
-  private def fail(error: NegotiationError): Nothing = throw NegotiationException(error)
+  private def fail(message: String): Nothing = throw NegotiationException(message)
+
+  private def at(locs: SourceLocation*):        String = locs.map(_.show).mkString(", ")
+  private def at(locs: Vector[SourceLocation]): String = locs.map(_.show).mkString(", ")
 
   // ============ pass 1: structural check and stable topological order ============
 
@@ -41,143 +51,38 @@ object Negotiator:
 
   private def structuralCheck(spec: DesignSpec): TopoOrder =
     // Protocol registry: one ProtocolId — one object (by reference, matching registration); kind must match the
-    // object's flavor (N1).
+    // object's flavor.
     spec.protocols.groupBy(_._1).foreach { (pid, regs) =>
       val objects = regs.map(_._2)
       if objects.exists(o => !(o eq objects.head)) then
-        fail(
-          NegotiationError.ProtocolMismatch(
-            s"protocol id ${pid.show} declared by ${regs.size} distinct protocol objects",
-            Vector(pid),
-            Vector.empty,
-            Vector.empty
-          )
-        )
+        fail(s"protocol id ${pid.show} declared by ${regs.size} distinct protocol objects")
     }
     spec.protocols.foreach { (pid, obj) =>
       val kindOk = obj match
         case _: Protocol   => pid.kind == ProtocolKind.Design
         case _: DVProtocol => pid.kind == ProtocolKind.Verification
         case _ => false
-      if !kindOk then
-        fail(
-          NegotiationError.ProtocolMismatch(
-            s"protocol ${pid.show} has kind ${pid.kind} inconsistent with its object flavor",
-            Vector(pid),
-            Vector.empty,
-            Vector.empty
-          )
-        )
+      if !kindOk then fail(s"protocol ${pid.show} has kind ${pid.kind} inconsistent with its object flavor")
     }
 
-    // Generator registry: one GeneratorId — one entry (N10).
+    // Generator registry: one GeneratorId — one entry.
     spec.generators.groupBy(_.id).foreach { (gid, entries) =>
-      if entries.sizeIs > 1 then fail(NegotiationError.GeneratorConflict(gid, Vector.empty))
+      if entries.sizeIs > 1 then fail(s"generator id ${gid.show} declared by ${entries.size} distinct registry entries")
     }
 
-    // Names (N9): duplicate child instance names; duplicate node / endpoint names within a module.
-    spec.moduleOrder.map(spec.modules).foreach {
-      case w: WrapperModuleSpec   =>
-        w.children.groupBy(identity).foreach { (name, occurrences) =>
-          if occurrences.sizeIs > 1 then
-            fail(
-              NegotiationError.IllegalStructure(
-                s"duplicate child instance name '$name' in ${w.id.show}",
-                Vector((w.id / name).show),
-                Vector(w.loc)
-              )
-            )
-        }
-      case g: GeneratorModuleSpec =>
-        val names = g.nodes.map(n => n.name -> n.loc) ++ g.dvSources.map(s => s.name -> s.loc) ++
-          g.dvSinks.map(s => s.name -> s.loc)
-        names.groupBy(_._1).foreach { (name, occurrences) =>
-          if occurrences.sizeIs > 1 then
-            fail(
-              NegotiationError.IllegalStructure(
-                s"duplicate endpoint name '$name' in ${g.id.show}",
-                Vector(ModuleNodeId(g.id, name).show),
-                occurrences.map(_._2)
-              )
-            )
-        }
-    }
-
-    // Module-internal parameter dependencies (N9): endpoints must exist with the right directions; no duplicates.
-    spec.generatorModules.foreach { g =>
-      g.dependencies.foreach { d =>
-        if !g.node(d.from).exists(_.direction == NodeDirection.Inward) then
-          fail(
-            NegotiationError.IllegalStructure(
-              s"dependency source '${d.from}' of ${g.id.show} is not an inward node",
-              Vector(ModuleNodeId(g.id, d.from).show),
-              Vector(d.loc)
-            )
-          )
-        if !g.node(d.to).exists(_.direction == NodeDirection.Outward) then
-          fail(
-            NegotiationError.IllegalStructure(
-              s"dependency target '${d.to}' of ${g.id.show} is not an outward node",
-              Vector(ModuleNodeId(g.id, d.to).show),
-              Vector(d.loc)
-            )
-          )
-      }
-      g.dependencies.groupBy(d => (d.from, d.to)).foreach { (pair, occurrences) =>
-        if occurrences.sizeIs > 1 then
-          fail(
-            NegotiationError.IllegalStructure(
-              s"duplicate parameter dependency ${pair._1} -> ${pair._2} in ${g.id.show}",
-              Vector(ModuleNodeId(g.id, pair._1).show, ModuleNodeId(g.id, pair._2).show),
-              occurrences.map(_.loc)
-            )
-          )
-      }
-    }
-
-    // Design binds (N4, N1).
+    // Design binds : endpoint existence (builders can leak across Design builds), declaration-site ancestry,
+    // and the exactly-once discipline. Directions and protocol equality hold by construction.
     spec.binds.foreach { b =>
-      val source = spec.nodeSpec(b.source)
-      val target = spec.nodeSpec(b.target)
-      if !source.exists(_.direction == NodeDirection.Outward) then
-        fail(
-          NegotiationError.IllegalBind(
-            s"bind source ${b.source.show} is not an existing outward node",
-            Vector(b.source),
-            Vector(b.bindId),
-            Vector(b.loc)
-          )
-        )
-      if !target.exists(_.direction == NodeDirection.Inward) then
-        fail(
-          NegotiationError.IllegalBind(
-            s"bind target ${b.target.show} is not an existing inward node",
-            Vector(b.target),
-            Vector(b.bindId),
-            Vector(b.loc)
-          )
-        )
+      if spec.nodeSpec(b.source).isEmpty then
+        fail(s"bind source ${b.source.show} is not a node of this design, at ${at(b.loc)}")
+      if spec.nodeSpec(b.target).isEmpty then
+        fail(s"bind target ${b.target.show} is not a node of this design, at ${at(b.loc)}")
       if !(b.declaredIn.isAncestorOf(b.source.module) && b.declaredIn.isAncestorOf(b.target.module)) then
         fail(
-          NegotiationError.IllegalBind(
-            s"bind declared in ${b.declaredIn.show} which is not an ancestor of both endpoints",
-            Vector(b.source, b.target),
-            Vector(b.bindId),
-            Vector(b.loc)
-          )
-        )
-      if source.get.protocol.id != target.get.protocol.id then
-        fail(
-          NegotiationError.ProtocolMismatch(
-            s"bind endpoints use different protocols",
-            Vector(source.get.protocol.id, target.get.protocol.id),
-            Vector(b.source, b.target),
-            Vector(b.loc)
-          )
+          s"bind ${b.source.show} -> ${b.target.show} declared in ${b.declaredIn.show}, " +
+            s"which is not an ancestor of both endpoints, at ${at(b.loc)}"
         )
     }
-
-    // Every outward node exactly once a bind source, every inward node exactly once a bind target (N4).
     val asSource = spec.binds.groupBy(_.source)
     val asTarget = spec.binds.groupBy(_.target)
     spec.generatorModules.foreach { g =>
@@ -189,17 +94,14 @@ object Negotiator:
         val count         = binds.fold(0)(_.size)
         if count != 1 then
           fail(
-            NegotiationError.IllegalBind(
-              s"${n.direction.toString.toLowerCase} node ${id.show} is the $role of $count binds, expected exactly 1",
-              Vector(id),
-              binds.fold(Vector.empty[BindId])(_.map(_.bindId)),
-              binds.fold(Vector(n.loc))(_.map(_.loc)) :+ n.loc
-            )
+            s"${n.direction.toString.toLowerCase} node ${id.show} is the $role of $count binds, " +
+              s"expected exactly 1, at ${at(binds.fold(Vector(n.loc))(_.map(_.loc)) :+ n.loc)}"
           )
       }
     }
 
-    // Verification topology (N8).
+    // Verification topology : endpoint existence, ancestry, and bind counts. Protocol equality holds by
+    // construction.
     val dvSourceSpecs = spec.generatorModules
       .flatMap(g => g.dvSources.map(s => DVSourceId(g.id, s.name) -> (g, s)))
       .toMap
@@ -208,144 +110,91 @@ object Negotiator:
       .toMap
     spec.dvBinds.foreach { b =>
       if !dvSourceSpecs.contains(b.source) then
-        fail(
-          NegotiationError.IllegalVerification(
-            s"probe source ${b.source.show} does not exist",
-            Vector(b.source),
-            Vector(b.sink),
-            Vector(b.loc)
-          )
-        )
+        fail(s"probe source ${b.source.show} is not an endpoint of this design, at ${at(b.loc)}")
       if !dvSinkSpecs.contains(b.sink) then
-        fail(
-          NegotiationError.IllegalVerification(
-            s"probe sink ${b.sink.show} does not exist",
-            Vector(b.source),
-            Vector(b.sink),
-            Vector(b.loc)
-          )
-        )
+        fail(s"probe sink ${b.sink.show} is not an endpoint of this design, at ${at(b.loc)}")
       if !(b.declaredIn.isAncestorOf(b.source.module) && b.declaredIn.isAncestorOf(b.sink.module)) then
         fail(
-          NegotiationError.IllegalVerification(
-            s"verification bind declared in ${b.declaredIn.show} which is not an ancestor of both endpoints",
-            Vector(b.source),
-            Vector(b.sink),
-            Vector(b.loc)
-          )
-        )
-      val src          = dvSourceSpecs(b.source)._2
-      val snk          = dvSinkSpecs(b.sink)._2
-      if src.protocol.id != snk.protocol.id then
-        fail(
-          NegotiationError.IllegalVerification(
-            s"probe source and sink use different protocols: ${src.protocol.id.show} vs ${snk.protocol.id.show}",
-            Vector(b.source),
-            Vector(b.sink),
-            Vector(b.loc, src.loc, snk.loc)
-          )
+          s"verification bind ${b.source.show} -> ${b.sink.show} declared in ${b.declaredIn.show}, " +
+            s"which is not an ancestor of both endpoints, at ${at(b.loc)}"
         )
       val sinkModule   = dvSinkSpecs(b.sink)._1
       val sourceModule = dvSourceSpecs(b.source)._1
       if !sinkModule.id.parent.exists(_.isStrictAncestorOf(sourceModule.id)) then
         fail(
-          NegotiationError.IllegalVerification(
-            s"parent of sink generator ${sinkModule.id.show} is not a strict ancestor of source module ${sourceModule.id.show}",
-            Vector(b.source),
-            Vector(b.sink),
-            Vector(b.loc)
-          )
+          s"parent of sink generator ${sinkModule.id.show} is not a strict ancestor of " +
+            s"source module ${sourceModule.id.show}, at ${at(b.loc)}"
         )
     }
-    // Each source exactly one bind; each sink at least one.
     val dvBySource    = spec.dvBinds.groupBy(_.source)
     dvSourceSpecs.foreach { (id, gs) =>
       val count = dvBySource.get(id).fold(0)(_.size)
       if count != 1 then
         fail(
-          NegotiationError.IllegalVerification(
-            s"probe source ${id.show} has $count verification binds, expected exactly 1",
-            Vector(id),
-            Vector.empty,
-            dvBySource.get(id).fold(Vector(gs._2.loc))(_.map(_.loc)) :+ gs._2.loc
-          )
+          s"probe source ${id.show} has $count verification binds, expected exactly 1, " +
+            s"at ${at(dvBySource.get(id).fold(Vector(gs._2.loc))(_.map(_.loc)) :+ gs._2.loc)}"
         )
     }
     val dvBySink      = spec.dvBinds.groupBy(_.sink)
     dvSinkSpecs.foreach { (id, gs) =>
-      if !dvBySink.contains(id) then
-        fail(
-          NegotiationError.IllegalVerification(
-            s"probe sink ${id.show} collects no probe source",
-            Vector.empty,
-            Vector(id),
-            Vector(gs._2.loc)
-          )
-        )
+      if !dvBySink.contains(id) then fail(s"probe sink ${id.show} collects no probe source, at ${at(gs._2.loc)}")
     }
 
-    // Stable topological sort of the Down DAG (N9 on cycles).
-    val preorder   = spec.moduleOrder.zipWithIndex.toMap
-    val nodeOrder  = mutable.Map.empty[ModuleNodeId, (Int, Int)]
-    val successors = mutable.Map.empty[ModuleNodeId, Vector[ModuleNodeId]].withDefaultValue(Vector.empty)
-    val indegree   = mutable.Map.empty[ModuleNodeId, Int].withDefaultValue(0)
-    val allNodes   = mutable.ArrayBuffer.empty[ModuleNodeId]
-    spec.generatorModules.foreach { g =>
-      g.nodes.foreach { n =>
-        val id = ModuleNodeId(g.id, n.name)
-        allNodes += id
-        nodeOrder(id) = (preorder(g.id), n.order)
-      }
-    }
-    def addEdge(from: ModuleNodeId, to: ModuleNodeId): Unit =
-      successors(from) = successors(from) :+ to
-      indegree(to) = indegree(to) + 1
-    spec.binds.foreach(b => addEdge(b.source, b.target))
-    spec.generatorModules.foreach { g =>
-      g.dependencies.foreach(d => addEdge(ModuleNodeId(g.id, d.from), ModuleNodeId(g.id, d.to)))
-    }
+    // Stable topological sort of the Down DAG; a cycle is an error. Kahn over immutable state, ties broken by module
+    // preorder then node declaration order.
+    val preorder = spec.moduleOrder.zipWithIndex.toMap
+    val nodeKey  = (
+      for g <- spec.generatorModules; n <- g.nodes
+      yield ModuleNodeId(g.id, n.name) -> (preorder(g.id), n.order)
+    ).toMap
+    val nodeIds  = nodeKey.keys.toVector
+    val edges    = spec.binds.map(b => b.source -> b.target) ++ (
+      for g <- spec.generatorModules; d <- g.dependencies
+      yield ModuleNodeId(g.id, d.from) -> ModuleNodeId(g.id, d.to)
+    )
 
-    given Ordering[ModuleNodeId] = Ordering.by(nodeOrder)
-    val ready                    = mutable.SortedSet.from(allNodes.filter(indegree(_) == 0))
-    val sorted                   = mutable.ArrayBuffer.empty[ModuleNodeId]
-    while ready.nonEmpty do
-      val n = ready.head
-      ready -= n
-      sorted += n
-      successors(n).foreach { s =>
-        indegree(s) = indegree(s) - 1
-        if indegree(s) == 0 then ready += s
-      }
-    if sorted.size < allNodes.size then
-      // Shrink to the cycles themselves: repeatedly strip nodes with no predecessor or no successor inside the
+    val successors   = edges.groupMap(_._1)(_._2).withDefaultValue(Vector.empty)
+    val predecessors = edges.groupMap(_._2)(_._1).withDefaultValue(Vector.empty)
+    val indegree     = nodeIds.map(id => id -> predecessors(id).size).toMap
+
+    given Ordering[ModuleNodeId] = Ordering.by(nodeKey)
+
+    @annotation.tailrec
+    def kahn(
+      ready: SortedSet[ModuleNodeId],
+      indeg: Map[ModuleNodeId, Int],
+      acc:   Vector[ModuleNodeId]
+    ): Vector[ModuleNodeId] =
+      ready.headOption match
+        case None    => acc
+        case Some(n) =>
+          val (indeg2, unblocked) = successors(n).foldLeft((indeg, Vector.empty[ModuleNodeId])) { case ((m, rs), s) =>
+            val c = m(s) - 1
+            (m.updated(s, c), if c == 0 then rs :+ s else rs)
+          }
+          kahn(ready - n ++ unblocked, indeg2, acc :+ n)
+
+    val sorted = kahn(SortedSet.from(nodeIds.filter(indegree(_) == 0)), indegree, Vector.empty)
+    if sorted.size < nodeIds.size then
+      // Shrink to the cycles themselves: drop nodes without both a predecessor and a successor inside the
       // remainder, so nodes merely blocked downstream of a cycle are not reported as part of it.
-      val sortedSet = sorted.toSet
-      var onCycle   = allNodes.filterNot(sortedSet).toSet
-      var changed   = true
-      while changed do
-        changed = false
-        onCycle.foreach { id =>
-          val hasSucc = successors(id).exists(onCycle)
-          val hasPred = onCycle.exists(p => successors(p).contains(id))
-          if !hasSucc || !hasPred then
-            onCycle -= id
-            changed = true
-        }
-      val members   = allNodes.filter(onCycle).toVector
-      val bindLocs  = spec.binds.filter(b => onCycle(b.source) && onCycle(b.target)).map(_.loc)
-      val depLocs   = spec.generatorModules.flatMap(g =>
-        g.dependencies
-          .filter(d => onCycle(ModuleNodeId(g.id, d.from)) && onCycle(ModuleNodeId(g.id, d.to)))
-          .map(_.loc)
-      )
-      fail(
-        NegotiationError.IllegalStructure(
-          s"parameter dependency graph has a cycle through ${members.map(_.show).mkString(", ")}",
-          members.map(_.show),
-          members.flatMap(id => spec.nodeSpec(id).map(_.loc)) ++ bindLocs ++ depLocs
+      @annotation.tailrec
+      def shrink(s: Set[ModuleNodeId]): Set[ModuleNodeId] =
+        val s2 = s.filter(id => successors(id).exists(s) && predecessors(id).exists(s))
+        if s2 == s then s else shrink(s2)
+      val onCycle = shrink(nodeIds.toSet -- sorted)
+      val members = nodeIds.filter(onCycle).sortBy(nodeKey)
+      val locs    = members.flatMap(id => spec.nodeSpec(id).map(_.loc)) ++
+        spec.binds.filter(b => onCycle(b.source) && onCycle(b.target)).map(_.loc) ++
+        spec.generatorModules.flatMap(g =>
+          g.dependencies
+            .filter(d => onCycle(ModuleNodeId(g.id, d.from)) && onCycle(ModuleNodeId(g.id, d.to)))
+            .map(_.loc)
         )
+      fail(
+        s"parameter dependency graph has a cycle through ${members.map(_.show).mkString(", ")}, at ${at(locs)}"
       )
-    TopoOrder(sorted.toVector)
+    TopoOrder(sorted)
 
   // ============ pass 2: Down forward propagation and Up backward propagation ============
 
@@ -369,49 +218,43 @@ object Negotiator:
         case NodeDirection.Inward  => g.dependencies.filter(_.from == name).map(d => (ModuleNodeId(g.id, d.to), d))
       deps.sortBy((n, _) => g.node(n.name).get.order)
 
-    def snapshot(reads: Vector[ModuleNodeId], values: ModuleNodeId => Any, downSide: Boolean): Vector[ujson.Value] =
-      reads.map { r =>
-        val p     = specOf(r).protocol
-        val codec = (if downSide then p.downCodec else p.upCodec).asInstanceOf[Codec[Any]]
-        codec.encode(values(r))
-      }
-
-    def evaluate(values: mutable.Map[ModuleNodeId, Any], id: ModuleNodeId, downSide: Boolean): Unit =
+    def evaluate(values: Map[ModuleNodeId, Any], id: ModuleNodeId, downSide: Boolean): Any =
       val n     = specOf(id)
       val reads = readsOf(id, n.direction)
-      val input = reads.map((r, _) => r -> values(r)).toMap
-      n.fn(input) match
-        case Right(v)        => values(id) = v
+      n.fn(reads.map((r, _) => r -> values(r)).toMap) match
+        case Right(v)        => v
         case Left(violation) =>
+          val snapshot = reads.map { (r, _) =>
+            val p     = specOf(r).protocol
+            val codec = (if downSide then p.downCodec else p.upCodec).asInstanceOf[Codec[Any]]
+            s"${r.show}=${ujson.write(codec.encode(values(r)))}"
+          }
           fail(
-            NegotiationError.PropagationFailed(
-              module = id.module,
-              node = id,
-              direction = n.direction,
-              deps = reads.map(_._1),
-              inputs = snapshot(reads.map(_._1), values, downSide),
-              violation = violation,
-              locs = n.loc +: reads.map(_._2.loc)
-            )
+            s"propagation failed at ${id.show} (${n.direction}): ${violation.message}; " +
+              s"inputs [${snapshot.mkString(", ")}], at ${at(n.loc +: reads.map(_._2.loc))}"
           )
 
     // Down: forward over the topological order. Outward nodes evaluate dFn; inward nodes receive along their bind.
-    val down = mutable.Map.empty[ModuleNodeId, Any]
-    order.nodes.foreach { id =>
-      specOf(id).direction match
-        case NodeDirection.Outward => evaluate(down, id, downSide = true)
-        case NodeDirection.Inward  => down(id) = down(bindOfTarget(id).source)
+    val down = order.nodes.foldLeft(Map.empty[ModuleNodeId, Any]) { (values, id) =>
+      values.updated(
+        id,
+        specOf(id).direction match
+          case NodeDirection.Outward => evaluate(values, id, downSide = true)
+          case NodeDirection.Inward  => values(bindOfTarget(id).source)
+      )
     }
 
     // Up: backward over the same order. Inward nodes evaluate uFn; outward nodes receive along their bind.
-    val up = mutable.Map.empty[ModuleNodeId, Any]
-    order.nodes.reverseIterator.foreach { id =>
-      specOf(id).direction match
-        case NodeDirection.Inward  => evaluate(up, id, downSide = false)
-        case NodeDirection.Outward => up(id) = up(bindOfSource(id).target)
+    val up = order.nodes.reverse.foldLeft(Map.empty[ModuleNodeId, Any]) { (values, id) =>
+      values.updated(
+        id,
+        specOf(id).direction match
+          case NodeDirection.Inward  => evaluate(values, id, downSide = false)
+          case NodeDirection.Outward => values(bindOfSource(id).target)
+      )
     }
 
-    Propagated(down.toMap, up.toMap)
+    Propagated(down, up)
 
   // ============ pass 3: per-edge settlement and per-sink verification settlement ============
 
@@ -426,14 +269,13 @@ object Negotiator:
       val up   = prop.up(b.target)
       p.asInstanceOf[Protocol { type Down = Any; type Up = Any }].negotiate(down, up) match
         case Left(violation) =>
-          fail(NegotiationError.SettleFailed(SettleSubject.Design(b.bindId), violation, Vector(b.loc)))
+          fail(s"settle failed at ${b.bindId.show}: ${violation.message}, at ${at(b.loc)}")
         case Right(edge)     =>
           val bundle = p.asInstanceOf[Protocol { type Edge = Any }].interfaceOf(edge)
           ResolvedEdge(b.bindId, p, down, up, edge, bundle)
     }
 
     // Per-sink verification settlement, in sink-module preorder then sink declaration order (doc @sec-determinism).
-    val preorder = spec.moduleOrder.zipWithIndex.toMap
     val sinkIds  = spec.generatorModules.flatMap(g => g.dvSinks.map(s => DVSinkId(g.id, s.name)))
     val bySink   = spec.dvBinds.groupBy(_.sink)
     val dvGroups = sinkIds.map { sinkId =>
@@ -446,14 +288,14 @@ object Negotiator:
       val layers   = sources.map(_.layer)
       val edge     = p.resolve(downs) match
         case Left(violation) =>
-          fail(NegotiationError.SettleFailed(SettleSubject.Verification(sinkId), violation, binds.map(_.loc)))
+          fail(s"settle failed at probe sink ${sinkId.show}: ${violation.message}, at ${at(binds.map(_.loc))}")
         case Right(edge)     => edge
       p.interfacesOf(edge, layers) match
         case Left(violation)   =>
-          fail(NegotiationError.SettleFailed(SettleSubject.Verification(sinkId), violation, binds.map(_.loc)))
+          fail(s"settle failed at probe sink ${sinkId.show}: ${violation.message}, at ${at(binds.map(_.loc))}")
         case Right(interfaces) =>
           checkDVInterfaces(interfaces, layers).foreach { detail =>
-            fail(NegotiationError.InterfaceViolation(detail, SettleSubject.Verification(sinkId), binds.map(_.loc)))
+            fail(s"interface violation at probe sink ${sinkId.show}: $detail, at ${at(binds.map(_.loc))}")
           }
           ResolvedDVGroup(sinkId, sinkSpec.protocol, binds.map(_.bindId), downs, layers, edge, interfaces)
     }
@@ -528,34 +370,13 @@ object Negotiator:
         val edge = n.direction match
           case NodeDirection.Outward => edgeOfSource(id)
           case NodeDirection.Inward  => edgeOfTarget(id)
+        // Reference targets are same-module existing nodes of the expected protocol by construction (builder).
         val refs = n.refs.map { r =>
-          val targetSpec = if r.target.module == g.id then g.node(r.target.name) else None
-          targetSpec match
-            case None     =>
-              fail(
-                NegotiationError.ReferenceFailed(
-                  s"reference target does not exist in ${g.id.show}",
-                  id,
-                  r.target,
-                  r.expectedProtocol,
-                  Vector(r.loc)
-                )
-              )
-            case Some(ts) =>
-              if ts.protocol.id != r.expectedProtocol then
-                fail(
-                  NegotiationError.ReferenceFailed(
-                    s"reference target protocol is ${ts.protocol.id.show}",
-                    id,
-                    r.target,
-                    r.expectedProtocol,
-                    Vector(r.loc)
-                  )
-                )
-              val targetEdge = ts.direction match
-                case NodeDirection.Outward => edgeOfSource(r.target)
-                case NodeDirection.Inward  => edgeOfTarget(r.target)
-              ResolvedProtocolReference(r.refName, id, r.target, ts.protocol, targetEdge.edge)
+          val ts         = g.node(r.target.name).get
+          val targetEdge = ts.direction match
+            case NodeDirection.Outward => edgeOfSource(r.target)
+            case NodeDirection.Inward  => edgeOfTarget(r.target)
+          ResolvedProtocolReference(r.refName, id, r.target, ts.protocol, targetEdge.edge)
         }
         NodeView(id, n.direction, edge, refs)
       }
@@ -576,7 +397,7 @@ object Negotiator:
       val view = EdgeView(g.id, nodeViews, VerificationView(sourceViews, sinkViews))
       g.computeProtocolParam(view) match
         case Left(violation) =>
-          fail(NegotiationError.CapabilityExceeded(g.id, violation, Vector(g.loc)))
+          fail(s"capability exceeded at ${g.id.show}: ${violation.message}, at ${at(g.loc)}")
         case Right(pp)       =>
           val fp      = g.combine(pp)
           val encoded = g.entry.fullParamCodec.asInstanceOf[Codec[Any]].encode(fp)

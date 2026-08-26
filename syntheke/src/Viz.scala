@@ -25,8 +25,7 @@ object Viz:
       resolved.spec,
       edgeLabel = bind =>
         byBind.get(bind).map { e =>
-          val rendered = e.protocol.asInstanceOf[Protocol { type Edge = Any }].render(e.edge)
-          rendered.label
+          e.protocol.asInstanceOf[Protocol { type Edge = Any }].render(e.edge).label
         }
     )
 
@@ -38,36 +37,40 @@ object Viz:
 
   private def graphmlImpl(spec: DesignSpec, byBind: Map[BindId, ResolvedEdge]): String =
     def esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
-    val out            = new StringBuilder
-    out ++= """<?xml version="1.0" encoding="UTF-8"?>""" + "\n"
-    out ++= """<graphml xmlns="http://graphml.graphdrawing.org/xmlns">""" + "\n"
-    out ++= """  <key id="module" for="node" attr.name="module" attr.type="string"/>""" + "\n"
-    out ++= """  <key id="name" for="node" attr.name="name" attr.type="string"/>""" + "\n"
-    out ++= """  <key id="direction" for="node" attr.name="direction" attr.type="string"/>""" + "\n"
-    out ++= """  <key id="kind" for="edge" attr.name="kind" attr.type="string"/>""" + "\n"
-    out ++= """  <key id="label" for="edge" attr.name="label" attr.type="string"/>""" + "\n"
-    out ++= """  <graph id="design" edgedefault="directed">""" + "\n"
-    spec.generatorModules.foreach { g =>
-      g.nodes.foreach { n =>
-        out ++= s"""    <node id="${esc(ModuleNodeId(g.id, n.name).show)}">""" + "\n"
-        out ++= s"""      <data key="module">${esc(g.id.show)}</data>""" + "\n"
-        out ++= s"""      <data key="name">${esc(n.name)}</data>""" + "\n"
-        out ++= s"""      <data key="direction">${n.direction.toString.toLowerCase}</data>""" + "\n"
-        out ++= "    </node>\n"
-      }
-      (g.dvSources.map(_.name) ++ g.dvSinks.map(_.name)).foreach { name =>
-        out ++= s"""    <node id="dv:${esc(DVSourceId(g.id, name).show)}">""" + "\n"
-        out ++= s"""      <data key="module">${esc(g.id.show)}</data>""" + "\n"
-        out ++= s"""      <data key="name">${esc(name)}</data>""" + "\n"
-        out ++= "    </node>\n"
-      }
-      g.dependencies.foreach { dep =>
-        out ++= s"""    <edge source="${esc(ModuleNodeId(g.id, dep.from).show)}" target="${esc(
+
+    val header    = Vector(
+      """<?xml version="1.0" encoding="UTF-8"?>""",
+      """<graphml xmlns="http://graphml.graphdrawing.org/xmlns">""",
+      """  <key id="module" for="node" attr.name="module" attr.type="string"/>""",
+      """  <key id="name" for="node" attr.name="name" attr.type="string"/>""",
+      """  <key id="direction" for="node" attr.name="direction" attr.type="string"/>""",
+      """  <key id="kind" for="edge" attr.name="kind" attr.type="string"/>""",
+      """  <key id="label" for="edge" attr.name="label" attr.type="string"/>""",
+      """  <graph id="design" edgedefault="directed">"""
+    )
+    val nodes     = spec.generatorModules.flatMap { g =>
+      g.nodes.flatMap { n =>
+        Vector(
+          s"""    <node id="${esc(ModuleNodeId(g.id, n.name).show)}">""",
+          s"""      <data key="module">${esc(g.id.show)}</data>""",
+          s"""      <data key="name">${esc(n.name)}</data>""",
+          s"""      <data key="direction">${n.direction.toString.toLowerCase}</data>""",
+          "    </node>"
+        )
+      } ++ (g.dvSources.map(_.name) ++ g.dvSinks.map(_.name)).flatMap { name =>
+        Vector(
+          s"""    <node id="dv:${esc(DVSourceId(g.id, name).show)}">""",
+          s"""      <data key="module">${esc(g.id.show)}</data>""",
+          s"""      <data key="name">${esc(name)}</data>""",
+          "    </node>"
+        )
+      } ++ g.dependencies.map { dep =>
+        s"""    <edge source="${esc(ModuleNodeId(g.id, dep.from).show)}" target="${esc(
             ModuleNodeId(g.id, dep.to).show
-          )}"><data key="kind">dependency</data></edge>""" + "\n"
+          )}"><data key="kind">dependency</data></edge>"""
       }
     }
-    spec.binds.foreach { b =>
+    val bindEdges = spec.binds.map { b =>
       val label = byBind
         .get(b.bindId)
         .map { e =>
@@ -75,64 +78,55 @@ object Viz:
           s"""<data key="label">${esc(rendered.label)}</data>"""
         }
         .getOrElse("")
-      out ++= s"""    <edge source="${esc(b.source.show)}" target="${esc(
+      s"""    <edge source="${esc(b.source.show)}" target="${esc(
           b.target.show
-        )}"><data key="kind">bind</data>$label</edge>""" + "\n"
+        )}"><data key="kind">bind</data>$label</edge>"""
     }
-    spec.dvBinds.foreach { b =>
-      out ++= s"""    <edge source="dv:${esc(b.source.show)}" target="dv:${esc(
+    val dvEdges   = spec.dvBinds.map { b =>
+      s"""    <edge source="dv:${esc(b.source.show)}" target="dv:${esc(
           b.sink.show
-        )}"><data key="kind">verification</data></edge>""" + "\n"
+        )}"><data key="kind">verification</data></edge>"""
     }
-    out ++= "  </graph>\n</graphml>\n"
-    out.result()
+    (header ++ nodes ++ bindEdges ++ dvEdges ++ Vector("  </graph>", "</graphml>", "")).mkString("\n")
 
   private def render(spec: DesignSpec, edgeLabel: BindId => Option[String]): String =
-    val out = new StringBuilder
-    out ++= "digraph design {\n  rankdir=LR;\n  node [shape=circle, fontsize=9];\n"
+    val clusterOf = spec.moduleOrder.zipWithIndex.toMap
 
-    var clusterId = 0
-    def emitModule(id: ModuleId, indent: String): Unit =
+    def moduleLines(id: ModuleId, indent: String): Vector[String] =
       spec.modules(id) match
         case w: WrapperModuleSpec   =>
-          out ++= s"${indent}subgraph cluster_$clusterId {\n"
-          clusterId += 1
-          out ++= s"$indent  label=${q(if id.path.isEmpty then "<root>" else id.path.last)};\n"
-          w.children.foreach(c => emitModule(id / c, indent + "  "))
-          out ++= s"$indent}\n"
+          Vector(
+            s"${indent}subgraph cluster_${clusterOf(id)} {",
+            s"$indent  label=${q(if id.path.isEmpty then "<root>" else id.path.last)};"
+          ) ++ w.children.flatMap(c => moduleLines(id / c, indent + "  ")) :+ s"$indent}"
         case g: GeneratorModuleSpec =>
-          out ++= s"${indent}subgraph cluster_$clusterId {\n"
-          clusterId += 1
-          out ++= s"$indent  label=${q(id.path.last)};\n  $indent style=filled; fillcolor=\"#f4f6f8\";\n"
-          g.nodes.foreach { n =>
+          Vector(
+            s"${indent}subgraph cluster_${clusterOf(id)} {",
+            s"$indent  label=${q(id.path.last)};",
+            s"$indent  style=filled; fillcolor=\"#f4f6f8\";"
+          ) ++ g.nodes.map { n =>
             val shape = n.direction match
               case NodeDirection.Inward  => "circle"
               case NodeDirection.Outward => "doublecircle"
-            out ++= s"$indent  ${vertexId(ModuleNodeId(id, n.name))} [label=${q(n.name)}, shape=$shape];\n"
-          }
-          g.dvSources.foreach(s =>
-            out ++= s"$indent  ${dvSourceId(DVSourceId(id, s.name))} [label=${q(s.name)}, shape=diamond, color=purple];\n"
-          )
-          g.dvSinks.foreach(s =>
-            out ++= s"$indent  ${dvSinkId(DVSinkId(id, s.name))} [label=${q(s.name)}, shape=Mdiamond, color=purple];\n"
-          )
-          out ++= s"$indent}\n"
-    emitModule(ModuleId.root, "  ")
+            s"$indent  ${vertexId(ModuleNodeId(id, n.name))} [label=${q(n.name)}, shape=$shape];"
+          } ++ g.dvSources.map(s =>
+            s"$indent  ${dvSourceId(DVSourceId(id, s.name))} [label=${q(s.name)}, shape=diamond, color=purple];"
+          ) ++ g.dvSinks.map(s =>
+            s"$indent  ${dvSinkId(DVSinkId(id, s.name))} [label=${q(s.name)}, shape=Mdiamond, color=purple];"
+          ) :+ s"$indent}"
 
-    // Module-internal parameter dependencies: dashed, inside the generator cluster.
-    spec.generatorModules.foreach { g =>
-      g.dependencies.foreach { dep =>
-        out ++= s"  ${vertexId(ModuleNodeId(g.id, dep.from))} -> ${vertexId(ModuleNodeId(g.id, dep.to))} [style=dashed, color=gray];\n"
+    val deps  = spec.generatorModules.flatMap { g =>
+      g.dependencies.map { dep =>
+        s"  ${vertexId(ModuleNodeId(g.id, dep.from))} -> ${vertexId(ModuleNodeId(g.id, dep.to))} [style=dashed, color=gray];"
       }
     }
-    // Design binds: solid, optionally labeled with the rendered edge.
-    spec.binds.foreach { b =>
+    val binds = spec.binds.map { b =>
       val label = edgeLabel(b.bindId).map(l => s" [label=${q(l)}]").getOrElse("")
-      out ++= s"  ${vertexId(b.source)} -> ${vertexId(b.target)}$label;\n"
+      s"  ${vertexId(b.source)} -> ${vertexId(b.target)}$label;"
     }
-    // Verification binds: dotted purple.
-    spec.dvBinds.foreach { b =>
-      out ++= s"  ${dvSourceId(b.source)} -> ${dvSinkId(b.sink)} [style=dotted, color=purple];\n"
+    val dv    = spec.dvBinds.map { b =>
+      s"  ${dvSourceId(b.source)} -> ${dvSinkId(b.sink)} [style=dotted, color=purple];"
     }
-    out ++= "}\n"
-    out.result()
+
+    (Vector("digraph design {", "  rankdir=LR;", "  node [shape=circle, fontsize=9];") ++
+      moduleLines(ModuleId.root, "  ") ++ deps ++ binds ++ dv :+ "}" :+ "").mkString("\n")

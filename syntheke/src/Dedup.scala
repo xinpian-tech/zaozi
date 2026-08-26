@@ -58,11 +58,10 @@ object Dedup:
     resolved:      ResolvedDesign,
     candidateName: ModuleId => String = _.path.lastOption.getOrElse("Top")
   ): DedupResult =
-    val spec  = resolved.spec
-    val keyOf = scala.collection.mutable.Map.empty[ModuleId, String]
+    val spec = resolved.spec
 
-    // Bottom-up: reverse preorder guarantees children before parents.
-    spec.moduleOrder.reverseIterator.foreach { id =>
+    // Bottom-up: reverse preorder guarantees children's keys exist before their parent's key is computed.
+    val keyOf = spec.moduleOrder.reverse.foldLeft(Map.empty[ModuleId, String]) { (acc, id) =>
       val key = spec.modules(id) match
         case g: GeneratorModuleSpec =>
           val gm = resolved.generatorModule(id).get
@@ -79,7 +78,7 @@ object Dedup:
             .filter(_.module == id)
             .sortBy(_.name.encoded)
             .map(p => ujson.Arr(ujson.Str(p.name.encoded), ujson.Str(p.direction.toString), interfaceKey(p.interface)))
-          val children = w.children.map(c => ujson.Arr(ujson.Str(c), ujson.Str(keyOf(id / c))))
+          val children = w.children.map(c => ujson.Arr(ujson.Str(c), ujson.Str(acc(id / c))))
           val wires    = resolved.wirePlans
             .filter(_.module == id)
             .map(wp => (ujson.write(endpointKey(wp.from)), ujson.write(endpointKey(wp.to))))
@@ -98,22 +97,26 @@ object Dedup:
               ujson.Arr.from(layers)
             )
           )
-      keyOf(id) = key
+      acc.updated(id, key)
     }
 
-    // One definition per key; candidate name of the first preorder instance; same-name different-key gets a
-    // suffix by the key's first preorder occurrence.
-    val byKeyFirstSeen = scala.collection.mutable.LinkedHashMap.empty[String, Vector[ModuleId]]
-    spec.moduleOrder.foreach(id => byKeyFirstSeen(keyOf(id)) = byKeyFirstSeen.getOrElse(keyOf(id), Vector.empty) :+ id)
-
-    val nameCount   = scala.collection.mutable.Map.empty[String, Int]
-    val definitions = byKeyFirstSeen.toVector.map { (key, instances) =>
-      val candidate = candidateName(instances.head)
-      val n         = nameCount.getOrElse(candidate, 0)
-      nameCount(candidate) = n + 1
-      val name      = if n == 0 then candidate else s"${candidate}_$n"
-      ModuleDefinition(name, key, instances)
-    }
+    // One definition per key, keyed groups ordered by first preorder occurrence; candidate name of the first
+    // instance, with a preorder-position suffix when the same candidate names a different key.
+    val grouped     = spec.moduleOrder
+      .foldLeft(Vector.empty[(String, Vector[ModuleId])]) { (acc, id) =>
+        val key = keyOf(id)
+        acc.indexWhere(_._1 == key) match
+          case -1 => acc :+ (key, Vector(id))
+          case i  => acc.updated(i, (key, acc(i)._2 :+ id))
+      }
+    val definitions = grouped
+      .foldLeft((Vector.empty[ModuleDefinition], Map.empty[String, Int])) { case ((defs, counts), (key, instances)) =>
+        val candidate = candidateName(instances.head)
+        val n         = counts.getOrElse(candidate, 0)
+        val name      = if n == 0 then candidate else s"${candidate}_$n"
+        (defs :+ ModuleDefinition(name, key, instances), counts.updated(candidate, n + 1))
+      }
+      ._1
     val nameOf      = definitions.flatMap(d => d.instances.map(_ -> d.name)).toMap
 
-    DedupResult(definitions, keyOf.toMap, nameOf)
+    DedupResult(definitions, keyOf, nameOf)

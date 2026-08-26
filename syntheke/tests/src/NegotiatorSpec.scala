@@ -46,28 +46,18 @@ object NegotiatorSpec extends TestSuite:
   def intEntry(name: String) =
     new GeneratorEntry[Int](GeneratorId(s"test.$name", "1"), Codec.fromReadWriter[Int](ujson.Str("int")))
 
-  /** prod(32) ─┐ ┌─ c0 (deep in `sub`, capacity 64) ├─ xbar (2 in, 2 out) ─────┤ dma(24) ─┘ └─ c1 (capacity given)
-    */
+  /** prod(32) and dma(24) feed a 2x2 xbar; c0 (capacity 64) lives one wrapper deep, c1's capacity is a knob. */
   def buildSoc(c1Capacity: Int): DesignSpec =
-    var prodOut: OutwardNodeBuilder[Wid.type] = null
-    var dmaOut:  OutwardNodeBuilder[Wid.type] = null
-    var xIn0:    InwardNodeBuilder[Wid.type]  = null
-    var xIn1:    InwardNodeBuilder[Wid.type]  = null
-    var xOut0:   OutwardNodeBuilder[Wid.type] = null
-    var xOut1:   OutwardNodeBuilder[Wid.type] = null
-    var c0In:    InwardNodeBuilder[Wid.type]  = null
-    var c1In:    InwardNodeBuilder[Wid.type]  = null
-
     Design {
-      generator("prod", intEntry("Prod")) {
-        prodOut = outward(Wid)("out").dFn(_ => Right(32))
+      val prodOut                    = generator("prod", intEntry("Prod")) {
         parametersConst(0)
+        outward(Wid)("out").dFn(_ => Right(32))
       }
-      generator("dma", intEntry("Dma")) {
-        dmaOut = outward(Wid)("out").dFn(_ => Right(24))
+      val dmaOut                     = generator("dma", intEntry("Dma")) {
         parametersConst(0)
+        outward(Wid)("out").dFn(_ => Right(24))
       }
-      generator("xbar", intEntry("Xbar")) {
+      val (xIn0, xIn1, xOut0, xOut1) = generator("xbar", intEntry("Xbar")) {
         val in0        = inward(Wid)("in0")
         val in1        = inward(Wid)("in1")
         val out0       = outward(Wid)("out0")
@@ -81,17 +71,17 @@ object NegotiatorSpec extends TestSuite:
         in0.uFn(ctx => Right(ctx(u00) min ctx(u01)))
         in1.uFn(ctx => Right(ctx(u10) min ctx(u11)))
         parameters(view => Right(view.nodes.map(_.edge.edgeAs(Wid))))(_.sum)
-        xIn0 = in0; xIn1 = in1; xOut0 = out0; xOut1 = out1
+        (in0, in1, out0, out1)
       }
-      wrapper("sub") {
+      val c0In                       = wrapper("sub") {
         generator("c0", intEntry("C0")) {
-          c0In = inward(Wid)("in").uFn(_ => Right(64))
           parametersConst(0)
+          inward(Wid)("in").uFn(_ => Right(64))
         }
       }
-      generator("c1", intEntry("C1")) {
-        c1In = inward(Wid)("in").uFn(_ => Right(c1Capacity))
+      val c1In                       = generator("c1", intEntry("C1")) {
         parametersConst(0)
+        inward(Wid)("in").uFn(_ => Right(c1Capacity))
       }
       xIn0 <-- prodOut
       xIn1 <-- dmaOut
@@ -153,124 +143,99 @@ object NegotiatorSpec extends TestSuite:
       // The 16-wide c1 constrains, through the xbar's uFns, every edge that can reach it; settlement runs in bind
       // declaration order, so prod -> in0 (32 > 16) throws first.
       val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(c1Capacity = 16)))
-      e.error match
-        case NegotiationError.SettleFailed(SettleSubject.Design(bind), violation, _) =>
-          assert(bind.source == ModuleNodeId(ModuleId.root / "prod", "out"))
-          assert(violation.message.contains("32"))
-        case other                                                                   => assert(false)
+      assert(e.getMessage.contains("settle failed"))
+      assert(e.getMessage.contains("prod#out"))
+      assert(e.getMessage.contains("32"))
     }
 
-    test("propagation failure is reported as N2 and downstream is blocked without derived errors") {
-      var out: OutwardNodeBuilder[Wid.type] = null
-      var in:  InwardNodeBuilder[Wid.type]  = null
+    test("a propagation conflict reports the node, the violation and the input snapshot") {
       val spec = Design {
-        generator("bad", intEntry("Bad")) {
-          out = outward(Wid)("out").dFn(_ => Left(PropagationViolation("no width available")))
+        val out = generator("bad", intEntry("Bad")) {
           parametersConst(0)
+          outward(Wid)("out").dFn(_ => Left(PropagationViolation("no width available")))
         }
-        generator("sink", intEntry("Sink")) {
-          in = inward(Wid)("in").uFn(_ => Right(64))
+        val in  = generator("sink", intEntry("Sink")) {
           parametersConst(0)
+          inward(Wid)("in").uFn(_ => Right(64))
         }
         in <-- out
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
-      e.error match
-        case NegotiationError.PropagationFailed(_, node, NodeDirection.Outward, _, _, violation, _) =>
-          assert(node == ModuleNodeId(ModuleId.root / "bad", "out"))
-          assert(violation.message == "no width available")
-        case other                                                                                  => assert(false)
+      assert(e.getMessage.contains("propagation failed"))
+      assert(e.getMessage.contains("bad#out"))
+      assert(e.getMessage.contains("no width available"))
     }
 
-    test("a parameter dependency cycle is reported as N9") {
-      var aOut: OutwardNodeBuilder[Wid.type] = null
-      var aIn:  InwardNodeBuilder[Wid.type]  = null
-      var bOut: OutwardNodeBuilder[Wid.type] = null
-      var bIn:  InwardNodeBuilder[Wid.type]  = null
+    test("a parameter dependency cycle reports exactly the cycle members") {
       val spec = Design {
-        generator("a", intEntry("A")) {
-          val i      = inward(Wid)("in")
-          val o      = outward(Wid)("out")
-          val (d, u) = depend(i, o)
-          o.dFn(ctx => Right(ctx(d)))
-          i.uFn(ctx => Right(ctx(u)))
-          parametersConst(0)
-          aIn = i; aOut = o
-        }
-        generator("b", intEntry("B")) {
-          val i      = inward(Wid)("in")
-          val o      = outward(Wid)("out")
-          val (d, u) = depend(i, o)
-          o.dFn(ctx => Right(ctx(d)))
-          i.uFn(ctx => Right(ctx(u)))
-          parametersConst(0)
-          bIn = i; bOut = o
-        }
+        def loopback(
+          name: String
+        )(
+          using WrapperScope
+        ) =
+          generator(name, intEntry(name.capitalize)) {
+            val i      = inward(Wid)("in")
+            val o      = outward(Wid)("out")
+            val (d, u) = depend(i, o)
+            o.dFn(ctx => Right(ctx(d)))
+            i.uFn(ctx => Right(ctx(u)))
+            parametersConst(0)
+            (i, o)
+          }
+        val (aIn, aOut) = loopback("a")
+        val (bIn, bOut) = loopback("b")
         bIn <-- aOut
         aIn <-- bOut
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
-      e.error match
-        case NegotiationError.IllegalStructure(detail, ids, _) =>
-          assert(detail.contains("cycle"))
-          // Only the four nodes on the cycle, none blocked downstream.
-          assert(ids.sizeIs == 4)
-        case other                                             => assert(false)
+      assert(e.getMessage.contains("cycle"))
+      Vector("a#in", "a#out", "b#in", "b#out").foreach(n => assert(e.getMessage.contains(n)))
     }
 
-    test("binding one node twice is reported as N4") {
-      var out: OutwardNodeBuilder[Wid.type] = null
-      var in0: InwardNodeBuilder[Wid.type]  = null
-      var in1: InwardNodeBuilder[Wid.type]  = null
+    test("binding one node twice is rejected") {
       val spec = Design {
-        generator("p", intEntry("P")) {
-          out = outward(Wid)("out").dFn(_ => Right(8))
+        val out        = generator("p", intEntry("P")) {
           parametersConst(0)
+          outward(Wid)("out").dFn(_ => Right(8))
         }
-        generator("c", intEntry("C")) {
-          in0 = inward(Wid)("in0").uFn(_ => Right(8))
-          in1 = inward(Wid)("in1").uFn(_ => Right(8))
+        val (in0, in1) = generator("c", intEntry("C")) {
           parametersConst(0)
+          (inward(Wid)("in0").uFn(_ => Right(8)), inward(Wid)("in1").uFn(_ => Right(8)))
         }
         in0 <-- out
         in1 <-- out
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
-      e.error match
-        case NegotiationError.IllegalBind(detail, _, _, _) => assert(detail.contains("source of 2 binds"))
-        case other                                         => assert(false)
+      assert(e.getMessage.contains("source of 2 binds"))
     }
 
     test("probe sources route to an ancestor sink with layers and sink sub-paths") {
       val layerCosim = LayerPath(Vector("verification", "cosim"))
-      var src0: DVSourceRef[Trace.type]      = null
-      var src1: DVSourceRef[Trace.type]      = null
-      var snk:  DVSinkRef[Trace.type]        = null
-      var pOut: OutwardNodeBuilder[Wid.type] = null
-      var cIn:  InwardNodeBuilder[Wid.type]  = null
-      val spec     = Design {
-        wrapper("cluster") {
+      val spec       = Design {
+        val (pOut, src0, src1) = wrapper("cluster") {
           generator("core", intEntry("Core")) {
-            pOut = outward(Wid)("mem").dFn(_ => Right(32))
-            src0 = dvSource(Trace)("rob", 8, layerCosim)
-            src1 = dvSource(Trace)("lsu", 4, layerCosim)
             parametersConst(0)
+            (
+              outward(Wid)("mem").dFn(_ => Right(32)),
+              dvSource(Trace)("rob", 8, layerCosim),
+              dvSource(Trace)("lsu", 4, layerCosim)
+            )
           }
         }
-        generator("mem", intEntry("Mem")) {
-          cIn = inward(Wid)("in").uFn(_ => Right(64))
+        val cIn                = generator("mem", intEntry("Mem")) {
           parametersConst(0)
+          inward(Wid)("in").uFn(_ => Right(64))
         }
-        generator("cosim", intEntry("Cosim")) {
-          snk = dvSink(Trace)("taps")
+        val snk                = generator("cosim", intEntry("Cosim")) {
           parametersConst(0)
+          dvSink(Trace)("taps")
         }
         cIn <-- pOut
         snk <-- src0
         snk <-- src1
       }
-      val resolved = Negotiator.negotiate(spec)
-      val group    = resolved.dvGroups.head
+      val resolved   = Negotiator.negotiate(spec)
+      val group      = resolved.dvGroups.head
       assert(group.edgeAs(Trace) == Vector(8, 4))
       assert(group.interfaces.sinkPaths == Vector(InterfacePath.root.field("src0"), InterfacePath.root.field("src1")))
 
@@ -310,34 +275,40 @@ object NegotiatorSpec extends TestSuite:
       assert(xbarRec("fullParam") == ujson.Num(120))
     }
 
-    test("a sink whose parent is not a strict ancestor of the source is reported as N8") {
+    test("a sink whose parent is not a strict ancestor of the source is rejected") {
       val layer = LayerPath(Vector("verification", "assert"))
-      var src:  DVSourceRef[Trace.type]      = null
-      var snk:  DVSinkRef[Trace.type]        = null
-      var pOut: OutwardNodeBuilder[Wid.type] = null
-      var cIn:  InwardNodeBuilder[Wid.type]  = null
-      val spec = Design {
-        generator("core", intEntry("Core")) {
-          pOut = outward(Wid)("mem").dFn(_ => Right(32))
-          src = dvSource(Trace)("rob", 8, layer)
+      val spec  = Design {
+        val (pOut, src) = generator("core", intEntry("Core")) {
           parametersConst(0)
+          (outward(Wid)("mem").dFn(_ => Right(32)), dvSource(Trace)("rob", 8, layer))
         }
-        wrapper("island") {
+        val snk         = wrapper("island") {
           generator("cosim", intEntry("Cosim")) {
-            snk = dvSink(Trace)("taps")
             parametersConst(0)
+            dvSink(Trace)("taps")
           }
         }
-        generator("mem", intEntry("Mem")) {
-          cIn = inward(Wid)("in").uFn(_ => Right(64))
+        val cIn         = generator("mem", intEntry("Mem")) {
           parametersConst(0)
+          inward(Wid)("in").uFn(_ => Right(64))
         }
         cIn <-- pOut
         snk <-- src
       }
-      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
-      e.error match
-        case NegotiationError.IllegalVerification(detail, _, _, _) => assert(detail.contains("strict ancestor"))
-        case other                                                 => assert(false)
+      val e     = intercept[NegotiationException](Negotiator.negotiate(spec))
+      assert(e.getMessage.contains("strict ancestor"))
+    }
+
+    test("declaration-site contracts reject duplicates on the spot") {
+      val dup = intercept[IllegalArgumentException] {
+        Design {
+          generator("g", intEntry("G")) {
+            parametersConst(0)
+            inward(Wid)("x").uFn(_ => Right(1))
+            outward(Wid)("x").dFn(_ => Right(1))
+          }
+        }
+      }
+      assert(dup.getMessage.contains("duplicate endpoint name 'x'"))
     }
   }

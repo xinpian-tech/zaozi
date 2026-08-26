@@ -10,6 +10,10 @@ import scala.collection.mutable
   * scopes declare nodes, module-internal parameter dependencies and verification endpoints. When the design body
   * returns, the builder freezes into an immutable [[DesignSpec]].
   *
+  * Declaration-site contracts are enforced on the spot with `require` — duplicate names, foreign-module targets and
+  * double registration fail at the offending line. What the type system already guarantees (bind ends share one
+  * protocol object, dependency endpoints have the right directions) is checked nowhere else.
+  *
   * The bind operator is written `target <-- source` (`<-` itself is reserved by Scala).
   */
 object Design:
@@ -34,6 +38,7 @@ object Design:
       generators = st.generators.toVector
     )
 
+/** Recording state of one `Design` build; append-only, frozen into the [[DesignSpec]] when the body returns. */
 private final class BuildState:
   val modules     = mutable.Map.empty[ModuleId, ModuleSpec]
   val moduleOrder = mutable.ArrayBuffer.empty[ModuleId]
@@ -63,51 +68,52 @@ final class ReadCtx private[syntheke] (values: Map[ModuleNodeId, Any]):
 
 sealed trait NodeBuilder[P <: Protocol]:
   val protocol: P
-  def id:                         ModuleNodeId
-  private[syntheke] def moduleId: ModuleId = id.module
-  private[syntheke] val refDecls = mutable.ArrayBuffer.empty[CrossProtocolRefSpec]
+  def id:                      ModuleNodeId
+  private[syntheke] def scope: GeneratorScope[?]
 
-  /** Declare a cross-protocol reference to another node of the same module (clock / power domain). */
+  /** Declare a cross-protocol reference to another node of the same module (clock / power domain). The target's
+    * protocol is the expected protocol by construction; foreign-module targets are rejected here.
+    */
   def ref(
     name:      String,
     target:    NodeBuilder[?]
   )(
     using loc: SourceLocation
   ): this.type =
-    refDecls += CrossProtocolRefSpec(name, target.id, target.protocol.id, loc)
+    require(
+      target.id.module == id.module,
+      s"cross-protocol reference '$name' of ${id.show}: target ${target.id.show} is not a node of this module"
+    )
+    scope.recordRef(id.name, CrossProtocolRefSpec(name, target.id, target.protocol.id, loc))
     this
 
-/** An inward node under declaration; carries the mandatory uFn. */
+/** An inward node under declaration; `uFn` must be attached exactly once before the scope closes. */
 final class InwardNodeBuilder[P <: Protocol] private[syntheke] (
-  val protocol: P,
-  val id:       ModuleNodeId,
-  val order:    Int,
-  val loc:      SourceLocation)
+  val protocol:                P,
+  private[syntheke] val scope: GeneratorScope[?],
+  val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
-  private[syntheke] var fn:                                         Option[ReadCtx => Either[PropagationViolation, Any]] = None
-  def uFn(f: ReadCtx => Either[PropagationViolation, protocol.Up]): this.type                                            =
-    require(fn.isEmpty, s"uFn of ${id.show} already set")
-    fn = Some(f)
+  def uFn(f: ReadCtx => Either[PropagationViolation, protocol.Up]): this.type =
+    scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
-/** An outward node under declaration; carries the mandatory dFn. */
+/** An outward node under declaration; `dFn` must be attached exactly once before the scope closes. */
 final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
-  val protocol: P,
-  val id:       ModuleNodeId,
-  val order:    Int,
-  val loc:      SourceLocation)
+  val protocol:                P,
+  private[syntheke] val scope: GeneratorScope[?],
+  val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
-  private[syntheke] var fn:                                           Option[ReadCtx => Either[PropagationViolation, Any]] = None
-  def dFn(f: ReadCtx => Either[PropagationViolation, protocol.Down]): this.type                                            =
-    require(fn.isEmpty, s"dFn of ${id.show} already set")
-    fn = Some(f)
+  def dFn(f: ReadCtx => Either[PropagationViolation, protocol.Down]): this.type =
+    scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
 /** Verification endpoint handles. */
 final class DVSourceRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSourceId)
 final class DVSinkRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSinkId)
 
-/** Design bind: `target <-- source`, recorded in the enclosing wrapper scope. Same protocol type on both ends. */
+/** Design bind: `target <-- source`, recorded in the enclosing wrapper scope. The shared type parameter guarantees one
+  * protocol object on both ends.
+  */
 extension [P <: Protocol](target: InwardNodeBuilder[P])
   infix def <--(
     source:   OutwardNodeBuilder[P]
@@ -131,42 +137,45 @@ extension [P <: DVProtocol](sink: DVSinkRef[P])
 final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
   private val children = mutable.ArrayBuffer.empty[String]
 
-  /** Instantiate a child wrapper module. */
-  def wrapper(
+  private def addChild(name: String): ModuleId =
+    require(!children.contains(name), s"duplicate child instance name '$name' in ${id.show}")
+    children += name
+    val childId = id / name
+    st.moduleOrder += childId
+    childId
+
+  /** Instantiate a child wrapper module; returns the body's value. */
+  def wrapper[A](
     name:      String
-  )(body:      WrapperScope ?=> Unit
+  )(body:      WrapperScope ?=> A
   )(
     using loc: SourceLocation
-  ): ModuleId =
-    val childId = id / name
-    children += name
-    st.moduleOrder += childId
+  ): A =
+    val childId = addChild(name)
     val scope   = new WrapperScope(childId, st)
-    body(
+    val result  = body(
       using scope
     )
     scope.close(loc)
-    childId
+    result
 
-  /** Instantiate a child generator module bound to a registry entry. */
-  def generator[FP](
+  /** Instantiate a child generator module bound to a registry entry; returns the body's value. */
+  def generator[FP, A](
     name:  String,
     entry: GeneratorEntry[FP]
-  )(body:  GeneratorScope[FP] ?=> Unit
+  )(body:  GeneratorScope[FP] ?=> A
   )(
     using
     loc:   SourceLocation
-  ): ModuleId =
-    val childId = id / name
-    children += name
-    st.moduleOrder += childId
+  ): A =
+    val childId = addChild(name)
     st.registerGenerator(entry)
     val scope   = new GeneratorScope[FP](childId, st, entry)
-    body(
+    val result  = body(
       using scope
     )
     scope.close(loc)
-    childId
+    result
 
   private[syntheke] def recordBind(source: ModuleNodeId, target: ModuleNodeId, loc: SourceLocation): Unit =
     st.binds += BindDecl(st.binds.size, source, target, id, loc)
@@ -178,11 +187,24 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
 
 /** A generator module under construction: nodes, dependencies, verification endpoints and parameter functions. */
 final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP]):
-  private val nodes  = mutable.ArrayBuffer.empty[NodeBuilder[?]]
+  private val nodes  = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, SourceLocation)]
+  private val fns    = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[PropagationViolation, Any]]
+  private val refs   = mutable.ArrayBuffer.empty[(String, CrossProtocolRefSpec)]
   private val deps   = mutable.ArrayBuffer.empty[ParamDependencySpec]
   private val dvSrcs = mutable.ArrayBuffer.empty[DVSourceSpec]
   private val dvSnks = mutable.ArrayBuffer.empty[DVSinkSpec]
-  private var params: Option[(EdgeView => Either[CapabilityViolation, Any], Any => Any)] = None
+  private val params = mutable.ArrayBuffer.empty[(EdgeView => Either[CapabilityViolation, Any], Any => Any)]
+
+  private def reserveName(name: String): Unit =
+    val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name) || dvSnks.exists(_.name == name)
+    require(!taken, s"duplicate endpoint name '$name' in ${id.show}")
+
+  private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[PropagationViolation, Any]): Unit =
+    require(!fns.contains(name), s"port parameter function of ${ModuleNodeId(id, name).show} already set")
+    fns(name) = f
+
+  private[syntheke] def recordRef(name: String, spec: CrossProtocolRefSpec): Unit =
+    refs += (name -> spec)
 
   /** Declare a named inward node of protocol `p`. */
   def inward(
@@ -191,9 +213,10 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(
     using loc: SourceLocation
   ): InwardNodeBuilder[p.type] =
+    reserveName(name)
     st.registerProtocol(p.id, p)
-    val b = new InwardNodeBuilder[p.type](p, ModuleNodeId(id, name), nodes.size, loc)
-    nodes += b
+    val b = new InwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
+    nodes += ((b, NodeDirection.Inward, loc))
     b
 
   /** Declare a named outward node of protocol `p`. */
@@ -203,13 +226,15 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(
     using loc: SourceLocation
   ): OutwardNodeBuilder[p.type] =
+    reserveName(name)
     st.registerProtocol(p.id, p)
-    val b = new OutwardNodeBuilder[p.type](p, ModuleNodeId(id, name), nodes.size, loc)
-    nodes += b
+    val b = new OutwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
+    nodes += ((b, NodeDirection.Outward, loc))
     b
 
   /** Declare one module-internal parameter dependency and receive the two read handles it grants: the outward node's
     * dFn may read the inward node's `Down`, the inward node's uFn may read the outward node's `Up` (doc @sec-generator-module).
+    * Both endpoints must be nodes of this module; a pair declares at most once.
     */
   def depend(
     from:      InwardNodeBuilder[?],
@@ -217,6 +242,14 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(
     using loc: SourceLocation
   ): (DownReader[from.protocol.Down], UpReader[to.protocol.Up]) =
+    require(
+      from.id.module == id && to.id.module == id,
+      s"parameter dependency endpoints ${from.id.show} -> ${to.id.show} must both be nodes of ${id.show}"
+    )
+    require(
+      !deps.exists(d => d.from == from.id.name && d.to == to.id.name),
+      s"duplicate parameter dependency ${from.id.show} -> ${to.id.show}"
+    )
     deps += ParamDependencySpec(from.id.name, to.id.name, deps.size, loc)
     (new DownReader[from.protocol.Down](from.id), new UpReader[to.protocol.Up](to.id))
 
@@ -230,6 +263,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     using
     loc:   SourceLocation
   ): DVSourceRef[p.type] =
+    reserveName(name)
     st.registerProtocol(p.id, p)
     dvSrcs += DVSourceSpec(name, p, down, layer, dvSrcs.size + dvSnks.size, loc)
     new DVSourceRef[p.type](p, DVSourceId(id, name))
@@ -241,44 +275,40 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(
     using loc: SourceLocation
   ): DVSinkRef[p.type] =
+    reserveName(name)
     st.registerProtocol(p.id, p)
     dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, loc)
     new DVSinkRef[p.type](p, DVSinkId(id, name))
 
-  /** Declare `computeProtocolParam` and `combine` (doc @sec-two-layer-params). */
+  /** Declare `computeProtocolParam` and `combine` (doc @sec-two-layer-params); exactly once per module. */
   def parameters[PP](compute: EdgeView => Either[CapabilityViolation, PP])(combine: PP => FP): Unit =
     require(params.isEmpty, s"parameters of ${id.show} already set")
-    params = Some((compute, pp => combine(pp.asInstanceOf[PP])))
+    params += ((compute, pp => combine(pp.asInstanceOf[PP])))
 
   /** A generator whose full parameter ignores the negotiation result entirely. */
   def parametersConst(fp: FP): Unit = parameters(_ => Right(()))(_ => fp)
 
   private[syntheke] def close(loc: SourceLocation): Unit =
-    val nodeSpecs          = nodes.toVector.map { b =>
-      val (direction, fnOpt) = b match
-        case ib: InwardNodeBuilder[?]  => (NodeDirection.Inward, ib.fn)
-        case ob: OutwardNodeBuilder[?] => (NodeDirection.Outward, ob.fn)
-      val userFn             = fnOpt.getOrElse(
+    val nodeSpecs          = nodes.toVector.zipWithIndex.map { case ((b, direction, declLoc), order) =>
+      val fn = fns.getOrElse(
+        b.id.name,
         throw new IllegalStateException(
           s"node ${b.id.show}: ${
               if direction == NodeDirection.Inward then "uFn" else "dFn"
             } is mandatory but was never set"
         )
       )
-      val (order, declLoc)   = b match
-        case ib: InwardNodeBuilder[?]  => (ib.order, ib.loc)
-        case ob: OutwardNodeBuilder[?] => (ob.order, ob.loc)
       NodeSpec(
         name = b.id.name,
         direction = direction,
         protocol = b.protocol,
-        fn = values => userFn(new ReadCtx(values)),
-        refs = b.refDecls.toVector,
+        fn = fn,
+        refs = refs.collect { case (n, spec) if n == b.id.name => spec }.toVector,
         order = order,
         loc = declLoc
       )
     }
-    val (compute, combine) = params.getOrElse(
+    val (compute, combine) = params.headOption.getOrElse(
       throw new IllegalStateException(s"generator module ${id.show}: parameters(...) is mandatory but was never set")
     )
     st.modules(id) = GeneratorModuleSpec(

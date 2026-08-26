@@ -100,20 +100,18 @@ object PortName:
     PortName(encoded.split('_').toVector.map(unescape))
 
   private def unescape(segment: String): String =
-    val sb = new StringBuilder
-    var i  = 0
-    while i < segment.length do
-      if segment(i) == '$' && i + 1 < segment.length then
-        segment(i + 1) match
-          case '$' => sb += '$'
-          case 'u' => sb += '_'
-          case 'm' => sb += '-'
-          case c   => sb += '$' += c
-        i += 2
-      else
-        sb += segment(i)
-        i += 1
-    sb.result()
+    @annotation.tailrec
+    def go(i: Int, acc: List[String]): String =
+      if i >= segment.length then acc.reverse.mkString
+      else if segment(i) == '$' && i + 1 < segment.length then
+        val piece = segment(i + 1) match
+          case '$' => "$"
+          case 'u' => "_"
+          case 'm' => "-"
+          case c   => s"$$$c"
+        go(i + 2, piece :: acc)
+      else go(i + 1, segment(i).toString :: acc)
+    go(0, Nil)
 
 enum PortDirection derives CanEqual:
   case Input, Output

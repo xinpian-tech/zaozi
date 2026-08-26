@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke
 
-import scala.collection.mutable
-
 /** Cross-hierarchy port and wire planning plus FIRRTL layer declarations (doc @ch-hierarchy).
   *
   * Every settled connection has two generator-module endpoints. The wiring scope `W` is their lowest common ancestor
@@ -12,13 +10,13 @@ import scala.collection.mutable
   */
 private[syntheke] object Planner:
 
+  /** One planned branch: its dangle ports, the wires inside those wrappers, and the end reference inside `W`. */
+  private final case class Branch(ports: Vector[PortPlan], wires: Vector[WirePlan], end: LocalEndpoint)
+
   def plan(
     spec:    DesignSpec,
     settled: Negotiator.Settled
   ): (Vector[PortPlan], Vector[WirePlan], Map[ModuleId, LayerTree]) =
-    val ports  = mutable.ArrayBuffer.empty[PortPlan]
-    val wires  = mutable.ArrayBuffer.empty[WirePlan]
-    val layers = mutable.Map.empty[ModuleId, LayerTree].withDefaultValue(LayerTree.empty)
 
     /** Wrapper modules strictly between `endpoint`'s parent and `w`, closest to the endpoint first. */
     def branchModules(endpoint: ModuleId, w: ModuleId): Vector[ModuleId] =
@@ -33,9 +31,6 @@ private[syntheke] object Planner:
       val rel = endpoint.path.drop(m.path.length)
       PortName(rel.flatMap(inst => Vector("inst", inst))) ++ base
 
-    /** Plan one branch: dangle ports below `w` plus the wires inside those wrappers. Returns the branch's end reference
-      * inside `w`.
-      */
     def planBranch(
       endpoint:  ModuleId, // generator module owning the endpoint port
       portName:  PortName, // the generator's own port name
@@ -45,11 +40,11 @@ private[syntheke] object Planner:
       interface: ProtocolBundle,
       origin:    PlanOrigin,
       loc:       SourceLocation
-    ): LocalEndpoint =
-      val ms = branchModules(endpoint, w)
-      ms.zipWithIndex.foreach { (m, i) =>
+    ): Branch =
+      val ms    = branchModules(endpoint, w)
+      val ports = ms.map(m => PortPlan(m, direction, dangleName(m, endpoint, base), interface, origin, loc))
+      val wires = ms.zipWithIndex.map { (m, i) =>
         val name       = dangleName(m, endpoint, base)
-        ports += PortPlan(m, direction, name, interface, origin, loc)
         val childRef   =
           if i == 0 then LocalEndpoint.ChildPort(endpoint.path.last, portName)
           else LocalEndpoint.ChildPort(ms(i - 1).path.last, dangleName(ms(i - 1), endpoint, base))
@@ -57,19 +52,21 @@ private[syntheke] object Planner:
         val (from, to) = direction match
           case PortDirection.Output => (childRef, thisRef)
           case PortDirection.Input  => (thisRef, childRef)
-        wires += WirePlan(m, from, to, origin, loc)
+        WirePlan(m, from, to, origin, loc)
       }
-      if ms.isEmpty then LocalEndpoint.ChildPort(endpoint.path.last, portName)
-      else LocalEndpoint.ChildPort(ms.last.path.last, dangleName(ms.last, endpoint, base))
+      val end   =
+        if ms.isEmpty then LocalEndpoint.ChildPort(endpoint.path.last, portName)
+        else LocalEndpoint.ChildPort(ms.last.path.last, dangleName(ms.last, endpoint, base))
+      Branch(ports, wires, end)
 
     // ============ design edges ============
-    settled.edges.foreach { e =>
+    val designParts = settled.edges.map { e =>
       val decl   = spec.binds(e.bind.order)
       val a      = e.bind.source.module
       val b      = e.bind.target.module
       val w      = if a == b then a.parent.get else ModuleId.lca(a, b)
       val origin = PlanOrigin.Design(e.bind)
-      val srcEnd = planBranch(
+      val src    = planBranch(
         endpoint = a,
         portName = PortName(e.bind.source.name),
         base = PortName("node", e.bind.source.name, "out"),
@@ -79,7 +76,7 @@ private[syntheke] object Planner:
         origin = origin,
         loc = decl.loc
       )
-      val tgtEnd = planBranch(
+      val tgt    = planBranch(
         endpoint = b,
         portName = PortName(e.bind.target.name),
         base = PortName("node", e.bind.target.name, "in"),
@@ -89,36 +86,43 @@ private[syntheke] object Planner:
         origin = origin,
         loc = decl.loc
       )
-      wires += WirePlan(w, srcEnd, tgtEnd, origin, decl.loc)
+      (src.ports ++ tgt.ports, src.wires ++ tgt.wires :+ WirePlan(w, src.end, tgt.end, origin, decl.loc))
     }
 
     // ============ verification binds ============
-    settled.dvGroups.foreach { group =>
+    val dvParts = for
+      group       <- settled.dvGroups
+      (bindId, i) <- group.binds.zipWithIndex
+    yield
       val sinkModule = group.sink.module
       val w          = sinkModule.parent.get
-      group.binds.zipWithIndex.foreach { (bindId, i) =>
-        val decl      = spec.dvBinds.find(_.bindId == bindId).get
-        val source    = bindId.source
-        val origin    = PlanOrigin.Verification(bindId)
-        val interface = group.interfaces.sources(i)
-        val srcEnd    = planBranch(
-          endpoint = source.module,
-          portName = PortName(source.name),
-          base = PortName("dv-source", source.name, "out"),
-          w = w,
-          direction = PortDirection.Output,
-          interface = interface,
-          origin = origin,
-          loc = decl.loc
-        )
-        val sinkRef   =
-          LocalEndpoint.ChildPort(sinkModule.path.last, PortName(group.sink.name), group.interfaces.sinkPaths(i))
-        wires += WirePlan(w, srcEnd, sinkRef, origin, decl.loc)
+      val decl       = spec.dvBinds.find(_.bindId == bindId).get
+      val source     = bindId.source
+      val origin     = PlanOrigin.Verification(bindId)
+      val src        = planBranch(
+        endpoint = source.module,
+        portName = PortName(source.name),
+        base = PortName("dv-source", source.name, "out"),
+        w = w,
+        direction = PortDirection.Output,
+        interface = group.interfaces.sources(i),
+        origin = origin,
+        loc = decl.loc
+      )
+      val sinkRef    =
+        LocalEndpoint.ChildPort(sinkModule.path.last, PortName(group.sink.name), group.interfaces.sinkPaths(i))
+      // Layer declarations on every wrapper the probe crosses, including the wiring scope.
+      val layered    = (branchModules(source.module, w) :+ w).map(_ -> group.layers(i))
+      (src.ports, src.wires :+ WirePlan(w, src.end, sinkRef, origin, decl.loc), layered)
 
-        // Layer declarations on every wrapper the probe crosses, including the wiring scope.
-        val layered = branchModules(source.module, w) :+ w
-        layered.foreach(m => layers(m) = layers(m).add(group.layers(i)))
+    val layers = dvParts
+      .flatMap(_._3)
+      .foldLeft(Map.empty[ModuleId, LayerTree]) { case (acc, (m, lp)) =>
+        acc.updated(m, acc.getOrElse(m, LayerTree.empty).add(lp))
       }
-    }
 
-    (ports.toVector, wires.toVector, layers.toMap)
+    (
+      designParts.flatMap(_._1) ++ dvParts.flatMap(_._1),
+      designParts.flatMap(_._2) ++ dvParts.flatMap(_._2),
+      layers
+    )

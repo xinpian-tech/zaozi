@@ -12,24 +12,24 @@ package me.jiuyang.syntheke
   * }}}
   */
 
-def wrapper(
+def wrapper[A](
   name:     String
-)(body:     WrapperScope ?=> Unit
+)(body:     WrapperScope ?=> A
 )(
   using ws: WrapperScope,
   loc:      SourceLocation
-): ModuleId =
+): A =
   ws.wrapper(name)(body)
 
-def generator[FP](
+def generator[FP, A](
   name:  String,
   entry: GeneratorEntry[FP]
-)(body:  GeneratorScope[FP] ?=> Unit
+)(body:  GeneratorScope[FP] ?=> A
 )(
   using
   ws:    WrapperScope,
   loc:   SourceLocation
-): ModuleId =
+): A =
   ws.generator(name, entry)(body)
 
 def inward(

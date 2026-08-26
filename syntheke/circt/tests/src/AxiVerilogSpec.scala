@@ -209,14 +209,12 @@ object AxiVerilogSpec extends TestSuite:
   )(
     using ws:  WrapperScope
   ): OutwardNodeBuilder[Axi4.type] =
-    var out: OutwardNodeBuilder[Axi4.type] = null
     generator(name, coreEntry) {
-      out = outward(Axi4)("mem").dFn(_ =>
+      parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, "mem"))))(identity)
+      outward(Axi4)("mem").dFn(_ =>
         Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight))))
       )
-      parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, "mem"))))(identity)
     }
-    out
 
   def mmioSlave(
     name:           String,
@@ -227,9 +225,9 @@ object AxiVerilogSpec extends TestSuite:
     using
     ws:             WrapperScope
   ): InwardNodeBuilder[Axi4.type] =
-    var in: InwardNodeBuilder[Axi4.type] = null
     generator(name, slaveEntry) {
-      in = inward(Axi4)("in").uFn(_ =>
+      parameters(view => Right(SlaveP(name, base, size, shapeOf(view, "in"))))(identity)
+      inward(Axi4)("in").uFn(_ =>
         Right(
           AxiSlavePort(
             slaves = Vector(
@@ -248,38 +246,20 @@ object AxiVerilogSpec extends TestSuite:
           )
         )
       )
-      parameters(view => Right(SlaveP(name, base, size, shapeOf(view, "in"))))(identity)
     }
-    in
 
   def buildSoc(): DesignSpec =
-    var core0Out: OutwardNodeBuilder[Axi4.type]         = null
-    var core1Out: OutwardNodeBuilder[Axi4.type]         = null
-    var dmaOut:   OutwardNodeBuilder[Axi4.type]         = null
-    var sysIns:   Vector[InwardNodeBuilder[Axi4.type]]  = null
-    var sysOuts:  Vector[OutwardNodeBuilder[Axi4.type]] = null
-    var l2In:     InwardNodeBuilder[Axi4.type]          = null
-    var l2Out:    OutwardNodeBuilder[Axi4.type]         = null
-    var dramIn:   InwardNodeBuilder[Axi4.type]          = null
-    var brIn:     InwardNodeBuilder[Axi4.type]          = null
-    var brOut:    OutwardNodeBuilder[Axi4.type]         = null
-    var perIns:   Vector[InwardNodeBuilder[Axi4.type]]  = null
-    var perOuts:  Vector[OutwardNodeBuilder[Axi4.type]] = null
-    var uartIn:   InwardNodeBuilder[Axi4.type]          = null
-    var gpioIn:   InwardNodeBuilder[Axi4.type]          = null
-
     Design {
-      core0Out = core("core0", idBits = 2, maxFlight = 4)
-      core1Out = core("core1", idBits = 3, maxFlight = 8)
-      dmaOut = core("dma", idBits = 1, maxFlight = 1)
+      val core0Out = core("core0", idBits = 2, maxFlight = 4)
+      val core1Out = core("core1", idBits = 3, maxFlight = 8)
+      val dmaOut   = core("dma", idBits = 1, maxFlight = 1)
 
-      generator("sysXbar", xbarEntry) {
-        val (i, o) = axiXbarBody(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "sysXbar", "roundRobin")
-        sysIns = i; sysOuts = o
+      val (sysIns, sysOuts) = generator("sysXbar", xbarEntry) {
+        axiXbarBody(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "sysXbar", "roundRobin")
       }
 
-      wrapper("mem") {
-        generator("l2", l2Entry) {
+      val l2In = wrapper("mem") {
+        val (l2In, l2Out) = generator("l2", l2Entry) {
           val in     = inward(Axi4)("in")
           val out    = outward(Axi4)("out")
           val (d, u) = depend(in, out)
@@ -289,10 +269,11 @@ object AxiVerilogSpec extends TestSuite:
           }
           in.uFn(ctx => Right(ctx(u)))
           parameters(view => Right(L2P(512, shapeOf(view, "in"), shapeOf(view, "out"))))(identity)
-          l2In = in; l2Out = out
+          (in, out)
         }
-        generator("dram", dramEntry) {
-          dramIn = inward(Axi4)("in").uFn(_ =>
+        val dramIn        = generator("dram", dramEntry) {
+          parameters(view => Right(DramP(2, shapeOf(view, "in"))))(identity)
+          inward(Axi4)("in").uFn(_ =>
             Right(
               AxiSlavePort(
                 slaves = Vector(
@@ -311,13 +292,13 @@ object AxiVerilogSpec extends TestSuite:
               )
             )
           )
-          parameters(view => Right(DramP(2, shapeOf(view, "in"))))(identity)
         }
         dramIn <-- l2Out
+        l2In
       }
       l2In <-- sysOuts(0)
 
-      generator("bridge", bridgeEntry) {
+      val (brIn, brOut) = generator("bridge", bridgeEntry) {
         val in     = inward(Axi4)("in")
         val out    = outward(Axi4)("out")
         val (d, u) = depend(in, out)
@@ -337,16 +318,15 @@ object AxiVerilogSpec extends TestSuite:
           )
         }
         parameters(view => Right(BridgeP(shapeOf(view, "in"), shapeOf(view, "out"))))(identity)
-        brIn = in; brOut = out
+        (in, out)
       }
 
-      generator("periphXbar", xbarEntry) {
-        val (i, o) = axiXbarBody(Vector("in"), Vector("uart", "gpio"), "periphXbar", "fixedPriority")
-        perIns = i; perOuts = o
+      val (perIns, perOuts) = generator("periphXbar", xbarEntry) {
+        axiXbarBody(Vector("in"), Vector("uart", "gpio"), "periphXbar", "fixedPriority")
       }
 
-      uartIn = mmioSlave("uart", 0x10000000L, 0x1000L, idCapacityBits = 8)
-      gpioIn = mmioSlave("gpio", 0x10010000L, 0x1000L, idCapacityBits = 8)
+      val uartIn = mmioSlave("uart", 0x10000000L, 0x1000L, idCapacityBits = 8)
+      val gpioIn = mmioSlave("gpio", 0x10010000L, 0x1000L, idCapacityBits = 8)
 
       sysIns(0) <-- core0Out
       sysIns(1) <-- core1Out
@@ -392,10 +372,7 @@ object AxiVerilogSpec extends TestSuite:
         case b => b
       }
       val e        = intercept[ElaborationException](Elaborator.elaborate(resolved, mangled))
-      e.error match
-        case ElaborationError.PortMismatch(m, "in", detail, _) =>
-          assert(m == ModuleId.root / "mem" / "dram")
-          assert(detail.contains("in.w.bits.data")) // the first-divergence path names the widened leaf
-        case other                                             => assert(false)
+      assert(e.getMessage.contains("port mismatch at mem.dram#in"))
+      assert(e.getMessage.contains("in.w.bits.data")) // the first-divergence path names the widened leaf
     }
   }

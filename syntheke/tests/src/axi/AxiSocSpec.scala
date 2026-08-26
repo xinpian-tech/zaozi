@@ -94,14 +94,12 @@ object AxiSocSpec extends TestSuite:
     using
     ws:        WrapperScope
   ): OutwardNodeBuilder[Axi4.type] =
-    var out: OutwardNodeBuilder[Axi4.type] = null
     generator(name, entry0) {
-      out = outward(Axi4)("mem").dFn(_ =>
+      parametersConst(CoreFull(name, idBits, maxFlight))
+      outward(Axi4)("mem").dFn(_ =>
         Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight))))
       )
-      parametersConst(CoreFull(name, idBits, maxFlight))
     }
-    out
 
   /** A memory-mapped peripheral slave: a boundary inward node serving one address range on a 32-bit bus. */
   def mmioSlave(
@@ -113,9 +111,9 @@ object AxiSocSpec extends TestSuite:
     using
     ws:             WrapperScope
   ): InwardNodeBuilder[Axi4.type] =
-    var in: InwardNodeBuilder[Axi4.type] = null
     generator(name, slaveEntry) {
-      val node = inward(Axi4)("in").uFn(_ =>
+      parameters(view => Right(view("in").edge.edgeAs(Axi4)))(e => SlaveFull(name, base, size, e.dataBits, e.idBits))
+      inward(Axi4)("in").uFn(_ =>
         Right(
           AxiSlavePort(
             slaves = Vector(
@@ -134,40 +132,21 @@ object AxiSocSpec extends TestSuite:
           )
         )
       )
-      parameters(view => Right(view("in").edge.edgeAs(Axi4)))(e => SlaveFull(name, base, size, e.dataBits, e.idBits))
-      in = node
     }
-    in
 
   def buildSoc(dramIdCapacity: Int = 6, gpioBase: Long = 0x10010000L): DesignSpec =
-    var core0Out: OutwardNodeBuilder[Axi4.type]         = null
-    var core1Out: OutwardNodeBuilder[Axi4.type]         = null
-    var dmaOut:   OutwardNodeBuilder[Axi4.type]         = null
-    var sysIns:   Vector[InwardNodeBuilder[Axi4.type]]  = null
-    var sysOuts:  Vector[OutwardNodeBuilder[Axi4.type]] = null
-    var l2In:     InwardNodeBuilder[Axi4.type]          = null
-    var l2Out:    OutwardNodeBuilder[Axi4.type]         = null
-    var dramIn:   InwardNodeBuilder[Axi4.type]          = null
-    var brIn:     InwardNodeBuilder[Axi4.type]          = null
-    var brOut:    OutwardNodeBuilder[Axi4.type]         = null
-    var perIns:   Vector[InwardNodeBuilder[Axi4.type]]  = null
-    var perOuts:  Vector[OutwardNodeBuilder[Axi4.type]] = null
-    var uartIn:   InwardNodeBuilder[Axi4.type]          = null
-    var gpioIn:   InwardNodeBuilder[Axi4.type]          = null
-
     Design {
-      core0Out = core(coreEntry, "core0", idBits = 2, maxFlight = 4)
-      core1Out = core(coreEntry, "core1", idBits = 3, maxFlight = 8)
-      dmaOut = core(dmaEntry, "dma", idBits = 1, maxFlight = 1)
+      val core0Out = core(coreEntry, "core0", idBits = 2, maxFlight = 4)
+      val core1Out = core(coreEntry, "core1", idBits = 3, maxFlight = 8)
+      val dmaOut   = core(dmaEntry, "dma", idBits = 1, maxFlight = 1)
 
-      generator("sysXbar", xbarEntry) {
-        val (i, o) = axiXbarBody(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "roundRobin")
-        sysIns = i; sysOuts = o
+      val (sysIns, sysOuts) = generator("sysXbar", xbarEntry) {
+        axiXbarBody(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "roundRobin")
       }
 
       // The memory branch lives one level down: sysXbar -> mem/l2 crosses the `mem` boundary.
-      wrapper("mem") {
-        generator("l2", l2Entry) {
+      val l2In = wrapper("mem") {
+        val (l2In, l2Out) = generator("l2", l2Entry) {
           val in     = inward(Axi4)("in")
           val out    = outward(Axi4)("out")
           val (d, u) = depend(in, out)
@@ -180,10 +159,22 @@ object AxiSocSpec extends TestSuite:
           parameters { view =>
             Right((view("in").edge.edgeAs(Axi4).idBits, view("out").edge.edgeAs(Axi4).idBits))
           }((upBits, downBits) => L2Full(capacityKiB = 512, upstreamIdBits = upBits, downstreamIdBits = downBits))
-          l2In = in; l2Out = out
+          (in, out)
         }
-        generator("dram", dramEntry) {
-          val node = inward(Axi4)("in").uFn(_ =>
+        val dramIn        = generator("dram", dramEntry) {
+          parameters { view =>
+            val e = view("in").edge.edgeAs(Axi4)
+            Right(
+              DramFull(
+                ranks = 2,
+                addrBits = e.addrBits,
+                dataBits = e.dataBits,
+                idBits = e.idBits,
+                masters = e.master.masters.map(_.name)
+              )
+            )
+          }(identity)
+          inward(Axi4)("in").uFn(_ =>
             Right(
               AxiSlavePort(
                 slaves = Vector(
@@ -202,29 +193,17 @@ object AxiSocSpec extends TestSuite:
               )
             )
           )
-          parameters { view =>
-            val e = view("in").edge.edgeAs(Axi4)
-            Right(
-              DramFull(
-                ranks = 2,
-                addrBits = e.addrBits,
-                dataBits = e.dataBits,
-                idBits = e.idBits,
-                masters = e.master.masters.map(_.name)
-              )
-            )
-          }(identity)
-          dramIn = node
         }
         // Both endpoints live under mem, so this bind may be declared here …
         dramIn <-- l2Out
+        l2In
       }
       // … but sysXbar -> l2 crosses the mem boundary: it must be declared in a common ancestor (the root).
       l2In <-- sysOuts(0)
 
       // Width bridge 128 -> 32: passes masters down; upstream it re-presents the peripherals on the wide bus,
       // fragmenting bursts internally, so the supported transfer ceiling grows to its own limit.
-      generator("bridge", bridgeEntry) {
+      val (brIn, brOut) = generator("bridge", bridgeEntry) {
         val wideBeatBytes       = 16
         val maxUpstreamTransfer = 64
         val in                  = inward(Axi4)("in")
@@ -248,16 +227,15 @@ object AxiSocSpec extends TestSuite:
         parameters(view => Right(view("in").edge.edgeAs(Axi4).idBits))(idBits =>
           BridgeFull(wideBeatBytes = 16, narrowBeatBytes = 4, idBits = idBits)
         )
-        brIn = in; brOut = out
+        (in, out)
       }
 
-      generator("periphXbar", xbarEntry) {
-        val (i, o) = axiXbarBody(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
-        perIns = i; perOuts = o
+      val (perIns, perOuts) = generator("periphXbar", xbarEntry) {
+        axiXbarBody(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
       }
 
-      uartIn = mmioSlave("uart", 0x10000000L, 0x1000L, idCapacityBits = 8)
-      gpioIn = mmioSlave("gpio", gpioBase, 0x1000L, idCapacityBits = 8)
+      val uartIn = mmioSlave("uart", 0x10000000L, 0x1000L, idCapacityBits = 8)
+      val gpioIn = mmioSlave("gpio", gpioBase, 0x1000L, idCapacityBits = 8)
 
       sysIns(0) <-- core0Out
       sysIns(1) <-- core1Out
@@ -372,18 +350,14 @@ object AxiSocSpec extends TestSuite:
       // Capacity 4: settlement runs in bind declaration order, and the first bind is l2 -> dram, whose remapped
       // id space (l2.wb appended) needs 5 bits > 4.
       val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(dramIdCapacity = 4)))
-      e.error match
-        case NegotiationError.SettleFailed(SettleSubject.Design(bind), _, _) =>
-          assert(bind.target == ModuleNodeId(root / "mem" / "dram", "in"))
-        case other                                                           => assert(false)
+      assert(e.getMessage.contains("settle failed"))
+      assert(e.getMessage.contains("mem.dram#in"))
     }
 
-    test("overlapping peripheral addresses are caught during upward aggregation as N2") {
+    test("overlapping peripheral addresses are caught during upward aggregation") {
       val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(gpioBase = 0x10000800L)))
-      e.error match
-        case NegotiationError.PropagationFailed(_, node, NodeDirection.Inward, _, _, violation, _) =>
-          assert(node == ModuleNodeId(root / "periphXbar", "in"))
-          assert(violation.message.contains("overlap"))
-        case other                                                                                 => assert(false)
+      assert(e.getMessage.contains("propagation failed"))
+      assert(e.getMessage.contains("periphXbar#in"))
+      assert(e.getMessage.contains("overlap"))
     }
   }
