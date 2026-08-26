@@ -87,7 +87,7 @@ Diplomacy 是 rocket-chip 生态中的参数协商框架：模块在图上声明
 - 去掉 AOP（Aspect-Oriented Programming）带来的过高自由度，硬件只在生成器里（@sec-module-kinds）；
 - 去掉 `resolveStar` 与四种基数算子：端口数量由具名节点的显式声明给出，每个节点恰好参与一次 bind（@sec-attach）。
 
-这样做的目的是减少隐式行为，使模块边界、连接关系和生成过程更加明确，并回应 Diplomacy 在多层次耦合下的几个问题：验证成本高（@req-verification、@req-ip），后端设计无法切分边界（@req-ip、@sec-bridge-boundary），NoC 无法作为生成器模块纳入同一套集成流程（@req-interconnect）。既有代码库中基数算子的实际使用情况另见分析文档《边数机制实证调查》。
+这样做的目的是减少隐式行为，使模块边界、连接关系和生成过程更加明确，并回应 Diplomacy 在多层次耦合下的几个问题：验证成本高（@req-verification、@req-ip），后端设计无法切分边界（@req-ip、@sec-bridge-boundary），NoC 无法作为生成器模块纳入同一套集成流程（@req-interconnect）。既有代码库中基数算子的实际使用情况另见分析文档《边数机制实证调查》；Diplomacy 惯用的"从图读回参数"在本方案中的承接见 @apx-readback。
 
 术语上，凡与 Diplomacy 指同一件事的，本文沿用 Diplomacy 的名字：`InwardNode` 与 `OutwardNode`、`Down` 与 `Up`、边、`dFn` 与 `uFn`、`render`、Dangle。下表列出名字不同或概念不完全重合之处。
 

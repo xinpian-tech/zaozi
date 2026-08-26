@@ -34,3 +34,4 @@
 #include "chapters/08-hardware.typ"
 #include "chapters/09-tooling.typ"
 #include "chapters/10-glossary.typ"
+#include "chapters/11-appendix-readback.typ"
