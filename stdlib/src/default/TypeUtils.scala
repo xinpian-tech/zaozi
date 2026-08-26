@@ -23,6 +23,7 @@ given TypeUtilsApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Propagated[R, Bits] = (ref.getType match
+      case _: Bits   => summon[AsBits[Bits]].asBits(ref.asInstanceOf[Referable[Bits]])
       case _: Bool   => summon[AsBits[Bool]].asBits(ref.asInstanceOf[Referable[Bool]])
       case _: Bundle => summon[AsBits[Bundle]].asBits(ref.asInstanceOf[Referable[Bundle]])
       case _: Record => summon[AsBits[Record]].asBits(ref.asInstanceOf[Referable[Record]])
@@ -47,6 +48,7 @@ given TypeUtilsApi with
       sourcecode.Name.Machine,
       InstanceContext
     ): Propagated[R, D] = (tpe match
+      case _: Bits   => summon[AsBits[Bits]].asBits(ref)
       case _: Bool   => ref.asBool
       case x: Bundle => ref.asBundle[Bundle](x)
       case x: Record => ref.asRecord[Record](x)

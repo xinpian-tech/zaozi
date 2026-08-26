@@ -80,6 +80,19 @@ object TypeUtilSpec extends TestSuite:
           io.outBool.dontCare()
       BoolAsBits.verilogTest(TypeUtilParameter(8))("assign outBits")
 
+    test("Bits.asBits"):
+      @generator
+      object BitsAsBits
+          extends Generator[TypeUtilParameter, TypeUtilLayers, TypeUtilIO, TypeUtilProbe]
+          with HasVerilogTest:
+        def architecture(parameter: TypeUtilParameter) =
+          val io = summon[Interface[TypeUtilIO]]
+          io.outBits := io.inBits.asBits
+          io.out.dontCare()
+          io.outSInt.dontCare()
+          io.outBool.dontCare()
+      BitsAsBits.verilogTest(TypeUtilParameter(8))("assign outBits")
+
     test("Bundle.asBits"):
       @generator
       object BundleAsBits
@@ -204,6 +217,27 @@ object TypeUtilSpec extends TestSuite:
           io.outBits.dontCare()
           io.outBool.dontCare()
       ConstAsTypeOfUInt.verilogTest(TypeUtilParameter(8))(
+        "always @(posedge syncDomain_clock) begin",
+        "if (syncDomain_reset)"
+      )
+
+    test("Const[Bits].asType(Bits) returns Const[Bits]"):
+      @generator
+      object ConstAsTypeOfBits
+          extends Generator[TypeUtilParameter, TypeUtilLayers, TypeUtilIO, TypeUtilProbe]
+          with HasVerilogTest:
+        def architecture(parameter: TypeUtilParameter) =
+          val io           = summon[Interface[TypeUtilIO]]
+          given ClockScope = ClockScope.posedge(io.syncDomain.clock)
+          given ResetScope = ResetScope.syncActiveHigh(io.syncDomain.reset)
+          val constBits: Const[Bits] = 0.B(parameter.width).asType(Bits(parameter.width))
+          val reg = RegInit(constBits)
+          io.outBits := reg
+          reg        := io.inBits
+          io.out.dontCare()
+          io.outSInt.dontCare()
+          io.outBool.dontCare()
+      ConstAsTypeOfBits.verilogTest(TypeUtilParameter(8))(
         "always @(posedge syncDomain_clock) begin",
         "if (syncDomain_reset)"
       )
