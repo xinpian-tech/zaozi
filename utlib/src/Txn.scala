@@ -24,6 +24,29 @@ import java.lang.foreign.Arena
   */
 object Txn:
 
+  /** High for exactly the first post-reset cycle. Feed it (OR'd with the external reset) to a wrapped IP's reset so
+    * the IP resets *itself* with its RTL's true reset values, in the formal model and the replay alike: in the model
+    * the register is init-pinned to 1 so cycle 0 is a reset cycle; on the testbench it stays 1 through the reset
+    * preamble and one cycle beyond, then drops. Both time axes see reset low from cycle 1 on — so imported-register
+    * init pinning no longer has to guess reset values (0 is fine, the RTL overwrites them at the cycle-0 edge).
+    */
+  def firstCycle(
+  )(
+    using ClockScope,
+    ResetScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Referable[Bool] =
+    val first = RegInit(true.B)
+    first := false.B
+    first
+
   /** The last `depth` beats of `sig` — `hist(0)` is one beat old, `hist(depth - 1)` the oldest — and a beat counter
     * saturating at `depth`, so `beats === depth` means the whole window is real history.
     */

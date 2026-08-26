@@ -10,13 +10,15 @@ package me.jiuyang.utlib
 object SvImport:
 
   /** Import SV sources via `circt-verilog --ir-hw` and adapt the result for circt-bmc. */
-  def toHw(sources: Seq[os.Path], outDir: os.Path): os.Path =
+  def toHw(sources: Seq[os.Path], outDir: os.Path, include: Option[os.Path] = None): os.Path =
     os.makeDir.all(outDir)
     val raw = outDir / "imported.hw.mlir"
     os.write.over(
       raw,
-      os.proc(Seq(CirctTools("circt-verilog")) ++ sources.map(_.toString) ++ Seq("--ir-hw"))
-        .call(check = true)
+      os.proc(
+        Seq(CirctTools("circt-verilog")) ++ sources.map(_.toString) ++ Seq("--ir-hw") ++
+          include.toSeq.flatMap(p => Seq("-I", p.toString))
+      ).call(check = true)
         .out
         .text()
     )
@@ -41,6 +43,8 @@ object SvImport:
       lines = lines
         .filterNot(l => toClock.findFirstMatchIn(l).exists(_.group(1) == converted))
         .map(_.replace(s"in $port : i1", s"in $port : !seq.clock"))
+        // an hw.instance passing the retyped value annotates the operand type inline: `clk: %clk_i: i1`
+        .map(_.replace(s"$port: i1", s"$port: !seq.clock"))
         .map(_.replaceAll(raw"${java.util.regex.Pattern.quote(converted)}\b", port))
 
     // 2. Four-state comparison predicates (case/wildcard equality from `==`/`===` on logic types): under the
@@ -67,6 +71,55 @@ object SvImport:
         )
       case l                               => Vector(l)
     }
+
+    // 4. Small memories (`seq.firmem`, e.g. a FIFO's storage) — circt-bmc cannot legalize the memory primitive, so
+    //    expand each one with a single combinational read port and a single write port into per-slot registers:
+    //    a zero-pinned compreg per slot, a write-enable mux per slot, and a read mux tree.
+    val memDef    = raw"^(\s*)(%[\w.$$/]+) = seq\.firmem [^:]+: <(\d+) x (\d+), mask \d+>.*$$".r
+    val readPort  =
+      raw"^\s*(%[\w.$$/]+) = seq\.firmem\.read_port (%[\w.$$/]+)\[(%[\w.$$/]+)\], clock (%[\w.$$/]+) : .*$$".r
+    val writePort =
+      raw"^\s*seq\.firmem\.write_port (%[\w.$$/]+)\[(%[\w.$$/]+)\] = (%[\w.$$/]+), clock (%[\w.$$/]+) enable (%[\w.$$/]+) : .*$$".r
+    val mems      = lines.collect { case memDef(ind, m, depth, width) => m -> (ind, depth.toInt, width.toInt) }.toMap
+    val reads     = lines.collect { case readPort(res, m, addr, clk) => m -> (res, addr, clk) }.toMap
+    val writes    = lines.collect { case writePort(m, addr, data, clk, en) => m -> (addr, data, clk, en) }.toMap
+    if mems.nonEmpty then
+      lines = lines.flatMap { l =>
+        l match
+          case memDef(ind, m, _, _) if reads.contains(m) && writes.contains(m) =>
+            val (_, depth, width)         = mems(m)
+            val aw                        = 32 - Integer.numberOfLeadingZeros(depth - 1)
+            val (rres, raddr, _)          = reads(m)
+            val (waddr, wdata, wclk, wen) = writes(m)
+            val n                         = m.drop(1).replace('/', '_')
+            val slots                     = (0 until depth).flatMap { i =>
+              Vector(
+                s"$ind%${n}__a$i = hw.constant $i : i$aw",
+                s"$ind%${n}__weq$i = comb.icmp eq $waddr, %${n}__a$i : i$aw",
+                s"$ind%${n}__we$i = comb.and %${n}__weq$i, $wen : i1",
+                s"$ind%${n}__n$i = comb.mux %${n}__we$i, $wdata, %${n}__s$i : i$width",
+                s"$ind%${n}__i$i = seq.initial() {",
+                s"$ind  %${n}__z$i = hw.constant 0 : i$width",
+                s"$ind  seq.yield %${n}__z$i : i$width",
+                s"$ind} : () -> !seq.immutable<i$width>",
+                s"$ind%${n}__s$i = seq.compreg %${n}__n$i, $wclk initial %${n}__i$i : i$width"
+              )
+            }
+            val readMux                   = (1 until depth).flatMap { i =>
+              val prev = if i == 1 then s"%${n}__s0" else s"%${n}__r${i - 1}"
+              Vector(
+                s"$ind%${n}__req$i = comb.icmp eq $raddr, %${n}__a$i : i$aw",
+                s"$ind%${n}__r$i = comb.mux %${n}__req$i, %${n}__s$i, $prev : i$width"
+              )
+            }
+            slots ++ readMux
+          case readPort(res, m, _, _) if mems.contains(m) && writes.contains(m) =>
+            val (_, depth, width) = mems(m)
+            val n                 = m.drop(1).replace('/', '_')
+            Vector(s"    $res = comb.or %${n}__r${depth - 1}, %${n}__r${depth - 1} : i$width")
+          case writePort(m, _, _, _, _) if mems.contains(m) && reads.contains(m) => Vector.empty
+          case _                                                                => Vector(l)
+      }
 
     val out = hwMlir / os.up / s"${hwMlir.last}.bmc.mlir"
     os.write.over(out, lines.mkString("\n"))
