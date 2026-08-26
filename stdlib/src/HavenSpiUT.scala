@@ -91,7 +91,7 @@ object HavenSpiUT
     io.DAT             := instance.io.dat_o
     io.ACK             := instance.io.ack_o
 
-    Assume((!io.reset.asBool).I, "rst_low")
+    Txn.assumeResetLow(io.reset)
 
     // C as typed value ∧ state semantics: the held write request (value — the driven Wishbone fields) meets the
     // design's acknowledgement (state — the registered ack). A *completed* write means the request is still held

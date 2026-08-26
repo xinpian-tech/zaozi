@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Txn, UT}
+import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -93,12 +93,14 @@ object ExtAccumUT
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    Assume((!io.reset.asBool).I, "rst_low")
+    Txn.assumeResetLow(io.reset)
 
-    val (_, beats) = Txn.history(io.A, parameter.width, 2)
-    val window     = beats === 2.U(2)
-    val sumIs9     = instance.io.sum === 9.U(parameter.width).asBits
-    Assert((!(window & sumIs9)).I, "gen_sum9_through_ext_ip")
+    // C as typed relation ∧ state semantics: after two real beats, the IP's accumulator reads 9.
+    val w = Txn.window(io.A, parameter.width, 2)
+    Generate(
+      Sem.relation(w)(_ => true.B) && Sem.state(instance.io.sum === 9.U(parameter.width).asBits),
+      "gen_sum9_through_ext_ip"
+    )
 
     val probe = summon[ProbeInterface[ExtAccumUTProbe]]
     layer("Verification"):

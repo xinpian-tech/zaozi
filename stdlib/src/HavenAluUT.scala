@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.stdlib
 
-import me.jiuyang.utlib.{Generate, Sem, UT}
+import me.jiuyang.utlib.{Generate, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -83,7 +83,7 @@ object HavenAluUT
     io.RESULT         := instance.io.result
     io.DONE           := instance.io.done
 
-    Assume((!io.reset.asBool).I, "rst_low")
+    Txn.assumeResetLow(io.reset)
 
     // C as typed state semantics: the ALU's completion state — done with result 0xBEEF.
     Generate(Sem.state(instance.io.done & (instance.io.result === 48879.U(32).asBits)), "gen_alu_xor_beef")
