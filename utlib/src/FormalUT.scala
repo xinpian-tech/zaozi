@@ -100,6 +100,19 @@ object FormalUT:
     val (hw, top) = elaborateToHw(dut, parameter, outDir)
     generate(hw, top, bound)
 
+  /** Lower a zaozi generator to the pruned HW module circt-bmc reads, without running it — the composition point for
+    * flows that post-process the model first (e.g. [[SvImport.mergeForBmc]] splicing an imported IP over an extern).
+    */
+  def lowerGenerator[
+    PARAM <: Parameter,
+    L <: LayerInterface[PARAM],
+    I <: HWInterface[PARAM],
+    P <: DVInterface[PARAM, L]
+  ](dut:       Generator[PARAM, L, I, P],
+    parameter: PARAM,
+    outDir:    os.Path
+  ): (os.Path, String) = elaborateToHw(dut, parameter, outDir)
+
   // ---- the circt-bmc engine ----------------------------------------------------------------------------------------
 
   private[utlib] enum Bmc:
