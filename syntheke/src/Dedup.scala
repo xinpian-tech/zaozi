@@ -23,7 +23,7 @@ object Dedup:
     nameOf:      Map[ModuleId, String])
 
   /** Canonical JSON: object keys sorted recursively; arrays keep order. */
-  private def canonical(v: ujson.Value): ujson.Value = v match
+  private[syntheke] def canonical(v: ujson.Value): ujson.Value = v match
     case obj: ujson.Obj => ujson.Obj.from(obj.value.toVector.sortBy(_._1).map((k, w) => k -> canonical(w)))
     case arr: ujson.Arr => ujson.Arr.from(arr.value.map(canonical))
     case other => other

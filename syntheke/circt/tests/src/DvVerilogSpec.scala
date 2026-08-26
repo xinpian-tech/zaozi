@@ -81,8 +81,7 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
   private val dumped = mutable.Set.empty[String]
 
   def moduleName(fullParam: Any): String =
-    val p = fullParam.asInstanceOf[StubFull]
-    s"${p.kind}_${Integer.toHexString(p.hashCode)}"
+    GeneratorBackend.canonicalModuleName(entry, fullParam.asInstanceOf[StubFull])
 
   def instantiate(
     fullParam:    Any,
@@ -241,6 +240,6 @@ object DvVerilogSpec extends TestSuite:
       // Verilog exists for the root and both stub endpoint modules; probes stay out of the release netlist
       // (bind layers), so the sink instance is not in module Top's body.
       assert(design.verilog.contains("module Top"))
-      assert(design.verilog.contains("module Src_"))
+      assert(design.verilog.contains("module demo_dv_Src_"))
     }
   }

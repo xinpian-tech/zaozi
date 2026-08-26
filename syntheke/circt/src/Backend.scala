@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke.circt
 
+import scala.collection.mutable
+
 import me.jiuyang.syntheke.*
 import me.jiuyang.zaozi.{DVInterface, Generator, HWInterface, InstanceContext, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation}
 
 import java.lang.foreign.Arena
@@ -19,7 +22,10 @@ import java.lang.foreign.Arena
 trait GeneratorBackend:
   def id: GeneratorId
 
-  /** The deduplicated module name for this full parameter; must be stable per (GeneratorId, canonical FullParam). */
+  /** The module name is the linking key: instances reference it and the dumped `.mlirbc` file is found by it, so it
+    * must be a faithful encoding of the identity (`GeneratorId`, canonical FullParam) — globally unique across
+    * backends, not merely stable within one. Use [[GeneratorBackend.canonicalModuleName]].
+    */
   def moduleName(fullParam: Any): String
 
   /** Create the instance operation in the current block; results are the ports, named by the `portNames` attribute. */
@@ -32,6 +38,21 @@ trait GeneratorBackend:
     Context,
     Block
   ): Operation
+
+object GeneratorBackend:
+  /** The canonical linking key: sanitized qualified `GeneratorId` plus a strong hash over (qualified name, version,
+    * canonical FullParam JSON). Distinct identities cannot collide in the flat symbol namespace the linker resolves by
+    * name.
+    */
+  def canonicalModuleName[FP](entry: GeneratorEntry[FP], fullParam: FP): String =
+    val payload = ujson.write(Dedup.canonical(entry.fullParamCodec.encode(fullParam)))
+    val digest  = java.security.MessageDigest
+      .getInstance("SHA-256")
+      .digest(
+        s"${entry.id.qualifiedName}\n${entry.id.version}\n$payload".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+      )
+    val hash    = digest.take(8).map(b => f"$b%02x").mkString
+    s"${entry.id.qualifiedName.map(c => if c.isLetterOrDigit then c else '_')}_$hash"
 
 /** The zaozi backend: a syntheke generator entry enacted by a zaozi [[Generator]].
   *
@@ -53,7 +74,34 @@ final class ZaoziBackend[
 
   private def param(fullParam: Any): PARAM = toParam(fullParam.asInstanceOf[FP])
 
-  def moduleName(fullParam: Any): String = generator.moduleName(param(fullParam))
+  def moduleName(fullParam: Any): String =
+    GeneratorBackend.canonicalModuleName(entry, fullParam.asInstanceOf[FP])
+
+  /** zaozi mints both the instance's referenced symbol and the dumped file name from `Generator.moduleName`; route both
+    * through the canonical name by delegating to a per-name view of the generator. Memoized per name so zaozi's
+    * dump-once bookkeeping keeps working across instantiations.
+    */
+  private val delegates = mutable.Map.empty[String, Generator[PARAM, L, I, P]]
+  private def delegate(name: String): Generator[PARAM, L, I, P] =
+    delegates.getOrElseUpdate(
+      name,
+      new Generator[PARAM, L, I, P]:
+        override def moduleName(parameter: PARAM):         String = name
+        def architecture(parameter: PARAM): (
+          Arena,
+          Context,
+          Block,
+          Interface[I],
+          ProbeInterface[P],
+          L,
+          InstanceContext
+        ) ?=> Unit = generator.architecture(parameter)
+        def layers(parameter:              PARAM):         L      = generator.layers(parameter)
+        def interface(parameter:           PARAM):         I      = generator.interface(parameter)
+        def probe(parameter:               PARAM):         P      = generator.probe(parameter)
+        def parseParameter(args:           Seq[String]):   PARAM  = generator.parseParameter(args)
+        def main(args:                     Array[String]): Unit   = generator.main(args)
+    )
 
   def instantiate(
     fullParam:    Any,
@@ -68,4 +116,4 @@ final class ZaoziBackend[
     given sourcecode.Line         = sourcecode.Line(loc.line)
     given sourcecode.Name.Machine = sourcecode.Name.Machine(instanceName)
     given InstanceContext         = new InstanceContext
-    generator.instantiate(param(fullParam)).operation
+    delegate(moduleName(fullParam)).instantiate(param(fullParam)).operation
