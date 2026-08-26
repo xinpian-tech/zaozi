@@ -161,7 +161,9 @@ object Elaborator:
         dd.definitions.foreach { d =>
           val rep = d.instances.head
           spec.wrapper(rep).foreach { w =>
-            val ports      = resolved.portPlans.filter(_.module == rep)
+            // Port order must match across every instance sharing this key; the key sorts ports by encoded name,
+            // so definition and instance emission both use that order.
+            val ports      = resolved.portPlans.filter(_.module == rep).sortBy(_.name.encoded)
             val portFields = ports.map { p =>
               summon[FirrtlBundleFieldApi].createFirrtlBundleField(
                 p.name.encoded,
@@ -292,7 +294,7 @@ object Elaborator:
                   }
                   (byName.toVector.map((n, i) => ((c, n), instOp.getResult(i))), sinkBlock.map(c -> _))
                 case _:  WrapperModuleSpec   =>
-                  val childPorts = resolved.portPlans.filter(_.module == childId)
+                  val childPorts = resolved.portPlans.filter(_.module == childId).sortBy(_.name.encoded)
                   val fields     = childPorts.map { p =>
                     summon[FirrtlBundleFieldApi].createFirrtlBundleField(
                       p.name.encoded,
