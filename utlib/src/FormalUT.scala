@@ -117,6 +117,9 @@ object FormalUT:
         bound.toString,
         "--module",
         top,
+        // One BMC step = one rising edge, so trace rows are clock cycles: without this each step is a clock
+        // phase, register state updates every other row, and a multi-cycle witness can't drive a testbench.
+        "--rising-clocks-only",
         "--print-only-first-counterexample",
         s"--shared-libs=${defaultLibz3()}"
       )

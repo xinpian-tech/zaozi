@@ -107,6 +107,13 @@ final class UTGenerator[
     ).call()
 
     val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
+    // A generation constraint asserted in the module body renders as a concurrent SVA property with per-atom
+    // clocking — Verilator cannot parse that form, and replay checks through probes (the build passes --no-assert
+    // anyway), so strip concurrent assertion statements from the testbench copy.
+    os.write.over(
+      emitted.primary,
+      os.read(emitted.primary).replaceAll("""(?s)(\w+:\s*)?(assert|assume|cover) property \([^;]*\);""", "")
+    )
     val driverPath = outDir / s"${Driver.topModuleName}.sv"
     os.write.over(driverPath, Driver.topString(harnessTop, trace = false, traceFile = "trace.vcd"))
     val capiPath   = outDir / s"${spec.dut}_tick.c"
