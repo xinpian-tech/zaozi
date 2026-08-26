@@ -15,7 +15,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 /** Operation-oriented implementation of `DW_fifo_s1_sf`.
   *
-  * The controller is elaborated in this generator. [[Ram]] is the only queue child module.
+  * The controller is elaborated in this generator. [[Ram]] and the arithmetic primitives are the queue's child modules.
   */
 case class SyncQueueParameter(
   width:             Int,
@@ -101,7 +101,9 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val writeN = io.pushRequestN | (full & io.popRequestN)
     val read   = !io.popRequestN & notEmpty
 
-    val writeAddressPlusOne = (writeAddress + 1.U(addressWidth)).asBits.bits(addressWidth - 1, 0).asUInt
+    val writeAddressIncrementer = Incrementer.instantiate(BKAIncrementerParameter(addressWidth))
+    writeAddressIncrementer.io.A := writeAddress.asBits
+    val writeAddressPlusOne = writeAddressIncrementer.io.SUM.asUInt
     val nextWriteAddress    = Wire(UInt(addressWidth))
     nextWriteAddress := writeAddress
     when(!writeN) {
@@ -112,7 +114,9 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
       }
     }
 
-    val readAddressPlusOne = (readAddress + 1.U(addressWidth)).asBits.bits(addressWidth - 1, 0).asUInt
+    val readAddressIncrementer = Incrementer.instantiate(BKAIncrementerParameter(addressWidth))
+    readAddressIncrementer.io.A := readAddress.asBits
+    val readAddressPlusOne = readAddressIncrementer.io.SUM.asUInt
     val diagnosticClear    = if parameter.enableDiagnostics then !io.diagnosticN else Node(false.B)
     val nextReadAddress    = Wire(UInt(addressWidth))
     nextReadAddress := readAddress
@@ -129,13 +133,21 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val nextWriteAddressAtMax =
       (nextWriteAddress.asBits & lastAddress.U(addressWidth).asBits).asUInt === lastAddress.U(addressWidth)
 
-    val incrementWordCount =
+    val incrementWordCount   =
       (!io.pushRequestN & io.popRequestN & !full) | (!io.pushRequestN & !notEmpty)
-    val decrementWordCount = io.pushRequestN & !io.popRequestN & notEmpty
-    val wordCountPlusOne   = (wordCount + 1.U(addressWidth)).asBits.bits(addressWidth - 1, 0).asUInt
-    val wordCountMinusOne  = (wordCount - 1.U(addressWidth)).asBits.bits(addressWidth - 1, 0).asUInt
-    val advancedWordCount  = decrementWordCount ? (wordCountMinusOne, wordCountPlusOne)
-    val nextWordCount      = (incrementWordCount | decrementWordCount) ? (advancedWordCount, Node(wordCount))
+    val decrementWordCount   = io.pushRequestN & !io.popRequestN & notEmpty
+    val wordCountIncrementer = Incrementer.instantiate(BKAIncrementerParameter(addressWidth))
+    wordCountIncrementer.io.A := wordCount.asBits
+    val wordCountPlusOne    = wordCountIncrementer.io.SUM.asUInt
+    val wordCountSubtractor = BrentKungAdder.instantiate(BrentKungAdderParameter(addressWidth, 4))
+    val wordCountSubtractIO =
+      wordCountSubtractor.io.asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
+    wordCountSubtractIO.A  := wordCount.asBits
+    wordCountSubtractIO.B  := ~1.U(addressWidth).asBits
+    wordCountSubtractIO.CI := true.B
+    val wordCountMinusOne = wordCountSubtractIO.SUM.asUInt
+    val advancedWordCount = decrementWordCount ? (wordCountMinusOne, wordCountPlusOne)
+    val nextWordCount     = (incrementWordCount | decrementWordCount) ? (advancedWordCount, Node(wordCount))
 
     val enteringFull       =
       (wordCount === lastAddress.U(addressWidth)) ? (!io.pushRequestN & io.popRequestN, false.B)

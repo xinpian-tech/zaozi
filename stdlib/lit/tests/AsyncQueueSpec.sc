@@ -58,6 +58,8 @@
 // ASYNC: if ([[QUEUE_RESET]]) begin
 // ASYNC: always @(posedge pop_clock or posedge [[QUEUE_RESET]]) begin
 // ASYNC: if ([[QUEUE_RESET]]) begin
+// ASYNC: Incrementer_width3_radix4
+// ASYNC: BrentKungAdder_width3_radix4
 // ASYNC: Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue ram (
 // ASYNC-NOT: SynchronizedReset
 // ASYNC-NOT: Verification
@@ -70,12 +72,18 @@
 // NONPOW: if ({{[_A-Za-z0-9]+}}) begin
 // NONPOW: always @(posedge pop_clock) begin
 // NONPOW: if ({{[_A-Za-z0-9]+}}) begin
+// NONPOW: Incrementer_width3_radix4
+// NONPOW: BrentKungAdder_width3_radix4
+// NONPOW: BrentKungAdder_width2_radix4
 // NONPOW: Ram_dataWidth8_depth6_asyncResetfalse_resetMemfalse ram (
 // NONPOW-NOT: SynchronizedReset
 // NONPOW-NOT: Verification
 // NONPOW-NOT: GTECH_
 
 // MUX-LABEL: module AsyncQueue_width8_depth9_pushAlmostEmptyLevel1_pushAlmostFullLevel1_popAlmostEmptyLevel1_popAlmostFullLevel1_stickyErrorfalse_pushSync2_popSync2_asyncResetfalse_resetMemfalse(
+// MUX: Incrementer_width4_radix4
+// MUX: BrentKungAdder_width4_radix4
+// MUX: BrentKungAdder_width3_radix4
 // MUX: Ram_dataWidth8_depth10_asyncResetfalse_resetMemfalse ram (
 // MUX-NOT: SynchronizedReset
 // MUX-NOT: Verification

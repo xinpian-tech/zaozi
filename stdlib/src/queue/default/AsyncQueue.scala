@@ -4,6 +4,7 @@ package me.jiuyang.stdlib.queue.default
 
 import java.lang.foreign.Arena
 
+import me.jiuyang.stdlib.{BKAIncrementerParameter, BrentKungAdder, BrentKungAdderParameter, Incrementer, PrefixAdderIO}
 import me.jiuyang.stdlib.default.{Ram, RamParameter}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
@@ -13,8 +14,8 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 /** Operation-oriented implementation of `DW_fifo_s2_sf`.
   *
-  * The controller, directional pointer logic, and synchronizers are elaboration helpers. [[Ram]] is the only queue
-  * child module.
+  * The controller, directional pointer logic, and synchronizers are elaboration helpers. [[Ram]] and the arithmetic
+  * primitives are the queue's child modules.
   */
 case class AsyncQueueParameter(
   width:                Int,
@@ -163,9 +164,11 @@ private final class AsyncDirection(
         val advance    = request & !atBoundary
         val errorEvent = request & atBoundary
 
-        val increment       = advance ? (1.U(pointerWidth), 0.U(pointerWidth))
-        val incremented     = (biasedPointer + increment).asBits.bits(pointerWidth - 1, 0).asUInt
-        val advancedPointer =
+        val pointerIncrementer = Incrementer.instantiate(BKAIncrementerParameter(pointerWidth))
+        pointerIncrementer.io.A := biasedPointer.asBits
+        val incrementedPointer = pointerIncrementer.io.SUM.asUInt
+        val incremented        = advance ? (incrementedPointer, biasedPointer)
+        val advancedPointer    =
           if geometry.needsCorrection then
             val result = Wire(UInt(pointerWidth))
             when((biasedPointer =/= endCount.U(pointerWidth)) | !advance) {
@@ -179,8 +182,14 @@ private final class AsyncDirection(
         val (writePointer, readPointer) = kind match
           case AsyncDirectionKind.Push => (advancedPointer, remoteBinary)
           case AsyncDirectionKind.Pop  => (remoteBinary, advancedPointer)
-        val rawWordCount                = (writePointer - readPointer).asBits.bits(pointerWidth - 1, 0).asUInt
-        val wrapped                     = writePointer < readPointer
+        val wordCountSubtractor         = BrentKungAdder.instantiate(BrentKungAdderParameter(pointerWidth, 4))
+        val wordCountSubtractIO         =
+          wordCountSubtractor.io.asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
+        wordCountSubtractIO.A  := writePointer.asBits
+        wordCountSubtractIO.B  := ~readPointer.asBits
+        wordCountSubtractIO.CI := true.B
+        val rawWordCount = wordCountSubtractIO.SUM.asUInt
+        val wrapped      = writePointer < readPointer
 
         val (correctedWordCount, nextAddress): (Node[UInt], Node[UInt]) =
           if !geometry.needsCorrection then (rawWordCount, advancedPointer.asBits.bits(addressWidth - 1, 0).asUInt)
@@ -189,11 +198,22 @@ private final class AsyncDirection(
             val rawHigh   = rawWordCount.asBits.bits(pointerWidth - 1, geometry.shift).asUInt
             val correctedHigh: Node[UInt] =
               if geometry.residual == 1 then
-                val decremented = (rawHigh - 1.U(highWidth)).asBits.bits(highWidth - 1, 0).asUInt
+                val decrementSubtractor = BrentKungAdder.instantiate(BrentKungAdderParameter(highWidth, 4))
+                val decrementSubtractIO =
+                  decrementSubtractor.io.asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
+                decrementSubtractIO.A  := rawHigh.asBits
+                decrementSubtractIO.B  := ~1.U(highWidth).asBits
+                decrementSubtractIO.CI := true.B
+                val decremented = decrementSubtractIO.SUM.asUInt
                 wrapped ? (decremented, rawHigh)
               else
-                val subtracted   =
-                  (rawHigh - geometry.residual.U(highWidth)).asBits.bits(highWidth - 1, 0).asUInt
+                val correctionSubtractor = BrentKungAdder.instantiate(BrentKungAdderParameter(highWidth, 4))
+                val correctionSubtractIO =
+                  correctionSubtractor.io.asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
+                correctionSubtractIO.A  := rawHigh.asBits
+                correctionSubtractIO.B  := ~geometry.residual.U(highWidth).asBits
+                correctionSubtractIO.CI := true.B
+                val subtracted   = correctionSubtractIO.SUM.asUInt
                 val selectedBits = Vector.tabulate(highWidth): bit =>
                   wrapped ? (subtracted.asBits.bit(bit), rawHigh.asBits.bit(bit))
                 Node(
@@ -205,11 +225,15 @@ private final class AsyncDirection(
               if geometry.shift == 0 then correctedHigh
               else (correctedHigh.asBits ## rawWordCount.asBits.bits(geometry.shift - 1, 0)).asUInt
 
-            val addressShift     = geometry.shift - 1
-            val addressHighWidth = pointerWidth - addressShift
-            val addressHigh      =
-              (advancedPointer.asBits.bits(pointerWidth - 1, addressShift).asUInt -
-                (startCount >> addressShift).U(addressHighWidth)).asBits.bits(addressHighWidth - 1, 0).asUInt
+            val addressShift      = geometry.shift - 1
+            val addressHighWidth  = pointerWidth - addressShift
+            val addressSubtractor = BrentKungAdder.instantiate(BrentKungAdderParameter(addressHighWidth, 4))
+            val addressSubtractIO =
+              addressSubtractor.io.asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
+            addressSubtractIO.A  := advancedPointer.asBits.bits(pointerWidth - 1, addressShift)
+            addressSubtractIO.B  := ~(startCount >> addressShift).U(addressHighWidth).asBits
+            addressSubtractIO.CI := true.B
+            val addressHigh = addressSubtractIO.SUM.asUInt
             val correctedAddress: Node[UInt] =
               if addressShift == 0 then addressHigh
               else (addressHigh.asBits ## advancedPointer.asBits.bits(addressShift - 1, 0)).asUInt
