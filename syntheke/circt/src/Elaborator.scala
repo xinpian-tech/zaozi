@@ -258,8 +258,8 @@ object Elaborator:
                 case gm: GeneratorModuleSpec =>
                   val rgm      = resolved.generatorModule(childId).get
                   val instOp   = backendOf(gm.entry).instantiate(rgm.fullParam, c, gm.loc)
-                  // Expected ports: one bundle per design node, and one pure-probe port per signal leaf of every
-                  // probe source (probes never form aggregates in hardware).
+                  // Expected ports: one bundle per design node, and one pure-probe port per interface leaf of every
+                  // probe source (a Probe node is one leaf; its inner may be an aggregate).
                   val expected = rgm.view.nodes.map { nv =>
                     (nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
                   } ++ gm.dvSources.flatMap { s =>
@@ -295,14 +295,14 @@ object Elaborator:
             val childValues = w.children.flatMap(emitChild).toMap
 
             def baseOf(e: LocalEndpoint): Value = e match
-              case LocalEndpoint.ThisPort(name)        =>
+              case LocalEndpoint.ThisPort(port)        =>
                 portIndex
-                  .get(name.encoded)
-                  .fold(fail(s"$name: missing port ${name.encoded}"))(i => module.getIO(i))
+                  .get(port.encoded)
+                  .fold(fail(s"wrapper $name: missing port ${port.encoded}"))(i => module.getIO(i))
               case LocalEndpoint.ChildPort(inst, port) =>
                 childValues.getOrElse(
                   (inst, port.encoded),
-                  fail(s"$name: missing child port $inst.${port.encoded}")
+                  fail(s"wrapper $name: missing child port $inst.${port.encoded}")
                 )
 
             resolved.wirePlans.filter(_.module == id).foreach { wp =>
@@ -382,7 +382,7 @@ object Elaborator:
             val circuitOps = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
               .filter(_.getName.str == "firrtl.circuit")
               .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
-            val moved      = circuitOps.filter(_.getName.str == "firrtl.module").filter { op =>
+            val moved      = circuitOps.filter(op => Set("firrtl.module", "firrtl.extmodule")(op.getName.str)).filter { op =>
               val s2 = op.getInherentAttributeByName("sym_name").stringAttrGetValue
               if defined(s2) then false
               else
