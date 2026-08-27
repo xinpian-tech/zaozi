@@ -43,7 +43,7 @@
 
 框架以探针汇为求解单位：按 bind 声明顺序收集该汇的 `NonEmptyVector[Down]`，调用一次该汇协议的 `resolve`；成功后以相同顺序收集各源的层路径，调用 `interfacesOf(edge, layers)` 得到 `DVInterfaces`。返回值中的 `sources` 与输入一一对应，供各探针源及其跨层端口使用；`sink` 是探针汇的聚合接口；`sinkPaths(i)` 在 `sink` 中选择与 `sources(i)` 结构完全相同的 Bundle。空路径选择 `sink` 根 Bundle；非空路径用 `Field` 进入具名字段、用 `Index` 进入 Vec 元素，并且最后一段必须落在 Bundle。所有路径必须有效、互异且互不重叠，其选中 Bundle 的信号叶必须精确覆盖 `sink` 的全部信号叶。
 
-验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验。`DVInterfaces` 违反以上契约时，报告接口映射违约（@sec-error-semantics）。
+验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，且不得出现 `Flipped`——观测是单向的；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验。`DVInterfaces` 违反以上契约时，报告接口映射违约（@sec-error-semantics）。
 
 求解结果按模块整理进 `EdgeView` 的验证部分 `VerificationView`：每个源的条目包含 `DVSourceId`、`DVBindId`、聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeFullParam` 分别读取这些条目并进入各自的完整参数（@sec-settle-pp、@sec-generator-module）。
 
@@ -59,7 +59,7 @@
   设探针汇生成器的父结构模块为 $W$。$W$ 必须是每个探针源模块的严格祖先；汇生成器是 $W$ 的直接子模块。每条硬件路径由源到 $W$ 的唯一上行路径及 $W$ 到汇生成器的连接组成。兄弟模块之间的观察应把汇生成器放在二者公共祖先之下。
 ] <dec-dv-ancestor>
 
-探针路由复用设计侧的跨层端口规划（@sec-punch-planning），但按信号叶展开：探针在硬件里从不组成聚合。第 $i$ 条 bind 对已求解 `DVInterfaces.sources(i)` 的每个信号叶各生成一条 Output 路径——沿途各层一个纯 `Probe` 类型的 Dangle 端口，逐层 `ref.define` 传递，`Vec` 叶按下标展开、与字段叶同样路由。每条叶路径最终在 $W$ 的 layerblock 中 `ref.resolve`，连接到汇生成器端口内 `sinkPaths(i)` 延伸该叶路径的位置。验证接口中的 `flip` 固定为 `false`；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
+探针路由复用设计侧的跨层端口规划（@sec-punch-planning），但按信号叶展开：探针在硬件里从不组成聚合。第 $i$ 条 bind 对已求解 `DVInterfaces.sources(i)` 的每个信号叶各生成一条 Output 路径——沿途各层一个纯 `Probe` 类型的 Dangle 端口，逐层 `ref.define` 传递，`Vec` 叶按下标展开、与字段叶同样路由。每条叶路径最终在 $W$ 的 layerblock 中 `ref.resolve`，连接到汇生成器端口内 `sinkPaths(i)` 延伸该叶路径的位置。验证接口不含 `Flipped`——观测是单向的；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
 
 结构校验核对探针源与探针汇的协议、源的唯一 bind 及祖先关系，违反时报告验证拓扑非法（@sec-error-semantics）。
 

@@ -16,7 +16,7 @@
 
 根结构模块没有端口，设计是封闭电路。根模块充当测试平台：芯片顶层是它的子模块，端口由本节规则生成；DDR、PCIe 等外部模型是根下的生成器模块。
 
-设计连接的沿途端口结构取自 `interfaceOf(edge)` 返回的非空 `ProtocolBundle`（@sec-protocol-interface）；验证连接取自对应的 `DVInterfaces.sources(i)`，它与目标端选定 Bundle 结构相同（@sec-dv-protocol）。框架将这两种结构翻译为 FIRRTL 类型。设计连接的源端路径使用 Output、目标端路径使用 Input，内部字段方向由 `flip` 确定；验证连接固定为源端 Output、目标端 Input，且 `flip` 全部为 `false`。
+设计连接的沿途端口结构取自 `interfaceOf(edge)` 返回的非空 `ProtocolBundle`（@sec-protocol-interface）；验证连接取自对应的 `DVInterfaces.sources(i)`，它与目标端选定 Bundle 结构相同（@sec-dv-protocol）。框架将这两种结构翻译为 FIRRTL 类型。设计连接的源端路径使用 Output、目标端路径使用 Input，内部字段方向由 `Flipped` 确定；验证连接固定为源端 Output、目标端 Input，不含 `Flipped`。
 
 #图([设计连接的跨层端口生成。a、b 是端点模块已有的模块节点；其严格祖先 M1、M2 分别生成 Output、Input 方向的 Dangle 端口，LCA 在顶层连接两条分支。])[
   #syn-diagram(

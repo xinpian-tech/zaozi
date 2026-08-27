@@ -77,7 +77,7 @@
 
 设计协议的接口由 `Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock` 与 `Reset` 构成。验证协议的接口以 `Probe`（FIRRTL 对内部信号的只读引用，@ch-verification）包装每个信号叶，并在 `Probe` 中记录 `LayerPath`。
 
-`ProtocolBundle` 描述源端视角的字段结构。框架为源模块端口赋予 Output 根方向，为目标模块端口赋予 Input 根方向；`flip = false` 跟随根方向，`flip = true` 取反。字段顺序是接口结构的一部分。
+`ProtocolBundle` 描述源端视角的字段结构。框架为源模块端口赋予 Output 根方向，为目标模块端口赋予 Input 根方向；对齐是无标记的默认，方向取反的字段以 `Flipped` 包装其类型（仅可直接作为字段类型出现）。字段顺序是接口结构的一部分。
 
 == 参数的双层结构 <sec-two-layer-params>
 
