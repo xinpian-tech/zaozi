@@ -34,7 +34,8 @@ object ProtocolInterface:
   /** Read-only reference to an internal signal, confined to a FIRRTL layer. */
   final case class Probe(inner: ProtocolInterface, layer: LayerPath) extends ProtocolInterface
 
-  final case class Field(name: String, flip: Boolean, tpe: ProtocolInterface) derives upickle.default.ReadWriter:
+  final case class Field(name: String, tpe: ProtocolInterface, flip: Boolean = false)
+      derives upickle.default.ReadWriter:
     DeclaredName.require(name, "interface field name")
 
 /** The top-level Bundle of a protocol port: the root and every nested Bundle carry at least one field (invariant

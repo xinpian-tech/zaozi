@@ -184,11 +184,11 @@ object DvVerilogSpec extends TestSuite:
       val sources = edge.zip(layers).map { (w, l) =>
         ProtocolBundle(
           ProtocolInterface
-            .Field("pc", false, ProtocolInterface.Vec(2, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
+            .Field("pc", ProtocolInterface.Vec(2, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
         )
       }
       val sink    = ProtocolInterface.Bundle(
-        edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", false, sources(i)))
+        edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", sources(i)))
       )
       Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
     val downRW:                                                     upickle.default.ReadWriter[Int]         = summon

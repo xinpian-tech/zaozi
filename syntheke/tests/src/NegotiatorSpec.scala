@@ -15,7 +15,7 @@ object Wid extends Protocol:
   def negotiate(down: Int, up: Int): Either[Violation, Int]          =
     if down <= up then Right(down) else Left(Violation(s"requested width $down exceeds capacity $up"))
   def interfaceOf(edge: Int):        ProtocolBundle                  =
-    ProtocolBundle(ProtocolInterface.Field("data", false, ProtocolInterface.UInt(edge)))
+    ProtocolBundle(ProtocolInterface.Field("data", ProtocolInterface.UInt(edge)))
   val downRW:                        upickle.default.ReadWriter[Int] = summon
   val upRW:                          upickle.default.ReadWriter[Int] = summon
   val edgeRW:                        upickle.default.ReadWriter[Int] = summon
@@ -28,10 +28,10 @@ object Trace extends DVProtocol:
     if downs.forall(_ > 0) then Right(downs) else Left(Violation("width must be positive"))
   def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[Violation, DVInterfaces]         =
     val sources = edge.zip(layers).map { (w, l) =>
-      ProtocolBundle(ProtocolInterface.Field("sig", false, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
+      ProtocolBundle(ProtocolInterface.Field("sig", ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
     }
     val sink    = ProtocolInterface.Bundle(
-      edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", false, sources(i)))
+      edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", sources(i)))
     )
     Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
   val downRW:                                                     upickle.default.ReadWriter[Int]         = summon

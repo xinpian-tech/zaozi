@@ -130,19 +130,19 @@ object Axi4 extends Protocol:
     def channel(payload: (String, ProtocolInterface)*): Bundle =
       Bundle(
         Vector(
-          Field("valid", false, Bool),
-          Field("ready", true, Bool),
-          Field("bits", false, Bundle(payload.toVector.map((n, t) => Field(n, false, t))))
+          Field("valid", Bool),
+          Field("ready", Bool, flip = true),
+          Field("bits", Bundle(payload.toVector.map((n, t) => Field(n, t))))
         )
       )
     val addr = ("addr", UInt(e.addrBits))
     val id0  = ("id", UInt(e.idBits))
     ProtocolBundle(
-      Field("aw", false, channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
-      Field("w", false, channel("data" -> UInt(e.dataBits), "strb" -> UInt(e.dataBits / 8), "last" -> Bool)),
-      Field("b", true, channel(id0, "resp" -> UInt(2))),
-      Field("ar", false, channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
-      Field("r", true, channel(id0, "data" -> UInt(e.dataBits), "resp" -> UInt(2), "last" -> Bool))
+      Field("aw", channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
+      Field("w", channel("data" -> UInt(e.dataBits), "strb" -> UInt(e.dataBits / 8), "last" -> Bool)),
+      Field("b", channel(id0, "resp" -> UInt(2)), flip = true),
+      Field("ar", channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
+      Field("r", channel(id0, "data" -> UInt(e.dataBits), "resp" -> UInt(2), "last" -> Bool), flip = true)
     )
 
   val downRW: upickle.default.ReadWriter[AxiMasterPort] = summon
