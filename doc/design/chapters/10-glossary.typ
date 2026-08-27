@@ -41,7 +41,7 @@
   [链接键], [linking key], [模块名对（生成器名字，规范化完整参数）的忠实编码，定义共享与链接据此进行（@sec-dedup）。],
   [探针源], [DV source], [生成器模块声明的观察点，提供 `Down` 与层路径；框架把每个探针叶自动上提到设计根（@sec-dv-declarations）。],
   [探针清单], [probe manifest], [`DesignSpec` 的纯函数：全部探针源按模块先序与声明顺序、每叶一条的可序列化记录（@sec-dv-testbench）。],
-  [测试平台后端], [testbench backend], [例化期消费探针清单的后端：按层在根内例化 harness，逐叶 `ref.resolve` 后按清单端口名接入（@sec-dv-testbench）。],
+  [测试平台后端], [testbench backend], [例化期消费探针清单的普通生成器后端，完整参数为按层切分的清单；按层在根内例化 harness，逐叶 `ref.resolve` 后按清单端口名接入（@sec-dv-testbench）。],
   [探针源标识], [`DVSourceId`], [由源模块与名称组成（@sec-dv-declarations）。],
   [层路径], [layer path], [探针所属的 FIRRTL 层名称序列；层的关闭与移除由 FIRRTL 提供（@sec-layers）。],
   [zaozi], [—], [Syntheke 使用的独立硬件生成器库，通过基于 MLIR 的 CIRCT 产出 FIRRTL（@sec-generator-contract）。],
