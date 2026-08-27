@@ -2,53 +2,69 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke
 
-/** Context-function façade over [[WrapperScope]] and [[GeneratorScope]], so design bodies read declaratively:
+/** Context-function façade over [[WrapperScope]] and [[GeneratorScope]], so design bodies read declaratively.
+  *
+  * Declarations are named by the val they are bound to (sourceinfo, like zaozi's instance naming):
   *
   * {{{
   * val spec = Design {
-  *   val core = generator("core", coreEntry) { ... }
-  *   ...
+  *   val core = generator(coreEntry) {   // instance name "core"
+  *     val out = outward(Wid).dFn(...)   // node name "out"
+  *     ...
+  *     out
+  *   }
   * }
+  * }}}
+  *
+  * When a val name cannot carry the intended name — computed names in a loop, destructured returns — provide the given
+  * explicitly, exactly like overriding zaozi's instance name:
+  *
+  * {{{
+  * given sourcecode.Name = sourcecode.Name(s"in$i")
+  * inward(Axi)
   * }}}
   */
 
 def wrapper[A](
-  name:     String
-)(body:     WrapperScope ?=> A
+  body: WrapperScope ?=> A
 )(
-  using ws: WrapperScope,
-  loc:      SourceLocation
+  using
+  ws:   WrapperScope,
+  name: sourcecode.Name,
+  loc:  SourceLocation
 ): A =
-  ws.wrapper(name)(body)
+  ws.wrapper(name.value)(body)
 
 def generator[FP, A](
-  name:  String,
   entry: GeneratorEntry[FP]
 )(body:  GeneratorScope[FP] ?=> A
 )(
   using
   ws:    WrapperScope,
+  name:  sourcecode.Name,
   loc:   SourceLocation
 ): A =
-  ws.generator(name, entry)(body)
+  ws.generator(name.value, entry)(body)
 
 def inward(
-  p:        Protocol
-)(name:     String
+  p:    Protocol
 )(
-  using gs: GeneratorScope[?],
-  loc:      SourceLocation
+  using
+  gs:   GeneratorScope[?],
+  name: sourcecode.Name,
+  loc:  SourceLocation
 ): InwardNodeBuilder[p.type] =
-  gs.inward(p)(name)
+  gs.inward(p)(name.value)
 
 def outward(
-  p:        Protocol
-)(name:     String
+  p:    Protocol
 )(
-  using gs: GeneratorScope[?],
-  loc:      SourceLocation
+  using
+  gs:   GeneratorScope[?],
+  name: sourcecode.Name,
+  loc:  SourceLocation
 ): OutwardNodeBuilder[p.type] =
-  gs.outward(p)(name)
+  gs.outward(p)(name.value)
 
 def depend(
   from:     InwardNodeBuilder[?],
@@ -61,24 +77,25 @@ def depend(
 
 def dvSource(
   p:     DVProtocol
-)(name:  String,
-  down:  p.Down,
+)(down:  p.Down,
   layer: LayerPath
 )(
   using
   gs:    GeneratorScope[?],
+  name:  sourcecode.Name,
   loc:   SourceLocation
 ): DVSourceRef[p.type] =
-  gs.dvSource(p)(name, down, layer)
+  gs.dvSource(p)(name.value, down, layer)
 
 def dvSink(
-  p:        DVProtocol
-)(name:     String
+  p:    DVProtocol
 )(
-  using gs: GeneratorScope[?],
-  loc:      SourceLocation
+  using
+  gs:   GeneratorScope[?],
+  name: sourcecode.Name,
+  loc:  SourceLocation
 ): DVSinkRef[p.type] =
-  gs.dvSink(p)(name)
+  gs.dvSink(p)(name.value)
 
 def parameters[PP, FP](
   compute: EdgeView => Either[CapabilityViolation, PP]

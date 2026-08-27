@@ -52,15 +52,19 @@ Deviations from the document's surface syntax:
 import me.jiuyang.syntheke.*
 
 val spec = Design {
-  val out = generator("prod", prodEntry) {
+  // Declarations are named by the val they are bound to (sourceinfo, like zaozi);
+  // provide `given sourcecode.Name = sourcecode.Name(s"in$i")` for computed names.
+  val prod = generator(prodEntry) {
     parametersConst(0)
-    outward(Wid)("out").dFn(_ => Right(32))
+    val out = outward(Wid).dFn(_ => Right(32))
+    out
   }
-  val in  = generator("cons", consEntry) {
+  val cons = generator(consEntry) {
     parametersConst(0)
-    inward(Wid)("in").uFn(_ => Right(64))
+    val in = inward(Wid).uFn(_ => Right(64))
+    in
   }
-  in <-- out
+  cons <-- prod
 }
 val resolved = Negotiator.negotiate(spec) // ResolvedDesign; throws NegotiationException at the first error
 

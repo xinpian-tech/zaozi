@@ -20,27 +20,39 @@ object DedupVerilogSpec extends TestSuite:
 
   def buildTwins(): DesignSpec =
     Design {
+      def clusterBody(
+        using WrapperScope
+      ) =
+        val leaf = generator(leafEntry) {
+          parameters(DvVerilogSpec.stubParams("DupLeaf"))(identity)
+          val p = inward(Wid).uFn(_ => Right(64))
+          val q = inward(Wid).uFn(_ => Right(64))
+          (p, q)
+        }
+        leaf
       def cluster(
         name: String
       )(
         using WrapperScope
       ) =
-        wrapper(name) {
-          generator("leaf", leafEntry) {
-            parameters(DvVerilogSpec.stubParams("DupLeaf"))(identity)
-            val p = inward(Wid)("p").uFn(_ => Right(64))
-            val q = inward(Wid)("q").uFn(_ => Right(64))
-            (p, q)
-          }
+        locally {
+          given sourcecode.Name = sourcecode.Name(name)
+          wrapper(clusterBody)
         }
+      def srcBody(
+        using GeneratorScope[StubFull]
+      ) =
+        parameters(DvVerilogSpec.stubParams("DupSrc"))(identity)
+        val out = outward(Wid).dFn(_ => Right(32))
+        out
       def src(
         name: String
       )(
         using WrapperScope
       ) =
-        generator(name, srcEntry) {
-          parameters(DvVerilogSpec.stubParams("DupSrc"))(identity)
-          outward(Wid)("out").dFn(_ => Right(32))
+        locally {
+          given sourcecode.Name = sourcecode.Name(name)
+          generator(srcEntry)(srcBody)
         }
       val (ap, aq) = cluster("clusterA")
       val (bp, bq) = cluster("clusterB")

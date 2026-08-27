@@ -219,26 +219,30 @@ object DvVerilogSpec extends TestSuite:
 
   def buildDesign(): DesignSpec =
     Design {
-      val (srcOut, rob, lsu) = wrapper("cluster") {
-        generator("src", srcEntry) {
-          val out = outward(Wid)("mem").dFn(_ => Right(32))
-          val rob = dvSource(Trace)("rob", 8, layerCosim)
-          val lsu = dvSource(Trace)("lsu", 4, layerCosim)
+      val cluster            = wrapper {
+        val src = generator(srcEntry) {
+          val mem = outward(Wid).dFn(_ => Right(32))
+          val rob = dvSource(Trace)(8, layerCosim)
+          val lsu = dvSource(Trace)(4, layerCosim)
           parameters(stubParams("Src"))(identity)
-          (out, rob, lsu)
+          (mem, rob, lsu)
         }
+        src
       }
-      val memIn              = generator("mem", memEntry) {
+      val (srcOut, rob, lsu) = cluster
+      val mem                = generator(memEntry) {
         parameters(stubParams("Mem"))(identity)
-        inward(Wid)("in").uFn(_ => Right(64))
+        val in = inward(Wid).uFn(_ => Right(64))
+        in
       }
-      val taps               = generator("cosim", snkEntry) {
+      val cosim              = generator(snkEntry) {
         parameters(stubParams("Cosim"))(identity)
-        dvSink(Trace)("taps")
+        val taps = dvSink(Trace)
+        taps
       }
-      memIn <-- srcOut
-      taps <-- rob
-      taps <-- lsu
+      mem <-- srcOut
+      cosim <-- rob
+      cosim <-- lsu
     }
 
   val tests = Tests {
@@ -260,17 +264,20 @@ object DvVerilogSpec extends TestSuite:
 
     test("Vec probe leaves route as individual pure-probe ports through subindex") {
       val spec     = Design {
-        val pcs  = wrapper("vc") {
-          generator("vsrc", vsrcEntry) {
+        val vc     = wrapper {
+          val vsrc = generator(vsrcEntry) {
             parameters(stubParams("VSrc"))(identity)
-            dvSource(VecTrace)("pcs", 32, layerCosim)
+            val pcs = dvSource(VecTrace)(32, layerCosim)
+            pcs
           }
+          vsrc
         }
-        val taps = generator("vcosim", vsnkEntry) {
+        val vcosim = generator(vsnkEntry) {
           parameters(stubParams("VCosim"))(identity)
-          dvSink(VecTrace)("taps")
+          val taps = dvSink(VecTrace)
+          taps
         }
-        taps <-- pcs
+        vcosim <-- vc
       }
       val resolved = Negotiator.negotiate(spec)
       val vc       = ModuleId.root / "vc"

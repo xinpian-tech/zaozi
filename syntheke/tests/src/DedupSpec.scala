@@ -15,26 +15,41 @@ object DedupSpec extends TestSuite:
     val consEntry = intEntry("Cons")
     val prodEntry = intEntry("Prod")
     Design {
+      def producerBody(
+        using GeneratorScope[Int]
+      ) =
+        parametersConst(0)
+        val out = outward(Wid).dFn(_ => Right(32))
+        out
       def producer(
         name: String
       )(
         using WrapperScope
       ) =
-        generator(name, prodEntry) {
-          parametersConst(0)
-          outward(Wid)("out").dFn(_ => Right(32))
+        locally {
+          given sourcecode.Name = sourcecode.Name(name)
+          generator(prodEntry)(producerBody)
         }
+      def clusterBody(
+        fp: Int
+      )(
+        using WrapperScope
+      ) =
+        val cons = generator(consEntry) {
+          parametersConst(fp)
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
+        }
+        cons
       def cluster(
         name: String,
         fp:   Int
       )(
         using WrapperScope
       ) =
-        wrapper(name) {
-          generator("cons", consEntry) {
-            parametersConst(fp)
-            inward(Wid)("in").uFn(_ => Right(64))
-          }
+        locally {
+          given sourcecode.Name = sourcecode.Name(name)
+          wrapper(clusterBody(fp))
         }
       val prodOut  = producer("p0")
       val prodOut2 = producer("p1")

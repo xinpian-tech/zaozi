@@ -49,19 +49,21 @@ object NegotiatorSpec extends TestSuite:
   /** prod(32) and dma(24) feed a 2x2 xbar; c0 (capacity 64) lives one wrapper deep, c1's capacity is a knob. */
   def buildSoc(c1Capacity: Int): DesignSpec =
     Design {
-      val prodOut                    = generator("prod", intEntry("Prod")) {
+      val prod                       = generator(intEntry("Prod")) {
         parametersConst(0)
-        outward(Wid)("out").dFn(_ => Right(32))
+        val out = outward(Wid).dFn(_ => Right(32))
+        out
       }
-      val dmaOut                     = generator("dma", intEntry("Dma")) {
+      val dma                        = generator(intEntry("Dma")) {
         parametersConst(0)
-        outward(Wid)("out").dFn(_ => Right(24))
+        val out = outward(Wid).dFn(_ => Right(24))
+        out
       }
-      val (xIn0, xIn1, xOut0, xOut1) = generator("xbar", intEntry("Xbar")) {
-        val in0        = inward(Wid)("in0")
-        val in1        = inward(Wid)("in1")
-        val out0       = outward(Wid)("out0")
-        val out1       = outward(Wid)("out1")
+      val xbar                       = generator(intEntry("Xbar")) {
+        val in0        = inward(Wid)
+        val in1        = inward(Wid)
+        val out0       = outward(Wid)
+        val out1       = outward(Wid)
         val (d00, u00) = depend(in0, out0)
         val (d01, u01) = depend(in0, out1)
         val (d10, u10) = depend(in1, out0)
@@ -73,20 +75,24 @@ object NegotiatorSpec extends TestSuite:
         parameters(view => Right(view.nodes.map(_.edge.edgeAs(Wid))))(_.sum)
         (in0, in1, out0, out1)
       }
-      val c0In                       = wrapper("sub") {
-        generator("c0", intEntry("C0")) {
+      val (xIn0, xIn1, xOut0, xOut1) = xbar
+      val sub                        = wrapper {
+        val c0 = generator(intEntry("C0")) {
           parametersConst(0)
-          inward(Wid)("in").uFn(_ => Right(64))
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
         }
+        c0
       }
-      val c1In                       = generator("c1", intEntry("C1")) {
+      val c1                         = generator(intEntry("C1")) {
         parametersConst(0)
-        inward(Wid)("in").uFn(_ => Right(c1Capacity))
+        val in = inward(Wid).uFn(_ => Right(c1Capacity))
+        in
       }
-      xIn0 <-- prodOut
-      xIn1 <-- dmaOut
-      c0In <-- xOut0
-      c1In <-- xOut1
+      xIn0 <-- prod
+      xIn1 <-- dma
+      sub <-- xOut0
+      c1 <-- xOut1
     }
 
   val tests = Tests {
@@ -150,15 +156,17 @@ object NegotiatorSpec extends TestSuite:
 
     test("a propagation conflict reports the node, the violation and the input snapshot") {
       val spec = Design {
-        val out = generator("bad", intEntry("Bad")) {
+        val bad  = generator(intEntry("Bad")) {
           parametersConst(0)
-          outward(Wid)("out").dFn(_ => Left(PropagationViolation("no width available")))
+          val out = outward(Wid).dFn(_ => Left(PropagationViolation("no width available")))
+          out
         }
-        val in  = generator("sink", intEntry("Sink")) {
+        val sink = generator(intEntry("Sink")) {
           parametersConst(0)
-          inward(Wid)("in").uFn(_ => Right(64))
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
         }
-        in <-- out
+        sink <-- bad
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
       assert(e.getMessage.contains("propagation failed"))
@@ -173,14 +181,20 @@ object NegotiatorSpec extends TestSuite:
         )(
           using WrapperScope
         ) =
-          generator(name, intEntry(name.capitalize)) {
-            val i      = inward(Wid)("in")
-            val o      = outward(Wid)("out")
-            val (d, u) = depend(i, o)
-            o.dFn(ctx => Right(ctx(d)))
-            i.uFn(ctx => Right(ctx(u)))
+          // The body is defined outside the named block so its own vals keep naming the nodes.
+          def body(
+            using GeneratorScope[Int]
+          ) =
+            val in     = inward(Wid)
+            val out    = outward(Wid)
+            val (d, u) = depend(in, out)
+            out.dFn(ctx => Right(ctx(d)))
+            in.uFn(ctx => Right(ctx(u)))
             parametersConst(0)
-            (i, o)
+            (in, out)
+          locally {
+            given sourcecode.Name = sourcecode.Name(name)
+            generator(intEntry(name.capitalize))(body)
           }
         val (aIn, aOut) = loopback("a")
         val (bIn, bOut) = loopback("b")
@@ -194,16 +208,20 @@ object NegotiatorSpec extends TestSuite:
 
     test("binding one node twice is rejected") {
       val spec = Design {
-        val out        = generator("p", intEntry("P")) {
+        val p          = generator(intEntry("P")) {
           parametersConst(0)
-          outward(Wid)("out").dFn(_ => Right(8))
+          val out = outward(Wid).dFn(_ => Right(8))
+          out
         }
-        val (in0, in1) = generator("c", intEntry("C")) {
+        val c          = generator(intEntry("C")) {
           parametersConst(0)
-          (inward(Wid)("in0").uFn(_ => Right(8)), inward(Wid)("in1").uFn(_ => Right(8)))
+          val in0 = inward(Wid).uFn(_ => Right(8))
+          val in1 = inward(Wid).uFn(_ => Right(8))
+          (in0, in1)
         }
-        in0 <-- out
-        in1 <-- out
+        val (in0, in1) = c
+        in0 <-- p
+        in1 <-- p
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
       assert(e.getMessage.contains("source of 2 binds"))
@@ -212,27 +230,30 @@ object NegotiatorSpec extends TestSuite:
     test("probe sources route to an ancestor sink with layers and sink sub-paths") {
       val layerCosim = LayerPath(Vector("verification", "cosim"))
       val spec       = Design {
-        val (pOut, src0, src1) = wrapper("cluster") {
-          generator("core", intEntry("Core")) {
+        val cluster            = wrapper {
+          val core = generator(intEntry("Core")) {
             parametersConst(0)
-            (
-              outward(Wid)("mem").dFn(_ => Right(32)),
-              dvSource(Trace)("rob", 8, layerCosim),
-              dvSource(Trace)("lsu", 4, layerCosim)
-            )
+            val mem = outward(Wid).dFn(_ => Right(32))
+            val rob = dvSource(Trace)(8, layerCosim)
+            val lsu = dvSource(Trace)(4, layerCosim)
+            (mem, rob, lsu)
           }
+          core
         }
-        val cIn                = generator("mem", intEntry("Mem")) {
+        val (pOut, src0, src1) = cluster
+        val mem                = generator(intEntry("Mem")) {
           parametersConst(0)
-          inward(Wid)("in").uFn(_ => Right(64))
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
         }
-        val snk                = generator("cosim", intEntry("Cosim")) {
+        val cosim              = generator(intEntry("Cosim")) {
           parametersConst(0)
-          dvSink(Trace)("taps")
+          val taps = dvSink(Trace)
+          taps
         }
-        cIn <-- pOut
-        snk <-- src0
-        snk <-- src1
+        mem <-- pOut
+        cosim <-- src0
+        cosim <-- src1
       }
       val resolved   = Negotiator.negotiate(spec)
       val group      = resolved.dvGroups.head
@@ -281,22 +302,28 @@ object NegotiatorSpec extends TestSuite:
     test("a sink whose parent is not a strict ancestor of the source is rejected") {
       val layer = LayerPath(Vector("verification", "assert"))
       val spec  = Design {
-        val (pOut, src) = generator("core", intEntry("Core")) {
+        val core        = generator(intEntry("Core")) {
           parametersConst(0)
-          (outward(Wid)("mem").dFn(_ => Right(32)), dvSource(Trace)("rob", 8, layer))
+          val mem = outward(Wid).dFn(_ => Right(32))
+          val rob = dvSource(Trace)(8, layer)
+          (mem, rob)
         }
-        val snk         = wrapper("island") {
-          generator("cosim", intEntry("Cosim")) {
+        val (pOut, src) = core
+        val island      = wrapper {
+          val cosim = generator(intEntry("Cosim")) {
             parametersConst(0)
-            dvSink(Trace)("taps")
+            val taps = dvSink(Trace)
+            taps
           }
+          cosim
         }
-        val cIn         = generator("mem", intEntry("Mem")) {
+        val mem         = generator(intEntry("Mem")) {
           parametersConst(0)
-          inward(Wid)("in").uFn(_ => Right(64))
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
         }
-        cIn <-- pOut
-        snk <-- src
+        mem <-- pOut
+        island <-- src
       }
       val e     = intercept[NegotiationException](Negotiator.negotiate(spec))
       assert(e.getMessage.contains("strict ancestor"))
@@ -305,10 +332,13 @@ object NegotiatorSpec extends TestSuite:
     test("declaration-site contracts reject duplicates on the spot") {
       val dup = intercept[IllegalArgumentException] {
         Design {
-          generator("g", intEntry("G")) {
+          generator(intEntry("G")) {
             parametersConst(0)
-            inward(Wid)("x").uFn(_ => Right(1))
-            outward(Wid)("x").dFn(_ => Right(1))
+            val x = inward(Wid).uFn(_ => Right(1))
+            locally {
+              given sourcecode.Name = sourcecode.Name("x")
+              outward(Wid).dFn(_ => Right(1))
+            }
           }
         }
       }
@@ -316,14 +346,18 @@ object NegotiatorSpec extends TestSuite:
 
       // Names become FIRRTL symbols verbatim; the shape rule rejects them at the declaration.
       val badInstance = intercept[IllegalArgumentException] {
-        Design { wrapper("a.b") {} }
+        Design {
+          given sourcecode.Name = sourcecode.Name("a.b")
+          wrapper {}
+        }
       }
       assert(badInstance.getMessage.contains("'a.b' is not a legal name"))
       val badEndpoint = intercept[IllegalArgumentException] {
         Design {
-          generator("g", intEntry("G")) {
+          generator(intEntry("G")) {
             parametersConst(0)
-            inward(Wid)("dv-source").uFn(_ => Right(1))
+            given sourcecode.Name = sourcecode.Name("dv-source")
+            inward(Wid).uFn(_ => Right(1))
           }
         }
       }
@@ -335,12 +369,45 @@ object NegotiatorSpec extends TestSuite:
       // declaring structure there is rejected on the spot instead of silently attaching to the outer wrapper.
       val nested = intercept[IllegalArgumentException] {
         Design {
-          generator("g", intEntry("G")) {
+          generator(intEntry("G")) {
             parametersConst(0)
-            wrapper("sub") {}
+            given sourcecode.Name = sourcecode.Name("sub")
+            wrapper {}
           }
         }
       }
-      assert(nested.getMessage.contains("instance 'sub' declared inside generator body g"))
+      assert(nested.getMessage.contains("declared inside generator body"))
+    }
+
+    test("declarations are named by their binding val via sourceinfo") {
+      val spec   = Design {
+        val cluster = wrapper {
+          val prod = generator(intEntry("P")) {
+            parametersConst(0)
+            val out = outward(Wid).dFn(_ => Right(32))
+            val rob = dvSource(Trace)(8, LayerPath(Vector("verification")))
+            (out, rob)
+          }
+          prod
+        }
+        val cons    = generator(intEntry("C")) {
+          parametersConst(0)
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
+        }
+        val cosim   = generator(intEntry("S")) {
+          parametersConst(0)
+          val taps = dvSink(Trace)
+          taps
+        }
+        cons <-- cluster._1
+        cosim <-- cluster._2
+      }
+      val prodId = ModuleId.root / "cluster" / "prod"
+      assert(spec.generatorModule(prodId).get.node("out").nonEmpty)
+      assert(spec.generatorModule(prodId).get.dvSources.map(_.name) == Vector("rob"))
+      assert(spec.generatorModule(ModuleId.root / "cons").get.node("in").nonEmpty)
+      assert(spec.generatorModule(ModuleId.root / "cosim").get.dvSinks.map(_.name) == Vector("taps"))
+      Negotiator.negotiate(spec)
     }
   }

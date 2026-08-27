@@ -58,8 +58,14 @@ object AxiSocSpec extends TestSuite:
     gs:          GeneratorScope[XbarFull],
     loc:         SourceLocation
   ): (Vector[InwardNodeBuilder[Axi4.type]], Vector[OutwardNodeBuilder[Axi4.type]]) =
-    val inBs  = ins.map(inward(Axi4)(_))
-    val outBs = outs.map(outward(Axi4)(_))
+    val inBs  = ins.map { n =>
+      given sourcecode.Name = sourcecode.Name(n)
+      inward(Axi4)
+    }
+    val outBs = outs.map { n =>
+      given sourcecode.Name = sourcecode.Name(n)
+      outward(Axi4)
+    }
     val grid  = outBs.map(out => inBs.map(in => depend(in, out)))
     outBs.zipWithIndex.foreach { (out, oi) =>
       val readers = grid(oi).map(_._1)
@@ -94,11 +100,16 @@ object AxiSocSpec extends TestSuite:
     using
     ws:        WrapperScope
   ): OutwardNodeBuilder[Axi4.type] =
-    generator(name, entry0) {
+    def body(
+      using GeneratorScope[CoreFull]
+    ) =
       parametersConst(CoreFull(name, idBits, maxFlight))
-      outward(Axi4)("mem").dFn(_ =>
-        Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight))))
-      )
+      val mem =
+        outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
+      mem
+    locally {
+      given sourcecode.Name = sourcecode.Name(name)
+      generator(entry0)(body)
     }
 
   /** A memory-mapped peripheral slave: a boundary inward node serving one address range on a 32-bit bus. */
@@ -111,9 +122,11 @@ object AxiSocSpec extends TestSuite:
     using
     ws:             WrapperScope
   ): InwardNodeBuilder[Axi4.type] =
-    generator(name, slaveEntry) {
+    def body(
+      using GeneratorScope[SlaveFull]
+    ) =
       parameters(view => Right(view("in").edge.edgeAs(Axi4)))(e => SlaveFull(name, base, size, e.dataBits, e.idBits))
-      inward(Axi4)("in").uFn(_ =>
+      val in = inward(Axi4).uFn(_ =>
         Right(
           AxiSlavePort(
             slaves = Vector(
@@ -132,6 +145,10 @@ object AxiSocSpec extends TestSuite:
           )
         )
       )
+      in
+    locally {
+      given sourcecode.Name = sourcecode.Name(name)
+      generator(slaveEntry)(body)
     }
 
   def buildSoc(dramIdCapacity: Int = 6, gpioBase: Long = 0x10010000L): DesignSpec =
@@ -140,15 +157,16 @@ object AxiSocSpec extends TestSuite:
       val core1Out = core(coreEntry, "core1", idBits = 3, maxFlight = 8)
       val dmaOut   = core(dmaEntry, "dma", idBits = 1, maxFlight = 1)
 
-      val (sysIns, sysOuts) = generator("sysXbar", xbarEntry) {
+      val sysXbar           = generator(xbarEntry) {
         axiXbarBody(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "roundRobin")
       }
+      val (sysIns, sysOuts) = sysXbar
 
       // The memory branch lives one level down: sysXbar -> mem/l2 crosses the `mem` boundary.
-      val l2In = wrapper("mem") {
-        val (l2In, l2Out) = generator("l2", l2Entry) {
-          val in     = inward(Axi4)("in")
-          val out    = outward(Axi4)("out")
+      val mem = wrapper {
+        val l2            = generator(l2Entry) {
+          val in     = inward(Axi4)
+          val out    = outward(Axi4)
           val (d, u) = depend(in, out)
           // The L2 appends its own writeback master after the upstream id space (an adapter transforming Down).
           out.dFn { ctx =>
@@ -161,7 +179,8 @@ object AxiSocSpec extends TestSuite:
           }((upBits, downBits) => L2Full(capacityKiB = 512, upstreamIdBits = upBits, downstreamIdBits = downBits))
           (in, out)
         }
-        val dramIn        = generator("dram", dramEntry) {
+        val (l2In, l2Out) = l2
+        val dram          = generator(dramEntry) {
           parameters { view =>
             val e = view("in").edge.edgeAs(Axi4)
             Right(
@@ -174,7 +193,7 @@ object AxiSocSpec extends TestSuite:
               )
             )
           }(identity)
-          inward(Axi4)("in").uFn(_ =>
+          val in = inward(Axi4).uFn(_ =>
             Right(
               AxiSlavePort(
                 slaves = Vector(
@@ -193,21 +212,22 @@ object AxiSocSpec extends TestSuite:
               )
             )
           )
+          in
         }
         // Both endpoints live under mem, so this bind may be declared here …
-        dramIn <-- l2Out
+        dram <-- l2Out
         l2In
       }
       // … but sysXbar -> l2 crosses the mem boundary: it must be declared in a common ancestor (the root).
-      l2In <-- sysOuts(0)
+      mem <-- sysOuts(0)
 
       // Width bridge 128 -> 32: passes masters down; upstream it re-presents the peripherals on the wide bus,
       // fragmenting bursts internally, so the supported transfer ceiling grows to its own limit.
-      val (brIn, brOut) = generator("bridge", bridgeEntry) {
+      val bridge        = generator(bridgeEntry) {
         val wideBeatBytes       = 16
         val maxUpstreamTransfer = 64
-        val in                  = inward(Axi4)("in")
-        val out                 = outward(Axi4)("out")
+        val in                  = inward(Axi4)
+        val out                 = outward(Axi4)
         val (d, u)              = depend(in, out)
         out.dFn(ctx => Right(ctx(d)))
         in.uFn { ctx =>
@@ -229,10 +249,12 @@ object AxiSocSpec extends TestSuite:
         )
         (in, out)
       }
+      val (brIn, brOut) = bridge
 
-      val (perIns, perOuts) = generator("periphXbar", xbarEntry) {
+      val periphXbar        = generator(xbarEntry) {
         axiXbarBody(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
       }
+      val (perIns, perOuts) = periphXbar
 
       val uartIn = mmioSlave("uart", 0x10000000L, 0x1000L, idCapacityBits = 8)
       val gpioIn = mmioSlave("gpio", gpioBase, 0x1000L, idCapacityBits = 8)
