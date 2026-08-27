@@ -36,15 +36,16 @@ trait Protocol:
   def upRW:   upickle.default.ReadWriter[Up]
   def edgeRW: upickle.default.ReadWriter[Edge]
 
-/** A verification protocol: a probe source publishes read-only signals that the framework forwards to top-level probe
-  * ports (doc @sec-dv-protocol). There is no negotiation and no in-design consumer — the `Down` is given at the
-  * declaration and fully determines the interface.
+/** A verification protocol: a probe source publishes read-only signals that the framework forwards to the root — into
+  * the [[testbench]]'s matching inputs when one is declared, to top-level probe ports otherwise (doc
+  * @sec-dv-protocol). There is no negotiation — the `Down` is given at the declaration and fully determines the
+  * interface.
   */
 trait DVProtocol:
   type Down
 
-  /** Probe interface of one source: every signal leaf wrapped in `Probe` carrying `layer`. Checked at the `dvSource`
-    * declaration.
+  /** Probe interface of one source: every interface leaf wrapped in `Probe` carrying `layer` (a probe's inner may be
+    * an aggregate). Checked at the `dvSource` declaration.
     */
   def interfaceOf(down: Down, layer: LayerPath): ProtocolBundle
 
