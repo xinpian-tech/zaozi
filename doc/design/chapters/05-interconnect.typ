@@ -45,7 +45,7 @@ bind 及其两端节点的稳定标识见 @sec-identity。
 
 === 拓扑位置与实现约束 <sec-placement>
 
-生成器用户参数可以把具名节点映射到具体实现位置。例如 NoC 参数把 `cpuIn`、`dmaIn` 等节点映射到路由器接入位置，Xbar 参数指定各 inward 节点的仲裁策略，时钟树参数指定 outward 节点所在的分支。`computeProtocolParam` 从本模块每个节点的已求解边得到接口形状和协议资源需求，再与用户参数合成为 `FullParam`。
+生成器用户参数可以把具名节点映射到具体实现位置。例如 NoC 参数把 `cpuIn`、`dmaIn` 等节点映射到路由器接入位置，Xbar 参数指定各 inward 节点的仲裁策略，时钟树参数指定 outward 节点所在的分支。完整参数计算 `computeFullParam` 从本模块每个节点的已求解边得到接口形状和协议资源需求，与闭包中的用户参数合成 `FullParam`。
 
 物理结构中未对外暴露的位置只存在于生成器用户参数和内部实现中。协商结束时的生成器能力校验（@sec-settle-pp）根据已声明节点及其已求解参数检查端口数、接口能力、拓扑位置和资源容量是否超出生成器实现的能力。
 
@@ -65,7 +65,7 @@ bind 及其两端节点的稳定标识见 @sec-identity。
 
 以内存互连为例，`sysNoc` 的每个下游 outward 节点可以在 `dFn` 中读取所有能够到达该端口的上游 inward 节点 `Down`，计算事务身份扩展、节点编号或内部表项容量；每个上游 inward 节点的 `uFn` 可以读取它能够到达的下游 outward 节点 `Up`，汇聚地址区域、操作能力和位宽约束。不同 outward 节点的可达集合可以不同，依赖关系与函数均由 `sysNoc` 模块显式声明。协议库随协议提供标准的合并函数，例如地址集合求并、事务身份合并；互连模块的 `dFn`、`uFn` 调用这些函数，自己只声明哪些 inward 到达哪些 outward。
 
-所有边求解后，框架按生成器模块投影出 `EdgeView`。每个节点条目包含该节点唯一一条边的 `Down`、`Up`、`Edge` 与接口结构。生成器模块通过 `computeProtocolParam(EdgeView)` 计算 `ProtocolParam`，再以 `combine(userParam, protocolParam)` 得到 `FullParam`。
+所有边求解后，框架按生成器模块投影出 `EdgeView`。每个节点条目包含该节点唯一一条边的 `Down`、`Up`、`Edge` 与接口结构。生成器模块通过 `computeFullParam(EdgeView)` 由已求解边与闭包中的用户参数直接得到 `FullParam`。
 
 #图([参数流。bind 与模块内部参数依赖组成 `Down` DAG（蓝），反向组成 `Up` DAG（红）；两者在每条 bind 上成为 `negotiate` 的输入，已求解边随后进入生成器参数计算。])[
   #syn-diagram(

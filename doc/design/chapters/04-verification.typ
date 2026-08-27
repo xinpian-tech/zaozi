@@ -45,7 +45,7 @@
 
 验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验。`DVInterfaces` 违反以上契约时，报告接口映射违约（@sec-error-semantics）。
 
-求解结果按模块整理进 `EdgeView` 的验证部分 `VerificationView`：每个源的条目包含 `DVSourceId`、`DVBindId`、聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeProtocolParam` 分别读取这些条目并生成协议参数（@sec-settle-pp、@sec-generator-module）。
+求解结果按模块整理进 `EdgeView` 的验证部分 `VerificationView`：每个源的条目包含 `DVSourceId`、`DVBindId`、聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeFullParam` 分别读取这些条目并进入各自的完整参数（@sec-settle-pp、@sec-generator-module）。
 
 `Down`、`Edge`、`DVInterfaces`、`InterfacePath` 与 `LayerPath` 为不可变、可序列化的数据。`downCodec` 与 `edgeCodec` 提供两个关联类型的 schema 与规范化编码；其余三种类型采用框架定义的 schema。`DVProtocol.id.kind` 固定为 `Verification`；任何会改变求解函数、接口、渲染结果或 codec schema 的变更都必须更新版本。
 

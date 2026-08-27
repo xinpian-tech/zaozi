@@ -71,7 +71,7 @@
   [@dec-dv-once], [探针连接必须逐条显式枚举。], [@sec-dv-routing],
   [@dec-dv-ancestor], [探针汇生成器的父结构模块必须是探针源模块的严格祖先。], [@sec-dv-routing],
   [@dec-layer-merge], [层路径按前缀合并。], [@sec-layers],
-  [@dec-pp-local], [`computeProtocolParam` 只读取本模块的已求解数据。], [@sec-settle-pp],
+  [@dec-pp-local], [`computeFullParam` 只读取本模块的已求解数据。], [@sec-settle-pp],
   [@dec-port-naming], [框架生成的 Dangle 端口名采用名称段的可逆编码，长度随层次线性增长。], [@sec-port-naming],
   [@dec-binding-check], [端口结构校验在例化期进行。], [@sec-generator-module],
 )
@@ -100,6 +100,6 @@ Diplomacy 是 rocket-chip 生态中的参数协商框架：模块在图上声明
   [`interfaceOf` 与 `ProtocolBundle`], [`bundleI`、`bundleO`], [Syntheke 返回可序列化的接口描述数据，例化期才翻译为 FIRRTL 类型；Diplomacy 直接返回 Chisel Bundle（@sec-protocol-interface）。],
   [模块内部参数依赖], [—], [Diplomacy 的 `dFn`、`uFn` 属于节点，`NexusNode` 隐含全部 inward 影响全部 outward；Syntheke 把两个函数挂在模块上，并显式声明哪个 inward 节点影响哪个 outward 节点（@sec-node-conn-proto）。],
   [`WrapperModule`、`GeneratorModule`], [`LazyModule`], [Diplomacy 不区分二者；Syntheke 在类型层面分开，硬件只在生成器模块里（@sec-module-kinds）。],
-  [`EdgeView`], [`node.in`、`node.out`], [Syntheke 按模块投影出全部节点的已求解边，供 `computeProtocolParam` 读取（@sec-generator-records）。],
+  [`EdgeView`], [`node.in`、`node.out`], [Syntheke 按模块投影出全部节点的已求解边，供 `computeFullParam` 读取（@sec-generator-records）。],
   [Dangle 端口], [`Dangle`、`AutoBundle`], [同一机制：连接穿过的模块边界上由框架生成端口；Syntheke 在协商期把它规划成计划数据（@sec-punch-planning）。],
 )

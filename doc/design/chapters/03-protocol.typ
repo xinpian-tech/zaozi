@@ -48,7 +48,7 @@
 
 同一对象可以被多个模块的节点引用；bind 两端引用同一个协议对象由构造保证，兼容性即对象同一性。
 
-双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(TermViolation)`，`TermViolation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置写入异常消息，并立即终止协商（@sec-error-semantics）。
+双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(Violation)`，`Violation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置写入异常消息，并立即终止协商（@sec-error-semantics）。
 
 `Down`、`Up` 与 `Edge` 均不可变、可序列化，相应序列化用于在工具文件中编码、解码协议数据。
 
@@ -84,9 +84,9 @@
 一个生成器最终使用的参数从两个来源合并而来：
 
 - #term[用户参数][user parameter]（`UserParam`）：构建期声明的容量、关联度、基地址与功能开关（@sec-module-kinds）。它在协商开始前就完全确定。
-- #term[协议参数][protocol parameter]（`ProtocolParam`）：由协商结果算出的生成器自有参数。协商结束后，框架把本模块每个节点求出的边整理成该模块的#term[边视图][`EdgeView`]（@sec-generator-records）；生成器模块声明的函数 `computeProtocolParam` 只读这份视图，算出协议参数（@sec-settle-pp）。
+- #term[协议参数][protocol parameter]：完整参数中由协商结果决定的部分。协商结束后，框架把本模块每个节点求出的边整理成该模块的#term[边视图][`EdgeView`]（@sec-generator-records）；生成器模块声明的函数 `computeFullParam` 只读这份视图，与闭包中的用户参数直接合成完整参数（@sec-settle-pp）。
 
-协商期调用生成器模块声明的合成函数 `combine`，将两者合并为该模块的 `FullParam` 并存入 `ResolvedDesign`。完整参数穿越 @sec-serialization-boundary 定义的序列化边界：
+协商期调用生成器模块声明的 `computeFullParam`，将两者合并为该模块的 `FullParam` 并存入 `ResolvedDesign`。完整参数穿越 @sec-serialization-boundary 定义的序列化边界：
 
 #图([参数的双层合并。用户参数写于构建期，协议参数算于协商期，二者在协商期合并为完整参数，并在例化期交给生成器。])[
   #syn-canvas({
@@ -97,7 +97,7 @@
     content((1.8, 1.05), [协议参数 \ #text(size: 8pt, fill: c-dim)[协商期生成]])
     line((3.75, 2.55), (5.1, 1.95), mark: (end: ">"))
     line((3.75, 1.05), (5.1, 1.65), mark: (end: ">"))
-    content((4.35, 2.65), text(size: 8pt)[`combine`])
+    content((4.35, 2.65), text(size: 8pt)[`computeFullParam`])
     rect((5.2, 1.25), (8.9, 2.35), stroke: 1pt, radius: 0.08)
     content((7.05, 1.8), [完整参数 \ #text(size: 8pt, fill: c-dim)[例化期输入 · 可序列化]])
     line((9.05, 1.8), (10.35, 1.8), mark: (end: ">"), stroke: 1.1pt + c-edge)

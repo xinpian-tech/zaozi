@@ -96,10 +96,10 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 *跨协议引用*是一个节点对本模块另一个节点的引用，用来声明本节点属于哪个时钟节点、电源节点（@sec-generator-module）；它在目标边求解后解析为目标边的 `Edge`。目标必须是本模块的节点，声明处即检查；引用名取自绑定它的 val，声明返回的句柄是读回该引用的唯一途径。目标节点恰好一条 bind 由结构校验保证，装配 `EdgeView` 时直接取该边的 `Edge`。
 
-*生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeProtocolParam(EdgeView)` 计算自有类型的协议参数，并可依据 `EdgeView` 与用户参数执行能力校验；框架随后调用 `combine(userParam, protocolParam)` 得到 `FullParam`。注册表条目、`EdgeView`、协议参数和完整参数一并存入 `ResolvedGeneratorModule`（@sec-generator-records、@sec-two-layer-params、@sec-generator-module）。
+*生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeFullParam(EdgeView)` 由已求解边与闭包中的用户参数得到 `FullParam`，并在其中执行能力校验。注册表条目、`EdgeView` 和完整参数一并存入 `ResolvedGeneratorModule`（@sec-generator-records、@sec-two-layer-params、@sec-generator-module）。
 
 #决策([协议参数只读取本模块的已求解数据])[
-  `computeProtocolParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用和验证端点结果。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
+  `computeFullParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用和验证端点结果。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
 ] <dec-pp-local>
 
 单次协商没有整机回读：`dFn` 只读 `Down`，`uFn` 只读 `Up`，生成器拿不到整张连接图的汇总，例如整机地址映射。这类产物由工具从导出数据生成（@sec-export）；生成器需要它时（例如 boot ROM 镜像），作为用户参数进入下一轮构建。
@@ -116,7 +116,7 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 `EdgeView` 按本模块的节点声明顺序保存条目。每个条目记录节点方向、该节点唯一的 `ResolvedEdge`，以及该节点显式声明且已经解析的跨协议引用；读取以声明得到的节点与引用句柄为键，结果按句柄的协议类型化，不提供按名字符串的查询；`EdgeView` 还包含按验证端点声明顺序装配的 `VerificationView`（@sec-dv-protocol）。
 
-`GeneratorEntry` 保存生成器及其 `FullParam` codec。`ResolvedGeneratorModule.entry` 选定完整参数类型，`fullParam` 采用该条目的 `FullParam`。`EdgeView` 在双向传播和逐边求解后装配，供本模块的 `computeProtocolParam` 使用。
+`GeneratorEntry` 保存生成器及其 `FullParam` codec。`ResolvedGeneratorModule.entry` 选定完整参数类型，`fullParam` 采用该条目的 `FullParam`。`EdgeView` 在双向传播和逐边求解后装配，供本模块的 `computeFullParam` 使用。
 
 == 错误语义 <sec-error-semantics>
 

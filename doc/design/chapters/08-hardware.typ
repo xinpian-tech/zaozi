@@ -22,14 +22,14 @@
 
 单个 IP 从参数文件例化时，由生成器库提供包含该名字条目的注册表。
 
-`computeProtocolParam` 将框架提供的 `EdgeView` 转换为生成器自有的 `ProtocolParam`，`combine` 再生成 `FullParam`。独立例化按名字找到注册项，并用该项的序列化解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与验证端点的名称、方向和接口结构。对于构建期动态声明的端点，`computeProtocolParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，`combine` 在 `FullParam` 中保留复现这些接口所需的值；若端点名称由生成器的固定接口决定，`FullParam` 只需保存决定接口结构的参数。
+`computeFullParam` 将框架提供的 `EdgeView` 与闭包中的用户参数直接合成 `FullParam`。独立例化按名字找到注册项，并用该项的序列化解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与验证端点的名称、方向和接口结构。对于构建期动态声明的端点，`computeFullParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，在 `FullParam` 中保留复现这些接口所需的值；若端点名称由生成器的固定接口决定，`FullParam` 只需保存决定接口结构的参数。
 
 #图([序列化边界。框架侧的生成器模块保存用户参数、参数合并函数、协议参数推导函数与模块节点声明；zaozi 侧的生成器从完整参数确定接口、FIRRTL 层结构与电路体。])[
   #syn-canvas({
     import cetz.draw: *
     rect((0, 0), (5.0, 3.4), stroke: 0.7pt, radius: 0.1)
     content((2.5, 3.05), [*生成器模块*（框架侧）])
-    for (y, t) in ((2.35, [用户参数（构建期声明）]), (1.65, [`combine : (UP, PP) => FP`]), (0.95, [`computeProtocolParam`]), (0.25, [模块节点声明])) {
+    for (y, t) in ((2.35, [用户参数（构建期声明）]), (1.65, [用户参数经闭包捕获]), (0.95, [`computeFullParam`]), (0.25, [模块节点声明])) {
       content((2.5, y), text(size: 8.5pt, t))
     }
     rect((7.6, 0), (12.4, 3.4), stroke: 0.7pt, radius: 0.1)
@@ -48,7 +48,7 @@
 
 生成器模块（@sec-module-kinds）在构建期声明契约数据与函数，包括用户参数、生成器注册表条目、inward 与 outward 节点列表、模块内部参数依赖、验证端点列表、协议参数推导函数，以及用户参数和协议参数到完整参数的合成函数。节点声明记录节点标识、名称、方向、协议、相应的 `dFn` 或 `uFn`、跨协议引用和源码位置。跨协议引用声明记录引用名、目标 `ModuleNodeId`、期望协议和源码位置。
 
-协商器为每个生成器模块装配 `EdgeView`，再调用该模块的 `computeProtocolParam`。
+协商器为每个生成器模块装配 `EdgeView`，再调用该模块的 `computeFullParam`。
 
 `nodes` 按声明顺序返回本模块的全部设计模块节点；`parameterDependencies` 按声明顺序返回本模块从 inward 节点到 outward 节点的依赖边，每条记录包含两端 `ModuleNodeId` 与 `SourceLocation`。`OutwardNodeSpec` 必须携带 `dFn`，`InwardNodeSpec` 必须携带 `uFn`，函数字段不可选。构建 API 每声明一条依赖边，就同时返回两个带协议类型的读取句柄（只能读取指定节点参数的句柄），分别供 outward 节点函数读取 inward `Down`、供 inward 节点函数读取 outward `Up`；原始节点句柄没有读取操作。因此函数可读集合与 `parameterDependencies` 由同一次调用产生，不能分开声明。函数返回类型由本节点协议确定。边界节点的函数从用户参数产生初值。处理器、存储、桥、Xbar、NoC、直连和时钟树均通过这套公开构造方法声明节点和模块内部参数依赖。
 
@@ -58,7 +58,7 @@
 
 `EdgeView` 是双向传播和逐边求解完成后按模块投影的数据。它按节点给出方向及唯一的已求解边；该边包含 `Down`、`Up`、`Edge` 与 `ProtocolBundle`。引用方节点条目另行包含显式跨协议引用的解析结果。
 
-`dvSources` 与 `dvSinks` 声明验证端点（@sec-dv-declarations）。解析后的条目由 `VerificationView` 按声明顺序提供，并经 `computeProtocolParam` 进入完整参数；字段契约见 @sec-generator-records。
+`dvSources` 与 `dvSinks` 声明验证端点（@sec-dv-declarations）。解析后的条目由 `VerificationView` 按声明顺序提供，并经 `computeFullParam` 进入完整参数；字段契约见 @sec-generator-records。
 
 每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在声明处当场报错（@sec-error-semantics）。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
 
