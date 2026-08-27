@@ -36,7 +36,7 @@ final case class XbarFull(arbitration: String, inputs: Vector[XbarInput], routes
 object AxiSocSpec extends TestSuite:
 
   private def entry[FP: ReadWriter](name: String) =
-    new GeneratorEntry[FP](GeneratorId(s"demo.axi.$name", "1"), Codec.fromReadWriter[FP](ujson.Str(name)))
+    new GeneratorEntry[FP](GeneratorId(s"demo.axi.$name", "1"))
 
   val coreEntry   = entry[CoreFull]("Core")
   val dmaEntry    = entry[CoreFull]("Dma")
@@ -318,7 +318,7 @@ object AxiSocSpec extends TestSuite:
     test("the xbar's FullParam is a serializable route table and id map") {
       val resolved = Negotiator.negotiate(buildSoc())
       val xbar     = resolved.generatorModule(root / "sysXbar").get
-      val decoded  = xbarEntry.fullParamCodec.decode(xbar.encodedFullParam).toOption.get
+      val decoded  = upickle.default.read[XbarFull](xbar.encodedFullParam)
       assert(decoded.arbitration == "roundRobin")
       assert(
         decoded.inputs == Vector(
@@ -369,11 +369,15 @@ object AxiSocSpec extends TestSuite:
       assert(inner.map(_.to) == Vector(LocalEndpoint.ChildPort("dram", PortName("in"))))
     }
 
-    test("render metadata reaches the edges export") {
+    test("settled parameters reach the edges export serialized") {
       val resolved    = Negotiator.negotiate(buildSoc())
       val designEdges = Export.edges(resolved)("designEdges").arr
-      assert(designEdges.exists(e => e("render")("label") == ujson.Str("AXI4 128b")))
-      assert(designEdges.exists(e => e("render")("attributes")("masters") == ujson.Str("core0+core1+dma+l2.wb")))
+      assert(designEdges.exists(e => e("edge")("dataBits") == ujson.Num(128)))
+      assert(
+        designEdges.exists(e =>
+          e("edge")("master")("masters").arr.map(_("name").str) == Seq("core0", "core1", "dma", "l2.wb")
+        )
+      )
     }
 
     test("a narrow dram id capacity fails fast at the first overflowing edge") {

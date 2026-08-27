@@ -225,9 +225,13 @@ object Negotiator:
         case Right(v)        => v
         case Left(violation) =>
           val snapshot = reads.map { (r, _) =>
-            val p     = specOf(r).protocol
-            val codec = (if downSide then p.downCodec else p.upCodec).asInstanceOf[Codec[Any]]
-            s"${r.show}=${ujson.write(codec.encode(values(r)))}"
+            val p  = specOf(r).protocol
+            val rw = (if downSide then p.downRW else p.upRW).asInstanceOf[upickle.default.ReadWriter[Any]]
+            s"${r.show}=${ujson.write(
+                upickle.default.writeJs(values(r))(
+                  using rw
+                )
+              )}"
           }
           fail(
             s"propagation failed at ${id.show} (${n.direction}): ${violation.message}; " +
@@ -407,6 +411,8 @@ object Negotiator:
           fail(s"capability exceeded at ${g.id.show}: ${violation.message}, at ${at(g.loc)}")
         case Right(pp)       =>
           val fp      = g.combine(pp)
-          val encoded = g.entry.fullParamCodec.asInstanceOf[Codec[Any]].encode(fp)
+          val encoded = upickle.default.writeJs(fp)(
+            using g.entry.fullParamRW.asInstanceOf[upickle.default.ReadWriter[Any]]
+          )
           ResolvedGeneratorModule(g.id, g.entry, view, pp, fp, encoded)
     }

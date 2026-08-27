@@ -45,7 +45,13 @@ object GeneratorBackend:
     * name.
     */
   def canonicalModuleName[FP](entry: GeneratorEntry[FP], fullParam: FP): String =
-    val payload = ujson.write(Dedup.canonical(entry.fullParamCodec.encode(fullParam)))
+    val payload = ujson.write(
+      Dedup.canonical(
+        upickle.default.writeJs(fullParam)(
+          using entry.fullParamRW
+        )
+      )
+    )
     val digest  = java.security.MessageDigest
       .getInstance("SHA-256")
       .digest(

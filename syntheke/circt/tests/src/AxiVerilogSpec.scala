@@ -156,7 +156,7 @@ object SlaveGen                                                         extends 
 object AxiVerilogSpec extends TestSuite:
 
   def entry[FP: ReadWriter](name: String) =
-    new GeneratorEntry[FP](GeneratorId(s"demo.axi.zaozi.$name", "1"), Codec.fromReadWriter[FP](ujson.Str(name)))
+    new GeneratorEntry[FP](GeneratorId(s"demo.axi.zaozi.$name", "1"))
 
   val coreEntry   = entry[CoreP]("Core")
   val xbarEntry   = entry[XbarP]("Xbar")

@@ -22,14 +22,13 @@ branch `init`, `doc/design/`, Chinese). Correspondence:
 |---|---|
 | 稳定标识 (`ModuleId`, `ModuleNodeId`, `BindId`, …) | `Ids.scala` |
 | 协议接口 (`ProtocolBundle`, `InterfacePath`, `LayerPath`) | `Interface.scala` |
-| 协议对象 (`Protocol`, `DVProtocol`, `Codec`, `render`) | `Protocol.scala` |
+| 协议对象 (`Protocol`, `DVProtocol`, upickle 序列化) | `Protocol.scala` |
 | 构建阶段 (`DesignSpec`, 模块与节点规格) | `Spec.scala`, `Builder.scala`, `Dsl.scala` |
 | 协商算法（结构校验、稳定拓扑序、双向传播、逐边求解、`EdgeView`、遇错即抛） | `Negotiator.scala` |
 | 跨层端口规划、端口命名、FIRRTL 层 | `Planner.scala` |
 | 已求解记录 (`ResolvedDesign`, `ResolvedEdge`, `EdgeView`, …) | `Resolved.scala` |
 | 模块身份与去重 (@sec-dedup 结构键、模块命名) | `Dedup.scala` |
 | 工具产物（topology/edges/plan/params JSON, @ch-tooling） | `Export.scala` |
-| 可视化（DOT 与 GraphML, @sec-visualization） | `Viz.scala` |
 | 生成器契约、端口结构校验 (@dec-binding-check)、例化流程 | `circt/src/Backend.scala`, `circt/src/Elaborator.scala` |
 
 Deviations from the document's surface syntax:

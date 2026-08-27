@@ -13,23 +13,22 @@ object Wid extends Protocol:
   type Up   = Int
   type Edge = Int
   val id = ProtocolId(ProtocolKind.Design, "wid", "1.0")
-  def negotiate(down: Int, up: Int): Either[TermViolation, Int] =
+  def negotiate(down: Int, up: Int): Either[TermViolation, Int]      =
     if down <= up then Right(down) else Left(TermViolation(s"requested width $down exceeds capacity $up"))
-  def interfaceOf(edge: Int):        ProtocolBundle             =
+  def interfaceOf(edge: Int):        ProtocolBundle                  =
     ProtocolBundle(ProtocolInterface.Field("data", false, ProtocolInterface.UInt(edge)))
-  def render(edge: Int):             RenderedValue              = RenderedValue(edge.toString, Map("width" -> edge.toString))
-  val downCodec:                     Codec[Int]                 = Codec.fromReadWriter[Int](ujson.Str("int"))
-  val upCodec:                       Codec[Int]                 = Codec.fromReadWriter[Int](ujson.Str("int"))
-  val edgeCodec:                     Codec[Int]                 = Codec.fromReadWriter[Int](ujson.Str("int"))
+  val downRW:                        upickle.default.ReadWriter[Int] = summon
+  val upRW:                          upickle.default.ReadWriter[Int] = summon
+  val edgeRW:                        upickle.default.ReadWriter[Int] = summon
 
 /** A toy probe protocol: each source contributes one probed UInt of the declared width. */
 object Trace extends DVProtocol:
   type Down = Int
   type Edge = Vector[Int]
   val id = ProtocolId(ProtocolKind.Verification, "trace", "1.0")
-  def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]  =
+  def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]      =
     if downs.forall(_ > 0) then Right(downs) else Left(TermViolation("width must be positive"))
-  def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces] =
+  def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]     =
     val sources = edge.zip(layers).map { (w, l) =>
       ProtocolBundle(ProtocolInterface.Field("sig", false, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
     }
@@ -37,14 +36,12 @@ object Trace extends DVProtocol:
       edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", false, sources(i)))
     )
     Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
-  def render(edge: Vector[Int]):                                  RenderedValue                       = RenderedValue(edge.mkString(","), Map.empty)
-  val downCodec:                                                  Codec[Int]                          = Codec.fromReadWriter[Int](ujson.Str("int"))
-  val edgeCodec:                                                  Codec[Vector[Int]]                  = Codec.fromReadWriter[Vector[Int]](ujson.Str("ints"))
+  val downRW:                                                     upickle.default.ReadWriter[Int]         = summon
+  val edgeRW:                                                     upickle.default.ReadWriter[Vector[Int]] = summon
 
 object NegotiatorSpec extends TestSuite:
 
-  def intEntry(name: String) =
-    new GeneratorEntry[Int](GeneratorId(s"test.$name", "1"), Codec.fromReadWriter[Int](ujson.Str("int")))
+  def intEntry(name: String) = new GeneratorEntry[Int](GeneratorId(s"test.$name", "1"))
 
   /** prod(32) and dma(24) feed a 2x2 xbar; c0 (capacity 64) lives one wrapper deep, c1's capacity is a knob. */
   def buildSoc(c1Capacity: Int): DesignSpec =
@@ -289,7 +286,7 @@ object NegotiatorSpec extends TestSuite:
       assert(topology("binds").arr.size == 4)
       val edges   = Export.edges(resolved)
       assert(edges("designEdges").arr.map(_("id")("order").num.toInt) == Seq(0, 1, 2, 3))
-      assert(edges("designEdges").arr.head("render")("attributes")("width") == ujson.Str("32"))
+      assert(edges("designEdges").arr.head("edge") == ujson.Num(32))
       val plan    = Export.plan(resolved)
       assert(plan("ports").arr.exists(_("name") == ujson.Str("inst_c0_node_in_in")))
       val params  = Export.params(resolved)

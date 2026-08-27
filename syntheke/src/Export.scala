@@ -127,7 +127,12 @@ object Export:
       })
     )
 
-  /** `edges.json`: settled design edges and per-sink verification results, with protocol codecs and render metadata. */
+  private def write(rw: upickle.default.ReadWriter[?], value: Any): ujson.Value =
+    upickle.default.writeJs(value)(
+      using rw.asInstanceOf[upickle.default.ReadWriter[Any]]
+    )
+
+  /** `edges.json`: settled design edges and per-sink verification results, with protocol-serialized parameters. */
   def edges(resolved: ResolvedDesign): ujson.Value =
     ujson.Obj(
       "designEdges" -> ujson.Arr.from(resolved.edges.map { e =>
@@ -135,11 +140,10 @@ object Export:
         ujson.Obj(
           "id"        -> bindId(e.bind),
           "protocol"  -> protocolId(p.id),
-          "down"      -> p.downCodec.asInstanceOf[Codec[Any]].encode(e.down),
-          "up"        -> p.upCodec.asInstanceOf[Codec[Any]].encode(e.up),
-          "edge"      -> p.edgeCodec.asInstanceOf[Codec[Any]].encode(e.edge),
-          "interface" -> interface(e.interface),
-          "render"    -> p.asInstanceOf[Protocol { type Edge = Any }].render(e.edge).encoded
+          "down"      -> write(p.downRW, e.down),
+          "up"        -> write(p.upRW, e.up),
+          "edge"      -> write(p.edgeRW, e.edge),
+          "interface" -> interface(e.interface)
         )
       }),
       "dvResults"   -> ujson.Arr.from(resolved.dvGroups.map { g =>
@@ -148,15 +152,14 @@ object Export:
           "sink"       -> dvSinkId(g.sink),
           "protocol"   -> protocolId(p.id),
           "binds"      -> ujson.Arr.from(g.binds.map(dvBindId)),
-          "downs"      -> ujson.Arr.from(g.downs.map(p.downCodec.asInstanceOf[Codec[Any]].encode)),
+          "downs"      -> ujson.Arr.from(g.downs.map(write(p.downRW, _))),
           "layers"     -> ujson.Arr.from(g.layers.map(layerPath)),
-          "edge"       -> p.edgeCodec.asInstanceOf[Codec[Any]].encode(g.edge),
+          "edge"       -> write(p.edgeRW, g.edge),
           "interfaces" -> ujson.Obj(
             "sources"   -> ujson.Arr.from(g.interfaces.sources.map(interface)),
             "sink"      -> interface(g.interfaces.sink),
             "sinkPaths" -> ujson.Arr.from(g.interfaces.sinkPaths.map(interfacePath))
-          ),
-          "render"     -> p.asInstanceOf[DVProtocol { type Edge = Any }].render(g.edge).encoded
+          )
         )
       })
     )

@@ -164,7 +164,7 @@ object DvVerilogSpec extends TestSuite:
   val outDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
 
   def entry(name: String) =
-    new GeneratorEntry[StubFull](GeneratorId(s"demo.dv.$name", "1"), Codec.fromReadWriter[StubFull](ujson.Str(name)))
+    new GeneratorEntry[StubFull](GeneratorId(s"demo.dv.$name", "1"))
 
   val srcEntry  = entry("Src")
   val memEntry  = entry("Mem")
@@ -181,8 +181,8 @@ object DvVerilogSpec extends TestSuite:
     type Down = Int
     type Edge = Vector[Int]
     val id = ProtocolId(ProtocolKind.Verification, "vectrace", "1.0")
-    def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]  = Right(downs)
-    def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces] =
+    def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]      = Right(downs)
+    def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]     =
       val sources = edge.zip(layers).map { (w, l) =>
         ProtocolBundle(
           ProtocolInterface
@@ -193,10 +193,8 @@ object DvVerilogSpec extends TestSuite:
         edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", false, sources(i)))
       )
       Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
-    def render(edge: Vector[Int]):                                  RenderedValue                       =
-      RenderedValue(edge.mkString(","), Map.empty)
-    val downCodec:                                                  Codec[Int]                          = Codec.fromReadWriter[Int](ujson.Str("int"))
-    val edgeCodec:                                                  Codec[Vector[Int]]                  = Codec.fromReadWriter[Vector[Int]](ujson.Str("ints"))
+    val downRW:                                                     upickle.default.ReadWriter[Int]         = summon
+    val edgeRW:                                                     upickle.default.ReadWriter[Vector[Int]] = summon
 
   /** Ports of a generator module reconstructed from its EdgeView — the FullParam determines the interface. */
   def stubParams(kind: String)(view: EdgeView): Either[CapabilityViolation, StubFull] =

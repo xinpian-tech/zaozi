@@ -2,37 +2,8 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke
 
-/** Serialization schema plus canonical encode / decode for one parameter type. */
-trait Codec[T]:
-  def schema:                     ujson.Value
-  def encode(value: T):           ujson.Value
-  def decode(value: ujson.Value): Either[String, T]
-
-object Codec:
-  /** Codec from a upickle ReadWriter with a caller-supplied schema. */
-  def fromReadWriter[T](
-    schemaValue: ujson.Value
-  )(
-    using rw:    upickle.default.ReadWriter[T]
-  ): Codec[T] =
-    new Codec[T]:
-      def schema                     = schemaValue
-      def encode(value: T)           = upickle.default.writeJs(value)
-      def decode(value: ujson.Value) =
-        try Right(upickle.default.read[T](value))
-        catch case e: Exception => Left(e.getMessage)
-
 /** Protocol-reported conflict description, returned as a value from `negotiate` / `resolve`. */
 final case class TermViolation(message: String)
-
-/** Visualization output of `render`: a display label plus named attributes. Attribute names are unique and encoded
-  * sorted by name (doc @sec-protocol-object).
-  */
-final case class RenderedValue(label: String, attributes: Map[String, String]):
-  def encoded: ujson.Value = ujson.Obj(
-    "label"      -> ujson.Str(label),
-    "attributes" -> ujson.Obj.from(attributes.toVector.sortBy(_._1).map((k, v) => k -> ujson.Str(v)))
-  )
 
 /** A design protocol: the negotiation contract of one edge (doc @sec-protocol-object).
   *
@@ -61,12 +32,10 @@ trait Protocol:
   /** Hardware interface of a settled edge; drives dangle-port planning and generator port checking. */
   def interfaceOf(edge: Edge): ProtocolBundle
 
-  /** Visualization label and attributes for a settled edge. */
-  def render(edge: Edge): RenderedValue
-
-  def downCodec: Codec[Down]
-  def upCodec:   Codec[Up]
-  def edgeCodec: Codec[Edge]
+  /** Canonical serialization of the three parameter types (upickle). */
+  def downRW: upickle.default.ReadWriter[Down]
+  def upRW:   upickle.default.ReadWriter[Up]
+  def edgeRW: upickle.default.ReadWriter[Edge]
 
 /** A verification protocol: one probe sink aggregates all its probe sources (doc @sec-dv-protocol). */
 trait DVProtocol:
@@ -89,7 +58,6 @@ trait DVProtocol:
     */
   def interfacesOf(edge: Edge, layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]
 
-  def render(edge: Edge): RenderedValue
-
-  def downCodec: Codec[Down]
-  def edgeCodec: Codec[Edge]
+  /** Canonical serialization of the two parameter types (upickle). */
+  def downRW: upickle.default.ReadWriter[Down]
+  def edgeRW: upickle.default.ReadWriter[Edge]

@@ -147,22 +147,9 @@ object Axi4 extends Protocol:
       Field("r", true, channel(id0, "data" -> UInt(e.dataBits), "resp" -> UInt(2), "last" -> Bool))
     )
 
-  def render(e: AxiEdgeParams): RenderedValue =
-    RenderedValue(
-      s"AXI4 ${e.dataBits}b",
-      Map(
-        "addrBits" -> e.addrBits.toString,
-        "dataBits" -> e.dataBits.toString,
-        "idBits"   -> e.idBits.toString,
-        "masters"  -> e.master.masters.map(_.name).mkString("+"),
-        "slaves"   -> e.slave.slaves.map(_.name).mkString("+")
-      )
-    )
-
-  private def schema(name: String) = ujson.Str(s"amba.axi4/$name@1.0")
-  val downCodec: Codec[AxiMasterPort] = Codec.fromReadWriter[AxiMasterPort](schema("MasterPort"))
-  val upCodec:   Codec[AxiSlavePort]  = Codec.fromReadWriter[AxiSlavePort](schema("SlavePort"))
-  val edgeCodec: Codec[AxiEdgeParams] = Codec.fromReadWriter[AxiEdgeParams](schema("EdgeParams"))
+  val downRW: upickle.default.ReadWriter[AxiMasterPort] = summon
+  val upRW:   upickle.default.ReadWriter[AxiSlavePort]  = summon
+  val edgeRW: upickle.default.ReadWriter[AxiEdgeParams] = summon
 
 /** Port-parameter transforms shared by the demo's interconnect generators, mirroring `AXI4Xbar.masterFn` / `slaveFn`:
   * the doc's static id remap (@sec-three-params) prefixes each input's local ids with the input index.

@@ -8,7 +8,7 @@ import utest.*
 object DedupSpec extends TestSuite:
 
   def intEntry(name: String) =
-    new GeneratorEntry[Int](GeneratorId(s"test.$name", "1"), Codec.fromReadWriter[Int](ujson.Str("int")))
+    new GeneratorEntry[Int](GeneratorId(s"test.$name", "1"))
 
   /** Two identical clusters: each wraps one consumer with the same generator and full parameter. */
   def buildTwinSoc(sameParam: Boolean): DesignSpec =

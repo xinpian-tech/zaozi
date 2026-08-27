@@ -17,5 +17,4 @@ object AxiDemoMain:
     os.write.over(dir / "edges.json", ujson.write(Export.edges(resolved), indent = 2))
     os.write.over(dir / "plan.json", ujson.write(Export.plan(resolved), indent = 2))
     os.write.over(dir / "params.json", ujson.write(Export.params(resolved), indent = 2))
-    os.write.over(dir / "design.dot", Viz.dot(resolved))
-    println(s"wrote Top.fir / Top.sv / four JSON exports / design.dot to $dir")
+    println(s"wrote Top.fir / Top.sv / four JSON exports to $dir")

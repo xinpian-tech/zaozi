@@ -64,12 +64,15 @@ final case class DVSinkSpec(
   order:    Int,
   loc:      SourceLocation)
 
-/** Registry entry: generator identity plus its FullParam codec (doc @sec-generator-records).
+/** Registry entry: generator identity plus its FullParam serialization (doc @sec-generator-records).
   *
   * The zaozi generator implementation itself lives beyond the serialization boundary and is bound in the elaboration
-  * module; within Build / Negotiate the entry is the identity and codec carrier.
+  * module; within Build / Negotiate the entry is the identity and serialization carrier.
   */
-final class GeneratorEntry[FP](val id: GeneratorId, val fullParamCodec: Codec[FP])
+final class GeneratorEntry[FP](
+  val id:                GeneratorId
+)(
+  using val fullParamRW: upickle.default.ReadWriter[FP])
 
 sealed trait ModuleSpec:
   def id:  ModuleId
