@@ -44,7 +44,7 @@ trait Protocol:
   type Up
   type Edge
 
-  /** Must have kind [[ProtocolKind.Design]]; checked by the structural pass (N1). */
+  /** Must have kind [[ProtocolKind.Design]]; checked by the structural pass. */
   def id: ProtocolId
 
   /** Per-edge settlement: combine the propagated Down and Up into the final edge parameter. */
@@ -65,7 +65,7 @@ trait DVProtocol:
   type Down
   type Edge
 
-  /** Must have kind [[ProtocolKind.Verification]]; checked by the structural pass (N1). */
+  /** Must have kind [[ProtocolKind.Verification]]; checked by the structural pass. */
   def id: ProtocolId
 
   /** Aggregate the source `Down`s (in bind declaration order) into the sink's `Edge`. */

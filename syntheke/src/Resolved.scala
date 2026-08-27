@@ -121,12 +121,14 @@ enum PlanOrigin derives CanEqual:
   case Design(bind: BindId)
   case Verification(bind: DVBindId)
 
-/** A framework-generated dangle port on a wrapper module. */
+/** A framework-generated dangle port on a wrapper module. Design edges plan one bundle port per crossing; probe routing
+  * plans one pure-probe port per signal leaf, so probes never form aggregates in hardware.
+  */
 final case class PortPlan(
   module:    ModuleId,
   direction: PortDirection,
   name:      PortName,
-  interface: ProtocolBundle,
+  interface: ProtocolInterface,
   origin:    PlanOrigin,
   loc:       SourceLocation)
 

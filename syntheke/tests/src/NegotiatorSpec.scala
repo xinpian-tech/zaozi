@@ -239,22 +239,25 @@ object NegotiatorSpec extends TestSuite:
       assert(group.edgeAs(Trace) == Vector(8, 4))
       assert(group.interfaces.sinkPaths == Vector(InterfacePath.root.field("src0"), InterfacePath.root.field("src1")))
 
-      // The cluster wrapper carries Output dangles for both probes and declares the layer.
+      // The cluster wrapper carries one pure-probe Output dangle per signal leaf and declares the layer.
       val cluster = ModuleId.root / "cluster"
       val probes  = resolved.portPlans.filter(p => p.module == cluster && p.origin.isInstanceOf[PlanOrigin.Verification])
-      assert(probes.map(_.name.encoded) == Vector("inst_core_dv$msource_rob_out", "inst_core_dv$msource_lsu_out"))
+      assert(
+        probes.map(_.name.encoded) == Vector("inst_core_dv$msource_rob_sig_out", "inst_core_dv$msource_lsu_sig_out")
+      )
+      assert(probes.forall(_.interface.isInstanceOf[ProtocolInterface.Probe]))
       assert(resolved.layerDecls(cluster).paths() == Vector(Vector("verification"), Vector("verification", "cosim")))
       assert(
         resolved.layerDecls(ModuleId.root).paths() == Vector(Vector("verification"), Vector("verification", "cosim"))
       )
 
-      // Root wires end inside the sink generator's port at the per-source sub-path.
+      // Root wires end inside the sink generator's port at the per-source sub-path extended by the leaf path.
       val rootDvWires =
         resolved.wirePlans.filter(w => w.module == ModuleId.root && w.origin.isInstanceOf[PlanOrigin.Verification])
       assert(
         rootDvWires.map(_.to) == Vector(
-          LocalEndpoint.ChildPort("cosim", PortName("taps"), InterfacePath.root.field("src0")),
-          LocalEndpoint.ChildPort("cosim", PortName("taps"), InterfacePath.root.field("src1"))
+          LocalEndpoint.ChildPort("cosim", PortName("taps"), InterfacePath.root.field("src0").field("sig")),
+          LocalEndpoint.ChildPort("cosim", PortName("taps"), InterfacePath.root.field("src1").field("sig"))
         )
       )
     }

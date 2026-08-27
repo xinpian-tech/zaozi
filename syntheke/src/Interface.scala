@@ -35,7 +35,7 @@ object ProtocolInterface:
   final case class Probe(inner: ProtocolInterface, layer: LayerPath) extends ProtocolInterface
 
   final case class Field(name: String, flip: Boolean, tpe: ProtocolInterface) derives upickle.default.ReadWriter:
-    require(name.nonEmpty, "field name must be non-empty")
+    DeclaredName.require(name, "interface field name")
 
 /** The top-level Bundle of a protocol port: the root and every nested Bundle carry at least one field (invariant
   * enforced by [[ProtocolInterface.Bundle]]).
@@ -71,10 +71,19 @@ final case class InterfacePath(segments: Vector[InterfacePath.Segment]) derives 
   def field(name:       String):        InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Field(name))
   def index(i:          Int):           InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Index(i))
   def isPrefixOf(other: InterfacePath): Boolean       = other.segments.startsWith(segments)
+  def ++(other:         InterfacePath): InterfacePath = InterfacePath(segments ++ other.segments)
   def show:                             String        = segments.map {
     case InterfacePath.Segment.Field(n) => s".$n"
     case InterfacePath.Segment.Index(i) => s"[$i]"
   }.mkString
+
+  /** Path as port-name segments: field names verbatim, Vec indices as digits. Unambiguous because interface field names
+    * cannot start with a digit ([[DeclaredName]]).
+    */
+  def nameSegments: Vector[String] = segments.map {
+    case InterfacePath.Segment.Field(n) => n
+    case InterfacePath.Segment.Index(i) => i.toString
+  }
 
 object InterfacePath:
   val root: InterfacePath = InterfacePath(Vector.empty)

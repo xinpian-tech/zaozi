@@ -272,6 +272,14 @@ object Negotiator:
           fail(s"settle failed at ${b.bindId.show}: ${violation.message}, at ${at(b.loc)}")
         case Right(edge)     =>
           val bundle = p.asInstanceOf[Protocol { type Edge = Any }].interfaceOf(edge)
+          // Probes belong to verification protocols; design ports are plain data (no open aggregates in hardware).
+          ProtocolBundle.leaves(bundle).collectFirst { case (path, _: ProtocolInterface.Probe) => path }.foreach {
+            path =>
+              fail(
+                s"design interface of ${b.bindId.show} contains a Probe at ${path.show}; " +
+                  s"probes belong to verification protocols, at ${at(b.loc)}"
+              )
+          }
           ResolvedEdge(b.bindId, p, down, up, edge, bundle)
     }
 

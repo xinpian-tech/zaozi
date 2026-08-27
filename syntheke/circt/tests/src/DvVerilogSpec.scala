@@ -126,36 +126,26 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         given Block = module.block
         p.ports.zipWithIndex.foreach { (sp, idx) =>
           val port = module.getIO(idx)
-          ProtocolBundle.leaves(sp.interface).foreach { (path, leaf) =>
-            leaf match
-              case ProtocolInterface.Probe(inner, _) if !sp.isInput =>
-                // A probe source: an invalidated dummy wire sent into the colored port leaf.
-                val wire = summon[WireApi].op(
-                  s"stub_${sp.name}_${path.segments.size}_${path.show.hashCode.toHexString}",
-                  unknownLoc,
-                  FirrtlNameKind.Droppable,
-                  Translate.tpe(inner)
-                )
-                wire.operation.appendToBlock()
-                wire.result.emitInvalidate(summon[Block], unknownLoc)
-                val dst  = path.segments.foldLeft(port) { (v, seg) =>
-                  seg match
-                    case InterfacePath.Segment.Field(n) =>
-                      val sub = summon[OpenSubfieldApi].op(v, v.getType.getBundleFieldIndex(n), unknownLoc)
-                      sub.operation.appendToBlock()
-                      sub.result
-                    case InterfacePath.Segment.Index(_) => throw new UnsupportedOperationException("vec probes")
-                }
-                val send = summon[RefSendApi].op(wire.result, unknownLoc)
-                send.operation.appendToBlock()
-                // Color the uncolored probe to the port leaf's layer-colored probe type.
-                val cast = summon[RefCastApi].op(send.result, dst.getType, unknownLoc)
-                cast.operation.appendToBlock()
-                summon[RefDefineApi].op(dst, cast.result, unknownLoc).operation.appendToBlock()
-              case _                                                => ()
-          }
-          // Non-probe ports: invalidate every writable leaf in one shot.
-          if !hasProbe(sp) then port.emitInvalidate(summon[Block], unknownLoc)
+          sp.interface match
+            case ProtocolInterface.Probe(inner, _) if !sp.isInput =>
+              // A pure-probe leaf port: an invalidated dummy wire sent into the colored port.
+              val wire = summon[WireApi].op(
+                s"stub_${sp.name}",
+                unknownLoc,
+                FirrtlNameKind.Droppable,
+                Translate.tpe(inner)
+              )
+              wire.operation.appendToBlock()
+              wire.result.emitInvalidate(summon[Block], unknownLoc)
+              val send = summon[RefSendApi].op(wire.result, unknownLoc)
+              send.operation.appendToBlock()
+              // Color the uncolored probe to the port's layer-colored probe type.
+              val cast = summon[RefCastApi].op(send.result, port.getType, unknownLoc)
+              cast.operation.appendToBlock()
+              summon[RefDefineApi].op(port, cast.result, unknownLoc).operation.appendToBlock()
+            case _                                                =>
+              // Data ports: invalidate every writable leaf in one shot.
+              port.emitInvalidate(summon[Block], unknownLoc)
         }
       }
       module.appendToCircuit()
@@ -169,9 +159,6 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
     instOp.operation.appendToBlock()
     instOp.operation
 
-  private def hasProbe(sp: StubPort): Boolean =
-    ProtocolBundle.leaves(sp.interface).exists(_._2.isInstanceOf[ProtocolInterface.Probe])
-
 object DvVerilogSpec extends TestSuite:
 
   val outDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
@@ -179,23 +166,51 @@ object DvVerilogSpec extends TestSuite:
   def entry(name: String) =
     new GeneratorEntry[StubFull](GeneratorId(s"demo.dv.$name", "1"), Codec.fromReadWriter[StubFull](ujson.Str(name)))
 
-  val srcEntry = entry("Src")
-  val memEntry = entry("Mem")
-  val snkEntry = entry("Cosim")
+  val srcEntry  = entry("Src")
+  val memEntry  = entry("Mem")
+  val snkEntry  = entry("Cosim")
+  val vsrcEntry = entry("VSrc")
+  val vsnkEntry = entry("VCosim")
   val backends: Seq[GeneratorBackend] =
-    Seq(StubBackend(srcEntry, outDir), StubBackend(memEntry, outDir), StubBackend(snkEntry, outDir))
+    Seq(srcEntry, memEntry, snkEntry, vsrcEntry, vsnkEntry).map(StubBackend(_, outDir))
 
   val layerCosim = LayerPath(Vector("verification", "cosim"))
+
+  /** Like [[Trace]], but each source contributes a Vec of probes: `pc: Vec(2, Probe(UInt(w)))`. */
+  object VecTrace extends DVProtocol:
+    type Down = Int
+    type Edge = Vector[Int]
+    val id = ProtocolId(ProtocolKind.Verification, "vectrace", "1.0")
+    def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]  = Right(downs)
+    def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces] =
+      val sources = edge.zip(layers).map { (w, l) =>
+        ProtocolBundle(
+          ProtocolInterface
+            .Field("pc", false, ProtocolInterface.Vec(2, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
+        )
+      }
+      val sink    = ProtocolInterface.Bundle(
+        edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", false, sources(i)))
+      )
+      Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
+    def render(edge: Vector[Int]):                                  RenderedValue                       =
+      RenderedValue(edge.mkString(","), Map.empty)
+    val downCodec:                                                  Codec[Int]                          = Codec.fromReadWriter[Int](ujson.Str("int"))
+    val edgeCodec:                                                  Codec[Vector[Int]]                  = Codec.fromReadWriter[Vector[Int]](ujson.Str("ints"))
 
   /** Ports of a generator module reconstructed from its EdgeView — the FullParam determines the interface. */
   def stubParams(kind: String)(view: EdgeView): Either[CapabilityViolation, StubFull] =
     Right(
       StubFull(
         kind,
-        view.nodes.map(nv =>
-          StubPort(nv.node.name, nv.direction == NodeDirection.Inward, nv.edge.interface)
-        ) ++ view.verification.sources.map(s => StubPort(s.source.name, false, s.interface))
-        // FIRRTL forbids input probes: the sink receives the probe-stripped (resolved) interface.
+        view.nodes.map(nv => StubPort(nv.node.name, nv.direction == NodeDirection.Inward, nv.edge.interface))
+        // A probe source exposes one pure-probe port per signal leaf.
+          ++ view.verification.sources.flatMap(s =>
+            ProtocolBundle.leaves(s.interface).map { (path, leaf) =>
+              StubPort(PortName(s.source.name +: path.nameSegments).encoded, false, leaf)
+            }
+          )
+          // FIRRTL forbids input probes: the sink receives the probe-stripped (resolved) interface.
           ++ view.verification.sinks.map(s =>
             StubPort(s.sink.name, true, ProtocolBundle.stripProbes(s.interfaces.sink))
           )
@@ -232,14 +247,41 @@ object DvVerilogSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildDesign())
       val design   = Elaborator.elaborate(resolved, backends)
 
-      // The layer tree is declared once at circuit level; the cluster carries probe dangle ports.
+      // The layer tree is declared once at circuit level; the cluster carries one pure-probe dangle per leaf.
       assert(design.firrtl.contains("layer verification"))
       assert(design.firrtl.contains("cosim"))
-      assert(design.firrtl.contains("inst_src_dv$msource_rob_out"))
+      assert(design.firrtl.contains("inst_src_dv$msource_rob_sig_out"))
       assert(design.firrtl.contains("define"))
       // Verilog exists for the root and both stub endpoint modules; probes stay out of the release netlist
       // (bind layers), so the sink instance is not in module Top's body.
       assert(design.verilog.contains("module Top"))
       assert(design.verilog.contains("module demo_dv_Src_"))
+    }
+
+    test("Vec probe leaves route as individual pure-probe ports through subindex") {
+      val spec     = Design {
+        val pcs  = wrapper("vc") {
+          generator("vsrc", vsrcEntry) {
+            parameters(stubParams("VSrc"))(identity)
+            dvSource(VecTrace)("pcs", 32, layerCosim)
+          }
+        }
+        val taps = generator("vcosim", vsnkEntry) {
+          parameters(stubParams("VCosim"))(identity)
+          dvSink(VecTrace)("taps")
+        }
+        taps <-- pcs
+      }
+      val resolved = Negotiator.negotiate(spec)
+      val vc       = ModuleId.root / "vc"
+      // One dangle per Vec element, pure probe type.
+      assert(
+        resolved.portPlans.filter(_.module == vc).map(_.name.encoded) ==
+          Vector("inst_vsrc_dv$msource_pcs_pc_0_out", "inst_vsrc_dv$msource_pcs_pc_1_out")
+      )
+      assert(resolved.portPlans.forall(_.interface.isInstanceOf[ProtocolInterface.Probe]))
+      val design   = Elaborator.elaborate(resolved, backends)
+      assert(design.firrtl.contains("pcs_pc_0"))
+      assert(design.verilog.contains("module Top"))
     }
   }

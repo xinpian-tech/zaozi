@@ -42,10 +42,10 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   LayerApi,
   LayerBlockApi,
   ModuleApi,
-  OpenSubfieldApi,
   RefDefineApi,
   RefResolveApi,
-  SubfieldApi
+  SubfieldApi,
+  SubindexApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
@@ -278,13 +278,20 @@ object Elaborator:
                   rgm.view.nodes.foreach { nv =>
                     checkPort(nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
                   }
-                  // Probe sources keep their probe types; sink ports carry the probe-stripped interface
-                  // (the shape after ref.resolve at this wrapper).
-                  rgm.view.verification.sources.foreach(s => checkPort(s.source.name, true, s.interface))
+                  // Probe sources expose one pure-probe port per signal leaf (probes never form aggregates in
+                  // hardware); sink ports carry the probe-stripped interface (the shape after ref.resolve at this
+                  // wrapper).
+                  def sourceLeafPorts(s: SourceView): Vector[(String, ProtocolInterface)] =
+                    ProtocolBundle.leaves(s.interface).map { (path, leaf) =>
+                      PortName(s.source.name +: path.nameSegments).encoded -> leaf
+                    }
+                  rgm.view.verification.sources.foreach {
+                    sourceLeafPorts(_).foreach((name, leaf) => checkPort(name, true, leaf))
+                  }
                   rgm.view.verification.sinks
                     .foreach(s => checkPort(s.sink.name, false, ProtocolBundle.stripProbes(s.interfaces.sink)))
                   val declared = rgm.view.nodes.map(_.node.name).toSet ++
-                    rgm.view.verification.sources.map(_.source.name) ++
+                    rgm.view.verification.sources.flatMap(sourceLeafPorts(_).map(_._1)) ++
                     rgm.view.verification.sinks.map(_.sink.name)
                   (byName.keySet -- declared).toVector.sorted.foreach { extra =>
                     fail(
@@ -331,11 +338,10 @@ object Elaborator:
                   fail(s"${d.name}: missing child port $inst.${port.encoded}")
                 )
 
-            /** Walk named fields; open bundles (probe-carrying) use `opensubfield`, plain data `subfield`. */
+            /** Walk a data path inside the sink's port: named fields via `subfield`, Vec indices via `subindex`. */
             def navigate(
               base: Value,
-              path: InterfacePath,
-              open: Boolean
+              path: InterfacePath
             )(
               using Block
             ): Value =
@@ -344,43 +350,34 @@ object Elaborator:
                   case InterfacePath.Segment.Field(n) =>
                     val idx = v.getType.getBundleFieldIndex(n)
                     if idx < 0 then fail(s"${d.name}: no field '$n' while navigating a verification path")
-                    val sub =
-                      if open then summon[OpenSubfieldApi].op(v, idx, unknownLoc)
-                      else summon[SubfieldApi].op(v, idx, unknownLoc)
+                    val sub = summon[SubfieldApi].op(v, idx, unknownLoc)
                     sub.operation.appendToBlock()
                     sub.result
                   case InterfacePath.Segment.Index(i) =>
-                    fail(s"${d.name}: unsupported: Vec index [$i] in a verification path")
+                    val sub = summon[SubindexApi].op(v, i, unknownLoc)
+                    sub.operation.appendToBlock()
+                    sub.result
               }
 
             resolved.wirePlans.filter(_.module == rep).foreach { wp =>
               wp.origin match
-                case PlanOrigin.Design(_)          =>
+                case PlanOrigin.Design(_)       =>
                   summon[ConnectApi].op(baseOf(wp.from), baseOf(wp.to), unknownLoc).operation.appendToBlock()
-                case PlanOrigin.Verification(bind) =>
-                  val group  = resolved.dvGroups.find(_.binds.contains(bind)).get
-                  val bundle = group.interfaces.sources(group.binds.indexOf(bind))
+                case PlanOrigin.Verification(_) =>
+                  // Every verification wire carries one probe leaf (doc @sec-dv-routing).
                   wp.to match
                     case LocalEndpoint.ThisPort(_)             =>
-                      // Pass-through across this boundary: per-leaf ref.define (doc @sec-dv-routing).
-                      ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
-                        val src = navigate(baseOf(wp.from), leafPath, open = true)
-                        val dst = navigate(baseOf(wp.to), leafPath, open = true)
-                        summon[RefDefineApi].op(dst, src, unknownLoc).operation.appendToBlock()
-                      }
+                      // Pass-through across this boundary: define the dangle from the child's probe port.
+                      summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
                     case LocalEndpoint.ChildPort(inst, _, sub) =>
-                      // The sink end: resolve each probe inside the sink's layerblock and connect the data.
+                      // The sink end: resolve the probe inside the sink's layerblock and connect the data leaf.
                       val lb = sinkBlocks.getOrElse(inst, fail(s"${d.name}: sink instance '$inst' has no layer block"))
                       locally {
                         given Block = lb
-                        ProtocolBundle.leaves(bundle).foreach { (leafPath, _) =>
-                          val src = navigate(baseOf(wp.from), leafPath, open = true)
-                          val dst =
-                            navigate(baseOf(wp.to), InterfacePath(sub.segments ++ leafPath.segments), open = false)
-                          val res = summon[RefResolveApi].op(src, unknownLoc)
-                          res.operation.appendToBlock()
-                          summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
-                        }
+                        val res     = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
+                        res.operation.appendToBlock()
+                        val dst     = navigate(baseOf(wp.to), sub)
+                        summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
                       }
             }
 

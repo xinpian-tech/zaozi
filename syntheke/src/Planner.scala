@@ -37,7 +37,7 @@ private[syntheke] object Planner:
       base:      PortName, // dangle base segments for this endpoint
       w:         ModuleId,
       direction: PortDirection,
-      interface: ProtocolBundle,
+      interface: ProtocolInterface,
       origin:    PlanOrigin,
       loc:       SourceLocation
     ): Branch =
@@ -90,9 +90,12 @@ private[syntheke] object Planner:
     }
 
     // ============ verification binds ============
+    // One pure-probe dangle port and wire chain per signal leaf of the source interface: probes never form
+    // aggregates in hardware, so Vec leaves route like any other and no open aggregate types are needed.
     val dvParts = for
-      group       <- settled.dvGroups
-      (bindId, i) <- group.binds.zipWithIndex
+      group            <- settled.dvGroups
+      (bindId, i)      <- group.binds.zipWithIndex
+      (leafPath, leaf) <- ProtocolBundle.leaves(group.interfaces.sources(i))
     yield
       val sinkModule = group.sink.module
       val w          = sinkModule.parent.get
@@ -101,16 +104,19 @@ private[syntheke] object Planner:
       val origin     = PlanOrigin.Verification(bindId)
       val src        = planBranch(
         endpoint = source.module,
-        portName = PortName(source.name),
-        base = PortName("dv-source", source.name, "out"),
+        portName = PortName(source.name +: leafPath.nameSegments),
+        base = PortName("dv-source" +: source.name +: leafPath.nameSegments :+ "out"),
         w = w,
         direction = PortDirection.Output,
-        interface = group.interfaces.sources(i),
+        interface = leaf,
         origin = origin,
         loc = decl.loc
       )
-      val sinkRef    =
-        LocalEndpoint.ChildPort(sinkModule.path.last, PortName(group.sink.name), group.interfaces.sinkPaths(i))
+      val sinkRef    = LocalEndpoint.ChildPort(
+        sinkModule.path.last,
+        PortName(group.sink.name),
+        group.interfaces.sinkPaths(i) ++ leafPath
+      )
       // Layer declarations on every wrapper the probe crosses, including the wiring scope.
       val layered    = (branchModules(source.module, w) :+ w).map(_ -> group.layers(i))
       (src.ports, src.wires :+ WirePlan(w, src.end, sinkRef, origin, decl.loc), layered)
