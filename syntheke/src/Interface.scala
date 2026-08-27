@@ -35,6 +35,7 @@ object ProtocolInterface:
   /** Read-only reference to an internal signal, confined to a FIRRTL layer. */
   final case class Probe(inner: ProtocolInterface, layer: LayerPath) extends ProtocolInterface:
     require(!containsFlipped(inner), "a probe is one-directional: no Flipped inside")
+    require(!containsProbe(inner), "a probe references data: no Probe inside a Probe")
 
   /** Direction reversal relative to the root, legal only directly as a field's type (zaozi's `Flipped`); alignment is
     * the unmarked case.
@@ -50,6 +51,13 @@ object ProtocolInterface:
     case Vec(_, e)      => containsFlipped(e)
     case Probe(i, _)    => containsFlipped(i)
     case _: Flipped => true
+    case _ => false
+
+  private[syntheke] def containsProbe(t: ProtocolInterface): Boolean = t match
+    case Bundle(fields) => fields.exists(f => containsProbe(f.tpe))
+    case Vec(_, e)      => containsProbe(e)
+    case Flipped(i)     => containsProbe(i)
+    case _: Probe => true
     case _ => false
 
 /** The top-level Bundle of a protocol port: the root and every nested Bundle carry at least one field (invariant

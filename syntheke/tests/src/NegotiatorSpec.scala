@@ -477,6 +477,13 @@ object NegotiatorSpec extends TestSuite:
         )
       }
       assert(fp.getMessage.contains("one-directional"))
+      val pp = intercept[IllegalArgumentException] {
+        ProtocolInterface.Probe(
+          ProtocolInterface.Probe(ProtocolInterface.Bool, LayerPath(Vector("verification"))),
+          LayerPath(Vector("verification"))
+        )
+      }
+      assert(pp.getMessage.contains("no Probe inside a Probe"))
 
       // A foreign builder read through another module's view is rejected at negotiation.
       val spec = Design {
