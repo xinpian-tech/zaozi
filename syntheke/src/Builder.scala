@@ -147,9 +147,13 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     require(!fns.contains(name), s"port parameter function of ${ModuleNodeId(id, name).show} already set")
     fns(name) = f
 
-  private[syntheke] def recordRef(name: String, spec: CrossProtocolRefSpec): Unit =
+  private[syntheke] def recordRef(nodeName: String, spec: CrossProtocolRefSpec): Unit =
     requireOpen()
-    refs += (name -> spec)
+    require(
+      !refs.exists((n, s) => n == nodeName && s.refName == spec.refName),
+      s"duplicate cross-protocol reference '${spec.refName}' on ${ModuleNodeId(id, nodeName).show}"
+    )
+    refs += (nodeName -> spec)
 
   /** Declare a named inward node of protocol `p`. */
   def inward(

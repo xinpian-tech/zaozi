@@ -7,25 +7,24 @@ package me.jiuyang.syntheke
   * the return-channel types [[Dangles]] / [[Endpoints]]. The scopes the declarations delegate to are the mechanism, in
   * `Builder.scala`.
   *
-  * Two capture givens thread through every declaration:
-  *
-  *   - `sourcecode.Name` — declarations are named by the val they are bound to, like zaozi's instance naming:
+  * Naming (`sourcecode.Name`): declarations are named by the val they are bound to, like zaozi's instance naming:
   *
   * {{{
-  *     val spec = Design {
-  *       val core = generator(coreEntry) {   // instance name "core"
-  *         val out = outward(Wid).dFn(...)   // node name "out"
-  *         ...
-  *         out
-  *       }
-  *     }
+  * val spec = Design {
+  *   val core = generator(coreEntry) {   // instance name "core"
+  *     val out = outward(Wid).dFn(...)   // node name "out"
+  *     ...
+  *     out
+  *   }
+  * }
   * }}}
   *
   * When the val cannot carry the intended name — computed names in a loop, destructured returns — provide the given
   * explicitly: `given sourcecode.Name = sourcecode.Name(s"in$i")`. A def forwarding its own binding-site name must
   * contain exactly the one wrapper / generator call, or the Name would capture its internal declarations too.
-  *   - `sourcecode.File` / `sourcecode.Line` — the declaration site, stored in the spec for diagnostics only, never as
-  *     identity (doc @sec-identity).
+  *
+  * Locations (`sourcecode.File` / `sourcecode.Line`): the declaration site, stored in the spec for diagnostics only,
+  * never as identity (doc @sec-identity).
   */
 
 /** Entry point: run `body` as the root wrapper module and freeze everything it declared into an immutable
@@ -180,6 +179,9 @@ def parametersConst[FP](
   * `down`, as read-only probes confined to FIRRTL layer `layer` (doc @sec-dv-declarations). The framework forwards
   * every probe leaf automatically to the root — into the [[testbench]]'s matching data input when one is declared, as a
   * top-level probe port otherwise.
+  *
+  * Always bind the declaration to a val. This is the one named declaration returning `Unit`, so nothing forces the
+  * binding: as a bare statement it would silently take its name from the enclosing definition instead.
   */
 def dvSource(
   p:     DVProtocol
@@ -209,18 +211,16 @@ extension [P <: Protocol](target: InwardNodeBuilder[P])
     ws.recordBind(source.id, target.id, (file, line))
 
 /** Read handles granted by [[depend]]: the only way a port parameter function reads a peer node's settled value,
-  * applied through the [[ReadCtx]] the function receives.
+  * applied through the [[ReadCtx]] the function receives. The two subclasses keep the directions apart at the type
+  * level — a dFn holds [[DownReader]]s, a uFn holds [[UpReader]]s.
   */
-final class DownReader[T] private[syntheke] (private[syntheke] val node: ModuleNodeId)
-
-/** See [[DownReader]]. */
-final class UpReader[T] private[syntheke] (private[syntheke] val node: ModuleNodeId)
+sealed abstract class Reader[T] private[syntheke] (private[syntheke] val node: ModuleNodeId)
+final class DownReader[T] private[syntheke] (node: ModuleNodeId) extends Reader[T](node)
+final class UpReader[T] private[syntheke] (node: ModuleNodeId)   extends Reader[T](node)
 
 /** Values visible to one port parameter function evaluation: apply a read handle to get that peer's settled value. */
 final class ReadCtx private[syntheke] (values: Map[ModuleNodeId, Any]):
-  def apply[T](r: DownReader[T]): T =
-    values.getOrElse(r.node, throw new UndeclaredReadException(r.node)).asInstanceOf[T]
-  def apply[T](r: UpReader[T]):   T =
+  def apply[T](r: Reader[T]): T =
     values.getOrElse(r.node, throw new UndeclaredReadException(r.node)).asInstanceOf[T]
 
 /** Handle of a declared cross-protocol reference: reads the target node's settled edge from the [[EdgeView]], typed by

@@ -20,6 +20,20 @@ object Wid extends Protocol:
   val upRW:                          upickle.default.ReadWriter[Int] = summon
   val edgeRW:                        upickle.default.ReadWriter[Int] = summon
 
+/** A protocol as a class, so tests can hold two distinct instances: their nodes must not bind — protocol identity is
+  * the object, enforced at compile time by the singleton-typed builders and the invariant type parameter.
+  */
+final class WidLike extends Protocol:
+  type Down = Int
+  type Up = Int
+  type Edge = Int
+  def negotiate(down: Int, up: Int): Either[Violation, Int]          = Right(down min up)
+  def interfaceOf(edge: Int):        ProtocolBundle                  =
+    ProtocolBundle(ProtocolInterface.Field("data", ProtocolInterface.UInt(edge)))
+  val downRW:                        upickle.default.ReadWriter[Int] = summon
+  val upRW:                          upickle.default.ReadWriter[Int] = summon
+  val edgeRW:                        upickle.default.ReadWriter[Int] = summon
+
 /** A toy probe protocol: each source publishes one probed UInt of the declared width. */
 object Trace extends DVProtocol:
   type Down = Int
@@ -406,6 +420,35 @@ object NegotiatorSpec extends TestSuite:
 
       // The body's return value is the only escape channel and it is typed: only endpoint containers leave.
       compileError("""Design { val x = generator(intEntry("G")) { parametersConst(0); 42 } }""")
+
+      // Protocol identity is the object: nodes of two distinct instances of one protocol class must not bind.
+      // This holds only while the builders stay singleton-typed and NodeBuilder stays invariant in its protocol.
+      compileError("""Design {
+        val p1 = new WidLike
+        val p2 = new WidLike
+        val g1 = generator(intEntry("W1")) { parametersConst(0); val out = outward(p1).dFn(_ => Right(1)); out }
+        val g2 = generator(intEntry("W2")) { parametersConst(0); val in = inward(p2).uFn(_ => Right(1)); in }
+        g2 <-- g1
+      }""")
+
+      // A duplicate reference name on one node is rejected at the declaration, like every other name.
+      val dupRef = intercept[IllegalArgumentException] {
+        Design {
+          generator(intEntry("R2")) {
+            parametersConst(0)
+            val a   = inward(Wid).uFn(_ => Right(1))
+            val b   = inward(Wid).uFn(_ => Right(1))
+            val out = outward(Wid).dFn(_ => Right(1))
+            val r1  = out.ref(a)
+            val r2  = locally {
+              given sourcecode.Name = sourcecode.Name("r1")
+              out.ref(b)
+            }
+            out
+          }
+        }
+      }
+      assert(dupRef.getMessage.contains("duplicate cross-protocol reference 'r1'"))
 
       // A closure capturing the scope (here: a dFn running at negotiation) cannot declare into a frozen module.
       val late = Design {
