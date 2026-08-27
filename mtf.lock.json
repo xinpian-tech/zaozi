@@ -5646,17 +5646,6 @@
         "scala3-interfaces-3.8.4.pom.sha1": "sha256-YgbOgwp53fMzQNpO0NXO57vj52IJ11LbWQHy3oGiSWE="
       }
     },
-    "org/scala-lang/scala3-library_3": {
-      "narHash": "sha256-X8q74jBNxCOx/rAMH0ozwbPGaNtLe50gYmHsyIGArQI=",
-      "runs": [
-        "104bb53c6cb5",
-        "7044fbf8e835"
-      ],
-      "files": {
-        "maven-metadata.xml": "sha256-l2lz+yiQT098R8fhhtbC+20m0tiae48Uz5gH2kLZCPA=",
-        "maven-metadata.xml.sha1": "sha256-SsIC1rrEnpYNmAR4ahMBAc9AqMvmW6GiCG+SgjLwwvY="
-      }
-    },
     "org/scala-lang/scala3-library_3/3.3.1": {
       "narHash": "sha256-q4moy/xalRYQGXEB36FwP9evc7MBjcnC/+S62p3tgGc=",
       "runs": [
