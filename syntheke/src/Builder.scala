@@ -208,8 +208,8 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     (new DownReader[from.protocol.Down](from.id), new UpReader[to.protocol.Up](to.id))
 
   /** Declare a probe source providing its verification `Down` and FIRRTL layer path. The interface is derived and
-    * checked here — every signal leaf must be a Probe carrying the declared layer, with no Flipped anywhere — so a
-    * protocol violating the contract fails at the declaration.
+    * checked here — every interface leaf must be a Probe carrying the declared layer (its inner may be an aggregate),
+    * with no Flipped anywhere — so a protocol violating the contract fails at the declaration.
     */
   private[syntheke] def dvSource(
     p:     DVProtocol

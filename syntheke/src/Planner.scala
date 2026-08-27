@@ -86,10 +86,10 @@ private[syntheke] object Planner:
     }
 
     // ============ probe sources ============
-    // One pure-probe dangle port and define chain per signal leaf of every source interface: probes never form
-    // aggregates in hardware, so Vec leaves route like any other and no open aggregate types are needed. With a
-    // testbench the chain ends in a wire from the last dangle into the testbench's matching input port at the root;
-    // without one the root's dangle ports are the top-level probe ports.
+    // One pure-probe dangle port and define chain per interface leaf of every source interface. A Probe node is one
+    // leaf — its inner may be an aggregate — and its port is a single reference, so no open aggregate types are
+    // needed either way. With a testbench the chain ends in a wire from the last dangle into the testbench's
+    // matching input port at the root; without one the root's dangle ports are the top-level probe ports.
     val dvParts = for
       g                <- spec.generatorModules
       s                <- g.dvSources

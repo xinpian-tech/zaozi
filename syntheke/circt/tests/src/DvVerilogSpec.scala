@@ -183,9 +183,11 @@ object DvVerilogSpec extends TestSuite:
   val srcEntry  = entry("Src")
   val memEntry  = entry("Mem")
   val vsrcEntry = entry("VSrc")
+  val psrcEntry = entry("PSrc")
   val tbEntry   = entry("Tb")
+  val ptbEntry  = entry("PTb")
   val backends: Seq[GeneratorBackend] =
-    Seq(srcEntry, memEntry, vsrcEntry, tbEntry).map(StubBackend(_, outDir, identity))
+    Seq(srcEntry, memEntry, vsrcEntry, psrcEntry, tbEntry, ptbEntry).map(StubBackend(_, outDir, identity))
 
   val layerCosim = LayerPath(Vector("verification", "cosim"))
 
@@ -196,6 +198,26 @@ object DvVerilogSpec extends TestSuite:
       ProtocolBundle(
         ProtocolInterface
           .Field("pc", ProtocolInterface.Vec(2, ProtocolInterface.Probe(ProtocolInterface.UInt(down), layer)))
+      )
+    val downRW:                                   upickle.default.ReadWriter[Int] = summon
+
+  /** An aggregate probe: the whole record behind one reference — one interface leaf, one port. */
+  object PackTrace extends DVProtocol:
+    type Down = Int
+    def interfaceOf(down: Int, layer: LayerPath): ProtocolBundle                  =
+      ProtocolBundle(
+        ProtocolInterface.Field(
+          "pack",
+          ProtocolInterface.Probe(
+            ProtocolInterface.Bundle(
+              Vector(
+                ProtocolInterface.Field("pc", ProtocolInterface.UInt(down)),
+                ProtocolInterface.Field("valid", ProtocolInterface.Bool)
+              )
+            ),
+            layer
+          )
+        )
       )
     val downRW:                                   upickle.default.ReadWriter[Int] = summon
 
@@ -292,6 +314,47 @@ object DvVerilogSpec extends TestSuite:
       assert(design.firrtl.contains("demo_dv_Tb"))
       assert(!design.firrtl.contains("output inst_cluster"))
       assert(!design.firrtl.contains("define inst_cluster"))
+      assert(design.verilog.contains("module Top"))
+    }
+
+    test("an aggregate probe is one interface leaf: a single reference port end to end") {
+      val inner    = ProtocolInterface.Bundle(
+        Vector(
+          ProtocolInterface.Field("pc", ProtocolInterface.UInt(16)),
+          ProtocolInterface.Field("valid", ProtocolInterface.Bool)
+        )
+      )
+      val spec     = Design {
+        val box = wrapper {
+          val psrc = generator(psrcEntry) {
+            parameters(stubParams("PSrc", probePorts(PackTrace)("tr", 16, layerCosim)))
+            val tr = dvSource(PackTrace)(16, layerCosim)
+          }
+        }
+        val tb  = testbench(ptbEntry) {
+          parameters(view =>
+            stubParams("PTb", view.probes.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe)))(view)
+          )
+        }
+      }
+      val resolved = Negotiator.negotiate(spec)
+
+      // One leaf whose data type is the whole aggregate; one pure-probe dangle carrying a single reference.
+      assert(
+        resolved.probes.flatMap(_.leaves).map(l => (l.portName, l.tpe)) ==
+          Vector("inst_box_inst_psrc_dv$msource_tr_pack_out" -> inner)
+      )
+      val box = ModuleId.root / "box"
+      assert(
+        resolved.portPlans.filter(_.module == box).map(_.name.encoded) ==
+          Vector("inst_psrc_dv$msource_tr_pack_out")
+      )
+      assert(
+        resolved.portPlans.filter(_.module == box).forall(_.interface == ProtocolInterface.Probe(inner, layerCosim))
+      )
+
+      // Through the C-API and firtool: the source defines a reference to a bundle, the testbench takes the bundle.
+      val design = Elaborator.elaborate(resolved, backends)
       assert(design.verilog.contains("module Top"))
     }
 

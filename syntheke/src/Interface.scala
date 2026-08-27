@@ -5,8 +5,9 @@ package me.jiuyang.syntheke
 /** Serializable hardware-interface description (doc @sec-protocol-interface).
   *
   * Negotiation manipulates this data; the Elaborate phase translates it to FIRRTL types. Design-protocol interfaces are
-  * built from Bundle / Vec / UInt / SInt / Bool / Clock / Reset; verification-protocol interfaces wrap every signal
-  * leaf in Probe carrying a LayerPath.
+  * built from Bundle / Vec / UInt / SInt / Bool / Clock / Reset; verification-protocol interfaces wrap their leaves in
+  * Probe carrying a LayerPath — a Probe's inner may itself be an aggregate, making the whole record one leaf behind a
+  * single reference.
   *
   * Every type here has exactly one JSON encoding — the custom ReadWriters below — used by the manifest, the tooling
   * exports and the canonical linking hash alike.

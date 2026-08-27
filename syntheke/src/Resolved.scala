@@ -145,7 +145,8 @@ enum PlanOrigin derives CanEqual:
   case Verification(source: DVSourceId)
 
 /** A framework-generated dangle port on a wrapper module. Design edges plan one bundle port per crossing; probe routing
-  * plans one pure-probe port per signal leaf, so probes never form aggregates in hardware.
+  * plans one pure-probe port per interface leaf — a Probe node is one leaf, its inner may be an aggregate, and the port
+  * is a single reference either way.
   */
 final case class PortPlan(
   module:    ModuleId,
