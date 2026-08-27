@@ -175,31 +175,30 @@ object NegotiatorSpec extends TestSuite:
     }
 
     test("a parameter dependency cycle reports exactly the cycle members") {
+      // A reusable definition: the endpoint class declares nodes as fields; the def binds the entry and forwards
+      // the build context, so the instance name comes from the call-site val.
+      final class LoopbackPorts(
+        using GeneratorScope[Int])
+          extends Endpoints:
+        val in             = inward(Wid)
+        val out            = outward(Wid)
+        private val (d, u) = depend(in, out)
+        out.dFn(ctx => Right(ctx(d)))
+        in.uFn(ctx => Right(ctx(u)))
+        parametersConst(0)
+      def loopback(
+      )(
+        using
+        ws:   WrapperScope,
+        name: sourcecode.Name,
+        loc:  SourceLocation
+      ) =
+        generator(intEntry(name.value.capitalize))(new LoopbackPorts)
       val spec = Design {
-        def loopback(
-          name: String
-        )(
-          using WrapperScope
-        ) =
-          // The body is defined outside the named block so its own vals keep naming the nodes.
-          def body(
-            using GeneratorScope[Int]
-          ) =
-            val in     = inward(Wid)
-            val out    = outward(Wid)
-            val (d, u) = depend(in, out)
-            out.dFn(ctx => Right(ctx(d)))
-            in.uFn(ctx => Right(ctx(u)))
-            parametersConst(0)
-            (in, out)
-          locally {
-            given sourcecode.Name = sourcecode.Name(name)
-            generator(intEntry(name.capitalize))(body)
-          }
-        val (aIn, aOut) = loopback("a")
-        val (bIn, bOut) = loopback("b")
-        bIn <-- aOut
-        aIn <-- bOut
+        val a = loopback()
+        val b = loopback()
+        b.in <-- a.out
+        a.in <-- b.out
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
       assert(e.getMessage.contains("cycle"))

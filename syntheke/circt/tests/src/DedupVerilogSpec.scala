@@ -18,49 +18,55 @@ object DedupVerilogSpec extends TestSuite:
   val srcEntry  = DvVerilogSpec.entry("DupSrc")
   val backends: Seq[GeneratorBackend] = Seq(StubBackend(leafEntry, outDir), StubBackend(srcEntry, outDir))
 
+  final class LeafPorts(
+    using GeneratorScope[StubFull])
+      extends Endpoints:
+    parameters(DvVerilogSpec.stubParams("DupLeaf"))(identity)
+    val p = inward(Wid).uFn(_ => Right(64))
+    val q = inward(Wid).uFn(_ => Right(64))
+
+  final class ClusterPorts(
+    using WrapperScope)
+      extends Endpoints:
+    val leaf = generator(leafEntry)(new LeafPorts)
+
+  def cluster(
+  )(
+    using
+    ws:   WrapperScope,
+    name: sourcecode.Name,
+    loc:  SourceLocation
+  ): ClusterPorts =
+    wrapper(new ClusterPorts)
+
+  final class SrcPort(
+    using GeneratorScope[StubFull])
+      extends Endpoints:
+    parameters(DvVerilogSpec.stubParams("DupSrc"))(identity)
+    val out = outward(Wid).dFn(_ => Right(32))
+
+  def src(
+  )(
+    using
+    ws:   WrapperScope,
+    name: sourcecode.Name,
+    loc:  SourceLocation
+  ): SrcPort =
+    generator(srcEntry)(new SrcPort)
+
   def buildTwins(): DesignSpec =
     Design {
-      def clusterBody(
-        using WrapperScope
-      ) =
-        val leaf = generator(leafEntry) {
-          parameters(DvVerilogSpec.stubParams("DupLeaf"))(identity)
-          val p = inward(Wid).uFn(_ => Right(64))
-          val q = inward(Wid).uFn(_ => Right(64))
-          (p, q)
-        }
-        leaf
-      def cluster(
-        name: String
-      )(
-        using WrapperScope
-      ) =
-        locally {
-          given sourcecode.Name = sourcecode.Name(name)
-          wrapper(clusterBody)
-        }
-      def srcBody(
-        using GeneratorScope[StubFull]
-      ) =
-        parameters(DvVerilogSpec.stubParams("DupSrc"))(identity)
-        val out = outward(Wid).dFn(_ => Right(32))
-        out
-      def src(
-        name: String
-      )(
-        using WrapperScope
-      ) =
-        locally {
-          given sourcecode.Name = sourcecode.Name(name)
-          generator(srcEntry)(srcBody)
-        }
-      val (ap, aq) = cluster("clusterA")
-      val (bp, bq) = cluster("clusterB")
+      val clusterA = cluster()
+      val clusterB = cluster()
+      val s0       = src()
+      val s1       = src()
+      val s2       = src()
+      val s3       = src()
       // Interleaved: clusterA's boundary sees its p edge first while clusterB sees its q edge first.
-      ap <-- src("s0")
-      bq <-- src("s1")
-      aq <-- src("s2")
-      bp <-- src("s3")
+      clusterA.leaf.p <-- s0.out
+      clusterB.leaf.q <-- s1.out
+      clusterA.leaf.q <-- s2.out
+      clusterB.leaf.p <-- s3.out
     }
 
   val tests = Tests {

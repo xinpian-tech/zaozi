@@ -121,9 +121,18 @@ final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
 final class DVSourceRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSourceId)
 final class DVSinkRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSinkId)
 
+/** Base for classes whose fields are a module body's endpoints: each `val x = inward(...)` field declares, names and
+  * exposes a node in one line, and the instance itself is the body's returned container. Plain classes have no Mirror,
+  * so the fields are not machine-checked — extending this trait is the author's declaration that they are endpoints.
+  * The one harmful thing a field could hold, the scope itself, is inert anyway: declarations outside the open scope
+  * fail on the spot.
+  */
+trait Endpoints
+
 /** What a module body may return: its dangling endpoints — node builders and verification endpoint handles — plus
-  * `Unit`, `Option` / `Vector` / `Seq` of them, and products (tuples, case classes) whose fields all qualify. This is
-  * the only channel out of a module body, so nothing else (readers, scopes, arbitrary values) can escape it.
+  * `Unit`, `Option` / `Vector` / `Seq` of them, products (tuples, case classes) whose fields all qualify, and
+  * [[Endpoints]] classes. This is the only channel out of a module body, so nothing else (readers, scopes, arbitrary
+  * values) can escape it.
   */
 sealed trait Dangles[A]
 
@@ -136,6 +145,7 @@ object Dangles:
   given outward[P <: Protocol]:    Dangles[OutwardNodeBuilder[P]] = of
   given dvSource[P <: DVProtocol]: Dangles[DVSourceRef[P]]        = of
   given dvSink[P <: DVProtocol]:   Dangles[DVSinkRef[P]]          = of
+  given endpoints[E <: Endpoints]: Dangles[E]                     = of
   given option[A](
     using Dangles[A]
   ): Dangles[Option[A]] = of

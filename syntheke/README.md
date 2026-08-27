@@ -67,6 +67,26 @@ val spec = Design {
   cons <-- prod
 }
 val resolved = Negotiator.negotiate(spec) // ResolvedDesign; throws NegotiationException at the first error
+```
+
+A reusable module definition is an endpoint class plus a def binding the
+entry: the class declares nodes as fields (each named by its val), the def
+forwards the build context so the instance name comes from the call-site
+val. A def taking `sourcecode.Name` must contain only the single
+`generator`/`wrapper` call — named declarations belong in the endpoint
+class, where the context name cannot capture them.
+
+```scala
+final class CorePorts(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Endpoints:
+  parametersConst(CoreFull(name, idBits))
+  val mem = outward(Axi4).dFn(...)
+
+def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, loc: SourceLocation): CorePorts =
+  generator(coreEntry)(new CorePorts(name.value, idBits))
+
+// in any design:
+val core0 = core(idBits = 2)   // instance "core0"
+sysXbar.inputs(0) <-- core0.mem
 
 // Elaborate (syntheke.circt): bind entries to zaozi generators, get Verilog.
 // Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error

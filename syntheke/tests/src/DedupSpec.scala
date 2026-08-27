@@ -14,49 +14,48 @@ object DedupSpec extends TestSuite:
   def buildTwinSoc(sameParam: Boolean): DesignSpec =
     val consEntry = intEntry("Cons")
     val prodEntry = intEntry("Prod")
+
+    final class ProdPort(
+      using GeneratorScope[Int])
+        extends Endpoints:
+      parametersConst(0)
+      val out = outward(Wid).dFn(_ => Right(32))
+    def producer(
+    )(
+      using
+      ws:   WrapperScope,
+      name: sourcecode.Name,
+      loc:  SourceLocation
+    ) =
+      generator(prodEntry)(new ProdPort)
+
+    final class ClusterPorts(
+      fp: Int
+    )(
+      using WrapperScope)
+        extends Endpoints:
+      val cons = generator(consEntry) {
+        parametersConst(fp)
+        val in = inward(Wid).uFn(_ => Right(64))
+        in
+      }
+    def cluster(
+      fp:   Int
+    )(
+      using
+      ws:   WrapperScope,
+      name: sourcecode.Name,
+      loc:  SourceLocation
+    ) =
+      wrapper(new ClusterPorts(fp))
+
     Design {
-      def producerBody(
-        using GeneratorScope[Int]
-      ) =
-        parametersConst(0)
-        val out = outward(Wid).dFn(_ => Right(32))
-        out
-      def producer(
-        name: String
-      )(
-        using WrapperScope
-      ) =
-        locally {
-          given sourcecode.Name = sourcecode.Name(name)
-          generator(prodEntry)(producerBody)
-        }
-      def clusterBody(
-        fp: Int
-      )(
-        using WrapperScope
-      ) =
-        val cons = generator(consEntry) {
-          parametersConst(fp)
-          val in = inward(Wid).uFn(_ => Right(64))
-          in
-        }
-        cons
-      def cluster(
-        name: String,
-        fp:   Int
-      )(
-        using WrapperScope
-      ) =
-        locally {
-          given sourcecode.Name = sourcecode.Name(name)
-          wrapper(clusterBody(fp))
-        }
-      val prodOut  = producer("p0")
-      val prodOut2 = producer("p1")
-      val aIn      = cluster("clusterA", 7)
-      val bIn      = cluster("clusterB", if sameParam then 7 else 8)
-      aIn <-- prodOut
-      bIn <-- prodOut2
+      val p0       = producer()
+      val p1       = producer()
+      val clusterA = cluster(7)
+      val clusterB = cluster(if sameParam then 7 else 8)
+      clusterA.cons <-- p0.out
+      clusterB.cons <-- p1.out
     }
 
   val tests = Tests {
