@@ -23,9 +23,9 @@ object AxiSocSpec extends TestSuite:
 
   def buildSoc(dramIdCapacity: Int = 6, gpioBase: Long = 0x10010000L): DesignSpec =
     Design {
-      val core0 = core(coreEntry, idBits = 2, maxFlight = 4)
-      val core1 = core(coreEntry, idBits = 3, maxFlight = 8)
-      val dma   = core(dmaEntry, idBits = 1, maxFlight = 1)
+      val core0 = core(idBits = 2, maxFlight = 4)
+      val core1 = core(idBits = 3, maxFlight = 8)
+      val dma   = dmaCtrl(idBits = 1, maxFlight = 1)
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "roundRobin")
 

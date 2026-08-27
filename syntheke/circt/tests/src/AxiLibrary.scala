@@ -63,6 +63,34 @@ def core(
 ): CorePorts =
   generator(coreEntry)(new CorePorts(name.value, idBits, maxFlight))
 
+// ============ Dma: a bus-mastering DMA engine ============
+
+val dmaEntry = entry[DmaP]("Dma")
+
+/** The DMA engine: an AXI master with its own small id space, named after the instance. */
+final class DmaPorts(
+  name:      String,
+  idBits:    Int,
+  maxFlight: Int
+)(
+  using GeneratorScope[DmaP])
+    extends Endpoints:
+  parameters(view => Right(DmaP(name, idBits, maxFlight, shapeOf(view, mem))))
+  val mem =
+    outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
+
+def dmaCtrl(
+  idBits:    Int,
+  maxFlight: Int
+)(
+  using
+  ws:        WrapperScope,
+  name:      sourcecode.Name,
+  file:      sourcecode.File,
+  line:      sourcecode.Line
+): DmaPorts =
+  generator(dmaEntry)(new DmaPorts(name.value, idBits, maxFlight))
+
 // ============ Xbar: the n×m crossbar ============
 
 val xbarEntry = entry[XbarP]("Xbar")
@@ -353,6 +381,7 @@ def gpioCtrl(
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives. */
 val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(coreEntry, CoreGen),
+  ZaoziBackend(dmaEntry, DmaGen),
   ZaoziBackend(xbarEntry, XbarGen),
   ZaoziBackend(l2Entry, L2Gen),
   ZaoziBackend(dramEntry, DramGen),

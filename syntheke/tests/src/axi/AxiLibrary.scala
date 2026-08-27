@@ -18,7 +18,6 @@ private def entry[FP: ReadWriter](name: String) =
 final case class CoreFull(name: String, idBits: Int, maxFlight: Int) derives ReadWriter
 
 val coreEntry = entry[CoreFull]("Core")
-val dmaEntry  = entry[CoreFull]("Dma")
 
 /** One AXI master core: a boundary outward node with a local id space; the master is named after the instance. */
 final class CorePorts(
@@ -32,9 +31,7 @@ final class CorePorts(
   val mem =
     outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
 
-/** `entry0` picks the registry identity: core0 and core1 share [[coreEntry]], the DMA registers as [[dmaEntry]]. */
 def core(
-  entry0:    GeneratorEntry[CoreFull],
   idBits:    Int,
   maxFlight: Int
 )(
@@ -44,7 +41,37 @@ def core(
   file:      sourcecode.File,
   line:      sourcecode.Line
 ): CorePorts =
-  generator(entry0)(new CorePorts(name.value, idBits, maxFlight))
+  generator(coreEntry)(new CorePorts(name.value, idBits, maxFlight))
+
+// ============ Dma: a bus-mastering DMA engine ============
+
+final case class DmaFull(name: String, idBits: Int, maxFlight: Int) derives ReadWriter
+
+val dmaEntry = entry[DmaFull]("Dma")
+
+/** The DMA engine: an AXI master with its own small id space, named after the instance. */
+final class DmaPorts(
+  name:      String,
+  idBits:    Int,
+  maxFlight: Int
+)(
+  using GeneratorScope[DmaFull])
+    extends Endpoints:
+  parameters(_ => Right(DmaFull(name, idBits, maxFlight)))
+  val mem =
+    outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
+
+def dmaCtrl(
+  idBits:    Int,
+  maxFlight: Int
+)(
+  using
+  ws:        WrapperScope,
+  name:      sourcecode.Name,
+  file:      sourcecode.File,
+  line:      sourcecode.Line
+): DmaPorts =
+  generator(dmaEntry)(new DmaPorts(name.value, idBits, maxFlight))
 
 // ============ Xbar: the n×m crossbar ============
 

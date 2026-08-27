@@ -78,6 +78,18 @@ class CorePIO(p: CoreP)                                                     exte
 object CoreGen                                                              extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
   def architecture(p: CoreP) = summon[Interface[CorePIO]].dontCare()
 
+// ============ Dma: a bus-mastering DMA engine ============
+
+case class DmaP(name: String, idBits: Int, maxFlight: Int, port: AxiShape) extends Parameter derives ReadWriter
+class DmaPLayers(p: DmaP)                                                  extends LayerInterface(p):
+  def layers = Seq.empty
+class DmaPProbe(p: DmaP)                                                   extends DVRecord[DmaP, DmaPLayers](p)
+class DmaPIO(p: DmaP)                                                      extends HWRecord(p):
+  val mem = Aligned("mem", new AxiPortRecord(p.port))
+@zaoziGenerator
+object DmaGen                                                              extends Generator[DmaP, DmaPLayers, DmaPIO, DmaPProbe]:
+  def architecture(p: DmaP) = summon[Interface[DmaPIO]].dontCare()
+
 // ============ Xbar: the n×m crossbar ============
 
 case class XbarP(
