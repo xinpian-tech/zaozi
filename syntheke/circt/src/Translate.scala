@@ -23,7 +23,8 @@ import org.llvm.mlir.scalalib.capi.support.{*, given}
 import java.lang.foreign.Arena
 
 /** Serializable interface descriptions to MLIR FIRRTL types (doc @sec-protocol-interface: negotiation manipulates the
-  * data, elaboration translates it). A bundle whose fields contain probes becomes an open bundle in CIRCT.
+  * data, elaboration translates it). Probe types occur only at the root of a translated type — probes route per
+  * interface leaf, so a mixed data-and-probe bundle is never translated and no open aggregates arise.
   */
 object Translate:
 
@@ -68,7 +69,7 @@ object Translate:
       case ProtocolInterface.Bundle(fields) => fields.flatMap(f => collect(f.tpe))
       case ProtocolInterface.Vec(_, e)      => collect(e)
       case ProtocolInterface.Flipped(inner) => collect(inner)
-      case ProtocolInterface.Probe(i, l)    => l.segments +: collect(i)
+      case ProtocolInterface.Probe(_, l)    => Vector(l.segments) // no probes inside a probe, by construction
       case _                                => Vector.empty
     collect(t).distinct.sorted(
       using Ordering.Implicits.seqOrdering[Vector, String]
