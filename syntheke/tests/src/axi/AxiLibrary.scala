@@ -263,24 +263,24 @@ def widthBridge(
 ): WidthBridgePorts =
   generator(bridgeEntry)(new WidthBridgePorts(wideBeatBytes, maxUpstreamTransfer))
 
-// ============ MmioSlave: a memory-mapped peripheral ============
+// ============ Uart: a memory-mapped peripheral ============
 
-final case class SlaveFull(name: String, base: Long, size: Long, dataBits: Int, idBits: Int) derives ReadWriter
+final case class UartFull(name: String, base: Long, size: Long, dataBits: Int, idBits: Int) derives ReadWriter
 
-val slaveEntry = entry[SlaveFull]("MmioSlave")
+val uartEntry = entry[UartFull]("Uart")
 
-/** A memory-mapped peripheral slave: a boundary inward node serving one address range on a 32-bit bus. */
-final class MmioSlavePorts(
+/** The UART: a boundary inward node serving one address range on a 32-bit bus. */
+final class UartPorts(
   name:           String,
   base:           Long,
   size:           Long,
   idCapacityBits: Int
 )(
-  using GeneratorScope[SlaveFull])
+  using GeneratorScope[UartFull])
     extends Endpoints:
   parameters { view =>
     val e = view.edgeOf(in)
-    Right(SlaveFull(name, base, size, e.dataBits, e.idBits))
+    Right(UartFull(name, base, size, e.dataBits, e.idBits))
   }
   val in = inward(Axi4).uFn(_ =>
     Right(
@@ -302,7 +302,7 @@ final class MmioSlavePorts(
     )
   )
 
-def mmioSlave(
+def uartCtrl(
   base:           Long,
   size:           Long,
   idCapacityBits: Int
@@ -312,5 +312,57 @@ def mmioSlave(
   name:           sourcecode.Name,
   file:           sourcecode.File,
   line:           sourcecode.Line
-): MmioSlavePorts =
-  generator(slaveEntry)(new MmioSlavePorts(name.value, base, size, idCapacityBits))
+): UartPorts =
+  generator(uartEntry)(new UartPorts(name.value, base, size, idCapacityBits))
+
+// ============ Gpio: a memory-mapped peripheral ============
+
+final case class GpioFull(name: String, base: Long, size: Long, dataBits: Int, idBits: Int) derives ReadWriter
+
+val gpioEntry = entry[GpioFull]("Gpio")
+
+/** The GPIO block: a boundary inward node serving one address range on a 32-bit bus. */
+final class GpioPorts(
+  name:           String,
+  base:           Long,
+  size:           Long,
+  idCapacityBits: Int
+)(
+  using GeneratorScope[GpioFull])
+    extends Endpoints:
+  parameters { view =>
+    val e = view.edgeOf(in)
+    Right(GpioFull(name, base, size, e.dataBits, e.idBits))
+  }
+  val in = inward(Axi4).uFn(_ =>
+    Right(
+      AxiSlavePort(
+        slaves = Vector(
+          AxiSlaveParams(
+            name,
+            Vector(AddressRange(base, size)),
+            "PUT_EFFECTS",
+            false,
+            TransferSizes(1, 4),
+            TransferSizes(1, 4)
+          )
+        ),
+        beatBytes = 4,
+        idCapacityBits = idCapacityBits,
+        minLatency = 1
+      )
+    )
+  )
+
+def gpioCtrl(
+  base:           Long,
+  size:           Long,
+  idCapacityBits: Int
+)(
+  using
+  ws:             WrapperScope,
+  name:           sourcecode.Name,
+  file:           sourcecode.File,
+  line:           sourcecode.Line
+): GpioPorts =
+  generator(gpioEntry)(new GpioPorts(name.value, base, size, idCapacityBits))

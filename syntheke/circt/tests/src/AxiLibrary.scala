@@ -366,30 +366,30 @@ def widthBridge(
 ): WidthBridgePorts =
   generator(bridgeEntry)(new WidthBridgePorts(wideBeatBytes, maxUpstreamTransfer))
 
-// ============ MmioSlave: a memory-mapped peripheral ============
+// ============ Uart: a memory-mapped peripheral ============
 
-case class SlaveP(name: String, base: Long, size: Long, port: AxiShape) extends Parameter derives ReadWriter
-class SlavePLayers(p: SlaveP)                                           extends LayerInterface(p):
+case class UartP(name: String, base: Long, size: Long, port: AxiShape) extends Parameter derives ReadWriter
+class UartPLayers(p: UartP)                                            extends LayerInterface(p):
   def layers = Seq.empty
-class SlavePProbe(p: SlaveP)                                            extends DVRecord[SlaveP, SlavePLayers](p)
-class SlavePIO(p: SlaveP)                                               extends HWRecord(p):
+class UartPProbe(p: UartP)                                             extends DVRecord[UartP, UartPLayers](p)
+class UartPIO(p: UartP)                                                extends HWRecord(p):
   val in = Flipped("in", new AxiPortRecord(p.port))
 @zaoziGenerator
-object SlaveGen                                                         extends Generator[SlaveP, SlavePLayers, SlavePIO, SlavePProbe]:
-  def architecture(p: SlaveP) = summon[Interface[SlavePIO]].dontCare()
+object UartGen                                                         extends Generator[UartP, UartPLayers, UartPIO, UartPProbe]:
+  def architecture(p: UartP) = summon[Interface[UartPIO]].dontCare()
 
-val slaveEntry = entry[SlaveP]("MmioSlave")
+val uartEntry = entry[UartP]("Uart")
 
-/** A memory-mapped peripheral slave: a boundary inward node serving one address range on a 32-bit bus. */
-final class MmioSlavePorts(
+/** The UART: a boundary inward node serving one address range on a 32-bit bus. */
+final class UartPorts(
   name:           String,
   base:           Long,
   size:           Long,
   idCapacityBits: Int
 )(
-  using GeneratorScope[SlaveP])
+  using GeneratorScope[UartP])
     extends Endpoints:
-  parameters(view => Right(SlaveP(name, base, size, shapeOf(view, in))))
+  parameters(view => Right(UartP(name, base, size, shapeOf(view, in))))
   val in = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
@@ -410,7 +410,7 @@ final class MmioSlavePorts(
     )
   )
 
-def mmioSlave(
+def uartCtrl(
   base:           Long,
   size:           Long,
   idCapacityBits: Int
@@ -420,8 +420,65 @@ def mmioSlave(
   name:           sourcecode.Name,
   file:           sourcecode.File,
   line:           sourcecode.Line
-): MmioSlavePorts =
-  generator(slaveEntry)(new MmioSlavePorts(name.value, base, size, idCapacityBits))
+): UartPorts =
+  generator(uartEntry)(new UartPorts(name.value, base, size, idCapacityBits))
+
+// ============ Gpio: a memory-mapped peripheral ============
+
+case class GpioP(name: String, base: Long, size: Long, port: AxiShape) extends Parameter derives ReadWriter
+class GpioPLayers(p: GpioP)                                            extends LayerInterface(p):
+  def layers = Seq.empty
+class GpioPProbe(p: GpioP)                                             extends DVRecord[GpioP, GpioPLayers](p)
+class GpioPIO(p: GpioP)                                                extends HWRecord(p):
+  val in = Flipped("in", new AxiPortRecord(p.port))
+@zaoziGenerator
+object GpioGen                                                         extends Generator[GpioP, GpioPLayers, GpioPIO, GpioPProbe]:
+  def architecture(p: GpioP) = summon[Interface[GpioPIO]].dontCare()
+
+val gpioEntry = entry[GpioP]("Gpio")
+
+/** The GPIO block: a boundary inward node serving one address range on a 32-bit bus. */
+final class GpioPorts(
+  name:           String,
+  base:           Long,
+  size:           Long,
+  idCapacityBits: Int
+)(
+  using GeneratorScope[GpioP])
+    extends Endpoints:
+  parameters(view => Right(GpioP(name, base, size, shapeOf(view, in))))
+  val in = inward(Axi4).uFn(_ =>
+    Right(
+      AxiSlavePort(
+        slaves = Vector(
+          AxiSlaveParams(
+            name,
+            Vector(AddressRange(base, size)),
+            "PUT_EFFECTS",
+            false,
+            TransferSizes(1, 4),
+            TransferSizes(1, 4)
+          )
+        ),
+        beatBytes = 4,
+        idCapacityBits = idCapacityBits,
+        minLatency = 1
+      )
+    )
+  )
+
+def gpioCtrl(
+  base:           Long,
+  size:           Long,
+  idCapacityBits: Int
+)(
+  using
+  ws:             WrapperScope,
+  name:           sourcecode.Name,
+  file:           sourcecode.File,
+  line:           sourcecode.Line
+): GpioPorts =
+  generator(gpioEntry)(new GpioPorts(name.value, base, size, idCapacityBits))
 
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives. */
 val axiBackends: Seq[GeneratorBackend] = Seq(
@@ -430,5 +487,6 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(l2Entry, L2Gen),
   ZaoziBackend(dramEntry, DramGen),
   ZaoziBackend(bridgeEntry, BridgeGen),
-  ZaoziBackend(slaveEntry, SlaveGen)
+  ZaoziBackend(uartEntry, UartGen),
+  ZaoziBackend(gpioEntry, GpioGen)
 )

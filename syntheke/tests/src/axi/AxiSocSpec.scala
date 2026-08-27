@@ -44,8 +44,8 @@ object AxiSocSpec extends TestSuite:
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
 
-      val uart = mmioSlave(0x10000000L, 0x1000L, idCapacityBits = 8)
-      val gpio = mmioSlave(gpioBase, 0x1000L, idCapacityBits = 8)
+      val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8)
+      val gpio = gpioCtrl(gpioBase, 0x1000L, idCapacityBits = 8)
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem

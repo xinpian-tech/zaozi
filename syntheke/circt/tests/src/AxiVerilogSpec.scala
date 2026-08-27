@@ -47,8 +47,8 @@ object AxiVerilogSpec extends TestSuite:
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
 
-      val uart = mmioSlave(0x10000000L, 0x1000L, idCapacityBits = 8)
-      val gpio = mmioSlave(0x10010000L, 0x1000L, idCapacityBits = 8)
+      val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8)
+      val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8)
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
