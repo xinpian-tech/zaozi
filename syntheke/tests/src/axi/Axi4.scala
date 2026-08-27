@@ -93,8 +93,8 @@ object Axi4 extends Protocol:
   type Up   = AxiSlavePort
   type Edge = AxiEdgeParams
 
-  def negotiate(m: AxiMasterPort, s: AxiSlavePort): Either[TermViolation, AxiEdgeParams] =
-    def fail(msg: String) = Left(TermViolation(msg))
+  def negotiate(m: AxiMasterPort, s: AxiSlavePort): Either[Violation, AxiEdgeParams] =
+    def fail(msg: String) = Left(Violation(msg))
     m.idOverlap match
       case Some((x, y)) => return fail(s"master id ranges of '${x.name}' and '${y.name}' overlap")
       case None         => ()
@@ -172,10 +172,10 @@ object Axi4Xbar:
   /** Upward: concatenated slaves of every reachable output; equal beatBytes required; the id capacity passed upstream
     * shrinks by the prefix bits this xbar consumes.
     */
-  def aggregate(ups: Vector[AxiSlavePort], nInputs: Int): Either[PropagationViolation, AxiSlavePort] =
+  def aggregate(ups: Vector[AxiSlavePort], nInputs: Int): Either[Violation, AxiSlavePort] =
     val widths = ups.map(_.beatBytes).distinct
     if widths.sizeIs > 1 then
-      return Left(PropagationViolation(s"xbar data widths don't match: beatBytes ${widths.mkString(" vs ")}"))
+      return Left(Violation(s"xbar data widths don't match: beatBytes ${widths.mkString(" vs ")}"))
     val slaves = ups.flatMap(_.slaves)
     val port   = AxiSlavePort(
       slaves = slaves,
@@ -185,5 +185,5 @@ object Axi4Xbar:
     )
     port.addressOverlap match
       case Some((xn, xa, yn, ya)) =>
-        Left(PropagationViolation(s"slave addresses overlap: '$xn' ${xa.show} vs '$yn' ${ya.show}"))
+        Left(Violation(s"slave addresses overlap: '$xn' ${xa.show} vs '$yn' ${ya.show}"))
       case None                   => Right(port)

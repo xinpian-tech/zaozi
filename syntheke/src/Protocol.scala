@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke
 
-/** Protocol-reported conflict description, returned as a value from `negotiate` / `resolve`. */
-final case class TermViolation(message: String)
+/** Conflict description returned as a value — the expression channel of protocol and parameter functions (`negotiate` /
+  * `resolve` / `interfacesOf`, dFn / uFn, `parameters`). The framework throws on receipt.
+  */
+final case class Violation(message: String)
 
 /** A design protocol: the negotiation contract of one edge (doc @sec-protocol-object).
   *
@@ -24,7 +26,7 @@ trait Protocol:
   type Ref     = RefHandle[this.type]
 
   /** Per-edge settlement: combine the propagated Down and Up into the final edge parameter. */
-  def negotiate(down: Down, up: Up): Either[TermViolation, Edge]
+  def negotiate(down: Down, up: Up): Either[Violation, Edge]
 
   /** Hardware interface of a settled edge; drives dangle-port planning and generator port checking. */
   def interfaceOf(edge: Edge): ProtocolBundle
@@ -44,13 +46,13 @@ trait DVProtocol:
   type Sink   = DVSinkRef[this.type]
 
   /** Aggregate the source `Down`s (in bind declaration order) into the sink's `Edge`. */
-  def resolve(downs: Vector[Down]): Either[TermViolation, Edge]
+  def resolve(downs: Vector[Down]): Either[Violation, Edge]
 
   /** Interfaces for each source, the aggregated sink interface, and the per-source sink paths. `layers(i)` is the layer
     * path declared by source `i`; every Probe in `sources(i)` and in the sink subtree selected by `sinkPaths(i)` must
     * carry it.
     */
-  def interfacesOf(edge: Edge, layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]
+  def interfacesOf(edge: Edge, layers: Vector[LayerPath]): Either[Violation, DVInterfaces]
 
   /** Canonical serialization of the two parameter types (upickle). */
   def downRW: upickle.default.ReadWriter[Down]

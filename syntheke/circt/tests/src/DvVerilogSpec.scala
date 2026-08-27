@@ -179,8 +179,8 @@ object DvVerilogSpec extends TestSuite:
   object VecTrace extends DVProtocol:
     type Down = Int
     type Edge = Vector[Int]
-    def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]      = Right(downs)
-    def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]     =
+    def resolve(downs: Vector[Int]):                                Either[Violation, Vector[Int]]          = Right(downs)
+    def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[Violation, DVInterfaces]         =
       val sources = edge.zip(layers).map { (w, l) =>
         ProtocolBundle(
           ProtocolInterface
@@ -195,7 +195,7 @@ object DvVerilogSpec extends TestSuite:
     val edgeRW:                                                     upickle.default.ReadWriter[Vector[Int]] = summon
 
   /** Ports of a generator module reconstructed from its EdgeView — the FullParam determines the interface. */
-  def stubParams(kind: String)(view: EdgeView): Either[CapabilityViolation, StubFull] =
+  def stubParams(kind: String)(view: EdgeView): Either[Violation, StubFull] =
     Right(
       StubFull(
         kind,
@@ -220,19 +220,19 @@ object DvVerilogSpec extends TestSuite:
           val mem = outward(Wid).dFn(_ => Right(32))
           val rob = dvSource(Trace)(8, layerCosim)
           val lsu = dvSource(Trace)(4, layerCosim)
-          parameters(stubParams("Src"))(identity)
+          parameters(stubParams("Src"))
           (mem, rob, lsu)
         }
         src
       }
       val (srcOut, rob, lsu) = cluster
       val mem                = generator(memEntry) {
-        parameters(stubParams("Mem"))(identity)
+        parameters(stubParams("Mem"))
         val in = inward(Wid).uFn(_ => Right(64))
         in
       }
       val cosim              = generator(snkEntry) {
-        parameters(stubParams("Cosim"))(identity)
+        parameters(stubParams("Cosim"))
         val taps = dvSink(Trace)
         taps
       }
@@ -262,14 +262,14 @@ object DvVerilogSpec extends TestSuite:
       val spec     = Design {
         val vc     = wrapper {
           val vsrc = generator(vsrcEntry) {
-            parameters(stubParams("VSrc"))(identity)
+            parameters(stubParams("VSrc"))
             val pcs = dvSource(VecTrace)(32, layerCosim)
             pcs
           }
           vsrc
         }
         val vcosim = generator(vsnkEntry) {
-          parameters(stubParams("VCosim"))(identity)
+          parameters(stubParams("VCosim"))
           val taps = dvSink(VecTrace)
           taps
         }

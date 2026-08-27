@@ -97,14 +97,12 @@ def dvSink(
 ): p.Sink =
   gs.dvSink(p)(name.value)
 
-def parameters[PP, FP](
-  compute: EdgeView => Either[CapabilityViolation, PP]
-)(combine: PP => FP
+def parameters[FP](
+  compute:  EdgeView => Either[Violation, FP]
 )(
-  using
-  gs:      GeneratorScope[FP]
+  using gs: GeneratorScope[FP]
 ): Unit =
-  gs.parameters(compute)(combine)
+  gs.parameters(compute)
 
 def parametersConst[FP](
   fp:       FP

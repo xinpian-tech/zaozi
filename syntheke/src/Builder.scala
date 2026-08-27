@@ -109,7 +109,7 @@ final class InwardNodeBuilder[P <: Protocol] private[syntheke] (
   private[syntheke] val scope: GeneratorScope[?],
   val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
-  def uFn(f: ReadCtx => Either[PropagationViolation, protocol.Up]): InwardNodeBuilder[P] =
+  def uFn(f: ReadCtx => Either[Violation, protocol.Up]): InwardNodeBuilder[P] =
     scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
@@ -119,7 +119,7 @@ final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
   private[syntheke] val scope: GeneratorScope[?],
   val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
-  def dFn(f: ReadCtx => Either[PropagationViolation, protocol.Down]): OutwardNodeBuilder[P] =
+  def dFn(f: ReadCtx => Either[Violation, protocol.Down]): OutwardNodeBuilder[P] =
     scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
@@ -259,12 +259,12 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
 /** A generator module under construction: nodes, dependencies, verification endpoints and parameter functions. */
 final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP]):
   private val nodes  = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, SourceLocation)]
-  private val fns    = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[PropagationViolation, Any]]
+  private val fns    = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[Violation, Any]]
   private val refs   = mutable.ArrayBuffer.empty[(String, CrossProtocolRefSpec)]
   private val deps   = mutable.ArrayBuffer.empty[ParamDependencySpec]
   private val dvSrcs = mutable.ArrayBuffer.empty[DVSourceSpec]
   private val dvSnks = mutable.ArrayBuffer.empty[DVSinkSpec]
-  private val params = mutable.ArrayBuffer.empty[(EdgeView => Either[CapabilityViolation, Any], Any => Any)]
+  private val params = mutable.ArrayBuffer.empty[EdgeView => Either[Violation, Any]]
 
   /** Declarations are only legal while this scope is the generator currently under construction — a closure capturing
     * the scope (a dFn running at negotiation, say) cannot declare into a frozen module.
@@ -278,7 +278,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name) || dvSnks.exists(_.name == name)
     require(!taken, s"duplicate endpoint name '$name' in ${id.show}")
 
-  private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[PropagationViolation, Any]): Unit =
+  private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[Violation, Any]): Unit =
     requireOpen()
     require(!fns.contains(name), s"port parameter function of ${ModuleNodeId(id, name).show} already set")
     fns(name) = f
@@ -358,17 +358,19 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, loc)
     new DVSinkRef[p.type](p, DVSinkId(id, name))
 
-  /** Declare `computeProtocolParam` and `combine` (doc @sec-two-layer-params); exactly once per module. */
-  def parameters[PP](compute: EdgeView => Either[CapabilityViolation, PP])(combine: PP => FP): Unit =
+  /** Declare the full-parameter computation (doc @sec-two-layer-params): the negotiated `EdgeView` plus the user
+    * parameters captured in the closure produce the `FullParam`; exactly once per module.
+    */
+  def parameters(compute: EdgeView => Either[Violation, FP]): Unit =
     requireOpen()
     require(params.isEmpty, s"parameters of ${id.show} already set")
-    params += ((compute, pp => combine(pp.asInstanceOf[PP])))
+    params += compute.asInstanceOf[EdgeView => Either[Violation, Any]]
 
   /** A generator whose full parameter ignores the negotiation result entirely. */
-  def parametersConst(fp: FP): Unit = parameters(_ => Right(()))(_ => fp)
+  def parametersConst(fp: FP): Unit = parameters(_ => Right(fp))
 
   private[syntheke] def close(loc: SourceLocation): Unit =
-    val nodeSpecs          = nodes.toVector.zipWithIndex.map { case ((b, direction, declLoc), order) =>
+    val nodeSpecs = nodes.toVector.zipWithIndex.map { case ((b, direction, declLoc), order) =>
       val fn = fns.getOrElse(
         b.id.name,
         throw new IllegalStateException(
@@ -387,7 +389,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
         loc = declLoc
       )
     }
-    val (compute, combine) = params.headOption.getOrElse(
+    val compute   = params.headOption.getOrElse(
       throw new IllegalStateException(s"generator module ${id.show}: parameters(...) is mandatory but was never set")
     )
     st.modules(id) = GeneratorModuleSpec(
@@ -397,7 +399,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
       dependencies = deps.toVector,
       dvSources = dvSrcs.toVector,
       dvSinks = dvSnks.toVector,
-      computeProtocolParam = compute,
-      combine = combine,
+      computeFullParam = compute,
       loc = loc
     )

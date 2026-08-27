@@ -11,12 +11,6 @@ package me.jiuyang.syntheke
 enum NodeDirection derives CanEqual:
   case Inward, Outward
 
-/** Violation value returned by a port parameter function (doc @sec-propagation). */
-final case class PropagationViolation(message: String)
-
-/** Violation value returned by `computeProtocolParam` capability checking (doc @sec-settle-pp). */
-final case class CapabilityViolation(message: String)
-
 /** A cross-protocol reference: a node names another node of the same module (its clock or power node); settlement
   * yields that node's edge parameter (doc @sec-settle-pp).
   */
@@ -35,7 +29,7 @@ final case class NodeSpec(
   name:      String,
   direction: NodeDirection,
   protocol:  Protocol,
-  fn:        Map[ModuleNodeId, Any] => Either[PropagationViolation, Any],
+  fn:        Map[ModuleNodeId, Any] => Either[Violation, Any],
   refs:      Vector[CrossProtocolRefSpec],
   order:     Int,
   loc:       SourceLocation)
@@ -86,15 +80,14 @@ final case class WrapperModuleSpec(
 
 /** A generator module: leaf of the hierarchy tree, bound to exactly one generator. */
 final case class GeneratorModuleSpec(
-  id:                   ModuleId,
-  entry:                GeneratorEntry[?],
-  nodes:                Vector[NodeSpec],
-  dependencies:         Vector[ParamDependencySpec],
-  dvSources:            Vector[DVSourceSpec],
-  dvSinks:              Vector[DVSinkSpec],
-  computeProtocolParam: EdgeView => Either[CapabilityViolation, Any],
-  combine:              Any => Any, // protocol param => FullParam; user param captured in the closure
-  loc:                  SourceLocation)
+  id:               ModuleId,
+  entry:            GeneratorEntry[?],
+  nodes:            Vector[NodeSpec],
+  dependencies:     Vector[ParamDependencySpec],
+  dvSources:        Vector[DVSourceSpec],
+  dvSinks:          Vector[DVSinkSpec],
+  computeFullParam: EdgeView => Either[Violation, Any], // user params captured in the closure
+  loc:              SourceLocation)
     extends ModuleSpec:
   def node(name: String): Option[NodeSpec] = nodes.find(_.name == name)
 

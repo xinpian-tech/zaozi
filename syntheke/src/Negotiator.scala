@@ -392,13 +392,12 @@ object Negotiator:
       }
 
       val view = EdgeView(g.id, nodeViews, VerificationView(sourceViews, sinkViews))
-      g.computeProtocolParam(view) match
+      g.computeFullParam(view) match
         case Left(violation) =>
           fail(s"capability exceeded at ${g.id.show}: ${violation.message}, at ${at(g.loc)}")
-        case Right(pp)       =>
-          val fp      = g.combine(pp)
+        case Right(fp)       =>
           val encoded = upickle.default.writeJs(fp)(
             using g.entry.fullParamRW.asInstanceOf[upickle.default.ReadWriter[Any]]
           )
-          ResolvedGeneratorModule(g.id, g.entry, view, pp, fp, encoded)
+          ResolvedGeneratorModule(g.id, g.entry, view, fp, encoded)
     }

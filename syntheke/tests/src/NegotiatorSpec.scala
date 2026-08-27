@@ -12,8 +12,8 @@ object Wid extends Protocol:
   type Down = Int
   type Up   = Int
   type Edge = Int
-  def negotiate(down: Int, up: Int): Either[TermViolation, Int]      =
-    if down <= up then Right(down) else Left(TermViolation(s"requested width $down exceeds capacity $up"))
+  def negotiate(down: Int, up: Int): Either[Violation, Int]          =
+    if down <= up then Right(down) else Left(Violation(s"requested width $down exceeds capacity $up"))
   def interfaceOf(edge: Int):        ProtocolBundle                  =
     ProtocolBundle(ProtocolInterface.Field("data", false, ProtocolInterface.UInt(edge)))
   val downRW:                        upickle.default.ReadWriter[Int] = summon
@@ -24,9 +24,9 @@ object Wid extends Protocol:
 object Trace extends DVProtocol:
   type Down = Int
   type Edge = Vector[Int]
-  def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]      =
-    if downs.forall(_ > 0) then Right(downs) else Left(TermViolation("width must be positive"))
-  def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]     =
+  def resolve(downs: Vector[Int]):                                Either[Violation, Vector[Int]]          =
+    if downs.forall(_ > 0) then Right(downs) else Left(Violation("width must be positive"))
+  def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[Violation, DVInterfaces]         =
     val sources = edge.zip(layers).map { (w, l) =>
       ProtocolBundle(ProtocolInterface.Field("sig", false, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
     }
@@ -67,7 +67,7 @@ object NegotiatorSpec extends TestSuite:
         out1.dFn(ctx => Right(ctx(d01) max ctx(d11)))
         in0.uFn(ctx => Right(ctx(u00) min ctx(u01)))
         in1.uFn(ctx => Right(ctx(u10) min ctx(u11)))
-        parameters(view => Right(view.nodes.map(_.edge.edgeAs(Wid))))(_.sum)
+        parameters(view => Right(view.nodes.map(_.edge.edgeAs(Wid)).sum))
         (in0, in1, out0, out1)
       }
       val (xIn0, xIn1, xOut0, xOut1) = xbar
@@ -153,7 +153,7 @@ object NegotiatorSpec extends TestSuite:
       val spec = Design {
         val bad  = generator(intEntry("Bad")) {
           parametersConst(0)
-          val out = outward(Wid).dFn(_ => Left(PropagationViolation("no width available")))
+          val out = outward(Wid).dFn(_ => Left(Violation("no width available")))
           out
         }
         val sink = generator(intEntry("Sink")) {
@@ -403,7 +403,7 @@ object NegotiatorSpec extends TestSuite:
           val out    = outward(Wid).dFn(_ => Right(32))
           val outClk = out.ref(clkIn)
           // The reference reads clkIn's settled edge — typed, no name string, no cast.
-          parameters(view => Right(view.edgeOf(outClk)))(identity)
+          parameters(view => Right(view.edgeOf(outClk)))
           (clkIn, out)
         }
         val (clkIn, out) = g

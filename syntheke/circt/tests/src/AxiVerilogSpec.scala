@@ -211,7 +211,7 @@ object AxiVerilogSpec extends TestSuite:
           outs.zip(outputs).map((n, b) => n -> shapeOf(view, b))
         )
       )
-    }(identity)
+    }
 
   def axiXbar(
     ins:         Vector[String],
@@ -232,7 +232,7 @@ object AxiVerilogSpec extends TestSuite:
   )(
     using GeneratorScope[CoreP])
       extends Endpoints:
-    parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, mem))))(identity)
+    parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, mem))))
     val mem =
       outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
 
@@ -255,7 +255,7 @@ object AxiVerilogSpec extends TestSuite:
   )(
     using GeneratorScope[SlaveP])
       extends Endpoints:
-    parameters(view => Right(SlaveP(name, base, size, shapeOf(view, in))))(identity)
+    parameters(view => Right(SlaveP(name, base, size, shapeOf(view, in))))
     val in = inward(Axi4).uFn(_ =>
       Right(
         AxiSlavePort(
@@ -306,7 +306,7 @@ object AxiVerilogSpec extends TestSuite:
             Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), 2)))
           }
           in.uFn(ctx => Right(ctx(u)))
-          parameters(view => Right(L2P(512, shapeOf(view, in), shapeOf(view, out))))(identity)
+          parameters(view => Right(L2P(512, shapeOf(view, in), shapeOf(view, out))))
           (in, out)
         }
         val (l2In, l2Out) = l2
@@ -330,7 +330,7 @@ object AxiVerilogSpec extends TestSuite:
               )
             )
           )
-          parameters(view => Right(DramP(2, shapeOf(view, in))))(identity)
+          parameters(view => Right(DramP(2, shapeOf(view, in))))
           in
         }
         dram <-- l2Out
@@ -357,7 +357,7 @@ object AxiVerilogSpec extends TestSuite:
             )
           )
         }
-        parameters(view => Right(BridgeP(shapeOf(view, in), shapeOf(view, out))))(identity)
+        parameters(view => Right(BridgeP(shapeOf(view, in), shapeOf(view, out))))
         (in, out)
       }
       val (brIn, brOut) = bridge

@@ -21,7 +21,7 @@ object DedupVerilogSpec extends TestSuite:
   final class LeafPorts(
     using GeneratorScope[StubFull])
       extends Endpoints:
-    parameters(DvVerilogSpec.stubParams("DupLeaf"))(identity)
+    parameters(DvVerilogSpec.stubParams("DupLeaf"))
     val p = inward(Wid).uFn(_ => Right(64))
     val q = inward(Wid).uFn(_ => Right(64))
 
@@ -42,7 +42,7 @@ object DedupVerilogSpec extends TestSuite:
   final class SrcPort(
     using GeneratorScope[StubFull])
       extends Endpoints:
-    parameters(DvVerilogSpec.stubParams("DupSrc"))(identity)
+    parameters(DvVerilogSpec.stubParams("DupSrc"))
     val out = outward(Wid).dFn(_ => Right(32))
 
   def src(

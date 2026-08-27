@@ -85,7 +85,7 @@ object AxiSocSpec extends TestSuite:
           routes = outs.zip(outputs).map((n, b) => XbarRoute(n, view.edgeOf(b).slave.slaves.flatMap(_.address)))
         )
       )
-    }(identity)
+    }
 
   def axiXbar(
     ins:         Vector[String],
@@ -132,7 +132,10 @@ object AxiSocSpec extends TestSuite:
   )(
     using GeneratorScope[SlaveFull])
       extends Endpoints:
-    parameters(view => Right(view.edgeOf(in)))(e => SlaveFull(name, base, size, e.dataBits, e.idBits))
+    parameters { view =>
+      val e = view.edgeOf(in)
+      Right(SlaveFull(name, base, size, e.dataBits, e.idBits))
+    }
     val in = inward(Axi4).uFn(_ =>
       Right(
         AxiSlavePort(
@@ -186,8 +189,14 @@ object AxiSocSpec extends TestSuite:
           }
           in.uFn(ctx => Right(ctx(u)))
           parameters { view =>
-            Right((view.edgeOf(in).idBits, view.edgeOf(out).idBits))
-          }((upBits, downBits) => L2Full(capacityKiB = 512, upstreamIdBits = upBits, downstreamIdBits = downBits))
+            Right(
+              L2Full(
+                capacityKiB = 512,
+                upstreamIdBits = view.edgeOf(in).idBits,
+                downstreamIdBits = view.edgeOf(out).idBits
+              )
+            )
+          }
           (in, out)
         }
         val (l2In, l2Out) = l2
@@ -222,7 +231,7 @@ object AxiSocSpec extends TestSuite:
                 masters = e.master.masters.map(_.name)
               )
             )
-          }(identity)
+          }
           in
         }
         // Both endpoints live under mem, so this bind may be declared here …
@@ -255,9 +264,7 @@ object AxiSocSpec extends TestSuite:
             )
           )
         }
-        parameters(view => Right(view.edgeOf(in).idBits))(idBits =>
-          BridgeFull(wideBeatBytes = 16, narrowBeatBytes = 4, idBits = idBits)
-        )
+        parameters(view => Right(BridgeFull(wideBeatBytes = 16, narrowBeatBytes = 4, idBits = view.edgeOf(in).idBits)))
         (in, out)
       }
       val (brIn, brOut) = bridge

@@ -62,7 +62,7 @@ final case class NodeView(
   edge:      ResolvedEdge,
   refs:      Vector[ResolvedProtocolReference])
 
-/** The per-module projection of settled data read by `computeProtocolParam` (doc @dec-pp-local).
+/** The per-module projection of settled data read by the module's `parameters` computation (doc @dec-pp-local).
   *
   * Reads are keyed by the node builders and reference handles declared in the module body, and the results are typed by
   * the handle's protocol — there is no lookup by name string.
@@ -94,12 +94,12 @@ final case class EdgeView(
       .edge
       .asInstanceOf[h.protocol.Edge]
 
-/** A settled generator module: registry entry, its view, and both parameter layers (doc @sec-two-layer-params). */
+/** A settled generator module: registry entry, its view, and the computed full parameter (doc @sec-two-layer-params).
+  */
 final case class ResolvedGeneratorModule(
   module:           ModuleId,
   entry:            GeneratorEntry[?],
   view:             EdgeView,
-  protocolParam:    Any,
   fullParam:        Any,
   encodedFullParam: ujson.Value)
 
