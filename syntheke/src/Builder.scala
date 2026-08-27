@@ -54,7 +54,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     childId
 
   /** Instantiate a child wrapper module; returns the body's dangling endpoints. */
-  def wrapper[A: Dangles](
+  private[syntheke] def wrapper[A: Dangles](
     name: String
   )(body: WrapperScope ?=> A
   )(
@@ -71,7 +71,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     result
 
   /** Instantiate a child generator module bound to a registry entry; returns the body's dangling endpoints. */
-  def generator[FP, A: Dangles](
+  private[syntheke] def generator[FP, A: Dangles](
     name:  String,
     entry: GeneratorEntry[FP]
   )(body:  GeneratorScope[FP] ?=> A
@@ -92,7 +92,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     result
 
   /** Instantiate the testbench generator module (doc @sec-dv-testbench): root scope only, at most one per design. */
-  def testbench[FP, A: Dangles](
+  private[syntheke] def testbench[FP, A: Dangles](
     name:  String,
     entry: GeneratorEntry[FP]
   )(body:  GeneratorScope[FP] ?=> A
@@ -156,7 +156,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     refs += (nodeName -> spec)
 
   /** Declare a named inward node of protocol `p`. */
-  def inward(
+  private[syntheke] def inward(
     p:    Protocol
   )(name: String
   )(
@@ -170,7 +170,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     b
 
   /** Declare a named outward node of protocol `p`. */
-  def outward(
+  private[syntheke] def outward(
     p:    Protocol
   )(name: String
   )(
@@ -187,7 +187,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     * dFn may read the inward node's `Down`, the inward node's uFn may read the outward node's `Up` (doc @sec-generator-module).
     * Both endpoints must be nodes of this module; a pair declares at most once.
     */
-  def depend(
+  private[syntheke] def depend(
     from: InwardNodeBuilder[?],
     to:   OutwardNodeBuilder[?]
   )(
@@ -211,7 +211,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     * checked here — every signal leaf must be a Probe carrying the declared layer, with no Flipped anywhere — so a
     * protocol violating the contract fails at the declaration.
     */
-  def dvSource(
+  private[syntheke] def dvSource(
     p:     DVProtocol
   )(name:  String,
     down:  p.Down,
@@ -241,13 +241,10 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   /** Declare the full-parameter computation (doc @sec-two-layer-params): the negotiated `EdgeView` plus the user
     * parameters captured in the closure produce the `FullParam`; exactly once per module.
     */
-  def parameters(compute: EdgeView => Either[Violation, FP]): Unit =
+  private[syntheke] def parameters(compute: EdgeView => Either[Violation, FP]): Unit =
     requireOpen()
     require(params.isEmpty, s"parameters of ${id.show} already set")
     params += compute.asInstanceOf[EdgeView => Either[Violation, Any]]
-
-  /** A generator whose full parameter ignores the negotiation result entirely. */
-  def parametersConst(fp: FP): Unit = parameters(_ => Right(fp))
 
   private[syntheke] def close(loc: (sourcecode.File, sourcecode.Line)): Unit =
     val nodeSpecs = nodes.toVector.zipWithIndex.map { case ((b, direction, declLoc), order) =>

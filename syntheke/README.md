@@ -61,12 +61,12 @@ val spec = Design {
   // Declarations are named by the val they are bound to (sourceinfo, like zaozi);
   // provide `given sourcecode.Name = sourcecode.Name(s"in$i")` for computed names.
   val prod = generator(prodEntry) {
-    parametersConst(0)
+    parameters(_ => Right(0))
     val out = outward(Wid).dFn(_ => Right(32))
     out
   }
   val cons = generator(consEntry) {
-    parametersConst(0)
+    parameters(_ => Right(0))
     val in = inward(Wid).uFn(_ => Right(64))
     in
   }
@@ -84,7 +84,7 @@ class, where the context name cannot capture them.
 
 ```scala
 final class CorePorts(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Endpoints:
-  parametersConst(CoreFull(name, idBits))
+  parameters(_ => Right(CoreFull(name, idBits)))
   val mem = outward(Axi4).dFn(...)
 
 def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line): CorePorts =

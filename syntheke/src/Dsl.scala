@@ -167,14 +167,6 @@ def parameters[FP](
 ): Unit =
   gs.parameters(compute)
 
-/** [[parameters]] of a generator whose FullParam ignores the negotiation result entirely. */
-def parametersConst[FP](
-  fp:       FP
-)(
-  using gs: GeneratorScope[FP]
-): Unit =
-  gs.parametersConst(fp)
-
 /** Declare a probe source named by the binding val: the enclosing module publishes the verification data described by
   * `down`, as read-only probes confined to FIRRTL layer `layer` (doc @sec-dv-declarations). The framework forwards
   * every probe leaf automatically to the root — into the [[testbench]]'s matching data input when one is declared, as a

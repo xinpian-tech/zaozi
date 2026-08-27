@@ -108,7 +108,7 @@ object AxiSocSpec extends TestSuite:
   )(
     using GeneratorScope[CoreFull])
       extends Endpoints:
-    parametersConst(CoreFull(name, idBits, maxFlight))
+    parameters(_ => Right(CoreFull(name, idBits, maxFlight)))
     val mem =
       outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
 

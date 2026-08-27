@@ -49,12 +49,12 @@ object NegotiatorSpec extends TestSuite:
   def buildSoc(c1Capacity: Int): DesignSpec =
     Design {
       val prod                       = generator(intEntry("Prod")) {
-        parametersConst(0)
+        parameters(_ => Right(0))
         val out = outward(Wid).dFn(_ => Right(32))
         out
       }
       val dma                        = generator(intEntry("Dma")) {
-        parametersConst(0)
+        parameters(_ => Right(0))
         val out = outward(Wid).dFn(_ => Right(24))
         out
       }
@@ -77,14 +77,14 @@ object NegotiatorSpec extends TestSuite:
       val (xIn0, xIn1, xOut0, xOut1) = xbar
       val sub                        = wrapper {
         val c0 = generator(intEntry("C0")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
         c0
       }
       val c1                         = generator(intEntry("C1")) {
-        parametersConst(0)
+        parameters(_ => Right(0))
         val in = inward(Wid).uFn(_ => Right(c1Capacity))
         in
       }
@@ -156,12 +156,12 @@ object NegotiatorSpec extends TestSuite:
     test("a propagation conflict reports the node, the violation and the input snapshot") {
       val spec = Design {
         val bad  = generator(intEntry("Bad")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val out = outward(Wid).dFn(_ => Left(Violation("no width available")))
           out
         }
         val sink = generator(intEntry("Sink")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
@@ -178,7 +178,7 @@ object NegotiatorSpec extends TestSuite:
       // evaluating function holds only its own declared dependencies and rejects the smuggled reader.
       val spec = Design {
         val g                 = generator(intEntry("Sneak")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in      = inward(Wid).uFn(_ => Right(64))
           val out0    = outward(Wid)
           val out1    = outward(Wid)
@@ -189,17 +189,17 @@ object NegotiatorSpec extends TestSuite:
         }
         val (gin, out0, out1) = g
         val src               = generator(intEntry("SneakSrc")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val out = outward(Wid).dFn(_ => Right(8))
           out
         }
         val c0                = generator(intEntry("SneakC0")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
         val c1                = generator(intEntry("SneakC1")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
@@ -223,7 +223,7 @@ object NegotiatorSpec extends TestSuite:
         private val (d, u) = depend(in, out)
         out.dFn(ctx => Right(ctx(d)))
         in.uFn(ctx => Right(ctx(u)))
-        parametersConst(0)
+        parameters(_ => Right(0))
       def loopback(
       )(
         using
@@ -247,12 +247,12 @@ object NegotiatorSpec extends TestSuite:
     test("binding one node twice is rejected") {
       val spec = Design {
         val p          = generator(intEntry("P")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val out = outward(Wid).dFn(_ => Right(8))
           out
         }
         val c          = generator(intEntry("C")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in0 = inward(Wid).uFn(_ => Right(8))
           val in1 = inward(Wid).uFn(_ => Right(8))
           (in0, in1)
@@ -270,7 +270,7 @@ object NegotiatorSpec extends TestSuite:
       val spec       = Design {
         val cluster = wrapper {
           val core = generator(intEntry("Core")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             val mem = outward(Wid).dFn(_ => Right(32))
             val rob = dvSource(Trace)(8, layerCosim)
             val lsu = dvSource(Trace)(4, layerCosim)
@@ -279,7 +279,7 @@ object NegotiatorSpec extends TestSuite:
           core
         }
         val mem     = generator(intEntry("Mem")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
@@ -322,7 +322,7 @@ object NegotiatorSpec extends TestSuite:
       val spec     = Design {
         val cluster = wrapper {
           val core = generator(intEntry("TbCore")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             val mem = outward(Wid).dFn(_ => Right(32))
             val rob = dvSource(Trace)(8, LayerPath(Vector("verification")))
             mem
@@ -339,7 +339,7 @@ object NegotiatorSpec extends TestSuite:
         tb._1 <-- cluster
         // A probe-bearing module declared after the testbench: order does not matter for the manifest.
         val tail    = generator(intEntry("Tail")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val out = outward(Wid).dFn(_ => Right(8))
           val sig = dvSource(Trace)(4, LayerPath(Vector("verification")))
           out
@@ -378,15 +378,15 @@ object NegotiatorSpec extends TestSuite:
       val nested = intercept[IllegalArgumentException] {
         Design {
           val sub = wrapper {
-            val t = testbench(intEntry("T2")) { parametersConst(0) }
+            val t = testbench(intEntry("T2")) { parameters(_ => Right(0)) }
           }
         }
       }
       assert(nested.getMessage.contains("the testbench lives on the top level"))
       val twice  = intercept[IllegalArgumentException] {
         Design {
-          val a = testbench(intEntry("T3")) { parametersConst(0) }
-          val b = testbench(intEntry("T4")) { parametersConst(0) }
+          val a = testbench(intEntry("T3")) { parameters(_ => Right(0)) }
+          val b = testbench(intEntry("T4")) { parameters(_ => Right(0)) }
         }
       }
       assert(twice.getMessage.contains("already declared"))
@@ -412,7 +412,7 @@ object NegotiatorSpec extends TestSuite:
       val dup = intercept[IllegalArgumentException] {
         Design {
           generator(intEntry("G")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             val x = inward(Wid).uFn(_ => Right(1))
             locally {
               given sourcecode.Name = sourcecode.Name("x")
@@ -434,7 +434,7 @@ object NegotiatorSpec extends TestSuite:
       val badEndpoint = intercept[IllegalArgumentException] {
         Design {
           generator(intEntry("G")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             given sourcecode.Name = sourcecode.Name("dv-source")
             inward(Wid).uFn(_ => Right(1))
           }
@@ -449,7 +449,7 @@ object NegotiatorSpec extends TestSuite:
       val nested = intercept[IllegalArgumentException] {
         Design {
           generator(intEntry("G")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             given sourcecode.Name = sourcecode.Name("sub")
             wrapper {}
           }
@@ -458,15 +458,15 @@ object NegotiatorSpec extends TestSuite:
       assert(nested.getMessage.contains("declared inside generator body"))
 
       // The body's return value is the only escape channel and it is typed: only endpoint containers leave.
-      compileError("""Design { val x = generator(intEntry("G")) { parametersConst(0); 42 } }""")
+      compileError("""Design { val x = generator(intEntry("G")) { parameters(_ => Right(0)); 42 } }""")
 
       // Protocol identity is the object: nodes of two distinct instances of one protocol class must not bind.
       // This holds only while the builders stay singleton-typed and NodeBuilder stays invariant in its protocol.
       compileError("""Design {
         val p1 = new WidLike
         val p2 = new WidLike
-        val g1 = generator(intEntry("W1")) { parametersConst(0); val out = outward(p1).dFn(_ => Right(1)); out }
-        val g2 = generator(intEntry("W2")) { parametersConst(0); val in = inward(p2).uFn(_ => Right(1)); in }
+        val g1 = generator(intEntry("W1")) { parameters(_ => Right(0)); val out = outward(p1).dFn(_ => Right(1)); out }
+        val g2 = generator(intEntry("W2")) { parameters(_ => Right(0)); val in = inward(p2).uFn(_ => Right(1)); in }
         g2 <-- g1
       }""")
 
@@ -474,7 +474,7 @@ object NegotiatorSpec extends TestSuite:
       val dupRef = intercept[IllegalArgumentException] {
         Design {
           generator(intEntry("R2")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             val a   = inward(Wid).uFn(_ => Right(1))
             val b   = inward(Wid).uFn(_ => Right(1))
             val out = outward(Wid).dFn(_ => Right(1))
@@ -489,10 +489,30 @@ object NegotiatorSpec extends TestSuite:
       }
       assert(dupRef.getMessage.contains("duplicate cross-protocol reference 'r1'"))
 
+      // The two body-completion mandates are enforced when the module closes.
+      val noFn     = intercept[IllegalStateException] {
+        Design {
+          val g = generator(intEntry("NF")) {
+            parameters(_ => Right(0))
+            val in = inward(Wid)
+          }
+        }
+      }
+      assert(noFn.getMessage.contains("uFn is mandatory but was never set"))
+      val noParams = intercept[IllegalStateException] {
+        Design {
+          val g = generator(intEntry("NP")) {
+            val out = outward(Wid).dFn(_ => Right(1))
+            out
+          }
+        }
+      }
+      assert(noParams.getMessage.contains("parameters(...) is mandatory but was never set"))
+
       // A closure capturing the scope (here: a dFn running at negotiation) cannot declare into a frozen module.
       val late = Design {
         val g = generator(intEntry("G")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val out = outward(Wid).dFn { _ =>
             inward(Wid)
             Right(1)
@@ -500,7 +520,7 @@ object NegotiatorSpec extends TestSuite:
           out
         }
         val c = generator(intEntry("C")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(1))
           in
         }
@@ -522,12 +542,12 @@ object NegotiatorSpec extends TestSuite:
         }
         val (clkIn, out) = g
         val clkSrc       = generator(intEntry("ClkSrc")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val o = outward(Wid).dFn(_ => Right(16))
           o
         }
         val snk          = generator(intEntry("Snk")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
@@ -545,7 +565,7 @@ object NegotiatorSpec extends TestSuite:
       val spec   = Design {
         val cluster = wrapper {
           val prod = generator(intEntry("P")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             val out = outward(Wid).dFn(_ => Right(32))
             val rob = dvSource(Trace)(8, LayerPath(Vector("verification")))
             out
@@ -553,7 +573,7 @@ object NegotiatorSpec extends TestSuite:
           prod
         }
         val cons    = generator(intEntry("C")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
@@ -601,7 +621,7 @@ object NegotiatorSpec extends TestSuite:
       val bare = intercept[IllegalArgumentException] {
         Design {
           val b = generator(intEntry("B")) {
-            parametersConst(0)
+            parameters(_ => Right(0))
             val t = dvSource(BadTrace)(8, LayerPath(Vector("verification")))
           }
         }
@@ -611,7 +631,7 @@ object NegotiatorSpec extends TestSuite:
       // A foreign builder read through another module's view is rejected at negotiation.
       val spec = Design {
         val p = generator(intEntry("P")) {
-          parametersConst(0)
+          parameters(_ => Right(0))
           val out = outward(Wid).dFn(_ => Right(8))
           out
         }
