@@ -101,4 +101,7 @@ sysXbar.inputs(0) <-- core0.mem
 The AXI4 demo (`tests/src/axi/`, `circt/tests/src/`) mirrors rocket-chip's
 `amba.axi4` parameter model over the design document's motivation SoC:
 id-space prefixing in the crossbar, upward address aggregation, a 128→32
-width bridge, per-edge conflict reporting, and end-to-end Verilog.
+width bridge, per-edge conflict reporting, and end-to-end Verilog. Each side
+splits the user story in two files: `AxiLibrary.scala` is what an IP author
+ships (per IP: FullParam, endpoint class, a def binding the registry entry),
+the spec file is what an SoC integrator writes (instantiate and wire).

@@ -3,7 +3,6 @@
 package me.jiuyang.syntheke.tests.axi
 
 import me.jiuyang.syntheke.*
-import upickle.default.ReadWriter
 import utest.*
 
 /** The design document's motivation SoC (@sec-three-params), negotiated over the [[Axi4]] protocol:
@@ -15,161 +14,12 @@ import utest.*
   *                                                                              └─ gpio
   * }}}
   *
-  * Mirrors rocket-chip: the xbar prefixes each input's local AXI ids with the input index (the static remap of the
-  * doc's example — downstream id bits = prefix + max local bits), addresses aggregate upward, data width flows from the
-  * slave side, and the l2 adapter appends its own writeback master.
+  * This is the SoC integrator's side: instantiate the IPs of `AxiLibrary.scala` and wire them. Mirrors rocket-chip: the
+  * xbar prefixes each input's local AXI ids with the input index (the static remap of the doc's example — downstream id
+  * bits = prefix + max local bits), addresses aggregate upward, data width flows from the slave side, and the l2
+  * adapter appends its own writeback master.
   */
-
-// ============ FullParam types (all serializable) ============
-
-final case class CoreFull(name: String, idBits: Int, maxFlight: Int) derives ReadWriter
-final case class SlaveFull(name: String, base: Long, size: Long, dataBits: Int, idBits: Int) derives ReadWriter
-final case class L2Full(capacityKiB: Int, upstreamIdBits: Int, downstreamIdBits: Int) derives ReadWriter
-final case class BridgeFull(wideBeatBytes: Int, narrowBeatBytes: Int, idBits: Int) derives ReadWriter
-final case class DramFull(ranks: Int, addrBits: Int, dataBits: Int, idBits: Int, masters: Vector[String])
-    derives ReadWriter
-
-final case class XbarInput(in: String, ids: IdRange) derives ReadWriter
-final case class XbarRoute(out: String, address: Vector[AddressRange]) derives ReadWriter
-final case class XbarFull(arbitration: String, inputs: Vector[XbarInput], routes: Vector[XbarRoute]) derives ReadWriter
-
 object AxiSocSpec extends TestSuite:
-
-  private def entry[FP: ReadWriter](name: String) =
-    new GeneratorEntry[FP](s"demo.axi.$name")
-
-  val coreEntry   = entry[CoreFull]("Core")
-  val dmaEntry    = entry[CoreFull]("Dma")
-  val xbarEntry   = entry[XbarFull]("Xbar")
-  val l2Entry     = entry[L2Full]("L2")
-  val dramEntry   = entry[DramFull]("Dram")
-  val bridgeEntry = entry[BridgeFull]("WidthBridge")
-  val slaveEntry  = entry[SlaveFull]("MmioSlave")
-
-  /** An n×m AXI crossbar: every input reaches every output. The endpoint class declares the nodes, the full dependency
-    * matrix, the id-remapping dFns and aggregating uFns, and a route-table FullParam.
-    */
-  final class AxiXbarPorts(
-    ins:         Vector[String],
-    outs:        Vector[String],
-    arbitration: String
-  )(
-    using GeneratorScope[XbarFull])
-      extends Endpoints:
-    val inputs       = ins.map { n =>
-      given sourcecode.Name = sourcecode.Name(n)
-      inward(Axi4)
-    }
-    val outputs      = outs.map { n =>
-      given sourcecode.Name = sourcecode.Name(n)
-      outward(Axi4)
-    }
-    private val grid = outputs.map(out => inputs.map(in => depend(in, out)))
-    outputs.zipWithIndex.foreach { (out, oi) =>
-      val readers = grid(oi).map(_._1)
-      out.dFn(ctx => Right(Axi4Xbar.mapInputs(readers.map(ctx(_)))))
-    }
-    inputs.zipWithIndex.foreach { (in, ii) =>
-      val readers = grid.map(_(ii)._2)
-      in.uFn(ctx => Axi4Xbar.aggregate(readers.map(ctx(_)), inputs.size))
-    }
-    parameters { view =>
-      val inEdges = inputs.map(b => view.edgeOf(b))
-      val local   = Axi4Xbar.localBits(inEdges.map(_.master))
-      Right(
-        XbarFull(
-          arbitration = arbitration,
-          inputs = ins.zip(inEdges).zipWithIndex.map { case ((n, e), i) =>
-            XbarInput(n, IdRange(i << local, (i << local) + e.master.endId))
-          },
-          routes = outs.zip(outputs).map((n, b) => XbarRoute(n, view.edgeOf(b).slave.slaves.flatMap(_.address)))
-        )
-      )
-    }
-
-  def axiXbar(
-    ins:         Vector[String],
-    outs:        Vector[String],
-    arbitration: String
-  )(
-    using
-    ws:          WrapperScope,
-    name:        sourcecode.Name,
-    file:        sourcecode.File,
-    line:        sourcecode.Line
-  ): AxiXbarPorts =
-    generator(xbarEntry)(new AxiXbarPorts(ins, outs, arbitration))
-
-  /** One AXI master core: a boundary outward node with a local id space; the master is named after the instance. */
-  final class CorePorts(
-    name:      String,
-    idBits:    Int,
-    maxFlight: Int
-  )(
-    using GeneratorScope[CoreFull])
-      extends Endpoints:
-    parameters(_ => Right(CoreFull(name, idBits, maxFlight)))
-    val mem =
-      outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
-
-  def core(
-    entry0:    GeneratorEntry[CoreFull],
-    idBits:    Int,
-    maxFlight: Int
-  )(
-    using
-    ws:        WrapperScope,
-    name:      sourcecode.Name,
-    file:      sourcecode.File,
-    line:      sourcecode.Line
-  ): CorePorts =
-    generator(entry0)(new CorePorts(name.value, idBits, maxFlight))
-
-  /** A memory-mapped peripheral slave: a boundary inward node serving one address range on a 32-bit bus. */
-  final class MmioSlavePorts(
-    name:           String,
-    base:           Long,
-    size:           Long,
-    idCapacityBits: Int
-  )(
-    using GeneratorScope[SlaveFull])
-      extends Endpoints:
-    parameters { view =>
-      val e = view.edgeOf(in)
-      Right(SlaveFull(name, base, size, e.dataBits, e.idBits))
-    }
-    val in = inward(Axi4).uFn(_ =>
-      Right(
-        AxiSlavePort(
-          slaves = Vector(
-            AxiSlaveParams(
-              name,
-              Vector(AddressRange(base, size)),
-              "PUT_EFFECTS",
-              false,
-              TransferSizes(1, 4),
-              TransferSizes(1, 4)
-            )
-          ),
-          beatBytes = 4,
-          idCapacityBits = idCapacityBits,
-          minLatency = 1
-        )
-      )
-    )
-
-  def mmioSlave(
-    base:           Long,
-    size:           Long,
-    idCapacityBits: Int
-  )(
-    using
-    ws:             WrapperScope,
-    name:           sourcecode.Name,
-    file:           sourcecode.File,
-    line:           sourcecode.Line
-  ): MmioSlavePorts =
-    generator(slaveEntry)(new MmioSlavePorts(name.value, base, size, idCapacityBits))
 
   def buildSoc(dramIdCapacity: Int = 6, gpioBase: Long = 0x10010000L): DesignSpec =
     Design {
@@ -181,96 +31,16 @@ object AxiSocSpec extends TestSuite:
 
       // The memory branch lives one level down: sysXbar -> mem/l2 crosses the `mem` boundary.
       val mem = wrapper {
-        val l2            = generator(l2Entry) {
-          val in     = inward(Axi4)
-          val out    = outward(Axi4)
-          val (d, u) = depend(in, out)
-          // The L2 appends its own writeback master after the upstream id space (an adapter transforming Down).
-          out.dFn { ctx =>
-            val up = ctx(d)
-            Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), 2)))
-          }
-          in.uFn(ctx => Right(ctx(u)))
-          parameters { view =>
-            Right(
-              L2Full(
-                capacityKiB = 512,
-                upstreamIdBits = view.edgeOf(in).idBits,
-                downstreamIdBits = view.edgeOf(out).idBits
-              )
-            )
-          }
-          (in, out)
-        }
-        val (l2In, l2Out) = l2
-        val dram          = generator(dramEntry) {
-          val in = inward(Axi4).uFn(_ =>
-            Right(
-              AxiSlavePort(
-                slaves = Vector(
-                  AxiSlaveParams(
-                    "dram",
-                    Vector(AddressRange(0x80000000L, 0x80000000L)),
-                    "UNCACHED",
-                    true,
-                    TransferSizes(1, 64),
-                    TransferSizes(1, 64)
-                  )
-                ),
-                beatBytes = 16,
-                idCapacityBits = dramIdCapacity,
-                minLatency = 8
-              )
-            )
-          )
-          parameters { view =>
-            val e = view.edgeOf(in)
-            Right(
-              DramFull(
-                ranks = 2,
-                addrBits = e.addrBits,
-                dataBits = e.dataBits,
-                idBits = e.idBits,
-                masters = e.master.masters.map(_.name)
-              )
-            )
-          }
-          in
-        }
+        val l2   = l2Cache(capacityKiB = 512)
+        val dram = dramCtrl(ranks = 2, base = 0x80000000L, size = 0x80000000L, idCapacityBits = dramIdCapacity)
         // Both endpoints live under mem, so this bind may be declared here …
-        dram <-- l2Out
-        l2In
+        dram.in <-- l2.out
+        l2.in
       }
       // … but sysXbar -> l2 crosses the mem boundary: it must be declared in a common ancestor (the root).
       mem <-- sysXbar.outputs(0)
 
-      // Width bridge 128 -> 32: passes masters down; upstream it re-presents the peripherals on the wide bus,
-      // fragmenting bursts internally, so the supported transfer ceiling grows to its own limit.
-      val bridge        = generator(bridgeEntry) {
-        val wideBeatBytes       = 16
-        val maxUpstreamTransfer = 64
-        val in                  = inward(Axi4)
-        val out                 = outward(Axi4)
-        val (d, u)              = depend(in, out)
-        out.dFn(ctx => Right(ctx(d)))
-        in.uFn { ctx =>
-          val narrow = ctx(u)
-          Right(
-            narrow.copy(
-              beatBytes = wideBeatBytes,
-              slaves = narrow.slaves.map(s =>
-                s.copy(
-                  supportsRead = TransferSizes(s.supportsRead.min, maxUpstreamTransfer),
-                  supportsWrite = TransferSizes(s.supportsWrite.min, maxUpstreamTransfer)
-                )
-              )
-            )
-          )
-        }
-        parameters(view => Right(BridgeFull(wideBeatBytes = 16, narrowBeatBytes = 4, idBits = view.edgeOf(in).idBits)))
-        (in, out)
-      }
-      val (brIn, brOut) = bridge
+      val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
 
@@ -280,8 +50,8 @@ object AxiSocSpec extends TestSuite:
       sysXbar.inputs(0) <-- core0.mem
       sysXbar.inputs(1) <-- core1.mem
       sysXbar.inputs(2) <-- dma.mem
-      brIn <-- sysXbar.outputs(1)
-      periphXbar.inputs(0) <-- brOut
+      bridge.in <-- sysXbar.outputs(1)
+      periphXbar.inputs(0) <-- bridge.out
       uart.in <-- periphXbar.outputs(0)
       gpio.in <-- periphXbar.outputs(1)
     }

@@ -9,7 +9,7 @@ import me.jiuyang.syntheke.circt.*
 object AxiDemoMain:
   def main(args: Array[String]): Unit =
     val resolved = Negotiator.negotiate(AxiVerilogSpec.buildSoc())
-    val design   = Elaborator.elaborate(resolved, AxiVerilogSpec.backends)
+    val design   = Elaborator.elaborate(resolved, axiBackends)
     val dir      = os.Path(args.headOption.getOrElse(os.pwd.toString), os.pwd)
     os.write.over(dir / "Top.fir", design.firrtl)
     os.write.over(dir / "Top.sv", design.verilog)
