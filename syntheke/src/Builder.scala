@@ -76,26 +76,36 @@ final class ReadCtx private[syntheke] (values: Map[ModuleNodeId, Any]):
   def apply[T](r: UpReader[T]):   T =
     values.getOrElse(r.node, throw new UndeclaredReadException(r.node)).asInstanceOf[T]
 
+/** Handle of a declared cross-protocol reference: reads the target node's settled edge from the [[EdgeView]], typed by
+  * the target's protocol (doc @sec-settle-pp).
+  */
+final class RefHandle[P <: Protocol] private[syntheke] (
+  val protocol:                   P,
+  private[syntheke] val referrer: ModuleNodeId,
+  private[syntheke] val refName:  String)
+
 sealed trait NodeBuilder[P <: Protocol]:
   val protocol: P
   def id:                      ModuleNodeId
   private[syntheke] def scope: GeneratorScope[?]
 
-  /** Declare a cross-protocol reference to another node of the same module (clock / power domain). The target's
-    * protocol is the expected protocol by construction; foreign-module targets are rejected here.
+  /** Declare a cross-protocol reference to another node of the same module (clock / power domain), named by the binding
+    * val. The target's protocol is the expected protocol by construction; foreign-module targets are rejected here. The
+    * returned handle is the only way to read the reference back.
     */
   def ref(
-    name:      String,
-    target:    NodeBuilder[?]
+    target: NodeBuilder[?]
   )(
-    using loc: SourceLocation
-  ): this.type =
+    using
+    name:   sourcecode.Name,
+    loc:    SourceLocation
+  ): RefHandle[target.protocol.type] =
     require(
       target.id.module == id.module,
-      s"cross-protocol reference '$name' of ${id.show}: target ${target.id.show} is not a node of this module"
+      s"cross-protocol reference '${name.value}' of ${id.show}: target ${target.id.show} is not a node of this module"
     )
-    scope.recordRef(id.name, CrossProtocolRefSpec(name, target.id, target.protocol.id, loc))
-    this
+    scope.recordRef(id.name, CrossProtocolRefSpec(name.value, target.id, target.protocol.id, loc))
+    new RefHandle[target.protocol.type](target.protocol, id, name.value)
 
 /** An inward node under declaration; `uFn` must be attached exactly once before the scope closes. */
 final class InwardNodeBuilder[P <: Protocol] private[syntheke] (

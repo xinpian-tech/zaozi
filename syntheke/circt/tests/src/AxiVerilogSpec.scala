@@ -174,7 +174,7 @@ object AxiVerilogSpec extends TestSuite:
     ZaoziBackend(slaveEntry, SlaveGen, identity[SlaveP])
   )
 
-  def shapeOf(view: EdgeView, node: String): AxiShape = AxiShape.of(view(node).edge.edgeAs(Axi4))
+  def shapeOf(view: EdgeView, n: NodeBuilder[Axi4.type]): AxiShape = AxiShape.of(view.edgeOf(n))
 
   /** The n×m crossbar as a reusable definition: endpoint class + def binding the entry. */
   final class AxiXbarPorts(
@@ -203,7 +203,14 @@ object AxiVerilogSpec extends TestSuite:
       in.uFn(ctx => Axi4Xbar.aggregate(readers.map(ctx(_)), inputs.size))
     }
     parameters { view =>
-      Right(XbarP(name, arbitration, ins.map(n => n -> shapeOf(view, n)), outs.map(n => n -> shapeOf(view, n))))
+      Right(
+        XbarP(
+          name,
+          arbitration,
+          ins.zip(inputs).map((n, b) => n -> shapeOf(view, b)),
+          outs.zip(outputs).map((n, b) => n -> shapeOf(view, b))
+        )
+      )
     }(identity)
 
   def axiXbar(
@@ -225,7 +232,7 @@ object AxiVerilogSpec extends TestSuite:
   )(
     using GeneratorScope[CoreP])
       extends Endpoints:
-    parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, "mem"))))(identity)
+    parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, mem))))(identity)
     val mem =
       outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
 
@@ -248,7 +255,7 @@ object AxiVerilogSpec extends TestSuite:
   )(
     using GeneratorScope[SlaveP])
       extends Endpoints:
-    parameters(view => Right(SlaveP(name, base, size, shapeOf(view, "in"))))(identity)
+    parameters(view => Right(SlaveP(name, base, size, shapeOf(view, in))))(identity)
     val in = inward(Axi4).uFn(_ =>
       Right(
         AxiSlavePort(
@@ -299,12 +306,11 @@ object AxiVerilogSpec extends TestSuite:
             Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), 2)))
           }
           in.uFn(ctx => Right(ctx(u)))
-          parameters(view => Right(L2P(512, shapeOf(view, "in"), shapeOf(view, "out"))))(identity)
+          parameters(view => Right(L2P(512, shapeOf(view, in), shapeOf(view, out))))(identity)
           (in, out)
         }
         val (l2In, l2Out) = l2
         val dram          = generator(dramEntry) {
-          parameters(view => Right(DramP(2, shapeOf(view, "in"))))(identity)
           val in = inward(Axi4).uFn(_ =>
             Right(
               AxiSlavePort(
@@ -324,6 +330,7 @@ object AxiVerilogSpec extends TestSuite:
               )
             )
           )
+          parameters(view => Right(DramP(2, shapeOf(view, in))))(identity)
           in
         }
         dram <-- l2Out
@@ -350,7 +357,7 @@ object AxiVerilogSpec extends TestSuite:
             )
           )
         }
-        parameters(view => Right(BridgeP(shapeOf(view, "in"), shapeOf(view, "out"))))(identity)
+        parameters(view => Right(BridgeP(shapeOf(view, in), shapeOf(view, out))))(identity)
         (in, out)
       }
       val (brIn, brOut) = bridge

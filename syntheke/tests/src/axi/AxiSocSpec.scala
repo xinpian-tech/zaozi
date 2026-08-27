@@ -74,7 +74,7 @@ object AxiSocSpec extends TestSuite:
       in.uFn(ctx => Axi4Xbar.aggregate(readers.map(ctx(_)), inputs.size))
     }
     parameters { view =>
-      val inEdges = ins.map(n => view(n).edge.edgeAs(Axi4))
+      val inEdges = inputs.map(b => view.edgeOf(b))
       val local   = Axi4Xbar.localBits(inEdges.map(_.master))
       Right(
         XbarFull(
@@ -82,7 +82,7 @@ object AxiSocSpec extends TestSuite:
           inputs = ins.zip(inEdges).zipWithIndex.map { case ((n, e), i) =>
             XbarInput(n, IdRange(i << local, (i << local) + e.master.endId))
           },
-          routes = outs.map(n => XbarRoute(n, view(n).edge.edgeAs(Axi4).slave.slaves.flatMap(_.address)))
+          routes = outs.zip(outputs).map((n, b) => XbarRoute(n, view.edgeOf(b).slave.slaves.flatMap(_.address)))
         )
       )
     }(identity)
@@ -132,7 +132,7 @@ object AxiSocSpec extends TestSuite:
   )(
     using GeneratorScope[SlaveFull])
       extends Endpoints:
-    parameters(view => Right(view("in").edge.edgeAs(Axi4)))(e => SlaveFull(name, base, size, e.dataBits, e.idBits))
+    parameters(view => Right(view.edgeOf(in)))(e => SlaveFull(name, base, size, e.dataBits, e.idBits))
     val in = inward(Axi4).uFn(_ =>
       Right(
         AxiSlavePort(
@@ -186,24 +186,12 @@ object AxiSocSpec extends TestSuite:
           }
           in.uFn(ctx => Right(ctx(u)))
           parameters { view =>
-            Right((view("in").edge.edgeAs(Axi4).idBits, view("out").edge.edgeAs(Axi4).idBits))
+            Right((view.edgeOf(in).idBits, view.edgeOf(out).idBits))
           }((upBits, downBits) => L2Full(capacityKiB = 512, upstreamIdBits = upBits, downstreamIdBits = downBits))
           (in, out)
         }
         val (l2In, l2Out) = l2
         val dram          = generator(dramEntry) {
-          parameters { view =>
-            val e = view("in").edge.edgeAs(Axi4)
-            Right(
-              DramFull(
-                ranks = 2,
-                addrBits = e.addrBits,
-                dataBits = e.dataBits,
-                idBits = e.idBits,
-                masters = e.master.masters.map(_.name)
-              )
-            )
-          }(identity)
           val in = inward(Axi4).uFn(_ =>
             Right(
               AxiSlavePort(
@@ -223,6 +211,18 @@ object AxiSocSpec extends TestSuite:
               )
             )
           )
+          parameters { view =>
+            val e = view.edgeOf(in)
+            Right(
+              DramFull(
+                ranks = 2,
+                addrBits = e.addrBits,
+                dataBits = e.dataBits,
+                idBits = e.idBits,
+                masters = e.master.masters.map(_.name)
+              )
+            )
+          }(identity)
           in
         }
         // Both endpoints live under mem, so this bind may be declared here …
@@ -255,7 +255,7 @@ object AxiSocSpec extends TestSuite:
             )
           )
         }
-        parameters(view => Right(view("in").edge.edgeAs(Axi4).idBits))(idBits =>
+        parameters(view => Right(view.edgeOf(in).idBits))(idBits =>
           BridgeFull(wideBeatBytes = 16, narrowBeatBytes = 4, idBits = idBits)
         )
         (in, out)

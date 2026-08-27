@@ -60,17 +60,39 @@ final case class NodeView(
   node:      ModuleNodeId,
   direction: NodeDirection,
   edge:      ResolvedEdge,
-  refs: Vector[ResolvedProtocolReference]):
-  def ref(name: String): Option[ResolvedProtocolReference] = refs.find(_.refName == name)
+  refs:      Vector[ResolvedProtocolReference])
 
-/** The per-module projection of settled data read by `computeProtocolParam` (doc @dec-pp-local). */
+/** The per-module projection of settled data read by `computeProtocolParam` (doc @dec-pp-local).
+  *
+  * Reads are keyed by the node builders and reference handles declared in the module body, and the results are typed by
+  * the handle's protocol — there is no lookup by name string.
+  */
 final case class EdgeView(
   module: ModuleId,
   nodes:  Vector[NodeView], // node declaration order
   verification: VerificationView):
-  def node(name: String):  Option[NodeView] = nodes.find(_.node.name == name)
-  def apply(name: String): NodeView         =
-    node(name).getOrElse(throw new NoSuchElementException(s"no node '$name' in EdgeView of ${module.show}"))
+
+  def apply(n: NodeBuilder[?]): NodeView =
+    require(n.id.module == module, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")
+    nodes.find(_.node == n.id).get
+
+  def edgeOf(n: NodeBuilder[?]): n.protocol.Edge = apply(n).edge.edgeAs(n.protocol)
+  def downOf(n: NodeBuilder[?]): n.protocol.Down = apply(n).edge.downAs(n.protocol)
+  def upOf(n:   NodeBuilder[?]): n.protocol.Up   = apply(n).edge.upAs(n.protocol)
+
+  def edgeOf(h: RefHandle[?]): h.protocol.Edge =
+    require(
+      h.referrer.module == module,
+      s"reference '${h.refName}' of ${h.referrer.show} is not a reference of EdgeView of ${module.show}"
+    )
+    nodes
+      .find(_.node == h.referrer)
+      .get
+      .refs
+      .find(_.refName == h.refName)
+      .get
+      .edge
+      .asInstanceOf[h.protocol.Edge]
 
 /** A settled generator module: registry entry, its view, and both parameter layers (doc @sec-two-layer-params). */
 final case class ResolvedGeneratorModule(

@@ -401,6 +401,37 @@ object NegotiatorSpec extends TestSuite:
       assert(e.getMessage.contains("outside its builder scope"))
     }
 
+    test("cross-protocol references settle to the target edge, typed through the view") {
+      val spec     = Design {
+        val g            = generator(intEntry("R")) {
+          val clkIn  = inward(Wid).uFn(_ => Right(64))
+          val out    = outward(Wid).dFn(_ => Right(32))
+          val outClk = out.ref(clkIn)
+          // The reference reads clkIn's settled edge — typed, no name string, no cast.
+          parameters(view => Right(view.edgeOf(outClk)))(identity)
+          (clkIn, out)
+        }
+        val (clkIn, out) = g
+        val clkSrc       = generator(intEntry("ClkSrc")) {
+          parametersConst(0)
+          val o = outward(Wid).dFn(_ => Right(16))
+          o
+        }
+        val snk          = generator(intEntry("Snk")) {
+          parametersConst(0)
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
+        }
+        clkIn <-- clkSrc
+        snk <-- out
+      }
+      val resolved = Negotiator.negotiate(spec)
+      // clkSrc requests 16 within capacity 64: the clock edge settles to 16 and the ref hands it to parameters.
+      assert(resolved.generatorModule(ModuleId.root / "g").get.fullParam == 16)
+      val refs     = resolved.generatorModule(ModuleId.root / "g").get.view.nodes.flatMap(_.refs)
+      assert(refs.map(r => (r.refName, r.target.name)) == Vector(("outClk", "clkIn")))
+    }
+
     test("declarations are named by their binding val via sourceinfo") {
       val spec   = Design {
         val cluster = wrapper {
