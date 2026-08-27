@@ -26,7 +26,7 @@
   [MBIST], [存储宏 → MBIST 控制器], [存储几何参数与测试接口形态], [可调度的接口数、支持的测试算法],
 )
 
-两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interfaceOf(edge)` 生成该边的硬件接口（@sec-protocol-interface），接口不得含 `Probe`——探针属于验证协议，求解期检查；`render(edge)` 生成可视化用的标签和属性（@sec-visualization）。边的 `Down`、`Up`、`Edge` 随后进入两端生成器模块各自的 `EdgeView`（@sec-two-layer-params）。
+两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interfaceOf(edge)` 生成该边的硬件接口（@sec-protocol-interface），接口不得含 `Probe`——探针属于验证协议，求解期检查。边的 `Down`、`Up`、`Edge` 随后进入两端生成器模块各自的 `EdgeView`（@sec-two-layer-params）。
 
 #图([一条边的求解输入。`Down`（蓝）沿 bind 方向传递，`Up`（红）沿相反方向传递；`negotiate` 将二者合成 `Edge`（绿）。])[
   #syn-diagram(
@@ -42,7 +42,7 @@
 
 == 协议对象 <sec-protocol-object>
 
-一个协议在代码里是一个协议对象。它给出：协议标识 `ProtocolId`，由协议种类（`ProtocolKind`）、名称和版本组成；三种关联类型 `Down`、`Up`、`Edge`；逐边求解函数 `negotiate`；接口描述函数 `interfaceOf`；三种参数各自的 `Codec`，即序列化 schema、规范化编码与解码；可视化渲染函数 `render`，其结果 `RenderedValue` 由显示标签和一组属性构成，属性名唯一并按名称排序后编码。设计协议的 `ProtocolKind` 固定为 `Design`。
+一个协议在代码里是一个协议对象。它给出：协议标识 `ProtocolId`，由协议种类（`ProtocolKind`）、名称和版本组成；三种关联类型 `Down`、`Up`、`Edge`；逐边求解函数 `negotiate`；接口描述函数 `interfaceOf`；三种参数各自的规范化序列化（编码与解码）。设计协议的 `ProtocolKind` 固定为 `Design`。
 
 `Down`、`Up` 与 `Edge` 关联到同一个协议值。给定协议值 `p`，`p.negotiate` 的参数类型是 `p.Down` 与 `p.Up`，成功结果类型是 `p.Edge`。bind 的源节点与目标节点使用同一个协议 `p`，因此该边上的参数和求解调用共享同一组类型；未经显式转换的跨协议连接表现为类型错误。
 
@@ -50,7 +50,7 @@
 
 双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(TermViolation)`，`TermViolation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置写入异常消息，并立即终止协商（@sec-error-semantics）。
 
-`ProtocolId`、`Down`、`Up` 与 `Edge` 均不可变、可序列化。相应 `Codec` 用于在工具文件中编码、解码协议数据；读取工具文件时，调用方提供包含相应 `ProtocolId` 条目的注册表。任何会改变 `negotiate`、接口、渲染结果或 codec schema 的变更都必须更新协议版本。
+`ProtocolId`、`Down`、`Up` 与 `Edge` 均不可变、可序列化。相应序列化用于在工具文件中编码、解码协议数据；读取工具文件时，调用方提供包含相应 `ProtocolId` 条目的注册表。任何会改变 `negotiate`、接口或序列化格式的变更都必须更新协议版本。
 
 跨协议转换由显式的#term[协议转换模块][protocol converter]表达。该模块声明一个协议 A 的 inward 节点和一个协议 B 的 outward 节点，并在二者之间声明参数依赖：outward 节点的 `dFn` 执行 `A.Down => B.Down`，inward 节点的 `uFn` 执行 `B.Up => A.Up`。两侧 bind 分别按协议 A 与协议 B 调用 `negotiate`；参数转换与硬件转换位于同一个生成器模块。
 

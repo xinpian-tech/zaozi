@@ -14,7 +14,7 @@
 
 生成器没有隐式时钟与复位：时钟和复位一律声明为时钟协议、复位协议的 inward 节点，与其它节点一样对应端口和一次 bind。
 
-每个生成器发布一个 `GeneratorId` 和 `FullParam` codec；codec 提供 schema、规范化编码与解码。完整的 `GeneratorId` 确定生成器实现和 codec schema（@sec-dedup）。
+每个生成器发布一个 `GeneratorId` 和 `FullParam` 的规范化序列化（编码与解码）。完整的 `GeneratorId` 确定生成器实现和 `FullParam` 的序列化格式（@sec-dedup）。
 
 `GeneratorId`、`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器登记到生成器注册表，注册表将 `GeneratorId` 映射到 `GeneratorEntry`。同一 `GeneratorId` 的所有模块引用同一个条目；两个条目使用相同 `GeneratorId` 而生成器实现或 codec 不同时报告生成器标识冲突（@sec-error-semantics）。
 
