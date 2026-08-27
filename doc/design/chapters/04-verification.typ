@@ -59,7 +59,7 @@
   设探针汇生成器的父结构模块为 $W$。$W$ 必须是每个探针源模块的严格祖先；汇生成器是 $W$ 的直接子模块。每条硬件路径由源到 $W$ 的唯一上行路径及 $W$ 到汇生成器的连接组成。兄弟模块之间的观察应把汇生成器放在二者公共祖先之下。
 ] <dec-dv-ancestor>
 
-探针路由复用设计侧的跨层端口规划（@sec-punch-planning）。第 $i$ 条 bind 沿途各层生成的 Dangle 端口（@sec-punch-planning）使用已求解 `DVInterfaces.sources(i)` 的结构，源端及这些 Dangle 端口以 Output 为根方向。该 Output 路径最终连接到汇生成器中由 `sinkPaths(i)` 指定的 Input Bundle。验证接口中的 `flip` 固定为 `false`；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
+探针路由复用设计侧的跨层端口规划（@sec-punch-planning），但按信号叶展开：探针在硬件里从不组成聚合。第 $i$ 条 bind 对已求解 `DVInterfaces.sources(i)` 的每个信号叶各生成一条 Output 路径——沿途各层一个纯 `Probe` 类型的 Dangle 端口，逐层 `ref.define` 传递，`Vec` 叶按下标展开、与字段叶同样路由。每条叶路径最终在 $W$ 的 layerblock 中 `ref.resolve`，连接到汇生成器端口内 `sinkPaths(i)` 延伸该叶路径的位置。验证接口中的 `flip` 固定为 `false`；该源接口及对应汇端 Bundle 的所有信号叶，都是带 `layers(i)` 的 `Probe`。
 
 结构校验核对探针源与探针汇的协议、源的唯一 bind 及祖先关系，违反时报告验证拓扑非法（@sec-error-semantics）。
 

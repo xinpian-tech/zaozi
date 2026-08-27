@@ -26,7 +26,7 @@
   [MBIST], [存储宏 → MBIST 控制器], [存储几何参数与测试接口形态], [可调度的接口数、支持的测试算法],
 )
 
-两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interfaceOf(edge)` 生成该边的硬件接口（@sec-protocol-interface），`render(edge)` 生成可视化用的标签和属性（@sec-visualization）。边的 `Down`、`Up`、`Edge` 随后进入两端生成器模块各自的 `EdgeView`（@sec-two-layer-params）。
+两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interfaceOf(edge)` 生成该边的硬件接口（@sec-protocol-interface），接口不得含 `Probe`——探针属于验证协议，求解期检查；`render(edge)` 生成可视化用的标签和属性（@sec-visualization）。边的 `Down`、`Up`、`Edge` 随后进入两端生成器模块各自的 `EdgeView`（@sec-two-layer-params）。
 
 #图([一条边的求解输入。`Down`（蓝）沿 bind 方向传递，`Up`（红）沿相反方向传递；`negotiate` 将二者合成 `Edge`（绿）。])[
   #syn-diagram(
