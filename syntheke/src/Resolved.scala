@@ -88,6 +88,50 @@ object PortName:
   private def escape(segment: String): String   =
     segment.replace("$", "$$").replace("_", "$u").replace("-", "$m")
 
+  /** Dangle-port name on wrapper `m` for the connection ending at `endpoint`'s port with `base` segments. */
+  private[syntheke] def dangle(m: ModuleId, endpoint: ModuleId, base: PortName): PortName =
+    PortName(endpoint.path.drop(m.path.length).flatMap(inst => Vector("inst", inst))) ++ base
+
+  /** Dangle base segments of one probe leaf: `dv-source`, the source name, the leaf path, `out`. */
+  private[syntheke] def dvBase(source: String, leafPath: InterfacePath): PortName =
+    PortName("dv-source" +: source +: leafPath.nameSegments :+ "out")
+
+/** One probe leaf as a testbench receives it: the harness input-port name (the leaf's root-scope dangle name — also the
+  * top-level port name when nothing consumes it), the data type after `ref.resolve`, and the leaf's path in its source
+  * interface.
+  */
+final case class ProbeLeaf(
+  portName: String,
+  tpe:      ProtocolInterface,
+  path:     InterfacePath)
+    derives upickle.default.ReadWriter
+
+/** One probe source in the design's probe manifest (doc @sec-dv-testbench): identity, protocol-encoded `Down`, layer,
+  * and leaves. The manifest is a pure function of the frozen [[DesignSpec]] — every field was recorded at the
+  * `dvSource` declaration — and it is serializable, so a testbench harness can take it as its full parameter.
+  */
+final case class ProbeSource(
+  id:     DVSourceId,
+  down:   ujson.Value,
+  layer:  LayerPath,
+  leaves: Vector[ProbeLeaf])
+    derives upickle.default.ReadWriter
+
+object ProbeSource:
+  /** The design's probe manifest, in hierarchy preorder then declaration order. */
+  def manifest(spec: DesignSpec): Vector[ProbeSource] =
+    for
+      g <- spec.generatorModules
+      s <- g.dvSources
+    yield
+      val leaves = ProtocolBundle.leaves(s.interface).collect { case (path, ProtocolInterface.Probe(inner, _)) =>
+        ProbeLeaf(PortName.dangle(ModuleId.root, g.id, PortName.dvBase(s.name, path)).encoded, inner, path)
+      }
+      val down   = upickle.default.writeJs(s.down)(
+        using s.protocol.downRW.asInstanceOf[upickle.default.ReadWriter[Any]]
+      )
+      ProbeSource(DVSourceId(g.id, s.name), down, s.layer, leaves)
+
 enum PortDirection derives CanEqual:
   case Input, Output
 

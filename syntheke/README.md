@@ -41,9 +41,13 @@ Deviations from the document's surface syntax:
   publishes (`DVProtocol.interfaceOf(down, layer)`, checked at the
   declaration), and the framework forwards every probe leaf automatically —
   one pure-probe dangle per signal leaf, `ref.define` per wrapper boundary —
-  up to top-level probe ports on the root. There is no in-design sink and no
-  verification bind; consumers attach outside the design through the
-  layer-gated top ports.
+  up to the root. There is no sink and no verification bind in the design
+  graph. The consumer is an elaboration-time option: pass a
+  `TestbenchBackend` and the root opens per-layer layerblocks, `ref.resolve`s
+  every leaf and wires it into the harness by the serializable probe
+  manifest's port names (`ProbeSource`/`ProbeLeaf`, a pure function of the
+  spec); without one, the probes surface as layer-gated top-level ports for
+  consumers outside the design.
 
 ```scala
 import me.jiuyang.syntheke.*

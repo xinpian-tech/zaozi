@@ -20,7 +20,7 @@ private[syntheke] object DeclaredName:
     Predef.require(shape.matches(name), s"$role '$name' is not a legal name ([A-Za-z_][A-Za-z0-9_]*)")
 
 /** Instance-name path from the design root. The root module has an empty path. */
-final case class ModuleId(path: Vector[String]):
+final case class ModuleId(path: Vector[String]) derives upickle.default.ReadWriter:
   def /(instanceName: String): ModuleId         = ModuleId(path :+ instanceName)
   def parent:                  Option[ModuleId] = if path.isEmpty then None else Some(ModuleId(path.init))
 
@@ -46,7 +46,7 @@ final case class BindId(order: Int, source: ModuleNodeId, target: ModuleNodeId):
   def show: String = s"bind[$order] ${source.show} -> ${target.show}"
 
 /** A named probe source on a generator module (doc @sec-dv-declarations). */
-final case class DVSourceId(module: ModuleId, name: String):
+final case class DVSourceId(module: ModuleId, name: String) derives upickle.default.ReadWriter:
   def show: String = s"${module.show}#$name"
 
 /** Declaration sites are captured with sourcecode's own `File` / `Line` givens and stored as the pair; this formats one

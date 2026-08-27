@@ -115,10 +115,14 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         None
       )
       // An internal layer unrelated to any routed probe: the linker must carry its definition into the design
-      // circuit, or verification fails on the layerblock below.
-      summon[Circuit].block.appendOwnedOperation(
-        summon[LayerApi].op("stubinternal", unknownLoc, FirrtlLayerConvention.Bind).operation
-      )
+      // circuit, or verification fails on the layerblock below. Only output-only stubs (probe sources) carry it —
+      // the testbench harness is instantiated under a layerblock, where a module with its own layerblock would be
+      // illegal nesting.
+      val internalLayer = !p.ports.exists(_.isInput)
+      if internalLayer then
+        summon[Circuit].block.appendOwnedOperation(
+          summon[LayerApi].op("stubinternal", unknownLoc, FirrtlLayerConvention.Bind).operation
+        )
       val module = summon[ModuleApi].op(
         name,
         unknownLoc,
@@ -128,7 +132,7 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
       )
       locally {
         given Block = module.block
-        summon[LayerBlockApi].op(Seq("stubinternal"), unknownLoc).operation.appendToBlock()
+        if internalLayer then summon[LayerBlockApi].op(Seq("stubinternal"), unknownLoc).operation.appendToBlock()
         p.ports.zipWithIndex.foreach { (sp, idx) =>
           val port = module.getIO(idx)
           sp.interface match
@@ -154,8 +158,8 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         }
       }
       module.appendToCircuit()
-      val file = outDir / s"$name.mlirbc"
-      val out = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
+      val file   = outDir / s"$name.mlirbc"
+      val out    = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
       try summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
       finally out.close()
 
@@ -163,6 +167,28 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
       summon[InstanceApi].op(name, instanceName, FirrtlNameKind.Interesting, unknownLoc, fields, layers.map(_.toSeq))
     instOp.operation.appendToBlock()
     instOp.operation
+
+/** A [[TestbenchBackend]] enacting the manifest contract with a [[StubBackend]] module: one data input per probe leaf,
+  * named by the leaf's port name.
+  */
+final class StubTestbench(entry: GeneratorEntry[StubFull], outDir: os.Path) extends TestbenchBackend:
+  private val inner = StubBackend(entry, outDir)
+
+  def instantiate(
+    layer:        LayerPath,
+    sources:      Vector[ProbeSource],
+    instanceName: String
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Operation =
+    val ports = sources.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))
+    inner.instantiate(
+      StubFull(("tb" +: layer.segments).mkString("_"), ports),
+      instanceName,
+      (summon[sourcecode.File], summon[sourcecode.Line])
+    )
 
 object DvVerilogSpec extends TestSuite:
 
@@ -248,6 +274,19 @@ object DvVerilogSpec extends TestSuite:
       assert(design.verilog.contains("module demo_dv_Src_"))
       // The stub's internal layer, unrelated to any routed probe, was carried by the linker into the design circuit.
       assert(design.firrtl.contains("layer stubinternal"))
+    }
+
+    test("a testbench backend consumes the probes at the root inside layerblocks") {
+      val resolved = Negotiator.negotiate(buildDesign())
+      val design   = Elaborator.elaborate(resolved, backends, testbench = Some(StubTestbench(entry("Tb"), outDir)))
+
+      // The harness sits in the layer's layerblock at the root; each leaf is resolved and connected by port name.
+      assert(design.firrtl.contains("layerblock"))
+      assert(design.firrtl.contains("tb_verification_cosim"))
+      assert(design.firrtl.contains("demo_dv_Tb"))
+      // The probes no longer surface as root ports: no root-level defines.
+      assert(!design.firrtl.contains("define inst_cluster"))
+      assert(design.verilog.contains("module Top"))
     }
 
     test("Vec probe leaves forward as individual pure-probe ports") {

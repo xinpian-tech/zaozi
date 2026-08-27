@@ -30,10 +30,7 @@ private[syntheke] object Planner:
     def ancestors(endpoint: ModuleId): Vector[ModuleId] =
       Iterator.iterate(endpoint.parent)(_.flatMap(_.parent)).takeWhile(_.isDefined).flatten.toVector
 
-    /** Dangle-port name on wrapper `m` for the connection ending at `endpoint`'s port with `base` segments. */
-    def dangleName(m: ModuleId, endpoint: ModuleId, base: PortName): PortName =
-      val rel = endpoint.path.drop(m.path.length)
-      PortName(rel.flatMap(inst => Vector("inst", inst))) ++ base
+    import PortName.dangle as dangleName
 
     /** Dangle ports on the wrappers `ms` and the wire chain through them. */
     def planChain(
@@ -101,7 +98,7 @@ private[syntheke] object Planner:
       val (ports, wires) = planChain(
         endpoint = g.id,
         portName = PortName(s.name +: leafPath.nameSegments),
-        base = PortName("dv-source" +: s.name +: leafPath.nameSegments :+ "out"),
+        base = PortName.dvBase(s.name, leafPath),
         ms = ms,
         direction = PortDirection.Output,
         interface = leaf,

@@ -65,6 +65,26 @@ object GeneratorBackend:
     val hash    = digest.take(8).map(b => f"$b%02x").mkString
     s"${entry.name.map(c => if c.isLetterOrDigit then c else '_')}_$hash"
 
+/** Enacts the testbench that consumes the design's probe manifest at the root (doc @sec-dv-testbench).
+  *
+  * For each FIRRTL layer the elaborator opens the layerblock in the root module and calls `instantiate` with that
+  * layer's probe sources. The returned instance must carry exactly one input port per probe leaf, named
+  * [[ProbeLeaf.portName]] and typed as the leaf's data type — the elaborator resolves every probe and connects it by
+  * that name, checking the ports like any generator's (@dec-binding-check). Like [[GeneratorBackend]], the
+  * implementation dumps its module as a per-module `.mlirbc` circuit that the linker picks up; the module must not
+  * contain layerblocks, since its instance sits under one.
+  */
+trait TestbenchBackend:
+  def instantiate(
+    layer:        LayerPath,
+    sources:      Vector[ProbeSource],
+    instanceName: String
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Operation
+
 /** The zaozi backend: a syntheke generator entry enacted by a zaozi [[Generator]].
   *
   * `toParam` recovers the zaozi parameter from the syntheke full parameter — typically an identity or a projection,

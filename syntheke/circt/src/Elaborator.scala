@@ -40,8 +40,10 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
+  LayerBlockApi,
   ModuleApi,
-  RefDefineApi
+  RefDefineApi,
+  RefResolveApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
@@ -98,6 +100,7 @@ object Elaborator:
   def elaborate(
     resolved:  ResolvedDesign,
     backends:  Seq[GeneratorBackend],
+    testbench: Option[TestbenchBackend] = None,
     mlirbcDir: os.Path = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
   ): ElaboratedDesign =
     val backendOf: Map[GeneratorEntry[?], GeneratorBackend] = backends.map(b => (b.entry: GeneratorEntry[?]) -> b).toMap
@@ -155,12 +158,23 @@ object Elaborator:
             emitLayers(sub, Some(op))
           }
 
+        // With a testbench backend the probes never surface as root ports: the manifest, grouped per layer, is
+        // enacted inside layerblocks in the root module and every probe leaf is resolved into the harness.
+        val tbByLayer: Vector[(LayerPath, Vector[ProbeSource])] =
+          if testbench.isEmpty then Vector.empty
+          else ProbeSource.manifest(spec).groupBy(_.layer).toVector.sortBy(_._1.segments.mkString("."))
+
         // ============ wrapper modules: one firrtl.module per instance ============
         spec.moduleOrder.foreach { id =>
           spec.wrapper(id).foreach { w =>
             val name       = moduleNames(id)
             // Definition and instance emission both sort ports by encoded name, so parent and child agree.
-            val ports      = resolved.portPlans.filter(_.module == id).sortBy(_.name.encoded)
+            val ports      = resolved.portPlans
+              .filter(_.module == id)
+              .filterNot(p =>
+                testbench.isDefined && id == ModuleId.root && p.origin.isInstanceOf[PlanOrigin.Verification]
+              )
+              .sortBy(_.name.encoded)
             val portFields = ports.map { p =>
               summon[FirrtlBundleFieldApi].createFirrtlBundleField(
                 p.name.encoded,
@@ -289,6 +303,49 @@ object Elaborator:
 
             val childValues = w.children.flatMap(emitChild).toMap
 
+            // Testbench harness at the root: one instance per layer inside its nested layerblocks. The port contract
+            // (one input per probe leaf, named ProbeLeaf.portName) is checked here like any generator's ports.
+            val tbPorts: Map[String, (Block, Value)] =
+              if id != ModuleId.root then Map.empty
+              else
+                tbByLayer.flatMap { (layer, sources) =>
+                  val lb     = layer.segments.indices.foldLeft(summon[Block]) { (outer, i) =>
+                    val block = summon[LayerBlockApi].op(layer.segments.take(i + 1), unknownLoc)
+                    locally {
+                      given Block = outer
+                      block.operation.appendToBlock()
+                    }
+                    block.block
+                  }
+                  val instOp = locally {
+                    given Block = lb
+                    testbench.get.instantiate(layer, sources, PortName("tb" +: layer.segments).encoded)
+                  }
+                  val names  = instOp.getInherentAttributeByName("portNames")
+                  val byName = Seq
+                    .tabulate(names.arrayAttrGetNumElements)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
+                    .toMap
+                  val dirs   = instOp.getInherentAttributeByName("portDirections")
+                  val leaves = sources.flatMap(_.leaves)
+                  leaves.foreach { l =>
+                    byName.get(l.portName) match
+                      case None    =>
+                        fail(
+                          s"testbench port mismatch: no port '${l.portName}' for a probe leaf of layer ${layer.show}"
+                        )
+                      case Some(i) =>
+                        if dirs.denseBoolArrayGetElement(i) then
+                          fail(s"testbench port mismatch at '${l.portName}': port is an output, expected input")
+                        firstDiff(translate(l.tpe), instOp.getResult(i).getType, l.portName).foreach { diff =>
+                          fail(s"testbench port mismatch at '${l.portName}': port type differs at $diff")
+                        }
+                  }
+                  (byName.keySet -- leaves.map(_.portName)).toVector.sorted.foreach { extra =>
+                    fail(s"testbench port mismatch: port '$extra' has no corresponding probe leaf")
+                  }
+                  leaves.map(l => l.portName -> (lb, instOp.getResult(byName(l.portName))))
+                }.toMap
+
             def baseOf(e: LocalEndpoint): Value = e match
               case LocalEndpoint.ThisPort(name)        =>
                 portIndex
@@ -305,9 +362,22 @@ object Elaborator:
                 case PlanOrigin.Design(_)       =>
                   summon[ConnectApi].op(baseOf(wp.from), baseOf(wp.to), unknownLoc).operation.appendToBlock()
                 case PlanOrigin.Verification(_) =>
-                  // Each verification wire forwards one probe leaf across this boundary (doc @sec-dv-routing):
-                  // define the dangle — at the root, the top-level probe port — from the child's probe port.
-                  summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
+                  // Each verification wire forwards one probe leaf across this boundary (doc @sec-dv-routing).
+                  wp.to match
+                    case LocalEndpoint.ThisPort(n) if tbPorts.contains(n.encoded) =>
+                      // The root with a testbench: resolve the probe inside the harness's layerblock and connect
+                      // the data leaf to the harness port of the same name.
+                      val (lb, dst) = tbPorts(n.encoded)
+                      locally {
+                        given Block = lb
+                        val res     = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
+                        res.operation.appendToBlock()
+                        summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
+                      }
+                    case _                                                        =>
+                      // Pass-through: define the dangle — without a testbench, at the root, the top-level probe
+                      // port — from the child's probe port.
+                      summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
             }
 
             module.appendToCircuit()
