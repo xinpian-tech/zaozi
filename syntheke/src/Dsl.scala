@@ -25,7 +25,7 @@ package me.jiuyang.syntheke
   * }}}
   */
 
-def wrapper[A](
+def wrapper[A: Dangles](
   body: WrapperScope ?=> A
 )(
   using
@@ -35,7 +35,7 @@ def wrapper[A](
 ): A =
   ws.wrapper(name.value)(body)
 
-def generator[FP, A](
+def generator[FP, A: Dangles](
   entry: GeneratorEntry[FP]
 )(body:  GeneratorScope[FP] ?=> A
 )(

@@ -377,6 +377,29 @@ object NegotiatorSpec extends TestSuite:
         }
       }
       assert(nested.getMessage.contains("declared inside generator body"))
+
+      // The body's return value is the only escape channel and it is typed: only endpoint containers leave.
+      compileError("""Design { val x = generator(intEntry("G")) { parametersConst(0); 42 } }""")
+
+      // A closure capturing the scope (here: a dFn running at negotiation) cannot declare into a frozen module.
+      val late = Design {
+        val g = generator(intEntry("G")) {
+          parametersConst(0)
+          val out = outward(Wid).dFn { _ =>
+            inward(Wid)
+            Right(1)
+          }
+          out
+        }
+        val c = generator(intEntry("C")) {
+          parametersConst(0)
+          val in = inward(Wid).uFn(_ => Right(1))
+          in
+        }
+        c <-- g
+      }
+      val e    = intercept[IllegalArgumentException](Negotiator.negotiate(late))
+      assert(e.getMessage.contains("outside its builder scope"))
     }
 
     test("declarations are named by their binding val via sourceinfo") {

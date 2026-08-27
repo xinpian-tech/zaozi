@@ -121,6 +121,45 @@ final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
 final class DVSourceRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSourceId)
 final class DVSinkRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSinkId)
 
+/** What a module body may return: its dangling endpoints — node builders and verification endpoint handles — plus
+  * `Unit`, `Option` / `Vector` / `Seq` of them, and products (tuples, case classes) whose fields all qualify. This is
+  * the only channel out of a module body, so nothing else (readers, scopes, arbitrary values) can escape it.
+  */
+sealed trait Dangles[A]
+
+object Dangles:
+  private val evidence = new Dangles[Any] {}
+  private def of[A]: Dangles[A] = evidence.asInstanceOf[Dangles[A]]
+
+  given unit:                      Dangles[Unit]                  = of
+  given inward[P <: Protocol]:     Dangles[InwardNodeBuilder[P]]  = of
+  given outward[P <: Protocol]:    Dangles[OutwardNodeBuilder[P]] = of
+  given dvSource[P <: DVProtocol]: Dangles[DVSourceRef[P]]        = of
+  given dvSink[P <: DVProtocol]:   Dangles[DVSinkRef[P]]          = of
+  given option[A](
+    using Dangles[A]
+  ): Dangles[Option[A]] = of
+  given vector[A](
+    using Dangles[A]
+  ): Dangles[Vector[A]] = of
+  given seq[A](
+    using Dangles[A]
+  ): Dangles[Seq[A]] = of
+
+  inline given product[A <: Product](
+    using m: scala.deriving.Mirror.ProductOf[A]
+  ): Dangles[A] =
+    allDangles[m.MirroredElemTypes]
+    of
+
+  private inline def allDangles[T <: Tuple]: Unit =
+    import scala.compiletime.{erasedValue, summonInline}
+    inline erasedValue[T] match
+      case _: EmptyTuple => ()
+      case _: (h *: t)   =>
+        summonInline[Dangles[h]]
+        allDangles[t]
+
 /** Design bind: `target <-- source`, recorded in the enclosing wrapper scope. The shared type parameter guarantees one
   * protocol object on both ends.
   */
@@ -156,8 +195,8 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     st.moduleOrder += childId
     childId
 
-  /** Instantiate a child wrapper module; returns the body's value. */
-  def wrapper[A](
+  /** Instantiate a child wrapper module; returns the body's dangling endpoints. */
+  def wrapper[A: Dangles](
     name:      String
   )(body:      WrapperScope ?=> A
   )(
@@ -171,8 +210,8 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     scope.close(loc)
     result
 
-  /** Instantiate a child generator module bound to a registry entry; returns the body's value. */
-  def generator[FP, A](
+  /** Instantiate a child generator module bound to a registry entry; returns the body's dangling endpoints. */
+  def generator[FP, A: Dangles](
     name:  String,
     entry: GeneratorEntry[FP]
   )(body:  GeneratorScope[FP] ?=> A
@@ -211,16 +250,25 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   private val dvSnks = mutable.ArrayBuffer.empty[DVSinkSpec]
   private val params = mutable.ArrayBuffer.empty[(EdgeView => Either[CapabilityViolation, Any], Any => Any)]
 
+  /** Declarations are only legal while this scope is the generator currently under construction — a closure capturing
+    * the scope (a dFn running at negotiation, say) cannot declare into a frozen module.
+    */
+  private def requireOpen(): Unit =
+    require(st.openLeaves.lastOption.contains(id), s"declaration on ${id.show} outside its builder scope")
+
   private def reserveName(name: String): Unit =
+    requireOpen()
     DeclaredName.require(name, s"endpoint name in ${id.show}")
     val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name) || dvSnks.exists(_.name == name)
     require(!taken, s"duplicate endpoint name '$name' in ${id.show}")
 
   private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[PropagationViolation, Any]): Unit =
+    requireOpen()
     require(!fns.contains(name), s"port parameter function of ${ModuleNodeId(id, name).show} already set")
     fns(name) = f
 
   private[syntheke] def recordRef(name: String, spec: CrossProtocolRefSpec): Unit =
+    requireOpen()
     refs += (name -> spec)
 
   /** Declare a named inward node of protocol `p`. */
@@ -259,6 +307,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(
     using loc: SourceLocation
   ): (DownReader[from.protocol.Down], UpReader[to.protocol.Up]) =
+    requireOpen()
     require(
       from.id.module == id && to.id.module == id,
       s"parameter dependency endpoints ${from.id.show} -> ${to.id.show} must both be nodes of ${id.show}"
@@ -299,6 +348,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
 
   /** Declare `computeProtocolParam` and `combine` (doc @sec-two-layer-params); exactly once per module. */
   def parameters[PP](compute: EdgeView => Either[CapabilityViolation, PP])(combine: PP => FP): Unit =
+    requireOpen()
     require(params.isEmpty, s"parameters of ${id.show} already set")
     params += ((compute, pp => combine(pp.asInstanceOf[PP])))
 
