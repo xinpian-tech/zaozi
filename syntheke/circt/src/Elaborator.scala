@@ -100,7 +100,7 @@ object Elaborator:
   def elaborate(
     resolved:  ResolvedDesign,
     backends:  Seq[GeneratorBackend],
-    testbench: Option[TestbenchBackend] = None,
+    testbench: Option[GeneratorBackend] = None,
     mlirbcDir: os.Path = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
   ): ElaboratedDesign =
     val backendOf: Map[GeneratorEntry[?], GeneratorBackend] = backends.map(b => (b.entry: GeneratorEntry[?]) -> b).toMap
@@ -135,6 +135,73 @@ object Elaborator:
         val unknownLoc = summon[LocationApi].locationUnknownGet
 
         def translate(t: ProtocolInterface): MlirType = Translate.tpe(t)
+
+        def typeText(t: MlirType): String =
+          val sb = new StringBuilder
+          t.print(sb ++= _)
+          sb.result()
+
+        /** First path where the two types diverge, with the local shapes; None when equivalent. */
+        def firstDiff(exp: MlirType, act: MlirType, path: String): Option[String] =
+          if exp.isEquivalentTo(act, true) then None
+          else if exp.isBundle && act.isBundle then
+            val (ne, na) = (exp.getBundleNumFields.toInt, act.getBundleNumFields.toInt)
+            if ne != na then Some(s"$path: $ne fields expected, generator has $na")
+            else
+              (0 until ne).view.flatMap { i =>
+                val (fe, fa) = (exp.getBundleFieldByIndex(i), act.getBundleFieldByIndex(i))
+                if fe.getName != fa.getName then Some(s"$path: field $i is '${fa.getName}', expected '${fe.getName}'")
+                else if fe.getIsFlip != fa.getIsFlip then
+                  Some(s"$path.${fe.getName}: flip is ${fa.getIsFlip}, expected ${fe.getIsFlip}")
+                else firstDiff(fe.getType, fa.getType, s"$path.${fe.getName}")
+              }.headOption
+                .orElse(Some(s"$path: ${typeText(exp)} vs ${typeText(act)}"))
+          else if exp.isVector && act.isVector then
+            if exp.getVectorElementNum != act.getVectorElementNum then
+              Some(
+                s"$path: Vec[${exp.getVectorElementNum}] expected, generator has Vec[${act.getVectorElementNum}]"
+              )
+            else firstDiff(exp.getVectorElementType, act.getVectorElementType, s"$path[]")
+          else Some(s"$path: expected ${typeText(exp)}, generator has ${typeText(act)}")
+
+        /** The single binding checkpoint (@dec-binding-check), shared by generator children and the testbench harness.
+          * Everything the settled design promises about an enacted instance's ports is verified here, and only here:
+          * presence, root direction, and exact interface structure (with the first divergence path on mismatch); ports
+          * the instance declares beyond the promise are rejected too. Returns the port values by name.
+          */
+        def checkedPorts(
+          instOp:   Operation,
+          expected: Vector[(String, Boolean, ProtocolInterface)], // name, is output, settled interface
+          subject:  String,
+          at:       String
+        ): Map[String, Value] =
+          val names  = instOp.getInherentAttributeByName("portNames")
+          val byName = Seq
+            .tabulate(names.arrayAttrGetNumElements)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
+            .toMap
+          val dirs   = instOp.getInherentAttributeByName("portDirections")
+          expected.foreach { (name, expectOutput, interface) =>
+            byName.get(name) match
+              case None    =>
+                fail(s"port mismatch at $subject#$name: declared endpoint has no matching generator port, at $at")
+              case Some(i) =>
+                val actualOutput = dirs.denseBoolArrayGetElement(i)
+                if actualOutput != expectOutput then
+                  fail(
+                    s"port mismatch at $subject#$name: port direction is ${
+                        if actualOutput then "output" else "input"
+                      }, expected ${if expectOutput then "output" else "input"}, at $at"
+                  )
+                firstDiff(translate(interface), instOp.getResult(i).getType, name).foreach { diff =>
+                  fail(
+                    s"port mismatch at $subject#$name: port type differs from the settled interface at $diff, at $at"
+                  )
+                }
+          }
+          (byName.keySet -- expected.map(_._1)).toVector.sorted.foreach { extra =>
+            fail(s"port mismatch at $subject#$extra: generator port has no corresponding declared endpoint, at $at")
+          }
+          byName.map((n, i) => n -> instOp.getResult(i))
 
         def leafPaths(t: LayerTree, prefix: Vector[String] = Vector.empty): Vector[Vector[String]] =
           if t.children.isEmpty then (if prefix.isEmpty then Vector.empty else Vector(prefix))
@@ -192,95 +259,23 @@ object Elaborator:
             )
             given Block    = module.block
 
-            def typeText(t: MlirType): String =
-              val sb = new StringBuilder
-              t.print(sb ++= _)
-              sb.result()
-
-            /** First path where the two types diverge, with the local shapes; None when equivalent. */
-            def firstDiff(exp: MlirType, act: MlirType, path: String): Option[String] =
-              if exp.isEquivalentTo(act, true) then None
-              else if exp.isBundle && act.isBundle then
-                val (ne, na) = (exp.getBundleNumFields.toInt, act.getBundleNumFields.toInt)
-                if ne != na then Some(s"$path: $ne fields expected, generator has $na")
-                else
-                  (0 until ne).view.flatMap { i =>
-                    val (fe, fa) = (exp.getBundleFieldByIndex(i), act.getBundleFieldByIndex(i))
-                    if fe.getName != fa.getName then
-                      Some(s"$path: field $i is '${fa.getName}', expected '${fe.getName}'")
-                    else if fe.getIsFlip != fa.getIsFlip then
-                      Some(s"$path.${fe.getName}: flip is ${fa.getIsFlip}, expected ${fe.getIsFlip}")
-                    else firstDiff(fe.getType, fa.getType, s"$path.${fe.getName}")
-                  }.headOption
-                    .orElse(Some(s"$path: ${typeText(exp)} vs ${typeText(act)}"))
-              else if exp.isVector && act.isVector then
-                if exp.getVectorElementNum != act.getVectorElementNum then
-                  Some(
-                    s"$path: Vec[${exp.getVectorElementNum}] expected, generator has Vec[${act.getVectorElementNum}]"
-                  )
-                else firstDiff(exp.getVectorElementType, act.getVectorElementType, s"$path[]")
-              else Some(s"$path: expected ${typeText(exp)}, generator has ${typeText(act)}")
-
             /** Emit one child instance; returns its port values. */
             def emitChild(c: String): Vector[((String, String), Value)] =
               val childId = id / c
               spec.modules(childId) match
                 case gm: GeneratorModuleSpec =>
-                  val rgm    = resolved.generatorModule(childId).get
-                  val instOp = backendOf(gm.entry).instantiate(rgm.fullParam, c, gm.loc)
-                  val names  = instOp.getInherentAttributeByName("portNames")
-                  val byName = Seq
-                    .tabulate(names.arrayAttrGetNumElements)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
-                    .toMap
-
-                  // The single binding checkpoint (@dec-binding-check). Everything the settled design promises about
-                  // this generator's ports is verified here, and only here: presence, root direction, and exact
-                  // interface structure (with the first divergence path on mismatch); ports the generator declares
-                  // beyond the settled design are rejected too.
-                  val dirs = instOp.getInherentAttributeByName("portDirections")
-                  def checkPort(name: String, expectOutput: Boolean, expectedInterface: ProtocolInterface): Unit =
-                    byName.get(name) match
-                      case None    =>
-                        fail(
-                          s"port mismatch at ${childId.show}#$name: declared endpoint has no matching generator port, " +
-                            s"at ${gm.loc.show}"
-                        )
-                      case Some(i) =>
-                        val actualOutput = dirs.denseBoolArrayGetElement(i)
-                        if actualOutput != expectOutput then
-                          fail(
-                            s"port mismatch at ${childId.show}#$name: port direction is ${
-                                if actualOutput then "output" else "input"
-                              }, expected ${if expectOutput then "output" else "input"}, at ${gm.loc.show}"
-                          )
-                        firstDiff(translate(expectedInterface), instOp.getResult(i).getType, name).foreach { diff =>
-                          fail(
-                            s"port mismatch at ${childId.show}#$name: port type differs from the settled interface " +
-                              s"at $diff, at ${gm.loc.show}"
-                          )
-                        }
-
-                  rgm.view.nodes.foreach { nv =>
-                    checkPort(nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
-                  }
-                  // Probe sources expose one pure-probe port per signal leaf (probes never form aggregates in
-                  // hardware).
-                  def sourceLeafPorts(s: DVSourceSpec): Vector[(String, ProtocolInterface)] =
+                  val rgm      = resolved.generatorModule(childId).get
+                  val instOp   = backendOf(gm.entry).instantiate(rgm.fullParam, c, gm.loc)
+                  // Expected ports: one bundle per design node, and one pure-probe port per signal leaf of every
+                  // probe source (probes never form aggregates in hardware).
+                  val expected = rgm.view.nodes.map { nv =>
+                    (nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
+                  } ++ gm.dvSources.flatMap { s =>
                     ProtocolBundle.leaves(s.interface).map { (path, leaf) =>
-                      PortName(s.name +: path.nameSegments).encoded -> leaf
+                      (PortName(s.name +: path.nameSegments).encoded, true, leaf)
                     }
-                  gm.dvSources.foreach {
-                    sourceLeafPorts(_).foreach((name, leaf) => checkPort(name, true, leaf))
                   }
-                  val declared = rgm.view.nodes.map(_.node.name).toSet ++
-                    gm.dvSources.flatMap(sourceLeafPorts(_).map(_._1))
-                  (byName.keySet -- declared).toVector.sorted.foreach { extra =>
-                    fail(
-                      s"port mismatch at ${childId.show}#$extra: generator port has no corresponding declared " +
-                        s"endpoint, at ${gm.loc.show}"
-                    )
-                  }
-                  byName.toVector.map((n, i) => ((c, n), instOp.getResult(i)))
+                  checkedPorts(instOp, expected, childId.show, gm.loc.show).toVector.map((n, v) => ((c, n), v))
                 case _:  WrapperModuleSpec   =>
                   val childPorts = resolved.portPlans.filter(_.module == childId).sortBy(_.name.encoded)
                   val fields     = childPorts.map { p =>
@@ -303,8 +298,8 @@ object Elaborator:
 
             val childValues = w.children.flatMap(emitChild).toMap
 
-            // Testbench harness at the root: one instance per layer inside its nested layerblocks. The port contract
-            // (one input per probe leaf, named ProbeLeaf.portName) is checked here like any generator's ports.
+            // Testbench harness at the root: an ordinary generator whose full parameter is the layer's manifest
+            // slice, one instance per layer inside its nested layerblocks, ports checked by the same checkpoint.
             val tbPorts: Map[String, (Block, Value)] =
               if id != ModuleId.root then Map.empty
               else
@@ -319,31 +314,13 @@ object Elaborator:
                   }
                   val instOp = locally {
                     given Block = lb
-                    testbench.get.instantiate(layer, sources, PortName("tb" +: layer.segments).encoded)
+                    testbench.get
+                      .instantiate(TestbenchParam(layer, sources), PortName("tb" +: layer.segments).encoded, w.loc)
                   }
-                  val names  = instOp.getInherentAttributeByName("portNames")
-                  val byName = Seq
-                    .tabulate(names.arrayAttrGetNumElements)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
-                    .toMap
-                  val dirs   = instOp.getInherentAttributeByName("portDirections")
                   val leaves = sources.flatMap(_.leaves)
-                  leaves.foreach { l =>
-                    byName.get(l.portName) match
-                      case None    =>
-                        fail(
-                          s"testbench port mismatch: no port '${l.portName}' for a probe leaf of layer ${layer.show}"
-                        )
-                      case Some(i) =>
-                        if dirs.denseBoolArrayGetElement(i) then
-                          fail(s"testbench port mismatch at '${l.portName}': port is an output, expected input")
-                        firstDiff(translate(l.tpe), instOp.getResult(i).getType, l.portName).foreach { diff =>
-                          fail(s"testbench port mismatch at '${l.portName}': port type differs at $diff")
-                        }
-                  }
-                  (byName.keySet -- leaves.map(_.portName)).toVector.sorted.foreach { extra =>
-                    fail(s"testbench port mismatch: port '$extra' has no corresponding probe leaf")
-                  }
-                  leaves.map(l => l.portName -> (lb, instOp.getResult(byName(l.portName))))
+                  val byName =
+                    checkedPorts(instOp, leaves.map(l => (l.portName, false, l.tpe)), "testbench", w.loc.show)
+                  leaves.map(l => l.portName -> (lb, byName(l.portName)))
                 }.toMap
 
             def baseOf(e: LocalEndpoint): Value = e match

@@ -73,14 +73,19 @@ import java.nio.file.StandardOpenOption.*
 final case class StubPort(name: String, isInput: Boolean, interface: ProtocolInterface) derives ReadWriter
 final case class StubFull(kind: String, ports: Vector[StubPort]) derives ReadWriter
 
-/** A [[GeneratorBackend]] that enacts a [[StubFull]] by building the module with circtlib operations, dumping it as a
-  * per-module `.mlirbc` circuit exactly like the zaozi flow.
+/** A [[GeneratorBackend]] whose module is the [[StubFull]] port list `describe` derives from the full parameter —
+  * interface from parameter, like any generator — built with circtlib operations and dumped as a per-module `.mlirbc`
+  * circuit exactly like the zaozi flow.
   */
-final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) extends GeneratorBackend:
+final class StubBackend[FP](
+  val entry: GeneratorEntry[FP],
+  outDir:    os.Path,
+  describe:  FP => StubFull)
+    extends GeneratorBackend:
   private val dumped = mutable.Set.empty[String]
 
   def moduleName(fullParam: Any): String =
-    GeneratorBackend.canonicalModuleName(entry, fullParam.asInstanceOf[StubFull])
+    GeneratorBackend.canonicalModuleName(entry, fullParam.asInstanceOf[FP])
 
   def instantiate(
     fullParam:    Any,
@@ -91,7 +96,7 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
     Context,
     Block
   ): Operation =
-    val p          = fullParam.asInstanceOf[StubFull]
+    val p          = describe(fullParam.asInstanceOf[FP])
     val name       = moduleName(fullParam)
     val unknownLoc = summon[LocationApi].locationUnknownGet
     val fields     = p.ports.map(sp => Translate.portField(sp.name, sp.isInput, sp.interface))
@@ -168,28 +173,6 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
     instOp.operation.appendToBlock()
     instOp.operation
 
-/** A [[TestbenchBackend]] enacting the manifest contract with a [[StubBackend]] module: one data input per probe leaf,
-  * named by the leaf's port name.
-  */
-final class StubTestbench(entry: GeneratorEntry[StubFull], outDir: os.Path) extends TestbenchBackend:
-  private val inner = StubBackend(entry, outDir)
-
-  def instantiate(
-    layer:        LayerPath,
-    sources:      Vector[ProbeSource],
-    instanceName: String
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Operation =
-    val ports = sources.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))
-    inner.instantiate(
-      StubFull(("tb" +: layer.segments).mkString("_"), ports),
-      instanceName,
-      (summon[sourcecode.File], summon[sourcecode.Line])
-    )
-
 object DvVerilogSpec extends TestSuite:
 
   val outDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
@@ -201,7 +184,22 @@ object DvVerilogSpec extends TestSuite:
   val memEntry  = entry("Mem")
   val vsrcEntry = entry("VSrc")
   val backends: Seq[GeneratorBackend] =
-    Seq(srcEntry, memEntry, vsrcEntry).map(StubBackend(_, outDir))
+    Seq(srcEntry, memEntry, vsrcEntry).map(StubBackend(_, outDir, identity))
+
+  /** The testbench harness is an ordinary generator: its full parameter is the layer's manifest slice, its interface is
+    * one data input per probe leaf, named by the leaf's port name.
+    */
+  val tbEntry = new GeneratorEntry[TestbenchParam]("demo.dv.Tb")
+  def tbBackend: GeneratorBackend =
+    StubBackend(
+      tbEntry,
+      outDir,
+      tp =>
+        StubFull(
+          ("tb" +: tp.layer.segments).mkString("_"),
+          tp.sources.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))
+        )
+    )
 
   val layerCosim = LayerPath(Vector("verification", "cosim"))
 
@@ -278,7 +276,7 @@ object DvVerilogSpec extends TestSuite:
 
     test("a testbench backend consumes the probes at the root inside layerblocks") {
       val resolved = Negotiator.negotiate(buildDesign())
-      val design   = Elaborator.elaborate(resolved, backends, testbench = Some(StubTestbench(entry("Tb"), outDir)))
+      val design   = Elaborator.elaborate(resolved, backends, testbench = Some(tbBackend))
 
       // The harness sits in the layer's layerblock at the root; each leaf is resolved and connected by port name.
       assert(design.firrtl.contains("layerblock"))

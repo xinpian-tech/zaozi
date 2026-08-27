@@ -117,6 +117,15 @@ final case class ProbeSource(
   leaves: Vector[ProbeLeaf])
     derives upickle.default.ReadWriter
 
+/** The full parameter of a testbench harness: the per-layer slice of the probe manifest (doc @sec-dv-testbench). The
+  * harness is an ordinary generator taking this as its parameter — one input port per leaf, named
+  * [[ProbeLeaf.portName]].
+  */
+final case class TestbenchParam(
+  layer:   LayerPath,
+  sources: Vector[ProbeSource])
+    derives upickle.default.ReadWriter
+
 object ProbeSource:
   /** The design's probe manifest, in hierarchy preorder then declaration order. */
   def manifest(spec: DesignSpec): Vector[ProbeSource] =
