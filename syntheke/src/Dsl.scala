@@ -53,7 +53,7 @@ def inward(
   gs:   GeneratorScope[?],
   name: sourcecode.Name,
   loc:  SourceLocation
-): InwardNodeBuilder[p.type] =
+): p.Inward =
   gs.inward(p)(name.value)
 
 def outward(
@@ -63,7 +63,7 @@ def outward(
   gs:   GeneratorScope[?],
   name: sourcecode.Name,
   loc:  SourceLocation
-): OutwardNodeBuilder[p.type] =
+): p.Outward =
   gs.outward(p)(name.value)
 
 def depend(
@@ -84,7 +84,7 @@ def dvSource(
   gs:    GeneratorScope[?],
   name:  sourcecode.Name,
   loc:   SourceLocation
-): DVSourceRef[p.type] =
+): p.Source =
   gs.dvSource(p)(name.value, down, layer)
 
 def dvSink(
@@ -94,7 +94,7 @@ def dvSink(
   gs:   GeneratorScope[?],
   name: sourcecode.Name,
   loc:  SourceLocation
-): DVSinkRef[p.type] =
+): p.Sink =
   gs.dvSink(p)(name.value)
 
 def parameters[PP, FP](

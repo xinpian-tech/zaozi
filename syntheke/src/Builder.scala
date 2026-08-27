@@ -99,7 +99,7 @@ sealed trait NodeBuilder[P <: Protocol]:
     using
     name:   sourcecode.Name,
     loc:    SourceLocation
-  ): RefHandle[target.protocol.type] =
+  ): target.protocol.Ref =
     require(
       target.id.module == id.module,
       s"cross-protocol reference '${name.value}' of ${id.show}: target ${target.id.show} is not a node of this module"
@@ -113,7 +113,7 @@ final class InwardNodeBuilder[P <: Protocol] private[syntheke] (
   private[syntheke] val scope: GeneratorScope[?],
   val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
-  def uFn(f: ReadCtx => Either[PropagationViolation, protocol.Up]): this.type =
+  def uFn(f: ReadCtx => Either[PropagationViolation, protocol.Up]): InwardNodeBuilder[P] =
     scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
@@ -123,7 +123,7 @@ final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
   private[syntheke] val scope: GeneratorScope[?],
   val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
-  def dFn(f: ReadCtx => Either[PropagationViolation, protocol.Down]): this.type =
+  def dFn(f: ReadCtx => Either[PropagationViolation, protocol.Down]): OutwardNodeBuilder[P] =
     scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
@@ -297,7 +297,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(name:      String
   )(
     using loc: SourceLocation
-  ): InwardNodeBuilder[p.type] =
+  ): p.Inward =
     reserveName(name)
     st.registerProtocol(p.id, p)
     val b = new InwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
@@ -310,7 +310,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(name:      String
   )(
     using loc: SourceLocation
-  ): OutwardNodeBuilder[p.type] =
+  ): p.Outward =
     reserveName(name)
     st.registerProtocol(p.id, p)
     val b = new OutwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
@@ -348,7 +348,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(
     using
     loc:   SourceLocation
-  ): DVSourceRef[p.type] =
+  ): p.Source =
     reserveName(name)
     st.registerProtocol(p.id, p)
     dvSrcs += DVSourceSpec(name, p, down, layer, dvSrcs.size + dvSnks.size, loc)
@@ -360,7 +360,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   )(name:      String
   )(
     using loc: SourceLocation
-  ): DVSinkRef[p.type] =
+  ): p.Sink =
     reserveName(name)
     st.registerProtocol(p.id, p)
     dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, loc)

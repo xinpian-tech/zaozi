@@ -44,6 +44,14 @@ trait Protocol:
   type Up
   type Edge
 
+  /** Handle types of this protocol object — `Axi4.Inward` reads naturally where the underlying singleton-typed builder
+    * (`InwardNodeBuilder[Axi4.type]`) would be spelled.
+    */
+  type Node    = NodeBuilder[this.type]
+  type Inward  = InwardNodeBuilder[this.type]
+  type Outward = OutwardNodeBuilder[this.type]
+  type Ref     = RefHandle[this.type]
+
   /** Must have kind [[ProtocolKind.Design]]; checked by the structural pass. */
   def id: ProtocolId
 
@@ -64,6 +72,10 @@ trait Protocol:
 trait DVProtocol:
   type Down
   type Edge
+
+  /** Handle types of this protocol object, mirroring [[Protocol.Inward]] / [[Protocol.Outward]]. */
+  type Source = DVSourceRef[this.type]
+  type Sink   = DVSinkRef[this.type]
 
   /** Must have kind [[ProtocolKind.Verification]]; checked by the structural pass. */
   def id: ProtocolId

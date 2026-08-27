@@ -174,7 +174,7 @@ object AxiVerilogSpec extends TestSuite:
     ZaoziBackend(slaveEntry, SlaveGen, identity[SlaveP])
   )
 
-  def shapeOf(view: EdgeView, n: NodeBuilder[Axi4.type]): AxiShape = AxiShape.of(view.edgeOf(n))
+  def shapeOf(view: EdgeView, n: Axi4.Node): AxiShape = AxiShape.of(view.edgeOf(n))
 
   /** The n×m crossbar as a reusable definition: endpoint class + def binding the entry. */
   final class AxiXbarPorts(
