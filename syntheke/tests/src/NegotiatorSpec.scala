@@ -173,6 +173,45 @@ object NegotiatorSpec extends TestSuite:
       assert(e.getMessage.contains("no width available"))
     }
 
+    test("a read outside the declared dependencies fails at evaluation, naming the node") {
+      // Readers are plain values, so a closure can capture one granted to a sibling; the read context of the
+      // evaluating function holds only its own declared dependencies and rejects the smuggled reader.
+      val spec = Design {
+        val g                 = generator(intEntry("Sneak")) {
+          parametersConst(0)
+          val in      = inward(Wid).uFn(_ => Right(64))
+          val out0    = outward(Wid)
+          val out1    = outward(Wid)
+          val (d0, _) = depend(in, out0)
+          out0.dFn(ctx => Right(ctx(d0)))
+          out1.dFn(ctx => Right(ctx(d0))) // d0 was granted for out0; out1 declared no dependency on in
+          (in, out0, out1)
+        }
+        val (gin, out0, out1) = g
+        val src               = generator(intEntry("SneakSrc")) {
+          parametersConst(0)
+          val out = outward(Wid).dFn(_ => Right(8))
+          out
+        }
+        val c0                = generator(intEntry("SneakC0")) {
+          parametersConst(0)
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
+        }
+        val c1                = generator(intEntry("SneakC1")) {
+          parametersConst(0)
+          val in = inward(Wid).uFn(_ => Right(64))
+          in
+        }
+        gin <-- src
+        c0 <-- out0
+        c1 <-- out1
+      }
+      val e    = intercept[UndeclaredReadException](Negotiator.negotiate(spec))
+      assert(e.getMessage.contains("g#in"))
+      assert(e.getMessage.contains("not a declared dependency"))
+    }
+
     test("a parameter dependency cycle reports exactly the cycle members") {
       // A reusable definition: the endpoint class declares nodes as fields; the def binds the entry and forwards
       // the build context, so the instance name comes from the call-site val.
