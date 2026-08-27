@@ -212,7 +212,12 @@ final case class ResolvedDesign(
   portPlans:        Vector[PortPlan],
   wirePlans:        Vector[WirePlan],
   layerDecls: Map[ModuleId, LayerTree]):
-  def edge(bind:          BindId):   Option[ResolvedEdge]            = edges.find(_.bind == bind)
+  /** The unique settled edge at `node` — every boundary node is bound exactly once. */
+  def edgeAt(node: ModuleNodeId): ResolvedEdge =
+    val found = edges.find(e => e.bind.source == node || e.bind.target == node)
+    require(found.isDefined, s"${node.show} has no settled edge")
+    found.get
+
   def generatorModule(id: ModuleId): Option[ResolvedGeneratorModule] = generatorModules.find(_.module == id)
 
   /** The design's probe sources with their leaves (doc @sec-dv-testbench). */

@@ -56,11 +56,6 @@ object AxiSocSpec extends TestSuite:
       gpio.in <-- periphXbar.output("gpio")
     }
 
-  // ============ helpers ============
-
-  def edgeAt(resolved: ResolvedDesign, target: ModuleNodeId): AxiEdgeParams =
-    resolved.edges.find(_.bind.target == target).get.edgeAs(Axi4)
-
   val root = ModuleId.root
 
   val tests = Tests {
@@ -70,7 +65,7 @@ object AxiSocSpec extends TestSuite:
       assert(resolved.edges.sizeIs == 9)
 
       // DRAM edge: 3 inputs -> 2 prefix bits over max local 3 bits; l2 appends its writeback master.
-      val dram = edgeAt(resolved, ModuleNodeId(root / "mem" / "dram", "in"))
+      val dram = resolved.edgeAt(ModuleNodeId(root / "mem" / "dram", "in")).edgeAs(Axi4)
       assert(dram.idBits == 5, dram.dataBits == 128, dram.addrBits == 32)
       assert(
         dram.master.masters.map(m => m.name -> m.id) == Vector(
@@ -82,16 +77,16 @@ object AxiSocSpec extends TestSuite:
       )
 
       // Address visibility aggregates upward: core0 sees dram + uart + gpio through the xbar.
-      val core0 = edgeAt(resolved, ModuleNodeId(root / "sysXbar", "in0"))
+      val core0 = resolved.edgeAt(ModuleNodeId(root / "sysXbar", "in0")).edgeAs(Axi4)
       assert(core0.slave.slaves.map(_.name) == Vector("dram", "uart", "gpio"))
       assert(core0.dataBits == 128, core0.idBits == 2)
       // Downstream id capacity shrinks by the xbar's prefix: min(dram 6, periph 8) - 2.
       assert(core0.slave.idCapacityBits == 4)
 
       // The low-speed branch narrows behind the bridge: 32-bit data, 29 address bits, ids pass through.
-      val uart = edgeAt(resolved, ModuleNodeId(root / "uart", "in"))
+      val uart = resolved.edgeAt(ModuleNodeId(root / "uart", "in")).edgeAs(Axi4)
       assert(uart.dataBits == 32, uart.addrBits == 29, uart.idBits == 5)
-      val wide = edgeAt(resolved, ModuleNodeId(root / "bridge", "in"))
+      val wide = resolved.edgeAt(ModuleNodeId(root / "bridge", "in")).edgeAs(Axi4)
       assert(wide.dataBits == 128, wide.slave.slaves.map(_.name) == Vector("uart", "gpio"))
     }
 
@@ -116,7 +111,7 @@ object AxiSocSpec extends TestSuite:
 
     test("the settled interface is the five AXI4 channels with correct widths and flips") {
       val resolved         = Negotiator.negotiate(buildSoc())
-      val interface        = resolved.edges.find(_.bind.target == ModuleNodeId(root / "mem" / "dram", "in")).get.interface
+      val interface        = resolved.edgeAt(ModuleNodeId(root / "mem" / "dram", "in")).interface
       assert(interface.fields.map(_.name) == Vector("aw", "w", "b", "ar", "r"))
       assert(
         interface.fields.map(_.tpe.isInstanceOf[ProtocolInterface.Flipped]) == Vector(false, false, true, false, true)

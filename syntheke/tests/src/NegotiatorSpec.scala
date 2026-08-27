@@ -112,8 +112,9 @@ object NegotiatorSpec extends TestSuite:
       assert(xbar.encodedFullParam == ujson.Num(32 + 24 + 32 + 32))
 
       // Up values propagate back: prod sees min over reachable capacities on in0's reachable outputs.
-      val prodEdge = resolved.edge(resolved.edges.head.bind).get
+      val prodEdge = resolved.edgeAt(ModuleNodeId(ModuleId.root / "prod", "out"))
       assert(prodEdge.upAs(Wid) == 64)
+      intercept[IllegalArgumentException](resolved.edgeAt(ModuleNodeId(ModuleId.root / "prod", "nope")))
     }
 
     test("cross-hierarchy edge plans an Input dangle port on the intermediate wrapper") {
