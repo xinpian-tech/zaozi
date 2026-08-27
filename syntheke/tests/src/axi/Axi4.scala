@@ -10,8 +10,8 @@ import upickle.default.ReadWriter
   *   - `Down` is the master port: masters with disjoint id ranges (AXI4MasterPortParameters);
   *   - `Up` is the slave port: slaves with disjoint address ranges, the bus `beatBytes`, and the id capacity the
   *     downstream can absorb (AXI4SlavePortParameters);
-  *   - `Edge` settles to bundle parameters: `addrBits = log2Up(maxAddress + 1)`, `dataBits = beatBytes * 8`,
-  *     `idBits = log2Up(endId)` (AXI4BundleParameters).
+  *   - `Edge` settles to bundle parameters: `addrBits = log2Up(maxAddress)` where `maxAddress` is the exclusive end,
+  *     `dataBits = beatBytes * 8`, `idBits = log2Up(endId)` (AXI4BundleParameters).
   *
   * Everything is plain serializable data; upickle codecs come from `derives ReadWriter`.
   */
