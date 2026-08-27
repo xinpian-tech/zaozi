@@ -136,7 +136,7 @@ final case class PortPlan(
   name:      PortName,
   interface: ProtocolInterface,
   origin:    PlanOrigin,
-  loc:       SourceLocation)
+  loc:       (sourcecode.File, sourcecode.Line))
 
 /** A local endpoint of a planned wire, inside one wrapper module. */
 enum LocalEndpoint derives CanEqual:
@@ -152,7 +152,7 @@ final case class WirePlan(
   from:   LocalEndpoint,
   to:     LocalEndpoint,
   origin: PlanOrigin,
-  loc:    SourceLocation)
+  loc:    (sourcecode.File, sourcecode.Line))
 
 /** FIRRTL layer declarations as a prefix tree (doc @sec-layers). */
 final case class LayerTree(children: Map[String, LayerTree]):

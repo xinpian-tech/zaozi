@@ -23,7 +23,7 @@ branch `init`, `doc/design/`, Chinese). Correspondence:
 | 稳定标识 (`ModuleId`, `ModuleNodeId`, `BindId`, …) | `Ids.scala` |
 | 协议接口 (`ProtocolBundle`, `InterfacePath`, `LayerPath`) | `Interface.scala` |
 | 协议对象 (`Protocol`, `DVProtocol`, upickle 序列化) | `Protocol.scala` |
-| 构建阶段 (`DesignSpec`, 模块与节点规格) | `Spec.scala`, `Builder.scala`, `Dsl.scala` |
+| 构建阶段（用户 API 门面 / 作用域机制 / 冻结的 `DesignSpec`） | `Dsl.scala`, `Builder.scala`, `Spec.scala` |
 | 协商算法（结构校验、稳定拓扑序、双向传播、逐边求解、`EdgeView`、遇错即抛） | `Negotiator.scala` |
 | 跨层端口规划、端口命名、FIRRTL 层 | `Planner.scala` |
 | 已求解记录 (`ResolvedDesign`, `ResolvedEdge`, `EdgeView`, …) | `Resolved.scala` |
@@ -79,7 +79,7 @@ final class CorePorts(name: String, idBits: Int)(using GeneratorScope[CoreFull])
   parametersConst(CoreFull(name, idBits))
   val mem = outward(Axi4).dFn(...)
 
-def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, loc: SourceLocation): CorePorts =
+def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line): CorePorts =
   generator(coreEntry)(new CorePorts(name.value, idBits))
 
 // in any design:

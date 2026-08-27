@@ -4,38 +4,17 @@ package me.jiuyang.syntheke
 
 import scala.collection.mutable
 
-/** The Build phase (doc @sec-build).
+/** The mechanism behind the authoring surface in `Dsl.scala` (doc @sec-build).
   *
-  * `Design { ... }` opens the root wrapper scope; wrapper scopes instantiate child modules and record binds; generator
-  * scopes declare nodes, module-internal parameter dependencies and verification endpoints. When the design body
-  * returns, the builder freezes into an immutable [[DesignSpec]].
+  * [[Design]] opens the root wrapper scope over a fresh [[BuildState]]; wrapper scopes instantiate child modules and
+  * record binds; generator scopes record nodes, module-internal parameter dependencies, verification endpoints and the
+  * parameter computation. When a body returns its scope freezes into the module's spec, and when the design body
+  * returns the state freezes into the immutable [[DesignSpec]].
   *
   * Declaration-site contracts are enforced on the spot with `require` — duplicate names, foreign-module targets and
   * double registration fail at the offending line. What the type system already guarantees (bind ends share one
   * protocol object, dependency endpoints have the right directions) is checked nowhere else.
-  *
-  * The bind operator is written `target <-- source` (`<-` itself is reserved by Scala).
   */
-object Design:
-  def apply(
-    body:      WrapperScope ?=> Unit
-  )(
-    using loc: SourceLocation
-  ): DesignSpec =
-    val st    = new BuildState
-    val scope = new WrapperScope(ModuleId.root, st)
-    st.moduleOrder += ModuleId.root
-    body(
-      using scope
-    )
-    scope.close(loc)
-    DesignSpec(
-      modules = st.modules.toMap,
-      moduleOrder = st.moduleOrder.toVector,
-      binds = st.binds.toVector,
-      dvBinds = st.dvBinds.toVector,
-      generators = st.generators.toVector
-    )
 
 /** Recording state of one `Design` build; append-only, frozen into the [[DesignSpec]] when the body returns. */
 private final class BuildState:
@@ -58,145 +37,8 @@ private final class BuildState:
   def registerGenerator(e: GeneratorEntry[?]): Unit =
     if !generators.exists(_ eq e) then generators += e
 
-/** Read handles produced by a dependency declaration; the only way a port parameter function reads a peer node. */
-final class DownReader[T] private[syntheke] (private[syntheke] val node: ModuleNodeId)
-final class UpReader[T] private[syntheke] (private[syntheke] val node: ModuleNodeId)
-
 private[syntheke] final class UndeclaredReadException(val node: ModuleNodeId)
     extends RuntimeException(s"read of ${node.show} which is not a declared dependency of this function")
-
-/** Values visible to one port parameter function evaluation. */
-final class ReadCtx private[syntheke] (values: Map[ModuleNodeId, Any]):
-  def apply[T](r: DownReader[T]): T =
-    values.getOrElse(r.node, throw new UndeclaredReadException(r.node)).asInstanceOf[T]
-  def apply[T](r: UpReader[T]):   T =
-    values.getOrElse(r.node, throw new UndeclaredReadException(r.node)).asInstanceOf[T]
-
-/** Handle of a declared cross-protocol reference: reads the target node's settled edge from the [[EdgeView]], typed by
-  * the target's protocol (doc @sec-settle-pp).
-  */
-final class RefHandle[P <: Protocol] private[syntheke] (
-  val protocol:                   P,
-  private[syntheke] val referrer: ModuleNodeId,
-  private[syntheke] val refName:  String)
-
-sealed trait NodeBuilder[P <: Protocol]:
-  val protocol: P
-  def id:                      ModuleNodeId
-  private[syntheke] def scope: GeneratorScope[?]
-
-  /** Declare a cross-protocol reference to another node of the same module (clock / power domain), named by the binding
-    * val. The target's protocol is the expected protocol by construction; foreign-module targets are rejected here. The
-    * returned handle is the only way to read the reference back.
-    */
-  def ref(
-    target: NodeBuilder[?]
-  )(
-    using
-    name:   sourcecode.Name,
-    loc:    SourceLocation
-  ): target.protocol.Ref =
-    require(
-      target.id.module == id.module,
-      s"cross-protocol reference '${name.value}' of ${id.show}: target ${target.id.show} is not a node of this module"
-    )
-    scope.recordRef(id.name, CrossProtocolRefSpec(name.value, target.id, loc))
-    new RefHandle[target.protocol.type](target.protocol, id, name.value)
-
-/** An inward node under declaration; `uFn` must be attached exactly once before the scope closes. */
-final class InwardNodeBuilder[P <: Protocol] private[syntheke] (
-  val protocol:                P,
-  private[syntheke] val scope: GeneratorScope[?],
-  val id:                      ModuleNodeId)
-    extends NodeBuilder[P]:
-  def uFn(f: ReadCtx => Either[Violation, protocol.Up]): InwardNodeBuilder[P] =
-    scope.recordFn(id.name, values => f(new ReadCtx(values)))
-    this
-
-/** An outward node under declaration; `dFn` must be attached exactly once before the scope closes. */
-final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
-  val protocol:                P,
-  private[syntheke] val scope: GeneratorScope[?],
-  val id:                      ModuleNodeId)
-    extends NodeBuilder[P]:
-  def dFn(f: ReadCtx => Either[Violation, protocol.Down]): OutwardNodeBuilder[P] =
-    scope.recordFn(id.name, values => f(new ReadCtx(values)))
-    this
-
-/** Verification endpoint handles. */
-final class DVSourceRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSourceId)
-final class DVSinkRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSinkId)
-
-/** Base for classes whose fields are a module body's endpoints: each `val x = inward(...)` field declares, names and
-  * exposes a node in one line, and the instance itself is the body's returned container. Plain classes have no Mirror,
-  * so the fields are not machine-checked — extending this trait is the author's declaration that they are endpoints.
-  * The one harmful thing a field could hold, the scope itself, is inert anyway: declarations outside the open scope
-  * fail on the spot.
-  */
-trait Endpoints
-
-/** What a module body may return: its dangling endpoints — node builders and verification endpoint handles — plus
-  * `Unit`, `Option` / `Vector` / `Seq` of them, products (tuples, case classes) whose fields all qualify, and
-  * [[Endpoints]] classes. This is the only channel out of a module body, so nothing else (readers, scopes, arbitrary
-  * values) can escape it.
-  */
-sealed trait Dangles[A]
-
-object Dangles:
-  private val evidence = new Dangles[Any] {}
-  private def of[A]: Dangles[A] = evidence.asInstanceOf[Dangles[A]]
-
-  given unit:                      Dangles[Unit]                  = of
-  given inward[P <: Protocol]:     Dangles[InwardNodeBuilder[P]]  = of
-  given outward[P <: Protocol]:    Dangles[OutwardNodeBuilder[P]] = of
-  given dvSource[P <: DVProtocol]: Dangles[DVSourceRef[P]]        = of
-  given dvSink[P <: DVProtocol]:   Dangles[DVSinkRef[P]]          = of
-  given endpoints[E <: Endpoints]: Dangles[E]                     = of
-  given option[A](
-    using Dangles[A]
-  ): Dangles[Option[A]] = of
-  given vector[A](
-    using Dangles[A]
-  ): Dangles[Vector[A]] = of
-  given seq[A](
-    using Dangles[A]
-  ): Dangles[Seq[A]] = of
-
-  inline given product[A <: Product](
-    using m: scala.deriving.Mirror.ProductOf[A]
-  ): Dangles[A] =
-    allDangles[m.MirroredElemTypes]
-    of
-
-  private inline def allDangles[T <: Tuple]: Unit =
-    import scala.compiletime.{erasedValue, summonInline}
-    inline erasedValue[T] match
-      case _: EmptyTuple => ()
-      case _: (h *: t)   =>
-        summonInline[Dangles[h]]
-        allDangles[t]
-
-/** Design bind: `target <-- source`, recorded in the enclosing wrapper scope. The shared type parameter guarantees one
-  * protocol object on both ends.
-  */
-extension [P <: Protocol](target: InwardNodeBuilder[P])
-  infix def <--(
-    source:   OutwardNodeBuilder[P]
-  )(
-    using ws: WrapperScope,
-    loc:      SourceLocation
-  ): Unit =
-    ws.recordBind(source.id, target.id, loc)
-
-/** Verification bind: `sink <-- source`. */
-extension [P <: DVProtocol](sink: DVSinkRef[P])
-  infix def <--(
-    source:   DVSourceRef[P]
-  )(
-    using ws: WrapperScope,
-    loc:      SourceLocation
-  ): Unit =
-    ws.recordDVBind(source.id, sink.id, loc)
 
 /** A structural module under construction. */
 final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
@@ -213,17 +55,19 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
 
   /** Instantiate a child wrapper module; returns the body's dangling endpoints. */
   def wrapper[A: Dangles](
-    name:      String
-  )(body:      WrapperScope ?=> A
+    name: String
+  )(body: WrapperScope ?=> A
   )(
-    using loc: SourceLocation
+    using
+    file: sourcecode.File,
+    line: sourcecode.Line
   ): A =
     val childId = addChild(name)
     val scope   = new WrapperScope(childId, st)
     val result  = body(
       using scope
     )
-    scope.close(loc)
+    scope.close((file, line))
     result
 
   /** Instantiate a child generator module bound to a registry entry; returns the body's dangling endpoints. */
@@ -233,7 +77,8 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
   )(body:  GeneratorScope[FP] ?=> A
   )(
     using
-    loc:   SourceLocation
+    file:  sourcecode.File,
+    line:  sourcecode.Line
   ): A =
     val childId = addChild(name)
     st.registerGenerator(entry)
@@ -243,22 +88,28 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
       using scope
     )
     st.openLeaves.dropRightInPlace(1)
-    scope.close(loc)
+    scope.close((file, line))
     result
 
-  private[syntheke] def recordBind(source: ModuleNodeId, target: ModuleNodeId, loc: SourceLocation): Unit =
+  private[syntheke] def recordBind(
+    source: ModuleNodeId,
+    target: ModuleNodeId,
+    loc:    (sourcecode.File, sourcecode.Line)
+  ): Unit =
     st.requireNotInLeaf(s"bind ${source.show} -> ${target.show}")
     st.binds += BindDecl(st.binds.size, source, target, id, loc)
-  private[syntheke] def recordDVBind(source: DVSourceId, sink: DVSinkId, loc: SourceLocation):       Unit =
+
+  private[syntheke] def recordDVBind(source: DVSourceId, sink: DVSinkId, loc: (sourcecode.File, sourcecode.Line))
+    : Unit =
     st.requireNotInLeaf(s"verification bind ${source.show} -> ${sink.show}")
     st.dvBinds += DVBindDecl(st.dvBinds.size, source, sink, id, loc)
 
-  private[syntheke] def close(loc: SourceLocation): Unit =
+  private[syntheke] def close(loc: (sourcecode.File, sourcecode.Line)): Unit =
     st.modules(id) = WrapperModuleSpec(id, children.toVector, loc)
 
 /** A generator module under construction: nodes, dependencies, verification endpoints and parameter functions. */
 final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP]):
-  private val nodes  = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, SourceLocation)]
+  private val nodes  = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, (sourcecode.File, sourcecode.Line))]
   private val fns    = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[Violation, Any]]
   private val refs   = mutable.ArrayBuffer.empty[(String, CrossProtocolRefSpec)]
   private val deps   = mutable.ArrayBuffer.empty[ParamDependencySpec]
@@ -289,26 +140,30 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
 
   /** Declare a named inward node of protocol `p`. */
   def inward(
-    p:         Protocol
-  )(name:      String
+    p:    Protocol
+  )(name: String
   )(
-    using loc: SourceLocation
+    using
+    file: sourcecode.File,
+    line: sourcecode.Line
   ): p.Inward =
     reserveName(name)
     val b = new InwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
-    nodes += ((b, NodeDirection.Inward, loc))
+    nodes += ((b, NodeDirection.Inward, (file, line)))
     b
 
   /** Declare a named outward node of protocol `p`. */
   def outward(
-    p:         Protocol
-  )(name:      String
+    p:    Protocol
+  )(name: String
   )(
-    using loc: SourceLocation
+    using
+    file: sourcecode.File,
+    line: sourcecode.Line
   ): p.Outward =
     reserveName(name)
     val b = new OutwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
-    nodes += ((b, NodeDirection.Outward, loc))
+    nodes += ((b, NodeDirection.Outward, (file, line)))
     b
 
   /** Declare one module-internal parameter dependency and receive the two read handles it grants: the outward node's
@@ -316,10 +171,12 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     * Both endpoints must be nodes of this module; a pair declares at most once.
     */
   def depend(
-    from:      InwardNodeBuilder[?],
-    to:        OutwardNodeBuilder[?]
+    from: InwardNodeBuilder[?],
+    to:   OutwardNodeBuilder[?]
   )(
-    using loc: SourceLocation
+    using
+    file: sourcecode.File,
+    line: sourcecode.Line
   ): (DownReader[from.protocol.Down], UpReader[to.protocol.Up]) =
     requireOpen()
     require(
@@ -330,7 +187,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
       !deps.exists(d => d.from == from.id.name && d.to == to.id.name),
       s"duplicate parameter dependency ${from.id.show} -> ${to.id.show}"
     )
-    deps += ParamDependencySpec(from.id.name, to.id.name, deps.size, loc)
+    deps += ParamDependencySpec(from.id.name, to.id.name, deps.size, (file, line))
     (new DownReader[from.protocol.Down](from.id), new UpReader[to.protocol.Up](to.id))
 
   /** Declare a probe source providing its verification `Down` and FIRRTL layer path. */
@@ -341,21 +198,24 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     layer: LayerPath
   )(
     using
-    loc:   SourceLocation
+    file:  sourcecode.File,
+    line:  sourcecode.Line
   ): p.Source =
     reserveName(name)
-    dvSrcs += DVSourceSpec(name, p, down, layer, dvSrcs.size + dvSnks.size, loc)
+    dvSrcs += DVSourceSpec(name, p, down, layer, dvSrcs.size + dvSnks.size, (file, line))
     new DVSourceRef[p.type](p, DVSourceId(id, name))
 
   /** Declare a probe sink on a verification generator module. */
   def dvSink(
-    p:         DVProtocol
-  )(name:      String
+    p:    DVProtocol
+  )(name: String
   )(
-    using loc: SourceLocation
+    using
+    file: sourcecode.File,
+    line: sourcecode.Line
   ): p.Sink =
     reserveName(name)
-    dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, loc)
+    dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, (file, line))
     new DVSinkRef[p.type](p, DVSinkId(id, name))
 
   /** Declare the full-parameter computation (doc @sec-two-layer-params): the negotiated `EdgeView` plus the user
@@ -369,7 +229,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   /** A generator whose full parameter ignores the negotiation result entirely. */
   def parametersConst(fp: FP): Unit = parameters(_ => Right(fp))
 
-  private[syntheke] def close(loc: SourceLocation): Unit =
+  private[syntheke] def close(loc: (sourcecode.File, sourcecode.Line)): Unit =
     val nodeSpecs = nodes.toVector.zipWithIndex.map { case ((b, direction, declLoc), order) =>
       val fn = fns.getOrElse(
         b.id.name,

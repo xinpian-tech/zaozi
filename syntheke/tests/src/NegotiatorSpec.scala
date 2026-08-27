@@ -186,7 +186,8 @@ object NegotiatorSpec extends TestSuite:
         using
         ws:   WrapperScope,
         name: sourcecode.Name,
-        loc:  SourceLocation
+        file: sourcecode.File,
+        line: sourcecode.Line
       ) =
         generator(intEntry(name.value.capitalize))(new LoopbackPorts)
       val spec = Design {

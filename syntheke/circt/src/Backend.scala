@@ -32,7 +32,7 @@ trait GeneratorBackend:
   def instantiate(
     fullParam:    Any,
     instanceName: String,
-    loc:          SourceLocation
+    loc:          (sourcecode.File, sourcecode.Line)
   )(
     using Arena,
     Context,
@@ -115,14 +115,14 @@ final class ZaoziBackend[
   def instantiate(
     fullParam:    Any,
     instanceName: String,
-    loc:          SourceLocation
+    loc:          (sourcecode.File, sourcecode.Line)
   )(
     using Arena,
     Context,
     Block
   ): Operation =
-    given sourcecode.File         = sourcecode.File(loc.file)
-    given sourcecode.Line         = sourcecode.Line(loc.line)
+    given sourcecode.File         = loc._1
+    given sourcecode.Line         = loc._2
     given sourcecode.Name.Machine = sourcecode.Name.Machine(instanceName)
     given InstanceContext         = new InstanceContext
     delegate(moduleName(fullParam)).instantiate(param(fullParam)).operation

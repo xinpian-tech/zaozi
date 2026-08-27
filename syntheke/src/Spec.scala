@@ -5,7 +5,7 @@ package me.jiuyang.syntheke
 /** The frozen design specification produced by the Build phase (doc @sec-build).
   *
   * Parameter values and port parameter functions are stored untyped ([[Any]]) at this layer; the typed façade lives in
-  * [[DesignBuilder]] and the protocol objects guard every crossing.
+  * `Dsl.scala` and the protocol objects guard every crossing.
   */
 
 enum NodeDirection derives CanEqual:
@@ -17,7 +17,7 @@ enum NodeDirection derives CanEqual:
 final case class CrossProtocolRefSpec(
   refName: String,
   target:  ModuleNodeId,
-  loc:     SourceLocation)
+  loc:     (sourcecode.File, sourcecode.Line))
 
 /** One named inward or outward node of a generator module (doc @sec-node-conn-proto).
   *
@@ -32,14 +32,14 @@ final case class NodeSpec(
   fn:        Map[ModuleNodeId, Any] => Either[Violation, Any],
   refs:      Vector[CrossProtocolRefSpec],
   order:     Int,
-  loc:       SourceLocation)
+  loc:       (sourcecode.File, sourcecode.Line))
 
 /** A module-internal parameter dependency from an inward node to an outward node of the same module. */
 final case class ParamDependencySpec(
   from:  String, // inward node name
   to:    String, // outward node name
   order: Int,
-  loc:   SourceLocation)
+  loc:   (sourcecode.File, sourcecode.Line))
 
 /** A probe source declaration: provides the verification `Down` and a FIRRTL layer path. */
 final case class DVSourceSpec(
@@ -48,34 +48,24 @@ final case class DVSourceSpec(
   down:     Any,
   layer:    LayerPath,
   order:    Int,
-  loc:      SourceLocation)
+  loc:      (sourcecode.File, sourcecode.Line))
 
 /** A probe sink declaration on a verification generator module. */
 final case class DVSinkSpec(
   name:     String,
   protocol: DVProtocol,
   order:    Int,
-  loc:      SourceLocation)
-
-/** Registry entry: generator identity plus its FullParam serialization (doc @sec-generator-records).
-  *
-  * The zaozi generator implementation itself lives beyond the serialization boundary and is bound in the elaboration
-  * module; within Build / Negotiate the entry is the identity and serialization carrier.
-  */
-final class GeneratorEntry[FP](
-  val name:              String
-)(
-  using val fullParamRW: upickle.default.ReadWriter[FP])
+  loc:      (sourcecode.File, sourcecode.Line))
 
 sealed trait ModuleSpec:
   def id:  ModuleId
-  def loc: SourceLocation
+  def loc: (sourcecode.File, sourcecode.Line)
 
 /** A structural module: composes children and declares binds; its circuit is emitted by the framework. */
 final case class WrapperModuleSpec(
   id:       ModuleId,
   children: Vector[String], // instance names in declaration order
-  loc:      SourceLocation)
+  loc:      (sourcecode.File, sourcecode.Line))
     extends ModuleSpec
 
 /** A generator module: leaf of the hierarchy tree, bound to exactly one generator. */
@@ -87,7 +77,7 @@ final case class GeneratorModuleSpec(
   dvSources:        Vector[DVSourceSpec],
   dvSinks:          Vector[DVSinkSpec],
   computeFullParam: EdgeView => Either[Violation, Any], // user params captured in the closure
-  loc:              SourceLocation)
+  loc:              (sourcecode.File, sourcecode.Line))
     extends ModuleSpec:
   def node(name: String): Option[NodeSpec] = nodes.find(_.name == name)
 
@@ -97,7 +87,7 @@ final case class BindDecl(
   source:     ModuleNodeId,
   target:     ModuleNodeId,
   declaredIn: ModuleId,
-  loc: SourceLocation):
+  loc: (sourcecode.File, sourcecode.Line)):
   def bindId: BindId = BindId(order, source, target)
 
 /** A verification bind declaration `sink <-- source`. */
@@ -106,7 +96,7 @@ final case class DVBindDecl(
   source:     DVSourceId,
   sink:       DVSinkId,
   declaredIn: ModuleId,
-  loc: SourceLocation):
+  loc: (sourcecode.File, sourcecode.Line)):
   def bindId: DVBindId = DVBindId(sink, source)
 
 /** The immutable output of the Build phase. */

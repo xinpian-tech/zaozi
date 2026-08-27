@@ -86,7 +86,7 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
   def instantiate(
     fullParam:    Any,
     instanceName: String,
-    loc:          SourceLocation
+    loc:          (sourcecode.File, sourcecode.Line)
   )(
     using Arena,
     Context,

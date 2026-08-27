@@ -221,7 +221,8 @@ object AxiVerilogSpec extends TestSuite:
     using
     ws:          WrapperScope,
     name:        sourcecode.Name,
-    loc:         SourceLocation
+    file:        sourcecode.File,
+    line:        sourcecode.Line
   ): AxiXbarPorts =
     generator(xbarEntry)(new AxiXbarPorts(name.value, ins, outs, arbitration))
 
@@ -243,7 +244,8 @@ object AxiVerilogSpec extends TestSuite:
     using
     ws:        WrapperScope,
     name:      sourcecode.Name,
-    loc:       SourceLocation
+    file:      sourcecode.File,
+    line:      sourcecode.Line
   ): CorePorts =
     generator(coreEntry)(new CorePorts(name.value, idBits, maxFlight))
 
@@ -284,7 +286,8 @@ object AxiVerilogSpec extends TestSuite:
     using
     ws:             WrapperScope,
     name:           sourcecode.Name,
-    loc:            SourceLocation
+    file:           sourcecode.File,
+    line:           sourcecode.Line
   ): MmioSlavePorts =
     generator(slaveEntry)(new MmioSlavePorts(name.value, base, size, idCapacityBits))
 

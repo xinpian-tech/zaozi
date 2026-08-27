@@ -39,7 +39,7 @@ private[syntheke] object Planner:
       direction: PortDirection,
       interface: ProtocolInterface,
       origin:    PlanOrigin,
-      loc:       SourceLocation
+      loc:       (sourcecode.File, sourcecode.Line)
     ): Branch =
       val ms    = branchModules(endpoint, w)
       val ports = ms.map(m => PortPlan(m, direction, dangleName(m, endpoint, base), interface, origin, loc))

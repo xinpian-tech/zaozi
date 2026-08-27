@@ -25,8 +25,8 @@ object Export:
   private def dvBindId(id: DVBindId):     ujson.Value =
     ujson.Obj("sink" -> dvSinkId(id.sink), "source" -> dvSourceId(id.source))
 
-  private def loc(l: SourceLocation): ujson.Value =
-    ujson.Obj("file" -> ujson.Str(l.file.replace('\\', '/')), "line" -> ujson.Num(l.line))
+  private def loc(l: (sourcecode.File, sourcecode.Line)): ujson.Value =
+    ujson.Obj("file" -> ujson.Str(l._1.value.replace('\\', '/')), "line" -> ujson.Num(l._2.value))
 
   private def layerPath(l: LayerPath): ujson.Value = ujson.Arr.from(l.segments.map(ujson.Str(_)))
 

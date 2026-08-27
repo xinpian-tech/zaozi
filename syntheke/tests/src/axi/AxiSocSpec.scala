@@ -95,7 +95,8 @@ object AxiSocSpec extends TestSuite:
     using
     ws:          WrapperScope,
     name:        sourcecode.Name,
-    loc:         SourceLocation
+    file:        sourcecode.File,
+    line:        sourcecode.Line
   ): AxiXbarPorts =
     generator(xbarEntry)(new AxiXbarPorts(ins, outs, arbitration))
 
@@ -119,7 +120,8 @@ object AxiSocSpec extends TestSuite:
     using
     ws:        WrapperScope,
     name:      sourcecode.Name,
-    loc:       SourceLocation
+    file:      sourcecode.File,
+    line:      sourcecode.Line
   ): CorePorts =
     generator(entry0)(new CorePorts(name.value, idBits, maxFlight))
 
@@ -164,7 +166,8 @@ object AxiSocSpec extends TestSuite:
     using
     ws:             WrapperScope,
     name:           sourcecode.Name,
-    loc:            SourceLocation
+    file:           sourcecode.File,
+    line:           sourcecode.Line
   ): MmioSlavePorts =
     generator(slaveEntry)(new MmioSlavePorts(name.value, base, size, idCapacityBits))
 

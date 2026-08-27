@@ -53,13 +53,8 @@ final case class DVSinkId(module: ModuleId, name: String):
 final case class DVBindId(sink: DVSinkId, source: DVSourceId):
   def show: String = s"dvbind ${source.show} -> ${sink.show}"
 
-/** Declaration-site source location, for diagnostics only. */
-final case class SourceLocation(file: String, line: Int):
-  def show: String = s"$file:$line"
-
-object SourceLocation:
-  given capture(
-    using file: sourcecode.FileName,
-    line:       sourcecode.Line
-  ): SourceLocation =
-    SourceLocation(file.value, line.value)
+/** Declaration sites are captured with sourcecode's own `File` / `Line` givens and stored as the pair; this formats one
+  * for a diagnostic message.
+  */
+extension (loc: (sourcecode.File, sourcecode.Line))
+  private[syntheke] def show: String = s"${loc._1.value}:${loc._2.value}"

@@ -41,8 +41,8 @@ object Negotiator:
 
   private def fail(message: String): Nothing = throw NegotiationException(message)
 
-  private def at(locs: SourceLocation*):        String = locs.map(_.show).mkString(", ")
-  private def at(locs: Vector[SourceLocation]): String = locs.map(_.show).mkString(", ")
+  private def at(locs: (sourcecode.File, sourcecode.Line)*):        String = locs.map(_.show).mkString(", ")
+  private def at(locs: Vector[(sourcecode.File, sourcecode.Line)]): String = locs.map(_.show).mkString(", ")
 
   // ============ pass 1: structural check and stable topological order ============
 
