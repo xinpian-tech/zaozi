@@ -39,7 +39,7 @@
   [边视图], [`EdgeView`], [求解完成后按模块和节点整理的“节点到唯一设计边”映射及验证结果（@sec-generator-records、@sec-settle-pp）。],
   [跨层端口规划], [cross-hierarchy port planning], [根据连接两端的层次路径生成所需的 Dangle 端口计划与逐层连线计划（@sec-punch-planning）。],
   [Dangle 端口], [dangle], [框架在被连接穿过的结构模块上生成的端口，方向由所在分支决定，名称可逆编码层次路径（@sec-punch-planning、@sec-port-naming）。],
-  [结构键], [structural key], [模块去重使用的规范化键（@sec-dedup）。],
+  [链接键], [linking key], [模块名对（生成器名字，规范化完整参数）的忠实编码，定义共享与链接据此进行（@sec-dedup）。],
   [探针源与探针汇], [DV source and DV sink], [生成器模块声明的验证端点；源提供 `Down`，汇按 bind 声明顺序收集并执行一次 `resolve`（@sec-dv-declarations）。],
   [验证生成器模块], [verification generator module], [实现协同仿真、记分板或断言逻辑、声明探针汇的生成器模块（@ch-verification）。],
   [验证端点标识], [`DVSourceId`, `DVSinkId`, and `DVBindId`], [分别由源模块与名称、汇模块与名称、汇与源标识组成（@sec-dv-declarations）。],

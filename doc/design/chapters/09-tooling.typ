@@ -33,7 +33,7 @@
 
 == 规范化顺序 <sec-determinism>
 
-模块、端口、子实例与连线的 FIRRTL 发射顺序及结构键采用 @sec-dedup 的规范。
+模块、端口、子实例与连线的 FIRRTL 发射顺序采用 @sec-dedup 与 @sec-port-naming 的规范。
 
 JSON 中模块按显式子实例声明顺序执行层次树先序导出；完整参数记录采用同一模块顺序。
 
