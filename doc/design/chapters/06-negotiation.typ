@@ -13,7 +13,7 @@
     node((1, 0.5), [参数依赖拓扑排序], name: <topo>),
     node((2, 0), [`Down` 正向传播], name: <d>, fill: rgb("#edf5ff")),
     node((2, 1), [`Up` 反向传播], name: <u>, fill: rgb("#fff1ef")),
-    node((3, 0.5), [设计边与验证求解], name: <e>),
+    node((3, 0.5), [设计边求解], name: <e>),
     node((4, 0.5), [`EdgeView` 与完整参数], name: <p>),
     node((5, 0.5), [端口、连线与层计划], name: <w>),
     node((6, 0.5), [`ResolvedDesign`], name: <r>, shape: fletcher.shapes.pill, fill: c-fill),
@@ -33,7 +33,7 @@
 + 固化协议与生成器注册表，校验名称、节点方向、bind、协议匹配和模块内部参数依赖；
 + 由 bind 与模块内部参数依赖构造 `Down` 参数依赖 DAG，并执行稳定拓扑排序；
 + 按该顺序执行 `Down` 正向传播，按逆序执行 `Up` 反向传播；
-+ 逐条设计边调用 `negotiate`，并按探针汇执行验证协议的 `resolve`；
++ 逐条设计边调用 `negotiate`；
 + 解析跨协议引用（@sec-settle-pp），按模块装配 `EdgeView`，计算协议参数与完整参数，并执行生成器能力校验；
 + 规划跨层端口、连线与 FIRRTL 层，装配 `ResolvedDesign`。
 
@@ -41,15 +41,13 @@
 
 == 结构校验与稳定拓扑序 <sec-structural-check>
 
-结构校验先固化生成器注册表。同一模块内的子实例名唯一，节点名与验证端点名唯一；每个生成器名字对应一个注册表条目。
+结构校验先固化生成器注册表。同一模块内的子实例名唯一，节点名与探针源名唯一；每个生成器名字对应一个注册表条目。
 
 每条设计 bind 的源、目标节点必须存在，声明该 bind 的结构模块必须是两端节点所在模块的祖先（@sec-node-conn-proto）。源节点方向为 outward，目标节点方向为 inward，两端协议匹配；每个 outward 节点恰好作为一次 bind 的源，每个 inward 节点恰好作为一次 bind 的目标。节点的数量在构建期已经固定，结构校验分别核对每个 outward 节点在 bind 源中出现一次、每个 inward 节点在 bind 目标中出现一次。
 
 模块内部只保存一份从本模块 inward 节点指向 outward 节点的参数依赖边集；每条依赖带声明顺序和源码位置。outward 节点的前驱与 inward 节点的后继都从该边集派生，按节点声明顺序排列。重复依赖边非法。每个 outward 节点必须携带 `dFn`，每个 inward 节点必须携带 `uFn`，函数字段不可选；函数可读的节点集合与依赖边集来自同一次声明（@sec-generator-module）。
 
 `Down` 参数依赖 DAG 由以下两类边组成：每条 bind 从源 outward 节点指向目标 inward 节点；每条模块内部参数依赖从 inward 节点指向 outward 节点。`Up` 参数依赖 DAG 反转上述全部方向。结构校验检查 `Down` 图无环；`Up` 是它的反向图，自动无环。稳定拓扑排序在多个节点均可选择时，采用模块的层次树先序和节点声明顺序打破平局；`Up` 直接使用同一拓扑序的逆序。检测到环时，错误包含环上的全部 `ModuleNodeId`、`BindId`、模块内部参数依赖和源码位置。
-
-验证连接另行核对探针源与探针汇的协议、源的唯一 bind 及祖先关系（@sec-dv-routing）。
 
 == `Down` 与 `Up` 传播 <sec-propagation>
 
@@ -88,18 +86,16 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
   )
 ]
 
-== 边求解、验证求解与生成器参数 <sec-settle-pp>
+== 边求解与生成器参数 <sec-settle-pp>
 
 *边求解*在两遍传播全部完成后，为每个 `BindId` 调用一次 `negotiate(down, up)`（@sec-protocol-object）。失败结果包含两个节点、两份参数快照及 bind 的源码位置；成功结果通过 `interfaceOf` 得到非空 `ProtocolBundle`。各设计边之间可以并行求解。
-
-*验证求解*按 `DVSinkId` 分组，每个探针汇调用一次 `resolve` 与 `interfacesOf`，并核对返回接口的契约（@sec-dv-protocol）。
 
 *跨协议引用*是一个节点对本模块另一个节点的引用，用来声明本节点属于哪个时钟节点、电源节点（@sec-generator-module）；它在目标边求解后解析为目标边的 `Edge`。目标必须是本模块的节点，声明处即检查；引用名取自绑定它的 val，声明返回的句柄是读回该引用的唯一途径。目标节点恰好一条 bind 由结构校验保证，装配 `EdgeView` 时直接取该边的 `Edge`。
 
 *生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeFullParam(EdgeView)` 由已求解边与闭包中的用户参数得到 `FullParam`，并在其中执行能力校验。注册表条目、`EdgeView` 和完整参数一并存入 `ResolvedGeneratorModule`（@sec-generator-records、@sec-two-layer-params、@sec-generator-module）。
 
 #决策([协议参数只读取本模块的已求解数据])[
-  `computeFullParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用和验证端点结果。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
+  `computeFullParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边和显式跨协议引用。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
 ] <dec-pp-local>
 
 单次协商没有整机回读：`dFn` 只读 `Down`，`uFn` 只读 `Up`，生成器拿不到整张连接图的汇总，例如整机地址映射。这类产物由工具从导出数据生成（@sec-export）；生成器需要它时（例如 boot ROM 镜像），作为用户参数进入下一轮构建。
@@ -108,13 +104,13 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 每条设计 bind 产生一个 `ResolvedEdge`。记录包含 `BindId`、源与目标 `ModuleNodeId`、对应协议对象、传播得到的 `Down` 和 `Up`、逐边求得的 `Edge` 以及 `interfaceOf(edge)` 返回的 `ProtocolBundle`。全部记录按 bind 声明顺序保存。
 
-`ResolvedDVGroup` 保存一个探针汇、验证协议对象、按声明顺序排列的验证 bind、源端 `Down` 与层路径、`resolve` 得到的 `Edge` 以及完整 `DVInterfaces`。`ResolvedProtocolReference` 保存引用名、引用方、目标 `ModuleNodeId`、目标协议对象与该节点唯一一条边的 `Edge`。这些协议值按 @sec-protocol-object 和 @sec-dv-protocol 的 codec 规则编码、解码。
+`ResolvedProtocolReference` 保存引用名、引用方、目标 `ModuleNodeId`、目标协议对象与该节点唯一一条边的 `Edge`。这些协议值按 @sec-protocol-object 的序列化规则编码、解码。
 
 == 生成器参数记录 <sec-generator-records>
 
 生成器注册表记录生成器标识、生成器实现和完整参数 codec。已求解生成器模块记录模块标识、注册表条目、`EdgeView`、协议参数和完整参数。
 
-`EdgeView` 按本模块的节点声明顺序保存条目。每个条目记录节点方向、该节点唯一的 `ResolvedEdge`，以及该节点显式声明且已经解析的跨协议引用；读取以声明得到的节点与引用句柄为键，结果按句柄的协议类型化，不提供按名字符串的查询；`EdgeView` 还包含按验证端点声明顺序装配的 `VerificationView`（@sec-dv-protocol）。
+`EdgeView` 按本模块的节点声明顺序保存条目。每个条目记录节点方向、该节点唯一的 `ResolvedEdge`，以及该节点显式声明且已经解析的跨协议引用；读取以声明得到的节点与引用句柄为键，结果按句柄的协议类型化，不提供按名字符串的查询。
 
 `GeneratorEntry` 保存生成器及其 `FullParam` codec。`ResolvedGeneratorModule.entry` 选定完整参数类型，`fullParam` 采用该条目的 `FullParam`。`EdgeView` 在双向传播和逐边求解后装配，供本模块的 `computeFullParam` 使用。
 
@@ -129,11 +125,10 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
   table.header([产生阶段], [触发条件], [报告必含]),
 
   [校验], [节点引用不存在；outward 节点未恰好作为一次 bind 的源；inward 节点未恰好作为一次 bind 的目标；或声明 bind 的结构模块不是两端节点所在模块的祖先。], [相关 `ModuleNodeId`、`BindId`、声明 bind 的模块、实际 bind 次数和源码位置。],
-  [校验], [探针汇的源集合为空；探针源的 bind 数量异于一；源与汇协议不匹配；汇生成器父结构模块与源模块的严格祖先关系缺失。], [`DVSourceId`、`DVSinkId` 与 `DVBindId`；协议标识与模块路径；全部相关源码位置。],
   [校验], [两个不同的注册表条目使用同一生成器名字。], [冲突的名字；相关模块及源码位置。],
   [拓扑排序], [参数依赖图存在环。], [环上的完整路径；环内每条 bind 与模块内部参数依赖的源码位置。],
   [`Down` 或 `Up` 传播], [`dFn` 或 `uFn` 返回约束冲突，例如地址区域重叠、请求地址不可达或事务身份空间无法分配。], [模块、outward 或 inward 节点、传播方向、有序输入快照、冲突描述和源码位置。],
-  [边与验证求解], [设计边的 `negotiate` 或探针汇的 `resolve` 返回参数冲突。], [设计边：`BindId`、`Down`、`Up` 与源码位置；探针汇：`DVSinkId`、有序 `Down` 与相关源码位置；协议给出的冲突描述。],
-  [边与验证求解], [设计 `ProtocolBundle` 非法；或 `DVInterfaces` 的数量、路径、结构、精确覆盖、单向 `Probe` 或层路径契约不成立。], [节点或 `DVSinkId`；期望与实际结构；无效路径；相关 bind 的源码位置。],
+  [边求解], [设计边的 `negotiate` 返回参数冲突。], [`BindId`、`Down`、`Up` 与源码位置；协议给出的冲突描述。],
+  [边求解], [设计边接口含 `Probe`——探针属于验证协议。], [`BindId`、越界的接口路径与源码位置。],
   [生成器参数], [本模块已求解边要求的端口数、接口参数、拓扑条件或资源容量超出生成器用户参数给出的实现上限。], [生成器模块、相关节点与 `BindId`、所需值、实现上限和用户参数。],
 )

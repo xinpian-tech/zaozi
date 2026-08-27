@@ -22,7 +22,7 @@
 
 单个 IP 从参数文件例化时，由生成器库提供包含该名字条目的注册表。
 
-`computeFullParam` 将框架提供的 `EdgeView` 与闭包中的用户参数直接合成 `FullParam`。独立例化按名字找到注册项，并用该项的序列化解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与验证端点的名称、方向和接口结构。对于构建期动态声明的端点，`computeFullParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，在 `FullParam` 中保留复现这些接口所需的值；若端点名称由生成器的固定接口决定，`FullParam` 只需保存决定接口结构的参数。
+`computeFullParam` 将框架提供的 `EdgeView` 与闭包中的用户参数直接合成 `FullParam`。独立例化按名字找到注册项，并用该项的序列化解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与探针端口的名称、方向和接口结构。对于构建期动态声明的端点，`computeFullParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，在 `FullParam` 中保留复现这些接口所需的值；若端点名称由生成器的固定接口决定，`FullParam` 只需保存决定接口结构的参数。
 
 #图([序列化边界。框架侧的生成器模块保存用户参数、参数合并函数、协议参数推导函数与模块节点声明；zaozi 侧的生成器从完整参数确定接口、FIRRTL 层结构与电路体。])[
   #syn-canvas({
@@ -46,7 +46,7 @@
 
 == 生成器模块的声明 <sec-generator-module>
 
-生成器模块（@sec-module-kinds）在构建期声明契约数据与函数，包括用户参数、生成器注册表条目、inward 与 outward 节点列表、模块内部参数依赖、验证端点列表、协议参数推导函数，以及用户参数和协议参数到完整参数的合成函数。节点声明记录节点标识、名称、方向、协议、相应的 `dFn` 或 `uFn`、跨协议引用和源码位置。跨协议引用声明记录引用名、目标 `ModuleNodeId`、期望协议和源码位置。
+生成器模块（@sec-module-kinds）在构建期声明契约数据与函数，包括用户参数、生成器注册表条目、inward 与 outward 节点列表、模块内部参数依赖、探针源列表、协议参数推导函数，以及用户参数和协议参数到完整参数的合成函数。节点声明记录节点标识、名称、方向、协议、相应的 `dFn` 或 `uFn`、跨协议引用和源码位置。跨协议引用声明记录引用名、目标 `ModuleNodeId`、期望协议和源码位置。
 
 协商器为每个生成器模块装配 `EdgeView`，再调用该模块的 `computeFullParam`。
 
@@ -58,12 +58,12 @@
 
 `EdgeView` 是双向传播和逐边求解完成后按模块投影的数据。它按节点给出方向及唯一的已求解边；该边包含 `Down`、`Up`、`Edge` 与 `ProtocolBundle`。引用方节点条目另行包含显式跨协议引用的解析结果。
 
-`dvSources` 与 `dvSinks` 声明验证端点（@sec-dv-declarations）。解析后的条目由 `VerificationView` 按声明顺序提供，并经 `computeFullParam` 进入完整参数；字段契约见 @sec-generator-records。
+`dvSources` 声明探针源（@sec-dv-declarations）：接口在声明处由协议导出并检查，闭包中的用户参数足以在 `FullParam` 中复现这些探针端口。
 
-每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在声明处当场报错（@sec-error-semantics）。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
+每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；每个探针源按信号叶对应若干纯 `Probe` 端口。节点和探针源的声明名称在模块内共用同一唯一性约束，重复时在声明处当场报错（@sec-error-semantics）。参与框架连线的每个生成器端口必须能由相应 `ModuleNodeId` 或探针源声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源的期望结构来自声明处导出的接口。
 
 #决策([端口结构校验在例化期进行])[
-  生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input；探针源按信号叶展开，每叶一个 Output 纯 `Probe` 端口，名称为源名加叶路径段（@sec-port-naming）；探针汇为 Input；字段名称、顺序和方向（`Flipped`），`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、bind 的源码位置以及期望结构与实际结构的差异路径。
+  生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input；探针源按信号叶展开，每叶一个 Output 纯 `Probe` 端口，名称为源名加叶路径段（@sec-port-naming）；字段名称、顺序和方向（`Flipped`），`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、声明的源码位置以及期望结构与实际结构的差异路径。
 ] <dec-binding-check>
 
 端口失配在实施阶段报出，与 @sec-error-semantics 的协商错误分属不同异常。
@@ -72,7 +72,7 @@
 
 例化期对层次树自底向上执行，每个模块一步：
 
-+ *生成器模块*：读取 `ResolvedDesign` 中的完整参数并调用生成器；按 @dec-binding-check 校验设计节点、探针源和探针汇端口，并登记设计边与验证 bind 的硬件端点。
++ *生成器模块*：读取 `ResolvedDesign` 中的完整参数并调用生成器；按 @dec-binding-check 校验设计节点与探针源端口，并登记设计边与探针路由的硬件端点。
 + *结构模块*：按#ref(<ch-hierarchy>)的端口与连线计划发射端口、子实例与连线。连线按 Bundle 整体连接，由 zaozi 根据字段方向展开。
 
 自底向上的次序保证子模块先于父模块发射，父模块生成连线时可以直接引用子实例端口。
@@ -85,6 +85,6 @@
   columns: (auto, 1fr, 1fr),
   table.header([类别], [内容], [约束]),
   [*必须可序列化*], [完整参数（用户参数 $+$ 协议参数合并后）。], [生成器以完整参数为输入；单个 IP 独立例化使用同一参数作为命令行输入（@req-ip）。],
-  [*可序列化、按需导出*], [稳定标识、设计边的 `Down`、`Up` 与 `Edge`、验证协议的 `Down` 与 `Edge`、`DVInterfaces`、`InterfacePath`、`ProtocolBundle`、`EdgeView`、端口与连线计划、FIRRTL 层声明树和诊断信息表。], [`ResolvedDesign` 使用这些数据类型；工具文件按需生成（@ch-tooling）。],
+  [*可序列化、按需导出*], [稳定标识、设计边的 `Down`、`Up` 与 `Edge`、验证协议的 `Down`、`InterfacePath`、`ProtocolBundle`、`EdgeView`、端口与连线计划、FIRRTL 层声明树和诊断信息表。], [`ResolvedDesign` 使用这些数据类型；工具文件按需生成（@ch-tooling）。],
   [*进程内函数*], [参数变换、合并与推导函数。], [这些闭包的生命周期限于当前设计进程；生成器输入采用完整参数值。],
 )

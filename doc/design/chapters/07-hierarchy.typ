@@ -6,17 +6,17 @@
 
 == 跨层端口规划 <sec-punch-planning>
 
-每条已求解连接具有两个生成器模块端点。对于设计 bind，两端是源 outward 节点与目标 inward 节点所标识的生成器端口（@sec-interconnect-nodes）；对于验证 bind，两端分别是探针源生成器与探针汇生成器（@sec-dv-declarations）。层次路径由这两个硬件端点确定。
+设计 bind 的两端是源 outward 节点与目标 inward 节点所标识的生成器端口（@sec-interconnect-nodes），层次路径由这两个硬件端点确定。验证观测只有源端：探针叶从源模块一路上提到设计根（@sec-dv-routing）。
 
-设连接 $c$ 的源端位于生成器模块 $A$，目标端位于生成器模块 $B$。当 $A != B$ 时，连线作用域 $W$ 取 $A$ 与 $B$ 的最近公共祖先（lowest common ancestor，`LCA(A, B)`）；当 $A = B$ 时，$W$ 取 $A$ 的父模块。结构模块 $W$ 发射两端之间的连接。设计连接的源端与目标端分别来自 bind 的源、目标节点；第 $i$ 条验证 bind 的源端是探针源顶层 Bundle，目标端是探针汇顶层 `sink` 中由 `sinkPaths(i)` 选定的 Bundle。规划规则：
+设连接 $c$ 的源端位于生成器模块 $A$，目标端位于生成器模块 $B$。当 $A != B$ 时，连线作用域 $W$ 取 $A$ 与 $B$ 的最近公共祖先（lowest common ancestor，`LCA(A, B)`）；当 $A = B$ 时，$W$ 取 $A$ 的父模块。结构模块 $W$ 发射两端之间的连接。设计连接的源端与目标端分别来自 bind 的源、目标节点；验证路径不设 $W$，端口一路生成到设计根（含根）。规划规则：
 
-+ 连接的两个端点是两端生成器的端口。设计连接使用两端的完整顶层 Bundle；验证连接按源接口的信号叶展开，每叶一条纯 `Probe` 路径（@sec-dv-routing）。为了让连接穿过中间的结构模块，框架在这些模块上生成端口，称为#term[Dangle 端口][dangle]：从 $A$ 的父模块开始逐层上行，在到达 $W$ 之前为每个模块边界生成一个 Output 方向的 Dangle 端口；从 $B$ 的父模块开始逐层上行，在到达 $W$ 之前为每个模块边界生成一个 Input 方向的 Dangle 端口。
++ 连接的两个端点是两端生成器的端口。设计连接使用两端的完整顶层 Bundle；验证连接按源接口的信号叶展开，每叶一条纯 `Probe` 路径（@sec-dv-routing）。为了让连接穿过中间的结构模块，框架在这些模块上生成端口，称为#term[Dangle 端口][dangle]：从 $A$ 的父模块开始逐层上行，在到达 $W$ 之前为每个模块边界生成一个 Output 方向的 Dangle 端口；从 $B$ 的父模块开始逐层上行，在到达 $W$ 之前为每个模块边界生成一个 Input 方向的 Dangle 端口。验证路径没有目标分支：Output Dangle 端口逐层生成，直到设计根（含根），根上的 Dangle 端口即顶层探针端口。
 + 源端分支按 Bundle 整体连接“子实例 Output → 本层 Output”，直到 $W$；目标端分支按 Bundle 整体连接“本层 Input → 子实例 Input”，直到 $B$。在 $W$ 内部，两条分支的末端整体连接；若某端点模块的父模块就是 $W$，直接以该子实例的完整 Bundle 或选定 Bundle 作为末端。
 + 当 $A = B$ 时，$W$ 在同一子实例的两个端口之间生成整体连接；当 $A$ 与 $B$ 是兄弟模块时，$W$ 直接连接两个子实例端口。
 
-根结构模块没有端口，设计是封闭电路。根模块充当测试平台：芯片顶层是它的子模块，端口由本节规则生成；DDR、PCIe 等外部模型是根下的生成器模块。
+根结构模块的端口只有顶层探针端口（@sec-dv-routing）；设计侧是封闭电路。根模块充当测试平台：芯片顶层是它的子模块，端口由本节规则生成；DDR、PCIe 等外部模型是根下的生成器模块。
 
-设计连接的沿途端口结构取自 `interfaceOf(edge)` 返回的非空 `ProtocolBundle`（@sec-protocol-interface）；验证连接取自对应的 `DVInterfaces.sources(i)`，它与目标端选定 Bundle 结构相同（@sec-dv-protocol）。框架将这两种结构翻译为 FIRRTL 类型。设计连接的源端路径使用 Output、目标端路径使用 Input，内部字段方向由 `Flipped` 确定；验证连接固定为源端 Output、目标端 Input，不含 `Flipped`。
+设计连接的沿途端口结构取自 `interfaceOf(edge)` 返回的非空 `ProtocolBundle`（@sec-protocol-interface）；验证连接取自探针源声明处导出的接口（@sec-dv-protocol）。框架将这两种结构翻译为 FIRRTL 类型。设计连接的源端路径使用 Output、目标端路径使用 Input，内部字段方向由 `Flipped` 确定；验证连接固定为 Output，不含 `Flipped`。
 
 #图([设计连接的跨层端口生成。a、b 是端点模块已有的模块节点；其严格祖先 M1、M2 分别生成 Output、Input 方向的 Dangle 端口，LCA 在顶层连接两条分支。])[
   #syn-diagram(
@@ -41,7 +41,7 @@
   )
 ]
 
-跨层端口规划在协商期生成端口计划与连线计划。计划使用带种类的稳定来源标识：设计连接为 `Design(BindId)`，验证连接为 `Verification(DVBindId)`；每项同时记录对应 bind 的源码位置。例化期按计划发射端口和连线。
+跨层端口规划在协商期生成端口计划与连线计划。计划使用带种类的稳定来源标识：设计连接为 `Design(BindId)`，验证连接为 `Verification(DVSourceId)`；每项同时记录对应声明的源码位置。例化期按计划发射端口和连线。
 
 == 端口命名 <sec-port-naming>
 
