@@ -276,31 +276,48 @@ object NegotiatorSpec extends TestSuite:
           }
           core
         }
-        // The build-time query: everything declared so far, with per-leaf port names and data types.
-        val ps      = probes()
-        assert(ps.map(_.id.show) == Vector("cluster.core#rob"))
-        assert(ps.flatMap(_.leaves.map(_.portName)) == Vector("inst_cluster_inst_core_dv$msource_rob_sig_out"))
         val tb      = testbench(intEntry("Tb")) {
-          parametersConst(0)
-          val mem = inward(Wid).uFn(_ => Right(64))
-          mem
+          // The manifest arrives through the view after the spec froze — its FullParam counts the probe leaves.
+          parameters(view => Right(view.probes.flatMap(_.leaves).size))
+          val mem  = inward(Wid).uFn(_ => Right(64))
+          val late = inward(Wid).uFn(_ => Right(64))
+          (mem, late)
         }
-        tb <-- cluster
+        tb._1 <-- cluster
+        // A probe-bearing module declared after the testbench: order does not matter for the manifest.
+        val tail    = generator(intEntry("Tail")) {
+          parametersConst(0)
+          val out = outward(Wid).dFn(_ => Right(8))
+          val sig = dvSource(Trace)(4, LayerPath(Vector("verification")))
+          out
+        }
+        tb._2 <-- tail
       }
       assert(spec.testbench == Some(ModuleId.root / "tb"))
       val resolved = Negotiator.negotiate(spec)
 
-      // The design edge into the testbench settled like any edge; nothing surfaces as a root port.
+      // The design edges into the testbench settled like any edge; nothing surfaces as a root port.
       assert(resolved.edges.head.edgeAs(Wid) == 32)
       assert(resolved.portPlans.filter(_.module == ModuleId.root).isEmpty)
 
-      // The probe chain ends in a wire from the cluster's dangle into the testbench's matching input.
+      // The testbench's view carried the complete manifest — including the source declared after it.
+      assert(resolved.generatorModule(ModuleId.root / "tb").get.fullParam == 2)
+      assert(
+        resolved.probes.flatMap(_.leaves.map(_.portName)) == Vector(
+          "inst_cluster_inst_core_dv$msource_rob_sig_out",
+          "inst_tail_dv$msource_sig_sig_out"
+        )
+      )
+      // Other modules receive no probes: their views are empty.
+      assert(resolved.generatorModule(ModuleId.root / "tail").get.view.probes.isEmpty)
+
+      // Each probe chain ends in a wire into the testbench's matching input.
       val dvWires =
         resolved.wirePlans.filter(w => w.module == ModuleId.root && w.origin.isInstanceOf[PlanOrigin.Verification])
       assert(
-        dvWires.map(w => (w.from, w.to)) == Vector(
-          LocalEndpoint.ChildPort("cluster", PortName("inst", "core", "dv-source", "rob", "sig", "out")) ->
-            LocalEndpoint.ChildPort("tb", PortName("inst", "cluster", "inst", "core", "dv-source", "rob", "sig", "out"))
+        dvWires.map(_.to) == Vector(
+          LocalEndpoint.ChildPort("tb", PortName("inst", "cluster", "inst", "core", "dv-source", "rob", "sig", "out")),
+          LocalEndpoint.ChildPort("tb", PortName("inst", "tail", "dv-source", "sig", "sig", "out"))
         )
       )
 

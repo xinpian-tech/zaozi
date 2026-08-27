@@ -249,15 +249,16 @@ object DvVerilogSpec extends TestSuite:
     }
 
   /** With a testbench: it terminates the design through a standard bind and takes every probe leaf as a data input,
-    * shaped from the build-time query.
+    * shaped from the manifest its view carries.
     */
   def buildTbDesign(): DesignSpec =
     Design {
       val cluster = wrapper(srcCluster)
-      val ps      = probes()
       val tb      = testbench(tbEntry) {
         val mem = inward(Wid).uFn(_ => Right(64))
-        parameters(stubParams("Tb", ps.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))))
+        parameters(view =>
+          stubParams("Tb", view.probes.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe)))(view)
+        )
         mem
       }
       tb <-- cluster

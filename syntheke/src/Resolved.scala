@@ -35,11 +35,14 @@ final case class NodeView(
 /** The per-module projection of settled data read by the module's `parameters` computation (doc @dec-pp-local).
   *
   * Reads are keyed by the node builders and reference handles declared in the module body, and the results are typed by
-  * the handle's protocol — there is no lookup by name string.
+  * the handle's protocol — there is no lookup by name string. `probes` are the probe leaves the framework wires into
+  * this module: the full manifest for the testbench — computed after the spec froze, so it is complete regardless of
+  * declaration order — and empty for every other module (doc @sec-dv-testbench).
   */
 final case class EdgeView(
   module: ModuleId,
-  nodes: Vector[NodeView]): // node declaration order
+  nodes:  Vector[NodeView], // node declaration order
+  probes: Vector[ProbeSource]):
 
   def apply(n: NodeBuilder[?]): NodeView =
     require(n.id.module == module, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")

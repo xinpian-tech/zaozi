@@ -128,7 +128,8 @@ def outward(
   * only, at most one per design. Its body is an ordinary generator body — its nodes bind to the design's nodes with
   * `<--` and negotiate like any edge, terminating the design's outward-facing interfaces. Its one specialty: the
   * framework wires every probe leaf of the design into a matching input port (named by the leaf's port name, typed as
-  * the resolved data). Query the declared probes with [[probes]] to shape those ports and the full parameter.
+  * the resolved data). Its [[parameters]] computation reads the probe manifest from `EdgeView.probes` — complete
+  * regardless of declaration order — to shape those ports and the full parameter.
   */
 def testbench[FP, A: Dangles](
   entry: GeneratorEntry[FP]
@@ -141,15 +142,6 @@ def testbench[FP, A: Dangles](
   line:  sourcecode.Line
 ): A =
   ws.testbench(name.value, entry)(body)
-
-/** All probe sources declared so far, with their leaves (doc @sec-dv-testbench): every field a [[testbench]] body needs
-  * to declare its probe inputs — per-leaf port name and data type — and to build its full parameter.
-  */
-def probes(
-)(
-  using ws: WrapperScope
-): Vector[ProbeSource] =
-  ws.probes
 
 /** Declare a module-internal parameter dependency from inward node `from` to outward node `to` and receive the two read
   * handles it grants: `to`'s dFn may read `from`'s settled `Down`, and `from`'s uFn may read `to`'s settled `Up` (doc @sec-generator-module).
@@ -186,8 +178,8 @@ def parametersConst[FP](
 
 /** Declare a probe source named by the binding val: the enclosing module publishes the verification data described by
   * `down`, as read-only probes confined to FIRRTL layer `layer` (doc @sec-dv-declarations). The framework forwards
-  * every probe leaf automatically to the root — into the [[testbench]]'s matching data input when one is declared,
-  * as a top-level probe port otherwise.
+  * every probe leaf automatically to the root — into the [[testbench]]'s matching data input when one is declared, as a
+  * top-level probe port otherwise.
   */
 def dvSource(
   p:     DVProtocol

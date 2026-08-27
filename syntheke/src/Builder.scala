@@ -110,17 +110,6 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     st.testbenches += (id / name)
     result
 
-  /** All probe sources declared so far, with their leaves (doc @sec-dv-testbench): the build-time query a testbench
-    * author uses to shape its probe inputs and full parameter.
-    */
-  def probes: Vector[ProbeSource] =
-    ProbeSource.of(
-      st.moduleOrder.toVector
-        .flatMap(m => st.modules.get(m))
-        .collect { case g: GeneratorModuleSpec => g.dvSources.map(g.id -> _) }
-        .flatten
-    )
-
   private[syntheke] def recordBind(
     source: ModuleNodeId,
     target: ModuleNodeId,

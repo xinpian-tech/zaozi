@@ -47,10 +47,11 @@ Deviations from the document's surface syntax:
   level only, at most one): its nodes bind to the design's nodes with the
   ordinary `<--` and negotiate like any edge, terminating the design's
   outward-facing interfaces. Its one specialty: the framework wires every
-  probe leaf of the design into a matching data input — the build-time
-  `probes()` query (and `resolved.probes`) gives the per-leaf port names and
-  types to shape those ports and the FullParam — checked by the same binding
-  checkpoint as any generator. Without a testbench the probes surface as
+  probe leaf of the design into a matching data input — its `parameters`
+  reads the manifest from `view.probes` (computed after the spec froze, so
+  declaration order never matters) to shape those ports and the FullParam,
+  checked by the same binding checkpoint as any generator; `resolved.probes`
+  serves external tools. Without a testbench the probes surface as
   layer-gated top-level ports.
 
 ```scala

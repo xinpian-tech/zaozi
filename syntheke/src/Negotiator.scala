@@ -230,6 +230,7 @@ object Negotiator:
   private def assembleViews(spec: DesignSpec, edges: Vector[ResolvedEdge]): Vector[ResolvedGeneratorModule] =
     val edgeOfSource = edges.map(e => e.bind.source -> e).toMap
     val edgeOfTarget = edges.map(e => e.bind.target -> e).toMap
+    val manifest     = ProbeSource.manifest(spec)
 
     spec.generatorModules.map { g =>
       val nodeViews = g.nodes.map { n =>
@@ -248,7 +249,7 @@ object Negotiator:
         NodeView(id, n.direction, edge, refs)
       }
 
-      val view = EdgeView(g.id, nodeViews)
+      val view = EdgeView(g.id, nodeViews, if spec.testbench.contains(g.id) then manifest else Vector.empty)
       g.computeFullParam(view) match
         case Left(violation) =>
           fail(s"capability exceeded at ${g.id.show}: ${violation.message}, at ${at(g.loc)}")
