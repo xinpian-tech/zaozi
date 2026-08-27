@@ -4,7 +4,9 @@ package me.jiuyang.syntheke
 
 /** Resolved records produced by the Negotiate phase (doc @sec-resolved-records, @sec-generator-records). */
 
-/** One settled design edge. */
+/** One settled design edge. The typed readers demand the edge's own protocol object — with erased parameter types, a
+  * foreign protocol would otherwise read silently mis-typed values.
+  */
 final case class ResolvedEdge(
   bind:     BindId,
   protocol: Protocol,
@@ -12,9 +14,17 @@ final case class ResolvedEdge(
   up:       Any,
   edge:     Any,
   interface: ProtocolBundle):
-  def edgeAs(p: Protocol): p.Edge = edge.asInstanceOf[p.Edge]
-  def downAs(p: Protocol): p.Down = down.asInstanceOf[p.Down]
-  def upAs(p:   Protocol): p.Up   = up.asInstanceOf[p.Up]
+  private def sameProtocol(p: Protocol): Unit   =
+    require(p eq protocol, s"${bind.show}: read with a protocol object other than the edge's own")
+  def edgeAs(p: Protocol):               p.Edge =
+    sameProtocol(p)
+    edge.asInstanceOf[p.Edge]
+  def downAs(p: Protocol):               p.Down =
+    sameProtocol(p)
+    down.asInstanceOf[p.Down]
+  def upAs(p: Protocol):                 p.Up   =
+    sameProtocol(p)
+    up.asInstanceOf[p.Up]
 
 /** A settled cross-protocol reference: the target node's edge parameter, providing domain information only. */
 final case class ResolvedProtocolReference(
@@ -23,7 +33,12 @@ final case class ResolvedProtocolReference(
   target:   ModuleNodeId,
   protocol: Protocol,
   edge: Any):
-  def edgeAs(p: Protocol): p.Edge = edge.asInstanceOf[p.Edge]
+  def edgeAs(p: Protocol): p.Edge =
+    require(
+      p eq protocol,
+      s"reference '$refName' of ${referrer.show}: read with a protocol object other than the target's"
+    )
+    edge.asInstanceOf[p.Edge]
 
 /** One node's entry in a module's [[EdgeView]]: direction, its unique settled edge, and resolved references. */
 final case class NodeView(
@@ -45,26 +60,21 @@ final case class EdgeView(
   probes: Vector[ProbeSource]):
 
   def apply(n: NodeBuilder[?]): NodeView =
-    require(n.id.module == module, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")
-    nodes.find(_.node == n.id).get
+    val view = nodes.find(_.node == n.id)
+    require(view.isDefined, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")
+    view.get
 
   def edgeOf(n: NodeBuilder[?]): n.protocol.Edge = apply(n).edge.edgeAs(n.protocol)
   def downOf(n: NodeBuilder[?]): n.protocol.Down = apply(n).edge.downAs(n.protocol)
   def upOf(n:   NodeBuilder[?]): n.protocol.Up   = apply(n).edge.upAs(n.protocol)
 
   def edgeOf(h: RefHandle[?]): h.protocol.Edge =
+    val ref = nodes.find(_.node == h.referrer).flatMap(_.refs.find(_.refName == h.refName))
     require(
-      h.referrer.module == module,
+      ref.isDefined,
       s"reference '${h.refName}' of ${h.referrer.show} is not a reference of EdgeView of ${module.show}"
     )
-    nodes
-      .find(_.node == h.referrer)
-      .get
-      .refs
-      .find(_.refName == h.refName)
-      .get
-      .edge
-      .asInstanceOf[h.protocol.Edge]
+    ref.get.edgeAs(h.protocol)
 
 /** A settled generator module: registry entry, its view, and the computed full parameter (doc @sec-two-layer-params).
   */

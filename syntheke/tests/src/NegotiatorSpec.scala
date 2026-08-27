@@ -731,5 +731,48 @@ object NegotiatorSpec extends TestSuite:
       }
       val e    = intercept[IllegalArgumentException](Negotiator.negotiate(spec))
       assert(e.getMessage.contains("is not a node of EdgeView"))
+
+      // Reading a settled edge with a foreign protocol object is rejected instead of silently mis-typing (erased
+      // parameter types would let the cast succeed with wrong values).
+      val settled = Negotiator.negotiate(buildSoc(c1Capacity = 64))
+      val foreign = intercept[IllegalArgumentException](settled.edges.head.edgeAs(new WidLike))
+      assert(foreign.getMessage.contains("protocol object other than"))
+
+      // A reference handle leaked from another design build is rejected like any foreign read.
+      val leaked = scala.collection.mutable.ArrayBuffer.empty[RefHandle[?]]
+      val d1     = Design {
+        val g = generator(intEntry("LeakG")) {
+          val a  = inward(Wid).uFn(_ => Right(8))
+          val o  = outward(Wid).dFn(_ => Right(8))
+          val rr = o.ref(a)
+          leaked += rr
+          parameters(_ => Right(0))
+          (a, o)
+        }
+      }
+      val d2     = Design {
+        val g   = generator(intEntry("LeakG2")) {
+          val a = inward(Wid).uFn(_ => Right(8))
+          val o = outward(Wid).dFn(_ => Right(8))
+          parameters(_ => Right(0))
+          (a, o)
+        }
+        val src = generator(intEntry("LeakSrc")) {
+          parameters(_ => Right(0))
+          val out = outward(Wid).dFn(_ => Right(8))
+          out
+        }
+        val snk = generator(intEntry("LeakSnk")) {
+          parameters(_ => Right(0))
+          val in = inward(Wid).uFn(_ => Right(8))
+          in
+        }
+        g._1 <-- src
+        snk <-- g._2
+      }
+      val r2     = Negotiator.negotiate(d2)
+      val stale  =
+        intercept[IllegalArgumentException](r2.generatorModule(ModuleId.root / "g").get.view.edgeOf(leaked.head))
+      assert(stale.getMessage.contains("is not a reference of EdgeView"))
     }
   }
