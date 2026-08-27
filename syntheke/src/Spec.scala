@@ -90,7 +90,7 @@ final case class DesignSpec(
   modules:     Map[ModuleId, ModuleSpec],
   moduleOrder: Vector[ModuleId], // hierarchy-tree preorder
   binds:       Vector[BindDecl],
-  ioNodes:     Vector[NodeSpec], // top-level IO nodes, declaration order (doc @sec-io-nodes)
+  testbench:   Option[ModuleId], // the testbench generator module, if declared (doc @sec-dv-testbench)
   generators: Vector[GeneratorEntry[?]]): // registration order; the name-conflict check runs over this
 
   def wrapper(id: ModuleId):         Option[WrapperModuleSpec]   = modules.get(id).collect { case w: WrapperModuleSpec => w }
@@ -99,5 +99,4 @@ final case class DesignSpec(
   def generatorModules:              Vector[GeneratorModuleSpec] =
     moduleOrder.flatMap(generatorModule)
   def nodeSpec(id: ModuleNodeId):    Option[NodeSpec]            =
-    if id.module == ModuleId.root then ioNodes.find(_.name == id.name)
-    else generatorModule(id.module).flatMap(_.node(id.name))
+    generatorModule(id.module).flatMap(_.node(id.name))

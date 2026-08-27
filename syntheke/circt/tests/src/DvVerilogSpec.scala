@@ -181,46 +181,11 @@ object DvVerilogSpec extends TestSuite:
     new GeneratorEntry[StubFull](s"demo.dv.$name")
 
   val srcEntry  = entry("Src")
+  val memEntry  = entry("Mem")
   val vsrcEntry = entry("VSrc")
+  val tbEntry   = entry("Tb")
   val backends: Seq[GeneratorBackend] =
-    Seq(srcEntry, vsrcEntry).map(StubBackend(_, outDir, identity))
-
-  /** A freestyle testbench: no parameter — the author holds the resolved design and reads the query API. The main part
-    * mirrors every IO (design outputs become its inputs and vice versa); each layer part takes the layer's probe leaves
-    * as data inputs.
-    */
-  final class StubTestbench(resolved: ResolvedDesign) extends TestbenchBackend:
-    private val mainStub  = StubBackend(entry("TbMain"), outDir, identity)
-    private val layerStub = StubBackend(entry("TbCosim"), outDir, identity)
-
-    def main(
-      instanceName: String
-    )(
-      using Arena,
-      Context,
-      Block
-    ): Operation =
-      val ports = resolved.ios.map(io => StubPort(io.name, io.direction == NodeDirection.Inward, io.edge.interface))
-      mainStub.instantiate(
-        StubFull("tbmain", ports),
-        instanceName,
-        (summon[sourcecode.File], summon[sourcecode.Line])
-      )
-
-    def layer(
-      layer:        LayerPath,
-      instanceName: String
-    )(
-      using Arena,
-      Context,
-      Block
-    ): Operation =
-      val ports = resolved.probes.filter(_.layer == layer).flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))
-      layerStub.instantiate(
-        StubFull(("tb" +: layer.segments).mkString("_"), ports),
-        instanceName,
-        (summon[sourcecode.File], summon[sourcecode.Line])
-      )
+    Seq(srcEntry, memEntry, vsrcEntry, tbEntry).map(StubBackend(_, outDir, identity))
 
   val layerCosim = LayerPath(Vector("verification", "cosim"))
 
@@ -251,25 +216,51 @@ object DvVerilogSpec extends TestSuite:
       StubPort(PortName(name +: path.nameSegments).encoded, false, leaf)
     }
 
+  /** The shared source cluster, spliced into a wrapper body (no `sourcecode.Name` here — a Name-carrying def may
+    * contain only a single wrapper/generator call, or it would capture the inner declarations too).
+    */
+  private def srcCluster(
+    using WrapperScope
+  ) =
+    val src = generator(srcEntry) {
+      val mem = outward(Wid).dFn(_ => Right(32))
+      val rob = dvSource(Trace)(8, layerCosim)
+      val lsu = dvSource(Trace)(4, layerCosim)
+      parameters(
+        stubParams(
+          "Src",
+          probePorts(Trace)("rob", 8, layerCosim) ++ probePorts(Trace)("lsu", 4, layerCosim)
+        )
+      )
+      mem
+    }
+    src
+
+  /** Without a testbench: an in-graph model terminates the design, probes surface as top-level probe ports. */
   def buildDesign(): DesignSpec =
     Design {
-      val cluster = wrapper {
-        val src = generator(srcEntry) {
-          val mem = outward(Wid).dFn(_ => Right(32))
-          val rob = dvSource(Trace)(8, layerCosim)
-          val lsu = dvSource(Trace)(4, layerCosim)
-          parameters(
-            stubParams(
-              "Src",
-              probePorts(Trace)("rob", 8, layerCosim) ++ probePorts(Trace)("lsu", 4, layerCosim)
-            )
-          )
-          mem
-        }
-        src
+      val cluster = wrapper(srcCluster)
+      val mem     = generator(memEntry) {
+        parameters(stubParams("Mem"))
+        val in = inward(Wid).uFn(_ => Right(64))
+        in
       }
-      val memIo   = ioInward(Wid).uFn(_ => Right(64))
-      memIo <-- cluster
+      mem <-- cluster
+    }
+
+  /** With a testbench: it terminates the design through a standard bind and takes every probe leaf as a data input,
+    * shaped from the build-time query.
+    */
+  def buildTbDesign(): DesignSpec =
+    Design {
+      val cluster = wrapper(srcCluster)
+      val ps      = probes()
+      val tb      = testbench(tbEntry) {
+        val mem = inward(Wid).uFn(_ => Right(64))
+        parameters(stubParams("Tb", ps.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))))
+        mem
+      }
+      tb <-- cluster
     }
 
   val tests = Tests {
@@ -279,11 +270,10 @@ object DvVerilogSpec extends TestSuite:
       val design   = Elaborator.elaborate(resolved, backends)
 
       // The layer tree is declared once at circuit level; the cluster carries one pure-probe dangle per leaf and the
-      // root exposes the same probes as top-level ports, next to the IO node's data port.
+      // root exposes the same probes as top-level ports.
       assert(design.firrtl.contains("layer verification"))
       assert(design.firrtl.contains("inst_src_dv$msource_rob_sig_out"))
       assert(design.firrtl.contains("inst_cluster_inst_src_dv$msource_rob_sig_out"))
-      assert(design.firrtl.contains("output memIo"))
       assert(design.firrtl.contains("define"))
       // Verilog exists for the root and both stub modules; probes stay out of the release netlist (bind layers).
       assert(design.verilog.contains("module Top"))
@@ -292,18 +282,14 @@ object DvVerilogSpec extends TestSuite:
       assert(design.firrtl.contains("layer stubinternal"))
     }
 
-    test("a testbench drives the IO and consumes the probes at the root") {
-      val resolved = Negotiator.negotiate(buildDesign())
-      val design   = Elaborator.elaborate(resolved, backends, testbench = Some(StubTestbench(resolved)))
+    test("the testbench terminates the design and takes the probes as data inputs") {
+      val resolved = Negotiator.negotiate(buildTbDesign())
+      val design   = Elaborator.elaborate(resolved, backends)
 
-      // The always-on main part receives the IO; the per-layer part sits in its layerblock, each probe leaf
-      // resolved and connected by port name.
-      assert(design.firrtl.contains("demo_dv_TbMain"))
-      assert(design.firrtl.contains("demo_dv_TbCosim"))
-      assert(design.firrtl.contains("layerblock"))
-      assert(design.firrtl.contains("tb_verification_cosim"))
-      // Top is closed: the IO feeds the testbench instead of a root port, probes produce no root-level defines.
-      assert(!design.firrtl.contains("output memIo"))
+      // The testbench is an ordinary generator instance at the root; its design edge settled like any edge and every
+      // probe leaf is resolved into its matching data input. Nothing surfaces as a root port.
+      assert(design.firrtl.contains("demo_dv_Tb"))
+      assert(!design.firrtl.contains("output inst_cluster"))
       assert(!design.firrtl.contains("define inst_cluster"))
       assert(design.verilog.contains("module Top"))
     }

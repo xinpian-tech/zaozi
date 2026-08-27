@@ -43,19 +43,15 @@ Deviations from the document's surface syntax:
   one pure-probe dangle per signal leaf, `ref.define` per wrapper boundary —
   up to the root. There is no sink and no verification bind in the design
   graph.
-- Top-level IO nodes (`ioInward`/`ioOutward`, root scope only) are ordinary
-  nodes on the design boundary: they negotiate through normal binds with the
-  internal nodes, and the settled interface surfaces as a top-level port
-  named by the val.
-- The testbench is an elaboration-time option (`TestbenchBackend`): no
-  parameter, freestyle hardware written against the query API
-  (`resolved.ios` / `resolved.probes`). Its always-on `main` part drives and
-  receives every IO; one `layer` part per FIRRTL layer consumes that layer's
-  probe leaves inside the layerblock (FIRRTL forbids both halves in one
-  instance). The framework places the instances, `ref.resolve`s every probe
-  leaf, connects by name and checks the ports with the same binding
-  checkpoint as any generator. Without a testbench, the IOs and probes
-  surface as top-level ports.
+- The testbench is a special generator module (`testbench(entry){...}`, top
+  level only, at most one): its nodes bind to the design's nodes with the
+  ordinary `<--` and negotiate like any edge, terminating the design's
+  outward-facing interfaces. Its one specialty: the framework wires every
+  probe leaf of the design into a matching data input — the build-time
+  `probes()` query (and `resolved.probes`) gives the per-leaf port names and
+  types to shape those ports and the FullParam — checked by the same binding
+  checkpoint as any generator. Without a testbench the probes surface as
+  layer-gated top-level ports.
 
 ```scala
 import me.jiuyang.syntheke.*

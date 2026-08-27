@@ -63,66 +63,59 @@ private[syntheke] object Planner:
       else LocalEndpoint.ChildPort(ms.last.path.last, dangleName(ms.last, endpoint, base))
 
     // ============ design edges ============
-    // An edge end on the design boundary (an IO node, module = root) has no instance behind it: its end is the
-    // root's own port, named by the IO node. The port faces out of the design, so its direction is the flip of the
-    // branch direction — an outward IO node reads a top-level Input, an inward IO node drives a top-level Output.
+    // ============ design edges ============
     val designParts = edges.map { e =>
-      val decl   = spec.binds(e.bind.order)
-      val a      = e.bind.source.module
-      val b      = e.bind.target.module
-      val w      = if a == b then a.parent.get else ModuleId.lca(a, b)
-      val origin = PlanOrigin.Design(e.bind)
-
-      def side(
-        end:      ModuleNodeId,
-        chainDir: PortDirection,
-        tag:      String
-      ): (Vector[PortPlan], Vector[WirePlan], LocalEndpoint) =
-        if end.module == ModuleId.root then
-          val port    = PortName(end.name)
-          val rootDir = chainDir match
-            case PortDirection.Output => PortDirection.Input
-            case PortDirection.Input  => PortDirection.Output
-          (
-            Vector(PortPlan(ModuleId.root, rootDir, port, e.interface, origin, decl.loc)),
-            Vector.empty,
-            LocalEndpoint.ThisPort(port)
-          )
-        else
-          val portName       = PortName(end.name)
-          val base           = PortName("node", end.name, tag)
-          val ms             = branchModules(end.module, w)
-          val (ports, wires) = planChain(end.module, portName, base, ms, chainDir, e.interface, origin, decl.loc)
-          (ports, wires, chainEnd(end.module, portName, base, ms))
-
-      val (srcPorts, srcWires, srcEnd) = side(e.bind.source, PortDirection.Output, "out")
-      val (tgtPorts, tgtWires, tgtEnd) = side(e.bind.target, PortDirection.Input, "in")
-      (srcPorts ++ tgtPorts, srcWires ++ tgtWires :+ WirePlan(w, srcEnd, tgtEnd, origin, decl.loc))
+      val decl                 = spec.binds(e.bind.order)
+      val a                    = e.bind.source.module
+      val b                    = e.bind.target.module
+      val w                    = if a == b then a.parent.get else ModuleId.lca(a, b)
+      val origin               = PlanOrigin.Design(e.bind)
+      val srcName              = PortName(e.bind.source.name)
+      val srcBase              = PortName("node", e.bind.source.name, "out")
+      val srcMs                = branchModules(a, w)
+      val tgtName              = PortName(e.bind.target.name)
+      val tgtBase              = PortName("node", e.bind.target.name, "in")
+      val tgtMs                = branchModules(b, w)
+      val (srcPorts, srcWires) =
+        planChain(a, srcName, srcBase, srcMs, PortDirection.Output, e.interface, origin, decl.loc)
+      val (tgtPorts, tgtWires) =
+        planChain(b, tgtName, tgtBase, tgtMs, PortDirection.Input, e.interface, origin, decl.loc)
+      val lcaWire              =
+        WirePlan(w, chainEnd(a, srcName, srcBase, srcMs), chainEnd(b, tgtName, tgtBase, tgtMs), origin, decl.loc)
+      (srcPorts ++ tgtPorts, srcWires ++ tgtWires :+ lcaWire)
     }
 
     // ============ probe sources ============
-    // One pure-probe dangle port and define chain per signal leaf of every source interface, on every wrapper from
-    // the source's parent up to and including the root: probes never form aggregates in hardware, so Vec leaves route
-    // like any other and no open aggregate types are needed. The root's ports are the top-level probe ports.
+    // One pure-probe dangle port and define chain per signal leaf of every source interface: probes never form
+    // aggregates in hardware, so Vec leaves route like any other and no open aggregate types are needed. With a
+    // testbench the chain ends in a wire from the last dangle into the testbench's matching input port at the root;
+    // without one the root's dangle ports are the top-level probe ports.
     val dvParts = for
       g                <- spec.generatorModules
       s                <- g.dvSources
       (leafPath, leaf) <- ProtocolBundle.leaves(s.interface)
     yield
-      val origin         = PlanOrigin.Verification(DVSourceId(g.id, s.name))
-      val ms             = ancestors(g.id)
-      val (ports, wires) = planChain(
-        endpoint = g.id,
-        portName = PortName(s.name +: leafPath.nameSegments),
-        base = PortName.dvBase(s.name, leafPath),
-        ms = ms,
-        direction = PortDirection.Output,
-        interface = leaf,
-        origin = origin,
-        loc = s.loc
-      )
-      // Layer declarations on every wrapper hosting a colored probe port.
-      (ports, wires, ms.map(_ -> s.layer))
+      val origin   = PlanOrigin.Verification(DVSourceId(g.id, s.name))
+      val portName = PortName(s.name +: leafPath.nameSegments)
+      val base     = PortName.dvBase(s.name, leafPath)
+      spec.testbench match
+        case Some(tb) =>
+          val ms             = branchModules(g.id, ModuleId.root)
+          val (ports, wires) = planChain(g.id, portName, base, ms, PortDirection.Output, leaf, origin, s.loc)
+          val tbWire         = WirePlan(
+            ModuleId.root,
+            chainEnd(g.id, portName, base, ms),
+            LocalEndpoint.ChildPort(tb.path.last, PortName.dangle(ModuleId.root, g.id, base)),
+            origin,
+            s.loc
+          )
+          // The root resolves the probes it feeds to the testbench, so it declares their layers too.
+          (ports, wires :+ tbWire, (ms :+ ModuleId.root).map(_ -> s.layer))
+        case None     =>
+          val ms             = ancestors(g.id)
+          val (ports, wires) = planChain(g.id, portName, base, ms, PortDirection.Output, leaf, origin, s.loc)
+          // Layer declarations on every wrapper hosting a colored probe port.
+          (ports, wires, ms.map(_ -> s.layer))
 
     val layers = dvParts
       .flatMap(_._3)

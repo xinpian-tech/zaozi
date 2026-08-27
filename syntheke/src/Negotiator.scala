@@ -68,13 +68,7 @@ object Negotiator:
             s"which is not an ancestor of both endpoints, at ${at(b.loc)}"
         )
     }
-    // IO nodes are ordinary nodes on the design boundary; every check below treats them uniformly. A bind between
-    // two IO nodes would put no hardware between its ends — reject.
-    spec.binds.foreach { b =>
-      if b.source.module == ModuleId.root && b.target.module == ModuleId.root then
-        fail(s"bind ${b.source.show} -> ${b.target.show} connects two IO nodes, at ${at(b.loc)}")
-    }
-    val allNodes = spec.generatorModules.flatMap(g => g.nodes.map(g.id -> _)) ++ spec.ioNodes.map(ModuleId.root -> _)
+    val allNodes = spec.generatorModules.flatMap(g => g.nodes.map(g.id -> _))
 
     val asSource = spec.binds.groupBy(_.source)
     val asTarget = spec.binds.groupBy(_.target)
@@ -159,14 +153,12 @@ object Negotiator:
       * pred inward nodes for a dFn, succ outward nodes for a uFn.
       */
     def readsOf(id: ModuleNodeId, direction: NodeDirection): Vector[(ModuleNodeId, ParamDependencySpec)] =
-      if id.module == ModuleId.root then Vector.empty // IO nodes have no module-internal dependencies
-      else
-        val g    = modOf(id)
-        val name = id.name
-        val deps = direction match
-          case NodeDirection.Outward => g.dependencies.filter(_.to == name).map(d => (ModuleNodeId(g.id, d.from), d))
-          case NodeDirection.Inward  => g.dependencies.filter(_.from == name).map(d => (ModuleNodeId(g.id, d.to), d))
-        deps.sortBy((n, _) => g.node(n.name).get.order)
+      val g    = modOf(id)
+      val name = id.name
+      val deps = direction match
+        case NodeDirection.Outward => g.dependencies.filter(_.to == name).map(d => (ModuleNodeId(g.id, d.from), d))
+        case NodeDirection.Inward  => g.dependencies.filter(_.from == name).map(d => (ModuleNodeId(g.id, d.to), d))
+      deps.sortBy((n, _) => g.node(n.name).get.order)
 
     def evaluate(values: Map[ModuleNodeId, Any], id: ModuleNodeId, downSide: Boolean): Any =
       val n     = specOf(id)

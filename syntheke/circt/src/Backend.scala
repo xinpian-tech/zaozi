@@ -65,39 +65,6 @@ object GeneratorBackend:
     val hash    = digest.take(8).map(b => f"$b%02x").mkString
     s"${entry.name.map(c => if c.isLetterOrDigit then c else '_')}_$hash"
 
-/** The optional testbench at the design's top level (doc @sec-dv-testbench): freestyle hardware written against one
-  * concrete [[ResolvedDesign]] — no parameter, no registry entry. The author holds the resolved design and reads
-  * `resolved.ios` / `resolved.probes` to build the modules; like a generator backend, each part is dumped as a
-  * per-module `.mlirbc` circuit and the returned instance references it by name.
-  *
-  * FIRRTL forces the split: values resolved from layer-colored probes cannot leave their layerblock, and logic inside a
-  * layerblock cannot drive signals outside it. So the IO-driving part is one always-on instance and the probe consumers
-  * are one instance per layer, inside that layer's layerblock (whose module therefore must not contain layerblocks of
-  * its own).
-  */
-trait TestbenchBackend:
-
-  /** The always-on part: one port per IO node, named by it, with the settled interface and the opposite root direction
-    * — the testbench drives what the design reads and reads what it drives.
-    */
-  def main(
-    instanceName: String
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Operation
-
-  /** The per-layer part: one data input per probe leaf of the layer, named [[ProbeLeaf.portName]]. */
-  def layer(
-    layer:        LayerPath,
-    instanceName: String
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Operation
-
 /** The zaozi backend: a syntheke generator entry enacted by a zaozi [[Generator]].
   *
   * `toParam` recovers the zaozi parameter from the syntheke full parameter — typically an identity or a projection,

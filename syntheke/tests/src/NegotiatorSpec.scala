@@ -265,73 +265,61 @@ object NegotiatorSpec extends TestSuite:
       )
     }
 
-    test("IO nodes negotiate like ordinary nodes and surface as root ports") {
+    test("the testbench is a generator module: standard binds, probes wired into it") {
       val spec     = Design {
-        val chip   = wrapper {
-          val core = generator(intEntry("IoCore")) {
+        val cluster = wrapper {
+          val core = generator(intEntry("TbCore")) {
             parametersConst(0)
-            val mem  = outward(Wid).dFn(_ => Right(32))
-            val ctrl = inward(Wid).uFn(_ => Right(16))
-            (mem, ctrl)
+            val mem = outward(Wid).dFn(_ => Right(32))
+            val rob = dvSource(Trace)(8, LayerPath(Vector("verification")))
+            mem
           }
           core
         }
-        val memIo  = ioInward(Wid).uFn(_ => Right(64))
-        val ctrlIo = ioOutward(Wid).dFn(_ => Right(8))
-        memIo <-- chip._1
-        chip._2 <-- ctrlIo
+        // The build-time query: everything declared so far, with per-leaf port names and data types.
+        val ps      = probes()
+        assert(ps.map(_.id.show) == Vector("cluster.core#rob"))
+        assert(ps.flatMap(_.leaves.map(_.portName)) == Vector("inst_cluster_inst_core_dv$msource_rob_sig_out"))
+        val tb      = testbench(intEntry("Tb")) {
+          parametersConst(0)
+          val mem = inward(Wid).uFn(_ => Right(64))
+          mem
+        }
+        tb <-- cluster
       }
+      assert(spec.testbench == Some(ModuleId.root / "tb"))
       val resolved = Negotiator.negotiate(spec)
 
-      // The IO nodes negotiated like any node: mem settles to 32 within capacity 64, ctrl to 8 within 16.
-      val ios = resolved.ios
-      assert(
-        ios.map(io => (io.name, io.direction)) ==
-          Vector("memIo" -> NodeDirection.Inward, "ctrlIo" -> NodeDirection.Outward)
-      )
-      assert(ios(0).edge.edgeAs(Wid) == 32)
-      assert(ios(1).edge.edgeAs(Wid) == 8)
+      // The design edge into the testbench settled like any edge; nothing surfaces as a root port.
+      assert(resolved.edges.head.edgeAs(Wid) == 32)
+      assert(resolved.portPlans.filter(_.module == ModuleId.root).isEmpty)
 
-      // Root ports: the inward IO is a top-level Output, the outward IO a top-level Input, named by the vals.
-      val rootPorts = resolved.portPlans.filter(_.module == ModuleId.root)
+      // The probe chain ends in a wire from the cluster's dangle into the testbench's matching input.
+      val dvWires =
+        resolved.wirePlans.filter(w => w.module == ModuleId.root && w.origin.isInstanceOf[PlanOrigin.Verification])
       assert(
-        rootPorts.map(p => (p.name.encoded, p.direction)) ==
-          Vector("memIo" -> PortDirection.Output, "ctrlIo" -> PortDirection.Input)
-      )
-      val rootWires = resolved.wirePlans.filter(_.module == ModuleId.root)
-      assert(
-        rootWires.map(w => (w.from, w.to)) == Vector(
-          LocalEndpoint.ChildPort("chip", PortName("inst", "core", "node", "mem", "out")) ->
-            LocalEndpoint.ThisPort(PortName("memIo")),
-          LocalEndpoint.ThisPort(PortName("ctrlIo"))                                      ->
-            LocalEndpoint.ChildPort("chip", PortName("inst", "core", "node", "ctrl", "in"))
+        dvWires.map(w => (w.from, w.to)) == Vector(
+          LocalEndpoint.ChildPort("cluster", PortName("inst", "core", "dv-source", "rob", "sig", "out")) ->
+            LocalEndpoint.ChildPort("tb", PortName("inst", "cluster", "inst", "core", "dv-source", "rob", "sig", "out"))
         )
       )
 
-      // A bind between two IO nodes has no hardware between its ends.
-      val ioToIo = Design {
-        val a = ioOutward(Wid).dFn(_ => Right(1))
-        val b = ioInward(Wid).uFn(_ => Right(1))
-        b <-- a
-      }
-      val e      = intercept[NegotiationException](Negotiator.negotiate(ioToIo))
-      assert(e.getMessage.contains("connects two IO nodes"))
-
-      // IO nodes live on the top level only; their parameter function is mandatory.
+      // Top level only, at most one.
       val nested = intercept[IllegalArgumentException] {
         Design {
           val sub = wrapper {
-            val x = ioInward(Wid)
+            val t = testbench(intEntry("T2")) { parametersConst(0) }
           }
         }
       }
-      assert(nested.getMessage.contains("IO nodes live on the design's top level"))
-      val noFn   = intercept[IllegalStateException] {
+      assert(nested.getMessage.contains("the testbench lives on the top level"))
+      val twice  = intercept[IllegalArgumentException] {
         Design {
-          val x = ioInward(Wid)
+          val a = testbench(intEntry("T3")) { parametersConst(0) }
+          val b = testbench(intEntry("T4")) { parametersConst(0) }
         }
       }
-      assert(noFn.getMessage.contains("uFn is mandatory"))
+      assert(twice.getMessage.contains("already declared"))
     }
 
     test("the four tooling exports carry stable identifiers and canonical order") {

@@ -16,56 +16,13 @@ import scala.collection.mutable
   * protocol object, dependency endpoints have the right directions) is checked nowhere else.
   */
 
-/** Where a node builder records its function and references: a generator scope, or the design boundary for top-level IO
-  * nodes.
-  */
-private[syntheke] trait NodeScope:
-  private[syntheke] def recordFn(name:  String, f:    Map[ModuleNodeId, Any] => Either[Violation, Any]): Unit
-  private[syntheke] def recordRef(name: String, spec: CrossProtocolRefSpec):                             Unit
-
 /** Recording state of one `Design` build; append-only, frozen into the [[DesignSpec]] when the body returns. */
 private final class BuildState:
   val modules     = mutable.Map.empty[ModuleId, ModuleSpec]
   val moduleOrder = mutable.ArrayBuffer.empty[ModuleId]
   val binds       = mutable.ArrayBuffer.empty[BindDecl]
   val generators  = mutable.ArrayBuffer.empty[GeneratorEntry[?]]
-
-  // Top-level IO nodes (doc @sec-io-nodes): ordinary nodes living on the design boundary, recorded like a generator
-  // scope's nodes. The root module closes last, so "root not yet closed" is the openness rule for late attachments.
-  val ioNodes = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, (sourcecode.File, sourcecode.Line))]
-  val ioFns   = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[Violation, Any]]
-  val ioRefs  = mutable.ArrayBuffer.empty[(String, CrossProtocolRefSpec)]
-  val ioScope: NodeScope = new NodeScope:
-    private def requireOpen(name: String):                                                             Unit =
-      require(!modules.contains(ModuleId.root), s"declaration on IO node '$name' outside the design body")
-    private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[Violation, Any]): Unit =
-      requireOpen(name)
-      require(!ioFns.contains(name), s"port parameter function of IO node '$name' already set")
-      ioFns(name) = f
-    private[syntheke] def recordRef(name: String, spec: CrossProtocolRefSpec):                         Unit =
-      requireOpen(name)
-      ioRefs += (name -> spec)
-
-  def ioNodeSpecs: Vector[NodeSpec] =
-    ioNodes.toVector.zipWithIndex.map { case ((b, direction, declLoc), order) =>
-      val fn = ioFns.getOrElse(
-        b.id.name,
-        throw new IllegalStateException(
-          s"IO node ${b.id.show}: ${
-              if direction == NodeDirection.Inward then "uFn" else "dFn"
-            } is mandatory but was never set"
-        )
-      )
-      NodeSpec(
-        name = b.id.name,
-        direction = direction,
-        protocol = b.protocol,
-        fn = fn,
-        refs = ioRefs.collect { case (n, spec) if n == b.id.name => spec }.toVector,
-        order = order,
-        loc = declLoc
-      )
-    }
+  val testbenches = mutable.ArrayBuffer.empty[ModuleId] // at most one, enforced at the declaration
 
   // Generator scopes currently under construction. Context functions stack rather than shadow, so the enclosing
   // WrapperScope stays visible inside a generator body; structure and binds declared there would silently attach to
@@ -134,39 +91,35 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     scope.close((file, line))
     result
 
-  private def reserveIoName(name: String): Unit =
-    require(id == ModuleId.root, s"IO node '$name' declared in ${id.show}: IO nodes live on the design's top level")
-    st.requireNotInLeaf(s"IO node '$name'")
-    DeclaredName.require(name, "IO node name")
-    require(!st.ioNodes.exists(_._1.id.name == name), s"duplicate IO node name '$name'")
-
-  /** Declare a named top-level inward IO node: it terminates an internal outward node and surfaces as top-level IO. */
-  def ioInward(
-    p:    Protocol
-  )(name: String
+  /** Instantiate the testbench generator module (doc @sec-dv-testbench): root scope only, at most one per design. */
+  def testbench[FP, A: Dangles](
+    name:  String,
+    entry: GeneratorEntry[FP]
+  )(body:  GeneratorScope[FP] ?=> A
   )(
     using
-    file: sourcecode.File,
-    line: sourcecode.Line
-  ): p.Inward =
-    reserveIoName(name)
-    val b = new InwardNodeBuilder[p.type](p, st.ioScope, ModuleNodeId(id, name))
-    st.ioNodes += ((b, NodeDirection.Inward, (file, line)))
-    b
+    file:  sourcecode.File,
+    line:  sourcecode.Line
+  ): A =
+    require(id == ModuleId.root, s"testbench '$name' declared in ${id.show}: the testbench lives on the top level")
+    require(
+      st.testbenches.isEmpty,
+      s"testbench '$name': testbench '${st.testbenches.headOption.fold("")(_.show)}' already declared"
+    )
+    val result = generator(name, entry)(body)
+    st.testbenches += (id / name)
+    result
 
-  /** Declare a named top-level outward IO node: it feeds an internal inward node from top-level IO. */
-  def ioOutward(
-    p:    Protocol
-  )(name: String
-  )(
-    using
-    file: sourcecode.File,
-    line: sourcecode.Line
-  ): p.Outward =
-    reserveIoName(name)
-    val b = new OutwardNodeBuilder[p.type](p, st.ioScope, ModuleNodeId(id, name))
-    st.ioNodes += ((b, NodeDirection.Outward, (file, line)))
-    b
+  /** All probe sources declared so far, with their leaves (doc @sec-dv-testbench): the build-time query a testbench
+    * author uses to shape its probe inputs and full parameter.
+    */
+  def probes: Vector[ProbeSource] =
+    ProbeSource.of(
+      st.moduleOrder.toVector
+        .flatMap(m => st.modules.get(m))
+        .collect { case g: GeneratorModuleSpec => g.dvSources.map(g.id -> _) }
+        .flatten
+    )
 
   private[syntheke] def recordBind(
     source: ModuleNodeId,
@@ -180,8 +133,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     st.modules(id) = WrapperModuleSpec(id, children.toVector, loc)
 
 /** A generator module under construction: nodes, dependencies, verification endpoints and parameter functions. */
-final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP])
-    extends NodeScope:
+final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP]):
   private val nodes  = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, (sourcecode.File, sourcecode.Line))]
   private val fns    = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[Violation, Any]]
   private val refs   = mutable.ArrayBuffer.empty[(String, CrossProtocolRefSpec)]

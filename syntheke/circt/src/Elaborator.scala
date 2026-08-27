@@ -40,7 +40,6 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
-  LayerBlockApi,
   ModuleApi,
   RefDefineApi,
   RefResolveApi
@@ -100,7 +99,6 @@ object Elaborator:
   def elaborate(
     resolved:  ResolvedDesign,
     backends:  Seq[GeneratorBackend],
-    testbench: Option[TestbenchBackend] = None,
     mlirbcDir: os.Path = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
   ): ElaboratedDesign =
     val backendOf: Map[GeneratorEntry[?], GeneratorBackend] = backends.map(b => (b.entry: GeneratorEntry[?]) -> b).toMap
@@ -225,21 +223,17 @@ object Elaborator:
             emitLayers(sub, Some(op))
           }
 
-        // With a testbench nothing surfaces as root ports: the IOs feed its always-on main instance and the probes,
-        // grouped per layer, are resolved into per-layer instances inside layerblocks (doc @sec-dv-testbench).
-        val tbByLayer: Vector[(LayerPath, Vector[ProbeSource])] =
-          if testbench.isEmpty then Vector.empty
-          else resolved.probes.groupBy(_.layer).toVector.sortBy(_._1.segments.mkString("."))
+        // With a testbench declared, every probe leaf of the design becomes one of its data inputs (doc
+        // @sec-dv-testbench); the binding checkpoint expects those ports on the testbench instance.
+        val tbLeaves: Vector[ProbeLeaf] =
+          if spec.testbench.isEmpty then Vector.empty else resolved.probes.flatMap(_.leaves)
 
         // ============ wrapper modules: one firrtl.module per instance ============
         spec.moduleOrder.foreach { id =>
           spec.wrapper(id).foreach { w =>
             val name       = moduleNames(id)
             // Definition and instance emission both sort ports by encoded name, so parent and child agree.
-            val ports      = resolved.portPlans
-              .filter(_.module == id)
-              .filterNot(_ => testbench.isDefined && id == ModuleId.root)
-              .sortBy(_.name.encoded)
+            val ports      = resolved.portPlans.filter(_.module == id).sortBy(_.name.encoded)
             val portFields = ports.map { p =>
               summon[FirrtlBundleFieldApi].createFirrtlBundleField(
                 p.name.encoded,
@@ -272,7 +266,11 @@ object Elaborator:
                     ProtocolBundle.leaves(s.interface).map { (path, leaf) =>
                       (PortName(s.name +: path.nameSegments).encoded, true, leaf)
                     }
-                  }
+                  } ++ (
+                    // The testbench additionally takes every probe leaf of the design as a data input.
+                    if spec.testbench.contains(childId) then tbLeaves.map(l => (l.portName, false, l.tpe))
+                    else Vector.empty
+                  )
                   checkedPorts(instOp, expected, childId.show, gm.loc.show).toVector.map((n, v) => ((c, n), v))
                 case _:  WrapperModuleSpec   =>
                   val childPorts = resolved.portPlans.filter(_.module == childId).sortBy(_.name.encoded)
@@ -296,51 +294,11 @@ object Elaborator:
 
             val childValues = w.children.flatMap(emitChild).toMap
 
-            // The testbench's always-on main instance at the root: one port per IO node, named by it, direction
-            // mirrored — the IO wires connect to these ports instead of root ports.
-            val tbMainPorts: Map[String, Value] =
-              if testbench.isEmpty || id != ModuleId.root || resolved.ios.isEmpty then Map.empty
-              else
-                val instOp = testbench.get.main("testbench")
-                checkedPorts(
-                  instOp,
-                  resolved.ios.map(io => (io.name, io.direction == NodeDirection.Outward, io.edge.interface)),
-                  "testbench",
-                  w.loc.show
-                )
-
-            // The testbench's per-layer instances inside their nested layerblocks: the layer's probe leaves are
-            // resolved and connected by port name.
-            val tbLayerPorts: Map[String, (Block, Value)] =
-              if id != ModuleId.root then Map.empty
-              else
-                tbByLayer.flatMap { (layer, sources) =>
-                  val lb     = layer.segments.indices.foldLeft(summon[Block]) { (outer, i) =>
-                    val block = summon[LayerBlockApi].op(layer.segments.take(i + 1), unknownLoc)
-                    locally {
-                      given Block = outer
-                      block.operation.appendToBlock()
-                    }
-                    block.block
-                  }
-                  val instOp = locally {
-                    given Block = lb
-                    testbench.get.layer(layer, PortName("tb" +: layer.segments).encoded)
-                  }
-                  val leaves = sources.flatMap(_.leaves)
-                  val byName =
-                    checkedPorts(instOp, leaves.map(l => (l.portName, false, l.tpe)), "testbench", w.loc.show)
-                  leaves.map(l => l.portName -> (lb, byName(l.portName)))
-                }.toMap
-
             def baseOf(e: LocalEndpoint): Value = e match
               case LocalEndpoint.ThisPort(name)        =>
-                val n = name.encoded
                 portIndex
-                  .get(n)
-                  .map(i => module.getIO(i))
-                  .orElse(tbMainPorts.get(n))
-                  .getOrElse(fail(s"$name: missing port $n"))
+                  .get(name.encoded)
+                  .fold(fail(s"$name: missing port ${name.encoded}"))(i => module.getIO(i))
               case LocalEndpoint.ChildPort(inst, port) =>
                 childValues.getOrElse(
                   (inst, port.encoded),
@@ -354,18 +312,13 @@ object Elaborator:
                 case PlanOrigin.Verification(_) =>
                   // Each verification wire forwards one probe leaf across this boundary (doc @sec-dv-routing).
                   wp.to match
-                    case LocalEndpoint.ThisPort(n) if tbLayerPorts.contains(n.encoded) =>
-                      // The root with a testbench: resolve the probe inside the layer instance's layerblock and
-                      // connect the data leaf to its port of the same name.
-                      val (lb, dst) = tbLayerPorts(n.encoded)
-                      locally {
-                        given Block = lb
-                        val res     = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
-                        res.operation.appendToBlock()
-                        summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
-                      }
-                    case _                                                             =>
-                      // Pass-through: define the dangle — without a testbench, at the root, the top-level probe
+                    case LocalEndpoint.ChildPort(_, _) =>
+                      // The testbench end at the root: resolve the probe and connect the data into its input.
+                      val res = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
+                      res.operation.appendToBlock()
+                      summon[ConnectApi].op(res.result, baseOf(wp.to), unknownLoc).operation.appendToBlock()
+                    case LocalEndpoint.ThisPort(_)     =>
+                      // Pass-through: define the dangle — at the root without a testbench, the top-level probe
                       // port — from the child's probe port.
                       summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
             }
