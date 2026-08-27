@@ -45,7 +45,7 @@
 
 每条设计 bind 的源、目标节点必须存在，声明该 bind 的结构模块必须是两端节点所在模块的祖先（@sec-node-conn-proto）。源节点方向为 outward，目标节点方向为 inward，两端协议匹配；每个 outward 节点恰好作为一次 bind 的源，每个 inward 节点恰好作为一次 bind 的目标。节点的数量在构建期已经固定，结构校验分别核对每个 outward 节点在 bind 源中出现一次、每个 inward 节点在 bind 目标中出现一次。
 
-模块内部只保存一份从本模块 inward 节点指向 outward 节点的参数依赖边集；每条依赖带声明顺序和源码位置。outward 节点的前驱与 inward 节点的后继都从该边集派生，按节点声明顺序排列。重复依赖边非法。每个 outward 节点必须携带 `dFn`，每个 inward 节点必须携带 `uFn`，函数字段不可选；函数可读的节点集合与依赖边集来自同一次声明（@sec-generator-module）。
+模块内部只保存一份从本模块 inward 节点指向 outward 节点的参数依赖边集；每条依赖带声明顺序和源码位置。outward 节点的前驱与 inward 节点的后继都从该边集派生，按节点声明顺序排列。重复依赖边非法。每个 outward 节点必须携带 `dFn`，每个 inward 节点必须携带 `uFn`，函数字段不可选；函数可读的节点集合与依赖边集来自同一次声明（@sec-generator-module）。顶层 IO 节点（@sec-io-nodes）与生成器节点同等参与以上检查、拓扑排序与两遍传播，它没有模块内部参数依赖；两个 IO 节点之间的 bind 非法。
 
 `Down` 参数依赖 DAG 由以下两类边组成：每条 bind 从源 outward 节点指向目标 inward 节点；每条模块内部参数依赖从 inward 节点指向 outward 节点。`Up` 参数依赖 DAG 反转上述全部方向。结构校验检查 `Down` 图无环；`Up` 是它的反向图，自动无环。稳定拓扑排序在多个节点均可选择时，采用模块的层次树先序和节点声明顺序打破平局；`Up` 直接使用同一拓扑序的逆序。检测到环时，错误包含环上的全部 `ModuleNodeId`、`BindId`、模块内部参数依赖和源码位置。
 
