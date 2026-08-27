@@ -352,11 +352,10 @@ object Negotiator:
         if a == b then fail(s"sinkPaths($i) and sinkPaths($j) are identical")
         if a.isPrefixOf(b) || b.isPrefixOf(a) then fail(s"sinkPaths($i) and sinkPaths($j) overlap")
       }
-      // Structural equality with the source interface; per-source layer on the selected subtree.
+      // Structural equality with the source interface; equality carries the per-source layer contract with it.
       resolvedPaths.foreach { (i, path, bundle) =>
         if bundle != interfaces.sources(i) then
           fail(s"sink Bundle at ${path.show} differs structurally from sources($i)")
-        leavesProbesWith(bundle, layers(i)).foreach(v => fail(s"sink subtree at ${path.show}: $v"))
       }
       // Exact cover: non-overlapping subtrees whose leaf count equals the sink leaf count.
       val selectedLeaves = resolvedPaths.map((_, _, b) => ProtocolBundle.leaves(b).size).sum

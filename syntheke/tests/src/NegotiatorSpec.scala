@@ -330,5 +330,17 @@ object NegotiatorSpec extends TestSuite:
       assert(badEndpoint.getMessage.contains("'dv-source' is not a legal name"))
       val badLayer    = intercept[IllegalArgumentException] { LayerPath(Vector("verification", "")) }
       assert(badLayer.getMessage.contains("not a legal name"))
+
+      // Generator modules are leaves: the enclosing WrapperScope stays visible inside a generator body, but
+      // declaring structure there is rejected on the spot instead of silently attaching to the outer wrapper.
+      val nested = intercept[IllegalArgumentException] {
+        Design {
+          generator("g", intEntry("G")) {
+            parametersConst(0)
+            wrapper("sub") {}
+          }
+        }
+      }
+      assert(nested.getMessage.contains("instance 'sub' declared inside generator body g"))
     }
   }

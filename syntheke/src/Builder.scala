@@ -47,6 +47,16 @@ private final class BuildState:
   val protocols   = mutable.ArrayBuffer.empty[(ProtocolId, AnyRef)]
   val generators  = mutable.ArrayBuffer.empty[GeneratorEntry[?]]
 
+  // Generator scopes currently under construction. Context functions stack rather than shadow, so the enclosing
+  // WrapperScope stays visible inside a generator body; structure and binds declared there would silently attach to
+  // the outer wrapper. Generator modules are leaves (doc @sec-module-kinds) — reject at the declaration.
+  val openLeaves = mutable.ArrayBuffer.empty[ModuleId]
+  def requireNotInLeaf(what: String): Unit =
+    require(
+      openLeaves.isEmpty,
+      s"$what declared inside generator body ${openLeaves.last.show}: generator modules are leaves"
+    )
+
   def registerProtocol(id: ProtocolId, p: AnyRef): Unit =
     if !protocols.exists((i, o) => i == id && (o eq p)) then protocols += (id -> p)
   def registerGenerator(e: GeneratorEntry[?]):     Unit =
@@ -138,6 +148,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
   private val children = mutable.ArrayBuffer.empty[String]
 
   private def addChild(name: String): ModuleId =
+    st.requireNotInLeaf(s"instance '$name'")
     DeclaredName.require(name, s"instance name in ${id.show}")
     require(!children.contains(name), s"duplicate child instance name '$name' in ${id.show}")
     children += name
@@ -171,16 +182,20 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
   ): A =
     val childId = addChild(name)
     st.registerGenerator(entry)
+    st.openLeaves += childId
     val scope   = new GeneratorScope[FP](childId, st, entry)
     val result  = body(
       using scope
     )
+    st.openLeaves.dropRightInPlace(1)
     scope.close(loc)
     result
 
   private[syntheke] def recordBind(source: ModuleNodeId, target: ModuleNodeId, loc: SourceLocation): Unit =
+    st.requireNotInLeaf(s"bind ${source.show} -> ${target.show}")
     st.binds += BindDecl(st.binds.size, source, target, id, loc)
   private[syntheke] def recordDVBind(source: DVSourceId, sink: DVSinkId, loc: SourceLocation):       Unit =
+    st.requireNotInLeaf(s"verification bind ${source.show} -> ${sink.show}")
     st.dvBinds += DVBindDecl(st.dvBinds.size, source, sink, id, loc)
 
   private[syntheke] def close(loc: SourceLocation): Unit =

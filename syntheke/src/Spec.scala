@@ -11,10 +11,10 @@ package me.jiuyang.syntheke
 enum NodeDirection derives CanEqual:
   case Inward, Outward
 
-/** Violation value returned by a port parameter function (doc @sec-propagation, error N2). */
+/** Violation value returned by a port parameter function (doc @sec-propagation). */
 final case class PropagationViolation(message: String)
 
-/** Violation value returned by `computeProtocolParam` capability checking (doc @sec-settle-pp, error N5). */
+/** Violation value returned by `computeProtocolParam` capability checking (doc @sec-settle-pp). */
 final case class CapabilityViolation(message: String)
 
 /** A cross-protocol reference: a node names another node of the same module (its clock or power node); settlement
