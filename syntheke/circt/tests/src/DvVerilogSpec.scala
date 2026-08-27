@@ -119,10 +119,8 @@ final class StubBackend[FP](
         layers.foldLeft(LayerTree.empty)((t, p) => t.add(LayerPath(p))),
         None
       )
-      // An internal layer unrelated to any routed probe: the linker must carry its definition into the design
-      // circuit, or verification fails on the layerblock below. Only output-only stubs (probe sources) carry it —
-      // the testbench harness is instantiated under a layerblock, where a module with its own layerblock would be
-      // illegal nesting.
+      // An internal layer unrelated to any routed probe, carried by output-only stubs (probe sources): the linker
+      // must carry its definition into the design circuit, or verification fails on the layerblock below.
       val internalLayer = !p.ports.exists(_.isInput)
       if internalLayer then
         summon[Circuit].block.appendOwnedOperation(
