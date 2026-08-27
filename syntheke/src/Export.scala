@@ -31,7 +31,7 @@ object Export:
   /** `topology.json`: the module tree, nodes, binds, dependencies and verification endpoints with stable ids. */
   def topology(spec: DesignSpec): ujson.Value =
     ujson.Obj(
-      "modules" -> ujson.Arr.from(spec.moduleOrder.map { id =>
+      "modules"   -> ujson.Arr.from(spec.moduleOrder.map { id =>
         spec.modules(id) match
           case w: WrapperModuleSpec   =>
             ujson.Obj(
@@ -74,9 +74,10 @@ object Export:
               "loc"          -> loc(g.loc)
             )
       }),
-      "binds"   -> ujson.Arr.from(spec.binds.map { b =>
+      "binds"     -> ujson.Arr.from(spec.binds.map { b =>
         ujson.Obj("id" -> bindId(b.bindId), "declaredIn" -> moduleId(b.declaredIn), "loc" -> loc(b.loc))
-      })
+      }),
+      "testbench" -> spec.testbench.fold[ujson.Value](ujson.Null)(moduleId)
     )
 
   private def write(rw: upickle.default.ReadWriter[?], value: Any): ujson.Value =

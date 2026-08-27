@@ -421,6 +421,7 @@ object NegotiatorSpec extends TestSuite:
         tb._2 <-- tail
       }
       assert(spec.testbench == Some(ModuleId.root / "tb"))
+      assert(Export.topology(spec)("testbench") == ujson.Arr(ujson.Str("tb")))
       val resolved = Negotiator.negotiate(spec)
 
       // The design edges into the testbench settled like any edge; nothing surfaces as a root port.
@@ -471,6 +472,7 @@ object NegotiatorSpec extends TestSuite:
       val topology = Export.topology(resolved.spec)
       assert(topology("modules").arr.head("id") == ujson.Arr()) // root first: hierarchy preorder
       assert(topology("binds").arr.size == 4)
+      assert(topology("testbench") == ujson.Null)
       val edges   = Export.edges(resolved)
       assert(edges("designEdges").arr.map(_("id")("order").num.toInt) == Seq(0, 1, 2, 3))
       assert(edges("designEdges").arr.head("edge") == ujson.Num(32))
