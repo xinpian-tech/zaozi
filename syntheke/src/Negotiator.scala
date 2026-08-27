@@ -50,9 +50,13 @@ object Negotiator:
 
   private def structuralCheck(spec: DesignSpec): TopoOrder =
     // Generator registry: one name — one entry. The name keys module naming, dedup and linking, so two distinct
-    // entries sharing it would collide in the flat symbol namespace.
-    spec.generators.groupBy(_.name).foreach { (name, entries) =>
-      if entries.sizeIs > 1 then fail(s"generator name '$name' used by ${entries.size} distinct registry entries")
+    // entries sharing it would collide in the flat symbol namespace. First-use order keys the first error.
+    spec.generators.foldLeft(Set.empty[String]) { (seen, e) =>
+      if seen(e.name) then
+        fail(
+          s"generator name '${e.name}' used by ${spec.generators.count(_.name == e.name)} distinct registry entries"
+        )
+      seen + e.name
     }
 
     // Design binds : endpoint existence (builders can leak across Design builds), declaration-site ancestry,
@@ -118,14 +122,20 @@ object Negotiator:
 
     val sorted = kahn(SortedSet.from(nodeIds.filter(indegree(_) == 0)), indegree, Vector.empty)
     if sorted.size < nodeIds.size then
-      // Shrink to the cycles themselves: drop nodes without both a predecessor and a successor inside the
-      // remainder, so nodes merely blocked downstream of a cycle are not reported as part of it.
-      @annotation.tailrec
-      def shrink(s: Set[ModuleNodeId]): Set[ModuleNodeId] =
-        val s2 = s.filter(id => successors(id).exists(s) && predecessors(id).exists(s))
-        if s2 == s then s else shrink(s2)
-      val onCycle = shrink(nodeIds.toSet -- sorted)
-      val members = nodeIds.filter(onCycle).sortBy(nodeKey)
+      // Exactly the nodes on cycles: those that reach themselves inside the unsorted remainder — a node merely on a
+      // path between two cycles is not a cycle member.
+      val remainder = nodeIds.toSet -- sorted
+      def cyclic(id: ModuleNodeId): Boolean =
+        @annotation.tailrec
+        def go(frontier: Vector[ModuleNodeId], seen: Set[ModuleNodeId]): Boolean = frontier match
+          case head +: tail =>
+            if head == id then true
+            else if seen(head) then go(tail, seen)
+            else go(tail ++ successors(head).filter(remainder), seen + head)
+          case _            => false
+        go(successors(id).filter(remainder).toVector, Set.empty)
+      val members = remainder.toVector.filter(cyclic).sortBy(nodeKey)
+      val onCycle = members.toSet
       val locs    = members.flatMap(id => spec.nodeSpec(id).map(_.loc)) ++
         spec.binds.filter(b => onCycle(b.source) && onCycle(b.target)).map(_.loc) ++
         spec.generatorModules.flatMap(g =>

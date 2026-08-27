@@ -244,6 +244,80 @@ object NegotiatorSpec extends TestSuite:
       Vector("a#in", "a#out", "b#in", "b#out").foreach(n => assert(e.getMessage.contains(n)))
     }
 
+    test("two distinct entries sharing a generator name are rejected") {
+      val spec = Design {
+        val p = generator(intEntry("Same")) {
+          parameters(_ => Right(0))
+          val o = outward(Wid).dFn(_ => Right(1))
+          o
+        }
+        val c = generator(intEntry("Same")) {
+          parameters(_ => Right(0))
+          val i = inward(Wid).uFn(_ => Right(1))
+          i
+        }
+        c <-- p
+      }
+      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
+      assert(e.getMessage.contains("generator name 'test.Same' used by 2 distinct registry entries"))
+    }
+
+    test("cycle reporting names exactly the cycle members, not bridges between cycles") {
+      // Two mutual-loopback cycles connected by a pass-through bridge: a.tap -> x -> c.ext. The bridge nodes have
+      // predecessors and successors among the unsorted remainder but lie on no cycle.
+      final class LoopPorts(
+        using GeneratorScope[Int])
+          extends Endpoints:
+        val in             = inward(Wid)
+        val out            = outward(Wid)
+        private val (d, u) = depend(in, out)
+        out.dFn(ctx => Right(ctx(d)))
+        in.uFn(ctx => Right(ctx(u)))
+        parameters(_ => Right(0))
+      final class TapPorts(
+        using GeneratorScope[Int])
+          extends Endpoints:
+        val in               = inward(Wid)
+        val out              = outward(Wid)
+        val tap              = outward(Wid)
+        private val (d1, u1) = depend(in, out)
+        private val (d2, u2) = depend(in, tap)
+        out.dFn(ctx => Right(ctx(d1)))
+        tap.dFn(ctx => Right(ctx(d2)))
+        in.uFn(ctx => Right(ctx(u1) min ctx(u2)))
+        parameters(_ => Right(0))
+      final class JoinPorts(
+        using GeneratorScope[Int])
+          extends Endpoints:
+        val in               = inward(Wid)
+        val ext              = inward(Wid)
+        val out              = outward(Wid)
+        private val (d1, u1) = depend(in, out)
+        private val (d2, u2) = depend(ext, out)
+        out.dFn(ctx => Right(ctx(d1) max ctx(d2)))
+        in.uFn(ctx => Right(ctx(u1)))
+        ext.uFn(ctx => Right(ctx(u2)))
+        parameters(_ => Right(0))
+      val spec = Design {
+        val a = generator(intEntry("CyA")) { new TapPorts }
+        val b = generator(intEntry("CyB")) { new LoopPorts }
+        val x = generator(intEntry("CyX")) { new LoopPorts }
+        val c = generator(intEntry("CyC")) { new JoinPorts }
+        val d = generator(intEntry("CyD")) { new LoopPorts }
+        b.in <-- a.out
+        a.in <-- b.out
+        x.in <-- a.tap
+        c.ext <-- x.out
+        d.in <-- c.out
+        c.in <-- d.out
+      }
+      val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
+      Vector("a#in", "a#out", "b#in", "b#out", "c#in", "c#out", "d#in", "d#out").foreach { n =>
+        assert(e.getMessage.contains(n))
+      }
+      Vector("a#tap", "x#in", "x#out", "c#ext").foreach(n => assert(!e.getMessage.contains(n)))
+    }
+
     test("binding one node twice is rejected") {
       val spec = Design {
         val p          = generator(intEntry("P")) {
