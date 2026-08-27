@@ -41,7 +41,7 @@ object AxiVerilogSpec extends TestSuite:
         dram.in <-- l2.out
         l2.in
       }
-      mem <-- sysXbar.outputs(0)
+      mem <-- sysXbar.output("mem")
 
       val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
 
@@ -50,13 +50,13 @@ object AxiVerilogSpec extends TestSuite:
       val uart = mmioSlave(0x10000000L, 0x1000L, idCapacityBits = 8)
       val gpio = mmioSlave(0x10010000L, 0x1000L, idCapacityBits = 8)
 
-      sysXbar.inputs(0) <-- core0.mem
-      sysXbar.inputs(1) <-- core1.mem
-      sysXbar.inputs(2) <-- dma.mem
-      bridge.in <-- sysXbar.outputs(1)
-      periphXbar.inputs(0) <-- bridge.out
-      uart.in <-- periphXbar.outputs(0)
-      gpio.in <-- periphXbar.outputs(1)
+      sysXbar.input("in0") <-- core0.mem
+      sysXbar.input("in1") <-- core1.mem
+      sysXbar.input("in2") <-- dma.mem
+      bridge.in <-- sysXbar.output("periph")
+      periphXbar.input("in") <-- bridge.out
+      uart.in <-- periphXbar.output("uart")
+      gpio.in <-- periphXbar.output("gpio")
     }
 
   val tests = Tests {

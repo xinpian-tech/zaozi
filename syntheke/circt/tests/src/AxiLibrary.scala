@@ -156,14 +156,24 @@ final class AxiXbarPorts(
 )(
   using GeneratorScope[XbarP])
     extends Endpoints:
-  val inputs       = ins.map { n =>
+  private val inputs  = ins.map { n =>
     given sourcecode.Name = sourcecode.Name(n)
     inward(Axi4)
   }
-  val outputs      = outs.map { n =>
+  private val outputs = outs.map { n =>
     given sourcecode.Name = sourcecode.Name(n)
     outward(Axi4)
   }
+
+  /** Ports are declared by name, so they are looked up by name. */
+  def input(n: String): Axi4.Inward =
+    require(ins.contains(n), s"xbar has no input '$n' (inputs: ${ins.mkString(", ")})")
+    inputs(ins.indexOf(n))
+
+  def output(n: String): Axi4.Outward =
+    require(outs.contains(n), s"xbar has no output '$n' (outputs: ${outs.mkString(", ")})")
+    outputs(outs.indexOf(n))
+
   private val grid = outputs.map(out => inputs.map(in => depend(in, out)))
   outputs.zipWithIndex.foreach { (out, oi) =>
     val readers = grid(oi).map(_._1)
