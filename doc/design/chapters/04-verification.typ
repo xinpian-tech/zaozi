@@ -4,7 +4,7 @@
 
 验证环境需要观察设计内部的信号，例如供协同仿真比对的架构状态、供记分板检查的互连事务与各级断言。Syntheke 用三样东西表示这类观察关系：被观察模块上声明的观察点，称为探针源；实现验证逻辑的生成器模块（称为验证生成器模块）上声明的收集入口，称为探针汇；以及把探针源接到探针汇的验证 bind。信号本身以 FIRRTL 的探针（`Probe`，对内部信号的只读引用）形式引出，跨模块边界的部分由框架统一规划端口和连线（@ch-hierarchy）。每个探针源还声明一条 FIRRTL 层路径，例如 `verification.cosim`，用于控制对应验证逻辑的生成与移除（@req-verification、@sec-layers）。
 
-验证协议是设计协议之外的第二种协议：设计协议在一条 bind 的两端之间双向传播、逐边求解；验证协议由探针汇一次聚合它的全部探针源，代码里对应的协议对象是 `DVProtocol`。两种协议共用注册表，`ProtocolKind` 为二者建立各自的标识空间。
+验证协议是设计协议之外的第二种协议：设计协议在一条 bind 的两端之间双向传播、逐边求解；验证协议由探针汇一次聚合它的全部探针源，代码里对应的协议对象是 `DVProtocol`。两种协议的身份都是各自的协议对象。
 
 == 探针源、探针汇与验证 bind <sec-dv-declarations>
 
@@ -45,7 +45,7 @@
 
 验证连接是从源到汇的单向观测。`sources` 与 `sink` 中的每个信号叶都必须是 `Probe`，所有 `flip` 必须为 `false`；`sources(i)` 及 `sinkPaths(i)` 选中的汇端子树中，每个 `Probe` 的 `LayerPath` 必须等于 `layers(i)`。源接口用于跨层端口规划，路径用于汇端连接，汇端接口用于生成器端口校验。`DVInterfaces` 违反以上契约时，报告接口映射违约（@sec-error-semantics）。
 
-求解结果按模块整理进 `EdgeView` 的验证部分 `VerificationView`：每个源的条目包含 `DVSourceId`、`DVBindId`、带 `ProtocolId` 的聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeProtocolParam` 分别读取这些条目并生成协议参数（@sec-settle-pp、@sec-generator-module）。
+求解结果按模块整理进 `EdgeView` 的验证部分 `VerificationView`：每个源的条目包含 `DVSourceId`、`DVBindId`、聚合 `Edge`、`sources(i)` 与层路径；汇端条目包含 `DVSinkId`、按声明顺序排列的 `DVBindId` 列表、同一个聚合 `Edge` 与完整 `DVInterfaces`。源生成器和汇生成器的 `computeProtocolParam` 分别读取这些条目并生成协议参数（@sec-settle-pp、@sec-generator-module）。
 
 `Down`、`Edge`、`DVInterfaces`、`InterfacePath` 与 `LayerPath` 为不可变、可序列化的数据。`downCodec` 与 `edgeCodec` 提供两个关联类型的 schema 与规范化编码；其余三种类型采用框架定义的 schema。`DVProtocol.id.kind` 固定为 `Verification`；任何会改变求解函数、接口、渲染结果或 codec schema 的变更都必须更新版本。
 

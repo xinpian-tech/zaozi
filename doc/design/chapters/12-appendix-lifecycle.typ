@@ -35,7 +35,7 @@
   [探针是一等协议：协商期规划路由与层，例化期由父结构模块在层块内 `ref.resolve` 喂给验证生成器（@ch-verification、@sec-sink-shape）。],
   [模块身份与去重],
   [例化后由编译器按结构去重，辅以 `CloneLazyModule` 等手工手段。],
-  [例化前按结构键承诺去重（@sec-dedup）；生成器缓存键为（`GeneratorId`，规范化完整参数）。],
+  [例化前按结构键承诺去重（@sec-dedup）；生成器缓存键为（生成器名字，规范化完整参数）。],
   [产物边界],
   [一次 elaboration 一个电路，中途无可序列化断面。],
   [`DesignSpec`、`ResolvedDesign`、完整参数三个可序列化断面（@sec-serialization-boundary）；IP 可凭一份参数文件独立例化（@req-ip）。],

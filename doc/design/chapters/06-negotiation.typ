@@ -41,7 +41,7 @@
 
 == 结构校验与稳定拓扑序 <sec-structural-check>
 
-结构校验先固化协议注册表与生成器注册表。同一模块内的子实例名唯一，节点名与验证端点名唯一；每个 `ProtocolId` 对应一个协议对象，每个 `GeneratorId` 对应一个生成器实现与 `FullParam` codec。
+结构校验先固化生成器注册表。同一模块内的子实例名唯一，节点名与验证端点名唯一；每个生成器名字对应一个注册表条目。
 
 每条设计 bind 的源、目标节点必须存在，声明该 bind 的结构模块必须是两端节点所在模块的祖先（@sec-node-conn-proto）。源节点方向为 outward，目标节点方向为 inward，两端协议匹配；每个 outward 节点恰好作为一次 bind 的源，每个 inward 节点恰好作为一次 bind 的目标。节点的数量在构建期已经固定，结构校验分别核对每个 outward 节点在 bind 源中出现一次、每个 inward 节点在 bind 目标中出现一次。
 
@@ -106,7 +106,7 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 == 已求解记录 <sec-resolved-records>
 
-每条设计 bind 产生一个 `ResolvedEdge`。记录包含 `BindId`、源与目标 `ModuleNodeId`、对应协议对象与 `ProtocolId`、传播得到的 `Down` 和 `Up`、逐边求得的 `Edge` 以及 `interfaceOf(edge)` 返回的 `ProtocolBundle`。全部记录按 bind 声明顺序保存。
+每条设计 bind 产生一个 `ResolvedEdge`。记录包含 `BindId`、源与目标 `ModuleNodeId`、对应协议对象、传播得到的 `Down` 和 `Up`、逐边求得的 `Edge` 以及 `interfaceOf(edge)` 返回的 `ProtocolBundle`。全部记录按 bind 声明顺序保存。
 
 `ResolvedDVGroup` 保存一个探针汇、验证协议对象、按声明顺序排列的验证 bind、源端 `Down` 与层路径、`resolve` 得到的 `Edge` 以及完整 `DVInterfaces`。`ResolvedProtocolReference` 保存引用名、引用方、目标 `ModuleNodeId`、目标协议对象与该节点唯一一条边的 `Edge`。这些协议值按 @sec-protocol-object 和 @sec-dv-protocol 的 codec 规则编码、解码。
 
@@ -127,10 +127,10 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 #table(
   columns: (auto, 1fr, 1fr),
   table.header([产生阶段], [触发条件], [报告必含]),
-  [校验], [不同协议对象声明同一 `ProtocolId`；bind 两端协议不匹配。], [冲突的协议对象与 `ProtocolId`；相关模块节点；源码位置。],
+
   [校验], [节点引用不存在；outward 节点未恰好作为一次 bind 的源；inward 节点未恰好作为一次 bind 的目标；或声明 bind 的结构模块不是两端节点所在模块的祖先。], [相关 `ModuleNodeId`、`BindId`、声明 bind 的模块、实际 bind 次数和源码位置。],
   [校验], [探针汇的源集合为空；探针源的 bind 数量异于一；源与汇协议不匹配；汇生成器父结构模块与源模块的严格祖先关系缺失。], [`DVSourceId`、`DVSinkId` 与 `DVBindId`；协议标识与模块路径；全部相关源码位置。],
-  [校验], [两个注册表条目使用同一 `GeneratorId`，但生成器实现或 `FullParam` codec 不同。], [`GeneratorId`；冲突的生成器实现与 codec；相关模块及源码位置。],
+  [校验], [两个不同的注册表条目使用同一生成器名字。], [冲突的名字；相关模块及源码位置。],
   [拓扑排序], [参数依赖图存在环。], [环上的完整路径；环内每条 bind 与模块内部参数依赖的源码位置。],
   [`Down` 或 `Up` 传播], [`dFn` 或 `uFn` 返回约束冲突，例如地址区域重叠、请求地址不可达或事务身份空间无法分配。], [模块、outward 或 inward 节点、传播方向、有序输入快照、冲突描述和源码位置。],
   [边与验证求解], [设计边的 `negotiate` 或探针汇的 `resolve` 返回参数冲突。], [设计边：`BindId`、`Down`、`Up` 与源码位置；探针汇：`DVSinkId`、有序 `Down` 与相关源码位置；协议给出的冲突描述。],

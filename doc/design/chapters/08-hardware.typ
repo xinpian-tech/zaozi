@@ -9,20 +9,20 @@
 生成器以完整参数为输入并产出电路模块，必须满足以下契约：
 
 + 硬件接口、探针接口、FIRRTL 层结构与电路体都由完整参数确定。跨层端口规划使用 `ResolvedEdge` 中的 `ProtocolBundle`；生成器从 `FullParam` 重建实际端口后，以同一 `ProtocolBundle` 作为期望结构进行校验。
-+ 同一 `GeneratorId` 与相同完整参数产生结构相同的模块，模块去重据此使用二者作为结构键（@sec-dedup）。
++ 同一生成器与相同完整参数产生结构相同的模块，模块去重据此使用生成器名字与完整参数作为结构键（@sec-dedup）。
 + 生成器 API 以完整参数为输入；将完整参数写成 JSON 后，可以直接调用生成器完成独立例化与测试。
 
 生成器没有隐式时钟与复位：时钟和复位一律声明为时钟协议、复位协议的 inward 节点，与其它节点一样对应端口和一次 bind。
 
-每个生成器发布一个 `GeneratorId` 和 `FullParam` 的规范化序列化（编码与解码）。完整的 `GeneratorId` 确定生成器实现和 `FullParam` 的序列化格式（@sec-dedup）。
+每个生成器发布一个名字和 `FullParam` 的规范化序列化（编码与解码）。名字确定生成器实现和 `FullParam` 的序列化格式（@sec-dedup）。
 
-`GeneratorId`、`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器登记到生成器注册表，注册表将 `GeneratorId` 映射到 `GeneratorEntry`。同一 `GeneratorId` 的所有模块引用同一个条目；两个条目使用相同 `GeneratorId` 而生成器实现或 codec 不同时报告生成器标识冲突（@sec-error-semantics）。
+`GeneratorEntry` 与 `ResolvedGeneratorModule` 的类型见 @sec-generator-records。`DesignBuilder` 把每个生成器条目登记到生成器注册表。同一生成器的所有模块引用同一个条目；两个不同条目使用同一名字时报告名字冲突（@sec-error-semantics）。
 
 `ResolvedGeneratorModule.entry` 确定完整参数的类型，`fullParam` 采用该条目的 `FullParam`。记录按模块的层次树先序存入 `ResolvedDesign`。例化从条目取得生成器，参数导出从同一条目取得 codec。
 
-单个 IP 从参数文件例化时，由生成器库提供包含该 `GeneratorId` 条目的注册表。
+单个 IP 从参数文件例化时，由生成器库提供包含该名字条目的注册表。
 
-`computeProtocolParam` 将框架提供的 `EdgeView` 转换为生成器自有的 `ProtocolParam`，`combine` 再生成 `FullParam`。独立例化根据 `GeneratorId` 找到注册项，并用该项的 codec 解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与验证端点的名称、方向和接口结构。对于构建期动态声明的端点，`computeProtocolParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，`combine` 在 `FullParam` 中保留复现这些接口所需的值；若端点名称由 `GeneratorId` 对应的固定接口 schema 决定，`FullParam` 只需保存决定接口结构的参数。
+`computeProtocolParam` 将框架提供的 `EdgeView` 转换为生成器自有的 `ProtocolParam`，`combine` 再生成 `FullParam`。独立例化按名字找到注册项，并用该项的序列化解码完整参数。`FullParam` 必须足以确定生成器全部设计端口与验证端点的名称、方向和接口结构。对于构建期动态声明的端点，`computeProtocolParam` 把端点名称、方向和 `ProtocolBundle` 约束转换为生成器自有字段，`combine` 在 `FullParam` 中保留复现这些接口所需的值；若端点名称由生成器的固定接口决定，`FullParam` 只需保存决定接口结构的参数。
 
 #图([序列化边界。框架侧的生成器模块保存用户参数、参数合并函数、协议参数推导函数与模块节点声明；zaozi 侧的生成器从完整参数确定接口、FIRRTL 层结构与电路体。])[
   #syn-canvas({
@@ -77,7 +77,7 @@
 
 自底向上的次序保证子模块先于父模块发射，父模块生成连线时可以直接引用子实例端口。
 
-生成器模块的定义与其实例引用按模块名链接，模块名因此是链接键：它必须忠实编码（`GeneratorId`、规范化完整参数），不同身份不得产生相同模块名。
+生成器模块的定义与其实例引用按模块名链接，模块名因此是链接键：它必须忠实编码（生成器名字、规范化完整参数），不同身份不得产生相同模块名。
 
 == 序列化范围 <sec-serialization-list>
 
