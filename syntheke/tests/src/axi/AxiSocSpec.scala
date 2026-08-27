@@ -36,7 +36,7 @@ final case class XbarFull(arbitration: String, inputs: Vector[XbarInput], routes
 object AxiSocSpec extends TestSuite:
 
   private def entry[FP: ReadWriter](name: String) =
-    new GeneratorEntry[FP](GeneratorId(s"demo.axi.$name", "1"))
+    new GeneratorEntry[FP](s"demo.axi.$name")
 
   val coreEntry   = entry[CoreFull]("Core")
   val dmaEntry    = entry[CoreFull]("Dma")

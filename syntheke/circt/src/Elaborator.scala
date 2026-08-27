@@ -104,9 +104,9 @@ object Elaborator:
     backends:  Seq[GeneratorBackend],
     mlirbcDir: os.Path = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
   ): ElaboratedDesign =
-    val backendOf = backends.map(b => b.id -> b).toMap
-    val spec      = resolved.spec
-    val dd        = Dedup.dedup(resolved)
+    val backendOf: Map[GeneratorEntry[?], GeneratorBackend] = backends.map(b => (b.entry: GeneratorEntry[?]) -> b).toMap
+    val spec = resolved.spec
+    val dd   = Dedup.dedup(resolved)
 
     // Module names: generator modules are named by their backend (stable per canonical FullParam, matching the
     // structural key); wrapper modules by the dedup naming rules.
@@ -114,8 +114,8 @@ object Elaborator:
       id -> (spec.modules(id) match
         case g: GeneratorModuleSpec =>
           backendOf
-            .get(g.entry.id)
-            .fold(fail(s"missing backend for generator ${g.entry.id.show} at ${id.show}"))(b =>
+            .get(g.entry)
+            .fold(fail(s"missing backend for generator ${g.entry.name} at ${id.show}"))(b =>
               b.moduleName(resolved.generatorModule(id).get.fullParam)
             )
         case _: WrapperModuleSpec   => dd.nameOf(id))
@@ -241,7 +241,7 @@ object Elaborator:
                       })
                   val instOp = locally {
                     given Block = sinkBlock.getOrElse(summon[Block])
-                    backendOf(gm.entry.id).instantiate(rgm.fullParam, c, gm.loc)
+                    backendOf(gm.entry).instantiate(rgm.fullParam, c, gm.loc)
                   }
                   val names = instOp.getInherentAttributeByName("portNames")
                   val byName = Seq

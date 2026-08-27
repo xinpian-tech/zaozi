@@ -45,17 +45,6 @@ final case class ModuleNodeId(module: ModuleId, name: String):
 final case class BindId(order: Int, source: ModuleNodeId, target: ModuleNodeId):
   def show: String = s"bind[$order] ${source.show} -> ${target.show}"
 
-enum ProtocolKind derives CanEqual:
-  case Design, Verification
-
-/** Protocol identity: kind, name and version (doc @sec-protocol-object). */
-final case class ProtocolId(kind: ProtocolKind, name: String, version: String):
-  def show: String = s"$name@$version($kind)"
-
-/** Generator identity: qualified name and version (doc @sec-generator-records). */
-final case class GeneratorId(qualifiedName: String, version: String):
-  def show: String = s"$qualifiedName@$version"
-
 /** Verification endpoint identifiers (doc @sec-dv-declarations). */
 final case class DVSourceId(module: ModuleId, name: String):
   def show: String = s"${module.show}#$name"

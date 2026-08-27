@@ -20,10 +20,10 @@ import java.lang.foreign.Arena
   * afterwards.
   */
 trait GeneratorBackend:
-  def id: GeneratorId
+  def entry: GeneratorEntry[?]
 
   /** The module name is the linking key: instances reference it and the dumped `.mlirbc` file is found by it, so it
-    * must be a faithful encoding of the identity (`GeneratorId`, canonical FullParam) — globally unique across
+    * must be a faithful encoding of the identity (generator name, canonical FullParam) — globally unique across
     * backends, not merely stable within one. Use [[GeneratorBackend.canonicalModuleName]].
     */
   def moduleName(fullParam: Any): String
@@ -40,9 +40,8 @@ trait GeneratorBackend:
   ): Operation
 
 object GeneratorBackend:
-  /** The canonical linking key: sanitized qualified `GeneratorId` plus a strong hash over (qualified name, version,
-    * canonical FullParam JSON). Distinct identities cannot collide in the flat symbol namespace the linker resolves by
-    * name.
+  /** The canonical linking key: the sanitized generator name plus a strong hash over (name, canonical FullParam JSON).
+    * Distinct identities cannot collide in the flat symbol namespace the linker resolves by name.
     */
   def canonicalModuleName[FP](entry: GeneratorEntry[FP], fullParam: FP): String =
     val payload = ujson.write(
@@ -55,10 +54,10 @@ object GeneratorBackend:
     val digest  = java.security.MessageDigest
       .getInstance("SHA-256")
       .digest(
-        s"${entry.id.qualifiedName}\n${entry.id.version}\n$payload".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        s"${entry.name}\n$payload".getBytes(java.nio.charset.StandardCharsets.UTF_8)
       )
     val hash    = digest.take(8).map(b => f"$b%02x").mkString
-    s"${entry.id.qualifiedName.map(c => if c.isLetterOrDigit then c else '_')}_$hash"
+    s"${entry.name.map(c => if c.isLetterOrDigit then c else '_')}_$hash"
 
 /** The zaozi backend: a syntheke generator entry enacted by a zaozi [[Generator]].
   *
@@ -75,8 +74,6 @@ final class ZaoziBackend[
   val generator: Generator[PARAM, L, I, P],
   toParam:       FP => PARAM)
     extends GeneratorBackend:
-
-  def id: GeneratorId = entry.id
 
   private def param(fullParam: Any): PARAM = toParam(fullParam.asInstanceOf[FP])
 

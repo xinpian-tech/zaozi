@@ -50,24 +50,10 @@ object Negotiator:
   private final case class TopoOrder(nodes: Vector[ModuleNodeId])
 
   private def structuralCheck(spec: DesignSpec): TopoOrder =
-    // Protocol registry: one ProtocolId — one object (by reference, matching registration); kind must match the
-    // object's flavor.
-    spec.protocols.groupBy(_._1).foreach { (pid, regs) =>
-      val objects = regs.map(_._2)
-      if objects.exists(o => !(o eq objects.head)) then
-        fail(s"protocol id ${pid.show} declared by ${regs.size} distinct protocol objects")
-    }
-    spec.protocols.foreach { (pid, obj) =>
-      val kindOk = obj match
-        case _: Protocol   => pid.kind == ProtocolKind.Design
-        case _: DVProtocol => pid.kind == ProtocolKind.Verification
-        case _ => false
-      if !kindOk then fail(s"protocol ${pid.show} has kind ${pid.kind} inconsistent with its object flavor")
-    }
-
-    // Generator registry: one GeneratorId — one entry.
-    spec.generators.groupBy(_.id).foreach { (gid, entries) =>
-      if entries.sizeIs > 1 then fail(s"generator id ${gid.show} declared by ${entries.size} distinct registry entries")
+    // Generator registry: one name — one entry. The name keys module naming, dedup and linking, so two distinct
+    // entries sharing it would collide in the flat symbol namespace.
+    spec.generators.groupBy(_.name).foreach { (name, entries) =>
+      if entries.sizeIs > 1 then fail(s"generator name '$name' used by ${entries.size} distinct registry entries")
     }
 
     // Design binds : endpoint existence (builders can leak across Design builds), declaration-site ancestry,

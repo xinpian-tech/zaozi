@@ -28,12 +28,6 @@ object Export:
   private def loc(l: SourceLocation): ujson.Value =
     ujson.Obj("file" -> ujson.Str(l.file.replace('\\', '/')), "line" -> ujson.Num(l.line))
 
-  private def protocolId(id: ProtocolId): ujson.Value =
-    ujson.Obj("kind" -> ujson.Str(id.kind.toString), "name" -> ujson.Str(id.name), "version" -> ujson.Str(id.version))
-
-  private def generatorId(id: GeneratorId): ujson.Value =
-    ujson.Obj("qualifiedName" -> ujson.Str(id.qualifiedName), "version" -> ujson.Str(id.version))
-
   private def layerPath(l: LayerPath): ujson.Value = ujson.Arr.from(l.segments.map(ujson.Str(_)))
 
   private def interfacePath(p: InterfacePath): ujson.Value =
@@ -76,12 +70,11 @@ object Export:
             ujson.Obj(
               "id"           -> moduleId(id),
               "kind"         -> ujson.Str("generator"),
-              "generator"    -> generatorId(g.entry.id),
+              "generator"    -> ujson.Str(g.entry.name),
               "nodes"        -> ujson.Arr.from(g.nodes.map { n =>
                 ujson.Obj(
                   "id"        -> nodeId(ModuleNodeId(id, n.name)),
                   "direction" -> ujson.Str(n.direction.toString.toLowerCase),
-                  "protocol"  -> protocolId(n.protocol.id),
                   "order"     -> ujson.Num(n.order),
                   "loc"       -> loc(n.loc)
                 )
@@ -96,19 +89,17 @@ object Export:
               }),
               "dvSources"    -> ujson.Arr.from(g.dvSources.map { s =>
                 ujson.Obj(
-                  "id"       -> dvSourceId(DVSourceId(id, s.name)),
-                  "protocol" -> protocolId(s.protocol.id),
-                  "layer"    -> layerPath(s.layer),
-                  "order"    -> ujson.Num(s.order),
-                  "loc"      -> loc(s.loc)
+                  "id"    -> dvSourceId(DVSourceId(id, s.name)),
+                  "layer" -> layerPath(s.layer),
+                  "order" -> ujson.Num(s.order),
+                  "loc"   -> loc(s.loc)
                 )
               }),
               "dvSinks"      -> ujson.Arr.from(g.dvSinks.map { s =>
                 ujson.Obj(
-                  "id"       -> dvSinkId(DVSinkId(id, s.name)),
-                  "protocol" -> protocolId(s.protocol.id),
-                  "order"    -> ujson.Num(s.order),
-                  "loc"      -> loc(s.loc)
+                  "id"    -> dvSinkId(DVSinkId(id, s.name)),
+                  "order" -> ujson.Num(s.order),
+                  "loc"   -> loc(s.loc)
                 )
               }),
               "loc"          -> loc(g.loc)
@@ -139,7 +130,6 @@ object Export:
         val p        = e.protocol
         ujson.Obj(
           "id"        -> bindId(e.bind),
-          "protocol"  -> protocolId(p.id),
           "down"      -> write(p.downRW, e.down),
           "up"        -> write(p.upRW, e.up),
           "edge"      -> write(p.edgeRW, e.edge),
@@ -150,7 +140,6 @@ object Export:
         val p       = g.protocol
         ujson.Obj(
           "sink"       -> dvSinkId(g.sink),
-          "protocol"   -> protocolId(p.id),
           "binds"      -> ujson.Arr.from(g.binds.map(dvBindId)),
           "downs"      -> ujson.Arr.from(g.downs.map(write(p.downRW, _))),
           "layers"     -> ujson.Arr.from(g.layers.map(layerPath)),
@@ -208,7 +197,7 @@ object Export:
     ujson.Arr.from(resolved.generatorModules.map { g =>
       ujson.Obj(
         "module"    -> moduleId(g.module),
-        "generator" -> generatorId(g.entry.id),
+        "generator" -> ujson.Str(g.entry.name),
         "fullParam" -> g.encodedFullParam
       )
     })

@@ -156,7 +156,7 @@ object SlaveGen                                                         extends 
 object AxiVerilogSpec extends TestSuite:
 
   def entry[FP: ReadWriter](name: String) =
-    new GeneratorEntry[FP](GeneratorId(s"demo.axi.zaozi.$name", "1"))
+    new GeneratorEntry[FP](s"demo.axi.zaozi.$name")
 
   val coreEntry   = entry[CoreP]("Core")
   val xbarEntry   = entry[XbarP]("Xbar")
@@ -402,7 +402,7 @@ object AxiVerilogSpec extends TestSuite:
     test("a backend interface that differs from the settled bundle is a binding-check error") {
       val resolved = Negotiator.negotiate(buildSoc())
       val mangled  = backends.map {
-        case b: ZaoziBackend[?, ?, ?, ?, ?] if b.id == dramEntry.id =>
+        case b: ZaoziBackend[?, ?, ?, ?, ?] if b.entry eq dramEntry =>
           ZaoziBackend(
             dramEntry,
             DramGen,

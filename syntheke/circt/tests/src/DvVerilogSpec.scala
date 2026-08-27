@@ -77,7 +77,6 @@ final case class StubFull(kind: String, ports: Vector[StubPort]) derives ReadWri
   * per-module `.mlirbc` circuit exactly like the zaozi flow.
   */
 final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) extends GeneratorBackend:
-  def id: GeneratorId = entry.id
   private val dumped = mutable.Set.empty[String]
 
   def moduleName(fullParam: Any): String =
@@ -164,7 +163,7 @@ object DvVerilogSpec extends TestSuite:
   val outDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
 
   def entry(name: String) =
-    new GeneratorEntry[StubFull](GeneratorId(s"demo.dv.$name", "1"))
+    new GeneratorEntry[StubFull](s"demo.dv.$name")
 
   val srcEntry  = entry("Src")
   val memEntry  = entry("Mem")
@@ -180,7 +179,6 @@ object DvVerilogSpec extends TestSuite:
   object VecTrace extends DVProtocol:
     type Down = Int
     type Edge = Vector[Int]
-    val id = ProtocolId(ProtocolKind.Verification, "vectrace", "1.0")
     def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]      = Right(downs)
     def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]     =
       val sources = edge.zip(layers).map { (w, l) =>

@@ -21,10 +21,9 @@ final case class CapabilityViolation(message: String)
   * yields that node's edge parameter (doc @sec-settle-pp).
   */
 final case class CrossProtocolRefSpec(
-  refName:          String,
-  target:           ModuleNodeId,
-  expectedProtocol: ProtocolId,
-  loc:              SourceLocation)
+  refName: String,
+  target:  ModuleNodeId,
+  loc:     SourceLocation)
 
 /** One named inward or outward node of a generator module (doc @sec-node-conn-proto).
   *
@@ -70,7 +69,7 @@ final case class DVSinkSpec(
   * module; within Build / Negotiate the entry is the identity and serialization carrier.
   */
 final class GeneratorEntry[FP](
-  val id:                GeneratorId
+  val name:              String
 )(
   using val fullParamRW: upickle.default.ReadWriter[FP])
 
@@ -120,11 +119,10 @@ final case class DVBindDecl(
 /** The immutable output of the Build phase. */
 final case class DesignSpec(
   modules:     Map[ModuleId, ModuleSpec],
-  moduleOrder: Vector[ModuleId],             // hierarchy-tree preorder
+  moduleOrder: Vector[ModuleId], // hierarchy-tree preorder
   binds:       Vector[BindDecl],
   dvBinds:     Vector[DVBindDecl],
-  protocols:   Vector[(ProtocolId, AnyRef)], // registration order; AnyRef is Protocol or DVProtocol
-  generators: Vector[GeneratorEntry[?]]):
+  generators: Vector[GeneratorEntry[?]]): // registration order; the name-conflict check runs over this
 
   def wrapper(id: ModuleId):         Option[WrapperModuleSpec]   = modules.get(id).collect { case w: WrapperModuleSpec => w }
   def generatorModule(id: ModuleId): Option[GeneratorModuleSpec] =

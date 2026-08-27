@@ -34,7 +34,6 @@ object Design:
       moduleOrder = st.moduleOrder.toVector,
       binds = st.binds.toVector,
       dvBinds = st.dvBinds.toVector,
-      protocols = st.protocols.toVector,
       generators = st.generators.toVector
     )
 
@@ -44,7 +43,6 @@ private final class BuildState:
   val moduleOrder = mutable.ArrayBuffer.empty[ModuleId]
   val binds       = mutable.ArrayBuffer.empty[BindDecl]
   val dvBinds     = mutable.ArrayBuffer.empty[DVBindDecl]
-  val protocols   = mutable.ArrayBuffer.empty[(ProtocolId, AnyRef)]
   val generators  = mutable.ArrayBuffer.empty[GeneratorEntry[?]]
 
   // Generator scopes currently under construction. Context functions stack rather than shadow, so the enclosing
@@ -57,9 +55,7 @@ private final class BuildState:
       s"$what declared inside generator body ${openLeaves.last.show}: generator modules are leaves"
     )
 
-  def registerProtocol(id: ProtocolId, p: AnyRef): Unit =
-    if !protocols.exists((i, o) => i == id && (o eq p)) then protocols += (id -> p)
-  def registerGenerator(e: GeneratorEntry[?]):     Unit =
+  def registerGenerator(e: GeneratorEntry[?]): Unit =
     if !generators.exists(_ eq e) then generators += e
 
 /** Read handles produced by a dependency declaration; the only way a port parameter function reads a peer node. */
@@ -104,7 +100,7 @@ sealed trait NodeBuilder[P <: Protocol]:
       target.id.module == id.module,
       s"cross-protocol reference '${name.value}' of ${id.show}: target ${target.id.show} is not a node of this module"
     )
-    scope.recordRef(id.name, CrossProtocolRefSpec(name.value, target.id, target.protocol.id, loc))
+    scope.recordRef(id.name, CrossProtocolRefSpec(name.value, target.id, loc))
     new RefHandle[target.protocol.type](target.protocol, id, name.value)
 
 /** An inward node under declaration; `uFn` must be attached exactly once before the scope closes. */
@@ -299,7 +295,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     using loc: SourceLocation
   ): p.Inward =
     reserveName(name)
-    st.registerProtocol(p.id, p)
     val b = new InwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
     nodes += ((b, NodeDirection.Inward, loc))
     b
@@ -312,7 +307,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     using loc: SourceLocation
   ): p.Outward =
     reserveName(name)
-    st.registerProtocol(p.id, p)
     val b = new OutwardNodeBuilder[p.type](p, this, ModuleNodeId(id, name))
     nodes += ((b, NodeDirection.Outward, loc))
     b
@@ -350,7 +344,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     loc:   SourceLocation
   ): p.Source =
     reserveName(name)
-    st.registerProtocol(p.id, p)
     dvSrcs += DVSourceSpec(name, p, down, layer, dvSrcs.size + dvSnks.size, loc)
     new DVSourceRef[p.type](p, DVSourceId(id, name))
 
@@ -362,7 +355,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     using loc: SourceLocation
   ): p.Sink =
     reserveName(name)
-    st.registerProtocol(p.id, p)
     dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, loc)
     new DVSinkRef[p.type](p, DVSinkId(id, name))
 

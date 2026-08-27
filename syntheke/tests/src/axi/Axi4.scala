@@ -93,8 +93,6 @@ object Axi4 extends Protocol:
   type Up   = AxiSlavePort
   type Edge = AxiEdgeParams
 
-  val id = ProtocolId(ProtocolKind.Design, "amba.axi4", "1.0")
-
   def negotiate(m: AxiMasterPort, s: AxiSlavePort): Either[TermViolation, AxiEdgeParams] =
     def fail(msg: String) = Left(TermViolation(msg))
     m.idOverlap match

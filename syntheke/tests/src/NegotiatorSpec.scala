@@ -12,7 +12,6 @@ object Wid extends Protocol:
   type Down = Int
   type Up   = Int
   type Edge = Int
-  val id = ProtocolId(ProtocolKind.Design, "wid", "1.0")
   def negotiate(down: Int, up: Int): Either[TermViolation, Int]      =
     if down <= up then Right(down) else Left(TermViolation(s"requested width $down exceeds capacity $up"))
   def interfaceOf(edge: Int):        ProtocolBundle                  =
@@ -25,7 +24,6 @@ object Wid extends Protocol:
 object Trace extends DVProtocol:
   type Down = Int
   type Edge = Vector[Int]
-  val id = ProtocolId(ProtocolKind.Verification, "trace", "1.0")
   def resolve(downs: Vector[Int]):                                Either[TermViolation, Vector[Int]]      =
     if downs.forall(_ > 0) then Right(downs) else Left(TermViolation("width must be positive"))
   def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[TermViolation, DVInterfaces]     =
@@ -41,7 +39,7 @@ object Trace extends DVProtocol:
 
 object NegotiatorSpec extends TestSuite:
 
-  def intEntry(name: String) = new GeneratorEntry[Int](GeneratorId(s"test.$name", "1"))
+  def intEntry(name: String) = new GeneratorEntry[Int](s"test.$name")
 
   /** prod(32) and dma(24) feed a 2x2 xbar; c0 (capacity 64) lives one wrapper deep, c1's capacity is a knob. */
   def buildSoc(c1Capacity: Int): DesignSpec =
@@ -291,7 +289,7 @@ object NegotiatorSpec extends TestSuite:
       assert(plan("ports").arr.exists(_("name") == ujson.Str("inst_c0_node_in_in")))
       val params  = Export.params(resolved)
       val xbarRec = params.arr.find(_("module") == ujson.Arr("xbar")).get
-      assert(xbarRec("generator")("qualifiedName") == ujson.Str("test.Xbar"))
+      assert(xbarRec("generator") == ujson.Str("test.Xbar"))
       assert(xbarRec("fullParam") == ujson.Num(120))
     }
 

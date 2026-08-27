@@ -68,8 +68,7 @@ object Dedup:
           ujson.write(
             ujson.Arr(
               ujson.Str("generator"),
-              ujson.Str(g.entry.id.qualifiedName),
-              ujson.Str(g.entry.id.version),
+              ujson.Str(g.entry.name),
               canonical(gm.encodedFullParam)
             )
           )

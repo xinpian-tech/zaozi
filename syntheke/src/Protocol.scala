@@ -23,9 +23,6 @@ trait Protocol:
   type Outward = OutwardNodeBuilder[this.type]
   type Ref     = RefHandle[this.type]
 
-  /** Must have kind [[ProtocolKind.Design]]; checked by the structural pass. */
-  def id: ProtocolId
-
   /** Per-edge settlement: combine the propagated Down and Up into the final edge parameter. */
   def negotiate(down: Down, up: Up): Either[TermViolation, Edge]
 
@@ -45,9 +42,6 @@ trait DVProtocol:
   /** Handle types of this protocol object, mirroring [[Protocol.Inward]] / [[Protocol.Outward]]. */
   type Source = DVSourceRef[this.type]
   type Sink   = DVSinkRef[this.type]
-
-  /** Must have kind [[ProtocolKind.Verification]]; checked by the structural pass. */
-  def id: ProtocolId
 
   /** Aggregate the source `Down`s (in bind declaration order) into the sink's `Edge`. */
   def resolve(downs: Vector[Down]): Either[TermViolation, Edge]
