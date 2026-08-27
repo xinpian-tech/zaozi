@@ -51,7 +51,6 @@ object Design:
       modules = st.modules.toMap,
       moduleOrder = st.moduleOrder.toVector,
       binds = st.binds.toVector,
-      dvBinds = st.dvBinds.toVector,
       generators = st.generators.toVector
     )
 
@@ -80,9 +79,9 @@ def wrapper[A: Dangles](
   ws.wrapper(name.value)(body)
 
 /** Instantiate a child generator module named by the binding val, bound to registry entry `entry`: a leaf of the
-  * hierarchy, implemented by a hardware generator (doc @sec-module-kinds). Its body declares nodes, dependencies,
-  * verification endpoints and exactly one [[parameters]] computation; child instances and binds are rejected inside it.
-  * Returns the body's dangling endpoints ([[Dangles]]).
+  * hierarchy, implemented by a hardware generator (doc @sec-module-kinds). Its body declares nodes, dependencies, probe
+  * sources and exactly one [[parameters]] computation; child instances and binds are rejected inside it. Returns the
+  * body's dangling endpoints ([[Dangles]]).
   */
 def generator[FP, A: Dangles](
   entry: GeneratorEntry[FP]
@@ -158,7 +157,8 @@ def parametersConst[FP](
   gs.parametersConst(fp)
 
 /** Declare a probe source named by the binding val: the enclosing module publishes the verification data described by
-  * `down`, as probes confined to FIRRTL layer `layer` (doc @sec-dv-declarations).
+  * `down`, as read-only probes confined to FIRRTL layer `layer` (doc @sec-dv-declarations). The framework forwards
+  * every probe leaf automatically to a top-level probe port; consumers attach outside the design.
   */
 def dvSource(
   p:     DVProtocol
@@ -170,22 +170,8 @@ def dvSource(
   name:  sourcecode.Name,
   file:  sourcecode.File,
   line:  sourcecode.Line
-): p.Source =
+): Unit =
   gs.dvSource(p)(name.value, down, layer)
-
-/** Declare a probe sink named by the binding val: the collecting endpoint on a verification generator module (doc
-  * @sec-dv-declarations).
-  */
-def dvSink(
-  p:    DVProtocol
-)(
-  using
-  gs:   GeneratorScope[?],
-  name: sourcecode.Name,
-  file: sourcecode.File,
-  line: sourcecode.Line
-): p.Sink =
-  gs.dvSink(p)(name.value)
 
 /** Design bind `target <-- source`: the source's settled edge flows into the target, recorded in the enclosing wrapper
   * (`<-` itself is reserved by Scala). The shared type parameter guarantees one protocol object on both ends; ancestry
@@ -200,17 +186,6 @@ extension [P <: Protocol](target: InwardNodeBuilder[P])
     line:     sourcecode.Line
   ): Unit =
     ws.recordBind(source.id, target.id, (file, line))
-
-/** Verification bind `sink <-- source`: route every probe leaf of the source to the collecting sink. */
-extension [P <: DVProtocol](sink: DVSinkRef[P])
-  infix def <--(
-    source:   DVSourceRef[P]
-  )(
-    using ws: WrapperScope,
-    file:     sourcecode.File,
-    line:     sourcecode.Line
-  ): Unit =
-    ws.recordDVBind(source.id, sink.id, (file, line))
 
 /** Read handles granted by [[depend]]: the only way a port parameter function reads a peer node's settled value,
   * applied through the [[ReadCtx]] the function receives.
@@ -288,12 +263,6 @@ final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
     scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
-/** Handle of a declared probe source; bind it with `sink <-- source`. */
-final class DVSourceRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSourceId)
-
-/** Handle of a declared probe sink; bind it with `sink <-- source`. */
-final class DVSinkRef[P <: DVProtocol] private[syntheke] (val protocol: P, val id: DVSinkId)
-
 /** Base for classes whose fields are a module body's endpoints: each `val x = inward(...)` field declares, names and
   * exposes a node in one line, and the instance itself is the body's returned container. Plain classes have no Mirror,
   * so the fields are not machine-checked — extending this trait is the author's declaration that they are endpoints.
@@ -302,10 +271,9 @@ final class DVSinkRef[P <: DVProtocol] private[syntheke] (val protocol: P, val i
   */
 trait Endpoints
 
-/** What a module body may return: its dangling endpoints — node builders and verification endpoint handles — plus
-  * `Unit`, `Option` / `Vector` / `Seq` of them, products (tuples, case classes) whose fields all qualify, and
-  * [[Endpoints]] classes. This is the only channel out of a module body, so nothing else (readers, scopes, arbitrary
-  * values) can escape it.
+/** What a module body may return: its dangling endpoints — node builders — plus `Unit`, `Option` / `Vector` / `Seq` of
+  * them, products (tuples, case classes) whose fields all qualify, and [[Endpoints]] classes. This is the only channel
+  * out of a module body, so nothing else (readers, scopes, arbitrary values) can escape it.
   */
 sealed trait Dangles[A]
 
@@ -316,8 +284,6 @@ object Dangles:
   given unit:                      Dangles[Unit]                  = of
   given inward[P <: Protocol]:     Dangles[InwardNodeBuilder[P]]  = of
   given outward[P <: Protocol]:    Dangles[OutwardNodeBuilder[P]] = of
-  given dvSource[P <: DVProtocol]: Dangles[DVSourceRef[P]]        = of
-  given dvSink[P <: DVProtocol]:   Dangles[DVSinkRef[P]]          = of
   given endpoints[E <: Endpoints]: Dangles[E]                     = of
   given option[A](
     using Dangles[A]

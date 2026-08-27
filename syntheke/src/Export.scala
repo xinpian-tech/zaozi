@@ -6,7 +6,7 @@ package me.jiuyang.syntheke
   *
   * Four whole-design files: `topology.json`, `edges.json`, `plan.json`, `params.json`. Orderings follow the
   * normalization rules of the design document (@sec-determinism): modules in hierarchy preorder, design edges in bind
-  * declaration order, per-sink verification records in bind declaration order, layer trees name-sorted.
+  * declaration order, probe sources in hierarchy preorder then declaration order, layer trees name-sorted.
   */
 object Export:
 
@@ -20,21 +20,11 @@ object Export:
 
   private def dvSourceId(id: DVSourceId): ujson.Value =
     ujson.Obj("module" -> moduleId(id.module), "name" -> ujson.Str(id.name))
-  private def dvSinkId(id: DVSinkId):     ujson.Value =
-    ujson.Obj("module" -> moduleId(id.module), "name" -> ujson.Str(id.name))
-  private def dvBindId(id: DVBindId):     ujson.Value =
-    ujson.Obj("sink" -> dvSinkId(id.sink), "source" -> dvSourceId(id.source))
 
   private def loc(l: (sourcecode.File, sourcecode.Line)): ujson.Value =
     ujson.Obj("file" -> ujson.Str(l._1.value.replace('\\', '/')), "line" -> ujson.Num(l._2.value))
 
   private def layerPath(l: LayerPath): ujson.Value = ujson.Arr.from(l.segments.map(ujson.Str(_)))
-
-  private def interfacePath(p: InterfacePath): ujson.Value =
-    ujson.Arr.from(p.segments.map {
-      case InterfacePath.Segment.Field(n) => ujson.Obj("field" -> ujson.Str(n))
-      case InterfacePath.Segment.Index(i) => ujson.Obj("index" -> ujson.Num(i))
-    })
 
   private def interface(tpe: ProtocolInterface): ujson.Value = tpe match
     case ProtocolInterface.Bundle(fields) =>
@@ -90,17 +80,12 @@ object Export:
               }),
               "dvSources"    -> ujson.Arr.from(g.dvSources.map { s =>
                 ujson.Obj(
-                  "id"    -> dvSourceId(DVSourceId(id, s.name)),
-                  "layer" -> layerPath(s.layer),
-                  "order" -> ujson.Num(s.order),
-                  "loc"   -> loc(s.loc)
-                )
-              }),
-              "dvSinks"      -> ujson.Arr.from(g.dvSinks.map { s =>
-                ujson.Obj(
-                  "id"    -> dvSinkId(DVSinkId(id, s.name)),
-                  "order" -> ujson.Num(s.order),
-                  "loc"   -> loc(s.loc)
+                  "id"        -> dvSourceId(DVSourceId(id, s.name)),
+                  "down"      -> write(s.protocol.downRW, s.down),
+                  "layer"     -> layerPath(s.layer),
+                  "interface" -> interface(s.interface),
+                  "order"     -> ujson.Num(s.order),
+                  "loc"       -> loc(s.loc)
                 )
               }),
               "loc"          -> loc(g.loc)
@@ -108,14 +93,6 @@ object Export:
       }),
       "binds"   -> ujson.Arr.from(spec.binds.map { b =>
         ujson.Obj("id" -> bindId(b.bindId), "declaredIn" -> moduleId(b.declaredIn), "loc" -> loc(b.loc))
-      }),
-      "dvBinds" -> ujson.Arr.from(spec.dvBinds.map { b =>
-        ujson.Obj(
-          "id"         -> dvBindId(b.bindId),
-          "order"      -> ujson.Num(b.order),
-          "declaredIn" -> moduleId(b.declaredIn),
-          "loc"        -> loc(b.loc)
-        )
       })
     )
 
@@ -124,7 +101,7 @@ object Export:
       using rw.asInstanceOf[upickle.default.ReadWriter[Any]]
     )
 
-  /** `edges.json`: settled design edges and per-sink verification results, with protocol-serialized parameters. */
+  /** `edges.json`: settled design edges with protocol-serialized parameters. */
   def edges(resolved: ResolvedDesign): ujson.Value =
     ujson.Obj(
       "designEdges" -> ujson.Arr.from(resolved.edges.map { e =>
@@ -136,21 +113,6 @@ object Export:
           "edge"      -> write(p.edgeRW, e.edge),
           "interface" -> interface(e.interface)
         )
-      }),
-      "dvResults"   -> ujson.Arr.from(resolved.dvGroups.map { g =>
-        val p       = g.protocol
-        ujson.Obj(
-          "sink"       -> dvSinkId(g.sink),
-          "binds"      -> ujson.Arr.from(g.binds.map(dvBindId)),
-          "downs"      -> ujson.Arr.from(g.downs.map(write(p.downRW, _))),
-          "layers"     -> ujson.Arr.from(g.layers.map(layerPath)),
-          "edge"       -> write(p.edgeRW, g.edge),
-          "interfaces" -> ujson.Obj(
-            "sources"   -> ujson.Arr.from(g.interfaces.sources.map(interface)),
-            "sink"      -> interface(g.interfaces.sink),
-            "sinkPaths" -> ujson.Arr.from(g.interfaces.sinkPaths.map(interfacePath))
-          )
-        )
       })
     )
 
@@ -158,11 +120,11 @@ object Export:
   def plan(resolved: ResolvedDesign): ujson.Value =
     def origin(o: PlanOrigin):       ujson.Value = o match
       case PlanOrigin.Design(b)       => ujson.Obj("design" -> bindId(b))
-      case PlanOrigin.Verification(b) => ujson.Obj("verification" -> dvBindId(b))
+      case PlanOrigin.Verification(s) => ujson.Obj("verification" -> dvSourceId(s))
     def endpoint(e: LocalEndpoint):  ujson.Value = e match
-      case LocalEndpoint.ThisPort(name)             => ujson.Obj("port" -> ujson.Str(name.encoded))
-      case LocalEndpoint.ChildPort(inst, port, sub) =>
-        ujson.Obj("instance" -> ujson.Str(inst), "port" -> ujson.Str(port.encoded), "sub" -> interfacePath(sub))
+      case LocalEndpoint.ThisPort(name)        => ujson.Obj("port" -> ujson.Str(name.encoded))
+      case LocalEndpoint.ChildPort(inst, port) =>
+        ujson.Obj("instance" -> ujson.Str(inst), "port" -> ujson.Str(port.encoded))
     ujson.Obj(
       "ports"  -> ujson.Arr.from(resolved.portPlans.map { p =>
         ujson.Obj(

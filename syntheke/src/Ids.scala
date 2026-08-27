@@ -45,13 +45,9 @@ final case class ModuleNodeId(module: ModuleId, name: String):
 final case class BindId(order: Int, source: ModuleNodeId, target: ModuleNodeId):
   def show: String = s"bind[$order] ${source.show} -> ${target.show}"
 
-/** Verification endpoint identifiers (doc @sec-dv-declarations). */
+/** A named probe source on a generator module (doc @sec-dv-declarations). */
 final case class DVSourceId(module: ModuleId, name: String):
   def show: String = s"${module.show}#$name"
-final case class DVSinkId(module: ModuleId, name: String):
-  def show: String = s"${module.show}#$name"
-final case class DVBindId(sink: DVSinkId, source: DVSourceId):
-  def show: String = s"dvbind ${source.show} -> ${sink.show}"
 
 /** Declaration sites are captured with sourcecode's own `File` / `Line` givens and stored as the pair; this formats one
   * for a diagnostic message.

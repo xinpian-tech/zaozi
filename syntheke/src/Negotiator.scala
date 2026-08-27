@@ -12,8 +12,8 @@ final class NegotiationException(message: String) extends RuntimeException(messa
 /** The Negotiate phase (doc @ch-negotiation).
   *
   * Pure computation from [[DesignSpec]] to [[ResolvedDesign]]: structural checking, stable topological ordering, `Down`
-  * forward propagation and `Up` backward propagation, per-edge and per-sink settlement, cross-protocol reference
-  * resolution, [[EdgeView]] assembly, generator parameter computation, and cross-hierarchy planning.
+  * forward propagation and `Up` backward propagation, per-edge settlement, cross-protocol reference resolution,
+  * [[EdgeView]] assembly, generator parameter computation, and cross-hierarchy planning.
   *
   * Fail fast: the first error found is thrown as a [[NegotiationException]] on the spot. Protocol and port parameter
   * functions still report conflicts as values (`Left`); the negotiator turns them into the throw. Exceptions escaping
@@ -26,13 +26,12 @@ object Negotiator:
   def negotiate(spec: DesignSpec): ResolvedDesign =
     val order                  = structuralCheck(spec)
     val propagated             = propagate(spec, order)
-    val settled                = settle(spec, propagated)
-    val generators             = assembleViews(spec, settled)
-    val (ports, wires, layers) = Planner.plan(spec, settled)
+    val edges                  = settle(spec, propagated)
+    val generators             = assembleViews(spec, edges)
+    val (ports, wires, layers) = Planner.plan(spec, edges)
     ResolvedDesign(
       spec = spec,
-      edges = settled.edges,
-      dvGroups = settled.dvGroups,
+      edges = edges,
       generatorModules = generators,
       portPlans = ports,
       wirePlans = wires,
@@ -84,46 +83,6 @@ object Negotiator:
               s"expected exactly 1, at ${at(binds.fold(Vector(n.loc))(_.map(_.loc)) :+ n.loc)}"
           )
       }
-    }
-
-    // Verification topology : endpoint existence, ancestry, and bind counts. Protocol equality holds by
-    // construction.
-    val dvSourceSpecs = spec.generatorModules
-      .flatMap(g => g.dvSources.map(s => DVSourceId(g.id, s.name) -> (g, s)))
-      .toMap
-    val dvSinkSpecs   = spec.generatorModules
-      .flatMap(g => g.dvSinks.map(s => DVSinkId(g.id, s.name) -> (g, s)))
-      .toMap
-    spec.dvBinds.foreach { b =>
-      if !dvSourceSpecs.contains(b.source) then
-        fail(s"probe source ${b.source.show} is not an endpoint of this design, at ${at(b.loc)}")
-      if !dvSinkSpecs.contains(b.sink) then
-        fail(s"probe sink ${b.sink.show} is not an endpoint of this design, at ${at(b.loc)}")
-      if !(b.declaredIn.isAncestorOf(b.source.module) && b.declaredIn.isAncestorOf(b.sink.module)) then
-        fail(
-          s"verification bind ${b.source.show} -> ${b.sink.show} declared in ${b.declaredIn.show}, " +
-            s"which is not an ancestor of both endpoints, at ${at(b.loc)}"
-        )
-      val sinkModule   = dvSinkSpecs(b.sink)._1
-      val sourceModule = dvSourceSpecs(b.source)._1
-      if !sinkModule.id.parent.exists(_.isStrictAncestorOf(sourceModule.id)) then
-        fail(
-          s"parent of sink generator ${sinkModule.id.show} is not a strict ancestor of " +
-            s"source module ${sourceModule.id.show}, at ${at(b.loc)}"
-        )
-    }
-    val dvBySource    = spec.dvBinds.groupBy(_.source)
-    dvSourceSpecs.foreach { (id, gs) =>
-      val count = dvBySource.get(id).fold(0)(_.size)
-      if count != 1 then
-        fail(
-          s"probe source ${id.show} has $count verification binds, expected exactly 1, " +
-            s"at ${at(dvBySource.get(id).fold(Vector(gs._2.loc))(_.map(_.loc)) :+ gs._2.loc)}"
-        )
-    }
-    val dvBySink      = spec.dvBinds.groupBy(_.sink)
-    dvSinkSpecs.foreach { (id, gs) =>
-      if !dvBySink.contains(id) then fail(s"probe sink ${id.show} collects no probe source, at ${at(gs._2.loc)}")
     }
 
     // Stable topological sort of the Down DAG; a cycle is an error. Kahn over immutable state, ties broken by module
@@ -246,14 +205,10 @@ object Negotiator:
 
     Propagated(down, up)
 
-  // ============ pass 3: per-edge settlement and per-sink verification settlement ============
+  // ============ pass 3: per-edge settlement ============
 
-  private[syntheke] final case class Settled(
-    edges:    Vector[ResolvedEdge],
-    dvGroups: Vector[ResolvedDVGroup])
-
-  private def settle(spec: DesignSpec, prop: Propagated): Settled =
-    val edges = spec.binds.map { b =>
+  private def settle(spec: DesignSpec, prop: Propagated): Vector[ResolvedEdge] =
+    spec.binds.map { b =>
       val p    = spec.nodeSpec(b.source).get.protocol
       val down = prop.down(b.source)
       val up   = prop.up(b.target)
@@ -273,94 +228,11 @@ object Negotiator:
           ResolvedEdge(b.bindId, p, down, up, edge, bundle)
     }
 
-    // Per-sink verification settlement, in sink-module preorder then sink declaration order (doc @sec-determinism).
-    val sinkIds  = spec.generatorModules.flatMap(g => g.dvSinks.map(s => DVSinkId(g.id, s.name)))
-    val bySink   = spec.dvBinds.groupBy(_.sink)
-    val dvGroups = sinkIds.map { sinkId =>
-      val binds    = bySink(sinkId).sortBy(_.order)
-      val sinkSpec = spec.generatorModule(sinkId.module).get.dvSinks.find(_.name == sinkId.name).get
-      val p        = sinkSpec.protocol.asInstanceOf[DVProtocol { type Down = Any; type Edge = Any }]
-      val sources  =
-        binds.map(b => spec.generatorModule(b.source.module).get.dvSources.find(_.name == b.source.name).get)
-      val downs    = sources.map(_.down)
-      val layers   = sources.map(_.layer)
-      val edge     = p.resolve(downs) match
-        case Left(violation) =>
-          fail(s"settle failed at probe sink ${sinkId.show}: ${violation.message}, at ${at(binds.map(_.loc))}")
-        case Right(edge)     => edge
-      p.interfacesOf(edge, layers) match
-        case Left(violation)   =>
-          fail(s"settle failed at probe sink ${sinkId.show}: ${violation.message}, at ${at(binds.map(_.loc))}")
-        case Right(interfaces) =>
-          checkDVInterfaces(interfaces, layers).foreach { detail =>
-            fail(s"interface violation at probe sink ${sinkId.show}: $detail, at ${at(binds.map(_.loc))}")
-          }
-          ResolvedDVGroup(sinkId, sinkSpec.protocol, binds.map(_.bindId), downs, layers, edge, interfaces)
-    }
-
-    Settled(edges, dvGroups)
-
-  /** DVInterfaces contract (doc @sec-dv-protocol); returns the first violation found. */
-  private def checkDVInterfaces(interfaces: DVInterfaces, layers: Vector[LayerPath]): Option[String] =
-    import scala.util.boundary, boundary.break
-    boundary[Option[String]]:
-      def fail(detail: String): Nothing = break(Some(detail))
-
-      val n = layers.size
-      if interfaces.sources.size != n || interfaces.sinkPaths.size != n then
-        fail(s"expected $n sources and sinkPaths, got ${interfaces.sources.size} and ${interfaces.sinkPaths.size}")
-
-      def flipsClear(tpe: ProtocolInterface): Boolean = tpe match
-        case ProtocolInterface.Bundle(fields) => fields.forall(f => flipsClear(f.tpe))
-        case _: ProtocolInterface.Flipped => false
-        case ProtocolInterface.Vec(_, e)   => flipsClear(e)
-        case ProtocolInterface.Probe(i, _) => flipsClear(i)
-        case _                             => true
-
-      def leavesProbesWith(tpe: ProtocolInterface, layer: LayerPath): Option[String] =
-        ProtocolBundle.leaves(tpe).collectFirst {
-          case (path, ProtocolInterface.Probe(_, l)) if l != layer         =>
-            s"probe at ${path.show} carries layer ${l.show}, expected ${layer.show}"
-          case (path, leaf) if !leaf.isInstanceOf[ProtocolInterface.Probe] =>
-            s"leaf at ${path.show} is not a Probe"
-        }
-
-      if !flipsClear(interfaces.sink) then fail("sink interface contains flipped fields")
-      interfaces.sources.zipWithIndex.foreach { (s, i) =>
-        if !flipsClear(s) then fail(s"sources($i) contains flipped fields")
-        leavesProbesWith(s, layers(i)).foreach(v => fail(s"sources($i): $v"))
-      }
-
-      // Paths: valid, land on a Bundle, pairwise distinct and non-overlapping.
-      val resolvedPaths  = interfaces.sinkPaths.zipWithIndex.map { (path, i) =>
-        InterfacePath.resolve(interfaces.sink, path) match
-          case Some(b: ProtocolInterface.Bundle) => (i, path, b)
-          case Some(_)                           => fail(s"sinkPaths($i) ${path.show} does not land on a Bundle")
-          case None                              => fail(s"sinkPaths($i) ${path.show} is invalid in the sink interface")
-      }
-      resolvedPaths.combinations(2).foreach { pair =>
-        val Seq((i, a, _), (j, b, _)) = pair: @unchecked
-        if a == b then fail(s"sinkPaths($i) and sinkPaths($j) are identical")
-        if a.isPrefixOf(b) || b.isPrefixOf(a) then fail(s"sinkPaths($i) and sinkPaths($j) overlap")
-      }
-      // Structural equality with the source interface; equality carries the per-source layer contract with it.
-      resolvedPaths.foreach { (i, path, bundle) =>
-        if bundle != interfaces.sources(i) then
-          fail(s"sink Bundle at ${path.show} differs structurally from sources($i)")
-      }
-      // Exact cover: non-overlapping subtrees whose leaf count equals the sink leaf count.
-      val selectedLeaves = resolvedPaths.map((_, _, b) => ProtocolBundle.leaves(b).size).sum
-      val sinkLeaves     = ProtocolBundle.leaves(interfaces.sink).size
-      if selectedLeaves != sinkLeaves then
-        fail(s"selected Bundles cover $selectedLeaves signal leaves, sink has $sinkLeaves")
-      None
-
   // ============ pass 4: cross-protocol references, EdgeView assembly, generator parameters ============
 
-  private def assembleViews(spec: DesignSpec, settled: Settled): Vector[ResolvedGeneratorModule] =
-    val edgeOfSource = settled.edges.map(e => e.bind.source -> e).toMap
-    val edgeOfTarget = settled.edges.map(e => e.bind.target -> e).toMap
-    val groupOfBind  = settled.dvGroups.flatMap(g => g.binds.map(b => b -> g)).toMap
+  private def assembleViews(spec: DesignSpec, edges: Vector[ResolvedEdge]): Vector[ResolvedGeneratorModule] =
+    val edgeOfSource = edges.map(e => e.bind.source -> e).toMap
+    val edgeOfTarget = edges.map(e => e.bind.target -> e).toMap
 
     spec.generatorModules.map { g =>
       val nodeViews = g.nodes.map { n =>
@@ -379,20 +251,7 @@ object Negotiator:
         NodeView(id, n.direction, edge, refs)
       }
 
-      val sourceViews = g.dvSources.map { s =>
-        val id    = DVSourceId(g.id, s.name)
-        val bind  = spec.dvBinds.find(_.source == id).get.bindId
-        val group = groupOfBind(bind)
-        val index = group.binds.indexOf(bind)
-        SourceView(id, bind, s.protocol, group.edge, group.interfaces.sources(index), s.layer)
-      }
-      val sinkViews   = g.dvSinks.map { s =>
-        val id    = DVSinkId(g.id, s.name)
-        val group = settled.dvGroups.find(_.sink == id).get
-        SinkView(id, group.binds, s.protocol, group.edge, group.interfaces)
-      }
-
-      val view = EdgeView(g.id, nodeViews, VerificationView(sourceViews, sinkViews))
+      val view = EdgeView(g.id, nodeViews)
       g.computeFullParam(view) match
         case Left(violation) =>
           fail(s"capability exceeded at ${g.id.show}: ${violation.message}, at ${at(g.loc)}")

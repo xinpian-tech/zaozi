@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke
 
-/** Conflict description returned as a value — the expression channel of protocol and parameter functions (`negotiate` /
-  * `resolve` / `interfacesOf`, dFn / uFn, `parameters`). The framework throws on receipt.
+/** Conflict description returned as a value — the expression channel of protocol and parameter functions (`negotiate`,
+  * dFn / uFn, `parameters`). The framework throws on receipt.
   */
 final case class Violation(message: String)
 
@@ -36,24 +36,17 @@ trait Protocol:
   def upRW:   upickle.default.ReadWriter[Up]
   def edgeRW: upickle.default.ReadWriter[Edge]
 
-/** A verification protocol: one probe sink aggregates all its probe sources (doc @sec-dv-protocol). */
+/** A verification protocol: a probe source publishes read-only signals that the framework forwards to top-level probe
+  * ports (doc @sec-dv-protocol). There is no negotiation and no in-design consumer — the `Down` is given at the
+  * declaration and fully determines the interface.
+  */
 trait DVProtocol:
   type Down
-  type Edge
 
-  /** Handle types of this protocol object, mirroring [[Protocol.Inward]] / [[Protocol.Outward]]. */
-  type Source = DVSourceRef[this.type]
-  type Sink   = DVSinkRef[this.type]
-
-  /** Aggregate the source `Down`s (in bind declaration order) into the sink's `Edge`. */
-  def resolve(downs: Vector[Down]): Either[Violation, Edge]
-
-  /** Interfaces for each source, the aggregated sink interface, and the per-source sink paths. `layers(i)` is the layer
-    * path declared by source `i`; every Probe in `sources(i)` and in the sink subtree selected by `sinkPaths(i)` must
-    * carry it.
+  /** Probe interface of one source: every signal leaf wrapped in `Probe` carrying `layer`. Checked at the `dvSource`
+    * declaration.
     */
-  def interfacesOf(edge: Edge, layers: Vector[LayerPath]): Either[Violation, DVInterfaces]
+  def interfaceOf(down: Down, layer: LayerPath): ProtocolBundle
 
-  /** Canonical serialization of the two parameter types (upickle). */
+  /** Canonical serialization of the source parameter (upickle). */
   def downRW: upickle.default.ReadWriter[Down]
-  def edgeRW: upickle.default.ReadWriter[Edge]

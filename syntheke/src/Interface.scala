@@ -68,18 +68,6 @@ type ProtocolBundle = ProtocolInterface.Bundle
 object ProtocolBundle:
   def apply(fields: ProtocolInterface.Field*): ProtocolBundle = ProtocolInterface.Bundle(fields.toVector)
 
-  /** Replace every probe leaf by its inner type: the shape a probe sink receives after `ref.resolve` at its parent
-    * wrapper. FIRRTL forbids input probe ports, so sink generator ports use the stripped interface; the probe-typed
-    * contract stays the protocol-level truth.
-    */
-  def stripProbes(tpe: ProtocolInterface): ProtocolInterface = tpe match
-    case ProtocolInterface.Bundle(fields) =>
-      ProtocolInterface.Bundle(fields.map(f => f.copy(tpe = stripProbes(f.tpe))))
-    case ProtocolInterface.Vec(n, e)      => ProtocolInterface.Vec(n, stripProbes(e))
-    case ProtocolInterface.Flipped(t)     => ProtocolInterface.Flipped(stripProbes(t))
-    case ProtocolInterface.Probe(i, _)    => stripProbes(i)
-    case leaf                             => leaf
-
   /** All signal leaves of an interface with their paths and probe layers. */
   def leaves(tpe: ProtocolInterface, prefix: InterfacePath = InterfacePath.root)
     : Vector[(InterfacePath, ProtocolInterface)] =
@@ -93,11 +81,9 @@ object ProtocolBundle:
 
 /** A path from an interface root: named-field selections and Vec indices (doc @sec-dv-protocol). */
 final case class InterfacePath(segments: Vector[InterfacePath.Segment]) derives upickle.default.ReadWriter:
-  def field(name:       String):        InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Field(name))
-  def index(i:          Int):           InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Index(i))
-  def isPrefixOf(other: InterfacePath): Boolean       = other.segments.startsWith(segments)
-  def ++(other:         InterfacePath): InterfacePath = InterfacePath(segments ++ other.segments)
-  def show:                             String        = segments.map {
+  def field(name: String): InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Field(name))
+  def index(i:    Int):    InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Index(i))
+  def show:                String        = segments.map {
     case InterfacePath.Segment.Field(n) => s".$n"
     case InterfacePath.Segment.Index(i) => s"[$i]"
   }.mkString
@@ -115,17 +101,3 @@ object InterfacePath:
   enum Segment derives CanEqual, upickle.default.ReadWriter:
     case Field(name: String)
     case Index(i: Int)
-
-  /** Resolve a path inside an interface; the last segment must land on a Bundle for sink paths. */
-  def resolve(tpe: ProtocolInterface, path: InterfacePath): Option[ProtocolInterface] =
-    path.segments.foldLeft(Option(tpe)) {
-      case (Some(ProtocolInterface.Bundle(fields)), Segment.Field(n))                        => fields.find(_.name == n).map(_.tpe)
-      case (Some(ProtocolInterface.Vec(size, elem)), Segment.Index(i)) if i >= 0 && i < size => Some(elem)
-      case _                                                                                 => None
-    }
-
-/** Aggregated verification interfaces returned by `DVProtocol.interfacesOf` (doc @sec-dv-protocol). */
-final case class DVInterfaces(
-  sources:   Vector[ProtocolBundle],
-  sink:      ProtocolBundle,
-  sinkPaths: Vector[InterfacePath])

@@ -20,22 +20,12 @@ object Wid extends Protocol:
   val upRW:                          upickle.default.ReadWriter[Int] = summon
   val edgeRW:                        upickle.default.ReadWriter[Int] = summon
 
-/** A toy probe protocol: each source contributes one probed UInt of the declared width. */
+/** A toy probe protocol: each source publishes one probed UInt of the declared width. */
 object Trace extends DVProtocol:
   type Down = Int
-  type Edge = Vector[Int]
-  def resolve(downs: Vector[Int]):                                Either[Violation, Vector[Int]]          =
-    if downs.forall(_ > 0) then Right(downs) else Left(Violation("width must be positive"))
-  def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[Violation, DVInterfaces]         =
-    val sources = edge.zip(layers).map { (w, l) =>
-      ProtocolBundle(ProtocolInterface.Field("sig", ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
-    }
-    val sink    = ProtocolInterface.Bundle(
-      edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", sources(i)))
-    )
-    Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
-  val downRW:                                                     upickle.default.ReadWriter[Int]         = summon
-  val edgeRW:                                                     upickle.default.ReadWriter[Vector[Int]] = summon
+  def interfaceOf(down: Int, layer: LayerPath): ProtocolBundle                  =
+    ProtocolBundle(ProtocolInterface.Field("sig", ProtocolInterface.Probe(ProtocolInterface.UInt(down), layer)))
+  val downRW:                                   upickle.default.ReadWriter[Int] = summon
 
 object NegotiatorSpec extends TestSuite:
 
@@ -222,38 +212,27 @@ object NegotiatorSpec extends TestSuite:
       assert(e.getMessage.contains("source of 2 binds"))
     }
 
-    test("probe sources route to an ancestor sink with layers and sink sub-paths") {
+    test("probe sources forward automatically to top-level probe ports") {
       val layerCosim = LayerPath(Vector("verification", "cosim"))
       val spec       = Design {
-        val cluster            = wrapper {
+        val cluster = wrapper {
           val core = generator(intEntry("Core")) {
             parametersConst(0)
             val mem = outward(Wid).dFn(_ => Right(32))
             val rob = dvSource(Trace)(8, layerCosim)
             val lsu = dvSource(Trace)(4, layerCosim)
-            (mem, rob, lsu)
+            mem
           }
           core
         }
-        val (pOut, src0, src1) = cluster
-        val mem                = generator(intEntry("Mem")) {
+        val mem     = generator(intEntry("Mem")) {
           parametersConst(0)
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
-        val cosim              = generator(intEntry("Cosim")) {
-          parametersConst(0)
-          val taps = dvSink(Trace)
-          taps
-        }
-        mem <-- pOut
-        cosim <-- src0
-        cosim <-- src1
+        mem <-- cluster
       }
       val resolved   = Negotiator.negotiate(spec)
-      val group      = resolved.dvGroups.head
-      assert(group.edgeAs(Trace) == Vector(8, 4))
-      assert(group.interfaces.sinkPaths == Vector(InterfacePath.root.field("src0"), InterfacePath.root.field("src1")))
 
       // The cluster wrapper carries one pure-probe Output dangle per signal leaf and declares the layer.
       val cluster = ModuleId.root / "cluster"
@@ -267,14 +246,22 @@ object NegotiatorSpec extends TestSuite:
         resolved.layerDecls(ModuleId.root).paths() == Vector(Vector("verification"), Vector("verification", "cosim"))
       )
 
-      // Root wires end inside the sink generator's port at the per-source sub-path extended by the leaf path.
+      // The root carries the same probes one level up: its dangles are the design's top-level probe ports.
+      val rootProbes = resolved.portPlans.filter(_.module == ModuleId.root)
+      assert(
+        rootProbes.map(_.name.encoded) == Vector(
+          "inst_cluster_inst_core_dv$msource_rob_sig_out",
+          "inst_cluster_inst_core_dv$msource_lsu_sig_out"
+        )
+      )
+      assert(rootProbes.forall(_.direction == PortDirection.Output))
+
+      // Root wires define the top-level ports from the cluster's dangles.
       val rootDvWires =
         resolved.wirePlans.filter(w => w.module == ModuleId.root && w.origin.isInstanceOf[PlanOrigin.Verification])
+      assert(rootDvWires.map(_.to) == rootProbes.map(p => LocalEndpoint.ThisPort(p.name)))
       assert(
-        rootDvWires.map(_.to) == Vector(
-          LocalEndpoint.ChildPort("cosim", PortName("taps"), InterfacePath.root.field("src0").field("sig")),
-          LocalEndpoint.ChildPort("cosim", PortName("taps"), InterfacePath.root.field("src1").field("sig"))
-        )
+        rootDvWires.map(_.from) == probes.map(p => LocalEndpoint.ChildPort("cluster", p.name))
       )
     }
 
@@ -292,36 +279,6 @@ object NegotiatorSpec extends TestSuite:
       val xbarRec = params.arr.find(_("module") == ujson.Arr("xbar")).get
       assert(xbarRec("generator") == ujson.Str("test.Xbar"))
       assert(xbarRec("fullParam") == ujson.Num(120))
-    }
-
-    test("a sink whose parent is not a strict ancestor of the source is rejected") {
-      val layer = LayerPath(Vector("verification", "assert"))
-      val spec  = Design {
-        val core        = generator(intEntry("Core")) {
-          parametersConst(0)
-          val mem = outward(Wid).dFn(_ => Right(32))
-          val rob = dvSource(Trace)(8, layer)
-          (mem, rob)
-        }
-        val (pOut, src) = core
-        val island      = wrapper {
-          val cosim = generator(intEntry("Cosim")) {
-            parametersConst(0)
-            val taps = dvSink(Trace)
-            taps
-          }
-          cosim
-        }
-        val mem         = generator(intEntry("Mem")) {
-          parametersConst(0)
-          val in = inward(Wid).uFn(_ => Right(64))
-          in
-        }
-        mem <-- pOut
-        island <-- src
-      }
-      val e     = intercept[NegotiationException](Negotiator.negotiate(spec))
-      assert(e.getMessage.contains("strict ancestor"))
     }
 
     test("declaration-site contracts reject duplicates on the spot") {
@@ -435,7 +392,7 @@ object NegotiatorSpec extends TestSuite:
             parametersConst(0)
             val out = outward(Wid).dFn(_ => Right(32))
             val rob = dvSource(Trace)(8, LayerPath(Vector("verification")))
-            (out, rob)
+            out
           }
           prod
         }
@@ -444,19 +401,12 @@ object NegotiatorSpec extends TestSuite:
           val in = inward(Wid).uFn(_ => Right(64))
           in
         }
-        val cosim   = generator(intEntry("S")) {
-          parametersConst(0)
-          val taps = dvSink(Trace)
-          taps
-        }
-        cons <-- cluster._1
-        cosim <-- cluster._2
+        cons <-- cluster
       }
       val prodId = ModuleId.root / "cluster" / "prod"
       assert(spec.generatorModule(prodId).get.node("out").nonEmpty)
       assert(spec.generatorModule(prodId).get.dvSources.map(_.name) == Vector("rob"))
       assert(spec.generatorModule(ModuleId.root / "cons").get.node("in").nonEmpty)
-      assert(spec.generatorModule(ModuleId.root / "cosim").get.dvSinks.map(_.name) == Vector("taps"))
       Negotiator.negotiate(spec)
     }
 
@@ -485,6 +435,22 @@ object NegotiatorSpec extends TestSuite:
         )
       }
       assert(pp.getMessage.contains("no Probe inside a Probe"))
+
+      // A verification interface whose leaves are not probes is rejected at the dvSource declaration.
+      object BadTrace extends DVProtocol:
+        type Down = Int
+        def interfaceOf(down: Int, layer: LayerPath): ProtocolBundle                  =
+          ProtocolBundle(ProtocolInterface.Field("sig", ProtocolInterface.UInt(down)))
+        val downRW:                                   upickle.default.ReadWriter[Int] = summon
+      val bare = intercept[IllegalArgumentException] {
+        Design {
+          val b = generator(intEntry("B")) {
+            parametersConst(0)
+            val t = dvSource(BadTrace)(8, LayerPath(Vector("verification")))
+          }
+        }
+      }
+      assert(bare.getMessage.contains("must be a Probe"))
 
       // A foreign builder read through another module's view is rejected at negotiation.
       val spec = Design {

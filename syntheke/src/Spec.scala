@@ -41,21 +41,17 @@ final case class ParamDependencySpec(
   order: Int,
   loc:   (sourcecode.File, sourcecode.Line))
 
-/** A probe source declaration: provides the verification `Down` and a FIRRTL layer path. */
+/** A probe source declaration: the verification `Down`, the FIRRTL layer path, and the probe interface derived from
+  * them at the declaration (checked there — see `GeneratorScope.dvSource`).
+  */
 final case class DVSourceSpec(
-  name:     String,
-  protocol: DVProtocol,
-  down:     Any,
-  layer:    LayerPath,
-  order:    Int,
-  loc:      (sourcecode.File, sourcecode.Line))
-
-/** A probe sink declaration on a verification generator module. */
-final case class DVSinkSpec(
-  name:     String,
-  protocol: DVProtocol,
-  order:    Int,
-  loc:      (sourcecode.File, sourcecode.Line))
+  name:      String,
+  protocol:  DVProtocol,
+  down:      Any,
+  layer:     LayerPath,
+  interface: ProtocolBundle,
+  order:     Int,
+  loc:       (sourcecode.File, sourcecode.Line))
 
 sealed trait ModuleSpec:
   def id:  ModuleId
@@ -75,7 +71,6 @@ final case class GeneratorModuleSpec(
   nodes:            Vector[NodeSpec],
   dependencies:     Vector[ParamDependencySpec],
   dvSources:        Vector[DVSourceSpec],
-  dvSinks:          Vector[DVSinkSpec],
   computeFullParam: EdgeView => Either[Violation, Any], // user params captured in the closure
   loc:              (sourcecode.File, sourcecode.Line))
     extends ModuleSpec:
@@ -90,21 +85,11 @@ final case class BindDecl(
   loc: (sourcecode.File, sourcecode.Line)):
   def bindId: BindId = BindId(order, source, target)
 
-/** A verification bind declaration `sink <-- source`. */
-final case class DVBindDecl(
-  order:      Int,
-  source:     DVSourceId,
-  sink:       DVSinkId,
-  declaredIn: ModuleId,
-  loc: (sourcecode.File, sourcecode.Line)):
-  def bindId: DVBindId = DVBindId(sink, source)
-
 /** The immutable output of the Build phase. */
 final case class DesignSpec(
   modules:     Map[ModuleId, ModuleSpec],
   moduleOrder: Vector[ModuleId], // hierarchy-tree preorder
   binds:       Vector[BindDecl],
-  dvBinds:     Vector[DVBindDecl],
   generators: Vector[GeneratorEntry[?]]): // registration order; the name-conflict check runs over this
 
   def wrapper(id: ModuleId):         Option[WrapperModuleSpec]   = modules.get(id).collect { case w: WrapperModuleSpec => w }

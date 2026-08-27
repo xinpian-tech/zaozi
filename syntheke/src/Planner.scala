@@ -4,18 +4,18 @@ package me.jiuyang.syntheke
 
 /** Cross-hierarchy port and wire planning plus FIRRTL layer declarations (doc @ch-hierarchy).
   *
-  * Every settled connection has two generator-module endpoints. The wiring scope `W` is their lowest common ancestor
-  * (the shared parent when both endpoints live in one module); dangle ports are generated on every wrapper boundary
-  * strictly between an endpoint's parent and `W`, and bundle-level wires are planned per wrapper.
+  * A settled design edge has two generator-module endpoints; its wiring scope `W` is their lowest common ancestor (the
+  * shared parent when both endpoints live in one module). Dangle ports are generated on every wrapper boundary strictly
+  * between an endpoint's parent and `W`, and bundle-level wires are planned per wrapper.
+  *
+  * A probe source has no in-design consumer: its branch runs from the source's parent up to and including the root, so
+  * the root's dangle ports are the design's top-level probe ports.
   */
 private[syntheke] object Planner:
 
-  /** One planned branch: its dangle ports, the wires inside those wrappers, and the end reference inside `W`. */
-  private final case class Branch(ports: Vector[PortPlan], wires: Vector[WirePlan], end: LocalEndpoint)
-
   def plan(
-    spec:    DesignSpec,
-    settled: Negotiator.Settled
+    spec:  DesignSpec,
+    edges: Vector[ResolvedEdge]
   ): (Vector[PortPlan], Vector[WirePlan], Map[ModuleId, LayerTree]) =
 
     /** Wrapper modules strictly between `endpoint`'s parent and `w`, closest to the endpoint first. */
@@ -26,22 +26,26 @@ private[syntheke] object Planner:
         .flatten
         .toVector
 
+    /** Every strict ancestor of `endpoint`: its parent first, the root last. */
+    def ancestors(endpoint: ModuleId): Vector[ModuleId] =
+      Iterator.iterate(endpoint.parent)(_.flatMap(_.parent)).takeWhile(_.isDefined).flatten.toVector
+
     /** Dangle-port name on wrapper `m` for the connection ending at `endpoint`'s port with `base` segments. */
     def dangleName(m: ModuleId, endpoint: ModuleId, base: PortName): PortName =
       val rel = endpoint.path.drop(m.path.length)
       PortName(rel.flatMap(inst => Vector("inst", inst))) ++ base
 
-    def planBranch(
-      endpoint:  ModuleId, // generator module owning the endpoint port
-      portName:  PortName, // the generator's own port name
-      base:      PortName, // dangle base segments for this endpoint
-      w:         ModuleId,
+    /** Dangle ports on the wrappers `ms` and the wire chain through them. */
+    def planChain(
+      endpoint:  ModuleId,         // generator module owning the endpoint port
+      portName:  PortName,         // the generator's own port name
+      base:      PortName,         // dangle base segments for this endpoint
+      ms:        Vector[ModuleId], // wrappers hosting dangle ports, closest to the endpoint first
       direction: PortDirection,
       interface: ProtocolInterface,
       origin:    PlanOrigin,
       loc:       (sourcecode.File, sourcecode.Line)
-    ): Branch =
-      val ms    = branchModules(endpoint, w)
+    ): (Vector[PortPlan], Vector[WirePlan]) =
       val ports = ms.map(m => PortPlan(m, direction, dangleName(m, endpoint, base), interface, origin, loc))
       val wires = ms.zipWithIndex.map { (m, i) =>
         val name       = dangleName(m, endpoint, base)
@@ -54,72 +58,58 @@ private[syntheke] object Planner:
           case PortDirection.Input  => (thisRef, childRef)
         WirePlan(m, from, to, origin, loc)
       }
-      val end   =
-        if ms.isEmpty then LocalEndpoint.ChildPort(endpoint.path.last, portName)
-        else LocalEndpoint.ChildPort(ms.last.path.last, dangleName(ms.last, endpoint, base))
-      Branch(ports, wires, end)
+      (ports, wires)
+
+    /** The chain's end as the module above `ms` sees it: the child-port reference the wiring scope connects. */
+    def chainEnd(endpoint: ModuleId, portName: PortName, base: PortName, ms: Vector[ModuleId]): LocalEndpoint =
+      if ms.isEmpty then LocalEndpoint.ChildPort(endpoint.path.last, portName)
+      else LocalEndpoint.ChildPort(ms.last.path.last, dangleName(ms.last, endpoint, base))
 
     // ============ design edges ============
-    val designParts = settled.edges.map { e =>
-      val decl   = spec.binds(e.bind.order)
-      val a      = e.bind.source.module
-      val b      = e.bind.target.module
-      val w      = if a == b then a.parent.get else ModuleId.lca(a, b)
-      val origin = PlanOrigin.Design(e.bind)
-      val src    = planBranch(
-        endpoint = a,
-        portName = PortName(e.bind.source.name),
-        base = PortName("node", e.bind.source.name, "out"),
-        w = w,
-        direction = PortDirection.Output,
-        interface = e.interface,
-        origin = origin,
-        loc = decl.loc
-      )
-      val tgt    = planBranch(
-        endpoint = b,
-        portName = PortName(e.bind.target.name),
-        base = PortName("node", e.bind.target.name, "in"),
-        w = w,
-        direction = PortDirection.Input,
-        interface = e.interface,
-        origin = origin,
-        loc = decl.loc
-      )
-      (src.ports ++ tgt.ports, src.wires ++ tgt.wires :+ WirePlan(w, src.end, tgt.end, origin, decl.loc))
+    val designParts = edges.map { e =>
+      val decl                 = spec.binds(e.bind.order)
+      val a                    = e.bind.source.module
+      val b                    = e.bind.target.module
+      val w                    = if a == b then a.parent.get else ModuleId.lca(a, b)
+      val origin               = PlanOrigin.Design(e.bind)
+      val srcName              = PortName(e.bind.source.name)
+      val srcBase              = PortName("node", e.bind.source.name, "out")
+      val srcMs                = branchModules(a, w)
+      val tgtName              = PortName(e.bind.target.name)
+      val tgtBase              = PortName("node", e.bind.target.name, "in")
+      val tgtMs                = branchModules(b, w)
+      val (srcPorts, srcWires) =
+        planChain(a, srcName, srcBase, srcMs, PortDirection.Output, e.interface, origin, decl.loc)
+      val (tgtPorts, tgtWires) =
+        planChain(b, tgtName, tgtBase, tgtMs, PortDirection.Input, e.interface, origin, decl.loc)
+      val lcaWire              =
+        WirePlan(w, chainEnd(a, srcName, srcBase, srcMs), chainEnd(b, tgtName, tgtBase, tgtMs), origin, decl.loc)
+      (srcPorts ++ tgtPorts, srcWires ++ tgtWires :+ lcaWire)
     }
 
-    // ============ verification binds ============
-    // One pure-probe dangle port and wire chain per signal leaf of the source interface: probes never form
-    // aggregates in hardware, so Vec leaves route like any other and no open aggregate types are needed.
+    // ============ probe sources ============
+    // One pure-probe dangle port and define chain per signal leaf of every source interface, on every wrapper from
+    // the source's parent up to and including the root: probes never form aggregates in hardware, so Vec leaves route
+    // like any other and no open aggregate types are needed. The root's ports are the top-level probe ports.
     val dvParts = for
-      group            <- settled.dvGroups
-      (bindId, i)      <- group.binds.zipWithIndex
-      (leafPath, leaf) <- ProtocolBundle.leaves(group.interfaces.sources(i))
+      g                <- spec.generatorModules
+      s                <- g.dvSources
+      (leafPath, leaf) <- ProtocolBundle.leaves(s.interface)
     yield
-      val sinkModule = group.sink.module
-      val w          = sinkModule.parent.get
-      val decl       = spec.dvBinds.find(_.bindId == bindId).get
-      val source     = bindId.source
-      val origin     = PlanOrigin.Verification(bindId)
-      val src        = planBranch(
-        endpoint = source.module,
-        portName = PortName(source.name +: leafPath.nameSegments),
-        base = PortName("dv-source" +: source.name +: leafPath.nameSegments :+ "out"),
-        w = w,
+      val origin         = PlanOrigin.Verification(DVSourceId(g.id, s.name))
+      val ms             = ancestors(g.id)
+      val (ports, wires) = planChain(
+        endpoint = g.id,
+        portName = PortName(s.name +: leafPath.nameSegments),
+        base = PortName("dv-source" +: s.name +: leafPath.nameSegments :+ "out"),
+        ms = ms,
         direction = PortDirection.Output,
         interface = leaf,
         origin = origin,
-        loc = decl.loc
+        loc = s.loc
       )
-      val sinkRef    = LocalEndpoint.ChildPort(
-        sinkModule.path.last,
-        PortName(group.sink.name),
-        group.interfaces.sinkPaths(i) ++ leafPath
-      )
-      // Layer declarations on every wrapper the probe crosses, including the wiring scope.
-      val layered    = (branchModules(source.module, w) :+ w).map(_ -> group.layers(i))
-      (src.ports, src.wires :+ WirePlan(w, src.end, sinkRef, origin, decl.loc), layered)
+      // Layer declarations on every wrapper hosting a colored probe port.
+      (ports, wires, ms.map(_ -> s.layer))
 
     val layers = dvParts
       .flatMap(_._3)

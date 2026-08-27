@@ -21,7 +21,6 @@ private final class BuildState:
   val modules     = mutable.Map.empty[ModuleId, ModuleSpec]
   val moduleOrder = mutable.ArrayBuffer.empty[ModuleId]
   val binds       = mutable.ArrayBuffer.empty[BindDecl]
-  val dvBinds     = mutable.ArrayBuffer.empty[DVBindDecl]
   val generators  = mutable.ArrayBuffer.empty[GeneratorEntry[?]]
 
   // Generator scopes currently under construction. Context functions stack rather than shadow, so the enclosing
@@ -99,11 +98,6 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     st.requireNotInLeaf(s"bind ${source.show} -> ${target.show}")
     st.binds += BindDecl(st.binds.size, source, target, id, loc)
 
-  private[syntheke] def recordDVBind(source: DVSourceId, sink: DVSinkId, loc: (sourcecode.File, sourcecode.Line))
-    : Unit =
-    st.requireNotInLeaf(s"verification bind ${source.show} -> ${sink.show}")
-    st.dvBinds += DVBindDecl(st.dvBinds.size, source, sink, id, loc)
-
   private[syntheke] def close(loc: (sourcecode.File, sourcecode.Line)): Unit =
     st.modules(id) = WrapperModuleSpec(id, children.toVector, loc)
 
@@ -114,7 +108,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   private val refs   = mutable.ArrayBuffer.empty[(String, CrossProtocolRefSpec)]
   private val deps   = mutable.ArrayBuffer.empty[ParamDependencySpec]
   private val dvSrcs = mutable.ArrayBuffer.empty[DVSourceSpec]
-  private val dvSnks = mutable.ArrayBuffer.empty[DVSinkSpec]
   private val params = mutable.ArrayBuffer.empty[EdgeView => Either[Violation, Any]]
 
   /** Declarations are only legal while this scope is the generator currently under construction — a closure capturing
@@ -126,7 +119,7 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
   private def reserveName(name: String): Unit =
     requireOpen()
     DeclaredName.require(name, s"endpoint name in ${id.show}")
-    val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name) || dvSnks.exists(_.name == name)
+    val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name)
     require(!taken, s"duplicate endpoint name '$name' in ${id.show}")
 
   private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[Violation, Any]): Unit =
@@ -190,7 +183,10 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     deps += ParamDependencySpec(from.id.name, to.id.name, deps.size, (file, line))
     (new DownReader[from.protocol.Down](from.id), new UpReader[to.protocol.Up](to.id))
 
-  /** Declare a probe source providing its verification `Down` and FIRRTL layer path. */
+  /** Declare a probe source providing its verification `Down` and FIRRTL layer path. The interface is derived and
+    * checked here — every signal leaf must be a Probe carrying the declared layer, with no Flipped anywhere — so a
+    * protocol violating the contract fails at the declaration.
+    */
   def dvSource(
     p:     DVProtocol
   )(name:  String,
@@ -200,23 +196,23 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
     using
     file:  sourcecode.File,
     line:  sourcecode.Line
-  ): p.Source =
+  ): Unit =
     reserveName(name)
-    dvSrcs += DVSourceSpec(name, p, down, layer, dvSrcs.size + dvSnks.size, (file, line))
-    new DVSourceRef[p.type](p, DVSourceId(id, name))
-
-  /** Declare a probe sink on a verification generator module. */
-  def dvSink(
-    p:    DVProtocol
-  )(name: String
-  )(
-    using
-    file: sourcecode.File,
-    line: sourcecode.Line
-  ): p.Sink =
-    reserveName(name)
-    dvSnks += DVSinkSpec(name, p, dvSrcs.size + dvSnks.size, (file, line))
-    new DVSinkRef[p.type](p, DVSinkId(id, name))
+    val interface = p.interfaceOf(down, layer)
+    require(
+      !ProtocolInterface.containsFlipped(interface),
+      s"probe source ${id.show}#$name: interface contains Flipped fields, but a probe is one-directional"
+    )
+    ProtocolBundle.leaves(interface).foreach { (path, leaf) =>
+      require(
+        leaf match
+          case ProtocolInterface.Probe(_, l) => l == layer
+          case _                             => false
+        ,
+        s"probe source ${id.show}#$name: leaf ${path.show} must be a Probe carrying layer ${layer.show}"
+      )
+    }
+    dvSrcs += DVSourceSpec(name, p, down, layer, interface, dvSrcs.size, (file, line))
 
   /** Declare the full-parameter computation (doc @sec-two-layer-params): the negotiated `EdgeView` plus the user
     * parameters captured in the closure produce the `FullParam`; exactly once per module.
@@ -258,7 +254,6 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
       nodes = nodeSpecs,
       dependencies = deps.toVector,
       dvSources = dvSrcs.toVector,
-      dvSinks = dvSnks.toVector,
       computeFullParam = compute,
       loc = loc
     )

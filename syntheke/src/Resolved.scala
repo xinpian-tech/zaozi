@@ -25,36 +25,6 @@ final case class ResolvedProtocolReference(
   edge: Any):
   def edgeAs(p: Protocol): p.Edge = edge.asInstanceOf[p.Edge]
 
-/** One settled probe-sink group: the sink, its binds in declaration order, and the aggregate. */
-final case class ResolvedDVGroup(
-  sink:     DVSinkId,
-  protocol: DVProtocol,
-  binds:    Vector[DVBindId],
-  downs:    Vector[Any],
-  layers:   Vector[LayerPath],
-  edge:     Any,
-  interfaces: DVInterfaces):
-  def edgeAs(p: DVProtocol): p.Edge = edge.asInstanceOf[p.Edge]
-
-/** Per-source verification view entry (doc @sec-dv-protocol). */
-final case class SourceView(
-  source:    DVSourceId,
-  bind:      DVBindId,
-  protocol:  DVProtocol,
-  edge:      Any,
-  interface: ProtocolBundle,
-  layer:     LayerPath)
-
-/** Per-sink verification view entry. */
-final case class SinkView(
-  sink:       DVSinkId,
-  binds:      Vector[DVBindId],
-  protocol:   DVProtocol,
-  edge:       Any,
-  interfaces: DVInterfaces)
-
-final case class VerificationView(sources: Vector[SourceView], sinks: Vector[SinkView])
-
 /** One node's entry in a module's [[EdgeView]]: direction, its unique settled edge, and resolved references. */
 final case class NodeView(
   node:      ModuleNodeId,
@@ -69,8 +39,7 @@ final case class NodeView(
   */
 final case class EdgeView(
   module: ModuleId,
-  nodes:  Vector[NodeView], // node declaration order
-  verification: VerificationView):
+  nodes: Vector[NodeView]): // node declaration order
 
   def apply(n: NodeBuilder[?]): NodeView =
     require(n.id.module == module, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")
@@ -125,7 +94,7 @@ enum PortDirection derives CanEqual:
 /** Stable origin of a planned port or wire. */
 enum PlanOrigin derives CanEqual:
   case Design(bind: BindId)
-  case Verification(bind: DVBindId)
+  case Verification(source: DVSourceId)
 
 /** A framework-generated dangle port on a wrapper module. Design edges plan one bundle port per crossing; probe routing
   * plans one pure-probe port per signal leaf, so probes never form aggregates in hardware.
@@ -143,8 +112,8 @@ enum LocalEndpoint derives CanEqual:
   /** A dangle port of the wrapper itself. */
   case ThisPort(name: PortName)
 
-  /** A port (or a sub-bundle of a port, for verification sinks) on a direct child instance. */
-  case ChildPort(instance: String, port: PortName, sub: InterfacePath = InterfacePath.root)
+  /** A port on a direct child instance. */
+  case ChildPort(instance: String, port: PortName)
 
 /** A planned bundle-level wire inside one wrapper module, from source side to target side. */
 final case class WirePlan(
@@ -180,7 +149,6 @@ object LayerTree:
 final case class ResolvedDesign(
   spec:             DesignSpec,
   edges:            Vector[ResolvedEdge],            // bind declaration order
-  dvGroups:         Vector[ResolvedDVGroup],
   generatorModules: Vector[ResolvedGeneratorModule], // hierarchy preorder
   portPlans:        Vector[PortPlan],
   wirePlans:        Vector[WirePlan],

@@ -61,13 +61,12 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import java.lang.foreign.Arena
 import java.nio.file.StandardOpenOption.*
 
-/** Verification enactment end-to-end: probe sources in a deep cluster route through framework-planned dangles and
-  * per-leaf `ref.define` to an ancestor sink, confined to FIRRTL layers.
+/** Verification enactment end-to-end: probe sources in a deep cluster forward through framework-planned dangles and
+  * per-leaf `ref.define` to top-level probe ports, confined to FIRRTL layers.
   *
-  * zaozi's probe interfaces are output-only today, so both endpoint generators here use a [[StubBackend]] that builds
-  * its module through the CIRCT C-API directly: outputs invalidated, probe sources defined from dummy wires, probe sink
-  * inputs left unread. The framework side — planning, dangles, defines, layers, linking, firtool — is exactly the
-  * production path.
+  * The generators here use a [[StubBackend]] that builds its module through the CIRCT C-API directly: outputs
+  * invalidated, probe sources defined from dummy wires. The framework side — planning, dangles, defines, layers,
+  * linking, firtool — is exactly the production path.
   */
 
 /** Serializable stub description: every port of the generator with its settled interface. */
@@ -116,13 +115,10 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         None
       )
       // An internal layer unrelated to any routed probe: the linker must carry its definition into the design
-      // circuit, or verification fails on the layerblock below. Only output-only stubs (sources) carry it — a sink
-      // is instantiated under a layerblock, where a module with its own layerblock would be illegal nesting.
-      val internalLayer = !p.ports.exists(_.isInput)
-      if internalLayer then
-        summon[Circuit].block.appendOwnedOperation(
-          summon[LayerApi].op("stubinternal", unknownLoc, FirrtlLayerConvention.Bind).operation
-        )
+      // circuit, or verification fails on the layerblock below.
+      summon[Circuit].block.appendOwnedOperation(
+        summon[LayerApi].op("stubinternal", unknownLoc, FirrtlLayerConvention.Bind).operation
+      )
       val module = summon[ModuleApi].op(
         name,
         unknownLoc,
@@ -132,7 +128,7 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
       )
       locally {
         given Block = module.block
-        if internalLayer then summon[LayerBlockApi].op(Seq("stubinternal"), unknownLoc).operation.appendToBlock()
+        summon[LayerBlockApi].op(Seq("stubinternal"), unknownLoc).operation.appendToBlock()
         p.ports.zipWithIndex.foreach { (sp, idx) =>
           val port = module.getIO(idx)
           sp.interface match
@@ -158,8 +154,8 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         }
       }
       module.appendToCircuit()
-      val file   = outDir / s"$name.mlirbc"
-      val out    = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
+      val file = outDir / s"$name.mlirbc"
+      val out = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
       try summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
       finally out.close()
 
@@ -177,122 +173,102 @@ object DvVerilogSpec extends TestSuite:
 
   val srcEntry  = entry("Src")
   val memEntry  = entry("Mem")
-  val snkEntry  = entry("Cosim")
   val vsrcEntry = entry("VSrc")
-  val vsnkEntry = entry("VCosim")
   val backends: Seq[GeneratorBackend] =
-    Seq(srcEntry, memEntry, snkEntry, vsrcEntry, vsnkEntry).map(StubBackend(_, outDir))
+    Seq(srcEntry, memEntry, vsrcEntry).map(StubBackend(_, outDir))
 
   val layerCosim = LayerPath(Vector("verification", "cosim"))
 
-  /** Like [[Trace]], but each source contributes a Vec of probes: `pc: Vec(2, Probe(UInt(w)))`. */
+  /** Like [[Trace]], but each source publishes a Vec of probes: `pc: Vec(2, Probe(UInt(w)))`. */
   object VecTrace extends DVProtocol:
     type Down = Int
-    type Edge = Vector[Int]
-    def resolve(downs: Vector[Int]):                                Either[Violation, Vector[Int]]          = Right(downs)
-    def interfacesOf(edge: Vector[Int], layers: Vector[LayerPath]): Either[Violation, DVInterfaces]         =
-      val sources = edge.zip(layers).map { (w, l) =>
-        ProtocolBundle(
-          ProtocolInterface
-            .Field("pc", ProtocolInterface.Vec(2, ProtocolInterface.Probe(ProtocolInterface.UInt(w), l)))
-        )
-      }
-      val sink    = ProtocolInterface.Bundle(
-        edge.indices.toVector.map(i => ProtocolInterface.Field(s"src$i", sources(i)))
+    def interfaceOf(down: Int, layer: LayerPath): ProtocolBundle                  =
+      ProtocolBundle(
+        ProtocolInterface
+          .Field("pc", ProtocolInterface.Vec(2, ProtocolInterface.Probe(ProtocolInterface.UInt(down), layer)))
       )
-      Right(DVInterfaces(sources, sink, edge.indices.toVector.map(i => InterfacePath.root.field(s"src$i"))))
-    val downRW:                                                     upickle.default.ReadWriter[Int]         = summon
-    val edgeRW:                                                     upickle.default.ReadWriter[Vector[Int]] = summon
+    val downRW:                                   upickle.default.ReadWriter[Int] = summon
 
-  /** Ports of a generator module reconstructed from its EdgeView — the FullParam determines the interface. */
-  def stubParams(kind: String)(view: EdgeView): Either[Violation, StubFull] =
+  /** Design ports of a generator module reconstructed from its EdgeView, plus its probe ports: one pure-probe port per
+    * signal leaf, named source name + leaf path — the same information the module declared with `dvSource`.
+    */
+  def stubParams(kind: String, probes: Vector[StubPort] = Vector.empty)(view: EdgeView): Either[Violation, StubFull] =
     Right(
       StubFull(
         kind,
         view.nodes.map(nv => StubPort(nv.node.name, nv.direction == NodeDirection.Inward, nv.edge.interface))
-        // A probe source exposes one pure-probe port per signal leaf.
-          ++ view.verification.sources.flatMap(s =>
-            ProtocolBundle.leaves(s.interface).map { (path, leaf) =>
-              StubPort(PortName(s.source.name +: path.nameSegments).encoded, false, leaf)
-            }
-          )
-          // FIRRTL forbids input probes: the sink receives the probe-stripped (resolved) interface.
-          ++ view.verification.sinks.map(s =>
-            StubPort(s.sink.name, true, ProtocolBundle.stripProbes(s.interfaces.sink))
-          )
+          ++ probes
       )
     )
 
+  def probePorts(p: DVProtocol)(name: String, down: p.Down, layer: LayerPath): Vector[StubPort] =
+    ProtocolBundle.leaves(p.interfaceOf(down, layer)).map { (path, leaf) =>
+      StubPort(PortName(name +: path.nameSegments).encoded, false, leaf)
+    }
+
   def buildDesign(): DesignSpec =
     Design {
-      val cluster            = wrapper {
+      val cluster = wrapper {
         val src = generator(srcEntry) {
           val mem = outward(Wid).dFn(_ => Right(32))
           val rob = dvSource(Trace)(8, layerCosim)
           val lsu = dvSource(Trace)(4, layerCosim)
-          parameters(stubParams("Src"))
-          (mem, rob, lsu)
+          parameters(
+            stubParams(
+              "Src",
+              probePorts(Trace)("rob", 8, layerCosim) ++ probePorts(Trace)("lsu", 4, layerCosim)
+            )
+          )
+          mem
         }
         src
       }
-      val (srcOut, rob, lsu) = cluster
-      val mem                = generator(memEntry) {
+      val mem     = generator(memEntry) {
         parameters(stubParams("Mem"))
         val in = inward(Wid).uFn(_ => Right(64))
         in
       }
-      val cosim              = generator(snkEntry) {
-        parameters(stubParams("Cosim"))
-        val taps = dvSink(Trace)
-        taps
-      }
-      mem <-- srcOut
-      cosim <-- rob
-      cosim <-- lsu
+      mem <-- cluster
     }
 
   val tests = Tests {
 
-    test("probe routing elaborates: dangles, per-leaf defines, layers, Verilog") {
+    test("probe forwarding elaborates: dangles, per-leaf defines, top-level probe ports, Verilog") {
       val resolved = Negotiator.negotiate(buildDesign())
       val design   = Elaborator.elaborate(resolved, backends)
 
-      // The layer tree is declared once at circuit level; the cluster carries one pure-probe dangle per leaf.
+      // The layer tree is declared once at circuit level; the cluster carries one pure-probe dangle per leaf and the
+      // root exposes the same probes as top-level ports.
       assert(design.firrtl.contains("layer verification"))
-      assert(design.firrtl.contains("cosim"))
       assert(design.firrtl.contains("inst_src_dv$msource_rob_sig_out"))
+      assert(design.firrtl.contains("inst_cluster_inst_src_dv$msource_rob_sig_out"))
       assert(design.firrtl.contains("define"))
-      // Verilog exists for the root and both stub endpoint modules; probes stay out of the release netlist
-      // (bind layers), so the sink instance is not in module Top's body.
+      // Verilog exists for the root and both stub modules; probes stay out of the release netlist (bind layers).
       assert(design.verilog.contains("module Top"))
       assert(design.verilog.contains("module demo_dv_Src_"))
       // The stub's internal layer, unrelated to any routed probe, was carried by the linker into the design circuit.
       assert(design.firrtl.contains("layer stubinternal"))
     }
 
-    test("Vec probe leaves route as individual pure-probe ports through subindex") {
+    test("Vec probe leaves forward as individual pure-probe ports") {
       val spec     = Design {
-        val vc     = wrapper {
+        val vc = wrapper {
           val vsrc = generator(vsrcEntry) {
-            parameters(stubParams("VSrc"))
+            parameters(stubParams("VSrc", probePorts(VecTrace)("pcs", 32, layerCosim)))
             val pcs = dvSource(VecTrace)(32, layerCosim)
-            pcs
           }
-          vsrc
         }
-        val vcosim = generator(vsnkEntry) {
-          parameters(stubParams("VCosim"))
-          val taps = dvSink(VecTrace)
-          taps
-        }
-        vcosim <-- vc
       }
       val resolved = Negotiator.negotiate(spec)
       val vc       = ModuleId.root / "vc"
-      // One dangle per Vec element, pure probe type.
+      // One dangle per Vec element on the intermediate wrapper and again on the root, pure probe type.
       assert(
         resolved.portPlans.filter(_.module == vc).map(_.name.encoded) ==
           Vector("inst_vsrc_dv$msource_pcs_pc_0_out", "inst_vsrc_dv$msource_pcs_pc_1_out")
+      )
+      assert(
+        resolved.portPlans.filter(_.module == ModuleId.root).map(_.name.encoded) ==
+          Vector("inst_vc_inst_vsrc_dv$msource_pcs_pc_0_out", "inst_vc_inst_vsrc_dv$msource_pcs_pc_1_out")
       )
       assert(resolved.portPlans.forall(_.interface.isInstanceOf[ProtocolInterface.Probe]))
       val design   = Elaborator.elaborate(resolved, backends)

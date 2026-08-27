@@ -40,12 +40,8 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
-  LayerBlockApi,
   ModuleApi,
-  RefDefineApi,
-  RefResolveApi,
-  SubfieldApi,
-  SubindexApi
+  RefDefineApi
 }
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
@@ -211,40 +207,14 @@ object Elaborator:
                 else firstDiff(exp.getVectorElementType, act.getVectorElementType, s"$path[]")
               else Some(s"$path: expected ${typeText(exp)}, generator has ${typeText(act)}")
 
-            /** Emit one child instance; returns its port values and, for a probe sink, its layerblock. */
-            def emitChild(c: String): (Vector[((String, String), Value)], Option[(String, Block)]) =
+            /** Emit one child instance; returns its port values. */
+            def emitChild(c: String): Vector[((String, String), Value)] =
               val childId = id / c
               spec.modules(childId) match
                 case gm: GeneratorModuleSpec =>
-                  val rgm        = resolved.generatorModule(childId).get
-                  val sinkLayers = rgm.view.verification.sinks
-                    .flatMap(sv => resolved.dvGroups.find(_.sink == sv.sink).toVector.flatMap(_.layers))
-                    .distinct
-                  // Probe sinks are enacted under a layerblock: FIRRTL has no input probe ports, so the wrapper
-                  // resolves every probe and feeds plain data into the sink instance inside the layer (bind pattern).
-                  val sinkBlock: Option[Block] =
-                    if rgm.view.verification.sinks.isEmpty then None
-                    else if rgm.view.nodes.nonEmpty then
-                      fail(s"unsupported: sink generator ${childId.show} mixes probe sinks with design nodes")
-                    else if sinkLayers.sizeIs != 1 then
-                      fail(
-                        s"unsupported: sink generator ${childId.show} collects probes from ${sinkLayers.size} distinct layers"
-                      )
-                    else
-                      // Layerblocks nest structurally: `layerblock @a { layerblock @a::@b { … } }`.
-                      Some(sinkLayers.head.segments.indices.foldLeft(summon[Block]) { (outer, i) =>
-                        val lb = summon[LayerBlockApi].op(sinkLayers.head.segments.take(i + 1), unknownLoc)
-                        locally {
-                          given Block = outer
-                          lb.operation.appendToBlock()
-                        }
-                        lb.block
-                      })
-                  val instOp = locally {
-                    given Block = sinkBlock.getOrElse(summon[Block])
-                    backendOf(gm.entry).instantiate(rgm.fullParam, c, gm.loc)
-                  }
-                  val names = instOp.getInherentAttributeByName("portNames")
+                  val rgm    = resolved.generatorModule(childId).get
+                  val instOp = backendOf(gm.entry).instantiate(rgm.fullParam, c, gm.loc)
+                  val names  = instOp.getInherentAttributeByName("portNames")
                   val byName = Seq
                     .tabulate(names.arrayAttrGetNumElements)(i => names.arrayAttrGetElement(i).stringAttrGetValue -> i)
                     .toMap
@@ -280,27 +250,23 @@ object Elaborator:
                     checkPort(nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
                   }
                   // Probe sources expose one pure-probe port per signal leaf (probes never form aggregates in
-                  // hardware); sink ports carry the probe-stripped interface (the shape after ref.resolve at this
-                  // wrapper).
-                  def sourceLeafPorts(s: SourceView): Vector[(String, ProtocolInterface)] =
+                  // hardware).
+                  def sourceLeafPorts(s: DVSourceSpec): Vector[(String, ProtocolInterface)] =
                     ProtocolBundle.leaves(s.interface).map { (path, leaf) =>
-                      PortName(s.source.name +: path.nameSegments).encoded -> leaf
+                      PortName(s.name +: path.nameSegments).encoded -> leaf
                     }
-                  rgm.view.verification.sources.foreach {
+                  gm.dvSources.foreach {
                     sourceLeafPorts(_).foreach((name, leaf) => checkPort(name, true, leaf))
                   }
-                  rgm.view.verification.sinks
-                    .foreach(s => checkPort(s.sink.name, false, ProtocolBundle.stripProbes(s.interfaces.sink)))
                   val declared = rgm.view.nodes.map(_.node.name).toSet ++
-                    rgm.view.verification.sources.flatMap(sourceLeafPorts(_).map(_._1)) ++
-                    rgm.view.verification.sinks.map(_.sink.name)
+                    gm.dvSources.flatMap(sourceLeafPorts(_).map(_._1))
                   (byName.keySet -- declared).toVector.sorted.foreach { extra =>
                     fail(
                       s"port mismatch at ${childId.show}#$extra: generator port has no corresponding declared " +
                         s"endpoint, at ${gm.loc.show}"
                     )
                   }
-                  (byName.toVector.map((n, i) => ((c, n), instOp.getResult(i))), sinkBlock.map(c -> _))
+                  byName.toVector.map((n, i) => ((c, n), instOp.getResult(i)))
                 case _:  WrapperModuleSpec   =>
                   val childPorts = resolved.portPlans.filter(_.module == childId).sortBy(_.name.encoded)
                   val fields     = childPorts.map { p =>
@@ -319,67 +285,29 @@ object Elaborator:
                     leafPaths(resolved.layerDecls.getOrElse(childId, LayerTree.empty))
                   )
                   instOp.operation.appendToBlock()
-                  (
-                    childPorts.zipWithIndex.map((p, i) => ((c, p.name.encoded), instOp.operation.getResult(i))),
-                    None
-                  )
+                  childPorts.zipWithIndex.map((p, i) => ((c, p.name.encoded), instOp.operation.getResult(i)))
 
-            val childInfos  = w.children.map(emitChild)
-            val childValues = childInfos.flatMap(_._1).toMap
-            val sinkBlocks  = childInfos.flatMap(_._2).toMap
+            val childValues = w.children.flatMap(emitChild).toMap
 
             def baseOf(e: LocalEndpoint): Value = e match
-              case LocalEndpoint.ThisPort(name)           =>
+              case LocalEndpoint.ThisPort(name)        =>
                 portIndex
                   .get(name.encoded)
                   .fold(fail(s"$name: missing port ${name.encoded}"))(i => module.getIO(i))
-              case LocalEndpoint.ChildPort(inst, port, _) =>
+              case LocalEndpoint.ChildPort(inst, port) =>
                 childValues.getOrElse(
                   (inst, port.encoded),
                   fail(s"$name: missing child port $inst.${port.encoded}")
                 )
-
-            /** Walk a data path inside the sink's port: named fields via `subfield`, Vec indices via `subindex`. */
-            def navigate(
-              base: Value,
-              path: InterfacePath
-            )(
-              using Block
-            ): Value =
-              path.segments.foldLeft(base) { (v, seg) =>
-                seg match
-                  case InterfacePath.Segment.Field(n) =>
-                    val idx = v.getType.getBundleFieldIndex(n)
-                    if idx < 0 then fail(s"$name: no field '$n' while navigating a verification path")
-                    val sub = summon[SubfieldApi].op(v, idx, unknownLoc)
-                    sub.operation.appendToBlock()
-                    sub.result
-                  case InterfacePath.Segment.Index(i) =>
-                    val sub = summon[SubindexApi].op(v, i, unknownLoc)
-                    sub.operation.appendToBlock()
-                    sub.result
-              }
 
             resolved.wirePlans.filter(_.module == id).foreach { wp =>
               wp.origin match
                 case PlanOrigin.Design(_)       =>
                   summon[ConnectApi].op(baseOf(wp.from), baseOf(wp.to), unknownLoc).operation.appendToBlock()
                 case PlanOrigin.Verification(_) =>
-                  // Every verification wire carries one probe leaf (doc @sec-dv-routing).
-                  wp.to match
-                    case LocalEndpoint.ThisPort(_)             =>
-                      // Pass-through across this boundary: define the dangle from the child's probe port.
-                      summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
-                    case LocalEndpoint.ChildPort(inst, _, sub) =>
-                      // The sink end: resolve the probe inside the sink's layerblock and connect the data leaf.
-                      val lb = sinkBlocks.getOrElse(inst, fail(s"$name: sink instance '$inst' has no layer block"))
-                      locally {
-                        given Block = lb
-                        val res     = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
-                        res.operation.appendToBlock()
-                        val dst     = navigate(baseOf(wp.to), sub)
-                        summon[ConnectApi].op(res.result, dst, unknownLoc).operation.appendToBlock()
-                      }
+                  // Each verification wire forwards one probe leaf across this boundary (doc @sec-dv-routing):
+                  // define the dangle — at the root, the top-level probe port — from the child's probe port.
+                  summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
             }
 
             module.appendToCircuit()
