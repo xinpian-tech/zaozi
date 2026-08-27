@@ -50,7 +50,7 @@
 
 协商器为每个生成器模块装配 `EdgeView`，再调用该模块的 `computeFullParam`。
 
-`nodes` 按声明顺序返回本模块的全部设计模块节点；`parameterDependencies` 按声明顺序返回本模块从 inward 节点到 outward 节点的依赖边，每条记录包含两端 `ModuleNodeId` 与 `SourceLocation`。`OutwardNodeSpec` 必须携带 `dFn`，`InwardNodeSpec` 必须携带 `uFn`，函数字段不可选。构建 API 每声明一条依赖边，就同时返回两个带协议类型的读取句柄（只能读取指定节点参数的句柄），分别供 outward 节点函数读取 inward `Down`、供 inward 节点函数读取 outward `Up`；原始节点句柄没有读取操作。因此函数可读集合与 `parameterDependencies` 由同一次调用产生，不能分开声明。函数返回类型由本节点协议确定。边界节点的函数从用户参数产生初值。处理器、存储、桥、Xbar、NoC、直连和时钟树均通过这套公开构造方法声明节点和模块内部参数依赖。
+`nodes` 按声明顺序返回本模块的全部设计模块节点；`parameterDependencies` 按声明顺序返回本模块从 inward 节点到 outward 节点的依赖边，每条记录包含两端 `ModuleNodeId` 与源码位置。`OutwardNodeSpec` 必须携带 `dFn`，`InwardNodeSpec` 必须携带 `uFn`，函数字段不可选。构建 API 每声明一条依赖边，就同时返回两个带协议类型的读取句柄（只能读取指定节点参数的句柄），分别供 outward 节点函数读取 inward `Down`、供 inward 节点函数读取 outward `Up`；原始节点句柄没有读取操作。因此函数可读集合与 `parameterDependencies` 由同一次调用产生，不能分开声明。函数返回类型由本节点协议确定。边界节点的函数从用户参数产生初值。处理器、存储、桥、Xbar、NoC、直连和时钟树均通过这套公开构造方法声明节点和模块内部参数依赖。
 
 `DesignBuilder` 根据当前模块的 `ModuleId` 与节点名派生 `ModuleNodeId`。同一模块内节点名唯一；每个节点恰好参与一次设计 bind。节点在生成器的端口中对应一个以节点声明名命名、由节点方向确定根方向的顶层 Bundle（@sec-port-naming）。
 
@@ -63,7 +63,7 @@
 每条设计边在源、目标生成器的端口中各对应一个顶层 Bundle；探针源和探针汇各对应一个具名顶层 Bundle。节点、探针源和探针汇的声明名称在模块内共用同一唯一性约束，重复时在声明处当场报错（@sec-error-semantics）。参与框架连线的每个生成器顶层 Bundle 必须能由相应 `ModuleNodeId` 或验证端点声明唯一还原。设计边端口的期望结构来自 `interfaceOf(edge)`；探针源与探针汇的期望结构分别来自 `DVInterfaces.sources(i)` 与 `DVInterfaces.sink`。
 
 #决策([端口结构校验在例化期进行])[
-  生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input；探针源按信号叶展开，每叶一个 Output 纯 `Probe` 端口，名称为源名加叶路径段（@sec-port-naming）；探针汇为 Input；字段名称、顺序和方向（`Flipped`），`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、bind 的源码位置（`SourceLocation`）以及期望结构与实际结构的差异路径。
+  生成器的设计端口和验证端口必须与相应 `ProtocolBundle` 完全一致：设计 bind 的源端根方向为 Output，目标端为 Input；探针源按信号叶展开，每叶一个 Output 纯 `Probe` 端口，名称为源名加叶路径段（@sec-port-naming）；探针汇为 Input；字段名称、顺序和方向（`Flipped`），`Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock`、`Reset`、`Probe` 类型构造器，Vec 长度、整数宽度与符号，以及 Probe 的 `LayerPath` 均逐层相同。声明端口缺失、参与连线的顶层 Bundle 没有对应声明或结构失配时，错误包含端点稳定标识、bind 的源码位置以及期望结构与实际结构的差异路径。
 ] <dec-binding-check>
 
 端口失配在实施阶段报出，与 @sec-error-semantics 的协商错误分属不同异常。

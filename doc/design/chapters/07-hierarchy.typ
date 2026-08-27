@@ -41,7 +41,7 @@
   )
 ]
 
-跨层端口规划在协商期生成端口计划与连线计划。计划使用带种类的稳定来源标识：设计连接为 `Design(BindId)`，验证连接为 `Verification(DVBindId)`；每项同时记录对应 bind 的源码位置（`SourceLocation`）。例化期按计划发射端口和连线。
+跨层端口规划在协商期生成端口计划与连线计划。计划使用带种类的稳定来源标识：设计连接为 `Design(BindId)`，验证连接为 `Verification(DVBindId)`；每项同时记录对应 bind 的源码位置。例化期按计划发射端口和连线。
 
 == 端口命名 <sec-port-naming>
 

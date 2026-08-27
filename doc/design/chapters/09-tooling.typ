@@ -8,7 +8,7 @@
 
 `ResolvedDesign` 可按需导出四份 JSON：
 
-- *拓扑*（`topology.json`）：模块树、模块节点、设计 bind、模块内部参数依赖，以及探针源、探针汇与验证 bind。模块、节点、bind 和验证端点包含各自的稳定标识；一条模块内部参数依赖由有序二元组“inward `ModuleNodeId`、outward `ModuleNodeId`”唯一标识。各项同时保存声明顺序和源码位置（`SourceLocation`）。
+- *拓扑*（`topology.json`）：模块树、模块节点、设计 bind、模块内部参数依赖，以及探针源、探针汇与验证 bind。模块、节点、bind 和验证端点包含各自的稳定标识；一条模块内部参数依赖由有序二元组“inward `ModuleNodeId`、outward `ModuleNodeId`”唯一标识。各项同时保存声明顺序和源码位置。
 - *求解结果*（`edges.json`）包含两组记录：
   - `designEdges` 按 bind 声明顺序保存 `BindId`、源与目标节点、传播得到的 `Down` 与 `Up`、`Edge` 和 `ProtocolBundle`；
   - `dvResults` 按 `DVSinkId` 保存有序 `DVBindId`、按相同顺序排列的验证协议 `Down` 与 `LayerPath`、验证 `Edge` 和 `DVInterfaces`（@sec-protocol-object、@sec-dv-protocol）。
@@ -27,7 +27,7 @@
 
 == 错误报告 <sec-error-format>
 
-错误报告（@sec-error-semantics）直接陈述问题与结论，随后列出相关源码位置（`SourceLocation`）、触发条件与参数值，末行给出修复方向。例如，地址重叠错误必须同时指出冲突的两个目标节点、各自服务区间、相交区间和收窄地址范围的修复方向。
+错误报告（@sec-error-semantics）直接陈述问题与结论，随后列出相关源码位置、触发条件与参数值，末行给出修复方向。例如，地址重叠错误必须同时指出冲突的两个目标节点、各自服务区间、相交区间和收窄地址范围的修复方向。
 
 涉及参数、数量或容量时附相应快照；修复建议限一句话。
 
@@ -43,6 +43,6 @@ JSON 中模块按显式子实例声明顺序执行层次树先序导出；完整
 
 Bundle 字段保留协议定义顺序；FIRRTL 层声明树的同级节点和映射键按名字典序。
 
-错误报告内的 `SourceLocation` 按规范化文件路径、行号与列号排序（@sec-error-semantics）。
+错误报告内的源码位置按规范化文件路径与行号排序（@sec-error-semantics）。
 
-`SourceLocation.file` 采用相对于设计源码根目录、分隔符统一为 `/` 的路径，行列号使用十进制。源码位置作为诊断字段；实体身份由稳定标识确定，导出顺序由上述规范确定。规范化编码使同一规格与同一工具版本产生逐字节相同的导出。
+源码位置的文件路径为 sourcecode 编译期捕获的路径，分隔符统一为 `/`，行号使用十进制。源码位置作为诊断字段；实体身份由稳定标识确定，导出顺序由上述规范确定。规范化编码使同一规格与同一工具版本产生逐字节相同的导出。

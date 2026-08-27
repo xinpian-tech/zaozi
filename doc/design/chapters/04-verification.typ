@@ -12,7 +12,7 @@
 
 验证端点的稳定标识由所属模块和端点名组成（`DVSourceId`、`DVSinkId`）；验证 bind 的稳定标识 `DVBindId` 由探针汇和探针源共同组成。实现类和构造器由框架密封；`DesignBuilder` 根据当前生成器模块的 `ModuleId` 与名称派生端点标识。探针源的私有实现保存构造方法接收的 `protocol.Down`。
 
-验证 bind 与设计 bind 共用 `<-` 声明语法和声明位置规则（@sec-node-conn-proto）：`sink <- source` 产生 `DVBindId`，并记录声明它的结构模块与 `SourceLocation`。每个源恰好 bind 一次，每个汇至少连接一个源，同一汇的全部端点使用注册表中的同一个 `DVProtocol` 对象。
+验证 bind 与设计 bind 共用 `<-` 声明语法和声明位置规则（@sec-node-conn-proto）：`sink <- source` 产生 `DVBindId`，并记录声明它的结构模块与源码位置。每个源恰好 bind 一次，每个汇至少连接一个源，同一汇的全部端点使用注册表中的同一个 `DVProtocol` 对象。
 
 探针源和探针汇分别对应生成器的一个顶层端口，端口名就是声明名，端口内部的字段都是 `Probe`；验证生成器以求解后的汇端端口为输入，并实现协同仿真、记分板或断言逻辑（@sec-generator-contract）。
 
@@ -100,7 +100,7 @@ $ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针�
 跨层端口与连线写入对应的 FIRRTL 层；关闭层路径时，FIRRTL 编译流程移除其中的验证逻辑。验证求解期核对 `DVInterfaces` 中的 `Probe` 层标注与探针源声明；例化期再把生成器的实际 Probe 端口与已求解 `ProtocolBundle` 比对，失配时当场报错（@sec-generator-contract）。
 
 #决策([层路径按前缀合并])[
-  相同层路径合并为同一声明。连接到同一探针汇的全部 bind 采用该汇的同一个 `DVProtocol`；检查发现其他协议时，报告相关 bind 的 `SourceLocation`。不同探针汇可以在同一层路径下使用不同协议。
+  相同层路径合并为同一声明。连接到同一探针汇的全部 bind 采用该汇的同一个 `DVProtocol`；检查发现其他协议时，报告相关 bind 的源码位置。不同探针汇可以在同一层路径下使用不同协议。
 ] <dec-layer-merge>
 
 == 探针汇接口结构 <sec-sink-shape>
