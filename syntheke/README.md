@@ -27,7 +27,6 @@ branch `init`, `doc/design/`, Chinese). Correspondence:
 | 协商算法（结构校验、稳定拓扑序、双向传播、逐边求解、`EdgeView`、遇错即抛） | `Negotiator.scala` |
 | 跨层端口规划、端口命名、FIRRTL 层 | `Planner.scala` |
 | 已求解记录 (`ResolvedDesign`, `ResolvedEdge`, `EdgeView`, …) | `Resolved.scala` |
-| 模块身份与去重 (@sec-dedup 结构键、模块命名) | `Dedup.scala` |
 | 工具产物（topology/edges/plan/params JSON, @ch-tooling） | `Export.scala` |
 | 生成器契约、端口结构校验 (@dec-binding-check)、例化流程 | `circt/src/Backend.scala`, `circt/src/Elaborator.scala` |
 

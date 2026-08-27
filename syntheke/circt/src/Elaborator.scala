@@ -106,10 +106,10 @@ object Elaborator:
   ): ElaboratedDesign =
     val backendOf: Map[GeneratorEntry[?], GeneratorBackend] = backends.map(b => (b.entry: GeneratorEntry[?]) -> b).toMap
     val spec = resolved.spec
-    val dd   = Dedup.dedup(resolved)
 
-    // Module names: generator modules are named by their backend (stable per canonical FullParam, matching the
-    // structural key); wrapper modules by the dedup naming rules.
+    // Module names: generator modules are named by their backend (the canonical linking key); wrapper modules by the
+    // reversible encoding of their instance path, "Top" for the root. Structural merging of identical modules is
+    // firtool's job (its Dedup pass), not syntheke's.
     val moduleNames: Map[ModuleId, String] = spec.moduleOrder.map { id =>
       id -> (spec.modules(id) match
         case g: GeneratorModuleSpec =>
@@ -118,7 +118,7 @@ object Elaborator:
             .fold(fail(s"missing backend for generator ${g.entry.name} at ${id.show}"))(b =>
               b.moduleName(resolved.generatorModule(id).get.fullParam)
             )
-        case _: WrapperModuleSpec   => dd.nameOf(id))
+        case _: WrapperModuleSpec   => if id.path.isEmpty then "Top" else PortName(id.path).encoded)
     }.toMap
 
     val arena = Arena.ofConfined()
@@ -142,7 +142,7 @@ object Elaborator:
           else t.children.toVector.sortBy(_._1).flatMap((n, sub) => leafPaths(sub, prefix :+ n))
 
         given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(unknownLoc)
-        val circuitName  = dd.nameOf(ModuleId.root)
+        val circuitName  = moduleNames(ModuleId.root)
         given Circuit    = summon[CircuitApi].op(circuitName)
         summon[Circuit].appendToModule()
 
@@ -159,13 +159,12 @@ object Elaborator:
             emitLayers(sub, Some(op))
           }
 
-        // ============ wrapper modules: one firrtl.module per structural key ============
-        dd.definitions.foreach { d =>
-          val rep = d.instances.head
-          spec.wrapper(rep).foreach { w =>
-            // Port order must match across every instance sharing this key; the key sorts ports by encoded name,
-            // so definition and instance emission both use that order.
-            val ports      = resolved.portPlans.filter(_.module == rep).sortBy(_.name.encoded)
+        // ============ wrapper modules: one firrtl.module per instance ============
+        spec.moduleOrder.foreach { id =>
+          spec.wrapper(id).foreach { w =>
+            val name       = moduleNames(id)
+            // Definition and instance emission both sort ports by encoded name, so parent and child agree.
+            val ports      = resolved.portPlans.filter(_.module == id).sortBy(_.name.encoded)
             val portFields = ports.map { p =>
               summon[FirrtlBundleFieldApi].createFirrtlBundleField(
                 p.name.encoded,
@@ -175,11 +174,11 @@ object Elaborator:
             }
             val portIndex  = ports.zipWithIndex.map((p, i) => p.name.encoded -> i).toMap
             val module     = summon[ModuleApi].op(
-              d.name,
+              name,
               unknownLoc,
               FirrtlConvention.Scalarized,
               portFields.map(f => (f, unknownLoc)),
-              leafPaths(resolved.layerDecls.getOrElse(rep, LayerTree.empty))
+              leafPaths(resolved.layerDecls.getOrElse(id, LayerTree.empty))
             )
             given Block    = module.block
 
@@ -214,7 +213,7 @@ object Elaborator:
 
             /** Emit one child instance; returns its port values and, for a probe sink, its layerblock. */
             def emitChild(c: String): (Vector[((String, String), Value)], Option[(String, Block)]) =
-              val childId = rep / c
+              val childId = id / c
               spec.modules(childId) match
                 case gm: GeneratorModuleSpec =>
                   val rgm        = resolved.generatorModule(childId).get
@@ -333,11 +332,11 @@ object Elaborator:
               case LocalEndpoint.ThisPort(name)           =>
                 portIndex
                   .get(name.encoded)
-                  .fold(fail(s"${d.name}: missing port ${name.encoded}"))(i => module.getIO(i))
+                  .fold(fail(s"$name: missing port ${name.encoded}"))(i => module.getIO(i))
               case LocalEndpoint.ChildPort(inst, port, _) =>
                 childValues.getOrElse(
                   (inst, port.encoded),
-                  fail(s"${d.name}: missing child port $inst.${port.encoded}")
+                  fail(s"$name: missing child port $inst.${port.encoded}")
                 )
 
             /** Walk a data path inside the sink's port: named fields via `subfield`, Vec indices via `subindex`. */
@@ -351,7 +350,7 @@ object Elaborator:
                 seg match
                   case InterfacePath.Segment.Field(n) =>
                     val idx = v.getType.getBundleFieldIndex(n)
-                    if idx < 0 then fail(s"${d.name}: no field '$n' while navigating a verification path")
+                    if idx < 0 then fail(s"$name: no field '$n' while navigating a verification path")
                     val sub = summon[SubfieldApi].op(v, idx, unknownLoc)
                     sub.operation.appendToBlock()
                     sub.result
@@ -361,7 +360,7 @@ object Elaborator:
                     sub.result
               }
 
-            resolved.wirePlans.filter(_.module == rep).foreach { wp =>
+            resolved.wirePlans.filter(_.module == id).foreach { wp =>
               wp.origin match
                 case PlanOrigin.Design(_)       =>
                   summon[ConnectApi].op(baseOf(wp.from), baseOf(wp.to), unknownLoc).operation.appendToBlock()
@@ -373,7 +372,7 @@ object Elaborator:
                       summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
                     case LocalEndpoint.ChildPort(inst, _, sub) =>
                       // The sink end: resolve the probe inside the sink's layerblock and connect the data leaf.
-                      val lb = sinkBlocks.getOrElse(inst, fail(s"${d.name}: sink instance '$inst' has no layer block"))
+                      val lb = sinkBlocks.getOrElse(inst, fail(s"$name: sink instance '$inst' has no layer block"))
                       locally {
                         given Block = lb
                         val res     = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)

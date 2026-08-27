@@ -40,12 +40,18 @@ trait GeneratorBackend:
   ): Operation
 
 object GeneratorBackend:
+  /** Canonical JSON: object keys sorted recursively; arrays keep order. */
+  private def canonical(v: ujson.Value): ujson.Value = v match
+    case obj: ujson.Obj => ujson.Obj.from(obj.value.toVector.sortBy(_._1).map((k, w) => k -> canonical(w)))
+    case arr: ujson.Arr => ujson.Arr.from(arr.value.map(canonical))
+    case other => other
+
   /** The canonical linking key: the sanitized generator name plus a strong hash over (name, canonical FullParam JSON).
     * Distinct identities cannot collide in the flat symbol namespace the linker resolves by name.
     */
   def canonicalModuleName[FP](entry: GeneratorEntry[FP], fullParam: FP): String =
     val payload = ujson.write(
-      Dedup.canonical(
+      canonical(
         upickle.default.writeJs(fullParam)(
           using entry.fullParamRW
         )
