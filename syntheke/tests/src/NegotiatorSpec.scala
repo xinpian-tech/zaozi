@@ -612,11 +612,11 @@ object NegotiatorSpec extends TestSuite:
       }
       assert(pp.getMessage.contains("no Probe inside a Probe"))
 
-      // One hardware type, one spelling: a 1-bit UInt normalizes to Bool, in construction and in decoding; the
-      // single canonical JSON encoding roundtrips.
-      assert(ProtocolInterface.UInt(1) == ProtocolInterface.Bool)
+      // Declaration fidelity: UInt(1) and Bool are the same hardware type but distinct declarations, told apart by
+      // their type tags; the single canonical JSON encoding roundtrips.
+      assert(ProtocolInterface.UInt(1) != ProtocolInterface.Bool)
       val sample: ProtocolInterface = ProtocolBundle(
-        ProtocolInterface.Field("a", ProtocolInterface.Vec(2, ProtocolInterface.UInt(4))),
+        ProtocolInterface.Field("a", ProtocolInterface.Vec(2, ProtocolInterface.UInt(1))),
         ProtocolInterface.Field("b", ProtocolInterface.Flipped(ProtocolInterface.Bool)),
         ProtocolInterface.Field(
           "p",

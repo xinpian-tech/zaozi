@@ -37,21 +37,11 @@ object ProtocolInterface:
     require(size > 0, "Vec size must be positive")
     require(!element.isInstanceOf[Flipped], "Vec elements cannot be Flipped")
 
-  /** Unsigned integer of positive width. One hardware type has one spelling: `UInt(1)` normalizes to [[Bool]], in
-    * construction and in decoding alike.
+  /** Unsigned integer of positive width. `UInt(1)` and [[Bool]] translate to the same hardware type but stay distinct
+    * declarations — what the author wrote is what the spec and the exports carry, told apart by their type tags.
     */
-  final class UInt private (val width: Int) extends ProtocolInterface:
-    override def equals(that: Any): Boolean = that match
-      case u: UInt => u.width == width
-      case _ => false
-    override def hashCode:          Int     = width.hashCode
-    override def toString:          String  = s"UInt($width)"
-  object UInt:
-    def apply(width: Int): ProtocolInterface =
-      require(width > 0, "UInt width must be positive")
-      if width == 1 then Bool else new UInt(width)
-    def unapply(u: UInt):  Some[Int]         = Some(u.width)
-
+  final case class UInt(width: Int) extends ProtocolInterface:
+    require(width > 0, "UInt width must be positive")
   final case class SInt(width: Int) extends ProtocolInterface:
     require(width > 0, "SInt width must be positive")
   case object Bool                  extends ProtocolInterface
