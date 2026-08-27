@@ -24,26 +24,9 @@ object Export:
   private def loc(l: (sourcecode.File, sourcecode.Line)): ujson.Value =
     ujson.Obj("file" -> ujson.Str(l._1.value.replace('\\', '/')), "line" -> ujson.Num(l._2.value))
 
-  private def layerPath(l: LayerPath): ujson.Value = ujson.Arr.from(l.segments.map(ujson.Str(_)))
-
-  private def interface(tpe: ProtocolInterface): ujson.Value = tpe match
-    case ProtocolInterface.Bundle(fields) =>
-      ujson.Obj(
-        "type"   -> ujson.Str("bundle"),
-        "fields" -> ujson.Arr.from(fields.map { f =>
-          ujson.Obj("name" -> ujson.Str(f.name), "tpe" -> interface(f.tpe))
-        })
-      )
-    case ProtocolInterface.Vec(n, e)      =>
-      ujson.Obj("type" -> ujson.Str("vec"), "size" -> ujson.Num(n), "element" -> interface(e))
-    case ProtocolInterface.Flipped(t)     => ujson.Obj("type" -> ujson.Str("flipped"), "inner" -> interface(t))
-    case ProtocolInterface.UInt(w)        => ujson.Obj("type" -> ujson.Str("uint"), "width" -> ujson.Num(w))
-    case ProtocolInterface.SInt(w)        => ujson.Obj("type" -> ujson.Str("sint"), "width" -> ujson.Num(w))
-    case ProtocolInterface.Bool           => ujson.Obj("type" -> ujson.Str("bool"))
-    case ProtocolInterface.Clock          => ujson.Obj("type" -> ujson.Str("clock"))
-    case ProtocolInterface.Reset          => ujson.Obj("type" -> ujson.Str("reset"))
-    case ProtocolInterface.Probe(i, l)    =>
-      ujson.Obj("type" -> ujson.Str("probe"), "inner" -> interface(i), "layer" -> layerPath(l))
+  // The one canonical encoding lives with the types (Interface.scala); the exports just apply it.
+  private def layerPath(l:   LayerPath):         ujson.Value = upickle.default.writeJs(l)
+  private def interface(tpe: ProtocolInterface): ujson.Value = upickle.default.writeJs(tpe)
 
   /** `topology.json`: the module tree, nodes, binds, dependencies and verification endpoints with stable ids. */
   def topology(spec: DesignSpec): ujson.Value =

@@ -612,6 +612,19 @@ object NegotiatorSpec extends TestSuite:
       }
       assert(pp.getMessage.contains("no Probe inside a Probe"))
 
+      // One hardware type, one spelling: a 1-bit UInt normalizes to Bool, in construction and in decoding; the
+      // single canonical JSON encoding roundtrips.
+      assert(ProtocolInterface.UInt(1) == ProtocolInterface.Bool)
+      val sample: ProtocolInterface = ProtocolBundle(
+        ProtocolInterface.Field("a", ProtocolInterface.Vec(2, ProtocolInterface.UInt(4))),
+        ProtocolInterface.Field("b", ProtocolInterface.Flipped(ProtocolInterface.Bool)),
+        ProtocolInterface.Field(
+          "p",
+          ProtocolInterface.Probe(ProtocolInterface.UInt(8), LayerPath(Vector("verification")))
+        )
+      )
+      assert(upickle.default.read[ProtocolInterface](upickle.default.write(sample)) == sample)
+
       // A verification interface whose leaves are not probes is rejected at the dvSource declaration.
       object BadTrace extends DVProtocol:
         type Down = Int
