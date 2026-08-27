@@ -51,6 +51,7 @@ object Design:
       modules = st.modules.toMap,
       moduleOrder = st.moduleOrder.toVector,
       binds = st.binds.toVector,
+      ioNodes = st.ioNodeSpecs,
       generators = st.generators.toVector
     )
 
@@ -122,6 +123,36 @@ def outward(
   line: sourcecode.Line
 ): p.Outward =
   gs.outward(p)(name.value)
+
+/** Declare a top-level inward IO node named by the binding val (doc @sec-io-nodes): an ordinary node living on the
+  * design boundary. It terminates an internal outward node through a normal bind, negotiates like any node (attach its
+  * mandatory uFn), and the settled edge's interface surfaces as top-level IO — a root port without a testbench, the
+  * testbench's port otherwise. Only legal at the design's top level.
+  */
+def ioInward(
+  p:    Protocol
+)(
+  using
+  ws:   WrapperScope,
+  name: sourcecode.Name,
+  file: sourcecode.File,
+  line: sourcecode.Line
+): p.Inward =
+  ws.ioInward(p)(name.value)
+
+/** Declare a top-level outward IO node named by the binding val (doc @sec-io-nodes): the source side of a normal bind
+  * feeding an internal inward node from top-level IO (attach its mandatory dFn). Only legal at the design's top level.
+  */
+def ioOutward(
+  p:    Protocol
+)(
+  using
+  ws:   WrapperScope,
+  name: sourcecode.Name,
+  file: sourcecode.File,
+  line: sourcecode.Line
+): p.Outward =
+  ws.ioOutward(p)(name.value)
 
 /** Declare a module-internal parameter dependency from inward node `from` to outward node `to` and receive the two read
   * handles it grants: `to`'s dFn may read `from`'s settled `Down`, and `from`'s uFn may read `to`'s settled `Up` (doc @sec-generator-module).
@@ -214,7 +245,7 @@ final class RefHandle[P <: Protocol] private[syntheke] (
 sealed trait NodeBuilder[P <: Protocol]:
   val protocol: P
   def id:                      ModuleNodeId
-  private[syntheke] def scope: GeneratorScope[?]
+  private[syntheke] def scope: NodeScope
 
   /** Declare a cross-protocol reference to another node of the same module (its clock / power domain), named by the
     * binding val. The target's protocol is the expected protocol by construction; foreign-module targets are rejected
@@ -238,7 +269,7 @@ sealed trait NodeBuilder[P <: Protocol]:
 /** An inward node under declaration; [[uFn]] must be attached exactly once before the body returns. */
 final class InwardNodeBuilder[P <: Protocol] private[syntheke] (
   val protocol:                P,
-  private[syntheke] val scope: GeneratorScope[?],
+  private[syntheke] val scope: NodeScope,
   val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
 
@@ -252,7 +283,7 @@ final class InwardNodeBuilder[P <: Protocol] private[syntheke] (
 /** An outward node under declaration; [[dFn]] must be attached exactly once before the body returns. */
 final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
   val protocol:                P,
-  private[syntheke] val scope: GeneratorScope[?],
+  private[syntheke] val scope: NodeScope,
   val id:                      ModuleNodeId)
     extends NodeBuilder[P]:
 

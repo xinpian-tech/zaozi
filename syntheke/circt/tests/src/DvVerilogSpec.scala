@@ -181,25 +181,46 @@ object DvVerilogSpec extends TestSuite:
     new GeneratorEntry[StubFull](s"demo.dv.$name")
 
   val srcEntry  = entry("Src")
-  val memEntry  = entry("Mem")
   val vsrcEntry = entry("VSrc")
   val backends: Seq[GeneratorBackend] =
-    Seq(srcEntry, memEntry, vsrcEntry).map(StubBackend(_, outDir, identity))
+    Seq(srcEntry, vsrcEntry).map(StubBackend(_, outDir, identity))
 
-  /** The testbench harness is an ordinary generator: its full parameter is the layer's manifest slice, its interface is
-    * one data input per probe leaf, named by the leaf's port name.
+  /** A freestyle testbench: no parameter — the author holds the resolved design and reads the query API. The main part
+    * mirrors every IO (design outputs become its inputs and vice versa); each layer part takes the layer's probe leaves
+    * as data inputs.
     */
-  val tbEntry = new GeneratorEntry[TestbenchParam]("demo.dv.Tb")
-  def tbBackend: GeneratorBackend =
-    StubBackend(
-      tbEntry,
-      outDir,
-      tp =>
-        StubFull(
-          ("tb" +: tp.layer.segments).mkString("_"),
-          tp.sources.flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))
-        )
-    )
+  final class StubTestbench(resolved: ResolvedDesign) extends TestbenchBackend:
+    private val mainStub  = StubBackend(entry("TbMain"), outDir, identity)
+    private val layerStub = StubBackend(entry("TbCosim"), outDir, identity)
+
+    def main(
+      instanceName: String
+    )(
+      using Arena,
+      Context,
+      Block
+    ): Operation =
+      val ports = resolved.ios.map(io => StubPort(io.name, io.direction == NodeDirection.Inward, io.edge.interface))
+      mainStub.instantiate(
+        StubFull("tbmain", ports),
+        instanceName,
+        (summon[sourcecode.File], summon[sourcecode.Line])
+      )
+
+    def layer(
+      layer:        LayerPath,
+      instanceName: String
+    )(
+      using Arena,
+      Context,
+      Block
+    ): Operation =
+      val ports = resolved.probes.filter(_.layer == layer).flatMap(_.leaves).map(l => StubPort(l.portName, true, l.tpe))
+      layerStub.instantiate(
+        StubFull(("tb" +: layer.segments).mkString("_"), ports),
+        instanceName,
+        (summon[sourcecode.File], summon[sourcecode.Line])
+      )
 
   val layerCosim = LayerPath(Vector("verification", "cosim"))
 
@@ -247,12 +268,8 @@ object DvVerilogSpec extends TestSuite:
         }
         src
       }
-      val mem     = generator(memEntry) {
-        parameters(stubParams("Mem"))
-        val in = inward(Wid).uFn(_ => Right(64))
-        in
-      }
-      mem <-- cluster
+      val memIo   = ioInward(Wid).uFn(_ => Right(64))
+      memIo <-- cluster
     }
 
   val tests = Tests {
@@ -262,10 +279,11 @@ object DvVerilogSpec extends TestSuite:
       val design   = Elaborator.elaborate(resolved, backends)
 
       // The layer tree is declared once at circuit level; the cluster carries one pure-probe dangle per leaf and the
-      // root exposes the same probes as top-level ports.
+      // root exposes the same probes as top-level ports, next to the IO node's data port.
       assert(design.firrtl.contains("layer verification"))
       assert(design.firrtl.contains("inst_src_dv$msource_rob_sig_out"))
       assert(design.firrtl.contains("inst_cluster_inst_src_dv$msource_rob_sig_out"))
+      assert(design.firrtl.contains("output memIo"))
       assert(design.firrtl.contains("define"))
       // Verilog exists for the root and both stub modules; probes stay out of the release netlist (bind layers).
       assert(design.verilog.contains("module Top"))
@@ -274,15 +292,18 @@ object DvVerilogSpec extends TestSuite:
       assert(design.firrtl.contains("layer stubinternal"))
     }
 
-    test("a testbench backend consumes the probes at the root inside layerblocks") {
+    test("a testbench drives the IO and consumes the probes at the root") {
       val resolved = Negotiator.negotiate(buildDesign())
-      val design   = Elaborator.elaborate(resolved, backends, testbench = Some(tbBackend))
+      val design   = Elaborator.elaborate(resolved, backends, testbench = Some(StubTestbench(resolved)))
 
-      // The harness sits in the layer's layerblock at the root; each leaf is resolved and connected by port name.
+      // The always-on main part receives the IO; the per-layer part sits in its layerblock, each probe leaf
+      // resolved and connected by port name.
+      assert(design.firrtl.contains("demo_dv_TbMain"))
+      assert(design.firrtl.contains("demo_dv_TbCosim"))
       assert(design.firrtl.contains("layerblock"))
       assert(design.firrtl.contains("tb_verification_cosim"))
-      assert(design.firrtl.contains("demo_dv_Tb"))
-      // The probes no longer surface as root ports: no root-level defines.
+      // Top is closed: the IO feeds the testbench instead of a root port, probes produce no root-level defines.
+      assert(!design.firrtl.contains("output memIo"))
       assert(!design.firrtl.contains("define inst_cluster"))
       assert(design.verilog.contains("module Top"))
     }

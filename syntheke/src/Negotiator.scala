@@ -68,30 +68,33 @@ object Negotiator:
             s"which is not an ancestor of both endpoints, at ${at(b.loc)}"
         )
     }
+    // IO nodes are ordinary nodes on the design boundary; every check below treats them uniformly. A bind between
+    // two IO nodes would put no hardware between its ends — reject.
+    spec.binds.foreach { b =>
+      if b.source.module == ModuleId.root && b.target.module == ModuleId.root then
+        fail(s"bind ${b.source.show} -> ${b.target.show} connects two IO nodes, at ${at(b.loc)}")
+    }
+    val allNodes = spec.generatorModules.flatMap(g => g.nodes.map(g.id -> _)) ++ spec.ioNodes.map(ModuleId.root -> _)
+
     val asSource = spec.binds.groupBy(_.source)
     val asTarget = spec.binds.groupBy(_.target)
-    spec.generatorModules.foreach { g =>
-      g.nodes.foreach { n =>
-        val id            = ModuleNodeId(g.id, n.name)
-        val (role, binds) = n.direction match
-          case NodeDirection.Outward => ("source", asSource.get(id))
-          case NodeDirection.Inward  => ("target", asTarget.get(id))
-        val count         = binds.fold(0)(_.size)
-        if count != 1 then
-          fail(
-            s"${n.direction.toString.toLowerCase} node ${id.show} is the $role of $count binds, " +
-              s"expected exactly 1, at ${at(binds.fold(Vector(n.loc))(_.map(_.loc)) :+ n.loc)}"
-          )
-      }
+    allNodes.foreach { (m, n) =>
+      val id            = ModuleNodeId(m, n.name)
+      val (role, binds) = n.direction match
+        case NodeDirection.Outward => ("source", asSource.get(id))
+        case NodeDirection.Inward  => ("target", asTarget.get(id))
+      val count         = binds.fold(0)(_.size)
+      if count != 1 then
+        fail(
+          s"${n.direction.toString.toLowerCase} node ${id.show} is the $role of $count binds, " +
+            s"expected exactly 1, at ${at(binds.fold(Vector(n.loc))(_.map(_.loc)) :+ n.loc)}"
+        )
     }
 
     // Stable topological sort of the Down DAG; a cycle is an error. Kahn over immutable state, ties broken by module
     // preorder then node declaration order.
     val preorder = spec.moduleOrder.zipWithIndex.toMap
-    val nodeKey  = (
-      for g <- spec.generatorModules; n <- g.nodes
-      yield ModuleNodeId(g.id, n.name) -> (preorder(g.id), n.order)
-    ).toMap
+    val nodeKey  = allNodes.map((m, n) => ModuleNodeId(m, n.name) -> (preorder(m), n.order)).toMap
     val nodeIds  = nodeKey.keys.toVector
     val edges    = spec.binds.map(b => b.source -> b.target) ++ (
       for g <- spec.generatorModules; d <- g.dependencies
@@ -156,12 +159,14 @@ object Negotiator:
       * pred inward nodes for a dFn, succ outward nodes for a uFn.
       */
     def readsOf(id: ModuleNodeId, direction: NodeDirection): Vector[(ModuleNodeId, ParamDependencySpec)] =
-      val g    = modOf(id)
-      val name = id.name
-      val deps = direction match
-        case NodeDirection.Outward => g.dependencies.filter(_.to == name).map(d => (ModuleNodeId(g.id, d.from), d))
-        case NodeDirection.Inward  => g.dependencies.filter(_.from == name).map(d => (ModuleNodeId(g.id, d.to), d))
-      deps.sortBy((n, _) => g.node(n.name).get.order)
+      if id.module == ModuleId.root then Vector.empty // IO nodes have no module-internal dependencies
+      else
+        val g    = modOf(id)
+        val name = id.name
+        val deps = direction match
+          case NodeDirection.Outward => g.dependencies.filter(_.to == name).map(d => (ModuleNodeId(g.id, d.from), d))
+          case NodeDirection.Inward  => g.dependencies.filter(_.from == name).map(d => (ModuleNodeId(g.id, d.to), d))
+        deps.sortBy((n, _) => g.node(n.name).get.order)
 
     def evaluate(values: Map[ModuleNodeId, Any], id: ModuleNodeId, downSide: Boolean): Any =
       val n     = specOf(id)

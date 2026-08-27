@@ -108,22 +108,13 @@ final case class ProbeLeaf(
 
 /** One probe source in the design's probe manifest (doc @sec-dv-testbench): identity, protocol-encoded `Down`, layer,
   * and leaves. The manifest is a pure function of the frozen [[DesignSpec]] — every field was recorded at the
-  * `dvSource` declaration — and it is serializable, so a testbench harness can take it as its full parameter.
+  * `dvSource` declaration — and it is serializable for tooling.
   */
 final case class ProbeSource(
   id:     DVSourceId,
   down:   ujson.Value,
   layer:  LayerPath,
   leaves: Vector[ProbeLeaf])
-    derives upickle.default.ReadWriter
-
-/** The full parameter of a testbench harness: the per-layer slice of the probe manifest (doc @sec-dv-testbench). The
-  * harness is an ordinary generator taking this as its parameter — one input port per leaf, named
-  * [[ProbeLeaf.portName]].
-  */
-final case class TestbenchParam(
-  layer:   LayerPath,
-  sources: Vector[ProbeSource])
     derives upickle.default.ReadWriter
 
 object ProbeSource:
@@ -198,6 +189,19 @@ object LayerTree:
   def of(path: LayerPath): LayerTree =
     path.segments.foldRight(empty)((seg, sub) => LayerTree(Map(seg -> sub)))
 
+/** One top-level IO of the design, as the testbench author queries it (doc @sec-io-nodes): the IO node's name (the
+  * top-level port name), its direction — `Inward` receives from the design, `Outward` drives into it — and the settled
+  * edge with the interface and typed parameter access (`edgeAs` / `downAs` / `upAs`).
+  */
+final case class BoundaryIO(
+  name:      String,
+  node:      ModuleNodeId,
+  direction: NodeDirection,
+  protocol:  Protocol,
+  edge:      ResolvedEdge,
+  refs:      Vector[ResolvedProtocolReference],
+  loc:       (sourcecode.File, sourcecode.Line))
+
 /** The Negotiate phase output: the spec plus every settled record and plan (doc @sec-triptych). */
 final case class ResolvedDesign(
   spec:             DesignSpec,
@@ -208,3 +212,24 @@ final case class ResolvedDesign(
   layerDecls: Map[ModuleId, LayerTree]):
   def edge(bind:          BindId):   Option[ResolvedEdge]            = edges.find(_.bind == bind)
   def generatorModule(id: ModuleId): Option[ResolvedGeneratorModule] = generatorModules.find(_.module == id)
+
+  /** The design's top-level IOs, in declaration order. */
+  def ios: Vector[BoundaryIO] =
+    spec.ioNodes.map { n =>
+      val id   = ModuleNodeId(ModuleId.root, n.name)
+      val edge = n.direction match
+        case NodeDirection.Inward  => edges.find(_.bind.target == id).get
+        case NodeDirection.Outward => edges.find(_.bind.source == id).get
+      // Reference targets are IO nodes of the boundary itself (same-module rule at the declaration).
+      val refs = n.refs.map { r =>
+        val ts         = spec.nodeSpec(r.target).get
+        val targetEdge = ts.direction match
+          case NodeDirection.Inward  => edges.find(_.bind.target == r.target).get
+          case NodeDirection.Outward => edges.find(_.bind.source == r.target).get
+        ResolvedProtocolReference(r.refName, id, r.target, ts.protocol, targetEdge.edge)
+      }
+      BoundaryIO(n.name, id, n.direction, n.protocol, edge, refs, n.loc)
+    }
+
+  /** The design's probe sources with their leaves (doc @sec-dv-testbench). */
+  def probes: Vector[ProbeSource] = ProbeSource.manifest(spec)

@@ -265,6 +265,75 @@ object NegotiatorSpec extends TestSuite:
       )
     }
 
+    test("IO nodes negotiate like ordinary nodes and surface as root ports") {
+      val spec     = Design {
+        val chip   = wrapper {
+          val core = generator(intEntry("IoCore")) {
+            parametersConst(0)
+            val mem  = outward(Wid).dFn(_ => Right(32))
+            val ctrl = inward(Wid).uFn(_ => Right(16))
+            (mem, ctrl)
+          }
+          core
+        }
+        val memIo  = ioInward(Wid).uFn(_ => Right(64))
+        val ctrlIo = ioOutward(Wid).dFn(_ => Right(8))
+        memIo <-- chip._1
+        chip._2 <-- ctrlIo
+      }
+      val resolved = Negotiator.negotiate(spec)
+
+      // The IO nodes negotiated like any node: mem settles to 32 within capacity 64, ctrl to 8 within 16.
+      val ios = resolved.ios
+      assert(
+        ios.map(io => (io.name, io.direction)) ==
+          Vector("memIo" -> NodeDirection.Inward, "ctrlIo" -> NodeDirection.Outward)
+      )
+      assert(ios(0).edge.edgeAs(Wid) == 32)
+      assert(ios(1).edge.edgeAs(Wid) == 8)
+
+      // Root ports: the inward IO is a top-level Output, the outward IO a top-level Input, named by the vals.
+      val rootPorts = resolved.portPlans.filter(_.module == ModuleId.root)
+      assert(
+        rootPorts.map(p => (p.name.encoded, p.direction)) ==
+          Vector("memIo" -> PortDirection.Output, "ctrlIo" -> PortDirection.Input)
+      )
+      val rootWires = resolved.wirePlans.filter(_.module == ModuleId.root)
+      assert(
+        rootWires.map(w => (w.from, w.to)) == Vector(
+          LocalEndpoint.ChildPort("chip", PortName("inst", "core", "node", "mem", "out")) ->
+            LocalEndpoint.ThisPort(PortName("memIo")),
+          LocalEndpoint.ThisPort(PortName("ctrlIo"))                                      ->
+            LocalEndpoint.ChildPort("chip", PortName("inst", "core", "node", "ctrl", "in"))
+        )
+      )
+
+      // A bind between two IO nodes has no hardware between its ends.
+      val ioToIo = Design {
+        val a = ioOutward(Wid).dFn(_ => Right(1))
+        val b = ioInward(Wid).uFn(_ => Right(1))
+        b <-- a
+      }
+      val e      = intercept[NegotiationException](Negotiator.negotiate(ioToIo))
+      assert(e.getMessage.contains("connects two IO nodes"))
+
+      // IO nodes live on the top level only; their parameter function is mandatory.
+      val nested = intercept[IllegalArgumentException] {
+        Design {
+          val sub = wrapper {
+            val x = ioInward(Wid)
+          }
+        }
+      }
+      assert(nested.getMessage.contains("IO nodes live on the design's top level"))
+      val noFn   = intercept[IllegalStateException] {
+        Design {
+          val x = ioInward(Wid)
+        }
+      }
+      assert(noFn.getMessage.contains("uFn is mandatory"))
+    }
+
     test("the four tooling exports carry stable identifiers and canonical order") {
       val resolved = Negotiator.negotiate(buildSoc(c1Capacity = 64))
       val topology = Export.topology(resolved.spec)
