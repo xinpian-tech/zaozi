@@ -94,7 +94,7 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 *验证求解*按 `DVSinkId` 分组，每个探针汇调用一次 `resolve` 与 `interfacesOf`，并核对返回接口的契约（@sec-dv-protocol）。
 
-*跨协议引用*是一个节点对本模块另一个节点的引用，用来声明本节点属于哪个时钟节点、电源节点（@sec-generator-module）；它在目标边求解后解析为目标边的 `Edge`。目标必须是本模块的节点，声明处即检查；目标节点恰好一条 bind 由结构校验保证，装配 `EdgeView` 时直接取该边的 `Edge`。
+*跨协议引用*是一个节点对本模块另一个节点的引用，用来声明本节点属于哪个时钟节点、电源节点（@sec-generator-module）；它在目标边求解后解析为目标边的 `Edge`。目标必须是本模块的节点，声明处即检查；引用名取自绑定它的 val，声明返回的句柄是读回该引用的唯一途径。目标节点恰好一条 bind 由结构校验保证，装配 `EdgeView` 时直接取该边的 `Edge`。
 
 *生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeProtocolParam(EdgeView)` 计算自有类型的协议参数，并可依据 `EdgeView` 与用户参数执行能力校验；框架随后调用 `combine(userParam, protocolParam)` 得到 `FullParam`。注册表条目、`EdgeView`、协议参数和完整参数一并存入 `ResolvedGeneratorModule`（@sec-generator-records、@sec-two-layer-params、@sec-generator-module）。
 
@@ -114,7 +114,7 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 
 生成器注册表记录生成器标识、生成器实现和完整参数 codec。已求解生成器模块记录模块标识、注册表条目、`EdgeView`、协议参数和完整参数。
 
-`EdgeView` 按本模块的节点声明顺序保存条目。每个条目记录节点方向、该节点唯一的 `ResolvedEdge`，以及该节点显式声明且已经解析的跨协议引用；`EdgeView` 还包含按验证端点声明顺序装配的 `VerificationView`（@sec-dv-protocol）。
+`EdgeView` 按本模块的节点声明顺序保存条目。每个条目记录节点方向、该节点唯一的 `ResolvedEdge`，以及该节点显式声明且已经解析的跨协议引用；读取以声明得到的节点与引用句柄为键，结果按句柄的协议类型化，不提供按名字符串的查询；`EdgeView` 还包含按验证端点声明顺序装配的 `VerificationView`（@sec-dv-protocol）。
 
 `GeneratorEntry` 保存生成器及其 `FullParam` codec。`ResolvedGeneratorModule.entry` 选定完整参数类型，`fullParam` 采用该条目的 `FullParam`。`EdgeView` 在双向传播和逐边求解后装配，供本模块的 `computeProtocolParam` 使用。
 
