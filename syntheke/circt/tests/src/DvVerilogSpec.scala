@@ -30,6 +30,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
+  LayerBlockApi,
   ModuleApi,
   OpenSubfieldApi,
   RefCastApi,
@@ -114,6 +115,14 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         layers.foldLeft(LayerTree.empty)((t, p) => t.add(LayerPath(p))),
         None
       )
+      // An internal layer unrelated to any routed probe: the linker must carry its definition into the design
+      // circuit, or verification fails on the layerblock below. Only output-only stubs (sources) carry it — a sink
+      // is instantiated under a layerblock, where a module with its own layerblock would be illegal nesting.
+      val internalLayer = !p.ports.exists(_.isInput)
+      if internalLayer then
+        summon[Circuit].block.appendOwnedOperation(
+          summon[LayerApi].op("stubinternal", unknownLoc, FirrtlLayerConvention.Bind).operation
+        )
       val module = summon[ModuleApi].op(
         name,
         unknownLoc,
@@ -123,6 +132,7 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
       )
       locally {
         given Block = module.block
+        if internalLayer then summon[LayerBlockApi].op(Seq("stubinternal"), unknownLoc).operation.appendToBlock()
         p.ports.zipWithIndex.foreach { (sp, idx) =>
           val port = module.getIO(idx)
           sp.interface match
@@ -148,8 +158,8 @@ final class StubBackend(val entry: GeneratorEntry[StubFull], outDir: os.Path) ex
         }
       }
       module.appendToCircuit()
-      val file = outDir / s"$name.mlirbc"
-      val out = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
+      val file   = outDir / s"$name.mlirbc"
+      val out    = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
       try summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
       finally out.close()
 
@@ -256,6 +266,8 @@ object DvVerilogSpec extends TestSuite:
       // (bind layers), so the sink instance is not in module Top's body.
       assert(design.verilog.contains("module Top"))
       assert(design.verilog.contains("module demo_dv_Src_"))
+      // The stub's internal layer, unrelated to any routed probe, was carried by the linker into the design circuit.
+      assert(design.firrtl.contains("layer stubinternal"))
     }
 
     test("Vec probe leaves route as individual pure-probe ports through subindex") {

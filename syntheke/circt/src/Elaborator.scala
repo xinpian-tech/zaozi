@@ -146,7 +146,10 @@ object Elaborator:
         given Circuit    = summon[CircuitApi].op(circuitName)
         summon[Circuit].appendToModule()
 
-        // Layer symbol definitions, once, from the union of every wrapper's layer tree.
+        // Layer symbol definitions are emitted once, after linking: the union of every wrapper's routing layers and
+        // every layer defined inside the linked per-module circuits (a generator may carry internal layers unrelated
+        // to any routed probe). MLIR symbol references are order-independent, so the definitions may follow their
+        // uses.
         def emitLayers(tree: LayerTree, parent: Option[CirctLayer]): Unit =
           tree.children.toVector.sortBy(_._1).foreach { (name, sub) =>
             val op = summon[LayerApi].op(name, unknownLoc, FirrtlLayerConvention.Bind)
@@ -155,7 +158,6 @@ object Elaborator:
               case Some(p) => p.block.appendOwnedOperation(op.operation)
             emitLayers(sub, Some(op))
           }
-        emitLayers(resolved.layerDecls.values.foldLeft(LayerTree.empty)(_.merge(_)), None)
 
         // ============ wrapper modules: one firrtl.module per structural key ============
         dd.definitions.foreach { d =>
@@ -419,21 +421,28 @@ object Elaborator:
         def opsIn(first: Operation): Vector[Operation] =
           Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => !isNullOp(op)).toVector
 
+        /** The layer definitions of one parsed per-module circuit, as a tree. */
+        def layerTreeOf(op: Operation): (String, LayerTree) =
+          val name     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
+          val children = opsIn(op.getFirstRegion.getFirstBlock.getFirstOperation)
+            .filter(_.getName.str == "firrtl.layer")
+            .map(layerTreeOf)
+          name -> LayerTree(children.toMap)
+
         @annotation.tailrec
-        def link(needed: List[String], defined: Set[String]): Unit = needed match
-          case Nil                         => ()
-          case sym :: rest if defined(sym) => link(rest, defined)
+        def link(needed: List[String], defined: Set[String], layers: LayerTree): LayerTree = needed match
+          case Nil                         => layers
+          case sym :: rest if defined(sym) => link(rest, defined, layers)
           case sym :: rest                 =>
-            val file      = mlirbcDir / s"$sym.mlirbc"
+            val file       = mlirbcDir / s"$sym.mlirbc"
             if !os.exists(file) then fail(s"instantiated module '$sym' has no definition ($file not found)")
-            val parsed    = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(file))
+            val parsed     = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(file))
             if parsed._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0 then
               fail(s"cannot parse $file")
-            val moduleOps = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
+            val circuitOps = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
               .filter(_.getName.str == "firrtl.circuit")
               .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
-              .filter(_.getName.str == "firrtl.module")
-            val moved     = moduleOps.filter { op =>
+            val moved      = circuitOps.filter(_.getName.str == "firrtl.module").filter { op =>
               val s2 = op.getInherentAttributeByName("sym_name").stringAttrGetValue
               if defined(s2) then false
               else
@@ -441,12 +450,18 @@ object Elaborator:
                 summon[Circuit].block.appendOwnedOperation(op)
                 true
             }
-            val defined2  = defined ++ moved.map(_.getInherentAttributeByName("sym_name").stringAttrGetValue)
+            // The circuit may define layers the module uses internally; carry them into the design circuit.
+            val layers2    = circuitOps
+              .filter(_.getName.str == "firrtl.layer")
+              .map(layerTreeOf)
+              .foldLeft(layers)((t, kv) => t.merge(LayerTree(Map(kv))))
+            val defined2   = defined ++ moved.map(_.getInherentAttributeByName("sym_name").stringAttrGetValue)
             if !defined2(sym) then fail(s"instantiated module '$sym' has no definition in $file")
-            link(rest ++ moved.flatMap(op => collectRefs(op) -- defined2), defined2)
+            link(rest ++ moved.flatMap(op => collectRefs(op) -- defined2), defined2, layers2)
 
-        val defined0 = collectDefined(summon[Circuit].operation)
-        link((collectRefs(summon[Circuit].operation) -- defined0).toList, defined0)
+        val defined0     = collectDefined(summon[Circuit].operation)
+        val linkedLayers = link((collectRefs(summon[Circuit].operation) -- defined0).toList, defined0, LayerTree.empty)
+        emitLayers(resolved.layerDecls.values.foldLeft(linkedLayers)(_.merge(_)), None)
 
         if !summon[MlirModule].getOperation.verify then fail("MLIR verification of the linked circuit failed")
 
