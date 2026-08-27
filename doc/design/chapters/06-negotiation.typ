@@ -95,7 +95,7 @@ $"pred"(o)$ 为空时，`dFn_o` 从构建期用户参数产生边界初值；$"s
 *生成器参数*在 `EdgeView` 装配后计算。每个生成器模块以 `computeFullParam(EdgeView)` 由已求解边与闭包中的用户参数得到 `FullParam`，并在其中执行能力校验。注册表条目、`EdgeView` 和完整参数一并存入 `ResolvedGeneratorModule`（@sec-generator-records、@sec-two-layer-params、@sec-generator-module）。
 
 #决策([协议参数只读取本模块的已求解数据])[
-  `computeFullParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边和显式跨协议引用。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
+  `computeFullParam` 接收本模块的 `EdgeView`：每个节点唯一的已求解边、显式跨协议引用，以及框架接进本模块的探针清单（仅测试平台非空，@sec-dv-testbench）。它不读取其他模块的数据，也不把计算结果反馈给 `dFn` 或 `uFn`。
 ] <dec-pp-local>
 
 单次协商没有整机回读：`dFn` 只读 `Down`，`uFn` 只读 `Up`，生成器拿不到整张连接图的汇总，例如整机地址映射。这类产物由工具从导出数据生成（@sec-export）；生成器需要它时（例如 boot ROM 镜像），作为用户参数进入下一轮构建。
