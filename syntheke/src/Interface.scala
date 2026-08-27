@@ -23,6 +23,7 @@ object ProtocolInterface:
     require(fields.map(_.name).distinct.sizeIs == fields.size, "Bundle field names must be unique")
   final case class Vec(size: Int, element: ProtocolInterface) extends ProtocolInterface:
     require(size > 0, "Vec size must be positive")
+    require(!element.isInstanceOf[Flipped], "Vec elements cannot be Flipped")
   final case class UInt(width: Int)                           extends ProtocolInterface:
     require(width > 0, "UInt width must be positive")
   final case class SInt(width: Int)                           extends ProtocolInterface:
@@ -32,11 +33,24 @@ object ProtocolInterface:
   case object Reset                                           extends ProtocolInterface
 
   /** Read-only reference to an internal signal, confined to a FIRRTL layer. */
-  final case class Probe(inner: ProtocolInterface, layer: LayerPath) extends ProtocolInterface
+  final case class Probe(inner: ProtocolInterface, layer: LayerPath) extends ProtocolInterface:
+    require(!containsFlipped(inner), "a probe is one-directional: no Flipped inside")
 
-  final case class Field(name: String, tpe: ProtocolInterface, flip: Boolean = false)
-      derives upickle.default.ReadWriter:
+  /** Direction reversal relative to the root, legal only directly as a field's type (zaozi's `Flipped`); alignment is
+    * the unmarked case.
+    */
+  final case class Flipped(inner: ProtocolInterface) extends ProtocolInterface:
+    require(!inner.isInstanceOf[Flipped], "Flipped(Flipped(_)) is meaningless")
+
+  final case class Field(name: String, tpe: ProtocolInterface) derives upickle.default.ReadWriter:
     DeclaredName.require(name, "interface field name")
+
+  private[syntheke] def containsFlipped(t: ProtocolInterface): Boolean = t match
+    case Bundle(fields) => fields.exists(f => containsFlipped(f.tpe))
+    case Vec(_, e)      => containsFlipped(e)
+    case Probe(i, _)    => containsFlipped(i)
+    case _: Flipped => true
+    case _ => false
 
 /** The top-level Bundle of a protocol port: the root and every nested Bundle carry at least one field (invariant
   * enforced by [[ProtocolInterface.Bundle]]).
@@ -54,6 +68,7 @@ object ProtocolBundle:
     case ProtocolInterface.Bundle(fields) =>
       ProtocolInterface.Bundle(fields.map(f => f.copy(tpe = stripProbes(f.tpe))))
     case ProtocolInterface.Vec(n, e)      => ProtocolInterface.Vec(n, stripProbes(e))
+    case ProtocolInterface.Flipped(t)     => ProtocolInterface.Flipped(stripProbes(t))
     case ProtocolInterface.Probe(i, _)    => stripProbes(i)
     case leaf                             => leaf
 
@@ -65,6 +80,7 @@ object ProtocolBundle:
         fields.flatMap(f => leaves(f.tpe, prefix.field(f.name)))
       case ProtocolInterface.Vec(n, elem)   =>
         (0 until n).toVector.flatMap(i => leaves(elem, prefix.index(i)))
+      case ProtocolInterface.Flipped(t)     => leaves(t, prefix)
       case leaf                             => Vector(prefix -> leaf)
 
 /** A path from an interface root: named-field selections and Vec indices (doc @sec-dv-protocol). */

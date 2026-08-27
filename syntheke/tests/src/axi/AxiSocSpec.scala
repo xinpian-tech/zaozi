@@ -345,7 +345,9 @@ object AxiSocSpec extends TestSuite:
       val resolved         = Negotiator.negotiate(buildSoc())
       val interface        = resolved.edges.find(_.bind.target == ModuleNodeId(root / "mem" / "dram", "in")).get.interface
       assert(interface.fields.map(_.name) == Vector("aw", "w", "b", "ar", "r"))
-      assert(interface.fields.map(_.flip) == Vector(false, false, true, false, true))
+      assert(
+        interface.fields.map(_.tpe.isInstanceOf[ProtocolInterface.Flipped]) == Vector(false, false, true, false, true)
+      )
       def bits(ch: String) =
         interface.fields
           .find(_.name == ch)
@@ -362,7 +364,10 @@ object AxiSocSpec extends TestSuite:
       assert(bits("w").fields.find(_.name == "strb").get.tpe == ProtocolInterface.UInt(16))
       // Every channel is valid / ready(flip) / bits.
       val aw               = interface.fields.head.tpe.asInstanceOf[ProtocolInterface.Bundle]
-      assert(aw.fields.map(f => f.name -> f.flip) == Vector("valid" -> false, "ready" -> true, "bits" -> false))
+      assert(
+        aw.fields.map(f => f.name -> f.tpe.isInstanceOf[ProtocolInterface.Flipped]) ==
+          Vector("valid" -> false, "ready" -> true, "bits" -> false)
+      )
     }
 
     test("the sysXbar -> mem/l2 edge plans a dangle port through the mem boundary") {

@@ -41,11 +41,12 @@ object Export:
       ujson.Obj(
         "type"   -> ujson.Str("bundle"),
         "fields" -> ujson.Arr.from(fields.map { f =>
-          ujson.Obj("name" -> ujson.Str(f.name), "flip" -> ujson.Bool(f.flip), "tpe" -> interface(f.tpe))
+          ujson.Obj("name" -> ujson.Str(f.name), "tpe" -> interface(f.tpe))
         })
       )
     case ProtocolInterface.Vec(n, e)      =>
       ujson.Obj("type" -> ujson.Str("vec"), "size" -> ujson.Num(n), "element" -> interface(e))
+    case ProtocolInterface.Flipped(t)     => ujson.Obj("type" -> ujson.Str("flipped"), "inner" -> interface(t))
     case ProtocolInterface.UInt(w)        => ujson.Obj("type" -> ujson.Str("uint"), "width" -> ujson.Num(w))
     case ProtocolInterface.SInt(w)        => ujson.Obj("type" -> ujson.Str("sint"), "width" -> ujson.Num(w))
     case ProtocolInterface.Bool           => ujson.Obj("type" -> ujson.Str("bool"))

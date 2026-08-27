@@ -34,8 +34,16 @@ object Translate:
     Context
   ): MlirType = t match
     case ProtocolInterface.Bundle(fields) =>
-      fields.map(f => summon[FirrtlBundleFieldApi].createFirrtlBundleField(f.name, f.flip, tpe(f.tpe))).getBundle
+      fields.map { f =>
+        val (flip, t) = f.tpe match
+          case ProtocolInterface.Flipped(inner) => (true, inner)
+          case t                                => (false, t)
+        summon[FirrtlBundleFieldApi].createFirrtlBundleField(f.name, flip, tpe(t))
+      }.getBundle
     case ProtocolInterface.Vec(n, e)      => tpe(e).getVector(n)
+    case ProtocolInterface.Flipped(_)     =>
+      // Direction is a bundle-field flag in FIRRTL; a Flipped outside a field position has no type of its own.
+      throw new IllegalArgumentException("Flipped is legal only directly as a bundle field's type")
     case ProtocolInterface.UInt(w)        => w.getUInt
     case ProtocolInterface.SInt(w)        => w.getSInt
     case ProtocolInterface.Bool           => 1.getUInt
@@ -59,6 +67,7 @@ object Translate:
     def collect(t: ProtocolInterface): Vector[Vector[String]] = t match
       case ProtocolInterface.Bundle(fields) => fields.flatMap(f => collect(f.tpe))
       case ProtocolInterface.Vec(_, e)      => collect(e)
+      case ProtocolInterface.Flipped(inner) => collect(inner)
       case ProtocolInterface.Probe(i, l)    => l.segments +: collect(i)
       case _                                => Vector.empty
     collect(t).distinct.sorted(

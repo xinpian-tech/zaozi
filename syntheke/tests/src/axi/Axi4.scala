@@ -131,7 +131,7 @@ object Axi4 extends Protocol:
       Bundle(
         Vector(
           Field("valid", Bool),
-          Field("ready", Bool, flip = true),
+          Field("ready", Flipped(Bool)),
           Field("bits", Bundle(payload.toVector.map((n, t) => Field(n, t))))
         )
       )
@@ -140,9 +140,9 @@ object Axi4 extends Protocol:
     ProtocolBundle(
       Field("aw", channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
       Field("w", channel("data" -> UInt(e.dataBits), "strb" -> UInt(e.dataBits / 8), "last" -> Bool)),
-      Field("b", channel(id0, "resp" -> UInt(2)), flip = true),
+      Field("b", Flipped(channel(id0, "resp" -> UInt(2)))),
       Field("ar", channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
-      Field("r", channel(id0, "data" -> UInt(e.dataBits), "resp" -> UInt(2), "last" -> Bool), flip = true)
+      Field("r", Flipped(channel(id0, "data" -> UInt(e.dataBits), "resp" -> UInt(2), "last" -> Bool)))
     )
 
   val downRW: upickle.default.ReadWriter[AxiMasterPort] = summon

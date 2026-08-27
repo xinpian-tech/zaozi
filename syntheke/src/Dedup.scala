@@ -32,9 +32,10 @@ object Dedup:
     case ProtocolInterface.Bundle(fields) =>
       // Bundle fields keep the protocol-defined order: they are part of the interface structure.
       ujson.Arr.from(fields.map { f =>
-        ujson.Arr(ujson.Str(f.name), ujson.Bool(f.flip), interfaceKey(f.tpe))
+        ujson.Arr(ujson.Str(f.name), interfaceKey(f.tpe))
       })
     case ProtocolInterface.Vec(n, e)      => ujson.Arr(ujson.Str("vec"), ujson.Num(n), interfaceKey(e))
+    case ProtocolInterface.Flipped(t)     => ujson.Arr(ujson.Str("flip"), interfaceKey(t))
     case ProtocolInterface.UInt(w)        => ujson.Arr(ujson.Str("uint"), ujson.Num(w))
     case ProtocolInterface.SInt(w)        => ujson.Arr(ujson.Str("sint"), ujson.Num(w))
     case ProtocolInterface.Bool           => ujson.Str("bool")

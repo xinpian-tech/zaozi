@@ -311,10 +311,11 @@ object Negotiator:
         fail(s"expected $n sources and sinkPaths, got ${interfaces.sources.size} and ${interfaces.sinkPaths.size}")
 
       def flipsClear(tpe: ProtocolInterface): Boolean = tpe match
-        case ProtocolInterface.Bundle(fields) => fields.forall(f => !f.flip && flipsClear(f.tpe))
-        case ProtocolInterface.Vec(_, e)      => flipsClear(e)
-        case ProtocolInterface.Probe(i, _)    => flipsClear(i)
-        case _                                => true
+        case ProtocolInterface.Bundle(fields) => fields.forall(f => flipsClear(f.tpe))
+        case _: ProtocolInterface.Flipped => false
+        case ProtocolInterface.Vec(_, e)   => flipsClear(e)
+        case ProtocolInterface.Probe(i, _) => flipsClear(i)
+        case _                             => true
 
       def leavesProbesWith(tpe: ProtocolInterface, layer: LayerPath): Option[String] =
         ProtocolBundle.leaves(tpe).collectFirst {
