@@ -50,8 +50,7 @@ object Design:
       modules = st.modules.toMap,
       moduleOrder = st.moduleOrder.toVector,
       binds = st.binds.toVector,
-      testbench = st.testbenches.headOption,
-      generators = st.generators.toVector
+      testbench = st.testbenches.headOption
     )
 
 /** Registry entry of one hardware generator: its unique name plus the FullParam serialization (doc

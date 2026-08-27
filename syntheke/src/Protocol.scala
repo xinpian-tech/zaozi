@@ -38,14 +38,14 @@ trait Protocol:
 
 /** A verification protocol: a probe source publishes read-only signals that the framework forwards to the root — into
   * the [[testbench]]'s matching inputs when one is declared, to top-level probe ports otherwise (doc
-  * @sec-dv-protocol). There is no negotiation — the `Down` is given at the declaration and fully determines the
-  * interface.
+  * @sec-dv-protocol).
+  *   There is no negotiation — the `Down` is given at the declaration and fully determines the interface.
   */
 trait DVProtocol:
   type Down
 
-  /** Probe interface of one source: every interface leaf wrapped in `Probe` carrying `layer` (a probe's inner may be
-    * an aggregate). Checked at the `dvSource` declaration.
+  /** Probe interface of one source: every interface leaf wrapped in `Probe` carrying `layer` (a probe's inner may be an
+    * aggregate). Checked at the `dvSource` declaration.
     */
   def interfaceOf(down: Down, layer: LayerPath): ProtocolBundle
 

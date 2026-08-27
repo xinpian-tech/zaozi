@@ -21,7 +21,6 @@ private final class BuildState:
   val modules     = mutable.Map.empty[ModuleId, ModuleSpec]
   val moduleOrder = mutable.ArrayBuffer.empty[ModuleId]
   val binds       = mutable.ArrayBuffer.empty[BindDecl]
-  val generators  = mutable.ArrayBuffer.empty[GeneratorEntry[?]]
   val testbenches = mutable.ArrayBuffer.empty[ModuleId] // at most one, enforced at the declaration
 
   // Generator scopes currently under construction. Context functions stack rather than shadow, so the enclosing
@@ -33,9 +32,6 @@ private final class BuildState:
       openLeaves.isEmpty,
       s"$what declared inside generator body ${openLeaves.last.show}: generator modules are leaves"
     )
-
-  def registerGenerator(e: GeneratorEntry[?]): Unit =
-    if !generators.exists(_ eq e) then generators += e
 
 private[syntheke] final class UndeclaredReadException(val node: ModuleNodeId)
     extends RuntimeException(s"read of ${node.show} which is not a declared dependency of this function")
@@ -81,7 +77,6 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     line:  sourcecode.Line
   ): A =
     val childId = addChild(name)
-    st.registerGenerator(entry)
     st.openLeaves += childId
     val scope   = new GeneratorScope[FP](childId, st, entry)
     val result  = body(

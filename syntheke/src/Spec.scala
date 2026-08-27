@@ -90,8 +90,7 @@ final case class DesignSpec(
   modules:     Map[ModuleId, ModuleSpec],
   moduleOrder: Vector[ModuleId], // hierarchy-tree preorder
   binds:       Vector[BindDecl],
-  testbench:   Option[ModuleId], // the testbench generator module, if declared (doc @sec-dv-testbench)
-  generators: Vector[GeneratorEntry[?]]): // registration order; the name-conflict check runs over this
+  testbench: Option[ModuleId]): // the testbench generator module, if declared (doc @sec-dv-testbench)
 
   def wrapper(id: ModuleId):         Option[WrapperModuleSpec]   = modules.get(id).collect { case w: WrapperModuleSpec => w }
   def generatorModule(id: ModuleId): Option[GeneratorModuleSpec] =
@@ -100,3 +99,9 @@ final case class DesignSpec(
     moduleOrder.flatMap(generatorModule)
   def nodeSpec(id: ModuleNodeId):    Option[NodeSpec]            =
     generatorModule(id.module).flatMap(_.node(id.name))
+
+  /** Registry entries in first-use order, deduplicated by reference; the name-conflict check runs over this. */
+  def generators: Vector[GeneratorEntry[?]] =
+    generatorModules.map(_.entry).foldLeft(Vector.empty[GeneratorEntry[?]]) { (acc, e) =>
+      if acc.exists(_ eq e) then acc else acc :+ e
+    }
