@@ -458,4 +458,41 @@ object NegotiatorSpec extends TestSuite:
       assert(spec.generatorModule(ModuleId.root / "cosim").get.dvSinks.map(_.name) == Vector("taps"))
       Negotiator.negotiate(spec)
     }
+
+    test("interface and view contracts reject illegal shapes on the spot") {
+      val ff = intercept[IllegalArgumentException] {
+        ProtocolInterface.Flipped(ProtocolInterface.Flipped(ProtocolInterface.Bool))
+      }
+      assert(ff.getMessage.contains("Flipped(Flipped"))
+      val fv = intercept[IllegalArgumentException] {
+        ProtocolInterface.Vec(2, ProtocolInterface.Flipped(ProtocolInterface.Bool))
+      }
+      assert(fv.getMessage.contains("Vec elements cannot be Flipped"))
+      val fp = intercept[IllegalArgumentException] {
+        ProtocolInterface.Probe(
+          ProtocolInterface.Bundle(
+            Vector(ProtocolInterface.Field("x", ProtocolInterface.Flipped(ProtocolInterface.Bool)))
+          ),
+          LayerPath(Vector("verification"))
+        )
+      }
+      assert(fp.getMessage.contains("one-directional"))
+
+      // A foreign builder read through another module's view is rejected at negotiation.
+      val spec = Design {
+        val p = generator(intEntry("P")) {
+          parametersConst(0)
+          val out = outward(Wid).dFn(_ => Right(8))
+          out
+        }
+        val c = generator(intEntry("C")) {
+          parameters(view => Right(view.edgeOf(p))) // p is module P's node — foreign to C's view
+          val in = inward(Wid).uFn(_ => Right(8))
+          in
+        }
+        c <-- p
+      }
+      val e    = intercept[IllegalArgumentException](Negotiator.negotiate(spec))
+      assert(e.getMessage.contains("is not a node of EdgeView"))
+    }
   }
