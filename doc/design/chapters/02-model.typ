@@ -67,17 +67,11 @@ bind 写在结构模块的构建体里，声明它的结构模块必须是两端
 
 模块显式声明 inward 节点到 outward 节点的#term[模块内部参数依赖][module-internal parameter dependency]：一条依赖表示该 inward 节点的 `Down` 参与计算该 outward 节点的 `Down`，反过来该 outward 节点的 `Up` 参与计算该 inward 节点的 `Up`。每个 outward 节点带一个函数 `dFn`：读取本节点所依赖的各 inward 节点的 `Down` 和本模块的用户参数，返回该 outward 节点唯一的 `Down`。每个 inward 节点带一个函数 `uFn`：读取依赖本节点的各 outward 节点的 `Up` 和用户参数，返回该 inward 节点唯一的 `Up`。`dFn` 与 `uFn` 统称#term[端口参数函数][port parameter functions]。不依赖任何 inward 节点的 outward 节点和不被任何 outward 节点依赖的 inward 节点称为#term[边界节点][boundary node]，它们的函数只从用户参数产生初值。函数能读哪些节点由依赖声明决定，声明方式见 @sec-generator-module；求值顺序见 @sec-propagation。同一个函数可以读不同协议的节点。Xbar、NoC 以多个具名节点表示多个端口，以内部参数依赖表示端口之间的参数影响关系；每个节点仍只参与一条 bind。
 
-#不变量[全部模块节点均由生成器模块声明；唯一的例外是顶层 IO 节点（@sec-io-nodes），它长在设计边界上。]
+#不变量[全部模块节点均由生成器模块声明。]
 
 #不变量[一条设计 bind 的源 outward 节点与目标 inward 节点必须使用同一协议。跨协议参数变换由具有不同 inward、outward 协议的显式生成器模块承担（@sec-protocol-object）。]
 
 #不变量[bind 与模块内部参数依赖组成的有向图必须无环；这张图称为#term[参数依赖 DAG][parameter dependency DAG]（@sec-propagation）。协商开始时的结构校验（@sec-structural-check）发现环时，报告环上的模块节点、bind、内部依赖及其源码位置。]
-
-== 顶层 IO 节点 <sec-io-nodes>
-
-设计可以在顶层声明#term[IO 节点][IO node]：长在设计边界上的普通节点，只允许写在设计体的最外层，名字取绑定 val。inward IO 节点经普通 bind 接住内部的 outward 节点；outward IO 节点作为普通 bind 的源，喂给内部的 inward 节点。它带自己的 uFn 或 dFn，与生成器节点同等参与传播和逐边求解；它没有生成器，不产生完整参数，没有模块内部参数依赖。
-
-求解后的边接口就是这个 IO 的形状：顶层 IO 的形状由顶层节点和内部节点协商得出。不例化测试平台时它成为根模块的顶层端口——inward IO 是 Output（设计向外驱动），outward IO 是 Input（外界向设计驱动）；例化测试平台时由测试平台驱动和接收（@sec-dv-testbench）。两个 IO 节点之间的 bind 两端没有硬件，结构校验拒绝。
 
 == 稳定标识 <sec-identity>
 
