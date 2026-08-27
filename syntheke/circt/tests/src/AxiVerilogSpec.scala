@@ -130,6 +130,15 @@ class DramPIO(p: DramP)                      extends HWRecord(p):
 object DramGen                               extends Generator[DramP, DramPLayers, DramPIO, DramPProbe]:
   def architecture(p: DramP) = summon[Interface[DramPIO]].dontCare()
 
+/** A deliberately wrong DRAM generator: same parameter type, twice the data width — its ports disagree with the settled
+  * bundle, for the binding-checkpoint test.
+  */
+class DramPWideIO(p: DramP) extends HWRecord(p):
+  val in = Flipped("in", new AxiPortRecord(p.port.copy(dataBits = p.port.dataBits * 2)))
+@zaoziGenerator
+object DramGenWide          extends Generator[DramP, DramPLayers, DramPWideIO, DramPProbe]:
+  def architecture(p: DramP) = summon[Interface[DramPWideIO]].dontCare()
+
 case class BridgeP(wide: AxiShape, narrow: AxiShape) extends Parameter derives ReadWriter
 class BridgePLayers(p: BridgeP)                      extends LayerInterface(p):
   def layers = Seq.empty
@@ -166,12 +175,12 @@ object AxiVerilogSpec extends TestSuite:
   val slaveEntry  = entry[SlaveP]("MmioSlave")
 
   val backends: Seq[GeneratorBackend] = Seq(
-    ZaoziBackend(coreEntry, CoreGen, identity[CoreP]),
-    ZaoziBackend(xbarEntry, XbarGen, identity[XbarP]),
-    ZaoziBackend(l2Entry, L2Gen, identity[L2P]),
-    ZaoziBackend(dramEntry, DramGen, identity[DramP]),
-    ZaoziBackend(bridgeEntry, BridgeGen, identity[BridgeP]),
-    ZaoziBackend(slaveEntry, SlaveGen, identity[SlaveP])
+    ZaoziBackend(coreEntry, CoreGen),
+    ZaoziBackend(xbarEntry, XbarGen),
+    ZaoziBackend(l2Entry, L2Gen),
+    ZaoziBackend(dramEntry, DramGen),
+    ZaoziBackend(bridgeEntry, BridgeGen),
+    ZaoziBackend(slaveEntry, SlaveGen)
   )
 
   def shapeOf(view: EdgeView, n: Axi4.Node): AxiShape = AxiShape.of(view.edgeOf(n))
@@ -405,13 +414,8 @@ object AxiVerilogSpec extends TestSuite:
     test("a backend interface that differs from the settled bundle is a binding-check error") {
       val resolved = Negotiator.negotiate(buildSoc())
       val mangled  = backends.map {
-        case b: ZaoziBackend[?, ?, ?, ?, ?] if b.entry eq dramEntry =>
-          ZaoziBackend(
-            dramEntry,
-            DramGen,
-            (fp: DramP) => fp.copy(port = fp.port.copy(dataBits = fp.port.dataBits * 2))
-          )
-        case b => b
+        case b if b.entry eq dramEntry => ZaoziBackend(dramEntry, DramGenWide)
+        case b                         => b
       }
       val e        = intercept[ElaborationException](Elaborator.elaborate(resolved, mangled))
       assert(e.getMessage.contains("port mismatch at mem.dram#in"))

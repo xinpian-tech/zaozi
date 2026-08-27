@@ -67,24 +67,23 @@ object GeneratorBackend:
 
 /** The zaozi backend: a syntheke generator entry enacted by a zaozi [[Generator]].
   *
-  * `toParam` recovers the zaozi parameter from the syntheke full parameter — typically an identity or a projection,
-  * since the full parameter is designed to be exactly what the generator needs (doc @sec-two-layer-params).
+  * The entry's full parameter IS the generator's zaozi [[Parameter]] — one type, no conversion: the `parameters`
+  * computation in the design body produces exactly the module parameter the zaozi generator consumes (doc
+  * @sec-two-layer-params).
   */
 final class ZaoziBackend[
-  FP,
   PARAM <: Parameter,
   L <: LayerInterface[PARAM],
   I <: HWInterface[PARAM],
   P <: DVInterface[PARAM, L]
-](val entry:     GeneratorEntry[FP],
-  val generator: Generator[PARAM, L, I, P],
-  toParam:       FP => PARAM)
+](val entry:     GeneratorEntry[PARAM],
+  val generator: Generator[PARAM, L, I, P])
     extends GeneratorBackend:
 
-  private def param(fullParam: Any): PARAM = toParam(fullParam.asInstanceOf[FP])
+  private def param(fullParam: Any): PARAM = fullParam.asInstanceOf[PARAM]
 
   def moduleName(fullParam: Any): String =
-    GeneratorBackend.canonicalModuleName(entry, fullParam.asInstanceOf[FP])
+    GeneratorBackend.canonicalModuleName(entry, param(fullParam))
 
   /** zaozi mints both the instance's referenced symbol and the dumped file name from `Generator.moduleName`; route both
     * through the canonical name by delegating to a per-name view of the generator. Memoized per name so zaozi's
