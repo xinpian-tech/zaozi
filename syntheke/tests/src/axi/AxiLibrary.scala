@@ -17,7 +17,7 @@ final case class CoreFull(name: String, idBits: Int, maxFlight: Int) derives Rea
 val Core = new GeneratorEntry[CoreFull]
 
 /** One AXI master core: a boundary outward node with a local id space; the master is named after the instance. */
-final class CorePorts(
+final class CoreNodes(
   name:      String,
   idBits:    Int,
   maxFlight: Int
@@ -37,8 +37,8 @@ def core(
   name:      sourcecode.Name,
   file:      sourcecode.File,
   line:      sourcecode.Line
-): CorePorts =
-  generator(Core)(new CorePorts(name.value, idBits, maxFlight))
+): CoreNodes =
+  generator(Core)(new CoreNodes(name.value, idBits, maxFlight))
 
 // ============ Dma: a bus-mastering DMA engine ============
 
@@ -47,7 +47,7 @@ final case class DmaFull(name: String, idBits: Int, maxFlight: Int) derives Read
 val Dma = new GeneratorEntry[DmaFull]
 
 /** The DMA engine: an AXI master with its own small id space, named after the instance. */
-final class DmaPorts(
+final class DmaNodes(
   name:      String,
   idBits:    Int,
   maxFlight: Int
@@ -67,8 +67,8 @@ def dmaCtrl(
   name:      sourcecode.Name,
   file:      sourcecode.File,
   line:      sourcecode.Line
-): DmaPorts =
-  generator(Dma)(new DmaPorts(name.value, idBits, maxFlight))
+): DmaNodes =
+  generator(Dma)(new DmaNodes(name.value, idBits, maxFlight))
 
 // ============ Xbar: the n×m crossbar ============
 
@@ -81,7 +81,7 @@ val Xbar = new GeneratorEntry[XbarFull]
 /** An n×m AXI crossbar: every input reaches every output. The endpoint class declares the nodes, the full dependency
   * matrix, the id-remapping dFns and aggregating uFns, and a route-table FullParam.
   */
-final class AxiXbarPorts(
+final class AxiXbarNodes(
   ins:         Vector[String],
   outs:        Vector[String],
   arbitration: String
@@ -139,8 +139,8 @@ def axiXbar(
   name:        sourcecode.Name,
   file:        sourcecode.File,
   line:        sourcecode.Line
-): AxiXbarPorts =
-  generator(Xbar)(new AxiXbarPorts(ins, outs, arbitration))
+): AxiXbarNodes =
+  generator(Xbar)(new AxiXbarNodes(ins, outs, arbitration))
 
 // ============ L2: a pass-through adapter with its own writeback master ============
 
@@ -151,7 +151,7 @@ val L2 = new GeneratorEntry[L2Full]
 /** The L2 adapter: addresses and slave capabilities pass through; downstream it appends its writeback master after the
   * upstream id space (an adapter transforming Down).
   */
-final class L2CachePorts(
+final class L2CacheNodes(
   capacityKiB: Int
 )(
   using GeneratorScope[L2Full])
@@ -182,8 +182,8 @@ def l2Cache(
   name:        sourcecode.Name,
   file:        sourcecode.File,
   line:        sourcecode.Line
-): L2CachePorts =
-  generator(L2)(new L2CachePorts(capacityKiB))
+): L2CacheNodes =
+  generator(L2)(new L2CacheNodes(capacityKiB))
 
 // ============ DRAM: the uncached memory slave ============
 
@@ -193,7 +193,7 @@ final case class DramFull(ranks: Int, addrBits: Int, dataBits: Int, idBits: Int,
 val Dram = new GeneratorEntry[DramFull]
 
 /** A DRAM controller: one uncached address range on a 128-bit bus, named after the instance. */
-final class DramPorts(
+final class DramNodes(
   name:           String,
   ranks:          Int,
   base:           Long,
@@ -237,8 +237,8 @@ def dramCtrl(
   name:           sourcecode.Name,
   file:           sourcecode.File,
   line:           sourcecode.Line
-): DramPorts =
-  generator(Dram)(new DramPorts(name.value, ranks, base, size, idCapacityBits))
+): DramNodes =
+  generator(Dram)(new DramNodes(name.value, ranks, base, size, idCapacityBits))
 
 // ============ WidthBridge: wide to narrow ============
 
@@ -249,7 +249,7 @@ val WidthBridge = new GeneratorEntry[BridgeFull]
 /** A width bridge: masters pass down unchanged; upstream it re-presents the narrow peripherals on the wide bus,
   * fragmenting bursts internally, so the supported transfer ceiling grows to its own limit.
   */
-final class WidthBridgePorts(
+final class WidthBridgeNodes(
   wideBeatBytes:       Int,
   maxUpstreamTransfer: Int
 )(
@@ -284,8 +284,8 @@ def widthBridge(
   name:                sourcecode.Name,
   file:                sourcecode.File,
   line:                sourcecode.Line
-): WidthBridgePorts =
-  generator(WidthBridge)(new WidthBridgePorts(wideBeatBytes, maxUpstreamTransfer))
+): WidthBridgeNodes =
+  generator(WidthBridge)(new WidthBridgeNodes(wideBeatBytes, maxUpstreamTransfer))
 
 // ============ Uart: a memory-mapped peripheral ============
 
@@ -294,7 +294,7 @@ final case class UartFull(name: String, base: Long, size: Long, dataBits: Int, i
 val Uart = new GeneratorEntry[UartFull]
 
 /** The UART: a boundary inward node serving one address range on a 32-bit bus. */
-final class UartPorts(
+final class UartNodes(
   name:           String,
   base:           Long,
   size:           Long,
@@ -336,8 +336,8 @@ def uartCtrl(
   name:           sourcecode.Name,
   file:           sourcecode.File,
   line:           sourcecode.Line
-): UartPorts =
-  generator(Uart)(new UartPorts(name.value, base, size, idCapacityBits))
+): UartNodes =
+  generator(Uart)(new UartNodes(name.value, base, size, idCapacityBits))
 
 // ============ Gpio: a memory-mapped peripheral ============
 
@@ -346,7 +346,7 @@ final case class GpioFull(name: String, base: Long, size: Long, dataBits: Int, i
 val Gpio = new GeneratorEntry[GpioFull]
 
 /** The GPIO block: a boundary inward node serving one address range on a 32-bit bus. */
-final class GpioPorts(
+final class GpioNodes(
   name:           String,
   base:           Long,
   size:           Long,
@@ -388,5 +388,5 @@ def gpioCtrl(
   name:           sourcecode.Name,
   file:           sourcecode.File,
   line:           sourcecode.Line
-): GpioPorts =
-  generator(Gpio)(new GpioPorts(name.value, base, size, idCapacityBits))
+): GpioNodes =
+  generator(Gpio)(new GpioNodes(name.value, base, size, idCapacityBits))

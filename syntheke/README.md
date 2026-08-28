@@ -85,12 +85,12 @@ class, where the context name cannot capture them.
 ```scala
 val Core = new GeneratorEntry[CoreFull]   // registry name "Core", from the val
 
-final class CorePorts(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Endpoints:
+final class CoreNodes(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Endpoints:
   parameters(_ => Right(CoreFull(name, idBits)))
   val mem = outward(Axi4).dFn(...)
 
-def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line): CorePorts =
-  generator(Core)(new CorePorts(name.value, idBits))
+def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line): CoreNodes =
+  generator(Core)(new CoreNodes(name.value, idBits))
 
 // in any design:
 val core0 = core(idBits = 2)   // instance "core0"
