@@ -82,7 +82,7 @@ ill-formed intent fails at compile time with a located message that feeds the re
 well-typed intent cannot produce an incoherent stimulus because the solver, not the model, builds it.
 That is the mechanism the weak-model result is supposed to expose.
 
-## What must be built (five items, in order)
+## What must be built (four items, in order)
 
 0. **The bulk-stimulus path** — needed for the head-to-head, and the reason the objection above
    lands: repeated solves under blocking constraints (`assume` the previous solution away) plus
@@ -98,10 +98,7 @@ That is the mechanism the weak-model result is supposed to expose.
    ≤64-bit word worked for ALU and SPI but does not scale (and the DPI return is width-limited).
    `AbstractStimulus` already carries every drive port per beat; what is missing is a codec and a
    tick callback that fill several ports — a columnar stimulus file plus a multi-output DPI callback.
-3. **Witness volume** — one witness is k cycles; closing many items needs many witnesses concatenated
-   into one replay, plus blocking constraints (`assume` the previous solution away) to get *distinct*
-   traces from one intent. Both are small additions on top of the existing solve loop.
-4. **UT wrappers at scale** — two designs are wrapped by hand; fourteen are not. This is the
+3. **UT wrappers at scale** — two designs are wrapped by hand; fourteen are not. This is the
    bottleneck, and it is also measurable: have the LLM generate the wrappers and report the
    type-check pass rate, which is itself a result about the typed surface.
 
