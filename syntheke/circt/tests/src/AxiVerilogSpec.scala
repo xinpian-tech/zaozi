@@ -56,9 +56,10 @@ object AxiVerilogSpec extends TestSuite:
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), Arbitration.FixedPriority)
 
-      val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
-      val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8)
-      val pads = serialPads()
+      val uart   = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
+      val gpio   = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8, width = 8)
+      val pads   = serialPads()
+      val gpioPd = gpioPads()
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
@@ -68,6 +69,7 @@ object AxiVerilogSpec extends TestSuite:
       uart.in <-- periphXbar.output("uart")
       gpio.in <-- periphXbar.output("gpio")
       pads.in <-- uart.serial
+      gpioPd.in <-- gpio.pins
 
       core0.clk <-- clkSrc.tap("core0")
       core1.clk <-- clkSrc.tap("core1")

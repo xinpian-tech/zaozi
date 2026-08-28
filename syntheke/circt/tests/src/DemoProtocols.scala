@@ -27,6 +27,22 @@ object ClockDomain extends Protocol:
   val upRW:                           upickle.default.ReadWriter[Unit] = summon
   val edgeRW:                         upickle.default.ReadWriter[Int]  = summon
 
+/** A GPIO pin bank; `Down` is the bank width. */
+object GpioPins extends Protocol:
+  type Down = Int
+  type Up = Unit
+  type Edge = Int
+  def negotiate(down: Int, up: Unit): Either[Violation, Int]           = Right(down)
+  def interfaceOf(edge: Int):         ProtocolBundle                   =
+    ProtocolBundle(
+      ProtocolInterface.Field("out", ProtocolInterface.UInt(edge)),
+      ProtocolInterface.Field("oe", ProtocolInterface.UInt(edge)),
+      ProtocolInterface.Field("in", ProtocolInterface.Flipped(ProtocolInterface.UInt(edge)))
+    )
+  val downRW:                         upickle.default.ReadWriter[Int]  = summon
+  val upRW:                           upickle.default.ReadWriter[Unit] = summon
+  val edgeRW:                         upickle.default.ReadWriter[Int]  = summon
+
 /** A serial pin pair; `Down` is the transmitter's baud rate. */
 object Serial extends Protocol:
   type Down = Int

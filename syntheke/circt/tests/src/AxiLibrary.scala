@@ -294,9 +294,12 @@ def widthBridge(
 
 // ============ Uart: a memory-mapped peripheral ============
 
-val Uart = new GeneratorEntry[UartP]
+val Uart = new GeneratorEntry[UartDeviceP]
 
-/** The UART: a boundary inward node serving one address range on a 32-bit bus, publishing its serial pins. */
+/** The UART ([[UartDeviceGen]], the real device): a boundary inward node serving one address range on a 32-bit bus,
+  * publishing its serial pins. Its baud divisor comes from the settled clock frequency; a clock too slow for the
+  * requested baud rate fails here.
+  */
 final class UartNodes(
   name:           String,
   base:           Long,
@@ -304,11 +307,17 @@ final class UartNodes(
   idCapacityBits: Int,
   baud:           Int
 )(
-  using GeneratorScope[UartP])
+  using GeneratorScope[UartDeviceP])
     extends Nodes:
   val clk    = inward(ClockDomain).uFn(_ => Right(()))
   val serial = outward(Serial).dFn(_ => Right(baud))
-  parameters(view => Right(UartP(name, base, size, shapeOf(view, in))))
+  parameters { view =>
+    val freq = view.edgeOf(clk)
+    if freq < baud * 8 then Left(Violation(s"clock $freq Hz too slow for $baud baud: needs 8 clocks per bit"))
+    else
+      val s = shapeOf(view, in)
+      Right(UartDeviceP(freq / baud, s.addrBits, s.dataBits, s.idBits))
+  }
   val in     = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
@@ -345,20 +354,27 @@ def uartCtrl(
 
 // ============ Gpio: a memory-mapped peripheral ============
 
-val Gpio = new GeneratorEntry[GpioP]
+val Gpio = new GeneratorEntry[GpioDeviceP]
 
-/** The GPIO block: a boundary inward node serving one address range on a 32-bit bus. */
+/** The GPIO block ([[GpioDeviceGen]], the real device): a boundary inward node serving one address range on a 32-bit
+  * bus, publishing its pin bank.
+  */
 final class GpioNodes(
   name:           String,
   base:           Long,
   size:           Long,
-  idCapacityBits: Int
+  idCapacityBits: Int,
+  width:          Int
 )(
-  using GeneratorScope[GpioP])
+  using GeneratorScope[GpioDeviceP])
     extends Nodes:
-  val clk = inward(ClockDomain).uFn(_ => Right(()))
-  parameters(view => Right(GpioP(name, base, size, shapeOf(view, in))))
-  val in  = inward(Axi4).uFn(_ =>
+  val clk  = inward(ClockDomain).uFn(_ => Right(()))
+  val pins = outward(GpioPins).dFn(_ => Right(width))
+  parameters { view =>
+    val s = shapeOf(view, in)
+    Right(GpioDeviceP(width, s.addrBits, s.dataBits, s.idBits))
+  }
+  val in   = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
         slaves = Vector(
@@ -381,7 +397,8 @@ final class GpioNodes(
 def gpioCtrl(
   base:           Long,
   size:           Long,
-  idCapacityBits: Int
+  idCapacityBits: Int,
+  width:          Int
 )(
   using
   ws:             WrapperScope,
@@ -389,7 +406,29 @@ def gpioCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): GpioNodes =
-  generator(Gpio)(new GpioNodes(name.value, base, size, idCapacityBits))
+  generator(Gpio)(new GpioNodes(name.value, base, size, idCapacityBits, width))
+
+// ============ GpioPads: the GPIO pin boundary ============
+
+val GpioPadRing = new GeneratorEntry[GpioPadsP]
+
+/** Terminates one GPIO pin bank; the FullParam records the settled width. */
+final class GpioPadsNodes(
+)(
+  using GeneratorScope[GpioPadsP])
+    extends Nodes:
+  val in = inward(GpioPins).uFn(_ => Right(()))
+  parameters(view => Right(GpioPadsP(view.edgeOf(in))))
+
+def gpioPads(
+)(
+  using
+  ws:   WrapperScope,
+  name: sourcecode.Name,
+  file: sourcecode.File,
+  line: sourcecode.Line
+): GpioPadsNodes =
+  generator(GpioPadRing)(new GpioPadsNodes)
 
 // ============ ClockSource: the clock and reset origin ============
 
@@ -457,6 +496,7 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(L2, L2Gen),
   ZaoziBackend(Dram, DramGen),
   ZaoziBackend(WidthBridge, BridgeGen),
-  ZaoziBackend(Uart, UartGen),
-  ZaoziBackend(Gpio, GpioGen)
+  ZaoziBackend(Uart, UartDeviceGen),
+  ZaoziBackend(Gpio, GpioDeviceGen),
+  ZaoziBackend(GpioPadRing, GpioPadsGen)
 )

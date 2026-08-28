@@ -21,59 +21,18 @@ import upickle.default.ReadWriter
   * Serial format 8N1, LSB first; `divisor` clocks per bit, receive sampled at mid-bit.
   */
 
-class UartClockBundle extends Bundle:
-  val clock = Aligned(Clock())
-  val reset = Aligned(Reset())
-
-class UartSerialBundle extends Bundle:
-  val tx = Aligned(Bool())
-  val rx = Flipped(Bool())
-
 case class UartDeviceP(divisor: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
   require(divisor >= 8, s"uart divisor $divisor: needs at least 8 clocks per bit")
   require(dataBits == 32, s"uart is a 32-bit single-beat slave, got dataBits $dataBits")
-
-class UartAxBundle(p: UartDeviceP) extends Bundle:
-  val id    = Aligned(UInt(p.idBits))
-  val addr  = Aligned(UInt(p.addrBits))
-  val len   = Aligned(UInt(8))
-  val size  = Aligned(UInt(3))
-  val burst = Aligned(UInt(2))
-
-class UartWBundle(p: UartDeviceP) extends Bundle:
-  val data = Aligned(UInt(p.dataBits))
-  val strb = Aligned(UInt(p.dataBits / 8))
-  val last = Aligned(Bool())
-
-class UartBBundle(p: UartDeviceP) extends Bundle:
-  val id   = Aligned(UInt(p.idBits))
-  val resp = Aligned(UInt(2))
-
-class UartRBundle(p: UartDeviceP) extends Bundle:
-  val id   = Aligned(UInt(p.idBits))
-  val data = Aligned(UInt(p.dataBits))
-  val resp = Aligned(UInt(2))
-  val last = Aligned(Bool())
-
-class UartChannel[B <: Bundle](bits0: B) extends Bundle:
-  val valid = Aligned(Bool())
-  val ready = Flipped(Bool())
-  val bits  = Aligned(bits0)
-
-class UartAxiBundle(p: UartDeviceP) extends Bundle:
-  val aw = Aligned(new UartChannel(new UartAxBundle(p)))
-  val w  = Aligned(new UartChannel(new UartWBundle(p)))
-  val b  = Flipped(new UartChannel(new UartBBundle(p)))
-  val ar = Aligned(new UartChannel(new UartAxBundle(p)))
-  val r  = Flipped(new UartChannel(new UartRBundle(p)))
+  def shape: AxiShape = AxiShape(addrBits, dataBits, idBits)
 
 class UartDevicePLayers(p: UartDeviceP) extends LayerInterface(p):
   def layers = Seq.empty
 class UartDevicePProbe(p: UartDeviceP)  extends DVBundle[UartDeviceP, UartDevicePLayers](p)
 class UartDevicePIO(p: UartDeviceP)     extends HWBundle(p):
-  val clk    = Flipped(new UartClockBundle)
-  val in     = Flipped(new UartAxiBundle(p))
-  val serial = Aligned(new UartSerialBundle)
+  val clk    = Flipped(new ClockBundle)
+  val in     = Flipped(new Axi4Bundle(p.shape))
+  val serial = Aligned(new SerialBundle)
 
 @generator
 object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevicePIO, UartDevicePProbe]:
