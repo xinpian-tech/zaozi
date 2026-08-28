@@ -11,6 +11,30 @@ import java.util.regex.Pattern
   */
 final case class Trace(cycles: Int, values: Map[String, Vector[BigInt]])
 
+/** The interface between the solver's raw counterexample and the framework's [[Trace]]: lowering may rename an
+  * ABI-level signal in the model (a delayed drive is traced as its register's `_next`), and the lowering that did the
+  * renaming is the one that records it here. Applied once at the model→trace boundary, so everything downstream —
+  * [[Stimulus]], reports, tests — speaks pure ABI names and no name convention leaks past this type.
+  */
+final case class TraceBinding(renames: Map[String, String]):
+  /** The trace with solver-side names translated back to ABI names (a translated entry wins over a raw one). */
+  def rebind(trace: Trace): Trace =
+    val (renamed, kept) = trace.values.partition((k, _) => renames.contains(k))
+    Trace(trace.cycles, kept ++ renamed.map((k, v) => renames(k) -> v))
+
+object TraceBinding:
+  /** No renaming — the model's signal names are already the ABI's. */
+  val identity: TraceBinding = TraceBinding(Map.empty)
+
+  /** The renaming [[FormalUT.delay]] introduces: a delayed drive's value at row t is its delay register's `_next`. */
+  def delayedDrives(drives: Seq[String]): TraceBinding =
+    TraceBinding(drives.map(d => s"$d${MlirBmc.DelayedDriveSuffix}_next" -> d).toMap)
+
+/** A lowered bounded model: the HW file circt-bmc reads, the module to solve, and the [[TraceBinding]] that maps the
+  * solver's signal names back to the ABI's.
+  */
+final case class LoweredModel(hw: os.Path, top: String, binding: TraceBinding)
+
 /** Outcome of proving a UT's assertions. */
 enum CheckOutcome:
   /** No assertion can be violated within the bound. */
@@ -63,6 +87,12 @@ object FormalUT:
       case Bmc.Held        => GenerateOutcome.Infeasible
       case Bmc.Unknown(d)  => GenerateOutcome.Unknown(d)
 
+  /** [[generate]] on a lowered model, with the witness translated back to ABI names through the model's binding. */
+  def generate(model: LoweredModel, bound: Int): GenerateOutcome =
+    generate(model.hw, model.top, bound) match
+      case GenerateOutcome.Generated(t) => GenerateOutcome.Generated(model.binding.rebind(t))
+      case other                        => other
+
   /** Generate a transaction directly from a zaozi UT generator whose SVA asserts `¬constraint`. */
   def generateGenerator[
     PARAM <: Parameter,
@@ -75,8 +105,7 @@ object FormalUT:
     outDir:        os.Path,
     delayedDrives: Seq[String] = Seq.empty
   ): GenerateOutcome =
-    val (hw, top) = lowerGenerator(dut, parameter, outDir, delayedDrives)
-    generate(hw, top, bound)
+    generate(lowerGenerator(dut, parameter, outDir, delayedDrives), bound)
 
   /** Lower a zaozi generator to the BMC-ready HW module, without running the solver — the composition point for flows
     * that post-process the model first (e.g. [[SvImport.mergeForBmc]] splicing an imported IP over an extern).
@@ -95,7 +124,7 @@ object FormalUT:
     parameter:     PARAM,
     outDir:        os.Path,
     delayedDrives: Seq[String] = Seq.empty
-  ): (os.Path, String) =
+  ): LoweredModel =
     os.makeDir.all(outDir)
     val top       = dut.moduleName(parameter)
     val moduleDir = outDir / s"formal_mlir_${parameter.hashCode.toHexString}"
@@ -104,7 +133,7 @@ object FormalUT:
     val bmcReady  = delay(prune(readLines(hw)), top, delayedDrives)
     val bmcFile   = hw / os.up / s"${hw.last}.bmc.mlir"
     os.write.over(bmcFile, bmcReady.mkString("\n"))
-    (stripContracts(bmcFile), top)
+    LoweredModel(stripContracts(bmcFile), top, TraceBinding.delayedDrives(delayedDrives))
 
   // ---- the circt-bmc engine ----------------------------------------------------------------------------------------
 

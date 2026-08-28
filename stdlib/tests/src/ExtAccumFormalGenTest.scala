@@ -22,10 +22,10 @@ object ExtAccumFormalGenTest extends TestSuite:
       val svFile = dir / "ext_accum.sv"
       os.makeDir.all(dir)
       os.write.over(svFile, ExtAccum.source)
-      val (wrapperHw, top) = FormalUT.lowerGenerator(ExtAccumUT, param, dir)
-      val ip               = SvImport.toHw(Seq(svFile), dir / "imported")
-      val merged           = SvImport.mergeForBmc(wrapperHw, ip)
-      val txn = solved(FormalUT.generate(merged, top, bound = 4))
+      val model  = FormalUT.lowerGenerator(ExtAccumUT, param, dir)
+      val ip     = SvImport.toHw(Seq(svFile), dir / "imported")
+      val merged = SvImport.mergeForBmc(model.hw, ip)
+      val txn    = solved(FormalUT.generate(model.copy(hw = merged), bound = 4))
       assert(txn.cycles >= 2)
 
       // 2. Bridge: the first two beats must sum to 9 — the constraint solved through the IP's own adder.

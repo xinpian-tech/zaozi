@@ -18,10 +18,10 @@ object HavenAluFormalGenTest extends TestSuite:
       val param  = HavenAluParameter()
       val svFile = resources / "haven" / "alu_top.v"
 
-      val (wrapperHw, top) = FormalUT.lowerGenerator(HavenAluUT, param, dir, delayedDrives = Seq("A"))
-      val ip               = SvImport.toHw(Seq(svFile), dir / "imported")
-      val merged           = SvImport.mergeForBmc(wrapperHw, ip)
-      val txn = solved(FormalUT.generate(merged, top, bound = 6))
+      val model  = FormalUT.lowerGenerator(HavenAluUT, param, dir, delayedDrives = Seq("A"))
+      val ip     = SvImport.toHw(Seq(svFile), dir / "imported")
+      val merged = SvImport.mergeForBmc(model.hw, ip)
+      val txn    = solved(FormalUT.generate(model.copy(hw = merged), bound = 6))
       assert(txn.cycles >= 3)
 
       // The witness must contain a beat whose packed operands XOR to 0xBEEF.

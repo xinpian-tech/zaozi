@@ -4,9 +4,9 @@ package me.jiuyang.utlib
 
 import utest.*
 
-/** The Trace → Model B `stimulus.txt` bridge: a [[FormalUT]] witness becomes the per-cycle drive file the generated
-  * tick callback replays. Values render as the callback reads them (`%ld`): signed ports in two's-complement decimal,
-  * unsigned ports raw.
+/** The model→stimulus interface: [[TraceBinding]] translates solver names back to ABI names, [[AbstractStimulus]]
+  * carries the witness purely in ABI terms, and [[ModelBStimulus]] is one codec over it — signed ports render as
+  * two's-complement decimal (the tick callback reads `%ld`), unsigned raw.
   */
 object StimulusTest extends TestSuite:
   private val outputRoot = os.Path(sys.props("zaozi.utlib.outDir"), os.pwd)
@@ -30,22 +30,30 @@ object StimulusTest extends TestSuite:
       val t = Trace(2, Map("A" -> Vector(BigInt(5), BigInt(243))))
       assert(Stimulus.fromTrace(t, spec(signed = true)) == "5\n-13\n")
 
-    test("the drive signal is found case-insensitively when the exact name is absent"):
-      val t = Trace(1, Map("a" -> Vector(BigInt(7))))
-      assert(Stimulus.fromTrace(t, spec(signed = false)) == "7\n")
+    test("TraceBinding.rebind translates a delayed drive's register signal back to its ABI name"):
+      val binding = TraceBinding.delayedDrives(Seq("A"))
+      val raw     = Trace(2, Map("A__d_next" -> Vector(BigInt(3), BigInt(5)), "A__d_state" -> Vector(BigInt(0), BigInt(3))))
+      val rebound = binding.rebind(raw)
+      assert(rebound.values("A") == Vector(BigInt(3), BigInt(5)))
+      assert(Stimulus.fromTrace(rebound, spec(signed = false)) == "3\n5\n")
 
-    test("a delayed drive is read from its <name>__d_next trace signal"):
-      val t = Trace(2, Map("A__d_next" -> Vector(BigInt(3), BigInt(5)), "A__d_state" -> Vector(BigInt(0), BigInt(3))))
-      assert(Stimulus.fromTrace(t, spec(signed = false)) == "3\n5\n")
+    test("AbstractStimulus carries every drive port per beat — the interface is not single-drive"):
+      val two = AbiSpec(
+        "multi",
+        Seq(AbiPort("a", AbiRole.Drive, 8, false), AbiPort("b", AbiRole.Drive, 8, false)),
+        "1.0"
+      )
+      val t   = Trace(2, Map("a" -> Vector(BigInt(1), BigInt(2)), "b" -> Vector(BigInt(7), BigInt(9))))
+      val s   = AbstractStimulus.fromTrace(t, two)
+      assert(s.cycles == 2)
+      assert(s.beats(1) == Beat(Map("a" -> BigInt(2), "b" -> BigInt(9))))
+      // ...but the Model B codec enforces its own single-drive limit.
+      intercept[IllegalArgumentException](ModelBStimulus.render(s))
 
     test("a trace missing the drive signal fails with the port name in the message"):
       val t = Trace(1, Map("other" -> Vector(BigInt(1))))
       val e = intercept[IllegalArgumentException](Stimulus.fromTrace(t, spec(signed = false)))
       assert(e.getMessage.contains("A"))
-
-    test("a spec without exactly one drive port is rejected"):
-      val s = spec(signed = false).copy(ports = Seq(AbiPort("clk", AbiRole.Clock, 1, false)))
-      intercept[IllegalArgumentException](Stimulus.fromTrace(Trace(1, Map.empty), s))
 
     test("save writes the file and returns its path"):
       val dir = outputRoot / "Stimulus-save"

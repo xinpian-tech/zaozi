@@ -18,10 +18,10 @@ object HavenSpiFormalGenTest extends TestSuite:
       val param   = HavenSpiParameter()
       val svFiles = Seq(resources / "haven" / "simple_spi_top.v", resources / "haven" / "fifo4.v")
 
-      val (wrapperHw, top) = FormalUT.lowerGenerator(HavenSpiUT, param, dir, delayedDrives = Seq("A"))
-      val ip               = SvImport.toHw(svFiles, dir / "imported", include = Some(resources / "haven"))
-      val merged           = SvImport.mergeForBmc(wrapperHw, ip)
-      val txn = solved(FormalUT.generate(merged, top, bound = 5))
+      val model  = FormalUT.lowerGenerator(HavenSpiUT, param, dir, delayedDrives = Seq("A"))
+      val ip     = SvImport.toHw(svFiles, dir / "imported", include = Some(resources / "haven"))
+      val merged = SvImport.mergeForBmc(model.hw, ip)
+      val txn    = solved(FormalUT.generate(model.copy(hw = merged), bound = 5))
 
       // The witness must hold a write request (cyc, stb, we, adr=2, dat=0xA5) somewhere.
       val gen  = UTGenerator(HavenSpiUT, param, outputDirectory = dir)
