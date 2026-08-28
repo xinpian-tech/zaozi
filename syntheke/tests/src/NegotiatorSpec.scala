@@ -43,7 +43,9 @@ object Trace extends DVProtocol:
 
 object NegotiatorSpec extends TestSuite:
 
-  def intEntry(name: String) = new GeneratorEntry[Int](s"test.$name")
+  def intEntry(name: String): GeneratorEntry[Int] =
+    given sourcecode.Name = sourcecode.Name(name)
+    new GeneratorEntry[Int]
 
   /** prod(32) and dma(24) feed a 2x2 xbar; c0 (capacity 64) lives one wrapper deep, c1's capacity is a knob. */
   def buildSoc(c1Capacity: Int): DesignSpec =
@@ -260,7 +262,7 @@ object NegotiatorSpec extends TestSuite:
         c <-- p
       }
       val e    = intercept[NegotiationException](Negotiator.negotiate(spec))
-      assert(e.getMessage.contains("generator name 'test.Same' used by 2 distinct registry entries"))
+      assert(e.getMessage.contains("generator name 'Same' used by 2 distinct registry entries"))
     }
 
     test("cycle reporting names exactly the cycle members, not bridges between cycles") {
@@ -481,7 +483,7 @@ object NegotiatorSpec extends TestSuite:
       assert(plan("ports").arr.exists(_("name") == ujson.Str("inst_c0_node_in_in")))
       val params  = Export.params(resolved)
       val xbarRec = params.arr.find(_("module") == ujson.Arr("xbar")).get
-      assert(xbarRec("generator") == ujson.Str("test.Xbar"))
+      assert(xbarRec("generator") == ujson.Str("Xbar"))
       assert(xbarRec("fullParam") == ujson.Num(120))
     }
 

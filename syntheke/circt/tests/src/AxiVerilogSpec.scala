@@ -85,8 +85,8 @@ object AxiVerilogSpec extends TestSuite:
     test("a backend interface that differs from the settled bundle is a binding-check error") {
       val resolved = Negotiator.negotiate(buildSoc())
       val mangled  = axiBackends.map {
-        case b if b.entry eq dramEntry => ZaoziBackend(dramEntry, DramGenWide)
-        case b                         => b
+        case b if b.entry eq Dram => ZaoziBackend(Dram, DramGenWide)
+        case b                    => b
       }
       val e        = intercept[ElaborationException](Elaborator.elaborate(resolved, mangled))
       assert(e.getMessage.contains("port mismatch at mem.dram#in"))

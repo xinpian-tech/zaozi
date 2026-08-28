@@ -83,16 +83,18 @@ val. A def taking `sourcecode.Name` must contain only the single
 class, where the context name cannot capture them.
 
 ```scala
+val Core = new GeneratorEntry[CoreFull]   // registry name "Core", from the val
+
 final class CorePorts(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Endpoints:
   parameters(_ => Right(CoreFull(name, idBits)))
   val mem = outward(Axi4).dFn(...)
 
 def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line): CorePorts =
-  generator(coreEntry)(new CorePorts(name.value, idBits))
+  generator(Core)(new CorePorts(name.value, idBits))
 
 // in any design:
 val core0 = core(idBits = 2)   // instance "core0"
-sysXbar.inputs(0) <-- core0.mem
+sysXbar.input("in0") <-- core0.mem
 
 // Elaborate (syntheke.circt): bind entries to zaozi generators, get Verilog.
 // Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error

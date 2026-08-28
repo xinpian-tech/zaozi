@@ -15,7 +15,6 @@ import me.jiuyang.syntheke.tests.axi.{
   IdRange,
   TransferSizes
 }
-import upickle.default.ReadWriter
 
 /** The syntheke wrap of the demo SoC's zaozi modules (`AxiZaoziModules.scala`) — how a plain zaozi IP gets onto the
   * negotiation graph. One section per IP: a registry entry typed by the IP's zaozi Parameter (negotiation computes it
@@ -27,9 +26,6 @@ import upickle.default.ReadWriter
   * The SoC that instantiates and wires these lives in [[AxiVerilogSpec]].
   */
 
-private def entry[FP: ReadWriter](name: String) =
-  new GeneratorEntry[FP](s"demo.axi.zaozi.$name")
-
 /** The settled shape at one of the module's own nodes, read from its view. */
 def shapeOf(view: EdgeView, n: Axi4.Node): AxiShape =
   val e = view.edgeOf(n)
@@ -37,7 +33,7 @@ def shapeOf(view: EdgeView, n: Axi4.Node): AxiShape =
 
 // ============ Core: an AXI master with a local id space ============
 
-val coreEntry = entry[CoreP]("Core")
+val Core = new GeneratorEntry[CoreP]
 
 /** One AXI master core: a boundary outward node with a local id space; the master is named after the instance. */
 final class CorePorts(
@@ -61,11 +57,11 @@ def core(
   file:      sourcecode.File,
   line:      sourcecode.Line
 ): CorePorts =
-  generator(coreEntry)(new CorePorts(name.value, idBits, maxFlight))
+  generator(Core)(new CorePorts(name.value, idBits, maxFlight))
 
 // ============ Dma: a bus-mastering DMA engine ============
 
-val dmaEntry = entry[DmaP]("Dma")
+val Dma = new GeneratorEntry[DmaP]
 
 /** The DMA engine: an AXI master with its own small id space, named after the instance. */
 final class DmaPorts(
@@ -89,11 +85,11 @@ def dmaCtrl(
   file:      sourcecode.File,
   line:      sourcecode.Line
 ): DmaPorts =
-  generator(dmaEntry)(new DmaPorts(name.value, idBits, maxFlight))
+  generator(Dma)(new DmaPorts(name.value, idBits, maxFlight))
 
 // ============ Xbar: the n×m crossbar ============
 
-val xbarEntry = entry[XbarP]("Xbar")
+val Xbar = new GeneratorEntry[XbarP]
 
 /** An n×m AXI crossbar: every input reaches every output. The endpoint class declares the nodes, the full dependency
   * matrix, the id-remapping dFns and aggregating uFns, and the port-shape FullParam.
@@ -155,11 +151,11 @@ def axiXbar(
   file:        sourcecode.File,
   line:        sourcecode.Line
 ): AxiXbarPorts =
-  generator(xbarEntry)(new AxiXbarPorts(name.value, ins, outs, arbitration))
+  generator(Xbar)(new AxiXbarPorts(name.value, ins, outs, arbitration))
 
 // ============ L2: a pass-through adapter with its own writeback master ============
 
-val l2Entry = entry[L2P]("L2")
+val L2 = new GeneratorEntry[L2P]
 
 /** The L2 adapter: addresses and slave capabilities pass through; downstream it appends its writeback master after the
   * upstream id space (an adapter transforming Down).
@@ -188,11 +184,11 @@ def l2Cache(
   file:        sourcecode.File,
   line:        sourcecode.Line
 ): L2CachePorts =
-  generator(l2Entry)(new L2CachePorts(capacityKiB))
+  generator(L2)(new L2CachePorts(capacityKiB))
 
 // ============ DRAM: the uncached memory slave ============
 
-val dramEntry = entry[DramP]("Dram")
+val Dram = new GeneratorEntry[DramP]
 
 /** A DRAM controller: one uncached address range on a 128-bit bus, named after the instance. */
 final class DramPorts(
@@ -237,11 +233,11 @@ def dramCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): DramPorts =
-  generator(dramEntry)(new DramPorts(name.value, ranks, base, size, idCapacityBits))
+  generator(Dram)(new DramPorts(name.value, ranks, base, size, idCapacityBits))
 
 // ============ WidthBridge: wide to narrow ============
 
-val bridgeEntry = entry[BridgeP]("WidthBridge")
+val WidthBridge = new GeneratorEntry[BridgeP]
 
 /** A width bridge: masters pass down unchanged; upstream it re-presents the narrow peripherals on the wide bus,
   * fragmenting bursts internally, so the supported transfer ceiling grows to its own limit.
@@ -282,11 +278,11 @@ def widthBridge(
   file:                sourcecode.File,
   line:                sourcecode.Line
 ): WidthBridgePorts =
-  generator(bridgeEntry)(new WidthBridgePorts(wideBeatBytes, maxUpstreamTransfer))
+  generator(WidthBridge)(new WidthBridgePorts(wideBeatBytes, maxUpstreamTransfer))
 
 // ============ Uart: a memory-mapped peripheral ============
 
-val uartEntry = entry[UartP]("Uart")
+val Uart = new GeneratorEntry[UartP]
 
 /** The UART: a boundary inward node serving one address range on a 32-bit bus. */
 final class UartPorts(
@@ -329,11 +325,11 @@ def uartCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): UartPorts =
-  generator(uartEntry)(new UartPorts(name.value, base, size, idCapacityBits))
+  generator(Uart)(new UartPorts(name.value, base, size, idCapacityBits))
 
 // ============ Gpio: a memory-mapped peripheral ============
 
-val gpioEntry = entry[GpioP]("Gpio")
+val Gpio = new GeneratorEntry[GpioP]
 
 /** The GPIO block: a boundary inward node serving one address range on a 32-bit bus. */
 final class GpioPorts(
@@ -376,16 +372,16 @@ def gpioCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): GpioPorts =
-  generator(gpioEntry)(new GpioPorts(name.value, base, size, idCapacityBits))
+  generator(Gpio)(new GpioPorts(name.value, base, size, idCapacityBits))
 
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives. */
 val axiBackends: Seq[GeneratorBackend] = Seq(
-  ZaoziBackend(coreEntry, CoreGen),
-  ZaoziBackend(dmaEntry, DmaGen),
-  ZaoziBackend(xbarEntry, XbarGen),
-  ZaoziBackend(l2Entry, L2Gen),
-  ZaoziBackend(dramEntry, DramGen),
-  ZaoziBackend(bridgeEntry, BridgeGen),
-  ZaoziBackend(uartEntry, UartGen),
-  ZaoziBackend(gpioEntry, GpioGen)
+  ZaoziBackend(Core, CoreGen),
+  ZaoziBackend(Dma, DmaGen),
+  ZaoziBackend(Xbar, XbarGen),
+  ZaoziBackend(L2, L2Gen),
+  ZaoziBackend(Dram, DramGen),
+  ZaoziBackend(WidthBridge, BridgeGen),
+  ZaoziBackend(Uart, UartGen),
+  ZaoziBackend(Gpio, GpioGen)
 )

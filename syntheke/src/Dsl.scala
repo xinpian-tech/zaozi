@@ -53,15 +53,18 @@ object Design:
       testbench = st.testbenches.headOption
     )
 
-/** Registry entry of one hardware generator: its unique name plus the FullParam serialization (doc
+/** Registry entry of one hardware generator: its identity across all phases plus the FullParam serialization (doc
   * @sec-generator-records).
-  *   The entry object is the generator's identity across all phases; the generator implementation lives beyond the
-  *   serialization boundary and is bound to its entry in the elaboration module.
+  *   The name derives from the binding val, like every other declaration; it is the module-name stem and the tooling id
+  *   of everything the generator enacts, so two distinct entries sharing a name are rejected by the structural check.
+  *   The generator implementation lives beyond the serialization boundary and is bound to its entry in the elaboration
+  *   module.
   */
 final class GeneratorEntry[FP](
-  val name:              String
-)(
-  using val fullParamRW: upickle.default.ReadWriter[FP])
+  using
+  val fullParamRW: upickle.default.ReadWriter[FP],
+  declaredName: sourcecode.Name):
+  val name: String = declaredName.value
 
 /** Instantiate a child structural module named by the binding val: its body composes child instances and `<--` binds
   * (doc @sec-module-kinds). Returns the body's dangling endpoints ([[Dangles]]).

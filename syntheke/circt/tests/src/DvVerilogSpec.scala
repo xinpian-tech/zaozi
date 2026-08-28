@@ -175,8 +175,9 @@ object DvVerilogSpec extends TestSuite:
 
   val outDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
 
-  def entry(name: String) =
-    new GeneratorEntry[StubFull](s"demo.dv.$name")
+  def entry(name: String): GeneratorEntry[StubFull] =
+    given sourcecode.Name = sourcecode.Name(name)
+    new GeneratorEntry[StubFull]
 
   val srcEntry  = entry("Src")
   val memEntry  = entry("Mem")
@@ -298,7 +299,7 @@ object DvVerilogSpec extends TestSuite:
       assert(design.firrtl.contains("define"))
       // Verilog exists for the root and both stub modules; probes stay out of the release netlist (bind layers).
       assert(design.verilog.contains("module Top"))
-      assert(design.verilog.contains("module demo_dv_Src_"))
+      assert(design.verilog.contains("module Src_"))
       // The stub's internal layer, unrelated to any routed probe, was carried by the linker into the design circuit.
       assert(design.firrtl.contains("layer stubinternal"))
     }
@@ -309,7 +310,7 @@ object DvVerilogSpec extends TestSuite:
 
       // The testbench is an ordinary generator instance at the root; its design edge settled like any edge and every
       // probe leaf is resolved into its matching data input. Nothing surfaces as a root port.
-      assert(design.firrtl.contains("demo_dv_Tb"))
+      assert(design.firrtl.contains("inst tb of Tb_"))
       assert(!design.firrtl.contains("output inst_cluster"))
       assert(!design.firrtl.contains("define inst_cluster"))
       assert(design.verilog.contains("module Top"))
