@@ -383,8 +383,11 @@ object Elaborator:
               .filter(_.getName.str == "firrtl.circuit")
               .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
             val moved      = circuitOps.filter(op => Set("firrtl.module", "firrtl.extmodule")(op.getName.str)).filter { op =>
-              val s2 = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-              if defined(s2) then false
+              val s2     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
+              // An extmodule with a dumped definition is zaozi's stub for a child it elaborated separately: leave the
+              // stub behind and link the real module on demand. Without a dump it is a genuine external module.
+              val isStub = op.getName.str == "firrtl.extmodule" && os.exists(mlirbcDir / s"$s2.mlirbc")
+              if defined(s2) || isStub then false
               else
                 op.removeFromParent()
                 summon[Circuit].block.appendOwnedOperation(op)

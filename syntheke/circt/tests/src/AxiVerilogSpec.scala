@@ -111,6 +111,13 @@ object AxiVerilogSpec extends TestSuite:
       coreModules.foreach(n => assert(design.verilog.contains(s"module $n")))
       // The dangle port punched through the mem boundary survives into Verilog on the wrapper.
       assert(design.firrtl.contains("inst_l2_node_in_in"))
+      // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
+      // to the dumped definition, transitively (the GPR too).
+      assert(design.firrtl.contains("inst core of DitDah32"))
+      assert(design.verilog.contains("module DitDah32("))
+      assert(design.verilog.contains("module DitDah32Gpr("))
+      // Every fabric module is real RTL now: the crossbars, the RAM, the bridge and the peripherals hold state.
+      assert(design.verilog.contains("always @(posedge"))
     }
 
     test("a backend interface that differs from the settled bundle is a binding-check error") {
