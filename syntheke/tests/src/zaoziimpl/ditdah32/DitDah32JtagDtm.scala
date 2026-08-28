@@ -8,8 +8,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
 @generator
-object DitDah32JtagDtm
-    extends Generator[DitDah32Parameter, DitDah32DebugLayers, JtagDtmIO, DitDah32DebugProbe]:
+object DitDah32JtagDtm extends Generator[DitDah32Parameter, DitDah32DebugLayers, JtagDtmIO, DitDah32DebugProbe]:
 
   override def moduleName(parameter: DitDah32Parameter): String = "DitDah32JtagDtm"
 
@@ -19,11 +18,11 @@ object DitDah32JtagDtm
     given ClockScope = ClockScope.posedge(io.tck)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    val state      = RegInit(TapState.TEST_LOGIC_RESET.U(4))
-    val ir         = RegInit(JtagInstruction.IDCODE.U(5))
-    val irShift    = RegInit(1.U(5))
-    val drShift    = RegInit(0.U(41))
-    val bypass     = RegInit(false.B)
+    val state   = RegInit(TapState.TEST_LOGIC_RESET.U(4))
+    val ir      = RegInit(JtagInstruction.IDCODE.U(5))
+    val irShift = RegInit(1.U(5))
+    val drShift = RegInit(0.U(41))
+    val bypass  = RegInit(false.B)
 
     val requestToggle = RegInit(false.B)
     val requestAddr   = RegInit(0.U(7))
@@ -111,14 +110,14 @@ object DitDah32JtagDtm
     val dtmcs = Wire(UInt(32))
     dtmcs := (
       0.B(11) ##
-      0.B(3) ##
-      0.B(1) ##
-      0.B(1) ##
-      0.B(1) ##
-      7.B(3) ##
-      stickyStatus.asBits ##
-      7.B(6) ##
-      1.B(4)
+        0.B(3) ##
+        0.B(1) ##
+        0.B(1) ##
+        0.B(1) ##
+        7.B(3) ##
+        stickyStatus.asBits ##
+        7.B(6) ##
+        1.B(4)
     ).asUInt
 
     responseToggleMeta := io.responseToggle
@@ -126,9 +125,9 @@ object DitDah32JtagDtm
     when(responseToggleSync =/= responseToggleSeen) {
       responseToggleSeen := responseToggleSync
       when(outstanding) {
-        outstanding := false.B
-        responseAddrReg := io.responseAddr
-        responseDataReg := io.responseData
+        outstanding       := false.B
+        responseAddrReg   := io.responseAddr
+        responseDataReg   := io.responseData
         responseStatusReg := io.responseOp
         when(io.responseOp =/= DmiOp.SUCCESS.U(2)) {
           stickyStatus := io.responseOp
@@ -139,15 +138,15 @@ object DitDah32JtagDtm
     state := nextState
 
     when(state === TapState.TEST_LOGIC_RESET.U(4)) {
-      ir := JtagInstruction.IDCODE.U(5)
-      requestAddr := 0.U(7)
-      requestData := 0.U(32)
-      requestOp := DmiOp.NOP.U(2)
-      outstanding := false.B
-      responseAddrReg := 0.U(7)
-      responseDataReg := 0.U(32)
+      ir                := JtagInstruction.IDCODE.U(5)
+      requestAddr       := 0.U(7)
+      requestData       := 0.U(32)
+      requestOp         := DmiOp.NOP.U(2)
+      outstanding       := false.B
+      responseAddrReg   := 0.U(7)
+      responseDataReg   := 0.U(32)
       responseStatusReg := DmiOp.SUCCESS.U(2)
-      stickyStatus := DmiOp.SUCCESS.U(2)
+      stickyStatus      := DmiOp.SUCCESS.U(2)
     }
 
     when(state === TapState.CAPTURE_IR.U(4)) {
@@ -171,8 +170,8 @@ object DitDah32JtagDtm
       when(ir === JtagInstruction.DMI.U(5)) {
         drShift := (
           responseAddrReg.asBits ##
-          responseDataReg.asBits ##
-          dmiCaptureStatus.asBits
+            responseDataReg.asBits ##
+            dmiCaptureStatus.asBits
         ).asUInt
         when((stickyStatus === DmiOp.SUCCESS.U(2)) & outstanding) {
           stickyStatus := DmiOp.BUSY.U(2)
@@ -185,7 +184,7 @@ object DitDah32JtagDtm
       }.otherwise {
         when(
           (ir === JtagInstruction.IDCODE.U(5)) |
-          (ir === JtagInstruction.DTMCS.U(5))
+            (ir === JtagInstruction.DTMCS.U(5))
         ) {
           drShift := (0.B(9) ## io.tdi.asBits ## drShift.asBits.bits(31, 1)).asUInt
         }.otherwise {
@@ -196,17 +195,17 @@ object DitDah32JtagDtm
     when(state === TapState.UPDATE_DR.U(4)) {
       when(ir === JtagInstruction.DTMCS.U(5)) {
         when(drShift.asBits.bit(16)) {
-          stickyStatus := DmiOp.SUCCESS.U(2)
+          stickyStatus      := DmiOp.SUCCESS.U(2)
           responseStatusReg := DmiOp.SUCCESS.U(2)
         }
         when(drShift.asBits.bit(17)) {
-          requestAddr := 0.U(7)
-          requestData := 0.U(32)
-          requestOp := DmiOp.NOP.U(2)
-          outstanding := false.B
-          stickyStatus := DmiOp.SUCCESS.U(2)
-          responseAddrReg := 0.U(7)
-          responseDataReg := 0.U(32)
+          requestAddr       := 0.U(7)
+          requestData       := 0.U(32)
+          requestOp         := DmiOp.NOP.U(2)
+          outstanding       := false.B
+          stickyStatus      := DmiOp.SUCCESS.U(2)
+          responseAddrReg   := 0.U(7)
+          responseDataReg   := 0.U(32)
           responseStatusReg := DmiOp.SUCCESS.U(2)
         }
       }
@@ -217,11 +216,11 @@ object DitDah32JtagDtm
             stickyStatus := DmiOp.BUSY.U(2)
           }.otherwise {
             when((updateOp === DmiOp.READ.U(2)) | (updateOp === DmiOp.WRITE.U(2))) {
-              requestAddr := drShift.asBits.bits(40, 34).asUInt
-              requestData := drShift.asBits.bits(33, 2).asUInt
-              requestOp := updateOp
+              requestAddr   := drShift.asBits.bits(40, 34).asUInt
+              requestData   := drShift.asBits.bits(33, 2).asUInt
+              requestOp     := updateOp
               requestToggle := !requestToggle
-              outstanding := true.B
+              outstanding   := true.B
             }.otherwise {
               stickyStatus := DmiOp.FAILED.U(2)
             }
@@ -230,31 +229,31 @@ object DitDah32JtagDtm
       }
       when(
         (ir =/= JtagInstruction.IDCODE.U(5)) &
-        (ir =/= JtagInstruction.DTMCS.U(5)) &
-        (ir =/= JtagInstruction.DMI.U(5))
+          (ir =/= JtagInstruction.DTMCS.U(5)) &
+          (ir =/= JtagInstruction.DMI.U(5))
       ) {
         bypass := drShift.asBits.bit(0)
       }
     }
 
     when(!io.trstN) {
-      state := TapState.TEST_LOGIC_RESET.U(4)
-      ir := JtagInstruction.IDCODE.U(5)
-      irShift := 1.U(5)
-      drShift := 0.U(41)
-      bypass := false.B
-      requestAddr := 0.U(7)
-      requestData := 0.U(32)
-      requestOp := DmiOp.NOP.U(2)
-      outstanding := false.B
-      responseAddrReg := 0.U(7)
-      responseDataReg := 0.U(32)
-      stickyStatus := DmiOp.SUCCESS.U(2)
+      state             := TapState.TEST_LOGIC_RESET.U(4)
+      ir                := JtagInstruction.IDCODE.U(5)
+      irShift           := 1.U(5)
+      drShift           := 0.U(41)
+      bypass            := false.B
+      requestAddr       := 0.U(7)
+      requestData       := 0.U(32)
+      requestOp         := DmiOp.NOP.U(2)
+      outstanding       := false.B
+      responseAddrReg   := 0.U(7)
+      responseDataReg   := 0.U(32)
+      stickyStatus      := DmiOp.SUCCESS.U(2)
       responseStatusReg := DmiOp.SUCCESS.U(2)
     }
 
-    io.tdo := tdo
+    io.tdo           := tdo
     io.requestToggle := requestToggle
-    io.requestAddr := requestAddr
-    io.requestData := requestData
-    io.requestOp := requestOp
+    io.requestAddr   := requestAddr
+    io.requestData   := requestData
+    io.requestOp     := requestOp

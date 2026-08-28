@@ -14,15 +14,15 @@ object CoreState:
   val IRQ:      Int = 7
 
 object TrapCause:
-  val NONE:          Int = 0
-  val ILLEGAL:       Int = 1
-  val EBREAK:        Int = 2
-  val RV32E_REGISTER:Int = 3
-  val ECALL:         Int = 4
-  val LOAD_MISALIGN: Int = 5
-  val STORE_MISALIGN:Int = 6
-  val AXI_ERROR:     Int = 7
-  val INTERRUPT:     Int = 8
+  val NONE:           Int = 0
+  val ILLEGAL:        Int = 1
+  val EBREAK:         Int = 2
+  val RV32E_REGISTER: Int = 3
+  val ECALL:          Int = 4
+  val LOAD_MISALIGN:  Int = 5
+  val STORE_MISALIGN: Int = 6
+  val AXI_ERROR:      Int = 7
+  val INTERRUPT:      Int = 8
 
 object CsrAddr:
   val MSTATUS:   Int = 0x300
@@ -40,13 +40,13 @@ object CsrAddr:
   val MHARTID:   Int = 0xf14
 
 object CsrBits:
-  val MSTATUS_MIE:  Int = 3
-  val MSTATUS_MPIE: Int = 7
-  val MSTATUS_MPP_LOW: Int = 11
+  val MSTATUS_MIE:      Int = 3
+  val MSTATUS_MPIE:     Int = 7
+  val MSTATUS_MPP_LOW:  Int = 11
   val MSTATUS_MPP_HIGH: Int = 12
-  val IRQ_SOFTWARE: Int = 3
-  val IRQ_TIMER:    Int = 7
-  val IRQ_EXTERNAL: Int = 11
+  val IRQ_SOFTWARE:     Int = 3
+  val IRQ_TIMER:        Int = 7
+  val IRQ_EXTERNAL:     Int = 11
 
 object StandardCause:
   val INSTRUCTION_MISALIGNED: Int = 0

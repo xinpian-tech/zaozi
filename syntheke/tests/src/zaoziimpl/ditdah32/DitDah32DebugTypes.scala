@@ -69,10 +69,10 @@ object AbstractCommandError:
   val OTHER:          Int = 7
 
 object DebugCause:
-  val EBREAK:        Int = 1
-  val HALT_REQUEST:  Int = 3
-  val STEP:          Int = 4
-  val RESET_HALT:    Int = 5
+  val EBREAK:       Int = 1
+  val HALT_REQUEST: Int = 3
+  val STEP:         Int = 4
+  val RESET_HALT:   Int = 5
 
 object DebugCsrAddr:
   val DCSR: Int = 0x7b0
@@ -110,9 +110,9 @@ class DebugModuleIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val responseData   = Aligned(UInt(32))
   val responseOp     = Aligned(UInt(2))
 
-  val haltReq   = Aligned(Bool())
-  val resumeReq = Aligned(Bool())
-  val resetReq  = Aligned(Bool())
+  val haltReq        = Aligned(Bool())
+  val resumeReq      = Aligned(Bool())
+  val resetReq       = Aligned(Bool())
   val haltOnResetReq = Aligned(Bool())
 
   val hartHalted    = Flipped(Bool())

@@ -10,8 +10,7 @@ import me.jiuyang.zaozi.valuetpe.*
 class DitDah32GprLayers(parameter: DitDah32Parameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
-class DitDah32GprProbe(parameter: DitDah32Parameter)
-    extends DVBundle[DitDah32Parameter, DitDah32GprLayers](parameter)
+class DitDah32GprProbe(parameter: DitDah32Parameter) extends DVBundle[DitDah32Parameter, DitDah32GprLayers](parameter)
 
 class DitDah32GprIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
@@ -30,8 +29,7 @@ class DitDah32GprIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val clearAll = Flipped(Bool())
 
 @generator
-object DitDah32Gpr
-    extends Generator[DitDah32Parameter, DitDah32GprLayers, DitDah32GprIO, DitDah32GprProbe]:
+object DitDah32Gpr extends Generator[DitDah32Parameter, DitDah32GprLayers, DitDah32GprIO, DitDah32GprProbe]:
 
   override def moduleName(parameter: DitDah32Parameter): String = "DitDah32Gpr"
 
