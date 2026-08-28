@@ -33,7 +33,7 @@ object AxiVerilogSpec extends TestSuite:
       val core1 = core(idBits = 3, maxFlight = 8)
       val dma   = dmaCtrl(idBits = 1, maxFlight = 1)
 
-      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "roundRobin")
+      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
       val mem = wrapper {
         val l2   = l2Cache(capacityKiB = 512)
@@ -45,7 +45,7 @@ object AxiVerilogSpec extends TestSuite:
 
       val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
 
-      val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
+      val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), Arbitration.FixedPriority)
 
       val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8)
       val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8)

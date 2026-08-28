@@ -13,6 +13,7 @@ import me.jiuyang.syntheke.tests.axi.{
   AxiSlaveParams,
   AxiSlavePort,
   IdRange,
+  RegionType,
   TransferSizes
 }
 
@@ -98,7 +99,7 @@ final class AxiXbarNodes(
   name:        String,
   ins:         Vector[String],
   outs:        Vector[String],
-  arbitration: String
+  arbitration: Arbitration
 )(
   using GeneratorScope[XbarP])
     extends Nodes:
@@ -143,7 +144,7 @@ final class AxiXbarNodes(
 def axiXbar(
   ins:         Vector[String],
   outs:        Vector[String],
-  arbitration: String
+  arbitration: Arbitration
 )(
   using
   ws:          WrapperScope,
@@ -208,7 +209,7 @@ final class DramNodes(
           AxiSlaveParams(
             name,
             Vector(AddressRange(base, size)),
-            "UNCACHED",
+            RegionType.Uncached,
             true,
             TransferSizes(1, 64),
             TransferSizes(1, 64)
@@ -301,7 +302,7 @@ final class UartNodes(
           AxiSlaveParams(
             name,
             Vector(AddressRange(base, size)),
-            "PUT_EFFECTS",
+            RegionType.PutEffects,
             false,
             TransferSizes(1, 4),
             TransferSizes(1, 4)
@@ -348,7 +349,7 @@ final class GpioNodes(
           AxiSlaveParams(
             name,
             Vector(AddressRange(base, size)),
-            "PUT_EFFECTS",
+            RegionType.PutEffects,
             false,
             TransferSizes(1, 4),
             TransferSizes(1, 4)

@@ -27,7 +27,7 @@ object AxiSocSpec extends TestSuite:
       val core1 = core(idBits = 3, maxFlight = 8)
       val dma   = dmaCtrl(idBits = 1, maxFlight = 1)
 
-      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), "roundRobin")
+      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
       // The memory branch lives one level down: sysXbar -> mem/l2 crosses the `mem` boundary.
       val mem = wrapper {
@@ -42,7 +42,7 @@ object AxiSocSpec extends TestSuite:
 
       val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
 
-      val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), "fixedPriority")
+      val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), Arbitration.FixedPriority)
 
       val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8)
       val gpio = gpioCtrl(gpioBase, 0x1000L, idCapacityBits = 8)
@@ -94,7 +94,7 @@ object AxiSocSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildSoc())
       val xbar     = resolved.generatorModule(root / "sysXbar").get
       val decoded  = upickle.default.read[XbarFull](xbar.encodedFullParam)
-      assert(decoded.arbitration == "roundRobin")
+      assert(decoded.arbitration == Arbitration.RoundRobin)
       assert(
         decoded.inputs == Vector(
           XbarInput("in0", IdRange(0, 4)),

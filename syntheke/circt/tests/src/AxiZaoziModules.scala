@@ -27,6 +27,7 @@ private def jsonTokens[T: ReadWriter](name: String): mainargs.TokensReader.Simpl
       catch case e: Exception => Left(e.getMessage)
 given mainargs.TokensReader.Simple[AxiShape] = jsonTokens("axi-shape")
 given mainargs.TokensReader.Simple[Vector[(String, AxiShape)]] = jsonTokens("axi-ports")
+given mainargs.TokensReader.Simple[Arbitration]                = jsonTokens("arbitration")
 
 // ============ AXI bundle shapes mirroring Axi4.interfaceOf exactly ============
 
@@ -92,20 +93,23 @@ object DmaGen                                                              exten
 
 // ============ Xbar: the n×m crossbar ============
 
+enum Arbitration derives CanEqual, ReadWriter:
+  case RoundRobin, FixedPriority
+
 case class XbarP(
   name:        String,
-  arbitration: String,
+  arbitration: Arbitration,
   inputs:      Vector[(String, AxiShape)],
   outputs:     Vector[(String, AxiShape)])
     extends Parameter derives ReadWriter
 class XbarPLayers(p: XbarP) extends LayerInterface(p):
   def layers = Seq.empty
-class XbarPProbe(p: XbarP)  extends DVRecord[XbarP, XbarPLayers](p)
-class XbarPIO(p: XbarP)     extends HWRecord(p):
+class XbarPProbe(p: XbarP) extends DVRecord[XbarP, XbarPLayers](p)
+class XbarPIO(p: XbarP) extends HWRecord(p):
   val ins  = p.inputs.map((n, s) => Flipped(n, new AxiPortRecord(s)))
   val outs = p.outputs.map((n, s) => Aligned(n, new AxiPortRecord(s)))
 @zaoziGenerator
-object XbarGen              extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
+object XbarGen          extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
   def architecture(p: XbarP) = summon[Interface[XbarPIO]].dontCare()
 
 // ============ L2: a pass-through adapter with its own writeback master ============

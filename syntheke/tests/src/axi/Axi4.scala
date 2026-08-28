@@ -52,10 +52,14 @@ final case class AxiMasterPort(masters: Vector[AxiMasterParams]) derives ReadWri
   def idOverlap: Option[(AxiMasterParams, AxiMasterParams)] =
     masters.combinations(2).collectFirst { case Seq(x, y) if x.id.overlaps(y.id) => (x, y) }
 
+/** Memory region semantics, rocket-chip's RegionType ladder. */
+enum RegionType derives CanEqual, ReadWriter:
+  case Cached, Tracked, Uncached, Idempotent, Volatile, PutEffects, GetEffects
+
 final case class AxiSlaveParams(
   name:          String,
   address:       Vector[AddressRange],
-  regionType:    String,
+  regionType:    RegionType,
   executable:    Boolean,
   supportsRead:  TransferSizes,
   supportsWrite: TransferSizes)
