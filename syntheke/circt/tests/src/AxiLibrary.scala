@@ -66,34 +66,43 @@ def core(
 
 // ============ Dma: a bus-mastering DMA engine ============
 
-val Dma = new GeneratorEntry[DmaP]
+val Dma = new GeneratorEntry[DmaDeviceP]
 
-/** The DMA engine: an AXI master with its own small id space, named after the instance. */
+/** The DMA engine ([[DmaDeviceGen]], the real device): an AXI master with its own small id space, walking a write
+  * window from `targetBase`.
+  */
 final class DmaNodes(
-  name:      String,
-  idBits:    Int,
-  maxFlight: Int
+  name:       String,
+  idBits:     Int,
+  maxFlight:  Int,
+  targetBase: Long,
+  windowLog2: Int
 )(
-  using GeneratorScope[DmaP])
+  using GeneratorScope[DmaDeviceP])
     extends Nodes:
   val clk = inward(ClockDomain).uFn(_ => Right(()))
-  parameters(view => Right(DmaP(name, idBits, maxFlight, shapeOf(view, mem))))
+  parameters { view =>
+    val s = shapeOf(view, mem)
+    Right(DmaDeviceP(targetBase, windowLog2, s.addrBits, s.dataBits, s.idBits))
+  }
   val mem =
     outward(Axi4).dFn(_ =>
       Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight = Some(maxFlight)))))
     )
 
 def dmaCtrl(
-  idBits:    Int,
-  maxFlight: Int
+  idBits:     Int,
+  maxFlight:  Int,
+  targetBase: Long,
+  windowLog2: Int
 )(
   using
-  ws:        WrapperScope,
-  name:      sourcecode.Name,
-  file:      sourcecode.File,
-  line:      sourcecode.Line
+  ws:         WrapperScope,
+  name:       sourcecode.Name,
+  file:       sourcecode.File,
+  line:       sourcecode.Line
 ): DmaNodes =
-  generator(Dma)(new DmaNodes(name.value, idBits, maxFlight))
+  generator(Dma)(new DmaNodes(name.value, idBits, maxFlight, targetBase, windowLog2))
 
 // ============ Xbar: the n×m crossbar ============
 
@@ -164,15 +173,15 @@ def axiXbar(
 
 // ============ L2: a pass-through adapter with its own writeback master ============
 
-val L2 = new GeneratorEntry[L2P]
+val L2 = new GeneratorEntry[L2DeviceP]
 
-/** The L2 adapter: addresses and slave capabilities pass through; downstream it appends its writeback master after the
-  * upstream id space (an adapter transforming Down).
+/** The L2 slot ([[L2DeviceGen]], the real device — a register slice today): addresses and slave capabilities pass
+  * through; downstream it reserves its writeback id range after the upstream id space (an adapter transforming Down).
   */
 final class L2CacheNodes(
   capacityKiB: Int
 )(
-  using GeneratorScope[L2P])
+  using GeneratorScope[L2DeviceP])
     extends Nodes:
   val clk            = inward(ClockDomain).uFn(_ => Right(()))
   val in             = inward(Axi4)
@@ -183,7 +192,7 @@ final class L2CacheNodes(
     Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), maxFlight = Some(2))))
   }
   in.uFn(ctx => Right(ctx(u)))
-  parameters(view => Right(L2P(capacityKiB, shapeOf(view, in), shapeOf(view, out))))
+  parameters(view => Right(L2DeviceP(capacityKiB, shapeOf(view, in), shapeOf(view, out))))
 
 def l2Cache(
   capacityKiB: Int
@@ -498,9 +507,9 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(ClockSource, ClockSourceGen),
   ZaoziBackend(SerialPads, SerialPadsGen),
   ZaoziBackend(Core, CoreGen),
-  ZaoziBackend(Dma, DmaGen),
+  ZaoziBackend(Dma, DmaDeviceGen),
   ZaoziBackend(Xbar, XbarGen),
-  ZaoziBackend(L2, L2Gen),
+  ZaoziBackend(L2, L2DeviceGen),
   ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeGen),
   ZaoziBackend(Uart, UartDeviceGen),

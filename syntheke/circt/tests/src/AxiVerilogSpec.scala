@@ -39,7 +39,7 @@ object AxiVerilogSpec extends TestSuite:
 
       val core0 = core(idBits = 2, maxFlight = 4)
       val core1 = core(idBits = 3, maxFlight = 8)
-      val dma   = dmaCtrl(idBits = 1, maxFlight = 1)
+      val dma   = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = 0x80000000L, windowLog2 = 10)
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
