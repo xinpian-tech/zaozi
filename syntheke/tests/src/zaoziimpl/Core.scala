@@ -14,6 +14,7 @@ class CorePLayers(p: CoreP)                                                 exte
   def layers = Seq.empty
 class CorePProbe(p: CoreP)                                                  extends DVRecord[CoreP, CorePLayers](p)
 class CorePIO(p: CoreP)                                                     extends HWRecord(p):
+  val clk = Flipped("clk", new ClockRecord)
   val mem = Aligned("mem", new AxiPortRecord(p.port))
 @zaoziGenerator
 object CoreGen                                                              extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:

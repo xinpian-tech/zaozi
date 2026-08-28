@@ -4,91 +4,18 @@ package me.jiuyang.syntheke.circt.tests
 
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
-import me.jiuyang.syntheke.tests.axi.{
-  AddressSet,
-  Axi4,
-  AxiMasterParams,
-  AxiMasterPort,
-  AxiSlaveParams,
-  AxiSlavePort,
-  IdRange,
-  RegionType,
-  TransferSizes
-}
 import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
-import me.jiuyang.zaozi.{DVBundle, Generator, HWBundle, LayerInterface, Parameter}
-import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
-import me.jiuyang.zaozi.reftpe.Interface
-import upickle.default.ReadWriter
+import me.jiuyang.syntheke.tests.axi.{AddressSet, Axi4, AxiSlaveParams, AxiSlavePort, RegionType, TransferSizes}
 import utest.*
 
-/** The real UART device ([[UartDeviceGen]], `UartDevice.scala`) on the negotiation graph, end to end.
-  *
-  * Two small protocols carry what a sequential device needs beyond its bus:
-  *   - [[ClockDomain]]: the source publishes its frequency downward; the interface is one clock plus one reset. The
-  *     UART computes its baud divisor from the settled frequency in `parameters` — a capability check rejects a clock
-  *     too slow for the requested baud rate.
-  *   - [[Serial]]: the device publishes its baud rate downward to whoever terminates the pins; the interface is `tx`
-  *     out, `rx` in.
+/** The real UART device ([[UartDeviceGen]], `zaoziimpl/UartDevice.scala`) on the negotiation graph, end to end: a clock
+  * source, an AXI host, the UART and the serial pads, negotiated over [[ClockDomain]], [[Axi4]] and [[Serial]]. The
+  * UART computes its baud divisor from the settled clock frequency in `parameters` and rejects a clock too slow for the
+  * requested baud rate.
   */
-
-/** One clock and reset; `Down` is the source's frequency in Hz. */
-object ClockDomain extends Protocol:
-  type Down = Int
-  type Up = Unit
-  type Edge = Int
-  def negotiate(down: Int, up: Unit): Either[Violation, Int]           = Right(down)
-  def interfaceOf(edge: Int):         ProtocolBundle                   =
-    ProtocolBundle(
-      ProtocolInterface.Field("clock", ProtocolInterface.Clock),
-      ProtocolInterface.Field("reset", ProtocolInterface.Reset)
-    )
-  val downRW:                         upickle.default.ReadWriter[Int]  = summon
-  val upRW:                           upickle.default.ReadWriter[Unit] = summon
-  val edgeRW:                         upickle.default.ReadWriter[Int]  = summon
-
-/** A serial pin pair; `Down` is the transmitter's baud rate. */
-object Serial extends Protocol:
-  type Down = Int
-  type Up = Unit
-  type Edge = Int
-  def negotiate(down: Int, up: Unit): Either[Violation, Int]           = Right(down)
-  def interfaceOf(edge: Int):         ProtocolBundle                   =
-    ProtocolBundle(
-      ProtocolInterface.Field("tx", ProtocolInterface.Bool),
-      ProtocolInterface.Field("rx", ProtocolInterface.Flipped(ProtocolInterface.Bool))
-    )
-  val downRW:                         upickle.default.ReadWriter[Int]  = summon
-  val upRW:                           upickle.default.ReadWriter[Unit] = summon
-  val edgeRW:                         upickle.default.ReadWriter[Int]  = summon
-
-// ============ test-side stubs: a clock source and the pad ring (placeholder bodies) ============
-
-case class ClockSourceP(freqHz: Int)      extends Parameter derives ReadWriter
-class ClockSourcePLayers(p: ClockSourceP) extends LayerInterface(p):
-  def layers = Seq.empty
-class ClockSourcePProbe(p: ClockSourceP)  extends DVBundle[ClockSourceP, ClockSourcePLayers](p)
-class ClockSourcePIO(p: ClockSourceP)     extends HWBundle(p):
-  val clk = Aligned(new UartClockBundle)
-@zaoziGenerator
-object ClockSourceGen                     extends Generator[ClockSourceP, ClockSourcePLayers, ClockSourcePIO, ClockSourcePProbe]:
-  def architecture(p: ClockSourceP) = summon[Interface[ClockSourcePIO]].dontCare()
-
-case class SerialPadsP(baud: Int)       extends Parameter derives ReadWriter
-class SerialPadsPLayers(p: SerialPadsP) extends LayerInterface(p):
-  def layers = Seq.empty
-class SerialPadsPProbe(p: SerialPadsP)  extends DVBundle[SerialPadsP, SerialPadsPLayers](p)
-class SerialPadsPIO(p: SerialPadsP)     extends HWBundle(p):
-  val in = Flipped(new UartSerialBundle)
-@zaoziGenerator
-object SerialPadsGen                    extends Generator[SerialPadsP, SerialPadsPLayers, SerialPadsPIO, SerialPadsPProbe]:
-  def architecture(p: SerialPadsP) = summon[Interface[SerialPadsPIO]].dontCare()
-
 object UartSpec extends TestSuite:
 
-  val UartDevice  = new GeneratorEntry[UartDeviceP]
-  val ClockSource = new GeneratorEntry[ClockSourceP]
-  val SerialPads  = new GeneratorEntry[SerialPadsP]
+  val UartDevice = new GeneratorEntry[UartDeviceP]
 
   val backends: Seq[GeneratorBackend] = Seq(
     ZaoziBackend(UartDevice, UartDeviceGen),
@@ -99,17 +26,9 @@ object UartSpec extends TestSuite:
 
   def buildDesign(freqHz: Int = 1843200, baud: Int = 115200): DesignSpec =
     Design {
-      val clkSrc = generator(ClockSource) {
-        parameters(_ => Right(ClockSourceP(freqHz)))
-        val clk = outward(ClockDomain).dFn(_ => Right(freqHz))
-        clk
-      }
+      val clkSrc = clockSource(freqHz, Vector("uart", "host"))
 
-      val host = generator(Core) {
-        val mem = outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams("host", IdRange(0, 4))))))
-        parameters(view => Right(CoreP("host", 2, 4, shapeOf(view, mem))))
-        mem
-      }
+      val host = core(idBits = 2, maxFlight = 4)
 
       val uart                          = generator(UartDevice) {
         val clk    = inward(ClockDomain).uFn(_ => Right(()))
@@ -144,15 +63,12 @@ object UartSpec extends TestSuite:
       }
       val (uartClk, uartIn, uartSerial) = uart
 
-      val pads = generator(SerialPads) {
-        val in = inward(Serial).uFn(_ => Right(()))
-        parameters(view => Right(SerialPadsP(view.edgeOf(in))))
-        in
-      }
+      val pads = serialPads()
 
-      uartClk <-- clkSrc
-      uartIn <-- host
-      pads <-- uartSerial
+      uartClk <-- clkSrc.tap("uart")
+      host.clk <-- clkSrc.tap("host")
+      uartIn <-- host.mem
+      pads.in <-- uartSerial
     }
 
   val tests = Tests {

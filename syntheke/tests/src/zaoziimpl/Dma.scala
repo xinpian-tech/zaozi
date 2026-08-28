@@ -14,6 +14,7 @@ class DmaPLayers(p: DmaP)                                                  exten
   def layers = Seq.empty
 class DmaPProbe(p: DmaP)                                                   extends DVRecord[DmaP, DmaPLayers](p)
 class DmaPIO(p: DmaP)                                                      extends HWRecord(p):
+  val clk = Flipped("clk", new ClockRecord)
   val mem = Aligned("mem", new AxiPortRecord(p.port))
 @zaoziGenerator
 object DmaGen                                                              extends Generator[DmaP, DmaPLayers, DmaPIO, DmaPProbe]:

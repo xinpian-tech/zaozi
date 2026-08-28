@@ -14,7 +14,8 @@ class DramPLayers(p: DramP)                  extends LayerInterface(p):
   def layers = Seq.empty
 class DramPProbe(p: DramP)                   extends DVRecord[DramP, DramPLayers](p)
 class DramPIO(p: DramP)                      extends HWRecord(p):
-  val in = Flipped("in", new AxiPortRecord(p.port))
+  val clk = Flipped("clk", new ClockRecord)
+  val in  = Flipped("in", new AxiPortRecord(p.port))
 @zaoziGenerator
 object DramGen                               extends Generator[DramP, DramPLayers, DramPIO, DramPProbe]:
   def architecture(p: DramP) = summon[Interface[DramPIO]].dontCare()

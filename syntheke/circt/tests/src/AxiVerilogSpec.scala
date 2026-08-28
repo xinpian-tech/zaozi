@@ -20,36 +20,45 @@ import utest.*
   * bundle, for the binding-checkpoint test.
   */
 class DramPWideIO(p: DramP) extends HWRecord(p):
-  val in = Flipped("in", new AxiPortRecord(p.port.copy(dataBits = p.port.dataBits * 2)))
+  val clk = Flipped("clk", new ClockRecord)
+  val in  = Flipped("in", new AxiPortRecord(p.port.copy(dataBits = p.port.dataBits * 2)))
 @zaoziGenerator
 object DramGenWide          extends Generator[DramP, DramPLayers, DramPWideIO, DramPProbe]:
   def architecture(p: DramP) = summon[Interface[DramPWideIO]].dontCare()
 
 object AxiVerilogSpec extends TestSuite:
 
-  /** Same topology as AxiSocSpec, with FullParam = the zaozi parameter of each IP. */
+  /** Same topology as AxiSocSpec plus the clock tree and serial pins, with FullParam = the zaozi parameter of each IP.
+    */
   def buildSoc(): DesignSpec =
     Design {
+      val clkSrc = clockSource(
+        100000000,
+        Vector("core0", "core1", "dma", "sysXbar", "l2", "dram", "bridge", "periphXbar", "uart", "gpio")
+      )
+
       val core0 = core(idBits = 2, maxFlight = 4)
       val core1 = core(idBits = 3, maxFlight = 8)
       val dma   = dmaCtrl(idBits = 1, maxFlight = 1)
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
-      val mem = wrapper {
+      val mem                     = wrapper {
         val l2   = l2Cache(capacityKiB = 512)
         val dram = dramCtrl(ranks = 2, base = 0x80000000L, size = 0x80000000L, idCapacityBits = 6)
         dram.in <-- l2.out
-        l2.in
+        (l2.in, l2.clk, dram.clk)
       }
-      mem <-- sysXbar.output("mem")
+      val (memIn, l2Clk, dramClk) = mem
+      memIn <-- sysXbar.output("mem")
 
       val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), Arbitration.FixedPriority)
 
-      val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8)
+      val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
       val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8)
+      val pads = serialPads()
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
@@ -58,6 +67,18 @@ object AxiVerilogSpec extends TestSuite:
       periphXbar.input("in") <-- bridge.out
       uart.in <-- periphXbar.output("uart")
       gpio.in <-- periphXbar.output("gpio")
+      pads.in <-- uart.serial
+
+      core0.clk <-- clkSrc.tap("core0")
+      core1.clk <-- clkSrc.tap("core1")
+      dma.clk <-- clkSrc.tap("dma")
+      sysXbar.clk <-- clkSrc.tap("sysXbar")
+      l2Clk <-- clkSrc.tap("l2")
+      dramClk <-- clkSrc.tap("dram")
+      bridge.clk <-- clkSrc.tap("bridge")
+      periphXbar.clk <-- clkSrc.tap("periphXbar")
+      uart.clk <-- clkSrc.tap("uart")
+      gpio.clk <-- clkSrc.tap("gpio")
     }
 
   val tests = Tests {

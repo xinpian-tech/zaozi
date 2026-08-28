@@ -14,7 +14,9 @@ class UartPLayers(p: UartP)                                            extends L
   def layers = Seq.empty
 class UartPProbe(p: UartP)                                             extends DVRecord[UartP, UartPLayers](p)
 class UartPIO(p: UartP)                                                extends HWRecord(p):
-  val in = Flipped("in", new AxiPortRecord(p.port))
+  val clk    = Flipped("clk", new ClockRecord)
+  val in     = Flipped("in", new AxiPortRecord(p.port))
+  val serial = Aligned("serial", new SerialRecord)
 @zaoziGenerator
 object UartGen                                                         extends Generator[UartP, UartPLayers, UartPIO, UartPProbe]:
   def architecture(p: UartP) = summon[Interface[UartPIO]].dontCare()

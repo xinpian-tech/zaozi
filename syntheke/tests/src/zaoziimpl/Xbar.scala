@@ -24,6 +24,7 @@ class XbarPLayers(p: XbarP) extends LayerInterface(p):
   def layers = Seq.empty
 class XbarPProbe(p: XbarP) extends DVRecord[XbarP, XbarPLayers](p)
 class XbarPIO(p: XbarP) extends HWRecord(p):
+  val clk  = Flipped("clk", new ClockRecord)
   val ins  = p.inputs.map((n, s) => Flipped(n, new AxiPortRecord(s)))
   val outs = p.outputs.map((n, s) => Aligned(n, new AxiPortRecord(s)))
 @zaoziGenerator

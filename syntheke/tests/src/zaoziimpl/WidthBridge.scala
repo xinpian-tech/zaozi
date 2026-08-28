@@ -14,6 +14,7 @@ class BridgePLayers(p: BridgeP)                      extends LayerInterface(p):
   def layers = Seq.empty
 class BridgePProbe(p: BridgeP)                       extends DVRecord[BridgeP, BridgePLayers](p)
 class BridgePIO(p: BridgeP)                          extends HWRecord(p):
+  val clk = Flipped("clk", new ClockRecord)
   val in  = Flipped("in", new AxiPortRecord(p.wide))
   val out = Aligned("out", new AxiPortRecord(p.narrow))
 @zaoziGenerator

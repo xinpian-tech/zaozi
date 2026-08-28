@@ -45,6 +45,7 @@ final class CoreNodes(
 )(
   using GeneratorScope[CoreP])
     extends Nodes:
+  val clk = inward(ClockDomain).uFn(_ => Right(()))
   parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, mem))))
   val mem =
     outward(Axi4).dFn(_ =>
@@ -75,6 +76,7 @@ final class DmaNodes(
 )(
   using GeneratorScope[DmaP])
     extends Nodes:
+  val clk = inward(ClockDomain).uFn(_ => Right(()))
   parameters(view => Right(DmaP(name, idBits, maxFlight, shapeOf(view, mem))))
   val mem =
     outward(Axi4).dFn(_ =>
@@ -108,6 +110,7 @@ final class AxiXbarNodes(
 )(
   using GeneratorScope[XbarP])
     extends Nodes:
+  val clk             = inward(ClockDomain).uFn(_ => Right(()))
   private val inputs  = ins.map { n =>
     given sourcecode.Name = sourcecode.Name(n)
     inward(Axi4)
@@ -171,6 +174,7 @@ final class L2CacheNodes(
 )(
   using GeneratorScope[L2P])
     extends Nodes:
+  val clk            = inward(ClockDomain).uFn(_ => Right(()))
   val in             = inward(Axi4)
   val out            = outward(Axi4)
   private val (d, u) = depend(in, out)
@@ -206,8 +210,9 @@ final class DramNodes(
 )(
   using GeneratorScope[DramP])
     extends Nodes:
+  val clk = inward(ClockDomain).uFn(_ => Right(()))
   parameters(view => Right(DramP(ranks, shapeOf(view, in))))
-  val in = inward(Axi4).uFn(_ =>
+  val in  = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
         slaves = Vector(
@@ -254,6 +259,7 @@ final class WidthBridgeNodes(
 )(
   using GeneratorScope[BridgeP])
     extends Nodes:
+  val clk            = inward(ClockDomain).uFn(_ => Right(()))
   val in             = inward(Axi4)
   val out            = outward(Axi4)
   private val (d, u) = depend(in, out)
@@ -290,17 +296,20 @@ def widthBridge(
 
 val Uart = new GeneratorEntry[UartP]
 
-/** The UART: a boundary inward node serving one address range on a 32-bit bus. */
+/** The UART: a boundary inward node serving one address range on a 32-bit bus, publishing its serial pins. */
 final class UartNodes(
   name:           String,
   base:           Long,
   size:           Long,
-  idCapacityBits: Int
+  idCapacityBits: Int,
+  baud:           Int
 )(
   using GeneratorScope[UartP])
     extends Nodes:
+  val clk    = inward(ClockDomain).uFn(_ => Right(()))
+  val serial = outward(Serial).dFn(_ => Right(baud))
   parameters(view => Right(UartP(name, base, size, shapeOf(view, in))))
-  val in = inward(Axi4).uFn(_ =>
+  val in     = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
         slaves = Vector(
@@ -323,7 +332,8 @@ final class UartNodes(
 def uartCtrl(
   base:           Long,
   size:           Long,
-  idCapacityBits: Int
+  idCapacityBits: Int,
+  baud:           Int
 )(
   using
   ws:             WrapperScope,
@@ -331,7 +341,7 @@ def uartCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): UartNodes =
-  generator(Uart)(new UartNodes(name.value, base, size, idCapacityBits))
+  generator(Uart)(new UartNodes(name.value, base, size, idCapacityBits, baud))
 
 // ============ Gpio: a memory-mapped peripheral ============
 
@@ -346,8 +356,9 @@ final class GpioNodes(
 )(
   using GeneratorScope[GpioP])
     extends Nodes:
+  val clk = inward(ClockDomain).uFn(_ => Right(()))
   parameters(view => Right(GpioP(name, base, size, shapeOf(view, in))))
-  val in = inward(Axi4).uFn(_ =>
+  val in  = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
         slaves = Vector(
@@ -380,8 +391,66 @@ def gpioCtrl(
 ): GpioNodes =
   generator(Gpio)(new GpioNodes(name.value, base, size, idCapacityBits))
 
+// ============ ClockSource: the clock and reset origin ============
+
+val ClockSource = new GeneratorEntry[ClockSourceP]
+
+/** One outward clock tap per name; taps are declared by name and looked up by name. */
+final class ClockSourceNodes(
+  freqHz: Int,
+  taps:   Vector[String]
+)(
+  using GeneratorScope[ClockSourceP])
+    extends Nodes:
+  private val outs = taps.map { n =>
+    given sourcecode.Name = sourcecode.Name(n)
+    outward(ClockDomain).dFn(_ => Right(freqHz))
+  }
+
+  def tap(n: String): ClockDomain.Outward =
+    require(taps.contains(n), s"clock source has no tap '$n' (taps: ${taps.mkString(", ")})")
+    outs(taps.indexOf(n))
+
+  parameters(_ => Right(ClockSourceP(freqHz, taps)))
+
+def clockSource(
+  freqHz: Int,
+  taps:   Vector[String]
+)(
+  using
+  ws:     WrapperScope,
+  name:   sourcecode.Name,
+  file:   sourcecode.File,
+  line:   sourcecode.Line
+): ClockSourceNodes =
+  generator(ClockSource)(new ClockSourceNodes(freqHz, taps))
+
+// ============ SerialPads: the serial pin boundary ============
+
+val SerialPads = new GeneratorEntry[SerialPadsP]
+
+/** Terminates one serial pin pair; the FullParam records the settled baud rate. */
+final class SerialPadsNodes(
+)(
+  using GeneratorScope[SerialPadsP])
+    extends Nodes:
+  val in = inward(Serial).uFn(_ => Right(()))
+  parameters(view => Right(SerialPadsP(view.edgeOf(in))))
+
+def serialPads(
+)(
+  using
+  ws:   WrapperScope,
+  name: sourcecode.Name,
+  file: sourcecode.File,
+  line: sourcecode.Line
+): SerialPadsNodes =
+  generator(SerialPads)(new SerialPadsNodes)
+
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives. */
 val axiBackends: Seq[GeneratorBackend] = Seq(
+  ZaoziBackend(ClockSource, ClockSourceGen),
+  ZaoziBackend(SerialPads, SerialPadsGen),
   ZaoziBackend(Core, CoreGen),
   ZaoziBackend(Dma, DmaGen),
   ZaoziBackend(Xbar, XbarGen),

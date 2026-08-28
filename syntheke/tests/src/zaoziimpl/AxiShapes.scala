@@ -56,3 +56,11 @@ class AxiPortRecord(s: AxiShape) extends Record:
   val b  = Flipped("b", new Channel(new BBits(s)))
   val ar = Aligned("ar", new Channel(new AxBits(s)))
   val r  = Flipped("r", new Channel(new RBits(s)))
+
+class ClockRecord extends Record:
+  val clock = Aligned("clock", Clock())
+  val reset = Aligned("reset", Reset())
+
+class SerialRecord extends Record:
+  val tx = Aligned("tx", Bool())
+  val rx = Flipped("rx", Bool())

@@ -14,7 +14,8 @@ class GpioPLayers(p: GpioP)                                            extends L
   def layers = Seq.empty
 class GpioPProbe(p: GpioP)                                             extends DVRecord[GpioP, GpioPLayers](p)
 class GpioPIO(p: GpioP)                                                extends HWRecord(p):
-  val in = Flipped("in", new AxiPortRecord(p.port))
+  val clk = Flipped("clk", new ClockRecord)
+  val in  = Flipped("in", new AxiPortRecord(p.port))
 @zaoziGenerator
 object GpioGen                                                         extends Generator[GpioP, GpioPLayers, GpioPIO, GpioPProbe]:
   def architecture(p: GpioP) = summon[Interface[GpioPIO]].dontCare()

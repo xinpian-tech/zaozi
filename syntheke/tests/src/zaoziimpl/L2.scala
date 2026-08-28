@@ -14,6 +14,7 @@ class L2PLayers(p: L2P)                                        extends LayerInte
   def layers = Seq.empty
 class L2PProbe(p: L2P)                                         extends DVRecord[L2P, L2PLayers](p)
 class L2PIO(p: L2P)                                            extends HWRecord(p):
+  val clk = Flipped("clk", new ClockRecord)
   val in  = Flipped("in", new AxiPortRecord(p.up))
   val out = Aligned("out", new AxiPortRecord(p.down))
 @zaoziGenerator
