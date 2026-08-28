@@ -110,3 +110,10 @@ is what an SoC integrator writes (instantiate and wire). On the circt side
 the zaozi modules themselves sit in `AxiZaoziModules.scala` — zaozi API
 only, no syntheke — and `AxiLibrary.scala` is the wrap that puts them on
 the negotiation graph.
+
+`circt/tests/src/UartDevice.scala` is a real device: an 8N1 UART with a
+single-beat AXI slave register file, written as a plain zaozi module.
+`UartSpec.scala` wraps it with a minimal clock-domain protocol (the
+source's frequency flows down; the UART computes its baud divisor from
+the settled clock and capability-checks it) and a serial pin protocol,
+then negotiates and lowers it to Verilog.
