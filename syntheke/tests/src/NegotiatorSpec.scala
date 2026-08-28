@@ -220,7 +220,7 @@ object NegotiatorSpec extends TestSuite:
       // the build context, so the instance name comes from the call-site val.
       final class LoopbackPorts(
         using GeneratorScope[Int])
-          extends Endpoints:
+          extends Nodes:
         val in             = inward(Wid)
         val out            = outward(Wid)
         private val (d, u) = depend(in, out)
@@ -270,7 +270,7 @@ object NegotiatorSpec extends TestSuite:
       // predecessors and successors among the unsorted remainder but lie on no cycle.
       final class LoopPorts(
         using GeneratorScope[Int])
-          extends Endpoints:
+          extends Nodes:
         val in             = inward(Wid)
         val out            = outward(Wid)
         private val (d, u) = depend(in, out)
@@ -279,7 +279,7 @@ object NegotiatorSpec extends TestSuite:
         parameters(_ => Right(0))
       final class TapPorts(
         using GeneratorScope[Int])
-          extends Endpoints:
+          extends Nodes:
         val in               = inward(Wid)
         val out              = outward(Wid)
         val tap              = outward(Wid)
@@ -291,7 +291,7 @@ object NegotiatorSpec extends TestSuite:
         parameters(_ => Right(0))
       final class JoinPorts(
         using GeneratorScope[Int])
-          extends Endpoints:
+          extends Nodes:
         val in               = inward(Wid)
         val ext              = inward(Wid)
         val out              = outward(Wid)

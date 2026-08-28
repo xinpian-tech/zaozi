@@ -42,7 +42,7 @@ final class CoreNodes(
   maxFlight: Int
 )(
   using GeneratorScope[CoreP])
-    extends Endpoints:
+    extends Nodes:
   parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, mem))))
   val mem =
     outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
@@ -70,7 +70,7 @@ final class DmaNodes(
   maxFlight: Int
 )(
   using GeneratorScope[DmaP])
-    extends Endpoints:
+    extends Nodes:
   parameters(view => Right(DmaP(name, idBits, maxFlight, shapeOf(view, mem))))
   val mem =
     outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
@@ -101,7 +101,7 @@ final class AxiXbarNodes(
   arbitration: String
 )(
   using GeneratorScope[XbarP])
-    extends Endpoints:
+    extends Nodes:
   private val inputs  = ins.map { n =>
     given sourcecode.Name = sourcecode.Name(n)
     inward(Axi4)
@@ -164,7 +164,7 @@ final class L2CacheNodes(
   capacityKiB: Int
 )(
   using GeneratorScope[L2P])
-    extends Endpoints:
+    extends Nodes:
   val in             = inward(Axi4)
   val out            = outward(Axi4)
   private val (d, u) = depend(in, out)
@@ -199,7 +199,7 @@ final class DramNodes(
   idCapacityBits: Int
 )(
   using GeneratorScope[DramP])
-    extends Endpoints:
+    extends Nodes:
   parameters(view => Right(DramP(ranks, shapeOf(view, in))))
   val in = inward(Axi4).uFn(_ =>
     Right(
@@ -247,7 +247,7 @@ final class WidthBridgeNodes(
   maxUpstreamTransfer: Int
 )(
   using GeneratorScope[BridgeP])
-    extends Endpoints:
+    extends Nodes:
   val in             = inward(Axi4)
   val out            = outward(Axi4)
   private val (d, u) = depend(in, out)
@@ -292,7 +292,7 @@ final class UartNodes(
   idCapacityBits: Int
 )(
   using GeneratorScope[UartP])
-    extends Endpoints:
+    extends Nodes:
   parameters(view => Right(UartP(name, base, size, shapeOf(view, in))))
   val in = inward(Axi4).uFn(_ =>
     Right(
@@ -339,7 +339,7 @@ final class GpioNodes(
   idCapacityBits: Int
 )(
   using GeneratorScope[GpioP])
-    extends Endpoints:
+    extends Nodes:
   parameters(view => Right(GpioP(name, base, size, shapeOf(view, in))))
   val in = inward(Axi4).uFn(_ =>
     Right(

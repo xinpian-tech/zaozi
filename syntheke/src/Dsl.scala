@@ -4,7 +4,7 @@ package me.jiuyang.syntheke
 
 /** The design-authoring surface (doc @sec-build): everything a design author writes lives in this file — the [[Design]]
   * entry point, the generator registry entry, the declaration functions, the bind operator, the handles they return and
-  * the return-channel types [[Dangles]] / [[Endpoints]]. The scopes the declarations delegate to are the mechanism, in
+  * the return-channel types [[Dangles]] / [[Nodes]]. The scopes the declarations delegate to are the mechanism, in
   * `Builder.scala`.
   *
   * Naming (`sourcecode.Name`): declarations are named by the val they are bound to, like zaozi's instance naming:
@@ -278,17 +278,17 @@ final class OutwardNodeBuilder[P <: Protocol] private[syntheke] (
     scope.recordFn(id.name, values => f(new ReadCtx(values)))
     this
 
-/** Base for classes whose fields are a module body's endpoints: each `val x = inward(...)` field declares, names and
-  * exposes a node in one line, and the instance itself is the body's returned container. Plain classes have no Mirror,
-  * so the fields are not machine-checked — extending this trait is the author's declaration that they are endpoints.
-  * The one harmful thing a field could hold, the scope itself, is inert anyway: declarations outside the open scope
-  * fail on the spot.
+/** Base for classes whose fields are a module's nodes: each `val x = inward(...)` field declares, names and exposes a
+  * node in one line, and the instance itself is the body's returned container. Plain classes have no Mirror, so the
+  * fields are not machine-checked — extending this trait is the author's declaration that they are nodes. The one
+  * harmful thing a field could hold, the scope itself, is inert anyway: declarations outside the open scope fail on the
+  * spot.
   */
-trait Endpoints
+trait Nodes
 
-/** What a module body may return: its dangling endpoints — node builders — plus `Unit`, `Option` / `Vector` / `Seq` of
-  * them, products (tuples, case classes) whose fields all qualify, and [[Endpoints]] classes. This is the only channel
-  * out of a module body, so nothing else (readers, scopes, arbitrary values) can escape it.
+/** What a module body may return: its dangling nodes — node builders — plus `Unit`, `Option` / `Vector` / `Seq` of
+  * them, products (tuples, case classes) whose fields all qualify, and [[Nodes]] classes. This is the only channel out
+  * of a module body, so nothing else (readers, scopes, arbitrary values) can escape it.
   */
 sealed trait Dangles[A]
 
@@ -296,10 +296,10 @@ object Dangles:
   private val evidence = new Dangles[Any] {}
   private def of[A]: Dangles[A] = evidence.asInstanceOf[Dangles[A]]
 
-  given unit:                      Dangles[Unit]                  = of
-  given inward[P <: Protocol]:     Dangles[InwardNodeBuilder[P]]  = of
-  given outward[P <: Protocol]:    Dangles[OutwardNodeBuilder[P]] = of
-  given endpoints[E <: Endpoints]: Dangles[E]                     = of
+  given unit:                   Dangles[Unit]                  = of
+  given inward[P <: Protocol]:  Dangles[InwardNodeBuilder[P]]  = of
+  given outward[P <: Protocol]: Dangles[OutwardNodeBuilder[P]] = of
+  given nodes[E <: Nodes]:      Dangles[E]                     = of
   given option[A](
     using Dangles[A]
   ): Dangles[Option[A]] = of

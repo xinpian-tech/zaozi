@@ -85,7 +85,7 @@ class, where the context name cannot capture them.
 ```scala
 val Core = new GeneratorEntry[CoreFull]   // registry name "Core", from the val
 
-final class CoreNodes(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Endpoints:
+final class CoreNodes(name: String, idBits: Int)(using GeneratorScope[CoreFull]) extends Nodes:
   parameters(_ => Right(CoreFull(name, idBits)))
   val mem = outward(Axi4).dFn(...)
 

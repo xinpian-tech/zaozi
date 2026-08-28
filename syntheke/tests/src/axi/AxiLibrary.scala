@@ -23,7 +23,7 @@ final class CoreNodes(
   maxFlight: Int
 )(
   using GeneratorScope[CoreFull])
-    extends Endpoints:
+    extends Nodes:
   parameters(_ => Right(CoreFull(name, idBits, maxFlight)))
   val mem =
     outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
@@ -53,7 +53,7 @@ final class DmaNodes(
   maxFlight: Int
 )(
   using GeneratorScope[DmaFull])
-    extends Endpoints:
+    extends Nodes:
   parameters(_ => Right(DmaFull(name, idBits, maxFlight)))
   val mem =
     outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
@@ -87,7 +87,7 @@ final class AxiXbarNodes(
   arbitration: String
 )(
   using GeneratorScope[XbarFull])
-    extends Endpoints:
+    extends Nodes:
   private val inputs  = ins.map { n =>
     given sourcecode.Name = sourcecode.Name(n)
     inward(Axi4)
@@ -155,7 +155,7 @@ final class L2CacheNodes(
   capacityKiB: Int
 )(
   using GeneratorScope[L2Full])
-    extends Endpoints:
+    extends Nodes:
   val in             = inward(Axi4)
   val out            = outward(Axi4)
   private val (d, u) = depend(in, out)
@@ -201,7 +201,7 @@ final class DramNodes(
   idCapacityBits: Int
 )(
   using GeneratorScope[DramFull])
-    extends Endpoints:
+    extends Nodes:
   parameters { view =>
     val e = view.edgeOf(in)
     Right(DramFull(ranks, e.addrBits, e.dataBits, e.idBits, e.master.masters.map(_.name)))
@@ -254,7 +254,7 @@ final class WidthBridgeNodes(
   maxUpstreamTransfer: Int
 )(
   using GeneratorScope[BridgeFull])
-    extends Endpoints:
+    extends Nodes:
   val in             = inward(Axi4)
   val out            = outward(Axi4)
   private val (d, u) = depend(in, out)
@@ -301,7 +301,7 @@ final class UartNodes(
   idCapacityBits: Int
 )(
   using GeneratorScope[UartFull])
-    extends Endpoints:
+    extends Nodes:
   parameters { view =>
     val e = view.edgeOf(in)
     Right(UartFull(name, base, size, e.dataBits, e.idBits))
@@ -353,7 +353,7 @@ final class GpioNodes(
   idCapacityBits: Int
 )(
   using GeneratorScope[GpioFull])
-    extends Endpoints:
+    extends Nodes:
   parameters { view =>
     val e = view.edgeOf(in)
     Right(GpioFull(name, base, size, e.dataBits, e.idBits))
