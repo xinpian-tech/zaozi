@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.syntheke.circt.tests
+package me.jiuyang.syntheke.tests.zaoziimpl
 
 import me.jiuyang.zaozi.{DVRecord, Generator, HWRecord, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}

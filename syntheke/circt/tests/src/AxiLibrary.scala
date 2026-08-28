@@ -4,6 +4,7 @@ package me.jiuyang.syntheke.circt.tests
 
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
+import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
 import me.jiuyang.syntheke.tests.axi.{
   AddressSet,
   Axi4,

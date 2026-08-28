@@ -107,9 +107,9 @@ width bridge, per-edge conflict reporting, and end-to-end Verilog. The user
 story splits by file: `AxiLibrary.scala` is what an IP author ships (per IP:
 FullParam, endpoint class, a def binding the registry entry), the spec file
 is what an SoC integrator writes (instantiate and wire). On the circt side
-the zaozi modules themselves sit in `AxiZaoziModules.scala` — zaozi API
-only, no syntheke — and `AxiLibrary.scala` is the wrap that puts them on
-the negotiation graph.
+the zaozi modules themselves sit in `tests/src/zaoziimpl/AxiZaoziModules.scala`
+— zaozi API only, no syntheke — and `circt/tests/src/AxiLibrary.scala` is
+the wrap that puts them on the negotiation graph.
 
 `tests/src/zaoziimpl/UartDevice.scala` is a real device: an 8N1 UART with
 a single-beat AXI slave register file, written as a plain zaozi module

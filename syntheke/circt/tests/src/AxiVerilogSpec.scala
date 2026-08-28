@@ -4,6 +4,7 @@ package me.jiuyang.syntheke.circt.tests
 
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
+import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
 import me.jiuyang.zaozi.{Generator, HWRecord}
 import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
 import me.jiuyang.zaozi.reftpe.Interface

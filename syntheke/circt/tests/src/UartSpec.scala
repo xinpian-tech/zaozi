@@ -15,7 +15,7 @@ import me.jiuyang.syntheke.tests.axi.{
   RegionType,
   TransferSizes
 }
-import me.jiuyang.syntheke.tests.zaoziimpl.{UartClockBundle, UartDeviceGen, UartDeviceP, UartSerialBundle}
+import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
 import me.jiuyang.zaozi.{DVBundle, Generator, HWBundle, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
 import me.jiuyang.zaozi.reftpe.Interface
