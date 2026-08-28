@@ -8,7 +8,7 @@
 
 == 探针源 <sec-dv-declarations>
 
-探针源由生成器模块声明，提供验证协议的 `Down` 与 FIRRTL 层路径。声明记录标识、协议、`Down`、层路径、由协议导出的接口和源码位置，构建期写入 `DesignSpec`。探针源的稳定标识 `DVSourceId` 由所属模块和端点名组成；名称与模块节点共用同一唯一性约束（@sec-generator-module）。
+探针源由生成器模块声明，提供验证协议的 `Down` 与 FIRRTL 层路径。声明记录标识、协议、`Down`、层路径、由协议导出的接口和源码位置，构建期写入 `DesignSpec`。探针源的稳定标识 `DVSourceId` 由所属模块和声明名组成；名称与模块节点共用同一唯一性约束（@sec-generator-module）。
 
 探针源按接口叶对应生成器的若干纯 `Probe` 端口，端口名为源名加叶路径段（@sec-port-naming）。`Probe` 节点即叶，其内部可为聚合——整包数据在一个引用后面，仍是单个端口，不产生开放聚合。
 
