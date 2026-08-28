@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
 class DitDah32Layers(parameter: DitDah32Parameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("DV"))
+  def layers = if parameter.enableTrace then Seq(Layer("DV")) else Seq.empty
 
 class Decoupled[T <: Data](gen: T) extends Bundle:
   val ready = Flipped(Bool())

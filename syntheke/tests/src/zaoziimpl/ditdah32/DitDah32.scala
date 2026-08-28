@@ -1189,109 +1189,63 @@ object DitDah32Module
     // pure observer; lowered into the layer("DV") bind collateral so the
     // production main module is trace-free. Probes are read by the formal
     // wrapper and cocotb harness via the generated XMR macros.
-    layer("DV"):
-      val traceValidReg             = RegInit(false.B)
-      val tracePcReg                = RegInit(0.U(parameter.xlen))
-      val traceNextPcReg            = RegInit(0.U(parameter.xlen))
-      val traceInstrReg             = RegInit(0.U(parameter.xlen))
-      val traceLenReg               = RegInit(0.U(3))
-      val traceRdWeReg              = RegInit(false.B)
-      val traceRdReg                = RegInit(0.U(parameter.registerIndexBits))
-      val traceRdWdataReg           = RegInit(0.U(parameter.xlen))
-      val traceRs1AddrReg           = RegInit(0.U(5))
-      val traceRs1RdataReg          = RegInit(0.U(parameter.xlen))
-      val traceRs2AddrReg           = RegInit(0.U(5))
-      val traceRs2RdataReg          = RegInit(0.U(parameter.xlen))
-      val traceMemAddrReg           = RegInit(0.U(parameter.xlen))
-      val traceMemRmaskReg          = RegInit(0.U(4))
-      val traceMemWmaskReg          = RegInit(0.U(4))
-      val traceMemRdataReg          = RegInit(0.U(parameter.xlen))
-      val traceMemWdataReg          = RegInit(0.U(parameter.xlen))
-      val traceMemFaultReg          = RegInit(false.B)
-      val traceMemFaultRmaskReg     = RegInit(0.U(4))
-      val traceMemFaultWmaskReg     = RegInit(0.U(4))
-      val traceCsrAddrReg           = RegInit(0.U(12))
-      val traceCsrRmaskReg          = RegInit(0.U(parameter.xlen))
-      val traceCsrWmaskReg          = RegInit(0.U(parameter.xlen))
-      val traceCsrRdataReg          = RegInit(0.U(parameter.xlen))
-      val traceCsrWdataReg          = RegInit(0.U(parameter.xlen))
-      val traceTrapReg              = RegInit(false.B)
-      val traceTrapCauseReg         = RegInit(0.U(4))
-      val tracePreTrapMstatusReg    = RegInit(0.U(parameter.xlen))
-      val tracePostCommitMstatusReg = RegInit(0.U(parameter.xlen))
-      val traceIrqPreTrapMstatusReg = RegInit(0.U(parameter.xlen))
-      val traceIrqPendingMaskReg    = RegInit(0.U(parameter.xlen))
-      val memTraceRs1AddrReg        = RegInit(0.U(5))
-      val memTraceRs1RdataReg       = RegInit(0.U(parameter.xlen))
-      val memTraceRs2AddrReg        = RegInit(0.U(5))
-      val memTraceRs2RdataReg       = RegInit(0.U(parameter.xlen))
+    if parameter.enableTrace then
+      layer("DV"):
+        val traceValidReg             = RegInit(false.B)
+        val tracePcReg                = RegInit(0.U(parameter.xlen))
+        val traceNextPcReg            = RegInit(0.U(parameter.xlen))
+        val traceInstrReg             = RegInit(0.U(parameter.xlen))
+        val traceLenReg               = RegInit(0.U(3))
+        val traceRdWeReg              = RegInit(false.B)
+        val traceRdReg                = RegInit(0.U(parameter.registerIndexBits))
+        val traceRdWdataReg           = RegInit(0.U(parameter.xlen))
+        val traceRs1AddrReg           = RegInit(0.U(5))
+        val traceRs1RdataReg          = RegInit(0.U(parameter.xlen))
+        val traceRs2AddrReg           = RegInit(0.U(5))
+        val traceRs2RdataReg          = RegInit(0.U(parameter.xlen))
+        val traceMemAddrReg           = RegInit(0.U(parameter.xlen))
+        val traceMemRmaskReg          = RegInit(0.U(4))
+        val traceMemWmaskReg          = RegInit(0.U(4))
+        val traceMemRdataReg          = RegInit(0.U(parameter.xlen))
+        val traceMemWdataReg          = RegInit(0.U(parameter.xlen))
+        val traceMemFaultReg          = RegInit(false.B)
+        val traceMemFaultRmaskReg     = RegInit(0.U(4))
+        val traceMemFaultWmaskReg     = RegInit(0.U(4))
+        val traceCsrAddrReg           = RegInit(0.U(12))
+        val traceCsrRmaskReg          = RegInit(0.U(parameter.xlen))
+        val traceCsrWmaskReg          = RegInit(0.U(parameter.xlen))
+        val traceCsrRdataReg          = RegInit(0.U(parameter.xlen))
+        val traceCsrWdataReg          = RegInit(0.U(parameter.xlen))
+        val traceTrapReg              = RegInit(false.B)
+        val traceTrapCauseReg         = RegInit(0.U(4))
+        val tracePreTrapMstatusReg    = RegInit(0.U(parameter.xlen))
+        val tracePostCommitMstatusReg = RegInit(0.U(parameter.xlen))
+        val traceIrqPreTrapMstatusReg = RegInit(0.U(parameter.xlen))
+        val traceIrqPendingMaskReg    = RegInit(0.U(parameter.xlen))
+        val memTraceRs1AddrReg        = RegInit(0.U(5))
+        val memTraceRs1RdataReg       = RegInit(0.U(parameter.xlen))
+        val memTraceRs2AddrReg        = RegInit(0.U(5))
+        val memTraceRs2RdataReg       = RegInit(0.U(parameter.xlen))
 
-      tracePreTrapMstatusReg    := csrMstatus.asUInt
-      tracePostCommitMstatusReg := csrMstatus.asUInt
+        tracePreTrapMstatusReg    := csrMstatus.asUInt
+        tracePostCommitMstatusReg := csrMstatus.asUInt
 
-      // Preserve the exact trapMstatus input across the IRQ redirect cycle.
-      when(
-        (stateSleep & irqTrapPending) |
-          (loadResponseOk & irqTrapPending) |
-          (storeResponseOk & irqTrapPending)
-      ) {
-        traceIrqPreTrapMstatusReg := csrMstatus.asUInt
-        traceIrqPendingMaskReg    := irqEnabledMask.asUInt
-      }
-      when(commitNonMem & !execTrap & postCommitIrqTrapPending) {
-        traceIrqPreTrapMstatusReg := postCommitMstatus.asUInt
-        traceIrqPendingMaskReg    := postCommitIrqEnabledMask.asUInt
-      }
-
-      when(!stateReset) {
-        traceValidReg         := false.B
-        traceRdWeReg          := false.B
-        traceRdReg            := 0.U(parameter.registerIndexBits)
-        traceRdWdataReg       := 0.U(parameter.xlen)
-        traceRs1AddrReg       := 0.U(5)
-        traceRs1RdataReg      := 0.U(parameter.xlen)
-        traceRs2AddrReg       := 0.U(5)
-        traceRs2RdataReg      := 0.U(parameter.xlen)
-        traceMemAddrReg       := 0.U(parameter.xlen)
-        traceMemRmaskReg      := 0.U(4)
-        traceMemWmaskReg      := 0.U(4)
-        traceMemRdataReg      := 0.U(parameter.xlen)
-        traceMemWdataReg      := 0.U(parameter.xlen)
-        traceMemFaultReg      := false.B
-        traceMemFaultRmaskReg := 0.U(4)
-        traceMemFaultWmaskReg := 0.U(4)
-        traceCsrAddrReg       := 0.U(12)
-        traceCsrRmaskReg      := 0.U(parameter.xlen)
-        traceCsrWmaskReg      := 0.U(parameter.xlen)
-        traceCsrRdataReg      := 0.U(parameter.xlen)
-        traceCsrWdataReg      := 0.U(parameter.xlen)
-        traceTrapReg          := false.B
-        traceTrapCauseReg     := 0.U(4)
-
-        when(stateIrq & csrMcause.bit(parameter.xlen - 1)) {
-          traceValidReg          := true.B
-          tracePcReg             := csrMepc
-          traceNextPcReg         := trapVector
-          traceInstrReg          := 0.U(parameter.xlen)
-          traceLenReg            := 0.U(3)
-          traceRdWeReg           := false.B
-          traceRdReg             := 0.U(parameter.registerIndexBits)
-          traceRdWdataReg        := 0.U(parameter.xlen)
-          traceRs1AddrReg        := 0.U(5)
-          traceRs1RdataReg       := 0.U(parameter.xlen)
-          traceRs2AddrReg        := 0.U(5)
-          traceRs2RdataReg       := 0.U(parameter.xlen)
-          traceTrapReg           := true.B
-          traceTrapCauseReg      := TrapCause.INTERRUPT.U(4)
-          tracePreTrapMstatusReg := traceIrqPreTrapMstatusReg
+        // Preserve the exact trapMstatus input across the IRQ redirect cycle.
+        when(
+          (stateSleep & irqTrapPending) |
+            (loadResponseOk & irqTrapPending) |
+            (storeResponseOk & irqTrapPending)
+        ) {
+          traceIrqPreTrapMstatusReg := csrMstatus.asUInt
+          traceIrqPendingMaskReg    := irqEnabledMask.asUInt
+        }
+        when(commitNonMem & !execTrap & postCommitIrqTrapPending) {
+          traceIrqPreTrapMstatusReg := postCommitMstatus.asUInt
+          traceIrqPendingMaskReg    := postCommitIrqEnabledMask.asUInt
         }
 
-        when(fetchResponseError) {
-          traceValidReg         := true.B
-          tracePcReg            := pc
-          traceNextPcReg        := trapVector
-          traceInstrReg         := 0.U(parameter.xlen)
-          traceLenReg           := 4.U(3)
+        when(!stateReset) {
+          traceValidReg         := false.B
           traceRdWeReg          := false.B
           traceRdReg            := 0.U(parameter.registerIndexBits)
           traceRdWdataReg       := 0.U(parameter.xlen)
@@ -1299,219 +1253,266 @@ object DitDah32Module
           traceRs1RdataReg      := 0.U(parameter.xlen)
           traceRs2AddrReg       := 0.U(5)
           traceRs2RdataReg      := 0.U(parameter.xlen)
-          traceMemAddrReg       := (pc.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
-          traceMemFaultReg      := true.B
+          traceMemAddrReg       := 0.U(parameter.xlen)
+          traceMemRmaskReg      := 0.U(4)
+          traceMemWmaskReg      := 0.U(4)
+          traceMemRdataReg      := 0.U(parameter.xlen)
+          traceMemWdataReg      := 0.U(parameter.xlen)
+          traceMemFaultReg      := false.B
           traceMemFaultRmaskReg := 0.U(4)
           traceMemFaultWmaskReg := 0.U(4)
-          traceCsrAddrReg       := CsrAddr.MCAUSE.U(12)
-          traceCsrRmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
-          traceCsrWmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
-          traceCsrRdataReg      := csrMcause.asUInt
-          traceCsrWdataReg      := 1.U(parameter.xlen)
-          traceTrapReg          := true.B
-          traceTrapCauseReg     := TrapCause.AXI_ERROR.U(4)
-        }
+          traceCsrAddrReg       := 0.U(12)
+          traceCsrRmaskReg      := 0.U(parameter.xlen)
+          traceCsrWmaskReg      := 0.U(parameter.xlen)
+          traceCsrRdataReg      := 0.U(parameter.xlen)
+          traceCsrWdataReg      := 0.U(parameter.xlen)
+          traceTrapReg          := false.B
+          traceTrapCauseReg     := 0.U(4)
 
-        when(loadResponseError) {
-          traceValidReg         := true.B
-          tracePcReg            := memPcReg
-          traceNextPcReg        := trapVector
-          traceInstrReg         := memInstrReg.asUInt
-          traceLenReg           := memLenReg
-          traceRdWeReg          := false.B
-          traceRdReg            := 0.U(parameter.registerIndexBits)
-          traceRdWdataReg       := 0.U(parameter.xlen)
-          traceRs1AddrReg       := 0.U(5)
-          traceRs1RdataReg      := 0.U(parameter.xlen)
-          traceRs2AddrReg       := 0.U(5)
-          traceRs2RdataReg      := 0.U(parameter.xlen)
-          traceMemAddrReg       := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
-          traceMemFaultReg      := true.B
-          traceMemFaultRmaskReg := loadMemMask
-          traceMemFaultWmaskReg := 0.U(4)
-          traceCsrAddrReg       := CsrAddr.MCAUSE.U(12)
-          traceCsrRmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
-          traceCsrWmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
-          traceCsrRdataReg      := csrMcause.asUInt
-          traceCsrWdataReg      := 5.U(parameter.xlen)
-          traceTrapReg          := true.B
-          traceTrapCauseReg     := TrapCause.AXI_ERROR.U(4)
-        }
-
-        when(storeResponseError) {
-          traceValidReg         := true.B
-          tracePcReg            := memPcReg
-          traceNextPcReg        := trapVector
-          traceInstrReg         := memInstrReg.asUInt
-          traceLenReg           := memLenReg
-          traceRdWeReg          := false.B
-          traceRdReg            := 0.U(parameter.registerIndexBits)
-          traceRdWdataReg       := 0.U(parameter.xlen)
-          traceRs1AddrReg       := 0.U(5)
-          traceRs1RdataReg      := 0.U(parameter.xlen)
-          traceRs2AddrReg       := 0.U(5)
-          traceRs2RdataReg      := 0.U(parameter.xlen)
-          traceMemAddrReg       := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
-          traceMemFaultReg      := true.B
-          traceMemFaultRmaskReg := 0.U(4)
-          traceMemFaultWmaskReg := memStoreBeReg
-          traceCsrAddrReg       := CsrAddr.MCAUSE.U(12)
-          traceCsrRmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
-          traceCsrWmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
-          traceCsrRdataReg      := csrMcause.asUInt
-          traceCsrWdataReg      := 7.U(parameter.xlen)
-          traceTrapReg          := true.B
-          traceTrapCauseReg     := TrapCause.AXI_ERROR.U(4)
-        }
-
-        when(loadResponseOk) {
-          traceValidReg     := true.B
-          tracePcReg        := memPcReg
-          traceNextPcReg    := memNextPcReg
-          traceInstrReg     := memInstrReg.asUInt
-          traceLenReg       := memLenReg
-          traceRdWeReg      := memRdReg =/= 0.B(5)
-          traceRdReg        := memRdReg.bits(3, 0).asUInt
-          traceRdWdataReg   := (memRdReg =/= 0.B(5)).?(loadWdata.asUInt, 0.U(parameter.xlen))
-          traceRs1AddrReg   := memTraceRs1AddrReg
-          traceRs1RdataReg  := memTraceRs1RdataReg
-          traceRs2AddrReg   := memTraceRs2AddrReg
-          traceRs2RdataReg  := memTraceRs2RdataReg
-          traceMemAddrReg   := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
-          traceMemRmaskReg  := loadMemMask
-          traceMemWmaskReg  := 0.U(4)
-          traceMemRdataReg  := axiR.bits.data
-          traceMemWdataReg  := 0.U(parameter.xlen)
-          traceTrapReg      := false.B
-          traceTrapCauseReg := 0.U(4)
-        }
-
-        when(storeResponseOk) {
-          traceValidReg     := true.B
-          tracePcReg        := memPcReg
-          traceNextPcReg    := memNextPcReg
-          traceInstrReg     := memInstrReg.asUInt
-          traceLenReg       := memLenReg
-          traceRdWeReg      := false.B
-          traceRdReg        := 0.U(parameter.registerIndexBits)
-          traceRdWdataReg   := 0.U(parameter.xlen)
-          traceRs1AddrReg   := memTraceRs1AddrReg
-          traceRs1RdataReg  := memTraceRs1RdataReg
-          traceRs2AddrReg   := memTraceRs2AddrReg
-          traceRs2RdataReg  := memTraceRs2RdataReg
-          traceMemAddrReg   := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
-          traceMemRmaskReg  := 0.U(4)
-          traceMemWmaskReg  := memStoreBeReg
-          traceMemRdataReg  := 0.U(parameter.xlen)
-          traceMemWdataReg  := memStoreDataReg.asUInt
-          traceTrapReg      := false.B
-          traceTrapCauseReg := 0.U(4)
-        }
-
-        when(stateStraddle) {
-          when(instrReady) {
-            when(!execWaitsForMem) {
-              traceValidReg  := true.B
-              tracePcReg     := pc
-              traceNextPcReg := execNextPc
-              traceInstrReg  := straddledInstr.asUInt
-              traceLenReg    := 4.U(3)
-            }
+          when(stateIrq & csrMcause.bit(parameter.xlen - 1)) {
+            traceValidReg          := true.B
+            tracePcReg             := csrMepc
+            traceNextPcReg         := trapVector
+            traceInstrReg          := 0.U(parameter.xlen)
+            traceLenReg            := 0.U(3)
+            traceRdWeReg           := false.B
+            traceRdReg             := 0.U(parameter.registerIndexBits)
+            traceRdWdataReg        := 0.U(parameter.xlen)
+            traceRs1AddrReg        := 0.U(5)
+            traceRs1RdataReg       := 0.U(parameter.xlen)
+            traceRs2AddrReg        := 0.U(5)
+            traceRs2RdataReg       := 0.U(parameter.xlen)
+            traceTrapReg           := true.B
+            traceTrapCauseReg      := TrapCause.INTERRUPT.U(4)
+            tracePreTrapMstatusReg := traceIrqPreTrapMstatusReg
           }
-        }.otherwise {
-          when(stateRun & instrReady) {
-            when(!straddled32) {
+
+          when(fetchResponseError) {
+            traceValidReg         := true.B
+            tracePcReg            := pc
+            traceNextPcReg        := trapVector
+            traceInstrReg         := 0.U(parameter.xlen)
+            traceLenReg           := 4.U(3)
+            traceRdWeReg          := false.B
+            traceRdReg            := 0.U(parameter.registerIndexBits)
+            traceRdWdataReg       := 0.U(parameter.xlen)
+            traceRs1AddrReg       := 0.U(5)
+            traceRs1RdataReg      := 0.U(parameter.xlen)
+            traceRs2AddrReg       := 0.U(5)
+            traceRs2RdataReg      := 0.U(parameter.xlen)
+            traceMemAddrReg       := (pc.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
+            traceMemFaultReg      := true.B
+            traceMemFaultRmaskReg := 0.U(4)
+            traceMemFaultWmaskReg := 0.U(4)
+            traceCsrAddrReg       := CsrAddr.MCAUSE.U(12)
+            traceCsrRmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
+            traceCsrWmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
+            traceCsrRdataReg      := csrMcause.asUInt
+            traceCsrWdataReg      := 1.U(parameter.xlen)
+            traceTrapReg          := true.B
+            traceTrapCauseReg     := TrapCause.AXI_ERROR.U(4)
+          }
+
+          when(loadResponseError) {
+            traceValidReg         := true.B
+            tracePcReg            := memPcReg
+            traceNextPcReg        := trapVector
+            traceInstrReg         := memInstrReg.asUInt
+            traceLenReg           := memLenReg
+            traceRdWeReg          := false.B
+            traceRdReg            := 0.U(parameter.registerIndexBits)
+            traceRdWdataReg       := 0.U(parameter.xlen)
+            traceRs1AddrReg       := 0.U(5)
+            traceRs1RdataReg      := 0.U(parameter.xlen)
+            traceRs2AddrReg       := 0.U(5)
+            traceRs2RdataReg      := 0.U(parameter.xlen)
+            traceMemAddrReg       := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
+            traceMemFaultReg      := true.B
+            traceMemFaultRmaskReg := loadMemMask
+            traceMemFaultWmaskReg := 0.U(4)
+            traceCsrAddrReg       := CsrAddr.MCAUSE.U(12)
+            traceCsrRmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
+            traceCsrWmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
+            traceCsrRdataReg      := csrMcause.asUInt
+            traceCsrWdataReg      := 5.U(parameter.xlen)
+            traceTrapReg          := true.B
+            traceTrapCauseReg     := TrapCause.AXI_ERROR.U(4)
+          }
+
+          when(storeResponseError) {
+            traceValidReg         := true.B
+            tracePcReg            := memPcReg
+            traceNextPcReg        := trapVector
+            traceInstrReg         := memInstrReg.asUInt
+            traceLenReg           := memLenReg
+            traceRdWeReg          := false.B
+            traceRdReg            := 0.U(parameter.registerIndexBits)
+            traceRdWdataReg       := 0.U(parameter.xlen)
+            traceRs1AddrReg       := 0.U(5)
+            traceRs1RdataReg      := 0.U(parameter.xlen)
+            traceRs2AddrReg       := 0.U(5)
+            traceRs2RdataReg      := 0.U(parameter.xlen)
+            traceMemAddrReg       := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
+            traceMemFaultReg      := true.B
+            traceMemFaultRmaskReg := 0.U(4)
+            traceMemFaultWmaskReg := memStoreBeReg
+            traceCsrAddrReg       := CsrAddr.MCAUSE.U(12)
+            traceCsrRmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
+            traceCsrWmaskReg      := BigInt("ffffffff", 16).U(parameter.xlen)
+            traceCsrRdataReg      := csrMcause.asUInt
+            traceCsrWdataReg      := 7.U(parameter.xlen)
+            traceTrapReg          := true.B
+            traceTrapCauseReg     := TrapCause.AXI_ERROR.U(4)
+          }
+
+          when(loadResponseOk) {
+            traceValidReg     := true.B
+            tracePcReg        := memPcReg
+            traceNextPcReg    := memNextPcReg
+            traceInstrReg     := memInstrReg.asUInt
+            traceLenReg       := memLenReg
+            traceRdWeReg      := memRdReg =/= 0.B(5)
+            traceRdReg        := memRdReg.bits(3, 0).asUInt
+            traceRdWdataReg   := (memRdReg =/= 0.B(5)).?(loadWdata.asUInt, 0.U(parameter.xlen))
+            traceRs1AddrReg   := memTraceRs1AddrReg
+            traceRs1RdataReg  := memTraceRs1RdataReg
+            traceRs2AddrReg   := memTraceRs2AddrReg
+            traceRs2RdataReg  := memTraceRs2RdataReg
+            traceMemAddrReg   := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
+            traceMemRmaskReg  := loadMemMask
+            traceMemWmaskReg  := 0.U(4)
+            traceMemRdataReg  := axiR.bits.data
+            traceMemWdataReg  := 0.U(parameter.xlen)
+            traceTrapReg      := false.B
+            traceTrapCauseReg := 0.U(4)
+          }
+
+          when(storeResponseOk) {
+            traceValidReg     := true.B
+            tracePcReg        := memPcReg
+            traceNextPcReg    := memNextPcReg
+            traceInstrReg     := memInstrReg.asUInt
+            traceLenReg       := memLenReg
+            traceRdWeReg      := false.B
+            traceRdReg        := 0.U(parameter.registerIndexBits)
+            traceRdWdataReg   := 0.U(parameter.xlen)
+            traceRs1AddrReg   := memTraceRs1AddrReg
+            traceRs1RdataReg  := memTraceRs1RdataReg
+            traceRs2AddrReg   := memTraceRs2AddrReg
+            traceRs2RdataReg  := memTraceRs2RdataReg
+            traceMemAddrReg   := (memAddrReg.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
+            traceMemRmaskReg  := 0.U(4)
+            traceMemWmaskReg  := memStoreBeReg
+            traceMemRdataReg  := 0.U(parameter.xlen)
+            traceMemWdataReg  := memStoreDataReg.asUInt
+            traceTrapReg      := false.B
+            traceTrapCauseReg := 0.U(4)
+          }
+
+          when(stateStraddle) {
+            when(instrReady) {
               when(!execWaitsForMem) {
                 traceValidReg  := true.B
                 tracePcReg     := pc
                 traceNextPcReg := execNextPc
-                traceInstrReg  := selectedInstr.asUInt
-                traceLenReg    := instrCompressed.?(2.U(3), 4.U(3))
+                traceInstrReg  := straddledInstr.asUInt
+                traceLenReg    := 4.U(3)
+              }
+            }
+          }.otherwise {
+            when(stateRun & instrReady) {
+              when(!straddled32) {
+                when(!execWaitsForMem) {
+                  traceValidReg  := true.B
+                  tracePcReg     := pc
+                  traceNextPcReg := execNextPc
+                  traceInstrReg  := selectedInstr.asUInt
+                  traceLenReg    := instrCompressed.?(2.U(3), 4.U(3))
+                }
+              }
+            }
+          }
+
+          when(commitEntersMem) {
+            memTraceRs1AddrReg  := execUsesRs1.?(rs1Index.asUInt, 0.U(5))
+            memTraceRs1RdataReg := execUsesRs1.?(rs1Data, 0.U(parameter.xlen))
+            memTraceRs2AddrReg  := execUsesRs2.?(rs2Index.asUInt, 0.U(5))
+            memTraceRs2RdataReg := execUsesRs2.?(rs2Data, 0.U(parameter.xlen))
+          }
+
+          when(commitNonMem) {
+            tracePostCommitMstatusReg := postCommitMstatus.asUInt
+            traceTrapReg              := execTrap
+            traceTrapCauseReg         := execTrapCause
+            traceRdWeReg              := execWriteRd
+            traceRdReg                := rdIndex.bits(3, 0).asUInt
+            traceRdWdataReg           := execWriteRd.?(execWdata, 0.U(parameter.xlen))
+            traceRs1AddrReg           := (execUsesRs1 & !execTrap).?(rs1Index.asUInt, 0.U(5))
+            traceRs1RdataReg          := (execUsesRs1 & !execTrap).?(rs1Data, 0.U(parameter.xlen))
+            traceRs2AddrReg           := (execUsesRs2 & !execTrap).?(rs2Index.asUInt, 0.U(5))
+            traceRs2RdataReg          := (execUsesRs2 & !execTrap).?(rs2Data, 0.U(parameter.xlen))
+            traceNextPcReg            := execTrap.?(trapVector, execNextPc)
+            when(isCsr & !execTrap) {
+              traceCsrAddrReg  := csrAddr.asUInt
+              traceCsrRmaskReg := BigInt("ffffffff", 16).U(parameter.xlen)
+              traceCsrRdataReg := csrReadData.asUInt
+              when(csrWriteEnable) {
+                traceCsrWmaskReg := BigInt("ffffffff", 16).U(parameter.xlen)
+                traceCsrWdataReg := csrTraceWriteData.asUInt
               }
             }
           }
         }
 
-        when(commitEntersMem) {
-          memTraceRs1AddrReg  := execUsesRs1.?(rs1Index.asUInt, 0.U(5))
-          memTraceRs1RdataReg := execUsesRs1.?(rs1Data, 0.U(parameter.xlen))
-          memTraceRs2AddrReg  := execUsesRs2.?(rs2Index.asUInt, 0.U(5))
-          memTraceRs2RdataReg := execUsesRs2.?(rs2Data, 0.U(parameter.xlen))
-        }
+        probe.trace_valid.foreach(_ <== traceValidReg)
+        probe.trace_pc.foreach(_ <== tracePcReg)
+        probe.trace_next_pc.foreach(_ <== traceNextPcReg)
+        probe.trace_instr.foreach(_ <== traceInstrReg)
+        probe.trace_len.foreach(_ <== traceLenReg)
+        probe.trace_rd_we.foreach(_ <== traceRdWeReg)
+        probe.trace_rd.foreach(_ <== traceRdReg)
+        probe.trace_rd_wdata.foreach(_ <== traceRdWdataReg)
+        probe.trace_rs1_addr.foreach(_ <== traceRs1AddrReg)
+        probe.trace_rs1_rdata.foreach(_ <== traceRs1RdataReg)
+        probe.trace_rs2_addr.foreach(_ <== traceRs2AddrReg)
+        probe.trace_rs2_rdata.foreach(_ <== traceRs2RdataReg)
+        probe.trace_mem_addr.foreach(_ <== traceMemAddrReg)
+        probe.trace_mem_rmask.foreach(_ <== traceMemRmaskReg)
+        probe.trace_mem_wmask.foreach(_ <== traceMemWmaskReg)
+        probe.trace_mem_rdata.foreach(_ <== traceMemRdataReg)
+        probe.trace_mem_wdata.foreach(_ <== traceMemWdataReg)
+        probe.trace_mem_fault.foreach(_ <== traceMemFaultReg)
+        probe.trace_mem_fault_rmask.foreach(_ <== traceMemFaultRmaskReg)
+        probe.trace_mem_fault_wmask.foreach(_ <== traceMemFaultWmaskReg)
+        probe.trace_csr_addr.foreach(_ <== traceCsrAddrReg)
+        probe.trace_csr_rmask.foreach(_ <== traceCsrRmaskReg)
+        probe.trace_csr_wmask.foreach(_ <== traceCsrWmaskReg)
+        probe.trace_csr_rdata.foreach(_ <== traceCsrRdataReg)
+        probe.trace_csr_wdata.foreach(_ <== traceCsrWdataReg)
+        probe.trace_trap.foreach(_ <== traceTrapReg)
+        probe.trace_trap_cause.foreach(_ <== traceTrapCauseReg)
+        probe.trace_mstatus_post_commit.foreach(_ <== tracePostCommitMstatusReg)
+        probe.trace_mstatus_pre_trap.foreach(_ <== tracePreTrapMstatusReg)
+        probe.trace_irq_pending_mask.foreach(_ <== traceIrqPendingMaskReg)
 
-        when(commitNonMem) {
-          tracePostCommitMstatusReg := postCommitMstatus.asUInt
-          traceTrapReg              := execTrap
-          traceTrapCauseReg         := execTrapCause
-          traceRdWeReg              := execWriteRd
-          traceRdReg                := rdIndex.bits(3, 0).asUInt
-          traceRdWdataReg           := execWriteRd.?(execWdata, 0.U(parameter.xlen))
-          traceRs1AddrReg           := (execUsesRs1 & !execTrap).?(rs1Index.asUInt, 0.U(5))
-          traceRs1RdataReg          := (execUsesRs1 & !execTrap).?(rs1Data, 0.U(parameter.xlen))
-          traceRs2AddrReg           := (execUsesRs2 & !execTrap).?(rs2Index.asUInt, 0.U(5))
-          traceRs2RdataReg          := (execUsesRs2 & !execTrap).?(rs2Data, 0.U(parameter.xlen))
-          traceNextPcReg            := execTrap.?(trapVector, execNextPc)
-          when(isCsr & !execTrap) {
-            traceCsrAddrReg  := csrAddr.asUInt
-            traceCsrRmaskReg := BigInt("ffffffff", 16).U(parameter.xlen)
-            traceCsrRdataReg := csrReadData.asUInt
-            when(csrWriteEnable) {
-              traceCsrWmaskReg := BigInt("ffffffff", 16).U(parameter.xlen)
-              traceCsrWdataReg := csrTraceWriteData.asUInt
-            }
-          }
-        }
-      }
-
-      probe.trace_valid <== traceValidReg
-      probe.trace_pc <== tracePcReg
-      probe.trace_next_pc <== traceNextPcReg
-      probe.trace_instr <== traceInstrReg
-      probe.trace_len <== traceLenReg
-      probe.trace_rd_we <== traceRdWeReg
-      probe.trace_rd <== traceRdReg
-      probe.trace_rd_wdata <== traceRdWdataReg
-      probe.trace_rs1_addr <== traceRs1AddrReg
-      probe.trace_rs1_rdata <== traceRs1RdataReg
-      probe.trace_rs2_addr <== traceRs2AddrReg
-      probe.trace_rs2_rdata <== traceRs2RdataReg
-      probe.trace_mem_addr <== traceMemAddrReg
-      probe.trace_mem_rmask <== traceMemRmaskReg
-      probe.trace_mem_wmask <== traceMemWmaskReg
-      probe.trace_mem_rdata <== traceMemRdataReg
-      probe.trace_mem_wdata <== traceMemWdataReg
-      probe.trace_mem_fault <== traceMemFaultReg
-      probe.trace_mem_fault_rmask <== traceMemFaultRmaskReg
-      probe.trace_mem_fault_wmask <== traceMemFaultWmaskReg
-      probe.trace_csr_addr <== traceCsrAddrReg
-      probe.trace_csr_rmask <== traceCsrRmaskReg
-      probe.trace_csr_wmask <== traceCsrWmaskReg
-      probe.trace_csr_rdata <== traceCsrRdataReg
-      probe.trace_csr_wdata <== traceCsrWdataReg
-      probe.trace_trap <== traceTrapReg
-      probe.trace_trap_cause <== traceTrapCauseReg
-      probe.trace_mstatus_post_commit <== tracePostCommitMstatusReg
-      probe.trace_mstatus_pre_trap <== tracePreTrapMstatusReg
-      probe.trace_irq_pending_mask <== traceIrqPendingMaskReg
-
-      val traceMstatusWire = Wire(UInt(parameter.xlen))
-      val traceMieWire     = Wire(UInt(parameter.xlen))
-      val traceMtvecWire   = Wire(UInt(parameter.xlen))
-      val traceMepcWire    = Wire(UInt(parameter.xlen))
-      val traceMtvalWire   = Wire(UInt(parameter.xlen))
-      val traceMipWire     = Wire(UInt(parameter.xlen))
-      val traceMcauseWire  = Wire(UInt(parameter.xlen))
-      traceMstatusWire := csrMstatus.asUInt
-      traceMieWire     := csrMie.asUInt
-      traceMtvecWire   := csrMtvec
-      traceMepcWire    := csrMepc
-      traceMtvalWire   := csrMtval
-      traceMipWire     := irqMip.asUInt
-      traceMcauseWire  := csrMcause.asUInt
-      probe.trace_mstatus <== traceMstatusWire
-      probe.trace_mie <== traceMieWire
-      probe.trace_mtvec <== traceMtvecWire
-      probe.trace_mepc <== traceMepcWire
-      probe.trace_mtval <== traceMtvalWire
-      probe.trace_mip <== traceMipWire
-      probe.trace_mcause <== traceMcauseWire
+        val traceMstatusWire = Wire(UInt(parameter.xlen))
+        val traceMieWire     = Wire(UInt(parameter.xlen))
+        val traceMtvecWire   = Wire(UInt(parameter.xlen))
+        val traceMepcWire    = Wire(UInt(parameter.xlen))
+        val traceMtvalWire   = Wire(UInt(parameter.xlen))
+        val traceMipWire     = Wire(UInt(parameter.xlen))
+        val traceMcauseWire  = Wire(UInt(parameter.xlen))
+        traceMstatusWire := csrMstatus.asUInt
+        traceMieWire     := csrMie.asUInt
+        traceMtvecWire   := csrMtvec
+        traceMepcWire    := csrMepc
+        traceMtvalWire   := csrMtval
+        traceMipWire     := irqMip.asUInt
+        traceMcauseWire  := csrMcause.asUInt
+        probe.trace_mstatus.foreach(_ <== traceMstatusWire)
+        probe.trace_mie.foreach(_ <== traceMieWire)
+        probe.trace_mtvec.foreach(_ <== traceMtvecWire)
+        probe.trace_mepc.foreach(_ <== traceMepcWire)
+        probe.trace_mtval.foreach(_ <== traceMtvalWire)
+        probe.trace_mip.foreach(_ <== traceMipWire)
+        probe.trace_mcause.foreach(_ <== traceMcauseWire)

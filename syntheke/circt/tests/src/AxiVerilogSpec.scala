@@ -37,15 +37,22 @@ object AxiVerilogSpec extends TestSuite:
         Vector("core0", "core1", "dma", "sysXbar", "l2", "dram", "bridge", "periphXbar", "uart", "gpio")
       )
 
-      val core0 = core(idBits = 2, maxFlight = 4)
-      val core1 = core(idBits = 3, maxFlight = 8)
+      val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0)
+      val core1 = core(idBits = 3, maxFlight = 8, resetPc = 0)
       val dma   = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = 0x80000000L, windowLog2 = 10)
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
       val mem                     = wrapper {
         val l2   = l2Cache(capacityKiB = 512)
-        val dram = dramCtrl(ranks = 2, wordsLog2 = 6, base = 0x80000000L, size = 0x80000000L, idCapacityBits = 6)
+        val dram = dramCtrl(
+          ranks = 2,
+          wordsLog2 = 6,
+          base = 0x80000000L,
+          size = 0x80000000L,
+          bootAliasSize = 0x10000000L,
+          idCapacityBits = 6
+        )
         dram.in <-- l2.out
         (l2.in, l2.clk, dram.clk)
       }

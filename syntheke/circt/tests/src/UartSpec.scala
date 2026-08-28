@@ -21,14 +21,14 @@ object UartSpec extends TestSuite:
     ZaoziBackend(UartDevice, UartDeviceGen),
     ZaoziBackend(ClockSource, ClockSourceGen),
     ZaoziBackend(SerialPads, SerialPadsGen),
-    ZaoziBackend(Core, CoreGen)
+    ZaoziBackend(Core, CoreDeviceGen)
   )
 
   def buildDesign(freqHz: Int = 1843200, baud: Int = 115200): DesignSpec =
     Design {
       val clkSrc = clockSource(freqHz, Vector("uart", "host"))
 
-      val host = core(idBits = 2, maxFlight = 4)
+      val host = core(idBits = 2, maxFlight = 4, resetPc = 0)
 
       val uart                          = generator(UartDevice) {
         val clk    = inward(ClockDomain).uFn(_ => Right(()))

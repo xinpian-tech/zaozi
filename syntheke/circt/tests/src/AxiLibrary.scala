@@ -35,18 +35,24 @@ def shapeOf(view: EdgeView, n: Axi4.Node): AxiShape =
 
 // ============ Core: an AXI master with a local id space ============
 
-val Core = new GeneratorEntry[CoreP]
+val Core = new GeneratorEntry[CoreDeviceP]
 
-/** One AXI master core: a boundary outward node with a local id space; the master is named after the instance. */
+/** One core ([[CoreDeviceGen]], the real DitDah32 RV32EC behind a widening shim): a boundary outward node with a local
+  * id space; the master is named after the instance.
+  */
 final class CoreNodes(
   name:      String,
   idBits:    Int,
-  maxFlight: Int
+  maxFlight: Int,
+  resetPc:   Int
 )(
-  using GeneratorScope[CoreP])
+  using GeneratorScope[CoreDeviceP])
     extends Nodes:
   val clk = inward(ClockDomain).uFn(_ => Right(()))
-  parameters(view => Right(CoreP(name, idBits, maxFlight, shapeOf(view, mem))))
+  parameters { view =>
+    val s = shapeOf(view, mem)
+    Right(CoreDeviceP(resetPc, s.addrBits, s.dataBits, s.idBits))
+  }
   val mem =
     outward(Axi4).dFn(_ =>
       Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight = Some(maxFlight)))))
@@ -54,7 +60,8 @@ final class CoreNodes(
 
 def core(
   idBits:    Int,
-  maxFlight: Int
+  maxFlight: Int,
+  resetPc:   Int
 )(
   using
   ws:        WrapperScope,
@@ -62,7 +69,7 @@ def core(
   file:      sourcecode.File,
   line:      sourcecode.Line
 ): CoreNodes =
-  generator(Core)(new CoreNodes(name.value, idBits, maxFlight))
+  generator(Core)(new CoreNodes(name.value, idBits, maxFlight, resetPc))
 
 // ============ Dma: a bus-mastering DMA engine ============
 
@@ -211,7 +218,8 @@ def l2Cache(
 val Dram = new GeneratorEntry[DramDeviceP]
 
 /** The DRAM controller ([[DramDeviceGen]], the real device): one uncached address range on a 128-bit bus, named after
-  * the instance; `wordsLog2` sizes the behavioral backing store.
+  * the instance; `wordsLog2` sizes the behavioral backing store. A non-zero `bootAliasSize` additionally decodes
+  * `[0, bootAliasSize)` onto the same store, so a core resetting at 0 boots from DRAM.
   */
 final class DramNodes(
   name:           String,
@@ -219,6 +227,7 @@ final class DramNodes(
   wordsLog2:      Int,
   base:           Long,
   size:           Long,
+  bootAliasSize:  Long,
   idCapacityBits: Int
 )(
   using GeneratorScope[DramDeviceP])
@@ -234,7 +243,8 @@ final class DramNodes(
         slaves = Vector(
           AxiSlaveParams(
             name,
-            AddressSet.misaligned(base, size),
+            AddressSet.misaligned(base, size) ++ (if bootAliasSize > 0 then AddressSet.misaligned(0L, bootAliasSize)
+                                                  else Vector.empty),
             RegionType.Uncached,
             executable = true,
             supportsWrite = TransferSizes(1, 64),
@@ -253,6 +263,7 @@ def dramCtrl(
   wordsLog2:      Int,
   base:           Long,
   size:           Long,
+  bootAliasSize:  Long,
   idCapacityBits: Int
 )(
   using
@@ -261,7 +272,7 @@ def dramCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): DramNodes =
-  generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, idCapacityBits))
+  generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, bootAliasSize, idCapacityBits))
 
 // ============ WidthBridge: wide to narrow ============
 
@@ -507,7 +518,7 @@ def serialPads(
 val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(ClockSource, ClockSourceGen),
   ZaoziBackend(SerialPads, SerialPadsGen),
-  ZaoziBackend(Core, CoreGen),
+  ZaoziBackend(Core, CoreDeviceGen),
   ZaoziBackend(Dma, DmaDeviceGen),
   ZaoziBackend(Xbar, XbarGen),
   ZaoziBackend(L2, L2DeviceGen),
