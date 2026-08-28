@@ -136,11 +136,15 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
       }
 
     // ================= write path =================
-    // 0 idle, 1 AW forward, 2 W stream, 3 B return, 4 DECERR absorb W, 5 DECERR answer B.
-    val wState = RegInit(0.U(3))
-    val wIn    = RegInit(0.U(inW))
-    val wOut   = RegInit(0.U(outW))
-    val wRr    = Option.when(p.arbitration == Arbitration.RoundRobin)(RegInit(0.U(inW)))
+    // 0 idle, 1 AW+W transfer, 3 B return, 4 DECERR absorb W, 5 DECERR answer B. AW and W forward concurrently in
+    // state 1: a slave may hold AWREADY until it sees WVALID (AXI's slave freedom), so W must never wait for the AW
+    // handshake (the matching master rule); each channel completes once, B follows when both have.
+    val wState  = RegInit(0.U(3))
+    val wIn     = RegInit(0.U(inW))
+    val wOut    = RegInit(0.U(outW))
+    val wAwDone = RegInit(false.B)
+    val wWDone  = RegInit(false.B)
+    val wRr     = Option.when(p.arbitration == Arbitration.RoundRobin)(RegInit(0.U(inW)))
 
     val wSel = Wire(UInt(inW))
     val wAny = Wire(Bool())
@@ -183,12 +187,12 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     for i <- 0 until n do
       for o <- 0 until m do
         val active = (wIn === i.U(inW)) & (wOut === o.U(outW))
-        // AW forward with the static id remap.
+        // AW forwards with the static id remap; W streams beside it until its last beat.
         when((wState === 1.U(3)) & active) {
           val aw  = ch(in(i), "aw")
           val oaw = ch(out(o), "aw")
-          oaw.field[Bool]("valid") := aw.field[Bool]("valid")
-          aw.field[Bool]("ready")  := oaw.field[Bool]("ready")
+          oaw.field[Bool]("valid") := aw.field[Bool]("valid") & (!wAwDone)
+          aw.field[Bool]("ready")  := oaw.field[Bool]("ready") & (!wAwDone)
           val lid = aw.field[Record]("bits").field[UInt]("id")
           val gid =
             if n == 1 then lid.asBits.asUInt
@@ -200,20 +204,23 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
           oaw.field[Record]("bits").field[UInt]("len")   := aw.field[Record]("bits").field[UInt]("len")
           oaw.field[Record]("bits").field[UInt]("size")  := aw.field[Record]("bits").field[UInt]("size")
           oaw.field[Record]("bits").field[UInt]("burst") := aw.field[Record]("bits").field[UInt]("burst")
-          when(aw.field[Bool]("valid") & oaw.field[Bool]("ready")) { wState := 2.U(3) }
-        }
-        // W stream until last.
-        when((wState === 2.U(3)) & active) {
           val w  = ch(in(i), "w")
           val ow = ch(out(o), "w")
-          ow.field[Bool]("valid")                      := w.field[Bool]("valid")
-          w.field[Bool]("ready")                       := ow.field[Bool]("ready")
+          ow.field[Bool]("valid")                      := w.field[Bool]("valid") & (!wWDone)
+          w.field[Bool]("ready")                       := ow.field[Bool]("ready") & (!wWDone)
           ow.field[Record]("bits").field[UInt]("data") := w.field[Record]("bits").field[UInt]("data")
           ow.field[Record]("bits").field[UInt]("strb") := w.field[Record]("bits").field[UInt]("strb")
           ow.field[Record]("bits").field[Bool]("last") := w.field[Record]("bits").field[Bool]("last")
-          when(
-            w.field[Bool]("valid") & ow.field[Bool]("ready") & w.field[Record]("bits").field[Bool]("last")
-          ) { wState := 3.U(3) }
+          val awHs  = aw.field[Bool]("valid") & oaw.field[Bool]("ready") & (!wAwDone)
+          val wLast = w.field[Bool]("valid") & ow.field[Bool]("ready") & (!wWDone) &
+            w.field[Record]("bits").field[Bool]("last")
+          when(awHs) { wAwDone := true.B }
+          when(wLast) { wWDone := true.B }
+          when((wAwDone | awHs) & (wWDone | wLast)) {
+            wAwDone := false.B
+            wWDone  := false.B
+            wState  := 3.U(3)
+          }
         }
         // B return with the id un-mapped.
         when((wState === 3.U(3)) & active) {

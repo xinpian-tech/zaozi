@@ -31,7 +31,7 @@ class DitDah32GprIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
 @generator
 object DitDah32Gpr extends Generator[DitDah32Parameter, DitDah32GprLayers, DitDah32GprIO, DitDah32GprProbe]:
 
-  override def moduleName(parameter: DitDah32Parameter): String = "DitDah32Gpr"
+  override def moduleName(parameter: DitDah32Parameter): String = s"DitDah32Gpr_${parameter.hashCode.toHexString}"
 
   def architecture(parameter: DitDah32Parameter) =
     val io = summon[Interface[DitDah32GprIO]]

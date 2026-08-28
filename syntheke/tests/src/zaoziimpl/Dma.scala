@@ -37,22 +37,32 @@ object DmaDeviceGen extends Generator[DmaDeviceP, DmaDevicePLayers, DmaDevicePIO
     val offset = RegInit(0.U(offW)) // byte offset inside the window, bus-word aligned
     val beat   = RegInit(0.U(32))
 
-    // States: 0 issue AW, 1 issue W, 2 wait B.
-    val state = RegInit(0.U(2))
+    // States: 0 issue AW and W together (W must not wait for the AW handshake — the AXI master rule), 2 wait B.
+    val state  = RegInit(0.U(2))
+    val awDone = RegInit(false.B)
+    val wDone  = RegInit(false.B)
 
-    io.mem.aw.valid      := state === 0.U(2)
+    io.mem.aw.valid      := (state === 0.U(2)) & (!awDone)
     io.mem.aw.bits.id    := 0.U(p.idBits)
     io.mem.aw.bits.addr  := (((p.targetBase >> offW).toInt).U(p.addrBits - offW).asBits ## offset.asBits).asUInt
     io.mem.aw.bits.len   := 0.U(8)
     io.mem.aw.bits.size  := 4.U(3) // 16 bytes per beat
     io.mem.aw.bits.burst := 1.U(2) // INCR
-    when((state === 0.U(2)) & io.mem.aw.ready) { state := 1.U(2) }
 
-    io.mem.w.valid     := state === 1.U(2)
+    io.mem.w.valid     := (state === 0.U(2)) & (!wDone)
     io.mem.w.bits.data := (0.U(96).asBits ## beat.asBits).asUInt
     io.mem.w.bits.strb := 65535.U(16)
     io.mem.w.bits.last := true.B
-    when((state === 1.U(2)) & io.mem.w.ready) { state := 2.U(2) }
+
+    val awHs = (state === 0.U(2)) & io.mem.aw.ready & (!awDone)
+    val wHs  = (state === 0.U(2)) & io.mem.w.ready & (!wDone)
+    when(awHs) { awDone := true.B }
+    when(wHs) { wDone := true.B }
+    when((awDone | awHs) & (wDone | wHs)) {
+      awDone := false.B
+      wDone  := false.B
+      state  := 2.U(2)
+    }
 
     io.mem.b.ready := state === 2.U(2)
     when((state === 2.U(2)) & io.mem.b.valid) {

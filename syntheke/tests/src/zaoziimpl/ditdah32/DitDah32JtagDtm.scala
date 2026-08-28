@@ -10,7 +10,8 @@ import me.jiuyang.zaozi.valuetpe.*
 @generator
 object DitDah32JtagDtm extends Generator[DitDah32Parameter, DitDah32DebugLayers, JtagDtmIO, DitDah32DebugProbe]:
 
-  override def moduleName(parameter: DitDah32Parameter): String = "DitDah32JtagDtm"
+  override def moduleName(parameter: DitDah32Parameter): String =
+    s"DitDah32JtagDtm_${parameter.hashCode.toHexString}"
 
   def architecture(parameter: DitDah32Parameter) =
     val io = summon[Interface[JtagDtmIO]]

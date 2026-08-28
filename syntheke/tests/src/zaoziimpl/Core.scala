@@ -44,23 +44,26 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     core.io.irq.timer    := false.B
     core.io.irq.external := false.B
 
-    // ---- AW: pass the word address, fixed id 0 / single beat / 4 bytes; remember the lane for W ----
+    // ---- AW / W: forwarded concurrently — W must not wait for the AW handshake (the AXI master rule; the peripheral
+    // slaves hold AWREADY until they see WVALID). The write lane follows the live AW address until that handshake and
+    // the latch afterwards; W flows whenever a lane is known. ----
     val awLane = RegInit(0.U(2))
-    val awSeen = RegInit(false.B)
+    val awDone = RegInit(false.B)
+    val wDone  = RegInit(false.B)
 
-    io.mem.aw.valid      := core.io.axi.aw.valid
-    core.io.axi.aw.ready := io.mem.aw.ready
+    io.mem.aw.valid      := core.io.axi.aw.valid & (!awDone)
+    core.io.axi.aw.ready := io.mem.aw.ready & (!awDone)
     io.mem.aw.bits.id    := 0.U(p.idBits)
     io.mem.aw.bits.addr  := core.io.axi.aw.bits.addr.asBits.bits(p.addrBits - 1, 0).asUInt
     io.mem.aw.bits.len   := 0.U(8)
     io.mem.aw.bits.size  := 2.U(3)
     io.mem.aw.bits.burst := 1.U(2)
-    when(core.io.axi.aw.valid & io.mem.aw.ready) {
-      awLane := core.io.axi.aw.bits.addr.asBits.bits(3, 2).asUInt
-      awSeen := true.B
-    }
 
-    // ---- W: held until the address passed, then ride the addressed lane ----
+    val lane = Wire(UInt(2))
+    lane := core.io.axi.aw.bits.addr.asBits.bits(3, 2).asUInt
+    when(awDone) { lane := awLane }
+    val laneKnown = awDone | core.io.axi.aw.valid
+
     val wData = Wire(UInt(p.dataBits))
     val wStrb = Wire(UInt(p.dataBits / 8))
     if p.dataBits == 32 then
@@ -69,22 +72,33 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     else
       wData := (0.U(96).asBits ## core.io.axi.w.bits.data.asBits).asUInt
       wStrb := (0.U(12).asBits ## core.io.axi.w.bits.strb.asBits).asUInt
-      for lane <- 1 until 4 do
-        when(awLane === lane.U(2)) {
-          if lane == 3 then
+      for l <- 1 until 4 do
+        when(lane === l.U(2)) {
+          if l == 3 then
             wData := (core.io.axi.w.bits.data.asBits ## 0.U(96).asBits).asUInt
             wStrb := (core.io.axi.w.bits.strb.asBits ## 0.U(12).asBits).asUInt
           else
-            wData := (0.U((3 - lane) * 32).asBits ## core.io.axi.w.bits.data.asBits ## 0.U(lane * 32).asBits).asUInt
-            wStrb := (0.U((3 - lane) * 4).asBits ## core.io.axi.w.bits.strb.asBits ## 0.U(lane * 4).asBits).asUInt
+            wData := (0.U((3 - l) * 32).asBits ## core.io.axi.w.bits.data.asBits ## 0.U(l * 32).asBits).asUInt
+            wStrb := (0.U((3 - l) * 4).asBits ## core.io.axi.w.bits.strb.asBits ## 0.U(l * 4).asBits).asUInt
         }
 
-    io.mem.w.valid      := core.io.axi.w.valid & awSeen
-    core.io.axi.w.ready := io.mem.w.ready & awSeen
+    io.mem.w.valid      := core.io.axi.w.valid & laneKnown & (!wDone)
+    core.io.axi.w.ready := io.mem.w.ready & laneKnown & (!wDone)
     io.mem.w.bits.data  := wData
     io.mem.w.bits.strb  := wStrb
     io.mem.w.bits.last  := true.B
-    when(core.io.axi.w.valid & io.mem.w.ready & awSeen) { awSeen := false.B }
+
+    val awHs = core.io.axi.aw.valid & io.mem.aw.ready & (!awDone)
+    val wHs  = core.io.axi.w.valid & io.mem.w.ready & laneKnown & (!wDone)
+    when(awHs) {
+      awDone := true.B
+      awLane := core.io.axi.aw.bits.addr.asBits.bits(3, 2).asUInt
+    }
+    when(wHs) { wDone := true.B }
+    when((awDone | awHs) & (wDone | wHs)) {
+      awDone := false.B
+      wDone  := false.B
+    }
 
     // ---- B / AR / R ----
     core.io.axi.b.valid     := io.mem.b.valid

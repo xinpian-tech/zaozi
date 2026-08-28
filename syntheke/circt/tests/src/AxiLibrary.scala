@@ -240,6 +240,61 @@ def dramCtrl(
 ): DramNodes =
   generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, bootAliasSize, idCapacityBits))
 
+// ============ BootRom: the boot memory ============
+
+val BootRom = new GeneratorEntry[BootRomP]
+
+/** The boot ROM ([[BootRomGen]], the real device): one executable read-only range on the 128-bit bus holding `image`;
+  * cores reset into it. Writes are answered with SLVERR, so the write capability is none.
+  */
+final class BootRomNodes(
+  name:           String,
+  base:           Long,
+  size:           Long,
+  idCapacityBits: Int,
+  image:          Vector[Long]
+)(
+  using GeneratorScope[BootRomP])
+    extends Nodes:
+  val clk = inward(ClockDomain).uFn(_ => Right(()))
+  parameters { view =>
+    val s = shapeOf(view, in)
+    Right(BootRomP(image, s.addrBits, s.dataBits, s.idBits))
+  }
+  val in  = inward(Axi4).uFn(_ =>
+    Right(
+      AxiSlavePort(
+        slaves = Vector(
+          AxiSlaveParams(
+            name,
+            AddressSet.misaligned(base, size),
+            RegionType.Uncached,
+            executable = true,
+            supportsWrite = TransferSizes.none,
+            supportsRead = TransferSizes(1, 16)
+          )
+        ),
+        beatBytes = 16,
+        idCapacityBits = idCapacityBits,
+        minLatency = 1
+      )
+    )
+  )
+
+def bootRom(
+  base:           Long,
+  size:           Long,
+  idCapacityBits: Int,
+  image:          Vector[Long]
+)(
+  using
+  ws:             WrapperScope,
+  name:           sourcecode.Name,
+  file:           sourcecode.File,
+  line:           sourcecode.Line
+): BootRomNodes =
+  generator(BootRom)(new BootRomNodes(name.value, base, size, idCapacityBits, image))
+
 // ============ WidthBridge: wide to narrow ============
 
 val WidthBridge = new GeneratorEntry[BridgeDeviceP]
@@ -480,6 +535,31 @@ def serialPads(
 ): SerialPadsNodes =
   generator(SerialPads)(new SerialPadsNodes)
 
+// ============ Console: the simulation testbench ============
+
+val Console = new GeneratorEntry[ConsoleP]
+
+/** The testbench ([[ConsoleGen]]): terminates the UART's serial pins, reassembles the frames at the divisor the settled
+  * clock frequency and baud rate dictate, and prints every byte through its `SimConsole`.
+  */
+final class ConsoleNodes(
+)(
+  using GeneratorScope[ConsoleP])
+    extends Nodes:
+  val clk    = inward(ClockDomain).uFn(_ => Right(()))
+  val serial = inward(Serial).uFn(_ => Right(()))
+  parameters(view => Right(ConsoleP(view.edgeOf(clk) / view.edgeOf(serial))))
+
+def console(
+)(
+  using
+  ws:   WrapperScope,
+  name: sourcecode.Name,
+  file: sourcecode.File,
+  line: sourcecode.Line
+): ConsoleNodes =
+  testbench(Console)(new ConsoleNodes)
+
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives. */
 val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(ClockSource, ClockSourceGen),
@@ -487,9 +567,11 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(Core, CoreDeviceGen),
   ZaoziBackend(Dma, DmaDeviceGen),
   ZaoziBackend(Xbar, XbarGen),
+  ZaoziBackend(BootRom, BootRomGen),
   ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeDeviceGen),
   ZaoziBackend(Uart, UartDeviceGen),
   ZaoziBackend(Gpio, GpioDeviceGen),
-  ZaoziBackend(GpioPadRing, GpioPadsGen)
+  ZaoziBackend(GpioPadRing, GpioPadsGen),
+  ZaoziBackend(Console, ConsoleGen)
 )

@@ -385,8 +385,10 @@ object Elaborator:
             val moved      = circuitOps.filter(op => Set("firrtl.module", "firrtl.extmodule")(op.getName.str)).filter { op =>
               val s2     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
               // An extmodule with a dumped definition is zaozi's stub for a child it elaborated separately: leave the
-              // stub behind and link the real module on demand. Without a dump it is a genuine external module.
-              val isStub = op.getName.str == "firrtl.extmodule" && os.exists(mlirbcDir / s"$s2.mlirbc")
+              // stub behind and link the real module on demand. Without a dump it is a genuine external module — as it
+              // is when this file is the extmodule's own dump (zaozi's VerilogWrapper flow): the declaration is the
+              // definition, carrying the Verilog module name and parameters into the design.
+              val isStub = op.getName.str == "firrtl.extmodule" && s2 != sym && os.exists(mlirbcDir / s"$s2.mlirbc")
               if defined(s2) || isStub then false
               else
                 op.removeFromParent()

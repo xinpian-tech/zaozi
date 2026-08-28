@@ -47,12 +47,15 @@ object BridgeDeviceGen extends Generator[BridgeDeviceP, BridgeDevicePLayers, Bri
     ) =
       (size <= 2.U(3)) & (len === 0.U(8))
 
-    // ---- write path: WIDLE accept, WAW forward, WW forward, WB wait, WERRW absorb, WERRB answer ----
-    val wState = RegInit(0.U(3))
-    val wId    = RegInit(0.U(p.wide.idBits))
-    val wLane  = RegInit(0.U(2))
-    val wAddr  = RegInit(0.U(p.narrow.addrBits))
-    val wSize  = RegInit(0.U(3))
+    // ---- write path: 0 accept, 1 AW+W transfer, 3 B wait, 4 error absorb, 5 error answer. AW and W go out
+    // concurrently — the peripheral may hold AWREADY until it sees WVALID, so W must not wait for the AW handshake. ----
+    val wState  = RegInit(0.U(3))
+    val wId     = RegInit(0.U(p.wide.idBits))
+    val wLane   = RegInit(0.U(2))
+    val wAddr   = RegInit(0.U(p.narrow.addrBits))
+    val wSize   = RegInit(0.U(3))
+    val wAwDone = RegInit(false.B)
+    val wWDone  = RegInit(false.B)
 
     io.in.aw.ready := wState === 0.U(3)
     when(io.in.aw.valid & io.in.aw.ready) {
@@ -67,13 +70,12 @@ object BridgeDeviceGen extends Generator[BridgeDeviceP, BridgeDevicePLayers, Bri
       }
     }
 
-    io.out.aw.valid      := wState === 1.U(3)
+    io.out.aw.valid      := (wState === 1.U(3)) & (!wAwDone)
     io.out.aw.bits.id    := wId
     io.out.aw.bits.addr  := wAddr
     io.out.aw.bits.len   := 0.U(8)
     io.out.aw.bits.size  := wSize
     io.out.aw.bits.burst := 1.U(2)
-    when((wState === 1.U(3)) & io.out.aw.ready) { wState := 2.U(3) }
 
     // The wide beat carries the word in lane wLane: extract data and strobes.
     val wDataSel = Wire(UInt(32))
@@ -86,12 +88,20 @@ object BridgeDeviceGen extends Generator[BridgeDeviceP, BridgeDevicePLayers, Bri
         wStrbSel := io.in.w.bits.strb.asBits.bits(lane * 4 + 3, lane * 4).asUInt
       }
 
-    io.in.w.ready      := (wState === 2.U(3)) & io.out.w.ready
-    io.out.w.valid     := (wState === 2.U(3)) & io.in.w.valid
+    io.in.w.ready      := (wState === 1.U(3)) & io.out.w.ready & (!wWDone)
+    io.out.w.valid     := (wState === 1.U(3)) & io.in.w.valid & (!wWDone)
     io.out.w.bits.data := wDataSel
     io.out.w.bits.strb := wStrbSel
     io.out.w.bits.last := true.B
-    when((wState === 2.U(3)) & io.in.w.valid & io.out.w.ready) { wState := 3.U(3) }
+    val wAwHs = (wState === 1.U(3)) & io.out.aw.ready & (!wAwDone)
+    val wWHs  = (wState === 1.U(3)) & io.in.w.valid & io.out.w.ready & (!wWDone)
+    when(wAwHs) { wAwDone := true.B }
+    when(wWHs) { wWDone := true.B }
+    when((wAwDone | wAwHs) & (wWDone | wWHs)) {
+      wAwDone := false.B
+      wWDone  := false.B
+      wState  := 3.U(3)
+    }
 
     io.out.b.ready := wState === 3.U(3)
     when((wState === 3.U(3)) & io.out.b.valid) { wState := 0.U(3) }

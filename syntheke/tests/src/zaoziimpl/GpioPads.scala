@@ -7,8 +7,9 @@ import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
 import me.jiuyang.zaozi.reftpe.Interface
 import upickle.default.ReadWriter
 
-/** The pad ring terminating a GPIO pin bank: the design boundary where out/oe leave and in enters. Like the clock
-  * source, the pad side has no in-design driver — the in placeholder marks where the testbench drives the pads.
+/** The pad ring terminating a GPIO pin bank, modeled at RTL fidelity: a driven pad (oe high) reads its output value
+  * back, an undriven pad reads 0 through its pull-down — so software can write OUT/DIR and observe IN. A production pad
+  * ring would route the pads to package pins instead.
   */
 
 case class GpioPadsP(width: Int) extends Parameter derives ReadWriter:
@@ -22,4 +23,6 @@ class GpioPadsPIO(p: GpioPadsP)     extends HWBundle(p):
 
 @zaoziGenerator
 object GpioPadsGen extends Generator[GpioPadsP, GpioPadsPLayers, GpioPadsPIO, GpioPadsPProbe]:
-  def architecture(p: GpioPadsP) = summon[Interface[GpioPadsPIO]].dontCare()
+  def architecture(p: GpioPadsP) =
+    val io = summon[Interface[GpioPadsPIO]]
+    io.in.in := (io.in.out.asBits & io.in.oe.asBits).asUInt
