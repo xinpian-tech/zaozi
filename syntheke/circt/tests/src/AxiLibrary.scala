@@ -198,20 +198,26 @@ def l2Cache(
 
 // ============ DRAM: the uncached memory slave ============
 
-val Dram = new GeneratorEntry[DramP]
+val Dram = new GeneratorEntry[DramDeviceP]
 
-/** A DRAM controller: one uncached address range on a 128-bit bus, named after the instance. */
+/** The DRAM controller ([[DramDeviceGen]], the real device): one uncached address range on a 128-bit bus, named after
+  * the instance; `wordsLog2` sizes the behavioral backing store.
+  */
 final class DramNodes(
   name:           String,
   ranks:          Int,
+  wordsLog2:      Int,
   base:           Long,
   size:           Long,
   idCapacityBits: Int
 )(
-  using GeneratorScope[DramP])
+  using GeneratorScope[DramDeviceP])
     extends Nodes:
   val clk = inward(ClockDomain).uFn(_ => Right(()))
-  parameters(view => Right(DramP(ranks, shapeOf(view, in))))
+  parameters { view =>
+    val s = shapeOf(view, in)
+    Right(DramDeviceP(ranks, wordsLog2, s.addrBits, s.dataBits, s.idBits))
+  }
   val in  = inward(Axi4).uFn(_ =>
     Right(
       AxiSlavePort(
@@ -234,6 +240,7 @@ final class DramNodes(
 
 def dramCtrl(
   ranks:          Int,
+  wordsLog2:      Int,
   base:           Long,
   size:           Long,
   idCapacityBits: Int
@@ -244,7 +251,7 @@ def dramCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): DramNodes =
-  generator(Dram)(new DramNodes(name.value, ranks, base, size, idCapacityBits))
+  generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, idCapacityBits))
 
 // ============ WidthBridge: wide to narrow ============
 
@@ -494,7 +501,7 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(Dma, DmaGen),
   ZaoziBackend(Xbar, XbarGen),
   ZaoziBackend(L2, L2Gen),
-  ZaoziBackend(Dram, DramGen),
+  ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeGen),
   ZaoziBackend(Uart, UartDeviceGen),
   ZaoziBackend(Gpio, GpioDeviceGen),

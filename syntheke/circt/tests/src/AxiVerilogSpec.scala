@@ -5,7 +5,7 @@ package me.jiuyang.syntheke.circt.tests
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
 import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
-import me.jiuyang.zaozi.{Generator, HWRecord}
+import me.jiuyang.zaozi.{Generator, HWBundle}
 import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
 import me.jiuyang.zaozi.reftpe.Interface
 import utest.*
@@ -19,12 +19,12 @@ import utest.*
 /** A deliberately wrong DRAM generator: same parameter type, twice the data width — its ports disagree with the settled
   * bundle, for the binding-checkpoint test.
   */
-class DramPWideIO(p: DramP) extends HWRecord(p):
-  val clk = Flipped("clk", new ClockRecord)
-  val in  = Flipped("in", new AxiPortRecord(p.port.copy(dataBits = p.port.dataBits * 2)))
+class DramWideIO(p: DramDeviceP) extends HWBundle(p):
+  val clk = Flipped(new ClockBundle)
+  val in  = Flipped(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits * 2, p.idBits)))
 @zaoziGenerator
-object DramGenWide          extends Generator[DramP, DramPLayers, DramPWideIO, DramPProbe]:
-  def architecture(p: DramP) = summon[Interface[DramPWideIO]].dontCare()
+object DramGenWide               extends Generator[DramDeviceP, DramDevicePLayers, DramWideIO, DramDevicePProbe]:
+  def architecture(p: DramDeviceP) = summon[Interface[DramWideIO]].dontCare()
 
 object AxiVerilogSpec extends TestSuite:
 
@@ -45,7 +45,7 @@ object AxiVerilogSpec extends TestSuite:
 
       val mem                     = wrapper {
         val l2   = l2Cache(capacityKiB = 512)
-        val dram = dramCtrl(ranks = 2, base = 0x80000000L, size = 0x80000000L, idCapacityBits = 6)
+        val dram = dramCtrl(ranks = 2, wordsLog2 = 6, base = 0x80000000L, size = 0x80000000L, idCapacityBits = 6)
         dram.in <-- l2.out
         (l2.in, l2.clk, dram.clk)
       }
