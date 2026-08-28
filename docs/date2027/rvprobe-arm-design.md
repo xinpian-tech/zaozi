@@ -19,14 +19,31 @@ Declining the race would read as evasion, and would leave the reader assuming we
 **Where the objection is wrong:** type checking is the visible surface, not the engine. Two
 differences are capability differences, not checking differences:
 
-1. **Declarative vs procedural.** HAVEN's DSL is a vocabulary of *steps* — `register_write`, `poll`,
-   `randomize_send`. The LLM must author the path: it has to know *how* to reach a scenario. In
-   rvprobe the LLM writes only *what must hold*, and BMC derives the input sequence — including
-   multi-cycle paths through state the model never reasons about. For a deep or rare state ("the FIFO
-   overflows while a read is in flight at address X") HAVEN needs the model to plan the route;
-   rvprobe needs it only to state the destination. This is precisely the gap that widened on the
-   complex designs: i2c, sdram and can are where route-planning breaks down, and they are where the
-   weak model collapsed.
+1. **Declarative vs procedural — verified against the generated artifacts, not assumed.** HAVEN's DSL
+   is procedural *at the sequence level* and declarative *at the value level*. From today's run
+   (`artifact/.../ir/phase4b_dsl_sequences.json`):
+
+   ```
+   i2c   write_single_byte_seq : register_write(slave_addr) → register_write(START=8'h60)
+                               → poll(sr[4]==0) → register_write(data) → register_write → poll
+   spi   transmit_byte_seq     : register_write(SPDR) → poll(status[7]==1)
+                               → register_read(SPDR) → register_write(clear SPIF)
+   alu   fp_add_operation      : randomize_send { a==32'h3f800000; b==...; op==4'h0; start==1 }
+   ```
+
+   The protocol designs get a genuine route — an ordered program with reactive `poll` waits — that
+   the **LLM had to author from the datasheet**. The ALU degenerates to a single constrained
+   `randomize_send`, i.e. value constraints, which is what our value semantics expresses directly.
+
+   So the LLM supplies the *route*, and it gets that route by transcribing the spec. The consequence
+   is the real claim: **HAVEN is strong exactly where the scenario is documented, and has nothing to
+   copy from where it is not** — an unusual interleaving, an error path, a corner state no datasheet
+   describes. rvprobe asks the model only for the destination and lets BMC find the route, documented
+   or not. That is the tail, and it is where i2c (63.2%) and sdram (11.0%) left their residual.
+
+   *Honest caveat on our side:* `poll` lets HAVEN wait an unknown number of cycles; a bounded witness
+   cannot. Protocols with long waits need k ≥ that latency, which feeds directly into the scaling
+   risk below.
 2. **Guarantee, and the infeasible verdict.** A witness provably satisfies the intent within the
    bound; constrained-random *probably* hits it. And when the intent cannot be satisfied, rvprobe
    says `Infeasible` — a result HAVEN structurally cannot produce. That verdict is information: the
