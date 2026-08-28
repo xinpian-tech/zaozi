@@ -30,7 +30,6 @@ final case class AddressRange(base: Long, size: Long) derives ReadWriter:
 /** Half-open id range `[start, end)`, as rocket-chip's IdRange. */
 final case class IdRange(start: Int, end: Int) derives ReadWriter:
   require(0 <= start && start < end, s"illegal IdRange($start, $end)")
-  def size:                    Int     = end - start
   def overlaps(that: IdRange): Boolean = start < that.end && that.start < end
   def shift(offset:  Int):     IdRange = IdRange(start + offset, end + offset)
 

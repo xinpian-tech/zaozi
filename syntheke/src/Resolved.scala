@@ -65,8 +65,6 @@ final case class EdgeView(
     view.get
 
   def edgeOf(n: NodeBuilder[?]): n.protocol.Edge = apply(n).edge.edgeAs(n.protocol)
-  def downOf(n: NodeBuilder[?]): n.protocol.Down = apply(n).edge.downAs(n.protocol)
-  def upOf(n:   NodeBuilder[?]): n.protocol.Up   = apply(n).edge.upAs(n.protocol)
 
   def edgeOf(h: RefHandle[?]): h.protocol.Edge =
     val ref = nodes.find(_.node == h.referrer).flatMap(_.refs.find(_.refName == h.refName))
