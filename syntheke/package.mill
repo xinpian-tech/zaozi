@@ -20,6 +20,12 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
 
   object tests extends ScalaTests with ScalafmtModule with Utest {
     def mvnDeps = Seq(v.utest)
+
+    // zaozi device implementations under `src/zaoziimpl` compile here; the zaozi annotation macros are experimental.
+    override def moduleDeps = super.moduleDeps ++ Seq(zaozi)
+
+    override def scalacOptions: T[Seq[String]] =
+      Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros") ++ Seq("-experimental"))
   }
 
   object circt extends ZaoziScalaModule with ScalafmtModule {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.syntheke.circt.tests
+package me.jiuyang.syntheke.tests.zaoziimpl
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
@@ -8,8 +8,8 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import upickle.default.ReadWriter
 
-/** A real UART device as a plain zaozi generator — zaozi API only, no syntheke construct; `UartSpec.scala` wraps it
-  * onto the negotiation graph and tests it end to end.
+/** A real UART device as a plain zaozi generator — zaozi API only, no syntheke construct; `UartSpec.scala` (in the
+  * circt test module) wraps it onto the negotiation graph and tests it end to end.
   *
   * Register map (word offsets on a 32-bit single-beat AXI slave — the negotiated contract `beatBytes = 4`,
   * `maxTransfer = 4` means one beat per burst):
@@ -29,25 +29,29 @@ class UartSerialBundle extends Bundle:
   val tx = Aligned(Bool())
   val rx = Flipped(Bool())
 
-class UartAxBundle(s: AxiShape) extends Bundle:
-  val id    = Aligned(UInt(s.idBits))
-  val addr  = Aligned(UInt(s.addrBits))
+case class UartDeviceP(divisor: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
+  require(divisor >= 8, s"uart divisor $divisor: needs at least 8 clocks per bit")
+  require(dataBits == 32, s"uart is a 32-bit single-beat slave, got dataBits $dataBits")
+
+class UartAxBundle(p: UartDeviceP) extends Bundle:
+  val id    = Aligned(UInt(p.idBits))
+  val addr  = Aligned(UInt(p.addrBits))
   val len   = Aligned(UInt(8))
   val size  = Aligned(UInt(3))
   val burst = Aligned(UInt(2))
 
-class UartWBundle(s: AxiShape) extends Bundle:
-  val data = Aligned(UInt(s.dataBits))
-  val strb = Aligned(UInt(s.dataBits / 8))
+class UartWBundle(p: UartDeviceP) extends Bundle:
+  val data = Aligned(UInt(p.dataBits))
+  val strb = Aligned(UInt(p.dataBits / 8))
   val last = Aligned(Bool())
 
-class UartBBundle(s: AxiShape) extends Bundle:
-  val id   = Aligned(UInt(s.idBits))
+class UartBBundle(p: UartDeviceP) extends Bundle:
+  val id   = Aligned(UInt(p.idBits))
   val resp = Aligned(UInt(2))
 
-class UartRBundle(s: AxiShape) extends Bundle:
-  val id   = Aligned(UInt(s.idBits))
-  val data = Aligned(UInt(s.dataBits))
+class UartRBundle(p: UartDeviceP) extends Bundle:
+  val id   = Aligned(UInt(p.idBits))
+  val data = Aligned(UInt(p.dataBits))
   val resp = Aligned(UInt(2))
   val last = Aligned(Bool())
 
@@ -56,23 +60,19 @@ class UartChannel[B <: Bundle](bits0: B) extends Bundle:
   val ready = Flipped(Bool())
   val bits  = Aligned(bits0)
 
-class UartAxiBundle(s: AxiShape) extends Bundle:
-  val aw = Aligned(new UartChannel(new UartAxBundle(s)))
-  val w  = Aligned(new UartChannel(new UartWBundle(s)))
-  val b  = Flipped(new UartChannel(new UartBBundle(s)))
-  val ar = Aligned(new UartChannel(new UartAxBundle(s)))
-  val r  = Flipped(new UartChannel(new UartRBundle(s)))
-
-case class UartDeviceP(name: String, divisor: Int, port: AxiShape) extends Parameter derives ReadWriter:
-  require(divisor >= 8, s"uart divisor $divisor: needs at least 8 clocks per bit")
-  require(port.dataBits == 32, s"uart is a 32-bit single-beat slave, got dataBits ${port.dataBits}")
+class UartAxiBundle(p: UartDeviceP) extends Bundle:
+  val aw = Aligned(new UartChannel(new UartAxBundle(p)))
+  val w  = Aligned(new UartChannel(new UartWBundle(p)))
+  val b  = Flipped(new UartChannel(new UartBBundle(p)))
+  val ar = Aligned(new UartChannel(new UartAxBundle(p)))
+  val r  = Flipped(new UartChannel(new UartRBundle(p)))
 
 class UartDevicePLayers(p: UartDeviceP) extends LayerInterface(p):
   def layers = Seq.empty
 class UartDevicePProbe(p: UartDeviceP)  extends DVBundle[UartDeviceP, UartDevicePLayers](p)
 class UartDevicePIO(p: UartDeviceP)     extends HWBundle(p):
   val clk    = Flipped(new UartClockBundle)
-  val in     = Flipped(new UartAxiBundle(p.port))
+  val in     = Flipped(new UartAxiBundle(p))
   val serial = Aligned(new UartSerialBundle)
 
 @generator
@@ -101,7 +101,7 @@ object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevic
       }
     }
 
-    // ---- receive engine (started below, completion may be overridden by a same-cycle RXDATA read-clear) ----
+    // ---- receive engine state (the engine itself is below the register file: completion beats a read-clear) ----
     val rxSync = RegInit(true.B)
     rxSync := io.serial.rx
     val rxShift = RegInit(0.U(8))
@@ -113,9 +113,9 @@ object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevic
 
     // ---- single-beat AXI slave ----
     val bPending = RegInit(false.B)
-    val bId      = RegInit(0.U(p.port.idBits))
+    val bId      = RegInit(0.U(p.idBits))
     val rPending = RegInit(false.B)
-    val rId      = RegInit(0.U(p.port.idBits))
+    val rId      = RegInit(0.U(p.idBits))
     val rData    = RegInit(0.U(32))
 
     io.in.aw.ready    := (!bPending) & io.in.w.valid
