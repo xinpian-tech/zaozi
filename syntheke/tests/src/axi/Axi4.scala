@@ -8,24 +8,88 @@ import upickle.default.ReadWriter
 /** An AXI4 negotiation protocol modeled on rocket-chip's `amba.axi4.Parameters`:
   *
   *   - `Down` is the master port: masters with disjoint id ranges (AXI4MasterPortParameters);
-  *   - `Up` is the slave port: slaves with disjoint address ranges, the bus `beatBytes`, and the id capacity the
+  *   - `Up` is the slave port: slaves with disjoint address sets, the bus `beatBytes`, and the id capacity the
   *     downstream can absorb (AXI4SlavePortParameters);
-  *   - `Edge` settles to bundle parameters: `addrBits = log2Up(maxAddress)` where `maxAddress` is the exclusive end,
-  *     `dataBits = beatBytes * 8`, `idBits = log2Up(endId)` (AXI4BundleParameters).
+  *   - `Edge` settles to bundle parameters: `addrBits = log2Up(maxAddress + 1)`, `dataBits = beatBytes * 8`,
+  *     `idBits = log2Up(endId)` (AXI4BundleParameters).
   *
-  * Everything is plain serializable data; upickle codecs come from `derives ReadWriter`.
+  * [[AddressSet]] carries diplomacy's base/mask algebra. Deliberate omissions from rocket-chip: the BundleField user
+  * bits (echo/request/response fields), device resources / DTS, and `nodePath` — syntheke's stable identifiers and
+  * source locations serve diagnostics instead. Everything is plain serializable data; upickle codecs come from
+  * `derives ReadWriter`.
   */
 
 def log2Up(x: Long): Int =
   require(x >= 1, s"log2Up($x)")
   if x <= 1 then 0 else 64 - java.lang.Long.numberOfLeadingZeros(x - 1)
 
-/** Half-open byte range `[base, base + size)`; the demo's simplification of rocket-chip's base/mask AddressSet. */
-final case class AddressRange(base: Long, size: Long) derives ReadWriter:
-  require(base >= 0 && size > 0, s"illegal AddressRange($base, $size)")
-  def end:                          Long    = base + size // exclusive
-  def overlaps(that: AddressRange): Boolean = base < that.end && that.base < end
-  def show:                         String  = f"0x$base%x+0x$size%x"
+/** The addresses with `(addr ^ base) & ~mask == 0`: `base` fixes the bits outside `mask`, the `mask` bits vary freely —
+  * diplomacy's AddressSet, mask not necessarily contiguous.
+  */
+final case class AddressSet(base: Long, mask: Long) derives ReadWriter:
+  require(base >= 0 && mask >= 0, s"illegal AddressSet($base, $mask)")
+  require((base & mask) == 0L, f"AddressSet base 0x$base%x must be aligned to its mask 0x$mask%x")
+
+  def contains(x:    Long):          Boolean = ((x ^ base) & ~mask) == 0L
+  def contains(that: AddressSet):    Boolean =
+    ((that.base ^ base) & ~mask) == 0L && (that.mask & ~mask) == 0L
+  def overlaps(that: AddressSet):    Boolean = ((that.base ^ base) & ~(mask | that.mask)) == 0L
+
+  def intersect(that: AddressSet): Option[AddressSet] =
+    if !overlaps(that) then None else Some(AddressSet(base | that.base, mask & that.mask))
+
+  /** This set minus `that`, as disjoint sets: one per bit free here but fixed in the intersection. */
+  def subtract(that: AddressSet): Vector[AddressSet] =
+    intersect(that) match
+      case None          => Vector(this)
+      case Some(removed) =>
+        AddressSet.bitsOf(mask & ~removed.mask).map { bit =>
+          AddressSet(base | (bit & ~removed.base), mask & ~bit)
+        }
+
+  /** Frees the `imask` bits: the union over all their values. */
+  def widen(imask: Long): AddressSet = AddressSet(base & ~imask, mask | imask)
+
+  def alignment:  Long    = (mask + 1) & ~mask
+  def contiguous: Boolean = alignment == mask + 1
+  def max:        Long    = base | mask // inclusive
+  def show:       String  = f"0x$base%x/0x$mask%x"
+
+object AddressSet:
+  private def bitsOf(x: Long): Vector[Long] =
+    Vector.iterate(java.lang.Long.lowestOneBit(x), java.lang.Long.bitCount(x))(bit =>
+      java.lang.Long.lowestOneBit(x & ~(bit | (bit - 1)))
+    )
+
+  /** `[base, base + size)` as disjoint aligned sets, largest chunks first-fit (diplomacy's misaligned). */
+  def misaligned(base: Long, size: Long): Vector[AddressSet] =
+    require(base >= 0 && size > 0, s"illegal misaligned($base, $size)")
+    @scala.annotation.tailrec
+    def loop(base: Long, size: Long, acc: Vector[AddressSet]): Vector[AddressSet] =
+      if size == 0 then acc
+      else
+        val baseAlign = base & -base
+        val sizeAlign = 1L << (63 - java.lang.Long.numberOfLeadingZeros(size))
+        val step      = if baseAlign == 0 || baseAlign > sizeAlign then sizeAlign else baseAlign
+        loop(base + step, size - step, acc :+ AddressSet(base, step - 1))
+    loop(base, size, Vector.empty)
+
+  /** The same address space with fewer sets: drops contained sets, merges same-mask sets differing in one base bit. */
+  def unify(seq: Seq[AddressSet]): Vector[AddressSet] =
+    val sets   = seq.toVector.distinct
+    val kept   = sets.filterNot(s => sets.exists(o => (o ne s) && o.contains(s)))
+    val merged = kept.indices.view
+      .flatMap(i => (i + 1 until kept.size).view.map(j => (i, j)))
+      .collectFirst {
+        case (i, j)
+            if kept(i).mask == kept(j).mask &&
+              java.lang.Long.bitCount(kept(i).base ^ kept(j).base) == 1 =>
+          val bit = kept(i).base ^ kept(j).base
+          kept.patch(j, Nil, 1).patch(i, Vector(AddressSet(kept(i).base & kept(j).base, kept(i).mask | bit)), 1)
+      }
+    merged match
+      case Some(next) => unify(next)
+      case None       => kept.sortBy(s => (s.base, s.mask))
 
 /** Half-open id range `[start, end)`, as rocket-chip's IdRange. */
 final case class IdRange(start: Int, end: Int) derives ReadWriter:
@@ -33,14 +97,26 @@ final case class IdRange(start: Int, end: Int) derives ReadWriter:
   def overlaps(that: IdRange): Boolean = start < that.end && that.start < end
   def shift(offset:  Int):     IdRange = IdRange(start + offset, end + offset)
 
-/** Supported transfer sizes in bytes, inclusive on both ends (rocket-chip TransferSizes). */
+/** Supported transfer sizes in bytes, inclusive powers of two, `none` when zero (rocket-chip TransferSizes). */
 final case class TransferSizes(min: Int, max: Int) derives ReadWriter:
-  require(0 < min && min <= max, s"illegal TransferSizes($min, $max)")
+  require(0 <= min && min <= max, s"illegal TransferSizes($min, $max)")
+  require((min == 0) == (max == 0), s"illegal TransferSizes($min, $max)")
+  require(min == 0 || Integer.bitCount(min) == 1, s"TransferSizes min $min is not a power of two")
+  require(max == 0 || Integer.bitCount(max) == 1, s"TransferSizes max $max is not a power of two")
+  def none:                           Boolean       = max == 0
+  def contains(x: Int):               Boolean       = Integer.bitCount(x) == 1 && min <= x && x <= max
+  def intersect(that: TransferSizes): TransferSizes =
+    if max < that.min || that.max < min then TransferSizes.none
+    else TransferSizes(math.max(min, that.min), math.min(max, that.max))
+
+object TransferSizes:
+  val none: TransferSizes = TransferSizes(0, 0)
 
 final case class AxiMasterParams(
   name:      String,
   id:        IdRange,
-  maxFlight: Int)
+  aligned:   Boolean = false,
+  maxFlight: Option[Int] = None) // None: unlimited transactions in flight per id
     derives ReadWriter
 
 /** The downward-flowing port parameters (AXI4MasterPortParameters). */
@@ -56,15 +132,18 @@ enum RegionType derives CanEqual, ReadWriter:
   case Cached, Tracked, Uncached, Idempotent, Volatile, PutEffects, GetEffects
 
 final case class AxiSlaveParams(
-  name:          String,
-  address:       Vector[AddressRange],
+  name:          String,             // diagnostics; rocket-chip uses nodePath / device resources instead
+  address:       Vector[AddressSet],
   regionType:    RegionType,
   executable:    Boolean,
+  supportsWrite: TransferSizes,
   supportsRead:  TransferSizes,
-  supportsWrite: TransferSizes)
+  interleavedId: Option[Int] = None) // Some(id): read responses of this slave never interleave
     derives ReadWriter:
-  def maxTransfer: Int  = math.max(supportsRead.max, supportsWrite.max)
-  def maxAddress:  Long = address.map(_.end).max
+  require(address.nonEmpty, s"slave '$name' needs at least one address set")
+  def maxTransfer:  Int  = math.max(supportsWrite.max, supportsRead.max)
+  def maxAddress:   Long = address.map(_.max).max // inclusive
+  def minAlignment: Long = address.map(_.alignment).min
 
 /** The upward-flowing port parameters (AXI4SlavePortParameters plus the id capacity of the doc's motivation example:
   * how many id bits the downstream implementation can absorb).
@@ -76,9 +155,10 @@ final case class AxiSlavePort(
   minLatency:     Int)
     derives ReadWriter:
   require(slaves.nonEmpty, "AxiSlavePort needs at least one slave")
-  def maxTransfer:    Int                                                  = slaves.map(_.maxTransfer).max
-  def maxAddress:     Long                                                 = slaves.map(_.maxAddress).max
-  def addressOverlap: Option[(String, AddressRange, String, AddressRange)] =
+  require(Integer.bitCount(beatBytes) == 1, s"beatBytes $beatBytes is not a power of two")
+  def maxTransfer:    Int                                              = slaves.map(_.maxTransfer).max
+  def maxAddress:     Long                                             = slaves.map(_.maxAddress).max // inclusive
+  def addressOverlap: Option[(String, AddressSet, String, AddressSet)] =
     val all = slaves.flatMap(s => s.address.map(a => (s.name, a)))
     all.combinations(2).collectFirst { case Seq((sn, sa), (tn, ta)) if sa.overlaps(ta) => (sn, sa, tn, ta) }
 
@@ -110,7 +190,6 @@ object Axi4 extends Protocol:
       return fail(
         s"masters need $idBits id bits (endId=${m.endId}) but the downstream absorbs at most ${s.idCapacityBits}"
       )
-    if !Integer.toBinaryString(s.beatBytes).matches("10*") then return fail(s"beatBytes ${s.beatBytes} is not pow2")
     if s.maxTransfer < s.beatBytes then
       return fail(s"maxTransfer ${s.maxTransfer} smaller than bus width ${s.beatBytes}: link pointlessly wide")
     if s.maxTransfer > s.beatBytes * 256 then
@@ -119,7 +198,7 @@ object Axi4 extends Protocol:
       AxiEdgeParams(
         master = m,
         slave = s,
-        addrBits = math.max(1, log2Up(s.maxAddress)),
+        addrBits = math.max(1, log2Up(s.maxAddress + 1)),
         dataBits = s.beatBytes * 8,
         idBits = idBits
       )

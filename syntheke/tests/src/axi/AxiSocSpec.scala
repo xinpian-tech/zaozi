@@ -103,9 +103,9 @@ object AxiSocSpec extends TestSuite:
         )
       )
       assert(decoded.routes.map(_.out) == Vector("mem", "periph"))
-      assert(decoded.routes(0).address == Vector(AddressRange(0x80000000L, 0x80000000L)))
+      assert(decoded.routes(0).address == Vector(AddressSet(0x80000000L, 0x7fffffffL)))
       assert(
-        decoded.routes(1).address == Vector(AddressRange(0x10000000L, 0x1000L), AddressRange(0x10010000L, 0x1000L))
+        decoded.routes(1).address == Vector(AddressSet(0x10000000L, 0xfffL), AddressSet(0x10010000L, 0xfffL))
       )
     }
 

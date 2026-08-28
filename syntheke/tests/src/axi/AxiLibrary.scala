@@ -26,7 +26,9 @@ final class CoreNodes(
     extends Nodes:
   parameters(_ => Right(CoreFull(name, idBits, maxFlight)))
   val mem =
-    outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
+    outward(Axi4).dFn(_ =>
+      Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight = Some(maxFlight)))))
+    )
 
 def core(
   idBits:    Int,
@@ -56,7 +58,9 @@ final class DmaNodes(
     extends Nodes:
   parameters(_ => Right(DmaFull(name, idBits, maxFlight)))
   val mem =
-    outward(Axi4).dFn(_ => Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight)))))
+    outward(Axi4).dFn(_ =>
+      Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight = Some(maxFlight)))))
+    )
 
 def dmaCtrl(
   idBits:    Int,
@@ -76,7 +80,7 @@ enum Arbitration derives CanEqual, ReadWriter:
   case RoundRobin, FixedPriority
 
 final case class XbarInput(in: String, ids: IdRange) derives ReadWriter
-final case class XbarRoute(out: String, address: Vector[AddressRange]) derives ReadWriter
+final case class XbarRoute(out: String, address: Vector[AddressSet]) derives ReadWriter
 final case class XbarFull(arbitration: Arbitration, inputs: Vector[XbarInput], routes: Vector[XbarRoute])
     derives ReadWriter
 
@@ -165,7 +169,7 @@ final class L2CacheNodes(
   private val (d, u) = depend(in, out)
   out.dFn { ctx =>
     val up = ctx(d)
-    Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), 2)))
+    Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), maxFlight = Some(2))))
   }
   in.uFn(ctx => Right(ctx(u)))
   parameters { view =>
@@ -216,11 +220,11 @@ final class DramNodes(
         slaves = Vector(
           AxiSlaveParams(
             name,
-            Vector(AddressRange(base, size)),
+            AddressSet.misaligned(base, size),
             RegionType.Uncached,
-            true,
-            TransferSizes(1, 64),
-            TransferSizes(1, 64)
+            executable = true,
+            supportsWrite = TransferSizes(1, 64),
+            supportsRead = TransferSizes(1, 64)
           )
         ),
         beatBytes = 16,
@@ -316,11 +320,11 @@ final class UartNodes(
         slaves = Vector(
           AxiSlaveParams(
             name,
-            Vector(AddressRange(base, size)),
+            AddressSet.misaligned(base, size),
             RegionType.PutEffects,
-            false,
-            TransferSizes(1, 4),
-            TransferSizes(1, 4)
+            executable = false,
+            supportsWrite = TransferSizes(1, 4),
+            supportsRead = TransferSizes(1, 4)
           )
         ),
         beatBytes = 4,
@@ -368,11 +372,11 @@ final class GpioNodes(
         slaves = Vector(
           AxiSlaveParams(
             name,
-            Vector(AddressRange(base, size)),
+            AddressSet.misaligned(base, size),
             RegionType.PutEffects,
-            false,
-            TransferSizes(1, 4),
-            TransferSizes(1, 4)
+            executable = false,
+            supportsWrite = TransferSizes(1, 4),
+            supportsRead = TransferSizes(1, 4)
           )
         ),
         beatBytes = 4,
