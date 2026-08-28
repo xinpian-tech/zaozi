@@ -110,10 +110,10 @@ is what an SoC integrator writes (instantiate and wire). On the circt side
 the zaozi modules themselves sit under `tests/src/zaoziimpl/`, one real
 implementation per file, zaozi API only — the cores are the vendored
 DitDah32 RV32EC (`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening
-shim, and Xbar / L2 / Dram / WidthBridge / Uart / Gpio / Dma follow their
-rocket-chip counterparts (AXI4Xbar with address decode and arbitration,
-AXI4Buffer register slices, a burst-capable AXI4RAM, a width widget, real
-peripheral register files). `circt/tests/src/AxiLibrary.scala` is the wrap
+shim, and Xbar / Dram / WidthBridge / Uart / Gpio / Dma follow their
+rocket-chip counterparts (AXI4Xbar with address decode and arbitration, a
+burst-capable AXI4RAM, a width widget, real peripheral register files; no
+L2 — an AXI fabric without coherence gives one nothing testable to do). `circt/tests/src/AxiLibrary.scala` is the wrap
 that puts them on the negotiation graph; a clock tree, serial pins and
 GPIO pads reach every IP, with ClockSource and the pad rings as the
 declared simulation boundary where a testbench drives the design.

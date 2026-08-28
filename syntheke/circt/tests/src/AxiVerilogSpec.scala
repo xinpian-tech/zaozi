@@ -28,13 +28,14 @@ object DramGenWide               extends Generator[DramDeviceP, DramDevicePLayer
 
 object AxiVerilogSpec extends TestSuite:
 
-  /** Same topology as AxiSocSpec plus the clock tree and serial pins, with FullParam = the zaozi parameter of each IP.
+  /** AxiSocSpec's topology minus the L2 slot (an AXI fabric without coherence gives an L2 nothing testable to do), plus
+    * the clock tree and pins; FullParam = the zaozi parameter of each IP.
     */
   def buildSoc(): DesignSpec =
     Design {
       val clkSrc = clockSource(
         100000000,
-        Vector("core0", "core1", "dma", "sysXbar", "l2", "dram", "bridge", "periphXbar", "uart", "gpio")
+        Vector("core0", "core1", "dma", "sysXbar", "dram", "bridge", "periphXbar", "uart", "gpio")
       )
 
       val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0)
@@ -43,8 +44,7 @@ object AxiVerilogSpec extends TestSuite:
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
-      val mem                     = wrapper {
-        val l2   = l2Cache(capacityKiB = 512)
+      val mem              = wrapper {
         val dram = dramCtrl(
           ranks = 2,
           wordsLog2 = 6,
@@ -53,10 +53,9 @@ object AxiVerilogSpec extends TestSuite:
           bootAliasSize = 0x10000000L,
           idCapacityBits = 6
         )
-        dram.in <-- l2.out
-        (l2.in, l2.clk, dram.clk)
+        (dram.in, dram.clk)
       }
-      val (memIn, l2Clk, dramClk) = mem
+      val (memIn, dramClk) = mem
       memIn <-- sysXbar.output("mem")
 
       val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
@@ -82,7 +81,6 @@ object AxiVerilogSpec extends TestSuite:
       core1.clk <-- clkSrc.tap("core1")
       dma.clk <-- clkSrc.tap("dma")
       sysXbar.clk <-- clkSrc.tap("sysXbar")
-      l2Clk <-- clkSrc.tap("l2")
       dramClk <-- clkSrc.tap("dram")
       bridge.clk <-- clkSrc.tap("bridge")
       periphXbar.clk <-- clkSrc.tap("periphXbar")
@@ -110,7 +108,7 @@ object AxiVerilogSpec extends TestSuite:
       assert(coreModules.sizeIs == 2)
       coreModules.foreach(n => assert(design.verilog.contains(s"module $n")))
       // The dangle port punched through the mem boundary survives into Verilog on the wrapper.
-      assert(design.firrtl.contains("inst_l2_node_in_in"))
+      assert(design.firrtl.contains("inst_dram_node_in_in"))
       // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
       // to the dumped definition, transitively (the GPR too).
       assert(design.firrtl.contains("inst core of DitDah32"))

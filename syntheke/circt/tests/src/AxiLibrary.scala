@@ -179,40 +179,6 @@ def axiXbar(
 ): AxiXbarNodes =
   generator(Xbar)(new AxiXbarNodes(name.value, ins, outs, arbitration))
 
-// ============ L2: a pass-through adapter with its own writeback master ============
-
-val L2 = new GeneratorEntry[L2DeviceP]
-
-/** The L2 slot ([[L2DeviceGen]], the real device — a register slice today): addresses and slave capabilities pass
-  * through; downstream it reserves its writeback id range after the upstream id space (an adapter transforming Down).
-  */
-final class L2CacheNodes(
-  capacityKiB: Int
-)(
-  using GeneratorScope[L2DeviceP])
-    extends Nodes:
-  val clk            = inward(ClockDomain).uFn(_ => Right(()))
-  val in             = inward(Axi4)
-  val out            = outward(Axi4)
-  private val (d, u) = depend(in, out)
-  out.dFn { ctx =>
-    val up = ctx(d)
-    Right(AxiMasterPort(up.masters :+ AxiMasterParams("l2.wb", IdRange(up.endId, up.endId + 1), maxFlight = Some(2))))
-  }
-  in.uFn(ctx => Right(ctx(u)))
-  parameters(view => Right(L2DeviceP(capacityKiB, shapeOf(view, in), shapeOf(view, out))))
-
-def l2Cache(
-  capacityKiB: Int
-)(
-  using
-  ws:          WrapperScope,
-  name:        sourcecode.Name,
-  file:        sourcecode.File,
-  line:        sourcecode.Line
-): L2CacheNodes =
-  generator(L2)(new L2CacheNodes(capacityKiB))
-
 // ============ DRAM: the uncached memory slave ============
 
 val Dram = new GeneratorEntry[DramDeviceP]
@@ -521,7 +487,6 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(Core, CoreDeviceGen),
   ZaoziBackend(Dma, DmaDeviceGen),
   ZaoziBackend(Xbar, XbarGen),
-  ZaoziBackend(L2, L2DeviceGen),
   ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeDeviceGen),
   ZaoziBackend(Uart, UartDeviceGen),
