@@ -28,7 +28,7 @@ object Export:
   private def layerPath(l:   LayerPath):         ujson.Value = upickle.default.writeJs(l)
   private def interface(tpe: ProtocolInterface): ujson.Value = upickle.default.writeJs(tpe)
 
-  /** `topology.json`: the module tree, nodes, binds, dependencies and verification endpoints with stable ids. */
+  /** `topology.json`: the module tree, nodes, binds, dependencies and probe sources with stable ids. */
   def topology(spec: DesignSpec): ujson.Value =
     ujson.Obj(
       "modules"   -> ujson.Arr.from(spec.moduleOrder.map { id =>

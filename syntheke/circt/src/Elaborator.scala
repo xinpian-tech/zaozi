@@ -181,7 +181,7 @@ object Elaborator:
           expected.foreach { (name, expectOutput, interface) =>
             byName.get(name) match
               case None    =>
-                fail(s"port mismatch at $subject#$name: declared endpoint has no matching generator port, at $at")
+                fail(s"port mismatch at $subject#$name: declaration has no matching generator port, at $at")
               case Some(i) =>
                 val actualOutput = dirs.denseBoolArrayGetElement(i)
                 if actualOutput != expectOutput then
@@ -197,7 +197,7 @@ object Elaborator:
                 }
           }
           (byName.keySet -- expected.map(_._1)).toVector.sorted.foreach { extra =>
-            fail(s"port mismatch at $subject#$extra: generator port has no corresponding declared endpoint, at $at")
+            fail(s"port mismatch at $subject#$extra: generator port has no corresponding declaration, at $at")
           }
           byName.map((n, i) => n -> instOp.getResult(i))
 

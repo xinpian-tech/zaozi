@@ -67,7 +67,7 @@ final class GeneratorEntry[FP](
   val name: String = declaredName.value
 
 /** Instantiate a child structural module named by the binding val: its body composes child instances and `<--` binds
-  * (doc @sec-module-kinds). Returns the body's dangling endpoints ([[Dangles]]).
+  * (doc @sec-module-kinds). Returns the body's dangling nodes ([[Dangles]]).
   */
 def wrapper[A: Dangles](
   body: WrapperScope ?=> A
@@ -83,7 +83,7 @@ def wrapper[A: Dangles](
 /** Instantiate a child generator module named by the binding val, bound to registry entry `entry`: a leaf of the
   * hierarchy, implemented by a hardware generator (doc @sec-module-kinds). Its body declares nodes, dependencies, probe
   * sources and exactly one [[parameters]] computation; child instances and binds are rejected inside it. Returns the
-  * body's dangling endpoints ([[Dangles]]).
+  * body's dangling nodes ([[Dangles]]).
   */
 def generator[FP, A: Dangles](
   entry: GeneratorEntry[FP]

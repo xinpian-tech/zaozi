@@ -500,7 +500,7 @@ object NegotiatorSpec extends TestSuite:
           }
         }
       }
-      assert(dup.getMessage.contains("duplicate endpoint name 'x'"))
+      assert(dup.getMessage.contains("duplicate declaration name 'x'"))
 
       // Names become FIRRTL symbols verbatim; the shape rule rejects them at the declaration.
       val badInstance = intercept[IllegalArgumentException] {

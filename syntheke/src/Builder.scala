@@ -7,9 +7,9 @@ import scala.collection.mutable
 /** The mechanism behind the authoring surface in `Dsl.scala` (doc @sec-build).
   *
   * [[Design]] opens the root wrapper scope over a fresh [[BuildState]]; wrapper scopes instantiate child modules and
-  * record binds; generator scopes record nodes, module-internal parameter dependencies, verification endpoints and the
-  * parameter computation. When a body returns its scope freezes into the module's spec, and when the design body
-  * returns the state freezes into the immutable [[DesignSpec]].
+  * record binds; generator scopes record nodes, module-internal parameter dependencies, probe sources and the parameter
+  * computation. When a body returns its scope freezes into the module's spec, and when the design body returns the
+  * state freezes into the immutable [[DesignSpec]].
   *
   * Declaration-site contracts are enforced on the spot with `require` — duplicate names, foreign-module targets and
   * double registration fail at the offending line. What the type system already guarantees (bind ends share one
@@ -49,7 +49,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     st.moduleOrder += childId
     childId
 
-  /** Instantiate a child wrapper module; returns the body's dangling endpoints. */
+  /** Instantiate a child wrapper module; returns the body's dangling nodes. */
   private[syntheke] def wrapper[A: Dangles](
     name: String
   )(body: WrapperScope ?=> A
@@ -66,7 +66,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     scope.close((file, line))
     result
 
-  /** Instantiate a child generator module bound to a registry entry; returns the body's dangling endpoints. */
+  /** Instantiate a child generator module bound to a registry entry; returns the body's dangling nodes. */
   private[syntheke] def generator[FP, A: Dangles](
     name:  String,
     entry: GeneratorEntry[FP]
@@ -116,7 +116,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
   private[syntheke] def close(loc: (sourcecode.File, sourcecode.Line)): Unit =
     st.modules(id) = WrapperModuleSpec(id, children.toVector, loc)
 
-/** A generator module under construction: nodes, dependencies, verification endpoints and parameter functions. */
+/** A generator module under construction: nodes, dependencies, probe sources and parameter functions. */
 final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP]):
   private val nodes  = mutable.ArrayBuffer.empty[(NodeBuilder[?], NodeDirection, (sourcecode.File, sourcecode.Line))]
   private val fns    = mutable.Map.empty[String, Map[ModuleNodeId, Any] => Either[Violation, Any]]
@@ -133,9 +133,9 @@ final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildSta
 
   private def reserveName(name: String): Unit =
     requireOpen()
-    DeclaredName.require(name, s"endpoint name in ${id.show}")
+    DeclaredName.require(name, s"declaration name in ${id.show}")
     val taken = nodes.exists(_._1.id.name == name) || dvSrcs.exists(_.name == name)
-    require(!taken, s"duplicate endpoint name '$name' in ${id.show}")
+    require(!taken, s"duplicate declaration name '$name' in ${id.show}")
 
   private[syntheke] def recordFn(name: String, f: Map[ModuleNodeId, Any] => Either[Violation, Any]): Unit =
     requireOpen()

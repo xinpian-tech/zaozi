@@ -8,7 +8,7 @@ package me.jiuyang.syntheke
   * diagnostics only and never part of identity.
   */
 
-/** Declaration-name shape, enforced at every declaration site (instance names, endpoint names, layer segments).
+/** Declaration-name shape, enforced at every declaration site (instance, node, probe-source and layer-segment names).
   *
   * Names become FIRRTL symbols verbatim — module, instance, port and layer names — so they are restricted to
   * `[A-Za-z_][A-Za-z0-9_]*`. Excluding `-` and `$` also makes the reversible dangle encoding's use of them a guaranteed
