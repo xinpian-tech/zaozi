@@ -153,7 +153,8 @@ final class AxiXbarNodes(
         name,
         arbitration,
         ins.zip(inputs).map((n, b) => n -> shapeOf(view, b)),
-        outs.zip(outputs).map((n, b) => n -> shapeOf(view, b))
+        outs.zip(outputs).map((n, b) => n -> shapeOf(view, b)),
+        outputs.map(b => view.edgeOf(b).slave.slaves.flatMap(_.address).map(a => (a.base, a.mask)))
       )
     )
   }

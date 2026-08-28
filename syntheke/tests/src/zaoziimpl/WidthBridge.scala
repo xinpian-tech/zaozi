@@ -37,7 +37,14 @@ object BridgeDeviceGen extends Generator[BridgeDeviceP, BridgeDevicePLayers, Bri
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 
-    def narrowable(size: Referable[UInt], len: Referable[UInt])(using Arena, Context, Block) =
+    def narrowable(
+      size: Referable[UInt],
+      len:  Referable[UInt]
+    )(
+      using Arena,
+      Context,
+      Block
+    ) =
       (size <= 2.U(3)) & (len === 0.U(8))
 
     // ---- write path: WIDLE accept, WAW forward, WW forward, WB wait, WERRW absorb, WERRB answer ----
@@ -136,7 +143,7 @@ object BridgeDeviceGen extends Generator[BridgeDeviceP, BridgeDevicePLayers, Bri
       val lo = lane * 32
       when(rLane === lane.U(2)) {
         if lane == 3 then rWide := (io.out.r.bits.data.asBits ## 0.U(96).asBits).asUInt
-        else rWide := (0.U(hi).asBits ## io.out.r.bits.data.asBits ## 0.U(lo).asBits).asUInt
+        else rWide              := (0.U(hi).asBits ## io.out.r.bits.data.asBits ## 0.U(lo).asBits).asUInt
       }
 
     io.out.r.ready    := (rState === 2.U(2)) & io.in.r.ready

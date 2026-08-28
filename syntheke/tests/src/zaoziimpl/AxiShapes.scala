@@ -12,14 +12,14 @@ import upickle.default.ReadWriter
   */
 
 // The @generator macro derives a mainargs CLI for every Parameter; nested fields read as JSON tokens.
-private[zaoziimpl] def jsonTokens[T: ReadWriter](name: String): mainargs.TokensReader.Simple[T] =
+private[zaoziimpl] def jsonTokens[T: ReadWriter](name: String): mainargs.TokensReader.Simple[T]                          =
   new mainargs.TokensReader.Simple[T]:
     def shortName = name
     def read(strs: Seq[String]): Either[String, T] =
       try Right(upickle.default.read[T](strs.last))
       catch case e: Exception => Left(e.getMessage)
-given mainargs.TokensReader.Simple[AxiShape] = jsonTokens("axi-shape")
-given mainargs.TokensReader.Simple[Vector[(String, AxiShape)]] = jsonTokens("axi-ports")
+given axiShapeTokens:                                           mainargs.TokensReader.Simple[AxiShape]                   = jsonTokens("axi-shape")
+given axiPortsTokens:                                           mainargs.TokensReader.Simple[Vector[(String, AxiShape)]] = jsonTokens("axi-ports")
 
 final case class AxiShape(addrBits: Int, dataBits: Int, idBits: Int) derives ReadWriter
 
