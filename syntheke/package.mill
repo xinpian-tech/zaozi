@@ -54,17 +54,13 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
       // simulation test forks a verilator build beside it. Run them in parallel and the machine runs out.
       override def testParallelism: T[Boolean] = Task(false)
 
-      // zaozi's BaseGeneratorHelper dumps per-module .mlirbc circuits into ZAOZI_OUTDIR. PATH and
-      // RAMULATOR_INSTALL_PATH are forwarded from the dev shell — as input tasks, so a changed environment
-      // invalidates them — for the simulation test to spawn verilator and link its DRAM model.
-      def hostPath:      T[String] = Task.Input(Task.env.getOrElse("PATH", ""))
-      def ramulatorPath: T[String] = Task.Input(Task.env.getOrElse("RAMULATOR_INSTALL_PATH", ""))
+      // zaozi's BaseGeneratorHelper dumps per-module .mlirbc circuits into ZAOZI_OUTDIR. The rest is forwarded from
+      // `nix develop .#syntheke` — as input tasks, so a changed environment invalidates them: PATH for verilator, and
+      // the two packages the simulation links and drives the design with.
+      private val forwarded = Seq("PATH", "RAMULATOR_INSTALL_PATH", "SIMPROBE_INSTALL_PATH")
+      def hostEnv: T[Map[String, String]] = Task.Input(forwarded.map(k => k -> Task.env.getOrElse(k, "")).toMap)
       override def forkEnv: T[Map[String, String]] = Task(
-        super.forkEnv() ++ Map(
-          "ZAOZI_OUTDIR"            -> Task.dest.toString,
-          "PATH"                    -> hostPath(),
-          "RAMULATOR_INSTALL_PATH"  -> ramulatorPath()
-        )
+        super.forkEnv() ++ hostEnv() ++ Map("ZAOZI_OUTDIR" -> Task.dest.toString)
       )
     }
   }

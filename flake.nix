@@ -68,20 +68,12 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
-          ramulator = pkgs.ramulator;
+          syntheke-ramulator = pkgs.syntheke.ramulator;
+          syntheke-simprobe = pkgs.syntheke.simprobe;
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [
-            mtf
-            nixd
-            jdk25
-            # What the syntheke demo's simulation test runs: verilator for the design, cargo for the probe-rs
-            # debugger it drives the design with.
-            verilator
-            cargo
-            rustc
-          ] ++ lib.optionals stdenv.isLinux [
+          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
           ];
           env = with pkgs; {
@@ -95,8 +87,6 @@
             MILL_NO_SEPARATE_BSP_OUTPUT_DIR = "1";
             SCALA_CLI_INSTALL_PATH = scala-cli;
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
-            # The DRAM model the syntheke demo's testbench links into its simulation.
-            RAMULATOR_INSTALL_PATH = ramulator;
             Z3_LIB = "${z3.lib}/lib/libz3.so";
           };
           # -Djextract.decls.per.header=65535 is scoped to the jextract
@@ -114,6 +104,15 @@
             ''}
           '';
         };
+
+        # The default shell plus what only syntheke's end-to-end tests need: the
+        # simulator, the DRAM model they link into it and the debugger that
+        # brings the design up.
+        devShells.syntheke = self.devShells.${system}.default.overrideAttrs (old: {
+          nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.verilator ];
+          RAMULATOR_INSTALL_PATH = pkgs.syntheke.ramulator;
+          SIMPROBE_INSTALL_PATH = pkgs.syntheke.simprobe;
+        });
       }
     );
 }

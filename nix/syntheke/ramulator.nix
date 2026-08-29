@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 
-# Ramulator 2, built as a plain C++ library: the DRAM model the demo SoC's
-# testbench attaches to its memory port through DPI.
-{ stdenv
+# Ramulator 2 as a plain C++ library: the DRAM model the demo SoC's testbench
+# attaches to its memory port through DPI.
+{ lib
+, stdenv
 , fetchFromGitHub
 , cmake
 , ninja
@@ -45,28 +46,29 @@ stdenv.mkDerivation {
     cp -r --no-preserve=mode,ownership ${fmt} ext/fmt
   '';
 
-  # The Python bindings only regenerate the DRAM models from Ramulator's own
-  # DSL; the generated C++ is committed upstream, so the library needs neither
-  # Python nor nanobind. Configurations are exported by that Python package —
-  # this build consumes the exported YAML, it does not produce it.
+  # The Python bindings only regenerate the DRAM models from Ramulator's own DSL
+  # and export configurations; the generated C++ is committed upstream and the
+  # configuration is vendored beside the model, so the library needs neither
+  # Python nor nanobind.
   cmakeFlags = [
     "-DRAMULATOR_PYTHON_BINDINGS=OFF"
     "-DFETCHCONTENT_FULLY_DISCONNECTED=ON"
   ];
 
-  # Ramulator has no install rules, and puts the library back in its source
-  # tree (LIBRARY_OUTPUT_DIRECTORY = PROJECT_SOURCE_DIR).
+  # Ramulator has no install rules, and puts the library back in its source tree
+  # (LIBRARY_OUTPUT_DIRECTORY = PROJECT_SOURCE_DIR).
   installPhase = ''
     runHook preInstall
-    mkdir -p $out/lib
-    cp $NIX_BUILD_TOP/source/libramulator.so $out/lib/
-    cd $NIX_BUILD_TOP/source/src
-    find ramulator -name '*.h' -exec install -Dm444 {} $out/include/{} \;
+    install -Dm555 "$NIX_BUILD_TOP/$sourceRoot/libramulator.so" "$out/lib/libramulator.so"
+    cd "$NIX_BUILD_TOP/$sourceRoot/src"
+    find ramulator -name '*.h' -exec install -Dm444 {} "$out/include/{}" \;
     runHook postInstall
   '';
 
   meta = {
-    description = "Cycle-accurate DRAM simulator (library build)";
+    description = "Cycle-accurate DRAM simulator, built as a library";
     homepage = "https://github.com/CMU-SAFARI/ramulator2";
+    license = lib.licenses.mit;
+    platforms = lib.platforms.unix;
   };
 }

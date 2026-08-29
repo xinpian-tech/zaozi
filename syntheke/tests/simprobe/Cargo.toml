@@ -3,7 +3,7 @@
 [package]
 name = "simprobe"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 description = "A probe-rs debug probe whose JTAG pins are a simulation's, over the DPI bridge"
 
 [dependencies]

@@ -210,27 +210,16 @@ object AxiVerilogSpec extends TestSuite:
   lazy val soc:    ResolvedDesign   = Negotiator.negotiate(buildSoc())
   lazy val design: ElaboratedDesign = Elaborator.elaborate(soc, axiBackends)
 
-  /** The DRAM simulator the testbench's memory model runs on, from the dev shell (`nix build .#ramulator`). */
-  lazy val ramulator: os.Path =
-    val path = sys.env.getOrElse(
-      "RAMULATOR_INSTALL_PATH",
-      throw new java.lang.AssertionError("RAMULATOR_INSTALL_PATH is unset: the dev shell provides it")
-    )
-    require(path.nonEmpty, "RAMULATOR_INSTALL_PATH is empty: the dev shell provides it")
+  /** What the bring-up test needs beside the design, both built by nix and named by `nix develop .#syntheke`: the DRAM
+    * simulator the testbench's memory model runs on, and the debugger that brings the SoC up over the DPI bridge.
+    */
+  def toolFrom(variable: String): os.Path =
+    val path = sys.env.getOrElse(variable, "")
+    require(path.nonEmpty, s"$variable is unset: `nix develop .#syntheke` provides it")
     os.Path(path)
 
-  /** The debugger the bring-up test drives the SoC with: `syntheke/tests/simprobe`, a probe-rs probe whose JTAG pins
-    * are a simulation's. Cargo builds it once and answers instantly after that.
-    */
-  lazy val simprobe: os.Path =
-    val manifest = Iterator
-      .iterate(os.pwd)(_ / os.up)
-      .take(8)
-      .map(_ / "syntheke" / "tests" / "simprobe" / "Cargo.toml")
-      .find(os.exists)
-      .getOrElse(throw new java.lang.AssertionError(s"no syntheke/tests/simprobe crate above ${os.pwd}"))
-    os.proc("cargo", "build", "--release", "--manifest-path", manifest.toString).call(cwd = manifest / os.up)
-    manifest / os.up / "target" / "release" / "simprobe"
+  lazy val ramulator: os.Path = toolFrom("RAMULATOR_INSTALL_PATH")
+  lazy val simprobe:  os.Path = toolFrom("SIMPROBE_INSTALL_PATH") / "bin" / "simprobe"
 
   val tests = Tests {
 

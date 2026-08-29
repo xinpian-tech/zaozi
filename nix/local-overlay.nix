@@ -9,5 +9,9 @@ final: prev:
 
   espresso = final.callPackage ./pkgs/espresso.nix { };
 
-  ramulator = final.callPackage ./pkgs/ramulator.nix { };
+  # Only syntheke's tests need these.
+  syntheke = {
+    ramulator = final.callPackage ./syntheke/ramulator.nix { };
+    simprobe = final.callPackage ./syntheke/simprobe.nix { };
+  };
 }

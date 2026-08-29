@@ -207,8 +207,9 @@ other. The SoC therefore simulates itself: verilator runs the linked
 Verilog, probe-rs brings it up over the bridge, and hart 1 prints "hello
 world" over the UART at 115200 baud, out of a DDR4 the whole time.
 
-To reproduce, from `nix develop` (which brings verilator, cargo and
-`RAMULATOR_INSTALL_PATH`; the test builds `simprobe` itself):
+Both are nix packages of their own — `nix/syntheke/`, nothing outside
+these tests depends on them — and `nix develop .#syntheke` is the default
+shell plus verilator and the two of them:
 
 ```
 mill syntheke.circt.tests.testForked me.jiuyang.syntheke.circt.tests.AxiVerilogSpec
@@ -224,7 +225,7 @@ cd out/demo && verilator --binary --timing -Wno-fatal -j 0 -I. --top-module Top 
   -f filelist.f layers-*.sv ClockGen.sv SimConsole.sv PllAnalog.sv TraceLog.sv \
   JtagDpi.sv jtag_dpi.cc DramDpi.sv dram_dpi.cc
 ./obj_dir/VTop &
-cargo run --release --manifest-path ../../syntheke/tests/simprobe/Cargo.toml -- \
+$SIMPROBE_INSTALL_PATH/bin/simprobe \
   --bridge 127.0.0.1:5555 --target target.yaml --chip syntheke-demo \
   --image program.bin --load 0x80000000 --hart-pc 0:0x8000002c --hart-pc 1:0x80000000
 ```
