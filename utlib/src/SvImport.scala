@@ -43,22 +43,13 @@ object SvImport:
     var lines = os.read(hwMlir).split("\n", -1).toVector
 
     // 1. seq.to_clock: retype the source port, drop the conversion, use the port everywhere.
-    val toClock = raw"^\s*(%[\w.$$]+) = seq\.to_clock (%[\w.$$]+)\s*$$".r
-    for (converted, port) <- lines.flatMap(l => toClock.findFirstMatchIn(l).map(m => m.group(1) -> m.group(2))) do
-      val use = Pattern.compile(raw"${Pattern.quote(converted)}\b")
-      lines = lines.flatMap { l =>
-        if toClock.findFirstMatchIn(l).exists(_.group(1) == converted) then None
-        else
-          Some(
-            use
-              .matcher(
-                l.replace(s"in $port : i1", s"in $port : !seq.clock")
-                  // an hw.instance passing the retyped value annotates the operand type inline: `clk: %clk_i: i1`
-                  .replace(s"$port: i1", s"$port: !seq.clock")
-              )
-              .replaceAll(port)
-          )
-      }
+    //
+    // Scoped to one module at a time: several modules of a hierarchy commonly have a port named `clk`, and a
+    // file-wide rename makes two unrelated values collide on the same SSA name (seen on the three-module I2C).
+    lines = Vector(lines.head) ++ MlirBmc
+      .topEntities(lines)
+      .flatMap((s, e) => retypeClocks(lines.slice(s, e + 1)))
+      ++ Vector("}", "")
 
     // 2. Two-state comparison predicates.
     lines = lines.map(
@@ -77,6 +68,28 @@ object SvImport:
 
     val out = hwMlir / os.up / s"${hwMlir.last}.bmc.mlir"
     os.write.over(out, lines.mkString("\n"))
+    out
+
+  private val toClock = raw"^\s*(%[\w.$$]+) = seq\.to_clock (%[\w.$$]+)\s*$$".r
+
+  /** Within one module: retype each clock port to `!seq.clock`, drop its `seq.to_clock`, and use the port directly. */
+  private def retypeClocks(block: Vector[String]): Vector[String] =
+    var out = block
+    for (converted, port) <- block.flatMap(l => toClock.findFirstMatchIn(l).map(m => m.group(1) -> m.group(2))) do
+      val use = Pattern.compile(raw"${Pattern.quote(converted)}\b")
+      out = out.flatMap { l =>
+        if toClock.findFirstMatchIn(l).exists(_.group(1) == converted) then None
+        else
+          Some(
+            use
+              .matcher(
+                l.replace(s"in $port : i1", s"in $port : !seq.clock")
+                  // an hw.instance passing the retyped value annotates the operand type inline: `clk: %clk_i: i1`
+                  .replace(s"$port: i1", s"$port: !seq.clock")
+              )
+              .replaceAll(port)
+          )
+      }
     out
 
   private val memDef    = raw"^(\s*)(%[\w.$$/]+) = seq\.firmem [^:]+: <(\d+) x (\d+), mask \d+>.*$$".r
