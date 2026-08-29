@@ -202,20 +202,32 @@ release build, and the `layers-*.sv` collateral binds the trace in on top
 of it, which is what the simulation compiles.
 
 What RTL cannot express becomes an external Verilog module declared
-through zaozi's `VerilogWrapper` and linked as an extmodule, each shipping
-its behavioral definition as a string next to the wrapper: `ClockGen`, the
-board's oscillator, `SimConsole`, stdout at the far end of the serial
-line, `JtagDpi`, the debugger's cable, and `DramDpi`, the memory device —
-all four in the harness — and `PllAnalog`, the loop inside the chip's PLL,
-where a real flow would put a hard macro. Two of them are wires to real
-tools rather than models of our own: probe-rs on one, Ramulator on the
-other. The SoC therefore simulates itself: verilator runs the linked
-Verilog, probe-rs brings it up over the bridge, and hart 1 prints "hello
-world" over the UART at 115200 baud, out of a DDR4 the whole time.
+through zaozi's `VerilogWrapper` and linked as an extmodule, with its
+behavioral definition in `demo/sim/`: `ClockGen`, the board's oscillator,
+`SimConsole`, stdout at the far end of the serial line, `JtagDpi`, the
+debugger's cable, and `DramDpi`, the memory device — all four in the
+harness — and `PllAnalog`, the loop inside the chip's PLL, where a real
+flow would put a hard macro. Two of them are wires to real tools rather
+than models of our own: probe-rs on one, Ramulator on the other. The SoC
+therefore simulates itself: verilator runs the linked Verilog, probe-rs
+brings it up over the bridge, and hart 1 prints "hello world" over the
+UART at 115200 baud, out of a DDR4 the whole time.
 
-Both are nix packages of their own (`nix/syntheke/` — nothing else in the
-monorepo depends on them), and `nix develop .#syntheke` is the default
-shell plus meson, verilator and the two of them.
+Those `.sv` files drive pins and count beats; everything with state behind
+them — the socket the debugger connects to, the memory's byte store and
+its requests to Ramulator — is Rust, in `demo/sim/` as a crate of its own,
+built into the shared object the simulation resolves its DPI imports
+against. Ramulator itself is C++, and a C++ interface (classes, a
+`std::function` callback) is not something Rust can call, so it is reached
+through a C ABI — `nix/syntheke/ramulator-capi`, bound with bindgen. That
+shim is the only C++ written here, and it sits with the packaging of the
+C++ library it wraps, not with the simulation.
+
+Everything the demo needs beyond the JVM is a nix package of its own
+(`nix/syntheke/` — nothing else in the monorepo depends on them):
+`syntheke-ramulator`, `syntheke-ramulator-capi`, `syntheke-dpi`,
+`syntheke-simprobe`. `nix develop .#syntheke` is the default shell plus
+meson, verilator and all four.
 
 Where the boundary falls: mill compiles Scala into `syntheke.demo.assembly`
 and stops. Everything downstream is `syntheke/meson.build` — run the jar to

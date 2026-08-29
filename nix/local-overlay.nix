@@ -9,9 +9,11 @@ final: prev:
 
   espresso = final.callPackage ./pkgs/espresso.nix { };
 
-  # Only syntheke's tests need these.
-  syntheke = {
+  # Only syntheke's demo needs these.
+  syntheke = rec {
     ramulator = final.callPackage ./syntheke/ramulator.nix { };
+    ramulator-capi = final.callPackage ./syntheke/ramulator-capi.nix { inherit ramulator; };
+    dpi = final.callPackage ./syntheke/dpi.nix { inherit ramulator-capi; };
     simprobe = final.callPackage ./syntheke/simprobe.nix { };
   };
 }

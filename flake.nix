@@ -69,6 +69,8 @@
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
           syntheke-ramulator = pkgs.syntheke.ramulator;
+          syntheke-ramulator-capi = pkgs.syntheke.ramulator-capi;
+          syntheke-dpi = pkgs.syntheke.dpi;
           syntheke-simprobe = pkgs.syntheke.simprobe;
         };
         devShells.default = pkgs.mkShell {
@@ -109,9 +111,13 @@
         # meson driving it all, the simulator, the DRAM model linked into it and
         # the debugger that brings the design up.
         devShells.syntheke = self.devShells.${system}.default.overrideAttrs (old: {
-          nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [ meson ninja verilator ]);
-          RAMULATOR_INSTALL_PATH = pkgs.syntheke.ramulator;
+          nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [ meson ninja verilator cargo rustc ]);
+          # What the simulation links, and what brings the design up. The last two are for building the DPI library
+          # outside nix: `cargo build` in demo/sim/ binds the C ABI's header, and bindgen wants libclang to do it.
+          SYNTHEKE_DPI_INSTALL_PATH = pkgs.syntheke.dpi;
           SIMPROBE_INSTALL_PATH = pkgs.syntheke.simprobe;
+          RAMULATOR_CAPI_INSTALL_PATH = pkgs.syntheke.ramulator-capi;
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         });
       }
     );
