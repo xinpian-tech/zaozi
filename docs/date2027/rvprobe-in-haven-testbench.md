@@ -47,7 +47,7 @@ be replayed exactly, or expanded to volume by pinning the fields the intent cons
 | rvprobe, volume fill | 10,000 | 10 | 79.41 | 89.42 | 77.36 | **94.85** | 78.46 |
 | + 6 hand-written residual intents | 10,006 | 16 | 90.40 | 93.12 | 86.32 | 96.02 | 86.15 |
 | **+ 5 LLM-written residual intents** | **10,011** | **21** | **94.78** | **98.94** | 89.62 | 96.72 | 93.85 |
-| HAVEN (15 spec-derived sequences + 3 BO iterations) | 10,110 | — | 95.87 | 97.88 | 92.92 | 97.28 | 95.38 |
+| HAVEN (4 initial sequences + 2 improvement rounds) | 10,110 | — | 95.87 | 97.88 | 92.92 | 97.28 | 95.38 |
 
 **The plumbing works**: solved stimulus runs inside a foreign testbench with only the sequence layer
 replaced, measured by an identical toolchain.
@@ -119,3 +119,23 @@ shape cannot express — a temporal intent, which the DSL has and this experimen
 Artifacts: `utlib/src/UvmSequence.scala` (the codec), `stdlib/src/HavenAluUT.scala`
 (`HavenAluOpUT`), `stdlib/tests/src/HavenAluUvmSeqTest.scala` (generates the sequence),
 scratchpad `rvprobe-in-haven-tb/` (the spliced testbench and its URG report).
+
+## Footnote: what HAVEN's improvement loop actually did
+
+Worth stating precisely, because "15 sequences + 3 BO iterations" overstates it. The ALU run's
+progression:
+
+| round | coverage | sequences |
+|---|---|---|
+| 0 (initial simulation) | 87.16 | 4 |
+| 1 | **95.86** | 9 |
+| 2 | 95.39 | 12 |
+
+Four sequences came from the spec; the loop added five (+8.7 points) and then three more that made it
+*worse* (−0.5), with the best snapshot preserved. It saturated after one productive round and
+regressed on the next, each round costing a full simulation plus LLM and Bayesian-optimization work.
+
+Our five LLM-written intents moved 90.40 → 94.78 monotonically for five transactions. The contrast is
+worth making: tuning a *distribution* runs out of room once the reachable mass is covered, while
+naming a *specific* uncovered item does not — a distribution has no way to express "the sum needs a
+rounding carry".
