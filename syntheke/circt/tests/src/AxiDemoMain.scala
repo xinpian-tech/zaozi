@@ -6,6 +6,9 @@ import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
 import me.jiuyang.syntheke.tests.zaoziimpl.{
   clockGenModel,
+  ddr4Config,
+  dramDpiModel,
+  dramDpiSource,
   jtagDpiModel,
   jtagDpiSource,
   pllAnalogModel,
@@ -30,6 +33,9 @@ object AxiDemoMain:
     os.write.over(dir / "TraceLog.sv", traceLogModel)
     os.write.over(dir / "JtagDpi.sv", jtagDpiModel)
     os.write.over(dir / "jtag_dpi.cc", jtagDpiSource)
+    os.write.over(dir / "DramDpi.sv", dramDpiModel)
+    os.write.over(dir / "dram_dpi.cc", dramDpiSource)
+    os.write.over(dir / "dram.yaml", ddr4Config)
     // The program the debugger downloads, and the target description it reads the chip from.
     os.write.over(
       dir / "program.bin",

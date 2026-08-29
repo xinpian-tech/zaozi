@@ -111,12 +111,21 @@ is what an SoC integrator writes (instantiate and wire). On the circt side
 the zaozi modules themselves sit under `tests/src/zaoziimpl/`, one real
 implementation per file, zaozi API only — the cores are the vendored
 DitDah32 RV32EC (`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening
-shim, and Xbar / Dram / WidthBridge / Uart / Gpio / Dma follow their
-rocket-chip counterparts (AXI4Xbar with address decode and arbitration, a
-burst-capable AXI4RAM, a width widget, real peripheral register files; no
-L2 — an AXI fabric without coherence gives one nothing testable to do).
-`circt/tests/src/AxiLibrary.scala` is the wrap that puts them on the
-negotiation graph.
+shim, and Xbar / WidthBridge / Uart / Gpio / Dma follow their rocket-chip
+counterparts (AXI4Xbar with address decode and arbitration, a width
+widget, real peripheral register files; no L2 — an AXI fabric without
+coherence gives one nothing testable to do). `circt/tests/src/AxiLibrary.scala`
+is the wrap that puts them on the negotiation graph.
+
+There is no DRAM among them. Memory is not on the die and is not an IP of
+this design, so what the chip has is a memory port: an `Axi4` node the
+testbench terminates, publishing upward the range it answers for. Behind
+it is Ramulator (`nix build .#ramulator`) through `DramDpi.scala` — the
+timing is a real DRAM simulator's, the contents a byte store beside it,
+and the ratio between the DRAM's clock and the port's comes from
+Ramulator's own tCK against the settled edge frequency. A register file
+pretending to be a DRAM would tell the design nothing about the latency it
+will actually see.
 
 The RISC-V debug chain is three more protocols
 (`circt/tests/src/DebugProtocols.scala`), one per boundary, because that
@@ -130,7 +139,10 @@ channel and the hart's status back. So the debug module and the transport
 are ordinary IPs, lifted out of the core into `Dm.scala` / `Dtm.scala`: the
 transport holds the tck-to-system crossing, and the module holds a hart
 array selected by `dmcontrol.hartsello`, each hart with its own halt
-request and flags. The core keeps only its hart-side debug port.
+request and flags. The core keeps only its hart-side debug port. The two
+sit inside a `wrapper` module of their own, so only what leaves the debug
+island — the pins, the hart ports, the bus master — crosses its boundary,
+as dangle ports the framework punches through.
 
 The debug module is a fourth edge as well: `dm.sb` is an ordinary `Axi4`
 master, the system bus access the debug spec gives a debugger, and the
@@ -141,8 +153,9 @@ debugger's instructions, which this core does not do.
 
 Everything that is not the chip is in one module, the design's
 `testbench`: `TestHarness.scala` publishes the board's 25 MHz reference
-clock, holds the debug adapter on the JTAG pins, and terminates the serial
-and GPIO pins in a console and a board model. On the die the reference
+clock, holds the debug adapter on the JTAG pins, the DRAM on the memory
+port, and terminates the serial and GPIO pins in a console and a board
+model. On the die the reference
 meets `Pll.scala`, which multiplies it to the 100 MHz system clock and
 feeds every consumer — the loop ratio comes out of the settled reference
 frequency, and one the dividers cannot reach fails negotiation. So the
@@ -186,14 +199,17 @@ What RTL cannot express becomes an external Verilog module declared
 through zaozi's `VerilogWrapper` and linked as an extmodule, each shipping
 its behavioral definition as a string next to the wrapper: `ClockGen`, the
 board's oscillator, `SimConsole`, stdout at the far end of the serial
-line, and `JtagDpi`, the debugger's cable — all three in the harness — and
-`PllAnalog`, the loop inside the chip's PLL, where a real flow would put a
-hard macro. The SoC therefore simulates itself: verilator runs the linked
+line, `JtagDpi`, the debugger's cable, and `DramDpi`, the memory device —
+all four in the harness — and `PllAnalog`, the loop inside the chip's PLL,
+where a real flow would put a hard macro. Two of them are wires to real
+tools rather than models of our own: probe-rs on one, Ramulator on the
+other. The SoC therefore simulates itself: verilator runs the linked
 Verilog, probe-rs brings it up over the bridge, and hart 1 prints "hello
-world" over the UART at 115200 baud.
+world" over the UART at 115200 baud, out of a DDR4 the whole time.
 
-To reproduce (needs `verilator`, `cargo` and a C toolchain on PATH; the
-test builds `simprobe` itself):
+To reproduce (needs `verilator`, `cargo` and a C toolchain on PATH, and
+`RAMULATOR_INSTALL_PATH` from the dev shell; the test builds `simprobe`
+itself):
 
 ```
 mill syntheke.circt.tests.testForked me.jiuyang.syntheke.circt.tests.AxiVerilogSpec
@@ -204,7 +220,10 @@ or by hand, from artifacts:
 ```
 mill syntheke.circt.tests.runMain me.jiuyang.syntheke.circt.tests.AxiDemoMain out/demo
 cd out/demo && verilator --binary --timing -Wno-fatal -j 0 -I. --top-module Top \
-  -f filelist.f layers-*.sv ClockGen.sv SimConsole.sv PllAnalog.sv TraceLog.sv JtagDpi.sv jtag_dpi.cc
+  -CFLAGS "-std=c++20 -I$RAMULATOR_INSTALL_PATH/include" \
+  -LDFLAGS "-L$RAMULATOR_INSTALL_PATH/lib -lramulator -Wl,-rpath,$RAMULATOR_INSTALL_PATH/lib" \
+  -f filelist.f layers-*.sv ClockGen.sv SimConsole.sv PllAnalog.sv TraceLog.sv \
+  JtagDpi.sv jtag_dpi.cc DramDpi.sv dram_dpi.cc
 ./obj_dir/VTop &
 cargo run --release --manifest-path ../../syntheke/tests/simprobe/Cargo.toml -- \
   --bridge 127.0.0.1:5555 --target target.yaml --chip syntheke-demo \

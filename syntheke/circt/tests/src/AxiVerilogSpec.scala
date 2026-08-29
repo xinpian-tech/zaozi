@@ -17,25 +17,25 @@ import utest.*
   * lowers to Verilog with the in-process firtool pipeline.
   */
 
-/** A deliberately wrong DRAM generator: same parameter type, twice the data width — its ports disagree with the settled
+/** A deliberately wrong UART generator: same parameter type, twice the data width — its ports disagree with the settled
   * bundle, for the binding-checkpoint test.
   */
-class DramWideIO(p: DramDeviceP) extends HWBundle(p):
-  val clk = Flipped(new ClockBundle)
-  val in  = Flipped(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits * 2, p.idBits)))
+class UartWideIO(p: UartDeviceP) extends HWBundle(p):
+  val clk    = Flipped(new ClockBundle)
+  val in     = Flipped(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits * 2, p.idBits)))
+  val serial = Aligned(new SerialBundle)
 @zaoziGenerator
-object DramGenWide               extends Generator[DramDeviceP, DramDevicePLayers, DramWideIO, DramDevicePProbe]:
-  def architecture(p: DramDeviceP) = summon[Interface[DramWideIO]].dontCare()
+object UartGenWide               extends Generator[UartDeviceP, UartDevicePLayers, UartWideIO, UartDevicePProbe]:
+  def architecture(p: UartDeviceP) = summon[Interface[UartWideIO]].dontCare()
 
 object AxiVerilogSpec extends TestSuite:
 
-  val loadBase:      Long = 0x80000000L // the DRAM base: where the debugger puts the program
-  val dramWordsLog2: Int  = 8           // the backing store, in 16-byte bus words
-  val dramBytes:     Long = (1L << dramWordsLog2) * 16
+  val loadBase:  Long = 0x80000000L // the DRAM base: where the debugger puts the program
+  val dramBytes: Long = 0x40000000L // one rank of DDR4 8Gb x8, the device the harness's model is configured as
   // The two harts get different work, so the printed line proves both halves of the debug module's hart array: hart 0
   // wrote the program into memory for the debugger and then parks in the done-spin, hart 1 is the one that runs it.
-  val hart0Pc:       Long = loadBase + 0x2c
-  val hart1Pc:       Long = loadBase
+  val hart0Pc:   Long = loadBase + 0x2c
+  val hart1Pc:   Long = loadBase
 
   /** The program, hand-assembled RV32E (registers x5–x8): walk the string at +0x40 and write each byte to the UART's
     * TXDATA, polling STATUS bit0 (txBusy) between bytes; a NUL ends the walk at the spin at +0x2c, where hart 1 parks.
@@ -102,8 +102,18 @@ object AxiVerilogSpec extends TestSuite:
     */
   def buildSoc(refHz: Int = 25000000): DesignSpec =
     Design {
-      // Outside the chip: the crystal, and the harness's own devices running off it.
-      val harness = testHarness(freqHz = refHz, taps = Vector("ref"), jtagPort = jtagPort, tckDiv = 2)
+      // Outside the chip: the crystal, the harness's own devices running off it, and the memory the chip's bus port
+      // ends in — one rank of DDR4, which is a device to attach, not RTL to write.
+      val harness = testHarness(
+        freqHz = refHz,
+        taps = Vector("ref"),
+        jtagPort = jtagPort,
+        tckDiv = 2,
+        memBase = loadBase,
+        memSize = dramBytes,
+        memIdCapBits = 6,
+        dramConfig = "dram.yaml"
+      )
 
       // On the die: the PLL multiplies the reference to the system clock and feeds every consumer.
       val sysPll = pll(
@@ -113,7 +123,7 @@ object AxiVerilogSpec extends TestSuite:
           "core1",
           "dma",
           "sysXbar",
-          "dram",
+          "mem",
           "bridge",
           "periphXbar",
           "uart",
@@ -132,14 +142,6 @@ object AxiVerilogSpec extends TestSuite:
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2", "in3"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
-      val mem              = wrapper {
-        val dram =
-          dramCtrl(ranks = 2, wordsLog2 = dramWordsLog2, base = loadBase, size = 0x80000000L, idCapacityBits = 6)
-        (dram.in, dram.clk)
-      }
-      val (memIn, dramClk) = mem
-      memIn <-- sysXbar.output("mem")
-
       val bridge = widthBridge(wideBeatBytes = 16, maxUpstreamTransfer = 64)
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), Arbitration.FixedPriority)
@@ -147,41 +149,47 @@ object AxiVerilogSpec extends TestSuite:
       val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
       val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8, width = 8)
 
-      // The on-chip half of the debug chain: transport, module, one negotiated port per hart. The module is a bus
-      // master too — that is the path a debugger's download takes, and the fabric sizes it like any other master.
-      val dtm = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
-      val dm  = debugModule(harts = 2, haltOnReset = true, sbIdBits = 1)
+      // The on-chip half of the debug chain is one wrapper module: transport and debug module inside it, and only
+      // what leaves the island crossing its boundary — the pins, one port per hart, and the module's bus master,
+      // which is the path a debugger's download takes.
+      val debug                                            = wrapper {
+        val dtm = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
+        val dm  = debugModule(harts = 2, haltOnReset = true, sbIdBits = 1)
+        dm.dmi <-- dtm.dmi
+        (dtm.jtag, dtm.clk, dm.clk, dm.sb, dm.hart(0), dm.hart(1))
+      }
+      val (jtagPins, dtmClk, dmClk, debugSb, hart0, hart1) = debug
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
       sysXbar.input("in2") <-- dma.mem
-      sysXbar.input("in3") <-- dm.sb
+      sysXbar.input("in3") <-- debugSb
       bridge.in <-- sysXbar.output("periph")
       periphXbar.input("in") <-- bridge.out
       uart.in <-- periphXbar.output("uart")
       gpio.in <-- periphXbar.output("gpio")
 
-      dm.dmi <-- dtm.dmi
-      core0.debug <-- dm.hart(0)
-      core1.debug <-- dm.hart(1)
+      core0.debug <-- hart0
+      core1.debug <-- hart1
 
-      // The chip's pins, all terminating in the harness.
+      // The chip's pins, all terminating in the harness — the memory port among them.
       harness.serialPins <-- uart.serial
       harness.gpioPins <-- gpio.pins
-      harness.jtagPins <-- dtm.jtag
+      harness.jtagPins <-- jtagPins
+      harness.memPins <-- sysXbar.output("mem")
+      harness.memClock <-- sysPll.tap("mem")
       harness.traceClock <-- sysPll.tap("trace")
 
       core0.clk <-- sysPll.tap("core0")
       core1.clk <-- sysPll.tap("core1")
       dma.clk <-- sysPll.tap("dma")
       sysXbar.clk <-- sysPll.tap("sysXbar")
-      dramClk <-- sysPll.tap("dram")
       bridge.clk <-- sysPll.tap("bridge")
       periphXbar.clk <-- sysPll.tap("periphXbar")
       uart.clk <-- sysPll.tap("uart")
       gpio.clk <-- sysPll.tap("gpio")
-      dtm.clk <-- sysPll.tap("dtm")
-      dm.clk <-- sysPll.tap("dm")
+      dtmClk <-- sysPll.tap("dtm")
+      dmClk <-- sysPll.tap("dm")
     }
 
   /** The SoC settles and elaborates once: every test below reads the same design, and elaborating it repeatedly would
@@ -189,6 +197,15 @@ object AxiVerilogSpec extends TestSuite:
     */
   lazy val soc:    ResolvedDesign   = Negotiator.negotiate(buildSoc())
   lazy val design: ElaboratedDesign = Elaborator.elaborate(soc, axiBackends)
+
+  /** The DRAM simulator the testbench's memory model runs on, from the dev shell (`nix build .#ramulator`). */
+  lazy val ramulator: os.Path =
+    val path = sys.env.getOrElse(
+      "RAMULATOR_INSTALL_PATH",
+      throw new java.lang.AssertionError("RAMULATOR_INSTALL_PATH is unset: the dev shell provides it")
+    )
+    require(path.nonEmpty, "RAMULATOR_INSTALL_PATH is empty: the dev shell provides it")
+    os.Path(path)
 
   /** The debugger the bring-up test drives the SoC with: `syntheke/tests/simprobe`, a probe-rs probe whose JTAG pins
     * are a simulation's. Cargo builds it once and answers instantly after that.
@@ -209,16 +226,17 @@ object AxiVerilogSpec extends TestSuite:
       assert(design.circuitName == "Top")
       // The bytecode artifact is the whole linked design as the framework built it, before firtool rewrote it.
       assert(design.mlirbc.nonEmpty)
-      // Verilog contains the root, the mem wrapper, and one deduplicated module per generator parameter.
+      // Verilog contains the root, the debug wrapper, and one deduplicated module per generator parameter.
       assert(design.verilog.contains("Top.sv"))
-      assert(design.verilog.contains("mem.sv"))
+      assert(design.verilog.contains("debug.sv"))
       assert(design.moduleNames(ModuleId.root) == "Top")
       val coreModules = Set("core0", "core1").map(n => design.moduleNames(ModuleId.root / n))
       // core0 and core1 have different full parameters, so they keep distinct zaozi module names.
       assert(coreModules.sizeIs == 2)
       coreModules.foreach(n => assert(design.verilog.contains(s"$n.sv")))
-      // The dangle port punched through the mem boundary survives into Verilog on the wrapper.
-      assert(design.verilog("mem.sv").contains("inst_dram_node_in_in"))
+      // The dangle ports punched through the debug boundary survive into Verilog on the wrapper.
+      assert(design.verilog("debug.sv").contains("inst_dtm_node_jtag_out_tck"))
+      assert(design.verilog("debug.sv").contains("inst_dm_node_sb_out_aw_valid"))
       // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
       // to the dumped definition, transitively (the GPR too). The two cores differ only in their id space, which is
       // the shim's parameter, so the two shims hold the same deduplicated DitDah32.
@@ -231,21 +249,22 @@ object AxiVerilogSpec extends TestSuite:
     test("the debug chain is four negotiated edges: pins, DMI bus, system bus, one interrupt port per hart") {
       val resolved = soc
 
-      val root = ModuleId.root
+      val root  = ModuleId.root
+      val debug = root / "debug"
       // The transport publishes the TAP it implements; the debugger is told about it from this very edge.
-      val tap  = resolved.edgeAt(ModuleNodeId(root / "harness", "jtagPins")).edgeAs(Jtag)
+      val tap   = resolved.edgeAt(ModuleNodeId(root / "harness", "jtagPins")).edgeAs(Jtag)
       assert(tap == JtagTap(0xdeadbeb1L, 5, 7, 32, 0x11))
       // The DMI bus settled at the transport's scan width, checked against the module's register file.
-      assert(resolved.edgeAt(ModuleNodeId(root / "dm", "dmi")).edgeAs(Dmi) == DmiEdge(7, 32))
+      assert(resolved.edgeAt(ModuleNodeId(debug / "dm", "dmi")).edgeAs(Dmi) == DmiEdge(7, 32))
       // One debug port per hart, each carrying its hart id downward and the hart's register width upward.
       assert(resolved.edgeAt(ModuleNodeId(root / "core0", "debug")).edgeAs(DebugInterrupt) == DebugEdge(0, 32))
       assert(resolved.edgeAt(ModuleNodeId(root / "core1", "debug")).edgeAs(DebugInterrupt) == DebugEdge(1, 32))
       // The module's own master port sits on the fabric, sized by it like every other master.
-      val sb   = resolved.edgeAt(ModuleNodeId(root / "dm", "sb")).edgeAs(Axi4)
+      val sb    = resolved.edgeAt(ModuleNodeId(debug / "dm", "sb")).edgeAs(Axi4)
       assert((sb.addrBits, sb.dataBits) == (32, 128))
 
       // The debug module's full parameter counts the harts the topology gave it, and carries the bus it settled on.
-      val dm = resolved.generatorModule(root / "dm").get.fullParam.asInstanceOf[DmP]
+      val dm = resolved.generatorModule(debug / "dm").get.fullParam.asInstanceOf[DmP]
       assert(dm.harts == 2)
       assert(dm.haltOnReset)
       assert(dm.sbDataBits == 128)
@@ -290,8 +309,8 @@ object AxiVerilogSpec extends TestSuite:
 
     test("probe-rs brings the SoC up over the DPI bridge and it prints over the UART") {
       // The external modules stay external: instantiated, never defined, so the models below are what gives them a
-      // body. The debug adapter is one of them — a socket is no more synthesizable than an oscillator.
-      Seq("ClockGen", "SimConsole", "PllAnalog", "TraceLog", "JtagDpi").foreach { m =>
+      // body. The debug adapter and the DRAM are among them — neither a socket nor a memory device is RTL.
+      Seq("ClockGen", "SimConsole", "PllAnalog", "TraceLog", "JtagDpi", "DramDpi").foreach { m =>
         assert(design.verilog.values.exists(_.contains(s"$m ")))
         assert(!design.verilog.contains(s"$m.sv"))
       }
@@ -309,6 +328,9 @@ object AxiVerilogSpec extends TestSuite:
       os.write(simDir / "TraceLog.sv", traceLogModel)
       os.write(simDir / "JtagDpi.sv", jtagDpiModel)
       os.write(simDir / "jtag_dpi.cc", jtagDpiSource)
+      os.write(simDir / "DramDpi.sv", dramDpiModel)
+      os.write(simDir / "dram_dpi.cc", dramDpiSource)
+      os.write(simDir / "dram.yaml", ddr4Config)
       // firtool's own file list is the release build; the layer collateral on top of it is the verification build.
       val layers = design.verilog.keys.toSeq.sorted.filter(_.startsWith("layers-"))
       os.proc(
@@ -321,10 +343,24 @@ object AxiVerilogSpec extends TestSuite:
         s"-I$simDir",
         "--top-module",
         "Top",
+        // Ramulator is the DRAM model behind `DramDpi`, and it is a C++20 library.
+        "-CFLAGS",
+        s"-std=c++20 -I$ramulator/include",
+        "-LDFLAGS",
+        s"-L$ramulator/lib -lramulator -Wl,-rpath,$ramulator/lib",
         "-f",
         "filelist.f",
         layers,
-        Seq("ClockGen.sv", "SimConsole.sv", "PllAnalog.sv", "TraceLog.sv", "JtagDpi.sv", "jtag_dpi.cc")
+        Seq(
+          "ClockGen.sv",
+          "SimConsole.sv",
+          "PllAnalog.sv",
+          "TraceLog.sv",
+          "JtagDpi.sv",
+          "jtag_dpi.cc",
+          "DramDpi.sv",
+          "dram_dpi.cc"
+        )
       ).call(cwd = simDir)
 
       // What the debugger downloads, and the description it reads the chip from — both written out of the design.
@@ -383,11 +419,11 @@ object AxiVerilogSpec extends TestSuite:
     test("a backend interface that differs from the settled bundle is a binding-check error") {
       val resolved = Negotiator.negotiate(buildSoc())
       val mangled  = axiBackends.map {
-        case b if b.entry eq Dram => ZaoziBackend(Dram, DramGenWide)
+        case b if b.entry eq Uart => ZaoziBackend(Uart, UartGenWide)
         case b                    => b
       }
       val e        = intercept[ElaborationException](Elaborator.elaborate(resolved, mangled))
-      assert(e.getMessage.contains("port mismatch at mem.dram#in"))
+      assert(e.getMessage.contains("port mismatch at uart#in"))
       assert(e.getMessage.contains("in.w.bits.data")) // the first-divergence path names the widened leaf
     }
   }

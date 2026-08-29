@@ -19,6 +19,7 @@ import upickle.default.ReadWriter
   *
   * The adapter is [[JtagDpi]], a socket a real debugger connects to. Nothing in this design knows the debug protocol
   * any more: probe-rs walks the TAP from outside the simulation, and the harness only clocks its bits onto the pins.
+  * The memory is [[DramDpi]] on the same footing: the chip's memory port ends here, in Ramulator.
   */
 
 /** One leaf of a hart's trace as it arrives here: the framework named the port, the protocol named the field. */
@@ -35,22 +36,29 @@ final case class TraceSource(hart: String, xlen: Int, regIndexBits: Int, ports: 
 given traceSourcesTokens: mainargs.TokensReader.Simple[Vector[TraceSource]] = jsonTokens("trace-sources")
 
 case class TestHarnessP(
-  freqHz:    Int,
-  taps:      Vector[String],
-  baud:      Int,
-  gpioWidth: Int,
-  jtagPort:  Int,
-  tckDiv:    Int,
-  traces:    Vector[TraceSource])
+  freqHz:     Int,
+  taps:       Vector[String],
+  baud:       Int,
+  gpioWidth:  Int,
+  jtagPort:   Int,
+  tckDiv:     Int,
+  memShape:   AxiShape,
+  memBase:    Long,
+  memHz:      Int,
+  dramConfig: String,
+  traces:     Vector[TraceSource])
     extends Parameter derives ReadWriter:
   require(freqHz > 0, s"clock frequency $freqHz must be positive")
   require(taps.nonEmpty, "a harness drives at least one clock tap")
   require(taps.distinct.sizeIs == taps.size, s"clock taps must be uniquely named: ${taps.mkString(", ")}")
   require(freqHz >= baud * 8, s"clock $freqHz Hz too slow for $baud baud: the console needs 8 clocks per bit")
+  require(memHz > 0, s"memory port frequency $memHz must be positive")
   require(traces.map(_.hart).distinct.sizeIs == traces.size, "one trace source per hart")
   def consoleP:             ConsoleP  = ConsoleP(freqHz / baud)
   def padsP:                GpioPadsP = GpioPadsP(gpioWidth)
   def adapterP:             JtagDpiP  = JtagDpiP(jtagPort, tckDiv)
+  // The DRAM's own clock comes out of its timing; what it needs from here is the period of the port it answers.
+  def dramP:                DramDpiP  = DramDpiP(dramConfig, memBase, 1000000000000L / memHz, memShape)
   // A debug session runs on wall-clock time and the design keeps clocking through it, so the budget covers the whole
   // bring-up, not just the program: what a hung debugger costs is exactly this much simulation.
   def clockP:               ClockGenP = ClockGenP(freqHz, watchdogMs = 50)
@@ -64,6 +72,9 @@ class TestHarnessPIO(p: TestHarnessP)     extends HWRecord(p):
   val serialPins = Flipped("serialPins", new SerialRecord)
   val gpioPins   = Flipped("gpioPins", new GpioPinsRecord(p.gpioWidth))
   val jtagPins   = Flipped("jtagPins", new JtagRecord)
+  // The memory port is a synchronous bus, so its clock crosses the boundary with it.
+  val memPins    = Flipped("memPins", new AxiPortRecord(p.memShape))
+  val memClock   = Flipped("memClock", new ClockRecord)
   // The trace runs in the chip's clock domain, so the harness takes that clock as an ordinary edge; the leaves
   // themselves are data inputs, resolved out of the design's probes by the framework.
   val traceClock = Flipped("traceClock", new ClockRecord)
@@ -99,6 +110,50 @@ object TestHarnessGen extends Generator[TestHarnessP, TestHarnessPLayers, TestHa
     val serial = io.field[Record]("serialPins")
     console.io.serial.tx     := serial.field[Bool]("tx")
     serial.field[Bool]("rx") := console.io.serial.rx
+
+    // The memory the chip's bus port ends in. It is not part of the chip and not modelled here: the beats go to
+    // Ramulator, which says when each one is done.
+    val dram = DramDpi.instantiate(p.dramP)
+    dram.io.clk.clock := io.field[Record]("memClock").field[Clock]("clock")
+    dram.io.clk.reset := io.field[Record]("memClock").field[Reset]("reset")
+    val mem    = io.field[Record]("memPins")
+    val memAw  = mem.field[Record]("aw")
+    val memW   = mem.field[Record]("w")
+    val memB   = mem.field[Record]("b")
+    val memAr  = mem.field[Record]("ar")
+    val memR   = mem.field[Record]("r")
+    val awBits = memAw.field[Record]("bits")
+    val wBits  = memW.field[Record]("bits")
+    val arBits = memAr.field[Record]("bits")
+    dram.io.in.aw.valid                            := memAw.field[Bool]("valid")
+    memAw.field[Bool]("ready")                     := dram.io.in.aw.ready
+    dram.io.in.aw.bits.id                          := awBits.field[UInt]("id")
+    dram.io.in.aw.bits.addr                        := awBits.field[UInt]("addr")
+    dram.io.in.aw.bits.len                         := awBits.field[UInt]("len")
+    dram.io.in.aw.bits.size                        := awBits.field[UInt]("size")
+    dram.io.in.aw.bits.burst                       := awBits.field[UInt]("burst")
+    dram.io.in.w.valid                             := memW.field[Bool]("valid")
+    memW.field[Bool]("ready")                      := dram.io.in.w.ready
+    dram.io.in.w.bits.data                         := wBits.field[UInt]("data")
+    dram.io.in.w.bits.strb                         := wBits.field[UInt]("strb")
+    dram.io.in.w.bits.last                         := wBits.field[Bool]("last")
+    memB.field[Bool]("valid")                      := dram.io.in.b.valid
+    dram.io.in.b.ready                             := memB.field[Bool]("ready")
+    memB.field[Record]("bits").field[UInt]("id")   := dram.io.in.b.bits.id
+    memB.field[Record]("bits").field[UInt]("resp") := dram.io.in.b.bits.resp
+    dram.io.in.ar.valid                            := memAr.field[Bool]("valid")
+    memAr.field[Bool]("ready")                     := dram.io.in.ar.ready
+    dram.io.in.ar.bits.id                          := arBits.field[UInt]("id")
+    dram.io.in.ar.bits.addr                        := arBits.field[UInt]("addr")
+    dram.io.in.ar.bits.len                         := arBits.field[UInt]("len")
+    dram.io.in.ar.bits.size                        := arBits.field[UInt]("size")
+    dram.io.in.ar.bits.burst                       := arBits.field[UInt]("burst")
+    memR.field[Bool]("valid")                      := dram.io.in.r.valid
+    dram.io.in.r.ready                             := memR.field[Bool]("ready")
+    memR.field[Record]("bits").field[UInt]("id")   := dram.io.in.r.bits.id
+    memR.field[Record]("bits").field[UInt]("data") := dram.io.in.r.bits.data
+    memR.field[Record]("bits").field[UInt]("resp") := dram.io.in.r.bits.resp
+    memR.field[Record]("bits").field[Bool]("last") := dram.io.in.r.bits.last
 
     // What the GPIO pads are wired to on the board.
     val pads = GpioPadsGen.instantiate(p.padsP)

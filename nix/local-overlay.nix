@@ -8,4 +8,6 @@ final: prev:
   riscv-opcodes = final.callPackage ./pkgs/riscv-opcodes.nix { };
 
   espresso = final.callPackage ./pkgs/espresso.nix { };
+
+  ramulator = final.callPackage ./pkgs/ramulator.nix { };
 }

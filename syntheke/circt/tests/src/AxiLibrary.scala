@@ -202,64 +202,6 @@ def axiXbar(
 ): AxiXbarNodes =
   generator(Xbar)(new AxiXbarNodes(name.value, ins, outs, arbitration))
 
-// ============ DRAM: the uncached memory slave ============
-
-val Dram = new GeneratorEntry[DramDeviceP]
-
-/** The DRAM controller ([[DramDeviceGen]], the real device): one uncached executable address range on a 128-bit bus,
-  * named after the instance; `wordsLog2` sizes the behavioral backing store. The cores reset into it and a debugger
-  * loads their program there.
-  */
-final class DramNodes(
-  name:           String,
-  ranks:          Int,
-  wordsLog2:      Int,
-  base:           Long,
-  size:           Long,
-  idCapacityBits: Int
-)(
-  using GeneratorScope[DramDeviceP])
-    extends Nodes:
-  val clk = inward(ClockDomain).uFn(_ => Right(()))
-  parameters { view =>
-    val s = shapeOf(view, in)
-    Right(DramDeviceP(ranks, wordsLog2, s.addrBits, s.dataBits, s.idBits))
-  }
-  val in  = inward(Axi4).uFn(_ =>
-    Right(
-      AxiSlavePort(
-        slaves = Vector(
-          AxiSlaveParams(
-            name,
-            AddressSet.misaligned(base, size),
-            RegionType.Uncached,
-            executable = true,
-            supportsWrite = TransferSizes(1, 64),
-            supportsRead = TransferSizes(1, 64)
-          )
-        ),
-        beatBytes = 16,
-        idCapacityBits = idCapacityBits,
-        minLatency = 8
-      )
-    )
-  )
-
-def dramCtrl(
-  ranks:          Int,
-  wordsLog2:      Int,
-  base:           Long,
-  size:           Long,
-  idCapacityBits: Int
-)(
-  using
-  ws:             WrapperScope,
-  name:           sourcecode.Name,
-  file:           sourcecode.File,
-  line:           sourcecode.Line
-): DramNodes =
-  generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, idCapacityBits))
-
 // ============ Pll: the chip's clock ============
 
 val Pll = new GeneratorEntry[PllP]
@@ -583,15 +525,24 @@ def gpioCtrl(
 val TestHarness = new GeneratorEntry[TestHarnessP]
 
 /** The design's testbench ([[TestHarnessGen]]): it publishes the clock the chip runs on, holds the debug adapter on the
-  * JTAG pins, and terminates the serial and GPIO pins. Every rate it needs comes from the settled edges — the baud rate
-  * from the serial edge, the pin count from the GPIO edge — so nothing here is stated twice. The TAP's own parameters
-  * are no longer among them: the adapter is a wire to a real debugger, and it is the debugger that knows the protocol.
+  * JTAG pins, terminates the serial and GPIO pins, and is where the chip's memory port ends. Every rate it needs comes
+  * from the settled edges — the baud rate from the serial edge, the pin count from the GPIO edge — so nothing here is
+  * stated twice. The TAP's own parameters are no longer among them: the adapter is a wire to a real debugger, and it is
+  * the debugger that knows the protocol.
+  *
+  * The memory is a node like any other: the DRAM is not on the die, so it is not an IP of this design. What the harness
+  * publishes upward is the range it answers for, which is the device Ramulator models on the other side of `memPins`.
   */
 final class TestHarnessNodes(
-  freqHz:   Int,
-  taps:     Vector[String],
-  jtagPort: Int,
-  tckDiv:   Int
+  name:         String,
+  freqHz:       Int,
+  taps:         Vector[String],
+  jtagPort:     Int,
+  tckDiv:       Int,
+  memBase:      Long,
+  memSize:      Long,
+  memIdCapBits: Int,
+  dramConfig:   String
 )(
   using GeneratorScope[TestHarnessP])
     extends Nodes:
@@ -608,6 +559,26 @@ final class TestHarnessNodes(
   val serialPins = inward(Serial).uFn(_ => Right(()))
   val gpioPins   = inward(GpioPins).uFn(_ => Right(()))
   val jtagPins   = inward(Jtag).uFn(_ => Right(()))
+  val memPins    = inward(Axi4).uFn(_ =>
+    Right(
+      AxiSlavePort(
+        slaves = Vector(
+          AxiSlaveParams(
+            name,
+            AddressSet.misaligned(memBase, memSize),
+            RegionType.Uncached,
+            executable = true,
+            supportsWrite = TransferSizes(1, 64),
+            supportsRead = TransferSizes(1, 64)
+          )
+        ),
+        beatBytes = 16,
+        idCapacityBits = memIdCapBits,
+        minLatency = 8
+      )
+    )
+  )
+  val memClock   = inward(ClockDomain).uFn(_ => Right(()))
   val traceClock = inward(ClockDomain).uFn(_ => Right(()))
 
   parameters { view =>
@@ -638,24 +609,34 @@ final class TestHarnessNodes(
         view.edgeOf(gpioPins),
         jtagPort,
         tckDiv,
+        shapeOf(view, memPins),
+        memBase,
+        view.edgeOf(memClock),
+        dramConfig,
         traces
       )
     )
   }
 
 def testHarness(
-  freqHz:   Int,
-  taps:     Vector[String],
-  jtagPort: Int,
-  tckDiv:   Int
+  freqHz:       Int,
+  taps:         Vector[String],
+  jtagPort:     Int,
+  tckDiv:       Int,
+  memBase:      Long,
+  memSize:      Long,
+  memIdCapBits: Int,
+  dramConfig:   String
 )(
   using
-  ws:       WrapperScope,
-  name:     sourcecode.Name,
-  file:     sourcecode.File,
-  line:     sourcecode.Line
+  ws:           WrapperScope,
+  name:         sourcecode.Name,
+  file:         sourcecode.File,
+  line:         sourcecode.Line
 ): TestHarnessNodes =
-  testbench(TestHarness)(new TestHarnessNodes(freqHz, taps, jtagPort, tckDiv))
+  testbench(TestHarness)(
+    new TestHarnessNodes(name.value, freqHz, taps, jtagPort, tckDiv, memBase, memSize, memIdCapBits, dramConfig)
+  )
 
 // ============ UartHarness: outside the chip, for the UART demo ============
 
@@ -702,7 +683,6 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(Xbar, XbarGen),
   ZaoziBackend(Dtm, DtmGen),
   ZaoziBackend(Dm, DmGen),
-  ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeDeviceGen),
   ZaoziBackend(Uart, UartDeviceGen),
   ZaoziBackend(Gpio, GpioDeviceGen)

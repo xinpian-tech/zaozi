@@ -68,6 +68,7 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
+          ramulator = pkgs.ramulator;
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
@@ -85,6 +86,8 @@
             MILL_NO_SEPARATE_BSP_OUTPUT_DIR = "1";
             SCALA_CLI_INSTALL_PATH = scala-cli;
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
+            # The DRAM model the syntheke demo's testbench links into its simulation.
+            RAMULATOR_INSTALL_PATH = ramulator;
             Z3_LIB = "${z3.lib}/lib/libz3.so";
           };
           # -Djextract.decls.per.header=65535 is scoped to the jextract
