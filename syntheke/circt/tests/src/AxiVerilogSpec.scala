@@ -109,14 +109,15 @@ object AxiVerilogSpec extends TestSuite:
           "uart",
           "gpio",
           "dtm",
-          "dm"
+          "dm",
+          "trace"
         )
       )
       sysPll.ref <-- harness.tap("ref")
 
       // The harts halt out of reset and the debugger hands them their PC, so the reset vector is never fetched.
-      val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = true)
-      val core1 = core(idBits = 3, maxFlight = 8, resetPc = 0, enableDebug = true)
+      val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = true, enableTrace = true)
+      val core1 = core(idBits = 3, maxFlight = 8, resetPc = 0, enableDebug = true, enableTrace = true)
       val dma   = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = 0x80000800L, windowLog2 = 10)
 
       val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
@@ -155,6 +156,7 @@ object AxiVerilogSpec extends TestSuite:
       harness.serialPins <-- uart.serial
       harness.gpioPins <-- gpio.pins
       harness.jtagPins <-- dtm.jtag
+      harness.traceClock <-- sysPll.tap("trace")
 
       core0.clk <-- sysPll.tap("core0")
       core1.clk <-- sysPll.tap("core1")

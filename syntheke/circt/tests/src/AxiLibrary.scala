@@ -46,14 +46,15 @@ final class CoreNodes(
   idBits:      Int,
   maxFlight:   Int,
   resetPc:     Int,
-  enableDebug: Boolean
+  enableDebug: Boolean,
+  enableTrace: Boolean
 )(
   using GeneratorScope[CoreDeviceP])
     extends Nodes:
   val clk               = inward(ClockDomain).uFn(_ => Right(()))
   private val debugNode = Option.when(enableDebug) {
     given sourcecode.Name = sourcecode.Name("debug")
-    inward(DebugInterrupt).uFn(_ => Right(DebugHartCap(32)))
+    inward(DebugInterrupt).uFn(_ => Right(DebugHartCap(CoreDeviceP.xlen)))
   }
 
   /** The hart's debug port, present only on a core built with one. */
@@ -61,9 +62,17 @@ final class CoreNodes(
     require(debugNode.isDefined, s"core '$name' was built without a debug node")
     debugNode.get
 
+  /** The hart's instruction trace. A declaration, not a connection: the framework carries every leaf to the testbench
+    * on its own, so nothing in the topology mentions it.
+    */
+  private val traceSource = Option.when(enableTrace) {
+    given sourcecode.Name = sourcecode.Name("trace")
+    dvSource(RvTrace)(RvTraceShape(CoreDeviceP.xlen, CoreDeviceP.regIndexBits), traceLayer)
+  }
+
   parameters { view =>
     val s = shapeOf(view, mem)
-    Right(CoreDeviceP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug))
+    Right(CoreDeviceP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug, enableTrace))
   }
   val mem =
     outward(Axi4).dFn(_ =>
@@ -74,7 +83,8 @@ def core(
   idBits:      Int,
   maxFlight:   Int,
   resetPc:     Int,
-  enableDebug: Boolean
+  enableDebug: Boolean,
+  enableTrace: Boolean
 )(
   using
   ws:          WrapperScope,
@@ -82,7 +92,7 @@ def core(
   file:        sourcecode.File,
   line:        sourcecode.Line
 ): CoreNodes =
-  generator(Core)(new CoreNodes(name.value, idBits, maxFlight, resetPc, enableDebug))
+  generator(Core)(new CoreNodes(name.value, idBits, maxFlight, resetPc, enableDebug, enableTrace))
 
 // ============ Dma: a bus-mastering DMA engine ============
 
@@ -588,9 +598,28 @@ final class TestHarnessNodes(
   val serialPins = inward(Serial).uFn(_ => Right(()))
   val gpioPins   = inward(GpioPins).uFn(_ => Right(()))
   val jtagPins   = inward(Jtag).uFn(_ => Right(()))
+  val traceClock = inward(ClockDomain).uFn(_ => Right(()))
 
   parameters { view =>
-    val t = view.edgeOf(jtagPins)
+    val t      = view.edgeOf(jtagPins)
+    // The probe manifest is the design's, complete regardless of declaration order: one source per hart, one leaf per
+    // trace signal, each already named with the port the framework will hand it over.
+    val traces = view.probes.map { src =>
+      val shape = upickle.default.read[RvTraceShape](src.down)
+      TraceSource(
+        src.id.module.path.last,
+        shape.xlen,
+        shape.regIndexBits,
+        src.leaves.map { l =>
+          val (width, bool) = l.tpe match
+            case ProtocolInterface.Bool     => (1, true)
+            case ProtocolInterface.UInt(w)  => (w, false)
+            case other                      =>
+              throw new IllegalArgumentException(s"trace leaf ${l.portName} is $other, not an integer")
+          TracePort(l.path.nameSegments.last, l.portName, width, bool)
+        }
+      )
+    }
     Right(
       TestHarnessP(
         freqHz,
@@ -603,7 +632,8 @@ final class TestHarnessNodes(
         t.dataBits,
         t.dmiInstruction,
         tckDiv,
-        dwell
+        dwell,
+        traces
       )
     )
   }

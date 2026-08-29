@@ -27,7 +27,7 @@ object UartSpec extends TestSuite:
     Design {
       val harness = uartHarness(freqHz, Vector("uart", "host"))
 
-      val host = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = false)
+      val host = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = false, enableTrace = false)
 
       val uart                          = generator(UartDevice) {
         val clk    = inward(ClockDomain).uFn(_ => Right(()))
