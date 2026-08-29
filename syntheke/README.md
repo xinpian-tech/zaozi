@@ -13,7 +13,8 @@ implemented in pure Scala 3.
   by zaozi through a `GeneratorBackend`, wrapper modules are emitted directly
   through the CIRCT C-API from the negotiated plans, the per-module `.mlirbc`
   circuits are linked, and the in-process firtool pipeline lowers the design to
-  Verilog. No textual FIRRTL is ever constructed by hand.
+  Verilog. FIRRTL is bytecode throughout — the artifacts are the linked
+  circuit's `.mlirbc` and the Verilog; no textual FIRRTL is read or written.
 
 The design contract is the Syntheke design document (`syntheke` repository,
 branch `init`, `doc/design/`, Chinese). Correspondence:

@@ -77,10 +77,12 @@ import java.lang.foreign.Arena
   */
 final class ElaborationException(message: String) extends RuntimeException(message)
 
-/** The enacted design: FIRRTL and Verilog text plus the module-name assignment. */
+/** The enacted design: the linked circuit as MLIR bytecode — the same form the backends dump, and the one the framework
+  * reads back — the Verilog the firtool pipeline lowered it to, and the module-name assignment.
+  */
 final case class ElaboratedDesign(
   circuitName: String,
-  firrtl:      String,
+  mlirbc:      Array[Byte],
   verilog:     String,
   moduleNames: Map[ModuleId, String])
 
@@ -89,7 +91,7 @@ final case class ElaboratedDesign(
   * Wrapper modules are emitted directly through the CIRCT C-API from the negotiated plans: dangle ports, one instance
   * per child, bundle-level connects, and layer declarations. Generator modules are enacted by their
   * [[GeneratorBackend]] (zaozi), which dumps per-module `.mlirbc` circuits; the elaborator links those into the design
-  * circuit, verifies it, and runs the firtool pipeline to Verilog — no textual FIRRTL is ever constructed by hand. Fail
+  * circuit, verifies it, and runs the firtool pipeline to Verilog — FIRRTL is only ever bytecode here, never text. Fail
   * fast: the first error throws an [[ElaborationException]] on the spot.
   */
 object Elaborator:
@@ -410,9 +412,11 @@ object Elaborator:
 
         if !summon[MlirModule].getOperation.verify then fail("MLIR verification of the linked circuit failed")
 
-        // ============ artifacts: FIRRTL text, then the firtool pipeline to Verilog ============
-        val fir = new StringBuilder
-        summon[MlirModule].exportFIRRTL(fir ++= _)
+        // ============ artifacts: the linked circuit as bytecode, then the firtool pipeline to Verilog ============
+        // Bytecode first: the pipeline below rewrites the circuit in place, so this is the last moment the design
+        // still exists as the FIRRTL the negotiation produced.
+        val bytecode = new java.io.ByteArrayOutputStream
+        summon[MlirModule].getOperation.writeBytecode(bc => bytecode.write(bc))
 
         given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
         given PassManager    = summon[PassManagerApi].passManagerCreate
@@ -428,6 +432,6 @@ object Elaborator:
           s"firtool lowering pipeline for circuit '$circuitName'"
         )
 
-        ElaboratedDesign(circuitName, fir.toString, verilog.toString, moduleNames)
+        ElaboratedDesign(circuitName, bytecode.toByteArray, verilog.toString, moduleNames)
       finally summon[Context].destroy()
     finally arena.close()

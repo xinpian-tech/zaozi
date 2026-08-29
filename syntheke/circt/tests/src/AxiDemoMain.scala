@@ -6,7 +6,7 @@ import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
 import me.jiuyang.syntheke.tests.zaoziimpl.{clockGenModel, pllAnalogModel, simConsoleModel}
 
-/** Dump the AXI demo SoC's artifacts: `Top.fir`, `Top.sv`, the behavioral definitions of its two external modules —
+/** Dump the AXI demo SoC's artifacts: `Top.mlirbc`, `Top.sv`, the behavioral definitions of its external modules —
   * everything a simulator needs — plus the tooling JSON exports.
   */
 object AxiDemoMain:
@@ -15,7 +15,7 @@ object AxiDemoMain:
     val design   = Elaborator.elaborate(resolved, axiBackends)
     val dir      = os.Path(args.headOption.getOrElse(os.pwd.toString), os.pwd)
     os.makeDir.all(dir)
-    os.write.over(dir / "Top.fir", design.firrtl)
+    os.write.over(dir / "Top.mlirbc", design.mlirbc)
     os.write.over(dir / "Top.sv", design.verilog)
     os.write.over(dir / "ClockGen.sv", clockGenModel)
     os.write.over(dir / "SimConsole.sv", simConsoleModel)
@@ -24,4 +24,4 @@ object AxiDemoMain:
     os.write.over(dir / "edges.json", ujson.write(Export.edges(resolved), indent = 2))
     os.write.over(dir / "plan.json", ujson.write(Export.plan(resolved), indent = 2))
     os.write.over(dir / "params.json", ujson.write(Export.params(resolved), indent = 2))
-    println(s"wrote Top.fir / Top.sv / the three behavioral models / four JSON exports to $dir")
+    println(s"wrote Top.mlirbc / Top.sv / the three behavioral models / four JSON exports to $dir")

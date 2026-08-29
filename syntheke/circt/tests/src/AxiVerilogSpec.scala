@@ -176,10 +176,8 @@ object AxiVerilogSpec extends TestSuite:
       val design   = Elaborator.elaborate(resolved, axiBackends)
 
       assert(design.circuitName == "Top")
-      // The FIRRTL artifact holds the whole linked design: root, wrappers, and zaozi-generated modules.
-      assert(design.firrtl.contains("circuit Top"))
-      assert(design.firrtl.contains("module Top"))
-      assert(design.firrtl.contains("module mem"))
+      // The bytecode artifact is the whole linked design as the framework built it, before firtool rewrote it.
+      assert(design.mlirbc.nonEmpty)
       // Verilog contains the root, the mem wrapper, and one deduplicated module per generator parameter.
       assert(design.verilog.contains("module Top"))
       assert(design.verilog.contains("module mem"))
@@ -189,11 +187,10 @@ object AxiVerilogSpec extends TestSuite:
       assert(coreModules.sizeIs == 2)
       coreModules.foreach(n => assert(design.verilog.contains(s"module $n")))
       // The dangle port punched through the mem boundary survives into Verilog on the wrapper.
-      assert(design.firrtl.contains("inst_dram_node_in_in"))
+      assert(design.verilog.contains("inst_dram_node_in_in"))
       // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
       // to the dumped definition, transitively (the GPR too). The two cores differ only in their id space, which is
       // the shim's parameter, so the two shims hold the same deduplicated DitDah32.
-      assert(design.firrtl.contains("inst core of DitDah32_"))
       assert(design.verilog.contains("module DitDah32_"))
       assert(design.verilog.contains("module DitDah32Gpr_"))
       // Every fabric module is real RTL now: the crossbars, the RAM, the bridge and the peripherals hold state.
@@ -260,10 +257,12 @@ object AxiVerilogSpec extends TestSuite:
     test("the SoC boots from JTAG and prints over the UART — verilator runs the linked Verilog") {
       val resolved = Negotiator.negotiate(buildSoc())
       val design   = Elaborator.elaborate(resolved, axiBackends)
-      // The three declared simulation boundaries survive linking as external modules.
-      assert(design.firrtl.contains("extmodule ClockGen"))
-      assert(design.firrtl.contains("extmodule SimConsole"))
-      assert(design.firrtl.contains("extmodule PllAnalog"))
+      // The three external modules stay external: instantiated, never defined, so the models below are what
+      // gives them a body.
+      Seq("ClockGen", "SimConsole", "PllAnalog").foreach { m =>
+        assert(design.verilog.contains(s"$m ") || design.verilog.contains(s"$m #("))
+        assert(!design.verilog.contains(s"module $m"))
+      }
 
       // The design generates its own clock and ends its own run, so the simulation is just Top plus the
       // behavioral definitions — no ports, no testbench file.

@@ -291,17 +291,16 @@ object DvVerilogSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildDesign())
       val design   = Elaborator.elaborate(resolved, backends)
 
-      // The layer tree is declared once at circuit level; the cluster carries one pure-probe dangle per leaf and the
-      // root exposes the same probes as top-level ports.
-      assert(design.firrtl.contains("layer verification"))
-      assert(design.firrtl.contains("inst_src_dv$msource_rob_sig_out"))
-      assert(design.firrtl.contains("inst_cluster_inst_src_dv$msource_rob_sig_out"))
-      assert(design.firrtl.contains("define"))
-      // Verilog exists for the root and both stub modules; probes stay out of the release netlist (bind layers).
+      // Without a testbench the chain ends in top-level probe ports, which lower to one cross-module reference per
+      // leaf — named by the whole path the leaf travelled, and resolving to the signal inside the source.
+      assert(design.verilog.contains("`define ref_Top_inst_cluster_inst_src_dv$msource_rob_sig_out cluster.src."))
+      // The layer tree reaches the Verilog: the routed probes' layer and the stub's internal one, which is unrelated
+      // to any probe and was carried in by the linker.
+      assert(design.verilog.contains("layers_Top_verification"))
+      assert(design.verilog.contains("layers_Top_stubinternal"))
+      // Verilog exists for the root and both stub modules; probes stay out of the release netlist.
       assert(design.verilog.contains("module Top"))
       assert(design.verilog.contains("module Src_"))
-      // The stub's internal layer, unrelated to any routed probe, was carried by the linker into the design circuit.
-      assert(design.firrtl.contains("layer stubinternal"))
     }
 
     test("the testbench terminates the design and takes the probes as data inputs") {
@@ -309,10 +308,9 @@ object DvVerilogSpec extends TestSuite:
       val design   = Elaborator.elaborate(resolved, backends)
 
       // The testbench is an ordinary generator instance at the root; its design edge settled like any edge and every
-      // probe leaf is resolved into its matching data input. Nothing surfaces as a root port.
-      assert(design.firrtl.contains("inst tb of Tb_"))
-      assert(!design.firrtl.contains("output inst_cluster"))
-      assert(!design.firrtl.contains("define inst_cluster"))
+      // probe leaf is resolved into its matching data input, so nothing leaves the design as a reference.
+      assert(design.verilog.contains("Tb_"))
+      assert(!design.verilog.contains("`define ref_Top"))
       assert(design.verilog.contains("module Top"))
     }
 
@@ -379,7 +377,7 @@ object DvVerilogSpec extends TestSuite:
       )
       assert(resolved.portPlans.forall(_.interface.isInstanceOf[ProtocolInterface.Probe]))
       val design   = Elaborator.elaborate(resolved, backends)
-      assert(design.firrtl.contains("pcs_pc_0"))
+      assert(design.verilog.contains("pcs_pc_0"))
       assert(design.verilog.contains("module Top"))
     }
   }
