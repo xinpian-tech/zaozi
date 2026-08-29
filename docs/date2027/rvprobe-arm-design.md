@@ -135,14 +135,10 @@ This becomes build item 0; the study cannot run without it.
 
 ## What must be built (five items, in order)
 
-0. **Internal-state reference** — ✅ **built** (`SvImport.promoteState`). A named internal signal of
-   the imported design is lifted to an output port, after which the ordinary typed semantics names
-   it; a missing name raises with the candidates listed and a wrong declared width is rejected.
-   Demonstrated on the HAVEN ALU: `fp_counter` sits inside the FP pipeline on no port, and
-   `HavenAluStateUT` states "it reaches 3" — the solver derives which opcode starts the pipeline and
-   how long to hold it (witness drives an FP op with `start`; the counter climbs 0→1→2→3).
-   *Remaining:* the promoted port exists only in the formal model, so replaying promoted state needs
-   a generated SV shim exposing it by hierarchical reference — folded into the coverage leg below.
+0. **Internal-state reference** — per the section above: a typed accessor for design state resolved
+   at elaboration, lowering to a constraint over the internal signal (harvest's `Resolver` is the
+   working precedent, `--flatten-modules` the cross-boundary mechanism). Without it "reach FSM state
+   S" cannot be stated, and the residual-closing study has nothing to aim at.
 
 1. **The bulk-stimulus path** — needed for the head-to-head, and the reason the objection above
    lands: repeated solves under blocking constraints (`assume` the previous solution away) plus
