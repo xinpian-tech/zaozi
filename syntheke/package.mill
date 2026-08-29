@@ -4,7 +4,6 @@ package build.syntheke
 
 import mill._
 import mill.scalalib._
-import mill.scalalib.TestModule.Utest
 import mill.scalalib.scalafmt._
 
 import build.{circtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
@@ -18,16 +17,6 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.oslib, v.upickle, v.sourcecode)
 
-  object tests extends ScalaTests with ScalafmtModule with Utest {
-    def mvnDeps = Seq(v.utest)
-
-    // zaozi device implementations under `src/zaoziimpl` compile here; the zaozi annotation macros are experimental.
-    override def moduleDeps = super.moduleDeps ++ Seq(zaozi)
-
-    override def scalacOptions: T[Seq[String]] =
-      Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros") ++ Seq("-experimental"))
-  }
-
   object circt extends ZaoziScalaModule with ScalafmtModule {
     def scalaVersion = Task(v.scala)
     def moduleDeps   = Seq(m, zaozi)
@@ -37,31 +26,26 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
     override def forkArgs: T[Seq[String]] = Task(
       super.forkArgs() ++ circtlib.forkArgs()
     )
+  }
 
-    object tests extends ScalaTests with ScalafmtModule with Utest {
-      override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros"))
+  // The demo SoC: the design document's motivation SoC as a real design — the AXI4 protocol library, the zaozi IPs,
+  // the topology, and a main that elaborates it into artifacts. Mill's part ends at that jar; `meson.build` beside it
+  // takes the artifacts from there, through verilator and a debugger, to a design that prints.
+  object demo extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(circt, zaozi)
 
-      def mvnDeps = Seq(v.utest)
+    // The zaozi annotation macros are experimental, and -Xcheck-macros does not survive them.
+    override def scalacOptions: T[Seq[String]] =
+      Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros") ++ Seq("-experimental"))
 
-      // Reuse the Axi4 protocol library defined in the negotiation test suite.
-      override def moduleDeps = super.moduleDeps ++ Seq(m.tests)
+    override def mainClass: T[Option[String]] = Task(Some("me.jiuyang.syntheke.demo.Main"))
 
-      override def forkArgs: T[Seq[String]] = Task(
-        super.forkArgs() ++ circtlib.forkArgs()
-      )
-
-      // One worker, not one per test class: each of these holds an MLIR context and the elaborated design, and the
-      // simulation test forks a verilator build beside it. Run them in parallel and the machine runs out.
-      override def testParallelism: T[Boolean] = Task(false)
-
-      // zaozi's BaseGeneratorHelper dumps per-module .mlirbc circuits into ZAOZI_OUTDIR. The rest is forwarded from
-      // `nix develop .#syntheke` — as input tasks, so a changed environment invalidates them: PATH for verilator, and
-      // the two packages the simulation links and drives the design with.
-      private val forwarded = Seq("PATH", "RAMULATOR_INSTALL_PATH", "SIMPROBE_INSTALL_PATH")
-      def hostEnv: T[Map[String, String]] = Task.Input(forwarded.map(k => k -> Task.env.getOrElse(k, "")).toMap)
-      override def forkEnv: T[Map[String, String]] = Task(
-        super.forkEnv() ++ hostEnv() ++ Map("ZAOZI_OUTDIR" -> Task.dest.toString)
-      )
-    }
+    // C2 miscompiles something on this workload — the JVM dies with SIGSEGV inside JIT-compiled code, at a different
+    // point every run, and never with -Xint or with C1 alone. Elaborating takes two seconds, which C2 cannot pay back
+    // anyway: capped at C1 the run is deterministic *and* twice as fast.
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs() ++ Seq("-XX:TieredStopAtLevel=1")
+    )
   }
 }

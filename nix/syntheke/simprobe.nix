@@ -11,8 +11,8 @@ rustPlatform.buildRustPackage {
   pname = "simprobe";
   version = "0.1.0";
 
-  src = ../../syntheke/tests/simprobe;
-  cargoLock.lockFile = ../../syntheke/tests/simprobe/Cargo.lock;
+  src = ../../syntheke/demo/simprobe;
+  cargoLock.lockFile = ../../syntheke/demo/simprobe/Cargo.lock;
 
   meta = {
     description = "probe-rs debug probe over a simulation's JTAG DPI bridge";

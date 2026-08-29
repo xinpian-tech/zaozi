@@ -24,4 +24,6 @@ result*
 *.fsdb
 *.log
 
-syntheke/tests/simprobe/target/
+syntheke/demo/simprobe/target/
+
+syntheke/build*/

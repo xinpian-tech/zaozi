@@ -15,6 +15,9 @@ implemented in pure Scala 3.
   circuits are linked, and the in-process firtool pipeline lowers the design to
   Verilog. FIRRTL is bytecode throughout — the artifacts are the linked
   circuit's `.mlirbc` and the Verilog; no textual FIRRTL is read or written.
+- **`syntheke.demo`** — the design document's motivation SoC as a real design,
+  and the only thing here that runs end to end. Mill's job ends at its jar;
+  `syntheke/meson.build` takes over from there — elaborate, verilate, bring up.
 
 The design contract is the Syntheke design document (`syntheke` repository,
 branch `init`, `doc/design/`, Chinese). Correspondence:
@@ -101,26 +104,25 @@ sysXbar.input("in0") <-- core0.mem
 // Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error
 ```
 
-The AXI4 demo (`tests/src/axi/`, `circt/tests/src/`) mirrors rocket-chip's
-`amba.axi4` parameter model over the design document's motivation SoC:
+The demo (`demo/`) mirrors rocket-chip's `amba.axi4` parameter model:
 id-space prefixing in the crossbar, upward address aggregation, a 128→32
 width bridge, per-edge conflict reporting, and end-to-end Verilog. The user
 story splits by file: `AxiLibrary.scala` is what an IP author ships (per IP:
-FullParam, endpoint class, a def binding the registry entry), the spec file
-is what an SoC integrator writes (instantiate and wire). On the circt side
-the zaozi modules themselves sit under `tests/src/zaoziimpl/`, one real
-implementation per file, zaozi API only — the cores are the vendored
-DitDah32 RV32EC (`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening
-shim, and Xbar / WidthBridge / Uart / Gpio / Dma follow their rocket-chip
-counterparts (AXI4Xbar with address decode and arbitration, a width
-widget, real peripheral register files; no L2 — an AXI fabric without
-coherence gives one nothing testable to do). `circt/tests/src/AxiLibrary.scala`
-is the wrap that puts them on the negotiation graph.
+FullParam, endpoint class, a def binding the registry entry), `Soc.scala`
+is what an SoC integrator writes (instantiate and wire). The zaozi modules
+themselves sit under `demo/src/zaoziimpl/`, one real implementation per
+file, zaozi API only — the cores are the vendored DitDah32 RV32EC
+(`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening shim, and Xbar /
+WidthBridge / Uart / Gpio / Dma follow their rocket-chip counterparts
+(AXI4Xbar with address decode and arbitration, a width widget, real
+peripheral register files; no L2 — an AXI fabric without coherence gives
+one nothing testable to do). `demo/src/AxiLibrary.scala` is the wrap that
+puts them on the negotiation graph.
 
 There is no DRAM among them. Memory is not on the die and is not an IP of
 this design, so what the chip has is a memory port: an `Axi4` node the
 testbench terminates, publishing upward the range it answers for. Behind
-it is Ramulator (`nix build .#ramulator`) through `DramDpi.scala` — the
+it is Ramulator (`nix build .#syntheke-ramulator`) through `DramDpi.scala` — the
 timing is a real DRAM simulator's, the contents a byte store beside it,
 and the ratio between the DRAM's clock and the port's comes from
 Ramulator's own tCK against the settled edge frequency. A register file
@@ -128,7 +130,7 @@ pretending to be a DRAM would tell the design nothing about the latency it
 will actually see.
 
 The RISC-V debug chain is three more protocols
-(`circt/tests/src/DebugProtocols.scala`), one per boundary, because that
+(`demo/src/DebugProtocols.scala`), one per boundary, because that
 is where the parameters actually meet: `Jtag` carries the TAP the
 transport implements down to whoever drives the pins (idcode, IR length,
 the scan-register widths, the instruction selecting DMI), `Dmi` is the
@@ -172,7 +174,7 @@ There is no boot ROM, and no debugger inside the design either. The
 adapter on the JTAG pins is `JtagDpi.scala`, an external module whose
 behavioral definition is a socket: it clocks one bit per `tck` period out
 of whatever a debugger sends and reports `tdo` back, and knows nothing
-else. The debugger is [probe-rs](https://probe.rs) — `tests/simprobe/`, a
+else. The debugger is [probe-rs](https://probe.rs) — `demo/simprobe/`, a
 small crate implementing probe-rs's `RawJtagIo` over that socket, so
 everything above the pins (the TAP walk, DTM, debug module, the RISC-V
 debug sequences) is probe-rs's own. It attaches, halts the harts, downloads the
@@ -184,7 +186,7 @@ the RAM range from the memory port's, the harts from the debug module's.
 
 The harts' instruction trace reaches the harness the way the framework
 intends verification to work, and it is the only thing in the demo that
-does: `RvTrace` (`circt/tests/src/TraceProtocol.scala`) is a `DVProtocol`
+does: `RvTrace` (`demo/src/TraceProtocol.scala`) is a `DVProtocol`
 carrying the core's whole trace surface, and each `CoreNodes` declares one
 `dvSource` of it. That declaration is not a connection — nothing in the
 topology mentions the trace — and the framework forwards every leaf up to
@@ -207,33 +209,28 @@ other. The SoC therefore simulates itself: verilator runs the linked
 Verilog, probe-rs brings it up over the bridge, and hart 1 prints "hello
 world" over the UART at 115200 baud, out of a DDR4 the whole time.
 
-Both are nix packages of their own — `nix/syntheke/`, nothing outside
-these tests depends on them — and `nix develop .#syntheke` is the default
-shell plus verilator and the two of them:
+Both are nix packages of their own (`nix/syntheke/` — nothing else in the
+monorepo depends on them), and `nix develop .#syntheke` is the default
+shell plus meson, verilator and the two of them.
+
+Where the boundary falls: mill compiles Scala into `syntheke.demo.assembly`
+and stops. Everything downstream is `syntheke/meson.build` — run the jar to
+elaborate the design, compile the testbench's DPI against Ramulator,
+verilate the file set, and bring the result up with a debugger. So the
+whole thing is one command:
 
 ```
-mill syntheke.circt.tests.testForked me.jiuyang.syntheke.circt.tests.AxiVerilogSpec
+nix develop .#syntheke
+cd syntheke && meson setup build && meson test -C build
 ```
 
-or by hand, from artifacts:
-
 ```
-mill syntheke.circt.tests.runMain me.jiuyang.syntheke.circt.tests.AxiDemoMain out/demo
-cd out/demo && verilator --binary --timing -Wno-fatal -j 0 -I. --top-module Top \
-  -CFLAGS "-std=c++20 -I$RAMULATOR_INSTALL_PATH/include" \
-  -LDFLAGS "-L$RAMULATOR_INSTALL_PATH/lib -lramulator -Wl,-rpath,$RAMULATOR_INSTALL_PATH/lib" \
-  -f filelist.f layers-*.sv ClockGen.sv SimConsole.sv PllAnalog.sv TraceLog.sv \
-  JtagDpi.sv jtag_dpi.cc DramDpi.sv dram_dpi.cc
-./obj_dir/VTop &
-$SIMPROBE_INSTALL_PATH/bin/simprobe \
-  --bridge 127.0.0.1:5555 --target target.yaml --chip syntheke-demo \
-  --image program.bin --load 0x80000000 --hart-pc 0:0x8000002c --hart-pc 1:0x80000000
+1/1 syntheke-demo:soc bring-up   OK   0.68s
 ```
 
-`tests/src/zaoziimpl/UartDevice.scala` is a real device: an 8N1 UART with
-a single-beat AXI slave register file, written as a plain zaozi module
-(zaozi implementations live under `tests/src/zaoziimpl`).
-`circt/tests/src/UartSpec.scala` wraps it with a minimal clock-domain protocol (the
-source's frequency flows down; the UART computes its baud divisor from
-the settled clock and capability-checks it) and a serial pin protocol,
-then negotiates and lowers it to Verilog.
+Each step is a target of its own if you want the pieces: `ninja -C build
+artifacts` for the elaborated design, `ninja -C build VTop` for the
+simulator. `syntheke/scripts/` holds the three scripts those targets run,
+and what each needs to know about the design — where the debugger attaches,
+what it loads where, what the harts should then be seen doing — comes from
+`bringup.env`, which the elaboration writes out of the design itself.

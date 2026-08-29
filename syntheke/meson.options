@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
+
+option('ramulator', type: 'string', value: '',
+  description: 'Ramulator prefix; defaults to $RAMULATOR_INSTALL_PATH')
+option('simprobe', type: 'string', value: '',
+  description: 'simprobe prefix; defaults to $SIMPROBE_INSTALL_PATH')

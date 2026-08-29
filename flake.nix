@@ -105,11 +105,11 @@
           '';
         };
 
-        # The default shell plus what only syntheke's end-to-end tests need: the
-        # simulator, the DRAM model they link into it and the debugger that
-        # brings the design up.
+        # The default shell plus what only syntheke needs downstream of the jar:
+        # meson driving it all, the simulator, the DRAM model linked into it and
+        # the debugger that brings the design up.
         devShells.syntheke = self.devShells.${system}.default.overrideAttrs (old: {
-          nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.verilator ];
+          nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [ meson ninja verilator ]);
           RAMULATOR_INSTALL_PATH = pkgs.syntheke.ramulator;
           SIMPROBE_INSTALL_PATH = pkgs.syntheke.simprobe;
         });
