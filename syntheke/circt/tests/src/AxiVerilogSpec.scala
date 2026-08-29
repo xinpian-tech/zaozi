@@ -184,8 +184,8 @@ object AxiVerilogSpec extends TestSuite:
       // The dangle port punched through the mem boundary survives into Verilog on the wrapper.
       assert(design.firrtl.contains("inst_dram_node_in_in"))
       // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
-      // to the dumped definition, transitively (the GPR too). The name carries the parameter hash — the two cores
-      // differ in their id space, so two DitDah32s link.
+      // to the dumped definition, transitively (the GPR too). The two cores differ only in their id space, which is
+      // the shim's parameter, so the two shims hold the same deduplicated DitDah32.
       assert(design.firrtl.contains("inst core of DitDah32_"))
       assert(design.verilog.contains("module DitDah32_"))
       assert(design.verilog.contains("module DitDah32Gpr_"))
