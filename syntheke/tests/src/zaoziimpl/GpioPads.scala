@@ -23,6 +23,8 @@ class GpioPadsPIO(p: GpioPadsP)     extends HWBundle(p):
 
 @zaoziGenerator
 object GpioPadsGen extends Generator[GpioPadsP, GpioPadsPLayers, GpioPadsPIO, GpioPadsPProbe]:
+  override def moduleName(p: GpioPadsP): String = s"GpioPads_${p.hashCode.toHexString}"
+
   def architecture(p: GpioPadsP) =
     val io = summon[Interface[GpioPadsPIO]]
     io.in.in := (io.in.out.asBits & io.in.oe.asBits).asUInt

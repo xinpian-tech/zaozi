@@ -115,7 +115,7 @@ rocket-chip counterparts (AXI4Xbar with address decode and arbitration, a
 burst-capable AXI4RAM, a width widget, real peripheral register files; no
 L2 — an AXI fabric without coherence gives one nothing testable to do).
 `circt/tests/src/AxiLibrary.scala` is the wrap that puts them on the
-negotiation graph; a clock tree, serial pins and GPIO pads reach every IP.
+negotiation graph.
 
 The RISC-V debug chain is three more protocols
 (`circt/tests/src/DebugProtocols.scala`), one per boundary, because that
@@ -131,21 +131,31 @@ transport holds the tck-to-system crossing, and the module holds a hart
 array selected by `dmcontrol.hartsello`, each hart with its own halt
 request and flags. The core keeps only its hart-side debug port.
 
-Nothing in the SoC is a boot ROM. `JtagHost.scala` is real RTL that
-divides the system clock into tck, walks the TAP, and scans in a script of
-DMI writes: with both harts halted out of reset, it writes the program
-into DRAM through hart 0's abstract memory access, gives each hart its
-start PC through `dpc`, and resumes them — hart 0 into the done-spin, hart
-1 into the program.
+Everything that is not the chip is in one module, the design's
+`testbench`: `TestHarness.scala` publishes the clock the whole design runs
+on, drives the JTAG pins as a debug adapter, and terminates the serial and
+GPIO pins in a console and a board model. It is a container, not a
+monolith — each of those is its own zaozi module instantiated inside it —
+and every rate it needs comes from the settled edges, so the harness
+cannot disagree with the chip about the baud rate, the pin count or how to
+scan the TAP. `UartHarness.scala` is the same thing sized to the UART
+demo. Nothing in the design is test equipment, and no module of the
+harness is an IP.
+
+There is no boot ROM. The harness's `JtagHost` is real RTL that divides
+the system clock into tck, walks the TAP, and scans in a script of DMI
+writes: with both harts halted out of reset, it writes the program into
+DRAM through hart 0's abstract memory access, gives each hart its start PC
+through `dpc`, and resumes them — hart 0 into the done-spin, hart 1 into
+the program.
 
 The two places RTL cannot go are external Verilog modules declared through
 zaozi's `VerilogWrapper` and linked as extmodules, each shipping its
 behavioral definition as a string next to the wrapper: `ClockGen`, the
-clock/reset origin inside ClockSource, and `SimConsole`, stdout inside the
-Console device — the framework's `testbench` feature terminating the
-serial pins. The SoC therefore simulates itself: verilator runs the linked
-Verilog and prints the "hello world" hart 1 sent over the UART at 115200
-baud, having received the program over JTAG.
+board's oscillator, and `SimConsole`, stdout at the far end of the serial
+line. Both live in the harness. The SoC therefore simulates itself:
+verilator runs the linked Verilog and prints the "hello world" hart 1 sent
+over the UART at 115200 baud, having received the program over JTAG.
 
 `tests/src/zaoziimpl/UartDevice.scala` is a real device: an 8N1 UART with
 a single-beat AXI slave register file, written as a plain zaozi module

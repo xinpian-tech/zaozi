@@ -51,6 +51,8 @@ class JtagHostPIO(p: JtagHostP)     extends HWBundle(p):
 
 @generator
 object JtagHostGen extends Generator[JtagHostP, JtagHostPLayers, JtagHostPIO, JtagHostPProbe]:
+  override def moduleName(p: JtagHostP): String = s"JtagHost_${p.hashCode.toHexString}"
+
   def architecture(p: JtagHostP) =
     val io           = summon[Interface[JtagHostPIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)

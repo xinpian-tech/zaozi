@@ -19,6 +19,13 @@ class JtagBundle extends Bundle:
   val trstN = Flipped(Bool())
   val tdo   = Aligned(Bool())
 
+class JtagRecord extends Record:
+  val tck   = Flipped("tck", Clock())
+  val tms   = Flipped("tms", Bool())
+  val tdi   = Flipped("tdi", Bool())
+  val trstN = Flipped("trstN", Bool())
+  val tdo   = Aligned("tdo", Bool())
+
 /** One DMI request/response pair, from the transport's side. */
 class DmiReqBits(abits: Int, dataBits: Int) extends Record:
   val addr = Aligned("addr", UInt(abits))

@@ -8,10 +8,10 @@ import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
 import me.jiuyang.syntheke.tests.axi.{AddressSet, Axi4, AxiSlaveParams, AxiSlavePort, RegionType, TransferSizes}
 import utest.*
 
-/** The real UART device ([[UartDeviceGen]], `zaoziimpl/UartDevice.scala`) on the negotiation graph, end to end: a clock
-  * source, an AXI host, the UART and the serial pads, negotiated over [[ClockDomain]], [[Axi4]] and [[Serial]]. The
-  * UART computes its baud divisor from the settled clock frequency in `parameters` and rejects a clock too slow for the
-  * requested baud rate.
+/** The real UART device ([[UartDeviceGen]], `zaoziimpl/UartDevice.scala`) on the negotiation graph, end to end: an AXI
+  * host and the UART on the chip, the clock and the serial line's other end in the test harness, negotiated over
+  * [[ClockDomain]], [[Axi4]] and [[Serial]]. The UART computes its baud divisor from the settled clock frequency in
+  * `parameters` and rejects a clock too slow for the requested baud rate.
   */
 object UartSpec extends TestSuite:
 
@@ -19,14 +19,13 @@ object UartSpec extends TestSuite:
 
   val backends: Seq[GeneratorBackend] = Seq(
     ZaoziBackend(UartDevice, UartDeviceGen),
-    ZaoziBackend(ClockSource, ClockSourceGen),
-    ZaoziBackend(SerialPads, SerialPadsGen),
+    ZaoziBackend(UartHarness, UartHarnessGen),
     ZaoziBackend(Core, CoreDeviceGen)
   )
 
   def buildDesign(freqHz: Int = 1843200, baud: Int = 115200): DesignSpec =
     Design {
-      val clkSrc = clockSource(freqHz, Vector("uart", "host"))
+      val harness = uartHarness(freqHz, Vector("uart", "host"))
 
       val host = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = false)
 
@@ -63,12 +62,10 @@ object UartSpec extends TestSuite:
       }
       val (uartClk, uartIn, uartSerial) = uart
 
-      val pads = serialPads()
-
-      uartClk <-- clkSrc.tap("uart")
-      host.clk <-- clkSrc.tap("host")
+      uartClk <-- harness.tap("uart")
+      host.clk <-- harness.tap("host")
       uartIn <-- host.mem
-      pads.in <-- uartSerial
+      harness.serialPins <-- uartSerial
     }
 
   val tests = Tests {
@@ -77,7 +74,10 @@ object UartSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildDesign())
       val uart     = resolved.generatorModule(ModuleId.root / "uart").get.fullParam
       assert(uart == UartDeviceP(divisor = 16, addrBits = 29, dataBits = 32, idBits = 2)) // 1843200 / 115200
-      assert(resolved.generatorModule(ModuleId.root / "pads").get.fullParam == SerialPadsP(115200))
+      // The harness learns the baud rate from the same edge, and its pads carry it.
+      val harness = resolved.generatorModule(ModuleId.root / "harness").get.fullParam.asInstanceOf[UartHarnessP]
+      assert(harness.baud == 115200)
+      assert(harness.padsP == SerialPadsP(115200))
       assert(resolved.edgeAt(ModuleNodeId(ModuleId.root / "uart", "clk")).edgeAs(ClockDomain) == 1843200)
     }
 

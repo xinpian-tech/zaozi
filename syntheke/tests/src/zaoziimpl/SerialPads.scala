@@ -24,6 +24,8 @@ class SerialPadsPIO(p: SerialPadsP)     extends HWRecord(p):
 
 @zaoziGenerator
 object SerialPadsGen extends Generator[SerialPadsP, SerialPadsPLayers, SerialPadsPIO, SerialPadsPProbe]:
+  override def moduleName(p: SerialPadsP): String = s"SerialPads_${p.hashCode.toHexString}"
+
   def architecture(p: SerialPadsP) =
     val io = summon[Interface[SerialPadsPIO]]
     io.field[Record]("in").field[Bool]("rx") := io.field[Record]("in").field[Bool]("tx")

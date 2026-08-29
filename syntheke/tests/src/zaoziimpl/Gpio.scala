@@ -30,6 +30,12 @@ class GpioPinsBundle(width: Int) extends Bundle:
   val oe  = Aligned(UInt(width))
   val in  = Flipped(UInt(width))
 
+/** The string-keyed twin, for a module whose ports are named by its parameter (the test harness). */
+class GpioPinsRecord(width: Int) extends Record:
+  val out = Aligned("out", UInt(width))
+  val oe  = Aligned("oe", UInt(width))
+  val in  = Flipped("in", UInt(width))
+
 class GpioDevicePLayers(p: GpioDeviceP) extends LayerInterface(p):
   def layers = Seq.empty
 class GpioDevicePProbe(p: GpioDeviceP)  extends DVBundle[GpioDeviceP, GpioDevicePLayers](p)

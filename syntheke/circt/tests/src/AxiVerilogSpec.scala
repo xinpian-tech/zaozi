@@ -80,14 +80,15 @@ object AxiVerilogSpec extends TestSuite:
       Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(1, halt = false, resume = true)))
 
   /** AxiSocSpec's topology minus the L2 slot (an AXI fabric without coherence gives an L2 nothing testable to do), plus
-    * the clock tree, the debug chain — JTAG host, transport, debug module, one port per hart — and the console
-    * testbench terminating the serial pins; FullParam = the zaozi parameter of each IP.
+    * the debug chain — on-chip transport and debug module, one port per hart. Everything that is not the chip is in the
+    * test harness: the clock, the debug adapter driving the JTAG pins, the console on the serial pins and the board the
+    * GPIO pads are wired to. FullParam = the zaozi parameter of each IP.
     */
   def buildSoc(): DesignSpec =
     Design {
-      val clkSrc = clockSource(
-        100000000,
-        Vector(
+      val harness = testHarness(
+        freqHz = 100000000,
+        taps = Vector(
           "core0",
           "core1",
           "dma",
@@ -97,11 +98,12 @@ object AxiVerilogSpec extends TestSuite:
           "periphXbar",
           "uart",
           "gpio",
-          "tb",
           "dtm",
-          "dm",
-          "host"
-        )
+          "dm"
+        ),
+        script = injection(program, loadBase, hart0Pc, hart1Pc),
+        tckDiv = 4,
+        dwell = 8
       )
 
       // The harts halt out of reset and the debugger hands them their PC, so the reset vector is never fetched.
@@ -122,15 +124,12 @@ object AxiVerilogSpec extends TestSuite:
 
       val periphXbar = axiXbar(Vector("in"), Vector("uart", "gpio"), Arbitration.FixedPriority)
 
-      val uart   = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
-      val gpio   = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8, width = 8)
-      val tb     = console()
-      val gpioPd = gpioPads()
+      val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
+      val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8, width = 8)
 
-      // The debug chain: pins, transport, module, one negotiated port per hart.
-      val dtm  = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
-      val dm   = debugModule(harts = 2, haltOnReset = true)
-      val host = jtagHost(script = injection(program, loadBase, hart0Pc, hart1Pc), tckDiv = 4, dwell = 8)
+      // The on-chip half of the debug chain: transport, module, one negotiated port per hart.
+      val dtm = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
+      val dm  = debugModule(harts = 2, haltOnReset = true)
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
@@ -139,27 +138,27 @@ object AxiVerilogSpec extends TestSuite:
       periphXbar.input("in") <-- bridge.out
       uart.in <-- periphXbar.output("uart")
       gpio.in <-- periphXbar.output("gpio")
-      tb.serial <-- uart.serial
-      gpioPd.in <-- gpio.pins
 
-      host.tap <-- dtm.jtag
       dm.dmi <-- dtm.dmi
       core0.debug <-- dm.hart(0)
       core1.debug <-- dm.hart(1)
 
-      core0.clk <-- clkSrc.tap("core0")
-      core1.clk <-- clkSrc.tap("core1")
-      dma.clk <-- clkSrc.tap("dma")
-      sysXbar.clk <-- clkSrc.tap("sysXbar")
-      dramClk <-- clkSrc.tap("dram")
-      bridge.clk <-- clkSrc.tap("bridge")
-      periphXbar.clk <-- clkSrc.tap("periphXbar")
-      uart.clk <-- clkSrc.tap("uart")
-      gpio.clk <-- clkSrc.tap("gpio")
-      tb.clk <-- clkSrc.tap("tb")
-      dtm.clk <-- clkSrc.tap("dtm")
-      dm.clk <-- clkSrc.tap("dm")
-      host.clk <-- clkSrc.tap("host")
+      // The chip's pins, all terminating in the harness.
+      harness.serialPins <-- uart.serial
+      harness.gpioPins <-- gpio.pins
+      harness.jtagPins <-- dtm.jtag
+
+      core0.clk <-- harness.tap("core0")
+      core1.clk <-- harness.tap("core1")
+      dma.clk <-- harness.tap("dma")
+      sysXbar.clk <-- harness.tap("sysXbar")
+      dramClk <-- harness.tap("dram")
+      bridge.clk <-- harness.tap("bridge")
+      periphXbar.clk <-- harness.tap("periphXbar")
+      uart.clk <-- harness.tap("uart")
+      gpio.clk <-- harness.tap("gpio")
+      dtm.clk <-- harness.tap("dtm")
+      dm.clk <-- harness.tap("dm")
     }
 
   val tests = Tests {
@@ -197,8 +196,8 @@ object AxiVerilogSpec extends TestSuite:
       val resolved = Negotiator.negotiate(buildSoc())
 
       val root = ModuleId.root
-      // The transport publishes the TAP it implements; the host takes it and knows how to scan it.
-      val tap  = resolved.edgeAt(ModuleNodeId(root / "host", "tap")).edgeAs(Jtag)
+      // The transport publishes the TAP it implements; the harness takes it and knows how to scan it.
+      val tap  = resolved.edgeAt(ModuleNodeId(root / "harness", "jtagPins")).edgeAs(Jtag)
       assert(tap == JtagTap(0xdeadbeb1L, 5, 7, 32, 0x11))
       // The DMI bus settled at the transport's scan width, checked against the module's register file.
       assert(resolved.edgeAt(ModuleNodeId(root / "dm", "dmi")).edgeAs(Dmi) == DmiEdge(7, 32))
@@ -211,13 +210,18 @@ object AxiVerilogSpec extends TestSuite:
       assert(dm.harts == 2)
       assert(dm.haltOnReset)
 
-      val design = Elaborator.elaborate(resolved, axiBackends)
-      // Transport, module and host are their own modules, and the module reaches both harts.
+      val design      = Elaborator.elaborate(resolved, axiBackends)
+      // Transport and module are their own modules, and the module reaches both harts.
       assert(design.verilog.contains("module Dtm_"))
       assert(design.verilog.contains("module Dm_"))
-      assert(design.verilog.contains("module JtagHost_"))
       assert(design.verilog.contains("hart0_halt"))
       assert(design.verilog.contains("hart1_halt"))
+      // The debug adapter is inside the harness, not the chip: one instance, and it is the harness that holds it.
+      assert(design.verilog.contains("module JtagHost_"))
+      assert(design.verilog.contains("module TestHarness_"))
+      val harnessBody = design.verilog.substring(design.verilog.indexOf("module TestHarness_"))
+      assert(harnessBody.contains("JtagHost_"))
+      assert(harnessBody.contains("ClockGen"))
     }
 
     test("the SoC boots from JTAG and prints over the UART — verilator runs the linked Verilog") {

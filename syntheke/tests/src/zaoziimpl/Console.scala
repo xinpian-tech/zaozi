@@ -56,6 +56,8 @@ endmodule
 
 @generator
 object ConsoleGen extends Generator[ConsoleP, ConsolePLayers, ConsolePIO, ConsolePProbe]:
+  override def moduleName(p: ConsoleP): String = s"Console_${p.hashCode.toHexString}"
+
   def architecture(p: ConsoleP) =
     val io           = summon[Interface[ConsolePIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)

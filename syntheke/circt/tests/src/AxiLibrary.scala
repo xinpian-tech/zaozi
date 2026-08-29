@@ -340,41 +340,6 @@ def debugModule(
 ): DmNodes =
   generator(Dm)(new DmNodes(name.value, harts, haltOnReset))
 
-// ============ JtagHost: the debug host driving the pins ============
-
-val JtagHost = new GeneratorEntry[JtagHostP]
-
-/** The debug host ([[JtagHostGen]]): takes the TAP the transport publishes and scans `script` into it. Everything it
-  * needs to drive the pins — IR length, scan-register widths, the instruction selecting DMI — comes from the settled
-  * JTAG edge, so the host and the transport cannot disagree about the chain.
-  */
-final class JtagHostNodes(
-  script: Vector[DmiWrite],
-  tckDiv: Int,
-  dwell:  Int
-)(
-  using GeneratorScope[JtagHostP])
-    extends Nodes:
-  val clk = inward(ClockDomain).uFn(_ => Right(()))
-  val tap = inward(Jtag).uFn(_ => Right(()))
-  parameters { view =>
-    val t = view.edgeOf(tap)
-    Right(JtagHostP(script, t.irLength, t.abits, t.dataBits, t.dmiInstruction, tckDiv, dwell))
-  }
-
-def jtagHost(
-  script: Vector[DmiWrite],
-  tckDiv: Int,
-  dwell:  Int
-)(
-  using
-  ws:     WrapperScope,
-  name:   sourcecode.Name,
-  file:   sourcecode.File,
-  line:   sourcecode.Line
-): JtagHostNodes =
-  generator(JtagHost)(new JtagHostNodes(script, tckDiv, dwell))
-
 // ============ WidthBridge: wide to narrow ============
 
 val WidthBridge = new GeneratorEntry[BridgeDeviceP]
@@ -537,38 +502,81 @@ def gpioCtrl(
 ): GpioNodes =
   generator(Gpio)(new GpioNodes(name.value, base, size, idCapacityBits, width))
 
-// ============ GpioPads: the GPIO pin boundary ============
+// ============ TestHarness: everything outside the chip ============
 
-val GpioPadRing = new GeneratorEntry[GpioPadsP]
+val TestHarness = new GeneratorEntry[TestHarnessP]
 
-/** Terminates one GPIO pin bank; the FullParam records the settled width. */
-final class GpioPadsNodes(
+/** The design's testbench ([[TestHarnessGen]]): it publishes the clock the chip runs on, drives the JTAG pins, and
+  * terminates the serial and GPIO pins. Every rate it needs comes from the settled edges — the baud rate from the
+  * serial edge, the pin count from the GPIO edge, the TAP from the JTAG edge — so nothing here is stated twice.
+  */
+final class TestHarnessNodes(
+  freqHz: Int,
+  taps:   Vector[String],
+  script: Vector[DmiWrite],
+  tckDiv: Int,
+  dwell:  Int
 )(
-  using GeneratorScope[GpioPadsP])
+  using GeneratorScope[TestHarnessP])
     extends Nodes:
-  val in = inward(GpioPins).uFn(_ => Right(()))
-  parameters(view => Right(GpioPadsP(view.edgeOf(in))))
+  private val outs = taps.map { n =>
+    given sourcecode.Name = sourcecode.Name(n)
+    outward(ClockDomain).dFn(_ => Right(freqHz))
+  }
 
-def gpioPads(
+  /** Clock taps are declared by name, so they are looked up by name. */
+  def tap(n: String): ClockDomain.Outward =
+    require(taps.contains(n), s"harness has no clock tap '$n' (taps: ${taps.mkString(", ")})")
+    outs(taps.indexOf(n))
+
+  val serialPins = inward(Serial).uFn(_ => Right(()))
+  val gpioPins   = inward(GpioPins).uFn(_ => Right(()))
+  val jtagPins   = inward(Jtag).uFn(_ => Right(()))
+
+  parameters { view =>
+    val t = view.edgeOf(jtagPins)
+    Right(
+      TestHarnessP(
+        freqHz,
+        taps,
+        view.edgeOf(serialPins),
+        view.edgeOf(gpioPins),
+        script,
+        t.irLength,
+        t.abits,
+        t.dataBits,
+        t.dmiInstruction,
+        tckDiv,
+        dwell
+      )
+    )
+  }
+
+def testHarness(
+  freqHz: Int,
+  taps:   Vector[String],
+  script: Vector[DmiWrite],
+  tckDiv: Int,
+  dwell:  Int
 )(
   using
-  ws:   WrapperScope,
-  name: sourcecode.Name,
-  file: sourcecode.File,
-  line: sourcecode.Line
-): GpioPadsNodes =
-  generator(GpioPadRing)(new GpioPadsNodes)
+  ws:     WrapperScope,
+  name:   sourcecode.Name,
+  file:   sourcecode.File,
+  line:   sourcecode.Line
+): TestHarnessNodes =
+  testbench(TestHarness)(new TestHarnessNodes(freqHz, taps, script, tckDiv, dwell))
 
-// ============ ClockSource: the clock and reset origin ============
+// ============ UartHarness: outside the chip, for the UART demo ============
 
-val ClockSource = new GeneratorEntry[ClockSourceP]
+val UartHarness = new GeneratorEntry[UartHarnessP]
 
-/** One outward clock tap per name; taps are declared by name and looked up by name. */
-final class ClockSourceNodes(
+/** The UART demo's testbench ([[UartHarnessGen]]): the clock, and the loopback jumper on the serial pins. */
+final class UartHarnessNodes(
   freqHz: Int,
   taps:   Vector[String]
 )(
-  using GeneratorScope[ClockSourceP])
+  using GeneratorScope[UartHarnessP])
     extends Nodes:
   private val outs = taps.map { n =>
     given sourcecode.Name = sourcecode.Name(n)
@@ -576,12 +584,14 @@ final class ClockSourceNodes(
   }
 
   def tap(n: String): ClockDomain.Outward =
-    require(taps.contains(n), s"clock source has no tap '$n' (taps: ${taps.mkString(", ")})")
+    require(taps.contains(n), s"harness has no clock tap '$n' (taps: ${taps.mkString(", ")})")
     outs(taps.indexOf(n))
 
-  parameters(_ => Right(ClockSourceP(freqHz, taps)))
+  val serialPins = inward(Serial).uFn(_ => Right(()))
 
-def clockSource(
+  parameters(view => Right(UartHarnessP(freqHz, taps, view.edgeOf(serialPins))))
+
+def uartHarness(
   freqHz: Int,
   taps:   Vector[String]
 )(
@@ -590,70 +600,19 @@ def clockSource(
   name:   sourcecode.Name,
   file:   sourcecode.File,
   line:   sourcecode.Line
-): ClockSourceNodes =
-  generator(ClockSource)(new ClockSourceNodes(freqHz, taps))
-
-// ============ SerialPads: the serial pin boundary ============
-
-val SerialPads = new GeneratorEntry[SerialPadsP]
-
-/** Terminates one serial pin pair; the FullParam records the settled baud rate. */
-final class SerialPadsNodes(
-)(
-  using GeneratorScope[SerialPadsP])
-    extends Nodes:
-  val in = inward(Serial).uFn(_ => Right(()))
-  parameters(view => Right(SerialPadsP(view.edgeOf(in))))
-
-def serialPads(
-)(
-  using
-  ws:   WrapperScope,
-  name: sourcecode.Name,
-  file: sourcecode.File,
-  line: sourcecode.Line
-): SerialPadsNodes =
-  generator(SerialPads)(new SerialPadsNodes)
-
-// ============ Console: the simulation testbench ============
-
-val Console = new GeneratorEntry[ConsoleP]
-
-/** The testbench ([[ConsoleGen]]): terminates the UART's serial pins, reassembles the frames at the divisor the settled
-  * clock frequency and baud rate dictate, and prints every byte through its `SimConsole`.
-  */
-final class ConsoleNodes(
-)(
-  using GeneratorScope[ConsoleP])
-    extends Nodes:
-  val clk    = inward(ClockDomain).uFn(_ => Right(()))
-  val serial = inward(Serial).uFn(_ => Right(()))
-  parameters(view => Right(ConsoleP(view.edgeOf(clk) / view.edgeOf(serial))))
-
-def console(
-)(
-  using
-  ws:   WrapperScope,
-  name: sourcecode.Name,
-  file: sourcecode.File,
-  line: sourcecode.Line
-): ConsoleNodes =
-  testbench(Console)(new ConsoleNodes)
+): UartHarnessNodes =
+  testbench(UartHarness)(new UartHarnessNodes(freqHz, taps))
 
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives. */
 val axiBackends: Seq[GeneratorBackend] = Seq(
-  ZaoziBackend(ClockSource, ClockSourceGen),
-  ZaoziBackend(SerialPads, SerialPadsGen),
+  ZaoziBackend(TestHarness, TestHarnessGen),
   ZaoziBackend(Core, CoreDeviceGen),
   ZaoziBackend(Dma, DmaDeviceGen),
   ZaoziBackend(Xbar, XbarGen),
   ZaoziBackend(Dtm, DtmGen),
   ZaoziBackend(Dm, DmGen),
-  ZaoziBackend(JtagHost, JtagHostGen),
   ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeDeviceGen),
   ZaoziBackend(Uart, UartDeviceGen),
-  ZaoziBackend(Gpio, GpioDeviceGen),
-  ZaoziBackend(GpioPadRing, GpioPadsGen),
-  ZaoziBackend(Console, ConsoleGen)
+  ZaoziBackend(Gpio, GpioDeviceGen)
 )
