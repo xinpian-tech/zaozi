@@ -17,9 +17,25 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
   def scalaVersion = Task(v.scala)
   def mvnDeps      = Seq(v.oslib, v.upickle, v.sourcecode)
 
+  // The Elaborate phase, and nothing about who enacts a module: the elaborator emits wrapper modules through the
+  // CIRCT C-API, links the per-module circuits and lowers them, and reaches generator modules only through the
+  // `GeneratorBackend` contract. No eDSL among its dependencies.
   object circt extends ZaoziScalaModule with ScalafmtModule {
     def scalaVersion = Task(v.scala)
-    def moduleDeps   = Seq(m, zaozi)
+    def moduleDeps   = Seq(m, circtlib)
+
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+
+  // One implementation of that contract: a generator entry enacted by a zaozi Generator. The only module here that
+  // depends on the eDSL.
+  object zaoziBackend extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(circt, zaozi)
 
     override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
@@ -33,7 +49,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
   // takes the artifacts from there, through verilator and a debugger, to a design that prints.
   object demo extends ZaoziScalaModule with ScalafmtModule {
     def scalaVersion = Task(v.scala)
-    def moduleDeps   = Seq(circt, zaozi)
+    def moduleDeps   = Seq(zaoziBackend, zaozi)
 
     // The zaozi annotation macros are experimental, and -Xcheck-macros does not survive them.
     override def scalacOptions: T[Seq[String]] =

@@ -9,12 +9,16 @@ implemented in pure Scala 3.
 - **`syntheke`** (this module) — the **Build** and **Negotiate** phases of the
   Triptych pipeline plus the tooling exports. Pure computation over plain data;
   no MLIR/CIRCT native dependency.
-- **`syntheke.circt`** — the **Elaborate** phase: generator modules are enacted
-  by zaozi through a `GeneratorBackend`, wrapper modules are emitted directly
-  through the CIRCT C-API from the negotiated plans, the per-module `.mlirbc`
-  circuits are linked, and the in-process firtool pipeline lowers the design to
-  Verilog. FIRRTL is bytecode throughout — the artifacts are the linked
-  circuit's `.mlirbc` and the Verilog; no textual FIRRTL is read or written.
+- **`syntheke.circt`** — the **Elaborate** phase: wrapper modules are emitted
+  directly through the CIRCT C-API from the negotiated plans, generator modules
+  are reached only through the `GeneratorBackend` contract, the per-module
+  `.mlirbc` circuits are linked, and the in-process firtool pipeline lowers the
+  design to Verilog. FIRRTL is bytecode throughout — the artifacts are the
+  linked circuit's `.mlirbc` and the Verilog; no textual FIRRTL is read or
+  written. It depends on CIRCT, and on no eDSL.
+- **`syntheke.zaoziBackend`** — one implementation of that contract: a
+  generator entry enacted by a zaozi `Generator`, whose zaozi `Parameter` *is*
+  the entry's full parameter. The only module that depends on zaozi.
 - **`syntheke.demo`** — the design document's motivation SoC as a real design,
   and the only thing here that runs end to end. Mill's job ends at its jar;
   `syntheke/meson.build` takes over from there — elaborate, verilate, bring up.
@@ -32,7 +36,7 @@ branch `init`, `doc/design/`, Chinese). Correspondence:
 | 跨层端口规划、端口命名、FIRRTL 层 | `Planner.scala` |
 | 已求解记录 (`ResolvedDesign`, `ResolvedEdge`, `EdgeView`, …) | `Resolved.scala` |
 | 工具产物（topology/edges/plan/params JSON, @ch-tooling） | `Export.scala` |
-| 生成器契约、端口结构校验 (@dec-binding-check)、例化流程 | `circt/src/Backend.scala`, `circt/src/Elaborator.scala` |
+| 生成器契约、端口结构校验 (@dec-binding-check)、例化流程 | `circt/src/Backend.scala`（契约）, `zaoziBackend/src/ZaoziBackend.scala`（zaozi 实现）, `circt/src/Elaborator.scala` |
 
 Deviations from the document's surface syntax:
 
@@ -100,7 +104,7 @@ def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourc
 val core0 = core(idBits = 2)   // instance "core0"
 sysXbar.input("in0") <-- core0.mem
 
-// Elaborate (syntheke.circt): bind entries to zaozi generators, get Verilog.
+// Elaborate (syntheke.circt): bind entries to backends — syntheke.zaoziBackend has one for zaozi — and get Verilog.
 // Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error
 ```
 

@@ -5,7 +5,7 @@ package me.jiuyang.syntheke.circt
 import scala.collection.mutable
 
 import me.jiuyang.syntheke.*
-import me.jiuyang.zaozi.default.runOnOpOrThrow
+import me.jiuyang.syntheke.circt.Diagnostics.runOnOpOrThrow
 
 import org.llvm.circt.scalalib.capi.dialect.emit.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.emit.DialectApi as EmitDialectApi

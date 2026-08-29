@@ -5,6 +5,7 @@ package me.jiuyang.syntheke.demo
 import com.vowstar.ditdah32.JtagInstruction
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
+import me.jiuyang.syntheke.zaozi.ZaoziBackend
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.syntheke.demo.axi.{
   AddressSet,
