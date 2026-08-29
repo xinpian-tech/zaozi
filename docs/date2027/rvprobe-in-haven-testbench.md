@@ -37,25 +37,31 @@ top) reused **verbatim**.
 
 ## Result
 
-| | transactions | score | line | cond | toggle | branch |
-|---|---|---|---|---|---|---|
-| rvprobe (10 directed intents) | **10** | 44.51 | 67.72 | 52.83 | 8.01 | 55.38 |
-| HAVEN (15 sequences + 3 BO iterations) | **10,110** | 95.87 | 97.88 | 92.92 | 97.28 | 95.38 |
+An intent is a *constraint*, and a witness is only one of its solutions — so the same ten intents can
+be replayed exactly, or expanded to volume by pinning the fields the intent constrains (`op`,
+`start`) and randomizing the free ones (`a`, `b`). Both fills, same testbench, same VCS, same URG:
+
+| | transactions | solver calls | score | line | cond | toggle | branch |
+|---|---|---|---|---|---|---|---|
+| rvprobe, witness replay | 10 | 10 | 44.51 | 67.72 | 52.83 | 8.01 | 55.38 |
+| **rvprobe, volume fill** | **10,000** | **10** | **79.41** | 89.42 | 77.36 | **94.85** | 78.46 |
+| HAVEN (15 spec-derived sequences + 3 BO iterations) | 10,110 | — | 95.87 | 97.88 | 92.92 | 97.28 | 95.38 |
 
 **The plumbing works**: solved stimulus runs inside a foreign testbench with only the sequence layer
 replaced, measured by an identical toolchain.
 
-**Read the numbers honestly.** HAVEN wins on absolute coverage by a wide margin, and this is not a
-fair coverage comparison — 10 transactions against 10,110. What it does establish is efficiency per
-transaction: 4.45 coverage points per transaction versus 0.0095, roughly 470×. Ten solver-chosen
-transactions reach 44.5% of a design that a thousand-fold more random ones take to 95.9%.
+**Volume is not a limitation of the approach.** The first row's 44.5% was an artifact of replaying one
+witness per intent, not a property of directed generation. Because the intent is a constraint, the
+solver only has to supply the *structure* — ten BMC calls, once — while the simulator fills the free
+data fields, and the transaction count becomes free. Toggle coverage moves 8.01 → **94.85** under
+exactly this change, confirming the earlier diagnosis that the toggle gap was a volume artifact.
 
-**Where the gap is concentrated is the informative part.** Toggle coverage is 8.01% against 97.28% —
-by far the widest margin — and that is exactly right: toggle coverage rewards bit-level *volume and
-diversity*, which random stimulus produces for free and ten directed transactions cannot. Line
-(67.7 vs 97.9) and branch (55.4 vs 95.4) sit much closer, because those are structural targets a
-solver can aim at. The profile says plainly: directed generation is not a volume strategy, and any
-honest framing has to pair it with volume rather than pretend to replace it.
+**The remaining 16 points are about intent quality, not mechanism.** At matched volume (10,000 vs
+10,110) HAVEN still leads 95.87 to 79.41 — but our ten intents were mechanically trivial
+(`op == k ∧ start`), with no scenario diversity, no FP corner values, and no coverage feedback,
+whereas HAVEN's fifteen sequences were derived from the datasheet and then tuned by three
+Bayesian-optimization iterations against measured gaps. That is precisely the gap the residual-closing
+loop is supposed to close, and it is now a measurable target rather than an assertion.
 
 ## What this settles for the experiment design
 
@@ -64,9 +70,12 @@ honest framing has to pair it with volume rather than pretend to replace it.
   critical path (build items 2 and 3 of the arm design).
 - Both arms can run inside *the same* infrastructure, so a coverage difference is attributable to the
   stimulus rather than to a hundred incidental testbench differences.
-- The residual-closing study is the right primary experiment: rvprobe should be pointed at what
-  volume leaves behind, and the toggle result is a concrete warning against framing it as a
-  total-coverage race.
+- The residual-closing study is the right primary experiment: with volume no longer the differentiator,
+  what separates the arms is which scenarios the intents name — so the coverage-feedback loop (read the
+  URG residual, write an intent for it) is the mechanism under test, and 79.41 → 95.87 is the distance
+  it has to cover.
+- Solver cost scales with *intents*, not transactions: ten BMC calls produced ten thousand
+  transactions. That decoupling is what makes a directed approach affordable at simulation volume.
 
 Artifacts: `utlib/src/UvmSequence.scala` (the codec), `stdlib/src/HavenAluUT.scala`
 (`HavenAluOpUT`), `stdlib/tests/src/HavenAluUvmSeqTest.scala` (generates the sequence),

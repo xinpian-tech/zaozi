@@ -42,6 +42,10 @@ object HavenAluUvmSeqTest extends TestSuite:
       val all   = UvmSequence.concat(spec, solved)
       val codec = UvmSequence("rvprobe_directed_seq", "alu_top_seq_item")
       val sv    = codec.write(all, dir / "rvprobe_directed_seq.sv")
+      // The same intents at volume: pin only what the intent constrained (op, start) and let the free data
+      // fields randomize, so one witness per opcode expands into 1000 transactions that all still satisfy it.
+      UvmSequence("rvprobe_bulk_seq", "alu_top_seq_item", pinned = Some(Set("op", "start")), repeatPerBeat = 1000)
+        .write(all, dir / "rvprobe_bulk_seq.sv")
       val text  = os.read(sv)
 
       // Every opcode the intents targeted must appear as a concrete assignment.
