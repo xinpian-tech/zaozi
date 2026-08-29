@@ -39,7 +39,9 @@ object TraceLog extends VerilogWrapper[TraceLogP, TraceLogPLayers, TraceLogIO, T
   def verilogModuleName(p: TraceLogP) = "TraceLog"
   def verilogParameter(p:  TraceLogP) = TraceLogVerilogP(p.hart)
 
-/** The behavioral definition of [[TraceLog]], simulation only. */
+/** The behavioral definition of [[TraceLog]], simulation only: one file per hart, so the log does not shred whatever
+  * the design itself is printing.
+  */
 val traceLogModel: String = """`timescale 1ns / 1ps
 module TraceLog #(
     parameter HART = "hart"
@@ -52,11 +54,20 @@ module TraceLog #(
     input [3:0]  rd,
     input [31:0] rdWdata
 );
+  integer fd;
+
+  initial begin
+    fd = $fopen($sformatf("trace-%0s.log", HART), "w");
+    if (fd == 0) $fatal(1, "[TraceLog] cannot open the trace file for %0s", HART);
+  end
+
   always @(posedge clock) begin
     if (valid) begin
-      if (rdWe) $display("[%0s] %08x: %08x  x%0d <- %08x", HART, pc, instr, rd, rdWdata);
-      else $display("[%0s] %08x: %08x", HART, pc, instr);
+      if (rdWe) $fwrite(fd, "%08x: %08x  x%0d <- %08x\n", pc, instr, rd, rdWdata);
+      else $fwrite(fd, "%08x: %08x\n", pc, instr);
     end
   end
+
+  final $fclose(fd);
 endmodule
 """

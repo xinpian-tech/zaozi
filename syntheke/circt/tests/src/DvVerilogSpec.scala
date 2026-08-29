@@ -293,14 +293,18 @@ object DvVerilogSpec extends TestSuite:
 
       // Without a testbench the chain ends in top-level probe ports, which lower to one cross-module reference per
       // leaf — named by the whole path the leaf travelled, and resolving to the signal inside the source.
-      assert(design.verilog.contains("`define ref_Top_inst_cluster_inst_src_dv$msource_rob_sig_out cluster.src."))
+      assert(
+        design
+          .verilog("ref_Top.sv")
+          .contains("`define ref_Top_inst_cluster_inst_src_dv$msource_rob_sig_out cluster.src.")
+      )
       // The layer tree reaches the Verilog: the routed probes' layer and the stub's internal one, which is unrelated
       // to any probe and was carried in by the linker.
-      assert(design.verilog.contains("layers_Top_verification"))
-      assert(design.verilog.contains("layers_Top_stubinternal"))
+      assert(design.verilog.contains("layers-Top-verification.sv"))
+      assert(design.verilog.contains("layers-Top-stubinternal.sv"))
       // Verilog exists for the root and both stub modules; probes stay out of the release netlist.
-      assert(design.verilog.contains("module Top"))
-      assert(design.verilog.contains("module Src_"))
+      assert(design.verilog.contains("Top.sv"))
+      assert(design.verilog.keys.exists(_.startsWith("Src_")))
     }
 
     test("the testbench terminates the design and takes the probes as data inputs") {
@@ -309,9 +313,9 @@ object DvVerilogSpec extends TestSuite:
 
       // The testbench is an ordinary generator instance at the root; its design edge settled like any edge and every
       // probe leaf is resolved into its matching data input, so nothing leaves the design as a reference.
-      assert(design.verilog.contains("Tb_"))
-      assert(!design.verilog.contains("`define ref_Top"))
-      assert(design.verilog.contains("module Top"))
+      assert(design.verilog.keys.exists(_.startsWith("Tb_")))
+      assert(!design.verilog.contains("ref_Top.sv"))
+      assert(design.verilog.contains("Top.sv"))
     }
 
     test("an aggregate probe is one interface leaf: a single reference port end to end") {
@@ -352,7 +356,7 @@ object DvVerilogSpec extends TestSuite:
 
       // Through the C-API and firtool: the source defines a reference to a bundle, the testbench takes the bundle.
       val design = Elaborator.elaborate(resolved, backends)
-      assert(design.verilog.contains("module Top"))
+      assert(design.verilog.contains("Top.sv"))
     }
 
     test("Vec probe leaves forward as individual pure-probe ports") {
@@ -377,7 +381,7 @@ object DvVerilogSpec extends TestSuite:
       )
       assert(resolved.portPlans.forall(_.interface.isInstanceOf[ProtocolInterface.Probe]))
       val design   = Elaborator.elaborate(resolved, backends)
-      assert(design.verilog.contains("pcs_pc_0"))
-      assert(design.verilog.contains("module Top"))
+      assert(design.verilog.values.exists(_.contains("pcs_pc_0")))
+      assert(design.verilog.contains("Top.sv"))
     }
   }

@@ -78,12 +78,16 @@ import java.lang.foreign.Arena
 final class ElaborationException(message: String) extends RuntimeException(message)
 
 /** The enacted design: the linked circuit as MLIR bytecode — the same form the backends dump, and the one the framework
-  * reads back — the Verilog the firtool pipeline lowered it to, and the module-name assignment.
+  * reads back — the Verilog firtool split it into, by file name, and the module-name assignment.
+  *
+  * The Verilog is a file set, not one text: a file per module, plus the layer and probe collateral, which include each
+  * other by name. A release build compiles the modules; a verification build adds the `layers-*.sv` that bind the
+  * layers in.
   */
 final case class ElaboratedDesign(
   circuitName: String,
   mlirbc:      Array[Byte],
-  verilog:     String,
+  verilog:     Map[String, String],
   moduleNames: Map[ModuleId, String])
 
 /** The Elaborate phase, CIRCT backend (doc @ch-hardware, @sec-wrapper-emission, @sec-elaboration-flow).
@@ -420,18 +424,23 @@ object Elaborator:
 
         given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
         given PassManager    = summon[PassManagerApi].passManagerCreate
-        val verilog          = new StringBuilder
         val firtoolOptions   = summon[FirtoolOptions]
+        // firtool writes the split Verilog to a directory; the design carries it as its files, so the caller decides
+        // where they land.
+        val verilogDir       = os.temp.dir(prefix = s"syntheke-$circuitName-verilog", deleteOnExit = false)
         summon[PassManager].preprocessTransforms(firtoolOptions)
         summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
         summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
         summon[PassManager].hwToSV(firtoolOptions)
-        summon[PassManager].exportVerilog(firtoolOptions, verilog ++= _)
+        summon[PassManager].exportSplitVerilog(firtoolOptions, verilogDir.toString)
         summon[PassManager].runOnOpOrThrow(
           summon[MlirModule].getOperation,
           s"firtool lowering pipeline for circuit '$circuitName'"
         )
+        val verilog          =
+          try os.walk(verilogDir).filter(os.isFile).map(p => p.relativeTo(verilogDir).toString -> os.read(p)).toMap
+          finally os.remove.all(verilogDir)
 
-        ElaboratedDesign(circuitName, bytecode.toByteArray, verilog.toString, moduleNames)
+        ElaboratedDesign(circuitName, bytecode.toByteArray, verilog, moduleNames)
       finally summon[Context].destroy()
     finally arena.close()

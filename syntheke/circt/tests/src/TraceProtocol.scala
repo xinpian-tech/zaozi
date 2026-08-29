@@ -21,8 +21,8 @@ object RvTrace extends DVProtocol:
 
   def interfaceOf(down: RvTraceShape, layer: LayerPath): ProtocolBundle =
     import ProtocolInterface.*
-    val word    = UInt(down.xlen)
-    def p(t: ProtocolInterface)                 = Probe(t, layer)
+    val word                                      = UInt(down.xlen)
+    def p(t:        ProtocolInterface)            = Probe(t, layer)
     def field(name: String, t: ProtocolInterface) = Field(name, p(t))
     ProtocolBundle(
       // the commit

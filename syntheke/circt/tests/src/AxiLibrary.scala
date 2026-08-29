@@ -612,9 +612,9 @@ final class TestHarnessNodes(
         shape.regIndexBits,
         src.leaves.map { l =>
           val (width, bool) = l.tpe match
-            case ProtocolInterface.Bool     => (1, true)
-            case ProtocolInterface.UInt(w)  => (w, false)
-            case other                      =>
+            case ProtocolInterface.Bool    => (1, true)
+            case ProtocolInterface.UInt(w) => (w, false)
+            case other                     =>
               throw new IllegalArgumentException(s"trace leaf ${l.portName} is $other, not an integer")
           TracePort(l.path.nameSegments.last, l.portName, width, bool)
         }

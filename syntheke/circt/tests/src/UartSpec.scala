@@ -90,9 +90,9 @@ object UartSpec extends TestSuite:
       val resolved   = Negotiator.negotiate(buildDesign())
       val design     = Elaborator.elaborate(resolved, backends)
       val uartModule = design.moduleNames(ModuleId.root / "uart")
-      assert(design.verilog.contains(s"module $uartModule"))
+      assert(design.verilog.contains(s"$uartModule.sv"))
       // The device is sequential and its pins survive: clocked process, serial ports, register state.
-      val uartBody   = design.verilog.substring(design.verilog.indexOf(s"module $uartModule"))
+      val uartBody   = design.verilog(s"$uartModule.sv")
       assert(uartBody.contains("always @(posedge"))
       assert(uartBody.contains("serial_tx"))
       assert(uartBody.contains("serial_rx"))

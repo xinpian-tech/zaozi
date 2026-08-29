@@ -181,22 +181,22 @@ object AxiVerilogSpec extends TestSuite:
       // The bytecode artifact is the whole linked design as the framework built it, before firtool rewrote it.
       assert(design.mlirbc.nonEmpty)
       // Verilog contains the root, the mem wrapper, and one deduplicated module per generator parameter.
-      assert(design.verilog.contains("module Top"))
-      assert(design.verilog.contains("module mem"))
+      assert(design.verilog.contains("Top.sv"))
+      assert(design.verilog.contains("mem.sv"))
       assert(design.moduleNames(ModuleId.root) == "Top")
       val coreModules = Set("core0", "core1").map(n => design.moduleNames(ModuleId.root / n))
       // core0 and core1 have different full parameters, so they keep distinct zaozi module names.
       assert(coreModules.sizeIs == 2)
-      coreModules.foreach(n => assert(design.verilog.contains(s"module $n")))
+      coreModules.foreach(n => assert(design.verilog.contains(s"$n.sv")))
       // The dangle port punched through the mem boundary survives into Verilog on the wrapper.
-      assert(design.verilog.contains("inst_dram_node_in_in"))
+      assert(design.verilog("mem.sv").contains("inst_dram_node_in_in"))
       // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
       // to the dumped definition, transitively (the GPR too). The two cores differ only in their id space, which is
       // the shim's parameter, so the two shims hold the same deduplicated DitDah32.
-      assert(design.verilog.contains("module DitDah32_"))
-      assert(design.verilog.contains("module DitDah32Gpr_"))
+      assert(design.verilog.keys.exists(_.startsWith("DitDah32_")))
+      assert(design.verilog.keys.exists(_.startsWith("DitDah32Gpr_")))
       // Every fabric module is real RTL now: the crossbars, the RAM, the bridge and the peripherals hold state.
-      assert(design.verilog.contains("always @(posedge"))
+      assert(design.verilog.values.exists(_.contains("always @(posedge")))
     }
 
     test("the debug chain is three negotiated edges: pins, DMI bus, one interrupt port per hart") {
@@ -219,14 +219,14 @@ object AxiVerilogSpec extends TestSuite:
 
       val design      = Elaborator.elaborate(resolved, axiBackends)
       // Transport and module are their own modules, and the module reaches both harts.
-      assert(design.verilog.contains("module Dtm_"))
-      assert(design.verilog.contains("module Dm_"))
-      assert(design.verilog.contains("hart0_halt"))
-      assert(design.verilog.contains("hart1_halt"))
+      assert(design.verilog.keys.exists(_.startsWith("Dtm_")))
+      assert(design.verilog.keys.exists(_.startsWith("Dm_")))
+      assert(design.verilog.collectFirst { case (n, c) if n.startsWith("Dm_") => c }.get.contains("hart0_halt"))
+      assert(design.verilog.collectFirst { case (n, c) if n.startsWith("Dm_") => c }.get.contains("hart1_halt"))
       // The debug adapter is inside the harness, not the chip: one instance, and it is the harness that holds it.
-      assert(design.verilog.contains("module JtagHost_"))
-      assert(design.verilog.contains("module TestHarness_"))
-      val harnessBody = design.verilog.substring(design.verilog.indexOf("module TestHarness_"))
+      assert(design.verilog.keys.exists(_.startsWith("JtagHost_")))
+      assert(design.verilog.keys.exists(_.startsWith("TestHarness_")))
+      val harnessBody = design.verilog.collectFirst { case (n, c) if n.startsWith("TestHarness_") => c }.get
       assert(harnessBody.contains("JtagHost_"))
       assert(harnessBody.contains("ClockGen"))
     }
@@ -261,18 +261,24 @@ object AxiVerilogSpec extends TestSuite:
       val design   = Elaborator.elaborate(resolved, axiBackends)
       // The three external modules stay external: instantiated, never defined, so the models below are what
       // gives them a body.
-      Seq("ClockGen", "SimConsole", "PllAnalog").foreach { m =>
-        assert(design.verilog.contains(s"$m ") || design.verilog.contains(s"$m #("))
-        assert(!design.verilog.contains(s"module $m"))
+      Seq("ClockGen", "SimConsole", "PllAnalog", "TraceLog").foreach { m =>
+        assert(design.verilog.values.exists(_.contains(s"$m ")))
+        assert(!design.verilog.contains(s"$m.sv"))
       }
 
       // The design generates its own clock and ends its own run, so the simulation is just Top plus the
       // behavioral definitions — no ports, no testbench file.
       val simDir = os.temp.dir(prefix = "syntheke-axi-sim")
-      os.write(simDir / "Top.sv", design.verilog)
+      // The design is a file set: `Top.sv` is the release netlist, and the `layers-*.sv` collateral carries the bind
+      // statements that put the trace into it. A DV build compiles both — which is what the trace log needs, and what
+      // a production build would leave out.
+      design.verilog.foreach((name, content) => os.write(simDir / name, content))
       os.write(simDir / "ClockGen.sv", clockGenModel)
       os.write(simDir / "SimConsole.sv", simConsoleModel)
       os.write(simDir / "PllAnalog.sv", pllAnalogModel)
+      os.write(simDir / "TraceLog.sv", traceLogModel)
+      // firtool's own file list is the release build; the layer collateral on top of it is the verification build.
+      val layers = design.verilog.keys.toSeq.sorted.filter(_.startsWith("layers-"))
       os.proc(
         "verilator",
         "--binary",
@@ -280,15 +286,22 @@ object AxiVerilogSpec extends TestSuite:
         "-Wno-fatal",
         "-j",
         "0",
+        s"-I$simDir",
         "--top-module",
         "Top",
-        "Top.sv",
-        "ClockGen.sv",
-        "SimConsole.sv",
-        "PllAnalog.sv"
+        "-f",
+        "filelist.f",
+        layers,
+        Seq("ClockGen.sv", "SimConsole.sv", "PllAnalog.sv", "TraceLog.sv")
       ).call(cwd = simDir)
       val run    = os.proc((simDir / "obj_dir" / "VTop").toString).call(cwd = simDir)
       assert(run.out.text().contains("hello world"))
+
+      // The trace made it out of both harts, through the framework's probe routing, into the harness: hart 1 ran the
+      // program from its first instruction, hart 0 sat in the done-spin.
+      val core1Trace = os.read(simDir / "trace-core1.log")
+      assert(core1Trace.startsWith(f"${hart1Pc}%08x: ${program.head}%08x"))
+      assert(os.read(simDir / "trace-core0.log").linesIterator.forall(_.startsWith(f"${hart0Pc}%08x")))
     }
 
     // Last: the wide generator dumps its `.mlirbc` under the same canonical module name before the port check rejects

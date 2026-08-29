@@ -50,10 +50,10 @@ case class TestHarnessP(
   require(taps.distinct.sizeIs == taps.size, s"clock taps must be uniquely named: ${taps.mkString(", ")}")
   require(freqHz >= baud * 8, s"clock $freqHz Hz too slow for $baud baud: the console needs 8 clocks per bit")
   require(traces.map(_.hart).distinct.sizeIs == traces.size, "one trace source per hart")
-  def consoleP:            ConsoleP   = ConsoleP(freqHz / baud)
-  def padsP:               GpioPadsP  = GpioPadsP(gpioWidth)
-  def hostP:               JtagHostP  = JtagHostP(script, irLength, abits, dataBits, dmiInstruction, tckDiv, dwell)
-  def clockP:              ClockGenP  = ClockGenP(freqHz)
+  def consoleP:             ConsoleP  = ConsoleP(freqHz / baud)
+  def padsP:                GpioPadsP = GpioPadsP(gpioWidth)
+  def hostP:                JtagHostP = JtagHostP(script, irLength, abits, dataBits, dmiInstruction, tckDiv, dwell)
+  def clockP:               ClockGenP = ClockGenP(freqHz)
   def logP(t: TraceSource): TraceLogP = TraceLogP(t.hart, t.xlen, t.regIndexBits)
 
 class TestHarnessPLayers(p: TestHarnessP) extends LayerInterface(p):
@@ -90,7 +90,7 @@ object TestHarnessGen extends Generator[TestHarnessP, TestHarnessPLayers, TestHa
     jtag.field[Bool]("tms")   := host.io.tap.tms
     jtag.field[Bool]("tdi")   := host.io.tap.tdi
     jtag.field[Bool]("trstN") := host.io.tap.trstN
-    host.io.tap.tdo := jtag.field[Bool]("tdo")
+    host.io.tap.tdo           := jtag.field[Bool]("tdo")
 
     // The terminal on the other end of the serial line.
     val console = ConsoleGen.instantiate(p.consoleP)

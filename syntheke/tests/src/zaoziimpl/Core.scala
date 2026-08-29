@@ -47,45 +47,45 @@ class CoreDevicePLayers(p: CoreDeviceP) extends LayerInterface(p):
   * field order and widths are [[me.jiuyang.syntheke.circt.tests.RvTrace]]'s — the binding checkpoint compares them.
   */
 class CoreDevicePProbe(parameter: CoreDeviceP) extends DVBundle[CoreDeviceP, CoreDevicePLayers](parameter):
-  private def dv          = layers("DV")
-  private def word        = UInt(parameter.xlen)
-  val trace_valid               = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
-  val trace_pc                  = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_nextPc              = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_instr               = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_len                 = Option.when(parameter.enableTrace)(ProbeRead(UInt(3), dv))
-  val trace_rdWe                = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
-  val trace_rd                  = Option.when(parameter.enableTrace)(ProbeRead(UInt(parameter.regIndexBits), dv))
-  val trace_rdWdata             = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_rs1Addr             = Option.when(parameter.enableTrace)(ProbeRead(UInt(5), dv))
-  val trace_rs1Rdata            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_rs2Addr             = Option.when(parameter.enableTrace)(ProbeRead(UInt(5), dv))
-  val trace_rs2Rdata            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_memAddr             = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_memRmask            = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
-  val trace_memWmask            = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
-  val trace_memRdata            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_memWdata            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_memFault            = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
-  val trace_memFaultRmask       = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
-  val trace_memFaultWmask       = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
-  val trace_csrAddr             = Option.when(parameter.enableTrace)(ProbeRead(UInt(12), dv))
-  val trace_csrRmask            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_csrWmask            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_csrRdata            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_csrWdata            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_trap                = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
-  val trace_trapCause           = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
-  val trace_mstatus             = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mstatusPostCommit   = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mstatusPreTrap      = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mie                 = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mtvec               = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mepc                = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mtval               = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mip                 = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_mcause              = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
-  val trace_irqPendingMask      = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  private def dv              = layers("DV")
+  private def word            = UInt(parameter.xlen)
+  val trace_valid             = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
+  val trace_pc                = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_nextPc            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_instr             = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_len               = Option.when(parameter.enableTrace)(ProbeRead(UInt(3), dv))
+  val trace_rdWe              = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
+  val trace_rd                = Option.when(parameter.enableTrace)(ProbeRead(UInt(parameter.regIndexBits), dv))
+  val trace_rdWdata           = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_rs1Addr           = Option.when(parameter.enableTrace)(ProbeRead(UInt(5), dv))
+  val trace_rs1Rdata          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_rs2Addr           = Option.when(parameter.enableTrace)(ProbeRead(UInt(5), dv))
+  val trace_rs2Rdata          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_memAddr           = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_memRmask          = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
+  val trace_memWmask          = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
+  val trace_memRdata          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_memWdata          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_memFault          = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
+  val trace_memFaultRmask     = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
+  val trace_memFaultWmask     = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
+  val trace_csrAddr           = Option.when(parameter.enableTrace)(ProbeRead(UInt(12), dv))
+  val trace_csrRmask          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_csrWmask          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_csrRdata          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_csrWdata          = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_trap              = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
+  val trace_trapCause         = Option.when(parameter.enableTrace)(ProbeRead(UInt(4), dv))
+  val trace_mstatus           = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mstatusPostCommit = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mstatusPreTrap    = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mie               = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mtvec             = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mepc              = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mtval             = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mip               = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_mcause            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
+  val trace_irqPendingMask    = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
 
 class CoreDevicePIO(p: CoreDeviceP) extends HWBundle(p):
   val clk   = Flipped(new ClockBundle)
@@ -111,118 +111,118 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     // ---- trace: the hart's probes forwarded to the shim's own, one reference each ----
     if p.enableTrace then
       layer("DV"):
-        val probe = summon[ProbeInterface[CoreDevicePProbe]]
-        val t     = core.probe
-        def word = UInt(p.xlen)
-        val validW = Wire(Bool())
+        val probe              = summon[ProbeInterface[CoreDevicePProbe]]
+        val t                  = core.probe
+        def word               = UInt(p.xlen)
+        val validW             = Wire(Bool())
         validW <== t.trace_valid.get
         probe.trace_valid.get <== validW
-        val pcW = Wire(word)
+        val pcW                = Wire(word)
         pcW <== t.trace_pc.get
         probe.trace_pc.get <== pcW
-        val nextPcW = Wire(word)
+        val nextPcW            = Wire(word)
         nextPcW <== t.trace_next_pc.get
         probe.trace_nextPc.get <== nextPcW
-        val instrW = Wire(word)
+        val instrW             = Wire(word)
         instrW <== t.trace_instr.get
         probe.trace_instr.get <== instrW
-        val lenW = Wire(UInt(3))
+        val lenW               = Wire(UInt(3))
         lenW <== t.trace_len.get
         probe.trace_len.get <== lenW
-        val rdWeW = Wire(Bool())
+        val rdWeW              = Wire(Bool())
         rdWeW <== t.trace_rd_we.get
         probe.trace_rdWe.get <== rdWeW
-        val rdW = Wire(UInt(p.regIndexBits))
+        val rdW                = Wire(UInt(p.regIndexBits))
         rdW <== t.trace_rd.get
         probe.trace_rd.get <== rdW
-        val rdWdataW = Wire(word)
+        val rdWdataW           = Wire(word)
         rdWdataW <== t.trace_rd_wdata.get
         probe.trace_rdWdata.get <== rdWdataW
-        val rs1AddrW = Wire(UInt(5))
+        val rs1AddrW           = Wire(UInt(5))
         rs1AddrW <== t.trace_rs1_addr.get
         probe.trace_rs1Addr.get <== rs1AddrW
-        val rs1RdataW = Wire(word)
+        val rs1RdataW          = Wire(word)
         rs1RdataW <== t.trace_rs1_rdata.get
         probe.trace_rs1Rdata.get <== rs1RdataW
-        val rs2AddrW = Wire(UInt(5))
+        val rs2AddrW           = Wire(UInt(5))
         rs2AddrW <== t.trace_rs2_addr.get
         probe.trace_rs2Addr.get <== rs2AddrW
-        val rs2RdataW = Wire(word)
+        val rs2RdataW          = Wire(word)
         rs2RdataW <== t.trace_rs2_rdata.get
         probe.trace_rs2Rdata.get <== rs2RdataW
-        val memAddrW = Wire(word)
+        val memAddrW           = Wire(word)
         memAddrW <== t.trace_mem_addr.get
         probe.trace_memAddr.get <== memAddrW
-        val memRmaskW = Wire(UInt(4))
+        val memRmaskW          = Wire(UInt(4))
         memRmaskW <== t.trace_mem_rmask.get
         probe.trace_memRmask.get <== memRmaskW
-        val memWmaskW = Wire(UInt(4))
+        val memWmaskW          = Wire(UInt(4))
         memWmaskW <== t.trace_mem_wmask.get
         probe.trace_memWmask.get <== memWmaskW
-        val memRdataW = Wire(word)
+        val memRdataW          = Wire(word)
         memRdataW <== t.trace_mem_rdata.get
         probe.trace_memRdata.get <== memRdataW
-        val memWdataW = Wire(word)
+        val memWdataW          = Wire(word)
         memWdataW <== t.trace_mem_wdata.get
         probe.trace_memWdata.get <== memWdataW
-        val memFaultW = Wire(Bool())
+        val memFaultW          = Wire(Bool())
         memFaultW <== t.trace_mem_fault.get
         probe.trace_memFault.get <== memFaultW
-        val memFaultRmaskW = Wire(UInt(4))
+        val memFaultRmaskW     = Wire(UInt(4))
         memFaultRmaskW <== t.trace_mem_fault_rmask.get
         probe.trace_memFaultRmask.get <== memFaultRmaskW
-        val memFaultWmaskW = Wire(UInt(4))
+        val memFaultWmaskW     = Wire(UInt(4))
         memFaultWmaskW <== t.trace_mem_fault_wmask.get
         probe.trace_memFaultWmask.get <== memFaultWmaskW
-        val csrAddrW = Wire(UInt(12))
+        val csrAddrW           = Wire(UInt(12))
         csrAddrW <== t.trace_csr_addr.get
         probe.trace_csrAddr.get <== csrAddrW
-        val csrRmaskW = Wire(word)
+        val csrRmaskW          = Wire(word)
         csrRmaskW <== t.trace_csr_rmask.get
         probe.trace_csrRmask.get <== csrRmaskW
-        val csrWmaskW = Wire(word)
+        val csrWmaskW          = Wire(word)
         csrWmaskW <== t.trace_csr_wmask.get
         probe.trace_csrWmask.get <== csrWmaskW
-        val csrRdataW = Wire(word)
+        val csrRdataW          = Wire(word)
         csrRdataW <== t.trace_csr_rdata.get
         probe.trace_csrRdata.get <== csrRdataW
-        val csrWdataW = Wire(word)
+        val csrWdataW          = Wire(word)
         csrWdataW <== t.trace_csr_wdata.get
         probe.trace_csrWdata.get <== csrWdataW
-        val trapW = Wire(Bool())
+        val trapW              = Wire(Bool())
         trapW <== t.trace_trap.get
         probe.trace_trap.get <== trapW
-        val trapCauseW = Wire(UInt(4))
+        val trapCauseW         = Wire(UInt(4))
         trapCauseW <== t.trace_trap_cause.get
         probe.trace_trapCause.get <== trapCauseW
-        val mstatusW = Wire(word)
+        val mstatusW           = Wire(word)
         mstatusW <== t.trace_mstatus.get
         probe.trace_mstatus.get <== mstatusW
         val mstatusPostCommitW = Wire(word)
         mstatusPostCommitW <== t.trace_mstatus_post_commit.get
         probe.trace_mstatusPostCommit.get <== mstatusPostCommitW
-        val mstatusPreTrapW = Wire(word)
+        val mstatusPreTrapW    = Wire(word)
         mstatusPreTrapW <== t.trace_mstatus_pre_trap.get
         probe.trace_mstatusPreTrap.get <== mstatusPreTrapW
-        val mieW = Wire(word)
+        val mieW               = Wire(word)
         mieW <== t.trace_mie.get
         probe.trace_mie.get <== mieW
-        val mtvecW = Wire(word)
+        val mtvecW             = Wire(word)
         mtvecW <== t.trace_mtvec.get
         probe.trace_mtvec.get <== mtvecW
-        val mepcW = Wire(word)
+        val mepcW              = Wire(word)
         mepcW <== t.trace_mepc.get
         probe.trace_mepc.get <== mepcW
-        val mtvalW = Wire(word)
+        val mtvalW             = Wire(word)
         mtvalW <== t.trace_mtval.get
         probe.trace_mtval.get <== mtvalW
-        val mipW = Wire(word)
+        val mipW               = Wire(word)
         mipW <== t.trace_mip.get
         probe.trace_mip.get <== mipW
-        val mcauseW = Wire(word)
+        val mcauseW            = Wire(word)
         mcauseW <== t.trace_mcause.get
         probe.trace_mcause.get <== mcauseW
-        val irqPendingMaskW = Wire(word)
+        val irqPendingMaskW    = Wire(word)
         irqPendingMaskW <== t.trace_irq_pending_mask.get
         probe.trace_irqPendingMask.get <== irqPendingMaskW
 
