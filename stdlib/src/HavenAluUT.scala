@@ -5,6 +5,7 @@ package me.jiuyang.stdlib
 import me.jiuyang.utlib.{Generate, Probes, Sem, Txn, UT}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -214,3 +215,61 @@ object HavenAluFpUT
     val probe = summon[ProbeInterface[HavenAluFpUTProbe]]
     layer("Verification"):
       Probes.expose(probe.RESULT, Bits(32), instance.io.result)
+
+/** Temporal intents over the FP pipeline: `notDoneCycles` says how many cycles after `start` the intent claims
+  * `done` stays low. Satisfiable for a count the pipeline really takes; Infeasible once it exceeds the pipeline's
+  * latency — and that verdict is the point.
+  */
+case class HavenAluSeqParameter(notDoneCycles: Int) extends Parameter
+
+given upickle.default.ReadWriter[HavenAluSeqParameter] = upickle.default.macroRW
+
+class HavenAluSeqLayers(parameter: HavenAluSeqParameter) extends LayerInterface(parameter):
+  def layers = Seq(Layer("Verification"))
+
+class HavenAluSeqUTIO(parameter: HavenAluSeqParameter) extends HWBundle(parameter):
+  val clock  = Flipped(Clock())
+  val reset  = Flipped(Reset())
+  val a      = Flipped(Bits(32))
+  val b      = Flipped(Bits(32))
+  val op     = Flipped(Bits(4))
+  val start  = Flipped(Bool())
+  val RESULT = Aligned(Bits(32))
+  val DONE   = Aligned(Bool())
+
+class HavenAluSeqUTProbe(parameter: HavenAluSeqParameter)
+    extends DVBundle[HavenAluSeqParameter, HavenAluSeqLayers](parameter):
+  val DONE = ProbeRead(Bits(1), layers("Verification"))
+
+/** C = "an FP add starts, and `done` stays low for the next `notDoneCycles` cycles" — a purely temporal intent,
+  * stated with 时序语义 and no reference to internal state.
+  */
+@generator
+object HavenAluSeqUT
+    extends Generator[HavenAluSeqParameter, HavenAluSeqLayers, HavenAluSeqUTIO, HavenAluSeqUTProbe]
+    with UT[HavenAluSeqParameter, HavenAluSeqUTIO]:
+  override def moduleName(p: HavenAluSeqParameter): String = s"HavenAluSeqUT_n${p.notDoneCycles}"
+
+  def architecture(parameter: HavenAluSeqParameter) =
+    val io       = summon[Interface[HavenAluSeqUTIO]]
+    val instance = HavenAlu.instantiate(HavenAluParameter())
+    instance.io.clk   := io.clock
+    instance.io.rst_n := !io.reset.asBool
+    instance.io.a     := io.a
+    instance.io.b     := io.b
+    instance.io.op    := io.op
+    instance.io.start := io.start
+    io.RESULT         := instance.io.result
+    io.DONE           := instance.io.done
+
+    Txn.assumeResetLow(io.reset)
+
+    given ClockEvent = posedge(io.clock)
+    val fpStart      = (io.op === 0.U(4).asBits) & io.start
+    val notDone      = !instance.io.done
+    val chain        = (1 to parameter.notDoneCycles).foldLeft(fpStart.S)((acc, _) => acc ### notDone.S)
+    Generate(Sem.temporal(chain), s"fp_not_done_for_${parameter.notDoneCycles}")
+
+    val probe = summon[ProbeInterface[HavenAluSeqUTProbe]]
+    layer("Verification"):
+      Probes.expose(probe.DONE, Bits(1), instance.io.done.asBits)

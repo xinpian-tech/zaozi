@@ -142,8 +142,24 @@ object FormalUT:
     case Held
     case Unknown(detail: String)
 
-  /** One circt-bmc run on `hwModule`, parsed into a [[Bmc]] verdict. */
-  private def run(hwModule: os.Path, top: String, bound: Int): Bmc =
+  /** One circt-bmc run, retried when the solver *crashes* rather than decides.
+    *
+    * circt-bmc aborts intermittently on some queries — the give-away is a backtrace on stderr and a non-zero exit,
+    * with no verdict either way. That is not an undecidable query, and reporting it as [[Bmc.Unknown]] would make a
+    * flaky crash indistinguishable from a real "cannot decide", which the whole argument for the `Infeasible`
+    * verdict depends on telling apart. Retry a crash; report a genuine non-verdict as Unknown.
+    */
+  private def run(hwModule: os.Path, top: String, bound: Int, attempt: Int = 1): Bmc =
+    runOnce(hwModule, top, bound) match
+      case Bmc.Unknown(detail) if attempt < 3 && looksLikeCrash(detail) => run(hwModule, top, bound, attempt + 1)
+      case verdict                                                      => verdict
+
+  /** A backtrace frame or an abort message, rather than anything circt-bmc says about the property. */
+  private def looksLikeCrash(detail: String): Boolean =
+    detail.contains("0x") && (detail.contains("libc.so") || detail.contains("+0x")) ||
+      detail.contains("Stack dump") || detail.contains("PLEASE submit a bug report")
+
+  private def runOnce(hwModule: os.Path, top: String, bound: Int): Bmc =
     val out = os
       .proc(
         CirctTools("circt-bmc"),
@@ -158,10 +174,14 @@ object FormalUT:
         "--print-only-first-counterexample",
         s"--shared-libs=$libz3"
       )
-      .call(check = false, mergeErrIntoOut = true)
-      .out
-      .text()
-    parseTrace(out)
+      .call(check = false, stderr = os.Pipe)
+    // stdout only: circt-bmc prints the counterexample there while the JIT and library loader write warnings to
+    // stderr, and merging the two streams can interleave mid-line — which showed up as an intermittent `Unknown`
+    // on a run whose counterexample was in fact present.
+    parseTrace(out.out.text()) match
+      case Bmc.Unknown(_) if out.err.text().nonEmpty =>
+        parseTrace(out.out.text() + "\n" + out.err.text())
+      case verdict                                   => verdict
 
   /** Parse circt-bmc's counterexample trace. The output holds one or more blocks:
     * {{{
