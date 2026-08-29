@@ -110,21 +110,42 @@ is what an SoC integrator writes (instantiate and wire). On the circt side
 the zaozi modules themselves sit under `tests/src/zaoziimpl/`, one real
 implementation per file, zaozi API only — the cores are the vendored
 DitDah32 RV32EC (`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening
-shim, and Xbar / BootRom / Dram / WidthBridge / Uart / Gpio / Dma follow
-their rocket-chip counterparts (AXI4Xbar with address decode and
-arbitration, an AXI4ROM, a burst-capable AXI4RAM, a width widget, real
-peripheral register files; no L2 — an AXI fabric without coherence gives
-one nothing testable to do). `circt/tests/src/AxiLibrary.scala` is the wrap
-that puts them on the negotiation graph; a clock tree, serial pins and GPIO
-pads reach every IP. The two places RTL cannot go are external Verilog
-modules declared through zaozi's `VerilogWrapper` and linked as extmodules,
-each shipping its behavioral definition as a string next to the wrapper:
-`ClockGen`, the clock/reset origin inside ClockSource, and `SimConsole`,
-stdout inside the Console device — the framework's `testbench` feature
-terminating the serial pins. The SoC therefore simulates itself: the
-AxiVerilogSpec boots both cores from the BootRom image (a hand-assembled
-RV32E program), and verilator prints the "hello world" it received over
-the UART at 115200 baud.
+shim, and Xbar / Dram / WidthBridge / Uart / Gpio / Dma follow their
+rocket-chip counterparts (AXI4Xbar with address decode and arbitration, a
+burst-capable AXI4RAM, a width widget, real peripheral register files; no
+L2 — an AXI fabric without coherence gives one nothing testable to do).
+`circt/tests/src/AxiLibrary.scala` is the wrap that puts them on the
+negotiation graph; a clock tree, serial pins and GPIO pads reach every IP.
+
+The RISC-V debug chain is three more protocols
+(`circt/tests/src/DebugProtocols.scala`), one per boundary, because that
+is where the parameters actually meet: `Jtag` carries the TAP the
+transport implements down to whoever drives the pins (idcode, IR length,
+the scan-register widths, the instruction selecting DMI), `Dmi` is the
+transport's request/response bus and rejects a debug module whose register
+file is wider than the transport can address, and `DebugInterrupt` is one
+debug-module port per hart — the halt request with the abstract command
+channel and the hart's status back. So the debug module and the transport
+are ordinary IPs, lifted out of the core into `Dm.scala` / `Dtm.scala`: the
+transport holds the tck-to-system crossing, and the module holds a hart
+array selected by `dmcontrol.hartsello`, each hart with its own halt
+request and flags. The core keeps only its hart-side debug port.
+
+Nothing in the SoC is a boot ROM. `JtagHost.scala` is real RTL that
+divides the system clock into tck, walks the TAP, and scans in a script of
+DMI writes: with both harts halted out of reset, it writes the program
+into DRAM through hart 0's abstract memory access, gives each hart its
+start PC through `dpc`, and resumes them — hart 0 into the done-spin, hart
+1 into the program.
+
+The two places RTL cannot go are external Verilog modules declared through
+zaozi's `VerilogWrapper` and linked as extmodules, each shipping its
+behavioral definition as a string next to the wrapper: `ClockGen`, the
+clock/reset origin inside ClockSource, and `SimConsole`, stdout inside the
+Console device — the framework's `testbench` feature terminating the
+serial pins. The SoC therefore simulates itself: verilator runs the linked
+Verilog and prints the "hello world" hart 1 sent over the UART at 115200
+baud, having received the program over JTAG.
 
 `tests/src/zaoziimpl/UartDevice.scala` is a real device: an 8N1 UART with
 a single-beat AXI slave register file, written as a plain zaozi module

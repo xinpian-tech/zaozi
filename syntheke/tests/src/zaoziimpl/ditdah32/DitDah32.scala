@@ -33,31 +33,6 @@ object DitDah32Module
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    val debugDtm    = Option.when(parameter.enableJtag)(DitDah32JtagDtm.instantiate(parameter))
-    val debugModule = Option.when(parameter.enableJtag)(DitDah32DebugModule.instantiate(parameter))
-
-    io.jtag.foreach { jtag =>
-      val dtm = debugDtm.get
-      val dm  = debugModule.get
-      dtm.io.tck   := jtag.tck
-      dtm.io.reset := io.reset
-      dtm.io.tms   := jtag.tms
-      dtm.io.tdi   := jtag.tdi
-      dtm.io.trstN := jtag.trstN
-      jtag.tdo     := dtm.io.tdo
-
-      dm.io.clock           := io.clock
-      dm.io.reset           := io.reset
-      dm.io.requestToggle   := dtm.io.requestToggle
-      dm.io.requestAddr     := dtm.io.requestAddr
-      dm.io.requestData     := dtm.io.requestData
-      dm.io.requestOp       := dtm.io.requestOp
-      dtm.io.responseToggle := dm.io.responseToggle
-      dtm.io.responseAddr   := dm.io.responseAddr
-      dtm.io.responseData   := dm.io.responseData
-      dtm.io.responseOp     := dm.io.responseOp
-    }
-
     val pc                  = RegInit(parameter.resetVector.U(parameter.xlen))
     val instrReg            = RegInit(0.B(parameter.xlen))
     val fetched             = RegInit(false.B)
@@ -96,23 +71,23 @@ object DitDah32Module
     gpr.io.wdata    := 0.U(parameter.xlen)
     gpr.io.clearAll := false.B
 
-    val debugDcsr           = Option.when(parameter.enableJtag)(RegInit(0x40000003.U(parameter.xlen)))
-    val debugDpc            = Option.when(parameter.enableJtag)(RegInit(parameter.resetVector.U(parameter.xlen)))
-    val debugStepActive     = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugResumeAck      = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugResetAck       = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugResetActive    = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugAbstractDone   = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugAbstractError  = Option.when(parameter.enableJtag)(RegInit(AbstractCommandError.NONE.U(3)))
-    val debugAbstractRdata  = Option.when(parameter.enableJtag)(RegInit(0.U(parameter.xlen)))
-    val debugMemBusy        = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugMemWrite       = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugMemAddr        = Option.when(parameter.enableJtag)(RegInit(0.U(parameter.xlen)))
-    val debugMemSize        = Option.when(parameter.enableJtag)(RegInit(0.U(3)))
-    val debugMemData        = Option.when(parameter.enableJtag)(RegInit(0.U(parameter.xlen)))
-    val debugMemOutstanding = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugMemAwDone      = Option.when(parameter.enableJtag)(RegInit(false.B))
-    val debugMemWDone       = Option.when(parameter.enableJtag)(RegInit(false.B))
+    val debugDcsr           = Option.when(parameter.enableDebug)(RegInit(0x40000003.U(parameter.xlen)))
+    val debugDpc            = Option.when(parameter.enableDebug)(RegInit(parameter.resetVector.U(parameter.xlen)))
+    val debugStepActive     = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugResumeAck      = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugResetAck       = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugResetActive    = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugAbstractDone   = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugAbstractError  = Option.when(parameter.enableDebug)(RegInit(AbstractCommandError.NONE.U(3)))
+    val debugAbstractRdata  = Option.when(parameter.enableDebug)(RegInit(0.U(parameter.xlen)))
+    val debugMemBusy        = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugMemWrite       = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugMemAddr        = Option.when(parameter.enableDebug)(RegInit(0.U(parameter.xlen)))
+    val debugMemSize        = Option.when(parameter.enableDebug)(RegInit(0.U(3)))
+    val debugMemData        = Option.when(parameter.enableDebug)(RegInit(0.U(parameter.xlen)))
+    val debugMemOutstanding = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugMemAwDone      = Option.when(parameter.enableDebug)(RegInit(false.B))
+    val debugMemWDone       = Option.when(parameter.enableDebug)(RegInit(false.B))
 
     val stateReset                   = Wire(Bool())
     val stateRun                     = Wire(Bool())
@@ -294,38 +269,38 @@ object DitDah32Module
     debugResetReq       := false.B
     debugHaltOnResetReq := false.B
     debugEbreak         := false.B
-    if parameter.enableJtag then
-      val dm = debugModule.get
+    if parameter.enableDebug then
+      val dm = io.debug.get
       stateTrap              := false.B
       stateDebug             := state === CoreState.DEBUG.U(3)
-      debugHaltReq           := dm.io.haltReq
-      debugResumeReq         := dm.io.resumeReq
-      debugResetReq          := dm.io.resetReq
-      debugHaltOnResetReq    := dm.io.haltOnResetReq
+      debugHaltReq           := dm.haltReq
+      debugResumeReq         := dm.resumeReq
+      debugResetReq          := dm.resetReq
+      debugHaltOnResetReq    := dm.haltOnResetReq
       debugResumeAck.get     := false.B
       debugResetAck.get      := false.B
       debugAbstractDone.get  := false.B
       debugAbstractError.get := AbstractCommandError.NONE.U(3)
-      dm.io.hartHalted       := stateDebug
-      dm.io.hartRunning      := !stateDebug & !debugResetReq
-      dm.io.hartResumeAck    := debugResumeAck.get
-      dm.io.hartResetAck     := debugResetAck.get
-      dm.io.abstractDone     := debugAbstractDone.get
-      dm.io.abstractError    := debugAbstractError.get
-      dm.io.abstractRdata    := debugAbstractRdata.get
+      dm.hartHalted          := stateDebug
+      dm.hartRunning         := !stateDebug & !debugResetReq
+      dm.hartResumeAck       := debugResumeAck.get
+      dm.hartResetAck        := debugResetAck.get
+      dm.abstractDone        := debugAbstractDone.get
+      dm.abstractError       := debugAbstractError.get
+      dm.abstractRdata       := debugAbstractRdata.get
     pcHalfwordHigh      := pc.asBits.bit(1)
     pcFetchAddr         := (pc.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
 
-    fetchRequest                              := stateRun | stateStraddle
-    if parameter.enableJtag then fetchRequest := (stateRun | stateStraddle) & !debugHaltReq
-    fetchArValid                              := fetchRequest & !fetchOutstanding
-    fetchArFire                               := fetchArValid & axiAr.ready
-    fetchAcceptsResponse                      := fetchOutstanding | fetchArFire
-    fetchResponseFire                         := fetchAcceptsResponse & axiR.valid
-    fetchResponseError                        := fetchResponseFire & (axiR.bits.resp =/= 0.U(2))
-    fetchResponseOk                           := fetchResponseFire & !fetchResponseError
-    instrReady                                := fetchResponseOk
-    instrRdata                                := axiR.bits.data.asBits
+    fetchRequest                               := stateRun | stateStraddle
+    if parameter.enableDebug then fetchRequest := (stateRun | stateStraddle) & !debugHaltReq
+    fetchArValid                               := fetchRequest & !fetchOutstanding
+    fetchArFire                                := fetchArValid & axiAr.ready
+    fetchAcceptsResponse                       := fetchOutstanding | fetchArFire
+    fetchResponseFire                          := fetchAcceptsResponse & axiR.valid
+    fetchResponseError                         := fetchResponseFire & (axiR.bits.resp =/= 0.U(2))
+    fetchResponseOk                            := fetchResponseFire & !fetchResponseError
+    instrReady                                 := fetchResponseOk
+    instrRdata                                 := axiR.bits.data.asBits
 
     loadArValid         := stateLoad & !memOutstanding
     loadArFire          := loadArValid & axiAr.ready
@@ -358,7 +333,7 @@ object DitDah32Module
     straddledInstr := instrRdata.bits(15, 0) ## straddleLowHalfword
 
     commitNow        := (stateStraddle & instrReady) | (stateRun & instrReady & !straddled32)
-    if parameter.enableJtag then
+    if parameter.enableDebug then
       commitNow      := ((stateStraddle & instrReady) | (stateRun & instrReady & !straddled32)) & !debugHaltReq
     commitInstr      := stateStraddle.?(straddledInstr, selectedInstr)
     commitLen        := stateStraddle.?(4.U(3), instrCompressed.?(2.U(3), 4.U(3)))
@@ -432,7 +407,7 @@ object DitDah32Module
     irqExternalEnabled     := irqEnabledMask.bit(CsrBits.IRQ_EXTERNAL)
     irqIndividuallyPending := irqEnabledMask =/= 0.B(parameter.xlen)
     irqTrapPending         := irqIndividuallyPending & csrMstatus.bit(CsrBits.MSTATUS_MIE)
-    if parameter.enableJtag then
+    if parameter.enableDebug then
       irqTrapPending       := irqIndividuallyPending & csrMstatus.bit(CsrBits.MSTATUS_MIE) & !debugStepActive.get
     irqCause               := BigInt("80000007", 16).B(parameter.xlen)
     when(irqSoftwareEnabled) {
@@ -492,7 +467,7 @@ object DitDah32Module
     postCommitIrqTrapPending     := (postCommitIrqEnabledMask =/= 0.B(parameter.xlen)) & postCommitMstatus.bit(
       CsrBits.MSTATUS_MIE
     )
-    if parameter.enableJtag then
+    if parameter.enableDebug then
       postCommitIrqTrapPending   :=
         (postCommitIrqEnabledMask =/= 0.B(parameter.xlen)) &
           postCommitMstatus.bit(CsrBits.MSTATUS_MIE) &
@@ -630,11 +605,11 @@ object DitDah32Module
       parameter.xlen - 1
     ) ## rs1Data.asBits).asSInt >> rs2Shamt).asBits.bits(parameter.xlen - 1, 0).asUInt
 
-    isLui                                    := opcode === 0x37.B(7)
-    isAuipc                                  := opcode === 0x17.B(7)
-    isJal                                    := opcode === 0x6f.B(7)
-    isJalr                                   := (opcode === 0x67.B(7)) & (funct3 === 0.B(3))
-    isBranch                                 := (opcode === 0x63.B(7)) & (
+    isLui                                     := opcode === 0x37.B(7)
+    isAuipc                                   := opcode === 0x17.B(7)
+    isJal                                     := opcode === 0x6f.B(7)
+    isJalr                                    := (opcode === 0x67.B(7)) & (funct3 === 0.B(3))
+    isBranch                                  := (opcode === 0x63.B(7)) & (
       (funct3 === 0.B(3)) |
         (funct3 === 1.B(3)) |
         (funct3 === 4.B(3)) |
@@ -642,20 +617,20 @@ object DitDah32Module
         (funct3 === 6.B(3)) |
         (funct3 === 7.B(3))
     )
-    isLoad                                   := (opcode === 0x03.B(7)) & (
+    isLoad                                    := (opcode === 0x03.B(7)) & (
       (funct3 === 0.B(3)) |
         (funct3 === 1.B(3)) |
         (funct3 === 2.B(3)) |
         (funct3 === 4.B(3)) |
         (funct3 === 5.B(3))
     )
-    isStore                                  := (opcode === 0x23.B(7)) & (
+    isStore                                   := (opcode === 0x23.B(7)) & (
       (funct3 === 0.B(3)) |
         (funct3 === 1.B(3)) |
         (funct3 === 2.B(3))
     )
-    isOpImm                                  := opcode === 0x13.B(7)
-    isAluImm                                 := isOpImm & (
+    isOpImm                                   := opcode === 0x13.B(7)
+    isAluImm                                  := isOpImm & (
       (funct3 === 0.B(3)) |
         (funct3 === 2.B(3)) |
         (funct3 === 3.B(3)) |
@@ -665,8 +640,8 @@ object DitDah32Module
         ((funct3 === 1.B(3)) & (funct7 === 0.B(7))) |
         ((funct3 === 5.B(3)) & ((funct7 === 0.B(7)) | (funct7 === 0x20.B(7))))
     )
-    isOpReg                                  := opcode === 0x33.B(7)
-    isAluReg                                 := isOpReg & (
+    isOpReg                                   := opcode === 0x33.B(7)
+    isAluReg                                  := isOpReg & (
       ((funct7 === 0.B(7)) & (
         (funct3 === 0.B(3)) |
           (funct3 === 1.B(3)) |
@@ -679,13 +654,13 @@ object DitDah32Module
       )) |
         ((funct7 === 0x20.B(7)) & ((funct3 === 0.B(3)) | (funct3 === 5.B(3))))
     )
-    isFence                                  := (opcode === 0x0f.B(7)) & (funct3 === 0.B(3))
-    isEcall                                  := decodedInstr === 0x00000073.B(parameter.xlen)
-    isEbreak                                 := decodedInstr === 0x00100073.B(parameter.xlen)
-    isWfi                                    := decodedInstr === 0x10500073.B(parameter.xlen)
-    isMret                                   := decodedInstr === 0x30200073.B(parameter.xlen)
-    isCNop                                   := commitCompressed & (commitInstr === 1.B(parameter.xlen))
-    if parameter.enableJtag then debugEbreak := isEbreak & debugDcsr.get.asBits.bit(15)
+    isFence                                   := (opcode === 0x0f.B(7)) & (funct3 === 0.B(3))
+    isEcall                                   := decodedInstr === 0x00000073.B(parameter.xlen)
+    isEbreak                                  := decodedInstr === 0x00100073.B(parameter.xlen)
+    isWfi                                     := decodedInstr === 0x10500073.B(parameter.xlen)
+    isMret                                    := decodedInstr === 0x30200073.B(parameter.xlen)
+    isCNop                                    := commitCompressed & (commitInstr === 1.B(parameter.xlen))
+    if parameter.enableDebug then debugEbreak := isEbreak & debugDcsr.get.asBits.bit(15)
 
     rdIllegal       := rdIndex.bit(4)
     rs1Illegal      := rs1Index.bit(4)
@@ -705,7 +680,7 @@ object DitDah32Module
 
     val regAccessIllegal = (execUsesRd & rdIllegal) | (execUsesRs1 & rs1Illegal) | (execUsesRs2 & rs2Illegal)
     execTrap      := (!execKnown) | csrIllegal | regAccessIllegal | loadMisaligned | storeMisaligned | isEcall | isEbreak
-    if parameter.enableJtag then
+    if parameter.enableDebug then
       execTrap    :=
         (!execKnown) |
           csrIllegal |
@@ -836,7 +811,7 @@ object DitDah32Module
     // memory phase (load/store) or retires immediately (everything else).
     val commitEntersMem = commitNow & execWaitsForMem
     val commitNonMem    =
-      if parameter.enableJtag then commitNow & !execWaitsForMem & !debugEbreak
+      if parameter.enableDebug then commitNow & !execWaitsForMem & !debugEbreak
       else commitNow & !execWaitsForMem
 
     branchTaken := false.B
@@ -1114,11 +1089,10 @@ object DitDah32Module
       }
     }
 
-    if parameter.enableJtag then
+    if parameter.enableDebug then
       connectDebugHart(
         parameter,
         io,
-        debugModule.get.io,
         pc,
         instrReg,
         fetched,

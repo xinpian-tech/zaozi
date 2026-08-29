@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke.circt.tests
 
+import com.vowstar.ditdah32.JtagInstruction
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
 import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
@@ -41,17 +42,28 @@ val Core = new GeneratorEntry[CoreDeviceP]
   * id space; the master is named after the instance.
   */
 final class CoreNodes(
-  name:      String,
-  idBits:    Int,
-  maxFlight: Int,
-  resetPc:   Int
+  name:        String,
+  idBits:      Int,
+  maxFlight:   Int,
+  resetPc:     Int,
+  enableDebug: Boolean
 )(
   using GeneratorScope[CoreDeviceP])
     extends Nodes:
-  val clk = inward(ClockDomain).uFn(_ => Right(()))
+  val clk               = inward(ClockDomain).uFn(_ => Right(()))
+  private val debugNode = Option.when(enableDebug) {
+    given sourcecode.Name = sourcecode.Name("debug")
+    inward(DebugInterrupt).uFn(_ => Right(DebugHartCap(32)))
+  }
+
+  /** The hart's debug port, present only on a core built with one. */
+  def debug: DebugInterrupt.Inward =
+    require(debugNode.isDefined, s"core '$name' was built without a debug node")
+    debugNode.get
+
   parameters { view =>
     val s = shapeOf(view, mem)
-    Right(CoreDeviceP(resetPc, s.addrBits, s.dataBits, s.idBits))
+    Right(CoreDeviceP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug))
   }
   val mem =
     outward(Axi4).dFn(_ =>
@@ -59,17 +71,18 @@ final class CoreNodes(
     )
 
 def core(
-  idBits:    Int,
-  maxFlight: Int,
-  resetPc:   Int
+  idBits:      Int,
+  maxFlight:   Int,
+  resetPc:     Int,
+  enableDebug: Boolean
 )(
   using
-  ws:        WrapperScope,
-  name:      sourcecode.Name,
-  file:      sourcecode.File,
-  line:      sourcecode.Line
+  ws:          WrapperScope,
+  name:        sourcecode.Name,
+  file:        sourcecode.File,
+  line:        sourcecode.Line
 ): CoreNodes =
-  generator(Core)(new CoreNodes(name.value, idBits, maxFlight, resetPc))
+  generator(Core)(new CoreNodes(name.value, idBits, maxFlight, resetPc, enableDebug))
 
 // ============ Dma: a bus-mastering DMA engine ============
 
@@ -183,9 +196,9 @@ def axiXbar(
 
 val Dram = new GeneratorEntry[DramDeviceP]
 
-/** The DRAM controller ([[DramDeviceGen]], the real device): one uncached address range on a 128-bit bus, named after
-  * the instance; `wordsLog2` sizes the behavioral backing store. A non-zero `bootAliasSize` additionally decodes
-  * `[0, bootAliasSize)` onto the same store, so a core resetting at 0 boots from DRAM.
+/** The DRAM controller ([[DramDeviceGen]], the real device): one uncached executable address range on a 128-bit bus,
+  * named after the instance; `wordsLog2` sizes the behavioral backing store. The cores reset into it and a debugger
+  * loads their program there.
   */
 final class DramNodes(
   name:           String,
@@ -193,7 +206,6 @@ final class DramNodes(
   wordsLog2:      Int,
   base:           Long,
   size:           Long,
-  bootAliasSize:  Long,
   idCapacityBits: Int
 )(
   using GeneratorScope[DramDeviceP])
@@ -209,8 +221,7 @@ final class DramNodes(
         slaves = Vector(
           AxiSlaveParams(
             name,
-            AddressSet.misaligned(base, size) ++ (if bootAliasSize > 0 then AddressSet.misaligned(0L, bootAliasSize)
-                                                  else Vector.empty),
+            AddressSet.misaligned(base, size),
             RegionType.Uncached,
             executable = true,
             supportsWrite = TransferSizes(1, 64),
@@ -229,7 +240,6 @@ def dramCtrl(
   wordsLog2:      Int,
   base:           Long,
   size:           Long,
-  bootAliasSize:  Long,
   idCapacityBits: Int
 )(
   using
@@ -238,62 +248,132 @@ def dramCtrl(
   file:           sourcecode.File,
   line:           sourcecode.Line
 ): DramNodes =
-  generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, bootAliasSize, idCapacityBits))
+  generator(Dram)(new DramNodes(name.value, ranks, wordsLog2, base, size, idCapacityBits))
 
-// ============ BootRom: the boot memory ============
+// ============ Dtm: the debug transport ============
 
-val BootRom = new GeneratorEntry[BootRomP]
+val Dtm = new GeneratorEntry[DtmP]
 
-/** The boot ROM ([[BootRomGen]], the real device): one executable read-only range on the 128-bit bus holding `image`;
-  * cores reset into it. Writes are answered with SLVERR, so the write capability is none.
+/** The JTAG debug transport ([[DtmGen]]): the TAP pins downward to whoever drives them, the DMI bus onward to the debug
+  * module. `abits` is the transport's own scan-register width — negotiation checks the debug module against it.
   */
-final class BootRomNodes(
-  name:           String,
-  base:           Long,
-  size:           Long,
-  idCapacityBits: Int,
-  image:          Vector[Long]
+final class DtmNodes(
+  name:   String,
+  idcode: Long,
+  abits:  Int
 )(
-  using GeneratorScope[BootRomP])
+  using GeneratorScope[DtmP])
     extends Nodes:
-  val clk = inward(ClockDomain).uFn(_ => Right(()))
+  val clk  = inward(ClockDomain).uFn(_ => Right(()))
+  val jtag =
+    outward(Jtag).dFn(_ => Right(JtagTap(idcode, DtmNodes.irLength, abits, 32, JtagInstruction.DMI)))
+  val dmi  = outward(Dmi).dFn(_ => Right(DmiMaster(name, abits, 32)))
   parameters { view =>
-    val s = shapeOf(view, in)
-    Right(BootRomP(image, s.addrBits, s.dataBits, s.idBits))
+    val e = view.edgeOf(dmi)
+    Right(DtmP(idcode, DtmNodes.irLength, e.abits, e.dataBits))
   }
-  val in  = inward(Axi4).uFn(_ =>
-    Right(
-      AxiSlavePort(
-        slaves = Vector(
-          AxiSlaveParams(
-            name,
-            AddressSet.misaligned(base, size),
-            RegionType.Uncached,
-            executable = true,
-            supportsWrite = TransferSizes.none,
-            supportsRead = TransferSizes(1, 16)
-          )
-        ),
-        beatBytes = 16,
-        idCapacityBits = idCapacityBits,
-        minLatency = 1
-      )
-    )
-  )
 
-def bootRom(
-  base:           Long,
-  size:           Long,
-  idCapacityBits: Int,
-  image:          Vector[Long]
+object DtmNodes:
+  /** The TAP's instruction register width, fixed by the transport's hardware. */
+  val irLength: Int = 5
+
+def debugTransport(
+  idcode: Long,
+  abits:  Int
 )(
   using
-  ws:             WrapperScope,
-  name:           sourcecode.Name,
-  file:           sourcecode.File,
-  line:           sourcecode.Line
-): BootRomNodes =
-  generator(BootRom)(new BootRomNodes(name.value, base, size, idCapacityBits, image))
+  ws:     WrapperScope,
+  name:   sourcecode.Name,
+  file:   sourcecode.File,
+  line:   sourcecode.Line
+): DtmNodes =
+  generator(Dtm)(new DtmNodes(name.value, idcode, abits))
+
+// ============ Dm: the debug module ============
+
+val Dm = new GeneratorEntry[DmP]
+
+/** The debug module ([[DmGen]]): a DMI slave with one outward port per hart. Every hart it holds is one negotiated
+  * edge, so the hart count is the topology's, not a parameter to keep in sync.
+  */
+final class DmNodes(
+  name:        String,
+  harts:       Int,
+  haltOnReset: Boolean
+)(
+  using GeneratorScope[DmP])
+    extends Nodes:
+  val clk               = inward(ClockDomain).uFn(_ => Right(()))
+  val dmi               = inward(Dmi).uFn(_ => Right(DmiSlave(name, DmNodes.addrBits, 32)))
+  private val hartPorts = (0 until harts).map { i =>
+    given sourcecode.Name = sourcecode.Name(s"hart$i")
+    outward(DebugInterrupt).dFn(_ => Right(DebugRequest(i)))
+  }
+
+  /** Hart ports are indexed by the hart id the module assigns them. */
+  def hart(i: Int): DebugInterrupt.Outward =
+    require(i >= 0 && i < harts, s"debug module '$name' has no hart $i (holds $harts)")
+    hartPorts(i)
+
+  parameters { view =>
+    val e     = view.edgeOf(dmi)
+    val xlens = hartPorts.map(view.edgeOf(_).xlen).distinct
+    if xlens.sizeIs != 1 then Left(Violation(s"harts disagree on register width: ${xlens.mkString(", ")}"))
+    else if xlens.head != e.dataBits then
+      Left(Violation(s"hart register width ${xlens.head} does not match the ${e.dataBits}-bit abstract data path"))
+    else Right(DmP(harts, e.abits, e.dataBits, xlens.head, haltOnReset))
+  }
+
+object DmNodes:
+  /** The debug register file's address width (`haltsum0` at 0x40 is the highest register it answers). */
+  val addrBits: Int = 7
+
+def debugModule(
+  harts:       Int,
+  haltOnReset: Boolean
+)(
+  using
+  ws:          WrapperScope,
+  name:        sourcecode.Name,
+  file:        sourcecode.File,
+  line:        sourcecode.Line
+): DmNodes =
+  generator(Dm)(new DmNodes(name.value, harts, haltOnReset))
+
+// ============ JtagHost: the debug host driving the pins ============
+
+val JtagHost = new GeneratorEntry[JtagHostP]
+
+/** The debug host ([[JtagHostGen]]): takes the TAP the transport publishes and scans `script` into it. Everything it
+  * needs to drive the pins — IR length, scan-register widths, the instruction selecting DMI — comes from the settled
+  * JTAG edge, so the host and the transport cannot disagree about the chain.
+  */
+final class JtagHostNodes(
+  script: Vector[DmiWrite],
+  tckDiv: Int,
+  dwell:  Int
+)(
+  using GeneratorScope[JtagHostP])
+    extends Nodes:
+  val clk = inward(ClockDomain).uFn(_ => Right(()))
+  val tap = inward(Jtag).uFn(_ => Right(()))
+  parameters { view =>
+    val t = view.edgeOf(tap)
+    Right(JtagHostP(script, t.irLength, t.abits, t.dataBits, t.dmiInstruction, tckDiv, dwell))
+  }
+
+def jtagHost(
+  script: Vector[DmiWrite],
+  tckDiv: Int,
+  dwell:  Int
+)(
+  using
+  ws:     WrapperScope,
+  name:   sourcecode.Name,
+  file:   sourcecode.File,
+  line:   sourcecode.Line
+): JtagHostNodes =
+  generator(JtagHost)(new JtagHostNodes(script, tckDiv, dwell))
 
 // ============ WidthBridge: wide to narrow ============
 
@@ -567,7 +647,9 @@ val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(Core, CoreDeviceGen),
   ZaoziBackend(Dma, DmaDeviceGen),
   ZaoziBackend(Xbar, XbarGen),
-  ZaoziBackend(BootRom, BootRomGen),
+  ZaoziBackend(Dtm, DtmGen),
+  ZaoziBackend(Dm, DmGen),
+  ZaoziBackend(JtagHost, JtagHostGen),
   ZaoziBackend(Dram, DramDeviceGen),
   ZaoziBackend(WidthBridge, BridgeDeviceGen),
   ZaoziBackend(Uart, UartDeviceGen),

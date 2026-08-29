@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke.circt.tests
 
+import com.vowstar.ditdah32.DebugRegister
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
 import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
@@ -28,13 +29,18 @@ object DramGenWide               extends Generator[DramDeviceP, DramDevicePLayer
 
 object AxiVerilogSpec extends TestSuite:
 
-  /** The boot program, hand-assembled RV32E (registers x5–x8), loaded at 0x2000_0000: walk the string at +0x40 and
-    * write each byte to the UART's TXDATA, polling STATUS bit0 (txBusy) between bytes; a NUL ends the walk at the spin
-    * at +0x2c — which is also where core1 parks, fetching its one-instruction loop forever.
+  val loadBase: Long = 0x80000000L // the DRAM base: where the debugger puts the program
+  // The two harts get different work, so the printed line proves both halves of the debug module's hart array: hart 0
+  // wrote the program into memory for the debugger and then parks in the done-spin, hart 1 is the one that runs it.
+  val hart0Pc:  Long = loadBase + 0x2c
+  val hart1Pc:  Long = loadBase
+
+  /** The program, hand-assembled RV32E (registers x5–x8): walk the string at +0x40 and write each byte to the UART's
+    * TXDATA, polling STATUS bit0 (txBusy) between bytes; a NUL ends the walk at the spin at +0x2c, where hart 1 parks.
     *
     * {{{
     * 00: 100002B7  lui  x5, 0x10000    ; x5 = UART base
-    * 04: 20000337  lui  x6, 0x20000    ; x6 = ROM base
+    * 04: 80000337  lui  x6, 0x80000    ; x6 = DRAM base
     * 08: 04030313  addi x6, x6, 0x40   ; x6 = &"hello world\n"
     * 0c: 00030383  lb   x7, 0(x6)      ; next char
     * 10: 00038E63  beq  x7, x0, +0x1c  ; NUL -> 2c
@@ -44,43 +50,69 @@ object AxiVerilogSpec extends TestSuite:
     * 20: 0072A023  sw   x7, 0(x5)      ; TXDATA = char
     * 24: 00130313  addi x6, x6, 1
     * 28: FE5FF06F  jal  x0, -0x1c      ; -> 0c
-    * 2c: 0000006F  jal  x0, 0          ; done: spin (core1's reset pc)
+    * 2c: 0000006F  jal  x0, 0          ; done: spin (where hart 0 parks)
     * 40: "hello world\n\0"
     * }}}
     */
-  val bootImage: Vector[Long] = Vector(
-    0x100002b7L, 0x20000337L, 0x04030313L, 0x00030383L, 0x00038e63L, 0x0082a403L, 0x00147413L, 0xfe041ce3L, 0x0072a023L,
+  val program: Vector[Long] = Vector(
+    0x100002b7L, 0x80000337L, 0x04030313L, 0x00030383L, 0x00038e63L, 0x0082a403L, 0x00147413L, 0xfe041ce3L, 0x0072a023L,
     0x00130313L, 0xfe5ff06fL, 0x0000006fL, 0L, 0L, 0L, 0L, 0x6c6c6568L, 0x6f77206fL, 0x0a646c72L, 0L
   )
 
+  /** What the debugger scans in over JTAG, in place of a boot ROM: with both harts halted out of reset, write the
+    * program into memory a word at a time through hart 0's abstract memory access (the address post-increments, so it
+    * is set once), then select each hart in turn, give it its start PC through `dpc`, and resume it.
+    */
+  def injection(image: Vector[Long], base: Long, hart0Pc: Long, hart1Pc: Long): Vector[DmiWrite] =
+    val accessMemoryWrite   = 0x02290000L // memory, four bytes, post-increment the address, write
+    val accessRegisterWrite = 0x002307b1L // register 0x7b1 = dpc, 32 bits, transfer, write
+    def dmcontrol(hart: Int, halt: Boolean, resume: Boolean): Long =
+      (if halt then 0x80000000L else 0L) | (if resume then 0x40000000L else 0L) | (hart.toLong << 16) | 1L
+    Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(0, halt = true, resume = false))) ++
+      Vector(DmiWrite(DebugRegister.DATA1, base)) ++
+      image.flatMap(w =>
+        Vector(DmiWrite(DebugRegister.DATA0, w), DmiWrite(DebugRegister.COMMAND, accessMemoryWrite))
+      ) ++
+      Vector(DmiWrite(DebugRegister.DATA0, hart0Pc), DmiWrite(DebugRegister.COMMAND, accessRegisterWrite)) ++
+      Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(0, halt = false, resume = true))) ++
+      Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(1, halt = true, resume = false))) ++
+      Vector(DmiWrite(DebugRegister.DATA0, hart1Pc), DmiWrite(DebugRegister.COMMAND, accessRegisterWrite)) ++
+      Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(1, halt = false, resume = true)))
+
   /** AxiSocSpec's topology minus the L2 slot (an AXI fabric without coherence gives an L2 nothing testable to do), plus
-    * the clock tree, the boot ROM the cores reset into, and the console testbench terminating the serial pins;
-    * FullParam = the zaozi parameter of each IP.
+    * the clock tree, the debug chain — JTAG host, transport, debug module, one port per hart — and the console
+    * testbench terminating the serial pins; FullParam = the zaozi parameter of each IP.
     */
   def buildSoc(): DesignSpec =
     Design {
       val clkSrc = clockSource(
         100000000,
-        Vector("core0", "core1", "dma", "sysXbar", "rom", "dram", "bridge", "periphXbar", "uart", "gpio", "tb")
+        Vector(
+          "core0",
+          "core1",
+          "dma",
+          "sysXbar",
+          "dram",
+          "bridge",
+          "periphXbar",
+          "uart",
+          "gpio",
+          "tb",
+          "dtm",
+          "dm",
+          "host"
+        )
       )
 
-      val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0x20000000)
-      val core1 = core(idBits = 3, maxFlight = 8, resetPc = 0x2000002c)
-      val dma   = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = 0x80000000L, windowLog2 = 10)
+      // The harts halt out of reset and the debugger hands them their PC, so the reset vector is never fetched.
+      val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = true)
+      val core1 = core(idBits = 3, maxFlight = 8, resetPc = 0, enableDebug = true)
+      val dma   = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = 0x80000800L, windowLog2 = 10)
 
-      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph", "boot"), Arbitration.RoundRobin)
-
-      val rom = bootRom(0x20000000L, 0x1000L, idCapacityBits = 6, image = bootImage)
+      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
       val mem              = wrapper {
-        val dram = dramCtrl(
-          ranks = 2,
-          wordsLog2 = 6,
-          base = 0x80000000L,
-          size = 0x80000000L,
-          bootAliasSize = 0x10000000L,
-          idCapacityBits = 6
-        )
+        val dram = dramCtrl(ranks = 2, wordsLog2 = 8, base = loadBase, size = 0x80000000L, idCapacityBits = 6)
         (dram.in, dram.clk)
       }
       val (memIn, dramClk) = mem
@@ -95,10 +127,14 @@ object AxiVerilogSpec extends TestSuite:
       val tb     = console()
       val gpioPd = gpioPads()
 
+      // The debug chain: pins, transport, module, one negotiated port per hart.
+      val dtm  = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
+      val dm   = debugModule(harts = 2, haltOnReset = true)
+      val host = jtagHost(script = injection(program, loadBase, hart0Pc, hart1Pc), tckDiv = 4, dwell = 8)
+
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
       sysXbar.input("in2") <-- dma.mem
-      rom.in <-- sysXbar.output("boot")
       bridge.in <-- sysXbar.output("periph")
       periphXbar.input("in") <-- bridge.out
       uart.in <-- periphXbar.output("uart")
@@ -106,17 +142,24 @@ object AxiVerilogSpec extends TestSuite:
       tb.serial <-- uart.serial
       gpioPd.in <-- gpio.pins
 
+      host.tap <-- dtm.jtag
+      dm.dmi <-- dtm.dmi
+      core0.debug <-- dm.hart(0)
+      core1.debug <-- dm.hart(1)
+
       core0.clk <-- clkSrc.tap("core0")
       core1.clk <-- clkSrc.tap("core1")
       dma.clk <-- clkSrc.tap("dma")
       sysXbar.clk <-- clkSrc.tap("sysXbar")
-      rom.clk <-- clkSrc.tap("rom")
       dramClk <-- clkSrc.tap("dram")
       bridge.clk <-- clkSrc.tap("bridge")
       periphXbar.clk <-- clkSrc.tap("periphXbar")
       uart.clk <-- clkSrc.tap("uart")
       gpio.clk <-- clkSrc.tap("gpio")
       tb.clk <-- clkSrc.tap("tb")
+      dtm.clk <-- clkSrc.tap("dtm")
+      dm.clk <-- clkSrc.tap("dm")
+      host.clk <-- clkSrc.tap("host")
     }
 
   val tests = Tests {
@@ -142,7 +185,7 @@ object AxiVerilogSpec extends TestSuite:
       assert(design.firrtl.contains("inst_dram_node_in_in"))
       // The vendored RV32EC links in: the shim instantiates DitDah32 and the linker resolves zaozi's extmodule stub
       // to the dumped definition, transitively (the GPR too). The name carries the parameter hash — the two cores
-      // reset at different vectors, so two DitDah32s link.
+      // differ in their id space, so two DitDah32s link.
       assert(design.firrtl.contains("inst core of DitDah32_"))
       assert(design.verilog.contains("module DitDah32_"))
       assert(design.verilog.contains("module DitDah32Gpr_"))
@@ -150,7 +193,34 @@ object AxiVerilogSpec extends TestSuite:
       assert(design.verilog.contains("always @(posedge"))
     }
 
-    test("the SoC boots from the ROM and prints over the UART — verilator runs the linked Verilog") {
+    test("the debug chain is three negotiated edges: pins, DMI bus, one interrupt port per hart") {
+      val resolved = Negotiator.negotiate(buildSoc())
+
+      val root = ModuleId.root
+      // The transport publishes the TAP it implements; the host takes it and knows how to scan it.
+      val tap  = resolved.edgeAt(ModuleNodeId(root / "host", "tap")).edgeAs(Jtag)
+      assert(tap == JtagTap(0xdeadbeb1L, 5, 7, 32, 0x11))
+      // The DMI bus settled at the transport's scan width, checked against the module's register file.
+      assert(resolved.edgeAt(ModuleNodeId(root / "dm", "dmi")).edgeAs(Dmi) == DmiEdge(7, 32))
+      // One debug port per hart, each carrying its hart id downward and the hart's register width upward.
+      assert(resolved.edgeAt(ModuleNodeId(root / "core0", "debug")).edgeAs(DebugInterrupt) == DebugEdge(0, 32))
+      assert(resolved.edgeAt(ModuleNodeId(root / "core1", "debug")).edgeAs(DebugInterrupt) == DebugEdge(1, 32))
+
+      // The debug module's full parameter counts the harts the topology gave it.
+      val dm = resolved.generatorModule(root / "dm").get.fullParam.asInstanceOf[DmP]
+      assert(dm.harts == 2)
+      assert(dm.haltOnReset)
+
+      val design = Elaborator.elaborate(resolved, axiBackends)
+      // Transport, module and host are their own modules, and the module reaches both harts.
+      assert(design.verilog.contains("module Dtm_"))
+      assert(design.verilog.contains("module Dm_"))
+      assert(design.verilog.contains("module JtagHost_"))
+      assert(design.verilog.contains("hart0_halt"))
+      assert(design.verilog.contains("hart1_halt"))
+    }
+
+    test("the SoC boots from JTAG and prints over the UART — verilator runs the linked Verilog") {
       val resolved = Negotiator.negotiate(buildSoc())
       val design   = Elaborator.elaborate(resolved, axiBackends)
       // The two declared simulation boundaries survive linking as external modules.

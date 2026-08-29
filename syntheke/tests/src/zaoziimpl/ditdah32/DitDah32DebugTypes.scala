@@ -4,12 +4,12 @@ package com.vowstar.ditdah32
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.valuetpe.*
 
-class DitDah32DebugLayers(parameter: DitDah32Parameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
-
-class DitDah32DebugProbe(parameter: DitDah32Parameter)
-    extends DVBundle[DitDah32Parameter, DitDah32DebugLayers](parameter)
+/** The RISC-V debug constants, plus the port through which an external debug module drives this hart. The debug module
+  * and the JTAG transport themselves are no longer part of the core: they are separate IPs on the negotiation graph
+  * (`Dm.scala` / `Dtm.scala`), so one debug module can hold several harts.
+  */
 
 object JtagInstruction:
   val BYPASS0: Int = 0x00
@@ -78,56 +78,28 @@ object DebugCsrAddr:
   val DCSR: Int = 0x7b0
   val DPC:  Int = 0x7b1
 
-class JtagDtmIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
-  val tck   = Flipped(Clock())
-  val reset = Flipped(Reset())
-  val tms   = Flipped(Bool())
-  val tdi   = Flipped(Bool())
-  val trstN = Flipped(Bool())
-  val tdo   = Aligned(Bool())
+/** What an external debug module drives into this hart, and what the hart reports back: the halt, resume and reset
+  * requests, one abstract command at a time, and the hart's state.
+  */
+class HartDebugBundle(parameter: DitDah32Parameter) extends Bundle:
+  val haltReq        = Flipped(Bool())
+  val resumeReq      = Flipped(Bool())
+  val resetReq       = Flipped(Bool())
+  val haltOnResetReq = Flipped(Bool())
 
-  val requestToggle = Aligned(Bool())
-  val requestAddr   = Aligned(UInt(7))
-  val requestData   = Aligned(UInt(32))
-  val requestOp     = Aligned(UInt(2))
+  val hartHalted    = Aligned(Bool())
+  val hartRunning   = Aligned(Bool())
+  val hartResumeAck = Aligned(Bool())
+  val hartResetAck  = Aligned(Bool())
 
-  val responseToggle = Flipped(Bool())
-  val responseAddr   = Flipped(UInt(7))
-  val responseData   = Flipped(UInt(32))
-  val responseOp     = Flipped(UInt(2))
+  val abstractValid   = Flipped(Bool())
+  val abstractCmdType = Flipped(UInt(2))
+  val abstractWrite   = Flipped(Bool())
+  val abstractRegno   = Flipped(UInt(16))
+  val abstractSize    = Flipped(UInt(3))
+  val abstractData    = Flipped(UInt(parameter.xlen))
+  val abstractAddress = Flipped(UInt(parameter.xlen))
 
-class DebugModuleIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
-  val clock = Flipped(Clock())
-  val reset = Flipped(Reset())
-
-  val requestToggle = Flipped(Bool())
-  val requestAddr   = Flipped(UInt(7))
-  val requestData   = Flipped(UInt(32))
-  val requestOp     = Flipped(UInt(2))
-
-  val responseToggle = Aligned(Bool())
-  val responseAddr   = Aligned(UInt(7))
-  val responseData   = Aligned(UInt(32))
-  val responseOp     = Aligned(UInt(2))
-
-  val haltReq        = Aligned(Bool())
-  val resumeReq      = Aligned(Bool())
-  val resetReq       = Aligned(Bool())
-  val haltOnResetReq = Aligned(Bool())
-
-  val hartHalted    = Flipped(Bool())
-  val hartRunning   = Flipped(Bool())
-  val hartResumeAck = Flipped(Bool())
-  val hartResetAck  = Flipped(Bool())
-
-  val abstractValid   = Aligned(Bool())
-  val abstractCmdType = Aligned(UInt(2))
-  val abstractWrite   = Aligned(Bool())
-  val abstractRegno   = Aligned(UInt(16))
-  val abstractSize    = Aligned(UInt(3))
-  val abstractData    = Aligned(UInt(32))
-  val abstractAddress = Aligned(UInt(32))
-
-  val abstractDone  = Flipped(Bool())
-  val abstractError = Flipped(UInt(3))
-  val abstractRdata = Flipped(UInt(32))
+  val abstractDone  = Aligned(Bool())
+  val abstractError = Aligned(UInt(3))
+  val abstractRdata = Aligned(UInt(parameter.xlen))

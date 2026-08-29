@@ -57,7 +57,7 @@ object DitDah32Gpr extends Generator[DitDah32Parameter, DitDah32GprLayers, DitDa
 
     // Debug read port and broadcast clear exist only for the JTAG hart.
     io.rdata3 := 0.U(parameter.xlen)
-    if parameter.enableJtag then
+    if parameter.enableDebug then
       (1 to 15).foreach { i =>
         when(io.raddr3 === i.U(5)) { io.rdata3 := regs(i) }
       }

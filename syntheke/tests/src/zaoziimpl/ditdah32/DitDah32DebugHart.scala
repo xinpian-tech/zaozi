@@ -16,7 +16,6 @@ trait DitDah32DebugHart:
   protected def connectDebugHart(
     parameter:           DitDah32Parameter,
     io:                  Interface[DitDah32IO],
-    dm:                  me.jiuyang.zaozi.reftpe.Interface[DebugModuleIO],
     pc:                  Reg[UInt],
     instrReg:            Reg[Bits],
     fetched:             Reg[Bool],
@@ -90,6 +89,7 @@ trait DitDah32DebugHart:
     sourcecode.Name.Machine,
     InstanceContext
   ): Unit =
+    val dm    = io.debug.get
     val axiAw = io.axi.aw
     val axiW  = io.axi.w
     val axiB  = io.axi.b

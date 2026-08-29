@@ -40,14 +40,14 @@ class AxiRBundle(s: AxiShape) extends Bundle:
   val resp = Aligned(UInt(2))
   val last = Aligned(Bool())
 
-class AxiChannel[B <: Bundle](bits0: B) extends Bundle:
+class ChannelBundle[B <: Bundle](bits0: B) extends Bundle:
   val valid = Aligned(Bool())
   val ready = Flipped(Bool())
   val bits  = Aligned(bits0)
 
 class Axi4Bundle(s: AxiShape) extends Bundle:
-  val aw = Aligned(new AxiChannel(new AxiAxBundle(s)))
-  val w  = Aligned(new AxiChannel(new AxiWBundle(s)))
-  val b  = Flipped(new AxiChannel(new AxiBBundle(s)))
-  val ar = Aligned(new AxiChannel(new AxiAxBundle(s)))
-  val r  = Flipped(new AxiChannel(new AxiRBundle(s)))
+  val aw = Aligned(new ChannelBundle(new AxiAxBundle(s)))
+  val w  = Aligned(new ChannelBundle(new AxiWBundle(s)))
+  val b  = Flipped(new ChannelBundle(new AxiBBundle(s)))
+  val ar = Aligned(new ChannelBundle(new AxiAxBundle(s)))
+  val r  = Flipped(new ChannelBundle(new AxiRBundle(s)))

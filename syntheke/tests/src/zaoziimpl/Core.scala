@@ -16,19 +16,25 @@ import java.lang.foreign.Arena
   * widens onto the 128-bit fabric. Every core access is a 32-bit single-beat transfer: the shim rides it in the
   * addressed word lane with id 0, len 0, size 4 bytes. The write data channel is held until its address has been seen,
   * so the lane is always known. Interrupt inputs are tied off.
+  *
+  * With `enableDebug` the core carries its debug port too, and the shim maps it onto the [[DebugHartBundle]] the debug
+  * module speaks — the same adapter role it plays for the memory port.
   */
 
-case class CoreDeviceP(resetPc: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
+case class CoreDeviceP(resetPc: Int, addrBits: Int, dataBits: Int, idBits: Int, enableDebug: Boolean) extends Parameter
+    derives ReadWriter:
   require(dataBits == 32 || dataBits == 128, s"the core shim rides a 32- or 128-bit fabric, got dataBits $dataBits")
   require(addrBits >= 1 && addrBits <= 32, s"the core addresses at most a 32-bit space, got addrBits $addrBits")
   require((resetPc & 0x3) == 0 && resetPc >= 0, s"resetPc 0x${resetPc.toHexString} must be 32-bit aligned")
+  val xlen: Int = 32
 
 class CoreDevicePLayers(p: CoreDeviceP) extends LayerInterface(p):
   def layers = Seq.empty
 class CoreDevicePProbe(p: CoreDeviceP)  extends DVBundle[CoreDeviceP, CoreDevicePLayers](p)
 class CoreDevicePIO(p: CoreDeviceP)     extends HWBundle(p):
-  val clk = Flipped(new ClockBundle)
-  val mem = Aligned(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
+  val clk   = Flipped(new ClockBundle)
+  val mem   = Aligned(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
+  val debug = Option.when(p.enableDebug)(Flipped(new DebugHartBundle(p.xlen)))
 
 @generator
 object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevicePIO, CoreDevicePProbe]:
@@ -37,12 +43,37 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 
-    val core = DitDah32Module.instantiate(DitDah32Parameter(resetVector = p.resetPc))
+    val core = DitDah32Module.instantiate(
+      DitDah32Parameter(resetVector = p.resetPc, enableDebug = p.enableDebug)
+    )
     core.io.clock        := io.clk.clock
     core.io.reset        := io.clk.reset
     core.io.irq.software := false.B
     core.io.irq.timer    := false.B
     core.io.irq.external := false.B
+
+    // ---- debug: the module's nested bundle onto the hart's flat one ----
+    io.debug.foreach { d =>
+      val h = core.io.debug.get
+      h.haltReq         := d.halt
+      h.resumeReq       := d.resume
+      h.resetReq        := d.reset
+      h.haltOnResetReq  := d.haltOnReset
+      h.abstractValid   := d.cmd.valid
+      h.abstractCmdType := d.cmd.kind
+      h.abstractWrite   := d.cmd.write
+      h.abstractRegno   := d.cmd.regno
+      h.abstractSize    := d.cmd.size
+      h.abstractData    := d.cmd.data
+      h.abstractAddress := d.cmd.address
+      d.hart.halted     := h.hartHalted
+      d.hart.running    := h.hartRunning
+      d.hart.resumeAck  := h.hartResumeAck
+      d.hart.resetAck   := h.hartResetAck
+      d.hart.cmdDone    := h.abstractDone
+      d.hart.cmdError   := h.abstractError
+      d.hart.cmdRdata   := h.abstractRdata
+    }
 
     // ---- AW / W: forwarded concurrently — W must not wait for the AW handshake (the AXI master rule; the peripheral
     // slaves hold AWREADY until they see WVALID). The write lane follows the live AW address until that handshake and

@@ -52,13 +52,6 @@ class StatusBundle extends Bundle:
   val busy  = Aligned(Bool())
   val sleep = Aligned(Bool())
 
-class JtagBundle extends Bundle:
-  val tck   = Flipped(Clock())
-  val tms   = Flipped(Bool())
-  val tdi   = Flipped(Bool())
-  val tdo   = Aligned(Bool())
-  val trstN = Flipped(Bool())
-
 class DitDah32IO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
   val reset = Flipped(Reset())
@@ -66,4 +59,4 @@ class DitDah32IO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val axi    = Aligned(new AxiLiteBundle(parameter))
   val irq    = Aligned(new InterruptBundle)
   val status = Aligned(new StatusBundle)
-  val jtag   = Option.when(parameter.enableJtag)(Aligned(new JtagBundle))
+  val debug  = Option.when(parameter.enableDebug)(Aligned(new HartDebugBundle(parameter)))
