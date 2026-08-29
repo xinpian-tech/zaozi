@@ -45,7 +45,8 @@ be replayed exactly, or expanded to volume by pinning the fields the intent cons
 |---|---|---|---|---|---|---|---|
 | rvprobe, witness replay | 10 | 10 | 44.51 | 67.72 | 52.83 | 8.01 | 55.38 |
 | rvprobe, volume fill | 10,000 | 10 | 79.41 | 89.42 | 77.36 | **94.85** | 78.46 |
-| **+ 6 residual-targeted intents** | **10,006** | **16** | **90.40** | 93.12 | 86.32 | 96.02 | 86.15 |
+| + 6 hand-written residual intents | 10,006 | 16 | 90.40 | 93.12 | 86.32 | 96.02 | 86.15 |
+| **+ 5 LLM-written residual intents** | **10,011** | **21** | **94.78** | **98.94** | 89.62 | 96.72 | 93.85 |
 | HAVEN (15 spec-derived sequences + 3 BO iterations) | 10,110 | — | 95.87 | 97.88 | 92.92 | 97.28 | 95.38 |
 
 **The plumbing works**: solved stimulus runs inside a foreign testbench with only the sequence layer
@@ -72,9 +73,34 @@ These need operand pairs whose *arithmetic result* lands in a rounding or underf
 intent to state than "a is NaN", and exactly the kind where naming the destination and letting the
 solver find the operands should pay off.
 
-**Caveat on what is automated.** The six intents above were written by hand from the residual report.
-The mechanism — residual → intent → solve → sequence → re-measure — is demonstrated end to end, but
-the LLM writing the intents is the next step, and it is the step the paper's claim actually rests on.
+## The loop closed by the LLM
+
+The step the paper's claim rests on: DeepSeek V4 Flash was given the 13 remaining uncovered lines with
+their RTL context, the opcode table, and the intent file's shape, and asked to write the intents
+itself. `ut_harness.py` typechecked its output and would have fed any diagnostics back.
+
+It compiled on the **first attempt** — no repair round — for 30,767 tokens (≈ ¥0.0015), and the five
+intents it chose show it reasoning about the arithmetic rather than pattern-matching:
+
+| intent | op | a | b | what it targets |
+|---|---|---|---|---|
+| `rounding_carry` | FP_ADD | `0x3f800000` (1.0) | `0x3f7fffff` (1−ε) | a sum whose mantissa needs rounding with carry |
+| `underflow_tiny` | FP_SUB | `0x00800001` | `0x00800000` | smallest normals subtracted → underflow |
+| `fp2int_nan` | FP2INT | `0x7fc00000` (NaN) | — | the invalid-conversion path |
+| `fp2int_tiny` | FP2INT | `0x00800000` | — | a magnitude that truncates to zero |
+| `reserved_opcode` | `0xA` | — | — | the reserved-opcode branch |
+
+Choosing operands whose *arithmetic result* lands in a rounding or underflow case is exactly the task
+that defeats route-planning: the model states the destination and the solver supplies the trace.
+
+**Result: 90.40 → 94.78 from five transactions**, and uncovered lines fell from 13 to **2**. Line
+coverage reached **98.94 against HAVEN's 97.88** — on the metric most directly tied to "was this code
+exercised", directed generation now leads. Total: 94.78 vs 95.87, a 1.1-point gap, with 21 solver
+calls and ~31k tokens for the whole closing loop.
+
+The last two lines are `fp_active <= 1'b0` (pipeline teardown on an aborted operation) and
+`f2i_int_val = 32'h0`. Both are plausibly reachable only via sequences the single-transaction intent
+shape cannot express — a temporal intent, which the DSL has and this experiment did not use.
 
 ## What this settles for the experiment design
 
