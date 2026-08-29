@@ -34,7 +34,7 @@ case class DefaultQueueSpecParameter(
 given upickle.default.ReadWriter[DefaultQueueSpecParameter] = upickle.default.macroRW
 
 class DefaultQueueSpecLayers(parameter: DefaultQueueSpecParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class DefaultQueueSpecIO(parameter: DefaultQueueSpecParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())

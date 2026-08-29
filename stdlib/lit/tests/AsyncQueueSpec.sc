@@ -33,6 +33,13 @@
 // NONPOW-RAM: always @(posedge clock) begin
 // NONPOW-RAM-NOT: ~resetN
 
+// ASYNC-LABEL: module AsyncQueue_width8_depth4_pushAlmostEmptyLevel1_pushAlmostFullLevel1_popAlmostEmptyLevel1_popAlmostFullLevel1_stickyErrorfalse_pushSync2_popSync3_asyncResettrue_resetMemtrue_Verification();
+// ASYNC: async_queue_push_accept:
+// ASYNC: push_clock)
+// ASYNC: async_queue_overflow_request:
+// ASYNC: async_queue_pop_accept:
+// ASYNC: pop_clock)
+// ASYNC: async_queue_underflow_request:
 // ASYNC-LABEL: module AsyncQueue_width8_depth4_pushAlmostEmptyLevel1_pushAlmostFullLevel1_popAlmostEmptyLevel1_popAlmostFullLevel1_stickyErrorfalse_pushSync2_popSync3_asyncResettrue_resetMemtrue(
 // ASYNC: input resetN,
 // ASYNC-NEXT: push_clock,
@@ -62,9 +69,13 @@
 // ASYNC: BrentKungAdder_width3_radix4
 // ASYNC: Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue ram (
 // ASYNC-NOT: SynchronizedReset
-// ASYNC-NOT: Verification
 // ASYNC-NOT: GTECH_
 
+// NONPOW-LABEL: module AsyncQueue_width8_depth5_pushAlmostEmptyLevel2_pushAlmostFullLevel1_popAlmostEmptyLevel1_popAlmostFullLevel2_stickyErrortrue_pushSync1_popSync2_asyncResetfalse_resetMemfalse_Verification();
+// NONPOW: async_queue_push_sticky_error_retained:
+// NONPOW: push_clock)
+// NONPOW: async_queue_pop_sticky_error_retained:
+// NONPOW: pop_clock)
 // NONPOW-LABEL: module AsyncQueue_width8_depth5_pushAlmostEmptyLevel2_pushAlmostFullLevel1_popAlmostEmptyLevel1_popAlmostFullLevel2_stickyErrortrue_pushSync1_popSync2_asyncResetfalse_resetMemfalse(
 // NONPOW-NOT: always @(posedge push_clock or
 // NONPOW-NOT: always @(posedge pop_clock or
@@ -77,7 +88,6 @@
 // NONPOW: BrentKungAdder_width2_radix4
 // NONPOW: Ram_dataWidth8_depth6_asyncResetfalse_resetMemfalse ram (
 // NONPOW-NOT: SynchronizedReset
-// NONPOW-NOT: Verification
 // NONPOW-NOT: GTECH_
 
 // MUX-LABEL: module AsyncQueue_width8_depth9_pushAlmostEmptyLevel1_pushAlmostFullLevel1_popAlmostEmptyLevel1_popAlmostFullLevel1_stickyErrorfalse_pushSync2_popSync2_asyncResetfalse_resetMemfalse(
@@ -86,5 +96,4 @@
 // MUX: BrentKungAdder_width3_radix4
 // MUX: Ram_dataWidth8_depth10_asyncResetfalse_resetMemfalse ram (
 // MUX-NOT: SynchronizedReset
-// MUX-NOT: Verification
 // MUX-NOT: GTECH_

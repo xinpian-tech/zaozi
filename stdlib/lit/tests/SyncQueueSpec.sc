@@ -34,6 +34,9 @@
 // SYNC-RAM: always @(posedge clock) begin
 // SYNC-RAM-NOT: ~resetN
 
+// ASYNC-LABEL: module SyncQueue_width8_depth4_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResettrue_resetMemtrue_Verification();
+// ASYNC: sync_queue_push_accept:
+// ASYNC: clock)
 // ASYNC-LABEL: module SyncQueue_width8_depth4_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResettrue_resetMemtrue(
 // ASYNC: input clock,
 // ASYNC-NEXT: resetN,
@@ -54,9 +57,11 @@
 // ASYNC: Incrementer_width2_radix4
 // ASYNC: BrentKungAdder_width2_radix4
 // ASYNC: Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue ram (
-// ASYNC-NOT: Verification
 // ASYNC-NOT: GTECH_
 
+// SYNC-LABEL: module SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse_Verification();
+// SYNC: sync_queue_push_accept:
+// SYNC: clock)
 // SYNC-LABEL: module SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse(
 // SYNC: input clock,
 // SYNC-NEXT: resetN,
@@ -66,5 +71,4 @@
 // SYNC: Incrementer_width2_radix4
 // SYNC: BrentKungAdder_width2_radix4
 // SYNC: Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse ram (
-// SYNC-NOT: Verification
 // SYNC-NOT: GTECH_
