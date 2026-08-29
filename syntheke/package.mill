@@ -50,6 +50,10 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
         super.forkArgs() ++ circtlib.forkArgs()
       )
 
+      // One worker, not one per test class: each of these holds an MLIR context and the elaborated design, and the
+      // simulation test forks a verilator build beside it. Run them in parallel and the machine runs out.
+      override def testParallelism: T[Boolean] = Task(false)
+
       // zaozi's BaseGeneratorHelper dumps per-module .mlirbc circuits into ZAOZI_OUTDIR. PATH is forwarded from the
       // dev shell — as an input task, so a changed environment invalidates it — for the simulation test to spawn
       // verilator and its C++ toolchain.

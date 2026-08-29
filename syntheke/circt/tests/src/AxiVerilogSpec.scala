@@ -171,12 +171,15 @@ object AxiVerilogSpec extends TestSuite:
       dm.clk <-- sysPll.tap("dm")
     }
 
+  /** The SoC settles and elaborates once: every test below reads the same design, and elaborating it repeatedly would
+    * hold one MLIR context per test for nothing.
+    */
+  lazy val soc:    ResolvedDesign   = Negotiator.negotiate(buildSoc())
+  lazy val design: ElaboratedDesign = Elaborator.elaborate(soc, axiBackends)
+
   val tests = Tests {
 
     test("the AXI SoC elaborates through zaozi and the CIRCT pipeline to Verilog") {
-      val resolved = Negotiator.negotiate(buildSoc())
-      val design   = Elaborator.elaborate(resolved, axiBackends)
-
       assert(design.circuitName == "Top")
       // The bytecode artifact is the whole linked design as the framework built it, before firtool rewrote it.
       assert(design.mlirbc.nonEmpty)
@@ -200,7 +203,7 @@ object AxiVerilogSpec extends TestSuite:
     }
 
     test("the debug chain is three negotiated edges: pins, DMI bus, one interrupt port per hart") {
-      val resolved = Negotiator.negotiate(buildSoc())
+      val resolved = soc
 
       val root = ModuleId.root
       // The transport publishes the TAP it implements; the harness takes it and knows how to scan it.
@@ -217,7 +220,6 @@ object AxiVerilogSpec extends TestSuite:
       assert(dm.harts == 2)
       assert(dm.haltOnReset)
 
-      val design      = Elaborator.elaborate(resolved, axiBackends)
       // Transport and module are their own modules, and the module reaches both harts.
       assert(design.verilog.keys.exists(_.startsWith("Dtm_")))
       assert(design.verilog.keys.exists(_.startsWith("Dm_")))
@@ -232,7 +234,7 @@ object AxiVerilogSpec extends TestSuite:
     }
 
     test("one crystal outside, one PLL on the die: every rate is derived where it is used") {
-      val resolved = Negotiator.negotiate(buildSoc())
+      val resolved = soc
       val root     = ModuleId.root
 
       // The crystal's frequency flows down to the PLL, which reports the loop it settled on.
@@ -257,8 +259,6 @@ object AxiVerilogSpec extends TestSuite:
     }
 
     test("the SoC boots from JTAG and prints over the UART — verilator runs the linked Verilog") {
-      val resolved = Negotiator.negotiate(buildSoc())
-      val design   = Elaborator.elaborate(resolved, axiBackends)
       // The three external modules stay external: instantiated, never defined, so the models below are what
       // gives them a body.
       Seq("ClockGen", "SimConsole", "PllAnalog", "TraceLog").foreach { m =>
@@ -302,6 +302,9 @@ object AxiVerilogSpec extends TestSuite:
       val core1Trace = os.read(simDir / "trace-core1.log")
       assert(core1Trace.startsWith(f"${hart1Pc}%08x: ${program.head}%08x"))
       assert(os.read(simDir / "trace-core0.log").linesIterator.forall(_.startsWith(f"${hart0Pc}%08x")))
+
+      // A verilated build is a few hundred megabytes; keep it only when something above failed.
+      os.remove.all(simDir)
     }
 
     // Last: the wide generator dumps its `.mlirbc` under the same canonical module name before the port check rejects

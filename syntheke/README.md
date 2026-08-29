@@ -156,6 +156,19 @@ DRAM through hart 0's abstract memory access, gives each hart its start PC
 through `dpc`, and resumes them — hart 0 into the done-spin, hart 1 into
 the program.
 
+The harts' instruction trace reaches the harness the way the framework
+intends verification to work, and it is the only thing in the demo that
+does: `RvTrace` (`circt/tests/src/TraceProtocol.scala`) is a `DVProtocol`
+carrying the core's whole trace surface, and each `CoreNodes` declares one
+`dvSource` of it. That declaration is not a connection — nothing in the
+topology mentions the trace — and the framework forwards every leaf up to
+the testbench's matching data input on its own. The harness shapes those
+ports out of `view.probes`, takes the chip's clock as an ordinary edge to
+sample them in, and gives each hart a `TraceLog`. The trace lives in a
+FIRRTL layer throughout: `Top.sv` and firtool's `filelist.f` are the
+release build, and the `layers-*.sv` collateral binds the trace in on top
+of it, which is what the simulation compiles.
+
 What RTL cannot express becomes an external Verilog module declared
 through zaozi's `VerilogWrapper` and linked as an extmodule, each shipping
 its behavioral definition as a string next to the wrapper: `ClockGen`, the
