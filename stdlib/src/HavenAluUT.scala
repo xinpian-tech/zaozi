@@ -92,3 +92,65 @@ object HavenAluUT
     layer("Verification"):
       Probes.expose(probe.RESULT, Bits(32), instance.io.result)
       Probes.expose(probe.DONE, Bits(1), instance.io.done.asBits)
+
+/** Per-opcode directed generation: the parameter names the opcode this instance targets, so one intent per opcode
+  * yields one witness, and the witnesses concatenate into a single UVM sequence.
+  */
+case class HavenAluOpParameter(targetOp: Int) extends Parameter:
+  require(targetOp >= 0 && targetOp < 16, "opcode is 4 bits")
+
+given upickle.default.ReadWriter[HavenAluOpParameter] = upickle.default.macroRW
+
+class HavenAluOpLayers(parameter: HavenAluOpParameter) extends LayerInterface(parameter):
+  def layers = Seq(Layer("Verification"))
+
+/** Drive ports match the HAVEN transaction's fields by name (a, b, op, start), so the emitted sequence assigns
+  * straight into its `seq_item` — no packing, because this stimulus goes to a UVM driver rather than the
+  * single-drive Model B callback.
+  */
+class HavenAluOpUTIO(parameter: HavenAluOpParameter) extends HWBundle(parameter):
+  val clock  = Flipped(Clock())
+  val reset  = Flipped(Reset())
+  val a      = Flipped(Bits(32))
+  val b      = Flipped(Bits(32))
+  val op     = Flipped(Bits(4))
+  val start  = Flipped(Bool())
+  val RESULT = Aligned(Bits(32))
+  val DONE   = Aligned(Bool())
+
+class HavenAluOpUTProbe(parameter: HavenAluOpParameter)
+    extends DVBundle[HavenAluOpParameter, HavenAluOpLayers](parameter):
+  val RESULT = ProbeRead(Bits(32), layers("Verification"))
+
+/** C = "issue the parameterized opcode with start asserted". Deliberately simple: the point of the experiment is the
+  * plumbing — a solved witness replacing the sequence layer of a template-generated testbench — not yet the
+  * cleverness of the intent.
+  */
+@generator
+object HavenAluOpUT
+    extends Generator[HavenAluOpParameter, HavenAluOpLayers, HavenAluOpUTIO, HavenAluOpUTProbe]
+    with UT[HavenAluOpParameter, HavenAluOpUTIO]:
+  override def moduleName(p: HavenAluOpParameter): String = s"HavenAluOpUT_op${p.targetOp}"
+
+  def architecture(parameter: HavenAluOpParameter) =
+    val io       = summon[Interface[HavenAluOpUTIO]]
+    val instance = HavenAlu.instantiate(HavenAluParameter())
+    instance.io.clk   := io.clock
+    instance.io.rst_n := !io.reset.asBool
+    instance.io.a     := io.a
+    instance.io.b     := io.b
+    instance.io.op    := io.op
+    instance.io.start := io.start
+    io.RESULT         := instance.io.result
+    io.DONE           := instance.io.done
+
+    Txn.assumeResetLow(io.reset)
+
+    Generate(
+      Sem.value((io.op === parameter.targetOp.U(4).asBits) & io.start),
+      s"gen_op${parameter.targetOp}"
+    )
+
+    val probe = summon[ProbeInterface[HavenAluOpUTProbe]]
+    layer("Verification"):
+      Probes.expose(probe.RESULT, Bits(32), instance.io.result)
