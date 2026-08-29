@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.syntheke.circt.tests
 
-import com.vowstar.ditdah32.DebugRegister
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
+import me.jiuyang.syntheke.tests.axi.Axi4
 import me.jiuyang.syntheke.tests.zaoziimpl.{*, given}
 import me.jiuyang.zaozi.{Generator, HWBundle}
 import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
@@ -29,11 +29,13 @@ object DramGenWide               extends Generator[DramDeviceP, DramDevicePLayer
 
 object AxiVerilogSpec extends TestSuite:
 
-  val loadBase: Long = 0x80000000L // the DRAM base: where the debugger puts the program
+  val loadBase:      Long = 0x80000000L // the DRAM base: where the debugger puts the program
+  val dramWordsLog2: Int  = 8           // the backing store, in 16-byte bus words
+  val dramBytes:     Long = (1L << dramWordsLog2) * 16
   // The two harts get different work, so the printed line proves both halves of the debug module's hart array: hart 0
   // wrote the program into memory for the debugger and then parks in the done-spin, hart 1 is the one that runs it.
-  val hart0Pc:  Long = loadBase + 0x2c
-  val hart1Pc:  Long = loadBase
+  val hart0Pc:       Long = loadBase + 0x2c
+  val hart1Pc:       Long = loadBase
 
   /** The program, hand-assembled RV32E (registers x5–x8): walk the string at +0x40 and write each byte to the UART's
     * TXDATA, polling STATUS bit0 (txBusy) between bytes; a NUL ends the walk at the spin at +0x2c, where hart 1 parks.
@@ -59,41 +61,49 @@ object AxiVerilogSpec extends TestSuite:
     0x00130313L, 0xfe5ff06fL, 0x0000006fL, 0L, 0L, 0L, 0L, 0x6c6c6568L, 0x6f77206fL, 0x0a646c72L, 0L
   )
 
-  /** What the debugger scans in over JTAG, in place of a boot ROM: with both harts halted out of reset, write the
-    * program into memory a word at a time through hart 0's abstract memory access (the address post-increments, so it
-    * is set once), then select each hart in turn, give it its start PC through `dpc`, and resume it.
+  /** The TCP port the simulation's JTAG bridge listens on, and the debugger connects to. */
+  val jtagPort: Int    = 5555
+  val chipName: String = "syntheke-demo"
+
+  /** The target description probe-rs needs, written out of the settled design: the TAP it will find on the pins, the
+    * harts the debug module holds, and the memory the fabric decodes to RAM. Nothing here is stated twice — every
+    * number comes from an edge the negotiation settled.
     */
-  def injection(image: Vector[Long], base: Long, hart0Pc: Long, hart1Pc: Long): Vector[DmiWrite] =
-    val accessMemoryWrite   = 0x02290000L // memory, four bytes, post-increment the address, write
-    val accessRegisterWrite = 0x002307b1L // register 0x7b1 = dpc, 32 bits, transfer, write
-    def dmcontrol(hart: Int, halt: Boolean, resume: Boolean): Long =
-      (if halt then 0x80000000L else 0L) | (if resume then 0x40000000L else 0L) | (hart.toLong << 16) | 1L
-    Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(0, halt = true, resume = false))) ++
-      Vector(DmiWrite(DebugRegister.DATA1, base)) ++
-      image.flatMap(w =>
-        Vector(DmiWrite(DebugRegister.DATA0, w), DmiWrite(DebugRegister.COMMAND, accessMemoryWrite))
-      ) ++
-      Vector(DmiWrite(DebugRegister.DATA0, hart0Pc), DmiWrite(DebugRegister.COMMAND, accessRegisterWrite)) ++
-      Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(0, halt = false, resume = true))) ++
-      Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(1, halt = true, resume = false))) ++
-      Vector(DmiWrite(DebugRegister.DATA0, hart1Pc), DmiWrite(DebugRegister.COMMAND, accessRegisterWrite)) ++
-      Vector(DmiWrite(DebugRegister.DMCONTROL, dmcontrol(1, halt = false, resume = true)))
+  def probeRsTarget(tap: JtagTap, harts: Int, ramBase: Long, ramSize: Long): String =
+    val cores = (0 until harts)
+      .map(i => s"""      - name: hart$i
+                   |        type: riscv
+                   |        core_access_options: !Riscv
+                   |          hart_id: $i""".stripMargin)
+      .mkString("\n")
+    s"""name: syntheke
+       |variants:
+       |  - name: $chipName
+       |    cores:
+       |$cores
+       |    memory_map:
+       |      - !Ram
+       |        name: dram
+       |        range:
+       |          start: 0x${ramBase.toHexString}
+       |          end: 0x${(ramBase + ramSize).toHexString}
+       |        cores: [${(0 until harts).map(i => s"hart$i").mkString(", ")}]
+       |    jtag:
+       |      scan_chain:
+       |        - name: dtm
+       |          ir_len: ${tap.irLength}
+       |      force_scan_chain: true
+       |""".stripMargin
 
   /** AxiSocSpec's topology minus the L2 slot (an AXI fabric without coherence gives an L2 nothing testable to do), plus
-    * the debug chain — on-chip transport and debug module, one port per hart. Everything that is not the chip is in the
-    * test harness: the clock, the debug adapter driving the JTAG pins, the console on the serial pins and the board the
-    * GPIO pads are wired to. FullParam = the zaozi parameter of each IP.
+    * the debug chain — on-chip transport and debug module, one port per hart, and the module's own bus master.
+    * Everything that is not the chip is in the test harness: the clock, the debug adapter on the JTAG pins, the console
+    * on the serial pins and the board the GPIO pads are wired to. FullParam = the zaozi parameter of each IP.
     */
   def buildSoc(refHz: Int = 25000000): DesignSpec =
     Design {
       // Outside the chip: the crystal, and the harness's own devices running off it.
-      val harness = testHarness(
-        freqHz = refHz,
-        taps = Vector("ref"),
-        script = injection(program, loadBase, hart0Pc, hart1Pc),
-        tckDiv = 2,
-        dwell = 8
-      )
+      val harness = testHarness(freqHz = refHz, taps = Vector("ref"), jtagPort = jtagPort, tckDiv = 2)
 
       // On the die: the PLL multiplies the reference to the system clock and feeds every consumer.
       val sysPll = pll(
@@ -120,10 +130,11 @@ object AxiVerilogSpec extends TestSuite:
       val core1 = core(idBits = 3, maxFlight = 8, resetPc = 0, enableDebug = true, enableTrace = true)
       val dma   = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = 0x80000800L, windowLog2 = 10)
 
-      val sysXbar = axiXbar(Vector("in0", "in1", "in2"), Vector("mem", "periph"), Arbitration.RoundRobin)
+      val sysXbar = axiXbar(Vector("in0", "in1", "in2", "in3"), Vector("mem", "periph"), Arbitration.RoundRobin)
 
       val mem              = wrapper {
-        val dram = dramCtrl(ranks = 2, wordsLog2 = 8, base = loadBase, size = 0x80000000L, idCapacityBits = 6)
+        val dram =
+          dramCtrl(ranks = 2, wordsLog2 = dramWordsLog2, base = loadBase, size = 0x80000000L, idCapacityBits = 6)
         (dram.in, dram.clk)
       }
       val (memIn, dramClk) = mem
@@ -136,13 +147,15 @@ object AxiVerilogSpec extends TestSuite:
       val uart = uartCtrl(0x10000000L, 0x1000L, idCapacityBits = 8, baud = 115200)
       val gpio = gpioCtrl(0x10010000L, 0x1000L, idCapacityBits = 8, width = 8)
 
-      // The on-chip half of the debug chain: transport, module, one negotiated port per hart.
+      // The on-chip half of the debug chain: transport, module, one negotiated port per hart. The module is a bus
+      // master too — that is the path a debugger's download takes, and the fabric sizes it like any other master.
       val dtm = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
-      val dm  = debugModule(harts = 2, haltOnReset = true)
+      val dm  = debugModule(harts = 2, haltOnReset = true, sbIdBits = 1)
 
       sysXbar.input("in0") <-- core0.mem
       sysXbar.input("in1") <-- core1.mem
       sysXbar.input("in2") <-- dma.mem
+      sysXbar.input("in3") <-- dm.sb
       bridge.in <-- sysXbar.output("periph")
       periphXbar.input("in") <-- bridge.out
       uart.in <-- periphXbar.output("uart")
@@ -177,6 +190,19 @@ object AxiVerilogSpec extends TestSuite:
   lazy val soc:    ResolvedDesign   = Negotiator.negotiate(buildSoc())
   lazy val design: ElaboratedDesign = Elaborator.elaborate(soc, axiBackends)
 
+  /** The debugger the bring-up test drives the SoC with: `syntheke/tests/simprobe`, a probe-rs probe whose JTAG pins
+    * are a simulation's. Cargo builds it once and answers instantly after that.
+    */
+  lazy val simprobe: os.Path =
+    val manifest = Iterator
+      .iterate(os.pwd)(_ / os.up)
+      .take(8)
+      .map(_ / "syntheke" / "tests" / "simprobe" / "Cargo.toml")
+      .find(os.exists)
+      .getOrElse(throw new java.lang.AssertionError(s"no syntheke/tests/simprobe crate above ${os.pwd}"))
+    os.proc("cargo", "build", "--release", "--manifest-path", manifest.toString).call(cwd = manifest / os.up)
+    manifest / os.up / "target" / "release" / "simprobe"
+
   val tests = Tests {
 
     test("the AXI SoC elaborates through zaozi and the CIRCT pipeline to Verilog") {
@@ -202,11 +228,11 @@ object AxiVerilogSpec extends TestSuite:
       assert(design.verilog.values.exists(_.contains("always @(posedge")))
     }
 
-    test("the debug chain is three negotiated edges: pins, DMI bus, one interrupt port per hart") {
+    test("the debug chain is four negotiated edges: pins, DMI bus, system bus, one interrupt port per hart") {
       val resolved = soc
 
       val root = ModuleId.root
-      // The transport publishes the TAP it implements; the harness takes it and knows how to scan it.
+      // The transport publishes the TAP it implements; the debugger is told about it from this very edge.
       val tap  = resolved.edgeAt(ModuleNodeId(root / "harness", "jtagPins")).edgeAs(Jtag)
       assert(tap == JtagTap(0xdeadbeb1L, 5, 7, 32, 0x11))
       // The DMI bus settled at the transport's scan width, checked against the module's register file.
@@ -214,23 +240,27 @@ object AxiVerilogSpec extends TestSuite:
       // One debug port per hart, each carrying its hart id downward and the hart's register width upward.
       assert(resolved.edgeAt(ModuleNodeId(root / "core0", "debug")).edgeAs(DebugInterrupt) == DebugEdge(0, 32))
       assert(resolved.edgeAt(ModuleNodeId(root / "core1", "debug")).edgeAs(DebugInterrupt) == DebugEdge(1, 32))
+      // The module's own master port sits on the fabric, sized by it like every other master.
+      val sb   = resolved.edgeAt(ModuleNodeId(root / "dm", "sb")).edgeAs(Axi4)
+      assert((sb.addrBits, sb.dataBits) == (32, 128))
 
-      // The debug module's full parameter counts the harts the topology gave it.
+      // The debug module's full parameter counts the harts the topology gave it, and carries the bus it settled on.
       val dm = resolved.generatorModule(root / "dm").get.fullParam.asInstanceOf[DmP]
       assert(dm.harts == 2)
       assert(dm.haltOnReset)
+      assert(dm.sbDataBits == 128)
 
       // Transport and module are their own modules, and the module reaches both harts.
       assert(design.verilog.keys.exists(_.startsWith("Dtm_")))
       assert(design.verilog.keys.exists(_.startsWith("Dm_")))
       assert(design.verilog.collectFirst { case (n, c) if n.startsWith("Dm_") => c }.get.contains("hart0_halt"))
       assert(design.verilog.collectFirst { case (n, c) if n.startsWith("Dm_") => c }.get.contains("hart1_halt"))
-      // The debug adapter is inside the harness, not the chip: one instance, and it is the harness that holds it.
-      assert(design.verilog.keys.exists(_.startsWith("JtagHost_")))
+      // The debug adapter is inside the harness, not the chip, and it is external: a socket, not logic.
       assert(design.verilog.keys.exists(_.startsWith("TestHarness_")))
       val harnessBody = design.verilog.collectFirst { case (n, c) if n.startsWith("TestHarness_") => c }.get
-      assert(harnessBody.contains("JtagHost_"))
+      assert(harnessBody.contains("JtagDpi"))
       assert(harnessBody.contains("ClockGen"))
+      assert(!design.verilog.contains("JtagDpi.sv"))
     }
 
     test("one crystal outside, one PLL on the die: every rate is derived where it is used") {
@@ -258,10 +288,10 @@ object AxiVerilogSpec extends TestSuite:
       assert(e.getMessage.contains("needs a 100/3 loop"))
     }
 
-    test("the SoC boots from JTAG and prints over the UART — verilator runs the linked Verilog") {
-      // The three external modules stay external: instantiated, never defined, so the models below are what
-      // gives them a body.
-      Seq("ClockGen", "SimConsole", "PllAnalog", "TraceLog").foreach { m =>
+    test("probe-rs brings the SoC up over the DPI bridge and it prints over the UART") {
+      // The external modules stay external: instantiated, never defined, so the models below are what gives them a
+      // body. The debug adapter is one of them — a socket is no more synthesizable than an oscillator.
+      Seq("ClockGen", "SimConsole", "PllAnalog", "TraceLog", "JtagDpi").foreach { m =>
         assert(design.verilog.values.exists(_.contains(s"$m ")))
         assert(!design.verilog.contains(s"$m.sv"))
       }
@@ -277,6 +307,8 @@ object AxiVerilogSpec extends TestSuite:
       os.write(simDir / "SimConsole.sv", simConsoleModel)
       os.write(simDir / "PllAnalog.sv", pllAnalogModel)
       os.write(simDir / "TraceLog.sv", traceLogModel)
+      os.write(simDir / "JtagDpi.sv", jtagDpiModel)
+      os.write(simDir / "jtag_dpi.cc", jtagDpiSource)
       // firtool's own file list is the release build; the layer collateral on top of it is the verification build.
       val layers = design.verilog.keys.toSeq.sorted.filter(_.startsWith("layers-"))
       os.proc(
@@ -292,10 +324,49 @@ object AxiVerilogSpec extends TestSuite:
         "-f",
         "filelist.f",
         layers,
-        Seq("ClockGen.sv", "SimConsole.sv", "PllAnalog.sv", "TraceLog.sv")
+        Seq("ClockGen.sv", "SimConsole.sv", "PllAnalog.sv", "TraceLog.sv", "JtagDpi.sv", "jtag_dpi.cc")
       ).call(cwd = simDir)
-      val run    = os.proc((simDir / "obj_dir" / "VTop").toString).call(cwd = simDir)
-      assert(run.out.text().contains("hello world"))
+
+      // What the debugger downloads, and the description it reads the chip from — both written out of the design.
+      os.write(
+        simDir / "program.bin",
+        program.flatMap(w => (0 until 4).map(b => ((w >> (b * 8)) & 0xff).toByte)).toArray
+      )
+      val tap = soc.edgeAt(ModuleNodeId(ModuleId.root / "harness", "jtagPins")).edgeAs(Jtag)
+      os.write(simDir / "target.yaml", probeRsTarget(tap, harts = 2, ramBase = loadBase, ramSize = dramBytes))
+
+      // The simulation comes up first and waits on its socket; the debugger then does what a debugger does — attach
+      // over JTAG, halt the harts, download, set each hart's PC, resume — and leaves the SoC running.
+      val simOut  = simDir / "sim.out"
+      val simErr  = simDir / "sim.err"
+      val sim     = os.proc((simDir / "obj_dir" / "VTop").toString).spawn(cwd = simDir, stdout = simOut, stderr = simErr)
+      val session =
+        try
+          os.proc(
+            simprobe.toString,
+            "--bridge",
+            s"127.0.0.1:$jtagPort",
+            "--target",
+            (simDir / "target.yaml").toString,
+            "--chip",
+            chipName,
+            "--image",
+            (simDir / "program.bin").toString,
+            "--load",
+            s"0x${loadBase.toHexString}",
+            "--hart-pc",
+            s"0:0x${hart0Pc.toHexString}",
+            "--hart-pc",
+            s"1:0x${hart1Pc.toHexString}"
+          ).call(cwd = simDir, check = false, timeout = 300000)
+        finally if sim.isAlive() && !sim.waitFor(120000) then sim.destroyForcibly()
+
+      if session.exitCode != 0 then
+        throw new java.lang.AssertionError(
+          s"the debugger failed (exit ${session.exitCode}):\n${session.out.text()}${session.err.text()}" +
+            s"\n--- simulation ---\n${os.read(simOut)}${os.read(simErr)}"
+        )
+      assert(os.read(simOut).contains("hello world"))
 
       // The trace made it out of both harts, through the framework's probe routing, into the harness: hart 1 ran the
       // program from its first instruction, hart 0 sat in the done-spin.

@@ -23,3 +23,5 @@ result*
 *.fst
 *.fsdb
 *.log
+
+syntheke/tests/simprobe/target/

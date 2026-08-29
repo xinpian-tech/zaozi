@@ -132,9 +132,16 @@ transport holds the tck-to-system crossing, and the module holds a hart
 array selected by `dmcontrol.hartsello`, each hart with its own halt
 request and flags. The core keeps only its hart-side debug port.
 
+The debug module is a fourth edge as well: `dm.sb` is an ordinary `Axi4`
+master, the system bus access the debug spec gives a debugger, and the
+crossbar sizes it like every other master. That is the path a download
+takes, so memory is reachable without borrowing a hart — the alternative
+the spec allows, a program buffer, needs the hart to execute the
+debugger's instructions, which this core does not do.
+
 Everything that is not the chip is in one module, the design's
 `testbench`: `TestHarness.scala` publishes the board's 25 MHz reference
-clock, drives the JTAG pins as a debug adapter, and terminates the serial
+clock, holds the debug adapter on the JTAG pins, and terminates the serial
 and GPIO pins in a console and a board model. On the die the reference
 meets `Pll.scala`, which multiplies it to the 100 MHz system clock and
 feeds every consumer — the loop ratio comes out of the settled reference
@@ -144,17 +151,23 @@ end up in different clock domains on the same wire, each computing its own
 divisor (868 and 217) from the frequency at its own edge. It is a container, not a
 monolith — each of those is its own zaozi module instantiated inside it —
 and every rate it needs comes from the settled edges, so the harness
-cannot disagree with the chip about the baud rate, the pin count or how to
-scan the TAP. `UartHarness.scala` is the same thing sized to the UART
-demo. Nothing in the design is test equipment, and no module of the
-harness is an IP.
+cannot disagree with the chip about the baud rate or the pin count.
+`UartHarness.scala` is the same thing sized to the UART demo. Nothing in
+the design is test equipment, and no module of the harness is an IP.
 
-There is no boot ROM. The harness's `JtagHost` is real RTL that divides
-the system clock into tck, walks the TAP, and scans in a script of DMI
-writes: with both harts halted out of reset, it writes the program into
-DRAM through hart 0's abstract memory access, gives each hart its start PC
-through `dpc`, and resumes them — hart 0 into the done-spin, hart 1 into
-the program.
+There is no boot ROM, and no debugger inside the design either. The
+adapter on the JTAG pins is `JtagDpi.scala`, an external module whose
+behavioral definition is a socket: it clocks one bit per `tck` period out
+of whatever a debugger sends and reports `tdo` back, and knows nothing
+else. The debugger is [probe-rs](https://probe.rs) — `tests/simprobe/`, a
+small crate implementing probe-rs's `RawJtagIo` over that socket, so
+everything above the pins (the TAP walk, DTM, debug module, the RISC-V
+debug sequences) is probe-rs's own. It attaches, halts the harts, downloads the
+program into DRAM over the debug module's system bus, gives each hart its
+start PC through `dpc` and resumes them — hart 0 into the done-spin, hart 1
+into the program. The target description it reads the chip from is written
+out of the settled design: the TAP's IR length comes from the `Jtag` edge,
+the RAM range from the DRAM's, the harts from the debug module's.
 
 The harts' instruction trace reaches the harness the way the framework
 intends verification to work, and it is the only thing in the demo that
@@ -172,11 +185,31 @@ of it, which is what the simulation compiles.
 What RTL cannot express becomes an external Verilog module declared
 through zaozi's `VerilogWrapper` and linked as an extmodule, each shipping
 its behavioral definition as a string next to the wrapper: `ClockGen`, the
-board's oscillator, and `SimConsole`, stdout at the far end of the serial
-line — both in the harness — and `PllAnalog`, the loop inside the chip's
-PLL, where a real flow would put a hard macro. The SoC therefore simulates itself:
-verilator runs the linked Verilog and prints the "hello world" hart 1 sent
-over the UART at 115200 baud, having received the program over JTAG.
+board's oscillator, `SimConsole`, stdout at the far end of the serial
+line, and `JtagDpi`, the debugger's cable — all three in the harness — and
+`PllAnalog`, the loop inside the chip's PLL, where a real flow would put a
+hard macro. The SoC therefore simulates itself: verilator runs the linked
+Verilog, probe-rs brings it up over the bridge, and hart 1 prints "hello
+world" over the UART at 115200 baud.
+
+To reproduce (needs `verilator`, `cargo` and a C toolchain on PATH; the
+test builds `simprobe` itself):
+
+```
+mill syntheke.circt.tests.testForked me.jiuyang.syntheke.circt.tests.AxiVerilogSpec
+```
+
+or by hand, from artifacts:
+
+```
+mill syntheke.circt.tests.runMain me.jiuyang.syntheke.circt.tests.AxiDemoMain out/demo
+cd out/demo && verilator --binary --timing -Wno-fatal -j 0 -I. --top-module Top \
+  -f filelist.f layers-*.sv ClockGen.sv SimConsole.sv PllAnalog.sv TraceLog.sv JtagDpi.sv jtag_dpi.cc
+./obj_dir/VTop &
+cargo run --release --manifest-path ../../syntheke/tests/simprobe/Cargo.toml -- \
+  --bridge 127.0.0.1:5555 --target target.yaml --chip syntheke-demo \
+  --image program.bin --load 0x80000000 --hart-pc 0:0x8000002c --hart-pc 1:0x80000000
+```
 
 `tests/src/zaoziimpl/UartDevice.scala` is a real device: an 8N1 UART with
 a single-beat AXI slave register file, written as a plain zaozi module

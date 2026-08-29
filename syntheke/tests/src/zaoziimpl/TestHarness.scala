@@ -9,13 +9,16 @@ import me.jiuyang.zaozi.valuetpe.*
 import upickle.default.ReadWriter
 
 /** The demo SoC's test harness: everything that is not the chip, in one module the framework knows as the design's
-  * testbench. It supplies the clock and reset the whole design runs on, drives the JTAG pins as a debug adapter,
+  * testbench. It supplies the clock and reset the whole design runs on, holds the debug adapter on the JTAG pins,
   * terminates the serial pins in a console, models what the GPIO pads are wired to on the board, and logs the trace
   * every hart publishes.
   *
   * It is a container, not a monolith: each of those is its own zaozi module, instantiated here — the same shape as the
   * chip's own hierarchy. Every rate it needs comes from the settled edges, so the harness cannot disagree with the
-  * design about the baud rate, the pin count or how to scan the TAP.
+  * design about the baud rate or the pin count.
+  *
+  * The adapter is [[JtagDpi]], a socket a real debugger connects to. Nothing in this design knows the debug protocol
+  * any more: probe-rs walks the TAP from outside the simulation, and the harness only clocks its bits onto the pins.
   */
 
 /** One leaf of a hart's trace as it arrives here: the framework named the port, the protocol named the field. */
@@ -32,18 +35,13 @@ final case class TraceSource(hart: String, xlen: Int, regIndexBits: Int, ports: 
 given traceSourcesTokens: mainargs.TokensReader.Simple[Vector[TraceSource]] = jsonTokens("trace-sources")
 
 case class TestHarnessP(
-  freqHz:         Int,
-  taps:           Vector[String],
-  baud:           Int,
-  gpioWidth:      Int,
-  script:         Vector[DmiWrite],
-  irLength:       Int,
-  abits:          Int,
-  dataBits:       Int,
-  dmiInstruction: Int,
-  tckDiv:         Int,
-  dwell:          Int,
-  traces:         Vector[TraceSource])
+  freqHz:    Int,
+  taps:      Vector[String],
+  baud:      Int,
+  gpioWidth: Int,
+  jtagPort:  Int,
+  tckDiv:    Int,
+  traces:    Vector[TraceSource])
     extends Parameter derives ReadWriter:
   require(freqHz > 0, s"clock frequency $freqHz must be positive")
   require(taps.nonEmpty, "a harness drives at least one clock tap")
@@ -52,8 +50,10 @@ case class TestHarnessP(
   require(traces.map(_.hart).distinct.sizeIs == traces.size, "one trace source per hart")
   def consoleP:             ConsoleP  = ConsoleP(freqHz / baud)
   def padsP:                GpioPadsP = GpioPadsP(gpioWidth)
-  def hostP:                JtagHostP = JtagHostP(script, irLength, abits, dataBits, dmiInstruction, tckDiv, dwell)
-  def clockP:               ClockGenP = ClockGenP(freqHz)
+  def adapterP:             JtagDpiP  = JtagDpiP(jtagPort, tckDiv)
+  // A debug session runs on wall-clock time and the design keeps clocking through it, so the budget covers the whole
+  // bring-up, not just the program: what a hung debugger costs is exactly this much simulation.
+  def clockP:               ClockGenP = ClockGenP(freqHz, watchdogMs = 50)
   def logP(t: TraceSource): TraceLogP = TraceLogP(t.hart, t.xlen, t.regIndexBits)
 
 class TestHarnessPLayers(p: TestHarnessP) extends LayerInterface(p):
@@ -81,16 +81,16 @@ object TestHarnessGen extends Generator[TestHarnessP, TestHarnessPLayers, TestHa
       io.field[Record](n).field[Reset]("reset") := gen.io.reset
     }
 
-    // The debug adapter on the JTAG pins.
-    val host = JtagHostGen.instantiate(p.hostP)
-    host.io.clk.clock := gen.io.clock
-    host.io.clk.reset := gen.io.reset
+    // The debug adapter on the JTAG pins: the far end of its socket is the debugger.
+    val adapter = JtagDpi.instantiate(p.adapterP)
+    adapter.io.clock := gen.io.clock
+    adapter.io.reset := gen.io.reset
     val jtag = io.field[Record]("jtagPins")
-    jtag.field[Clock]("tck")  := host.io.tap.tck
-    jtag.field[Bool]("tms")   := host.io.tap.tms
-    jtag.field[Bool]("tdi")   := host.io.tap.tdi
-    jtag.field[Bool]("trstN") := host.io.tap.trstN
-    host.io.tap.tdo           := jtag.field[Bool]("tdo")
+    jtag.field[Clock]("tck")  := adapter.io.tck
+    jtag.field[Bool]("tms")   := adapter.io.tms
+    jtag.field[Bool]("tdi")   := adapter.io.tdi
+    jtag.field[Bool]("trstN") := adapter.io.trstN
+    adapter.io.tdo            := jtag.field[Bool]("tdo")
 
     // The terminal on the other end of the serial line.
     val console = ConsoleGen.instantiate(p.consoleP)

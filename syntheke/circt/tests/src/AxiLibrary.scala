@@ -359,13 +359,15 @@ def debugTransport(
 
 val Dm = new GeneratorEntry[DmP]
 
-/** The debug module ([[DmGen]]): a DMI slave with one outward port per hart. Every hart it holds is one negotiated
-  * edge, so the hart count is the topology's, not a parameter to keep in sync.
+/** The debug module ([[DmGen]]): a DMI slave with one outward port per hart, and an AXI master of its own. Every hart
+  * it holds is one negotiated edge, so the hart count is the topology's, not a parameter to keep in sync; the master
+  * port is the system bus access the debug spec gives a debugger, and it settles on the fabric like any other master.
   */
 final class DmNodes(
   name:        String,
   harts:       Int,
-  haltOnReset: Boolean
+  haltOnReset: Boolean,
+  sbIdBits:    Int
 )(
   using GeneratorScope[DmP])
     extends Nodes:
@@ -381,13 +383,20 @@ final class DmNodes(
     require(i >= 0 && i < harts, s"debug module '$name' has no hart $i (holds $harts)")
     hartPorts(i)
 
+  /** The system bus: one word in flight, so a debugger's download rides the fabric the harts use. */
+  val sb =
+    outward(Axi4).dFn(_ =>
+      Right(AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << sbIdBits), maxFlight = Some(1)))))
+    )
+
   parameters { view =>
     val e     = view.edgeOf(dmi)
+    val s     = shapeOf(view, sb)
     val xlens = hartPorts.map(view.edgeOf(_).xlen).distinct
     if xlens.sizeIs != 1 then Left(Violation(s"harts disagree on register width: ${xlens.mkString(", ")}"))
     else if xlens.head != e.dataBits then
       Left(Violation(s"hart register width ${xlens.head} does not match the ${e.dataBits}-bit abstract data path"))
-    else Right(DmP(harts, e.abits, e.dataBits, xlens.head, haltOnReset))
+    else Right(DmP(harts, e.abits, e.dataBits, xlens.head, haltOnReset, s.addrBits, s.dataBits, s.idBits))
   }
 
 object DmNodes:
@@ -396,7 +405,8 @@ object DmNodes:
 
 def debugModule(
   harts:       Int,
-  haltOnReset: Boolean
+  haltOnReset: Boolean,
+  sbIdBits:    Int
 )(
   using
   ws:          WrapperScope,
@@ -404,7 +414,7 @@ def debugModule(
   file:        sourcecode.File,
   line:        sourcecode.Line
 ): DmNodes =
-  generator(Dm)(new DmNodes(name.value, harts, haltOnReset))
+  generator(Dm)(new DmNodes(name.value, harts, haltOnReset, sbIdBits))
 
 // ============ WidthBridge: wide to narrow ============
 
@@ -572,16 +582,16 @@ def gpioCtrl(
 
 val TestHarness = new GeneratorEntry[TestHarnessP]
 
-/** The design's testbench ([[TestHarnessGen]]): it publishes the clock the chip runs on, drives the JTAG pins, and
-  * terminates the serial and GPIO pins. Every rate it needs comes from the settled edges — the baud rate from the
-  * serial edge, the pin count from the GPIO edge, the TAP from the JTAG edge — so nothing here is stated twice.
+/** The design's testbench ([[TestHarnessGen]]): it publishes the clock the chip runs on, holds the debug adapter on the
+  * JTAG pins, and terminates the serial and GPIO pins. Every rate it needs comes from the settled edges — the baud rate
+  * from the serial edge, the pin count from the GPIO edge — so nothing here is stated twice. The TAP's own parameters
+  * are no longer among them: the adapter is a wire to a real debugger, and it is the debugger that knows the protocol.
   */
 final class TestHarnessNodes(
-  freqHz: Int,
-  taps:   Vector[String],
-  script: Vector[DmiWrite],
-  tckDiv: Int,
-  dwell:  Int
+  freqHz:   Int,
+  taps:     Vector[String],
+  jtagPort: Int,
+  tckDiv:   Int
 )(
   using GeneratorScope[TestHarnessP])
     extends Nodes:
@@ -601,7 +611,7 @@ final class TestHarnessNodes(
   val traceClock = inward(ClockDomain).uFn(_ => Right(()))
 
   parameters { view =>
-    val t      = view.edgeOf(jtagPins)
+    // The JTAG edge is not read here: the pins are taken as they come, and what rides them is the debugger's business.
     // The probe manifest is the design's, complete regardless of declaration order: one source per hart, one leaf per
     // trace signal, each already named with the port the framework will hand it over.
     val traces = view.probes.map { src =>
@@ -626,32 +636,26 @@ final class TestHarnessNodes(
         taps,
         view.edgeOf(serialPins),
         view.edgeOf(gpioPins),
-        script,
-        t.irLength,
-        t.abits,
-        t.dataBits,
-        t.dmiInstruction,
+        jtagPort,
         tckDiv,
-        dwell,
         traces
       )
     )
   }
 
 def testHarness(
-  freqHz: Int,
-  taps:   Vector[String],
-  script: Vector[DmiWrite],
-  tckDiv: Int,
-  dwell:  Int
+  freqHz:   Int,
+  taps:     Vector[String],
+  jtagPort: Int,
+  tckDiv:   Int
 )(
   using
-  ws:     WrapperScope,
-  name:   sourcecode.Name,
-  file:   sourcecode.File,
-  line:   sourcecode.Line
+  ws:       WrapperScope,
+  name:     sourcecode.Name,
+  file:     sourcecode.File,
+  line:     sourcecode.Line
 ): TestHarnessNodes =
-  testbench(TestHarness)(new TestHarnessNodes(freqHz, taps, script, tckDiv, dwell))
+  testbench(TestHarness)(new TestHarnessNodes(freqHz, taps, jtagPort, tckDiv))
 
 // ============ UartHarness: outside the chip, for the UART demo ============
 

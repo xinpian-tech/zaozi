@@ -17,7 +17,8 @@ case class UartHarnessP(freqHz: Int, taps: Vector[String], baud: Int) extends Pa
   require(taps.nonEmpty, "a harness drives at least one clock tap")
   require(taps.distinct.sizeIs == taps.size, s"clock taps must be uniquely named: ${taps.mkString(", ")}")
   def padsP:  SerialPadsP = SerialPadsP(baud)
-  def clockP: ClockGenP   = ClockGenP(freqHz)
+  // A loopback demo ends on its own in well under a millisecond; the watchdog is only there for when it does not.
+  def clockP: ClockGenP   = ClockGenP(freqHz, watchdogMs = 10)
 
 class UartHarnessPLayers(p: UartHarnessP) extends LayerInterface(p):
   def layers = Seq.empty

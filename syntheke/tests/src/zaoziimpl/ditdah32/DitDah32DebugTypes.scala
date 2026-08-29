@@ -53,6 +53,9 @@ object DebugRegister:
   val ABSTRACTCS:   Int = 0x16
   val COMMAND:      Int = 0x17
   val ABSTRACTAUTO: Int = 0x18
+  val SBCS:         Int = 0x38
+  val SBADDRESS0:   Int = 0x39
+  val SBDATA0:      Int = 0x3c
   val HALTSUM0:     Int = 0x40
 
 object AbstractCommandType:

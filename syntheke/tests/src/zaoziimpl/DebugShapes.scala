@@ -4,7 +4,6 @@ package me.jiuyang.syntheke.tests.zaoziimpl
 
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.valuetpe.{Bundle, Record}
-import upickle.default.ReadWriter
 
 /** The zaozi shapes of the debug subsystem's three protocols. Like the AXI shapes they come in two flavours — the
   * string-keyed Records of `AxiShapes.scala` for a module whose ports are named by its parameter (the debug module has
@@ -107,10 +106,3 @@ class DebugHartBundle(xlen: Int) extends Bundle:
   val haltOnReset = Aligned(Bool())
   val cmd         = Aligned(new DebugCmdBundle(xlen))
   val hart        = Flipped(new DebugStatusBundle(xlen))
-
-/** One entry of a debug transport's injection script: a DMI register write. */
-final case class DmiWrite(addr: Int, data: Long) derives ReadWriter:
-  require(addr >= 0, s"DMI address $addr must be non-negative")
-  require(data >= 0L && data <= 0xffffffffL, s"DMI data 0x${data.toHexString} must fit in 32 bits")
-
-given dmiScriptTokens: mainargs.TokensReader.Simple[Vector[DmiWrite]] = jsonTokens("dmi-script")

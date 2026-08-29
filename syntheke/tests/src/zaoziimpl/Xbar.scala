@@ -64,6 +64,8 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
 
     val n    = p.inputs.size
     val m    = p.outputs.size
+    // The port index widths. The round-robin wrap below divides by the input count, and that count needs one bit more
+    // than an index of it whenever it is a power of two — hence `n.U(inW + 1)` at every wrap.
     val inW  = math.max(1, 32 - Integer.numberOfLeadingZeros(math.max(1, n - 1)))
     val outW = math.max(1, 32 - Integer.numberOfLeadingZeros(math.max(1, m - 1)))
 
@@ -234,7 +236,7 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
           when(ob.field[Bool]("valid") & b.field[Bool]("ready")) {
             wState := 0.U(3)
             wRr.foreach(
-              _ := (if n == 1 then 0.U(inW) else ((wIn + 1.U(inW)) % n.U(inW)).asBits.bits(inW - 1, 0).asUInt)
+              _ := (if n == 1 then 0.U(inW) else ((wIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
             )
           }
         }
@@ -253,7 +255,9 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
         b.field[Record]("bits").field[UInt]("resp") := 3.U(2) // DECERR
         when(b.field[Bool]("ready")) {
           wState := 0.U(3)
-          wRr.foreach(_ := (if n == 1 then 0.U(inW) else ((wIn + 1.U(inW)) % n.U(inW)).asBits.bits(inW - 1, 0).asUInt))
+          wRr.foreach(
+            _ := (if n == 1 then 0.U(inW) else ((wIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
+          )
         }
       }
 
@@ -342,7 +346,7 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
           ) {
             rState := 0.U(2)
             rRr.foreach(
-              _ := (if n == 1 then 0.U(inW) else ((rIn + 1.U(inW)) % n.U(inW)).asBits.bits(inW - 1, 0).asUInt)
+              _ := (if n == 1 then 0.U(inW) else ((rIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
             )
           }
         }
@@ -357,6 +361,8 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
         r.field[Record]("bits").field[Bool]("last") := true.B
         when(r.field[Bool]("ready")) {
           rState := 0.U(2)
-          rRr.foreach(_ := (if n == 1 then 0.U(inW) else ((rIn + 1.U(inW)) % n.U(inW)).asBits.bits(inW - 1, 0).asUInt))
+          rRr.foreach(
+            _ := (if n == 1 then 0.U(inW) else ((rIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
+          )
         }
       }

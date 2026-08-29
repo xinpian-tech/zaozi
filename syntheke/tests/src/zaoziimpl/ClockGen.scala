@@ -15,8 +15,9 @@ import upickle.default.ReadWriter
   * clock onto the graph.
   */
 
-case class ClockGenP(freqHz: Int) extends Parameter derives ReadWriter:
+case class ClockGenP(freqHz: Int, watchdogMs: Int) extends Parameter derives ReadWriter:
   require(freqHz > 0, s"clock frequency $freqHz must be positive")
+  require(watchdogMs > 0, s"watchdog $watchdogMs ms must be positive")
 
 class ClockGenPLayers(p: ClockGenP) extends LayerInterface(p):
   def layers = Seq.empty
@@ -25,19 +26,21 @@ class ClockGenIO(p: ClockGenP)      extends HWBundle(p):
   val clock = Aligned(Clock())
   val reset = Aligned(Reset())
 
-case class ClockGenVerilogP(FREQ_HZ: Int) extends VerilogParameter
+case class ClockGenVerilogP(FREQ_HZ: Int, WATCHDOG_MS: Int) extends VerilogParameter
 
 @zaoziGenerator
 object ClockGen extends VerilogWrapper[ClockGenP, ClockGenPLayers, ClockGenIO, ClockGenPProbe, ClockGenVerilogP]:
   def verilogModuleName(p: ClockGenP) = "ClockGen"
-  def verilogParameter(p:  ClockGenP) = ClockGenVerilogP(p.freqHz)
+  def verilogParameter(p:  ClockGenP) = ClockGenVerilogP(p.freqHz, p.watchdogMs)
 
 /** The behavioral definition of [[ClockGen]], simulation only: the clock at `FREQ_HZ` on a 1ns timescale, reset held
-  * through the first 20 edges, and a watchdog ending a simulation that never finishes on its own.
+  * through the first 20 edges, and a watchdog ending a simulation that never finishes on its own. The budget is a
+  * parameter because it is a real cost: a run that hangs is simulated to the end of it.
   */
 val clockGenModel: String = """`timescale 1ns / 1ps
 module ClockGen #(
-    parameter FREQ_HZ = 100000000
+    parameter FREQ_HZ     = 100000000,
+    parameter WATCHDOG_MS = 10
 ) (
     output reg clock,
     output reg reset
@@ -50,7 +53,7 @@ module ClockGen #(
   end
   always #(500000000 / FREQ_HZ) clock = ~clock;
   initial begin
-    #10ms;
+    #(WATCHDOG_MS * 1ms);
     $display("[ClockGen] watchdog: simulation did not finish");
     $finish;
   end
