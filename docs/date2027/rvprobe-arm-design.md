@@ -99,23 +99,62 @@ ill-formed intent fails at compile time with a located message that feeds the re
 well-typed intent cannot produce an incoherent stimulus because the solver, not the model, builds it.
 That is the mechanism the weak-model result is supposed to expose.
 
-## What must be built (four items, in order)
+## The blocker: intents can only reference IO
 
-0. **The bulk-stimulus path** — needed for the head-to-head, and the reason the objection above
+Every intent we have written references the wrapper's `io.*` or the instantiated DUT's *ports*
+(`instance.io.done`, `instance.io.sum`). None references an internal register or FSM state. That is
+not an accident of the examples — it is the only thing the DSL can currently name.
+
+This is a blocker for the residual-closing study above, because **coverage holes are internal**: an
+unhit FSM state, an untaken branch inside a submodule, a register that never takes a value. "Reach
+state S" is not expressible today; only "drive these inputs, observe these outputs" is.
+
+It also explains a redundancy the code review flagged independently: `Sem.value` and `Sem.state` were
+structurally identical wrappers. Of course they were — both can only reference ports, so 状态语义 had
+nothing distinct to point at. The kind only becomes meaningful once it can name design state.
+
+**The good news is that the limit is in the naming, not in the model.** The solver already reasons
+over internal state: BMC traces carry `instance/fp_active_state`, `instance/int_done_pipe_state`, and
+the fake-history soundness bug we fixed was *about* internal registers. Two proven mechanisms exist:
+
+- **`MlirInvariant` on the `harvest` branch** already emits `verif.assume` referencing internal
+  signals by their preserved `%name`, through a `Resolver` mapping signal name → SSA reference and
+  width; registers keep their `%name` through `circt-verilog --ir-hw`. Our own `MlirBmc.pinFirregs`
+  likewise rewrites internal registers by name, so the plumbing is in the repo already.
+- **`circt-bmc --flatten-modules`** puts every instance in one namespace, which is how a constraint
+  crosses a module boundary to reach a submodule's state.
+
+**The design question for the DSL** is how to name internal state *without* giving up the typing that
+is the paper's contribution. A raw string path (`"instance/state"`) works and is what the harvest
+code does, but an unchecked string in a typed DSL is exactly the wrong trade. The right shape is a
+typed accessor carrying a symbolic path, resolved and **checked at elaboration** against the DUT's
+actual signal set — a mistyped or non-existent state name should fail where every other malformed
+intent fails, at compile time, not as a silent no-op in the solver.
+
+This becomes build item 0; the study cannot run without it.
+
+## What must be built (five items, in order)
+
+0. **Internal-state reference** — per the section above: a typed accessor for design state resolved
+   at elaboration, lowering to a constraint over the internal signal (harvest's `Resolver` is the
+   working precedent, `--flatten-modules` the cross-boundary mechanism). Without it "reach FSM state
+   S" cannot be stated, and the residual-closing study has nothing to aim at.
+
+1. **The bulk-stimulus path** — needed for the head-to-head, and the reason the objection above
    lands: repeated solves under blocking constraints (`assume` the previous solution away) plus
    witness concatenation, so one run produces a stimulus stream rather than a single trace. The `ut`
    branch's rejection-sampling CRV (`e6b4d2f`) is the prior art to port forward.
-1. **The coverage leg** — the one real gap (item 5 of the infra list, never built). Cheaper than it
+2. **The coverage leg** — the one real gap (item 5 of the infra list, never built). Cheaper than it
    looks: `Driver.topString` emits plain SystemVerilog (`always #5 clock`, a DPI-C tick callback), so
    the Model B testbench runs under VCS unmodified. Needed: a `vcs -sverilog -cm
    line+branch+tgl+fsm+cond` build path beside the Verilator one, and a URG report parser. Both the
    FHS wrapper (`snps-fhs-env` + `snps-shell`) and the URG output format are already understood from
    today's HAVEN run — reuse them so *both arms are measured by the identical toolchain*.
-2. **Multi-drive stimulus** — HAVEN's designs have wide input sets. Packing everything into one
+3. **Multi-drive stimulus** — HAVEN's designs have wide input sets. Packing everything into one
    ≤64-bit word worked for ALU and SPI but does not scale (and the DPI return is width-limited).
    `AbstractStimulus` already carries every drive port per beat; what is missing is a codec and a
    tick callback that fill several ports — a columnar stimulus file plus a multi-output DPI callback.
-3. **UT wrappers at scale** — two designs are wrapped by hand; fourteen are not. This is the
+4. **UT wrappers at scale** — two designs are wrapped by hand; fourteen are not. This is the
    bottleneck, and it is also measurable: have the LLM generate the wrappers and report the
    type-check pass rate, which is itself a result about the typed surface.
 
@@ -138,7 +177,7 @@ Do not start with all 16. Take three designs that stress different points:
   compiles and solves at all is already a qualitative win, and it directly exercises the
   "errors surface at scalac, not at VCS" claim.
 
-Build items 0-1 (bulk stimulus, coverage), wrap those three by hand, and run both the head-to-head
+Build items 0-2 (internal-state reference, bulk stimulus, coverage), wrap those three by hand, and run both the head-to-head
 and the residual-closing loop on them. That is enough
 to know whether the full sweep is worth it, and it produces the paper's core figure either way.
 
