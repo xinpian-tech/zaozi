@@ -132,9 +132,15 @@ array selected by `dmcontrol.hartsello`, each hart with its own halt
 request and flags. The core keeps only its hart-side debug port.
 
 Everything that is not the chip is in one module, the design's
-`testbench`: `TestHarness.scala` publishes the clock the whole design runs
-on, drives the JTAG pins as a debug adapter, and terminates the serial and
-GPIO pins in a console and a board model. It is a container, not a
+`testbench`: `TestHarness.scala` publishes the board's 25 MHz reference
+clock, drives the JTAG pins as a debug adapter, and terminates the serial
+and GPIO pins in a console and a board model. On the die the reference
+meets `Pll.scala`, which multiplies it to the 100 MHz system clock and
+feeds every consumer — the loop ratio comes out of the settled reference
+frequency, and one the dividers cannot reach fails negotiation. So the
+chip crosses its boundary with one clock, and the UART and the console
+end up in different clock domains on the same wire, each computing its own
+divisor (868 and 217) from the frequency at its own edge. It is a container, not a
 monolith — each of those is its own zaozi module instantiated inside it —
 and every rate it needs comes from the settled edges, so the harness
 cannot disagree with the chip about the baud rate, the pin count or how to
@@ -149,11 +155,12 @@ DRAM through hart 0's abstract memory access, gives each hart its start PC
 through `dpc`, and resumes them — hart 0 into the done-spin, hart 1 into
 the program.
 
-The two places RTL cannot go are external Verilog modules declared through
-zaozi's `VerilogWrapper` and linked as extmodules, each shipping its
-behavioral definition as a string next to the wrapper: `ClockGen`, the
+What RTL cannot express becomes an external Verilog module declared
+through zaozi's `VerilogWrapper` and linked as an extmodule, each shipping
+its behavioral definition as a string next to the wrapper: `ClockGen`, the
 board's oscillator, and `SimConsole`, stdout at the far end of the serial
-line. Both live in the harness. The SoC therefore simulates itself:
+line — both in the harness — and `PllAnalog`, the loop inside the chip's
+PLL, where a real flow would put a hard macro. The SoC therefore simulates itself:
 verilator runs the linked Verilog and prints the "hello world" hart 1 sent
 over the UART at 115200 baud, having received the program over JTAG.
 

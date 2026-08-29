@@ -84,10 +84,20 @@ object AxiVerilogSpec extends TestSuite:
     * test harness: the clock, the debug adapter driving the JTAG pins, the console on the serial pins and the board the
     * GPIO pads are wired to. FullParam = the zaozi parameter of each IP.
     */
-  def buildSoc(): DesignSpec =
+  def buildSoc(refHz: Int = 25000000): DesignSpec =
     Design {
+      // Outside the chip: the crystal, and the harness's own devices running off it.
       val harness = testHarness(
-        freqHz = 100000000,
+        freqHz = refHz,
+        taps = Vector("ref"),
+        script = injection(program, loadBase, hart0Pc, hart1Pc),
+        tckDiv = 2,
+        dwell = 8
+      )
+
+      // On the die: the PLL multiplies the reference to the system clock and feeds every consumer.
+      val sysPll = pll(
+        outHz = 100000000,
         taps = Vector(
           "core0",
           "core1",
@@ -100,11 +110,9 @@ object AxiVerilogSpec extends TestSuite:
           "gpio",
           "dtm",
           "dm"
-        ),
-        script = injection(program, loadBase, hart0Pc, hart1Pc),
-        tckDiv = 4,
-        dwell = 8
+        )
       )
+      sysPll.ref <-- harness.tap("ref")
 
       // The harts halt out of reset and the debugger hands them their PC, so the reset vector is never fetched.
       val core0 = core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = true)
@@ -148,17 +156,17 @@ object AxiVerilogSpec extends TestSuite:
       harness.gpioPins <-- gpio.pins
       harness.jtagPins <-- dtm.jtag
 
-      core0.clk <-- harness.tap("core0")
-      core1.clk <-- harness.tap("core1")
-      dma.clk <-- harness.tap("dma")
-      sysXbar.clk <-- harness.tap("sysXbar")
-      dramClk <-- harness.tap("dram")
-      bridge.clk <-- harness.tap("bridge")
-      periphXbar.clk <-- harness.tap("periphXbar")
-      uart.clk <-- harness.tap("uart")
-      gpio.clk <-- harness.tap("gpio")
-      dtm.clk <-- harness.tap("dtm")
-      dm.clk <-- harness.tap("dm")
+      core0.clk <-- sysPll.tap("core0")
+      core1.clk <-- sysPll.tap("core1")
+      dma.clk <-- sysPll.tap("dma")
+      sysXbar.clk <-- sysPll.tap("sysXbar")
+      dramClk <-- sysPll.tap("dram")
+      bridge.clk <-- sysPll.tap("bridge")
+      periphXbar.clk <-- sysPll.tap("periphXbar")
+      uart.clk <-- sysPll.tap("uart")
+      gpio.clk <-- sysPll.tap("gpio")
+      dtm.clk <-- sysPll.tap("dtm")
+      dm.clk <-- sysPll.tap("dm")
     }
 
   val tests = Tests {
@@ -224,19 +232,46 @@ object AxiVerilogSpec extends TestSuite:
       assert(harnessBody.contains("ClockGen"))
     }
 
+    test("one crystal outside, one PLL on the die: every rate is derived where it is used") {
+      val resolved = Negotiator.negotiate(buildSoc())
+      val root     = ModuleId.root
+
+      // The crystal's frequency flows down to the PLL, which reports the loop it settled on.
+      assert(resolved.edgeAt(ModuleNodeId(root / "sysPll", "ref")).edgeAs(ClockDomain) == 25000000)
+      val sysPll = resolved.generatorModule(root / "sysPll").get.fullParam.asInstanceOf[PllP]
+      assert((sysPll.mult, sysPll.div) == (4, 1)) // 25 MHz * 4 = 100 MHz
+      // Every consumer on the die sees the multiplied clock.
+      assert(resolved.edgeAt(ModuleNodeId(root / "uart", "clk")).edgeAs(ClockDomain) == 100000000)
+
+      // The UART and the console sit in different clock domains on the same wire, and each computes its own
+      // divisor from the frequency at its own edge.
+      val uart    = resolved.generatorModule(root / "uart").get.fullParam.asInstanceOf[UartDeviceP]
+      val harness = resolved.generatorModule(root / "harness").get.fullParam.asInstanceOf[TestHarnessP]
+      assert(uart.divisor == 868)             // 100 MHz / 115200
+      assert(harness.consoleP.divisor == 217) // 25 MHz / 115200
+    }
+
+    test("a reference the loop cannot lock onto fails the PLL's capability check") {
+      // 100 MHz from a 3 MHz crystal needs a 100/3 loop, past the dividers the PLL has.
+      val e = intercept[NegotiationException](Negotiator.negotiate(buildSoc(refHz = 3000000)))
+      assert(e.getMessage.contains("needs a 100/3 loop"))
+    }
+
     test("the SoC boots from JTAG and prints over the UART — verilator runs the linked Verilog") {
       val resolved = Negotiator.negotiate(buildSoc())
       val design   = Elaborator.elaborate(resolved, axiBackends)
-      // The two declared simulation boundaries survive linking as external modules.
+      // The three declared simulation boundaries survive linking as external modules.
       assert(design.firrtl.contains("extmodule ClockGen"))
       assert(design.firrtl.contains("extmodule SimConsole"))
+      assert(design.firrtl.contains("extmodule PllAnalog"))
 
-      // The design generates its own clock and ends its own run, so the simulation is just Top plus the two
+      // The design generates its own clock and ends its own run, so the simulation is just Top plus the
       // behavioral definitions — no ports, no testbench file.
       val simDir = os.temp.dir(prefix = "syntheke-axi-sim")
       os.write(simDir / "Top.sv", design.verilog)
       os.write(simDir / "ClockGen.sv", clockGenModel)
       os.write(simDir / "SimConsole.sv", simConsoleModel)
+      os.write(simDir / "PllAnalog.sv", pllAnalogModel)
       os.proc(
         "verilator",
         "--binary",
@@ -248,7 +283,8 @@ object AxiVerilogSpec extends TestSuite:
         "Top",
         "Top.sv",
         "ClockGen.sv",
-        "SimConsole.sv"
+        "SimConsole.sv",
+        "PllAnalog.sv"
       ).call(cwd = simDir)
       val run    = os.proc((simDir / "obj_dir" / "VTop").toString).call(cwd = simDir)
       assert(run.out.text().contains("hello world"))

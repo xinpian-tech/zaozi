@@ -4,7 +4,7 @@ package me.jiuyang.syntheke.circt.tests
 
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.circt.*
-import me.jiuyang.syntheke.tests.zaoziimpl.{clockGenModel, simConsoleModel}
+import me.jiuyang.syntheke.tests.zaoziimpl.{clockGenModel, pllAnalogModel, simConsoleModel}
 
 /** Dump the AXI demo SoC's artifacts: `Top.fir`, `Top.sv`, the behavioral definitions of its two external modules —
   * everything a simulator needs — plus the tooling JSON exports.
@@ -19,8 +19,9 @@ object AxiDemoMain:
     os.write.over(dir / "Top.sv", design.verilog)
     os.write.over(dir / "ClockGen.sv", clockGenModel)
     os.write.over(dir / "SimConsole.sv", simConsoleModel)
+    os.write.over(dir / "PllAnalog.sv", pllAnalogModel)
     os.write.over(dir / "topology.json", ujson.write(Export.topology(resolved.spec), indent = 2))
     os.write.over(dir / "edges.json", ujson.write(Export.edges(resolved), indent = 2))
     os.write.over(dir / "plan.json", ujson.write(Export.plan(resolved), indent = 2))
     os.write.over(dir / "params.json", ujson.write(Export.params(resolved), indent = 2))
-    println(s"wrote Top.fir / Top.sv / ClockGen.sv / SimConsole.sv / four JSON exports to $dir")
+    println(s"wrote Top.fir / Top.sv / the three behavioral models / four JSON exports to $dir")
