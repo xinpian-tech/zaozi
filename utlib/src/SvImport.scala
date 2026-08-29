@@ -4,12 +4,6 @@ package me.jiuyang.utlib
 
 import java.util.regex.Pattern
 
-/** One internal signal of an imported design, named for promotion to an output port so a typed intent can reference
-  * design state. The width is declared by the caller and checked against the design — a mismatch is an error, not a
-  * silent truncation.
-  */
-final case class StateSignal(name: String, width: Int)
-
 /** Brings a SystemVerilog-only IP into the formal flow: `circt-verilog` imports the RTL to the HW dialect, [[toHw]]
   * adapts it for circt-bmc, and [[mergeForBmc]] splices the definition into a zaozi wrapper's lowered module in place
   * of its `hw.module.extern` — so a typed-DSL constraint solves *through* external RTL the same way it does through a
@@ -139,59 +133,6 @@ object SvImport:
         case writePort(_, _, _, _, _) => Vector.empty
         case _                        => Vector(l)
     }
-
-  private val moduleHeader = raw"^(\s*hw\.module @[\w.$$]+\()(.*)(\) \{)\s*$$".r
-  private val ssaDef       = raw"^\s*(%[\w.$$]+) = .*: (i\d+)\s*$$".r
-  private val outputOp     = raw"^(\s*hw\.output)( .*)?$$".r
-
-  /** Promote internal signals of the imported design to output ports, so a typed intent can name design state the way
-    * it names any other port — an unhit FSM state or a counter that never reaches a value is exactly what a coverage
-    * hole looks like, and neither is visible on the DUT's own IO.
-    *
-    * The rewrite is structural on the printed module: each named signal's definition supplies its SSA value and width,
-    * the port list gains `out <name> : iN`, and `hw.output` gains the value. A name that does not exist, or whose
-    * width disagrees with the declaration, raises — with the available signals listed, so a caller (or an LLM repair
-    * loop) can correct it. Silence here would surface as a solver result that quietly means nothing.
-    */
-  def promoteState(importedHw: os.Path, signals: Seq[StateSignal]): os.Path =
-    if signals.isEmpty then return importedHw
-    val lines = os.read(importedHw).split("\n", -1).toVector
-
-    val defined = lines.flatMap(l => ssaDef.findFirstMatchIn(l).map(m => m.group(1).drop(1) -> m.group(2))).toMap
-    for s <- signals do
-      defined.get(s.name) match
-        case None      =>
-          throw IllegalArgumentException(
-            s"no signal '${s.name}' in $importedHw; available: ${defined.keys.toSeq.sorted.mkString(", ")}"
-          )
-        case Some(ty)  =>
-          require(ty == s"i${s.width}", s"signal '${s.name}' is $ty, but was declared ${s.width} bits wide")
-
-    val headerIdx = lines.indexWhere(l => moduleHeader.findFirstMatchIn(l).nonEmpty)
-    require(headerIdx >= 0, s"no hw.module header in $importedHw")
-    val outIdx    = lines.indexWhere(l => outputOp.findFirstMatchIn(l).nonEmpty, headerIdx)
-    require(outIdx >= 0, s"no hw.output in the module of $importedHw")
-
-    val promotedPorts = signals.map(s => s"out ${s.name} : i${s.width}").mkString(", ")
-    val header        = lines(headerIdx) match
-      case moduleHeader(pre, ports, post) => s"$pre$ports, $promotedPorts$post"
-      case other                          => other
-    val output        = lines(outIdx) match
-      case outputOp(op, rest) =>
-        val existing          = Option(rest).getOrElse("").trim
-        val (vals, tys)       =
-          if existing.isEmpty then (Seq.empty[String], Seq.empty[String])
-          else
-            val parts = existing.split(" : ", 2)
-            (parts(0).split(",").map(_.trim).toSeq, parts(1).split(",").map(_.trim).toSeq)
-        val allVals = vals ++ signals.map(s => s"%${s.name}")
-        val allTys  = tys ++ signals.map(s => s"i${s.width}")
-        s"$op ${allVals.mkString(", ")} : ${allTys.mkString(", ")}"
-      case other              => other
-
-    val out = importedHw / os.up / s"${importedHw.last}.promoted.mlir"
-    os.write.over(out, lines.updated(headerIdx, header).updated(outIdx, output).mkString("\n"))
-    out
 
   /** Splice the imported definition into the wrapper's lowered module: the wrapper's single `hw.module.extern` is
     * dropped and the imported top module renamed to that extern's symbol, so the wrapper's instance binds to real
