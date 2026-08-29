@@ -8,7 +8,7 @@ SoC 设计把处理器核、缓存、DMA、内存控制器和外设等独立模�
 
 Syntheke 用基于 Scala 的嵌入式领域专用语言（embedded domain-specific language，eDSL）描述 SoC：处理器、DMA、存储、外设、Xbar（crossbar）、NoC、时钟树和电源网格都是设计里显式例化的模块，每个模块的硬件由一个生成器按参数产生；模块之间用显式的连接相连；框架先在连接图上推导出每个模块的接口参数，然后才生成硬件。概念模型见 @ch-model；与 Diplomacy 的关系见 @sec-diplomacy。
 
-从定位上看，Syntheke 与 SystemRDL 等 SoC 集成专用语言相似，都是为了描述和生成复杂 SoC 的系统结构；作为 Scala eDSL，它有更高的灵活性和抽象能力。Syntheke 还把时钟、复位、电源和 IO 这些物理设计的关键需求，建模为带有相应协议的显式模块，纳入同一套集成结构。
+从定位上看，Syntheke 与 SystemRDL 等 SoC 集成专用语言相似，都是为了描述和生成复杂 SoC 的系统结构；作为 Scala eDSL，它有更高的灵活性和抽象能力。Syntheke 还把时钟、复位、电源、IO 和调试链这些物理设计与硅后引导的关键需求，建模为带有相应协议的显式模块，纳入同一套集成结构。
 
 == 一个例子：位宽、地址与事务身份 <sec-three-params>
 
