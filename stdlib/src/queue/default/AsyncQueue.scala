@@ -8,6 +8,7 @@ import me.jiuyang.stdlib.{BKAIncrementerParameter, BrentKungAdder, BrentKungAdde
 import me.jiuyang.stdlib.default.{Ram, RamParameter}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
@@ -62,7 +63,7 @@ case class AsyncQueueParameter(
 given upickle.default.ReadWriter[AsyncQueueParameter] = upickle.default.macroRW
 
 class AsyncQueueLayers(parameter: AsyncQueueParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class AsyncQueuePortIO extends Bundle:
   /** Local clock for this push or pop endpoint. */
@@ -397,6 +398,43 @@ object AsyncQueue extends Generator[AsyncQueueParameter, AsyncQueueLayers, Async
     io.pop.almostFull   := pop.almostFull
     io.pop.full         := pop.full
     io.pop.error        := pop.error
+
+    layer("Verification"):
+      val lastAddress = (parameter.depth - 1) & ((1 << geometry.addressWidth) - 1)
+
+      posedge(io.push.clock):
+        val pushRequest  = !io.push.requestN
+        val pushAccepted = pushRequest & !push.full
+        Cover(pushAccepted.S, io.resetN.asBool, "async_queue_push_accept")
+        Cover((pushAccepted & push.empty).S, io.resetN.asBool, "async_queue_push_empty_to_nonempty")
+        Cover(push.halfFull.S, io.resetN.asBool, "async_queue_push_reach_half_full")
+        Cover(push.almostFull.S, io.resetN.asBool, "async_queue_push_reach_almost_full")
+        Cover(push.full.S, io.resetN.asBool, "async_queue_push_reach_full")
+        Cover(
+          (pushAccepted & (push.address === lastAddress.U(geometry.addressWidth))).S,
+          io.resetN.asBool,
+          "async_queue_write_wrap"
+        )
+        Cover((pushRequest & push.full).S, io.resetN.asBool, "async_queue_overflow_request")
+        if parameter.stickyError then Cover(push.error.S, io.resetN.asBool, "async_queue_push_sticky_error_retained")
+
+      posedge(io.pop.clock):
+        val popRequest  = !io.pop.requestN
+        val popAccepted = popRequest & !pop.empty
+        Cover(popAccepted.S, io.resetN.asBool, "async_queue_pop_accept")
+        Cover(
+          (popAccepted & (pop.wordCount === 1.U(geometry.pointerWidth))).S,
+          io.resetN.asBool,
+          "async_queue_pop_to_empty"
+        )
+        Cover(pop.halfFull.S, io.resetN.asBool, "async_queue_pop_reach_half_full")
+        Cover(
+          (popAccepted & (pop.address === lastAddress.U(geometry.addressWidth))).S,
+          io.resetN.asBool,
+          "async_queue_read_wrap"
+        )
+        Cover((popRequest & pop.empty).S, io.resetN.asBool, "async_queue_underflow_request")
+        if parameter.stickyError then Cover(pop.error.S, io.resetN.asBool, "async_queue_pop_sticky_error_retained")
 
     // The push clock owns RAM writes. An active-low request writes only when the push-domain full flag is clear.
     val writeEnable = !(push.full | io.push.requestN)

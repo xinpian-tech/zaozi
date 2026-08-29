@@ -9,6 +9,7 @@ import me.jiuyang.stdlib.default.{*, given}
 import me.jiuyang.stdlib.queue.*
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
@@ -53,7 +54,7 @@ case class SyncQueueParameter(
 given upickle.default.ReadWriter[SyncQueueParameter] = upickle.default.macroRW
 
 class SyncQueueLayers(parameter: SyncQueueParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class SyncQueueIO(parameter: SyncQueueParameter) extends HWBundle(parameter):
   /** Clock shared by the queue controller and RAM writes. */
@@ -211,6 +212,26 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
       else Node(false.B)
     val retainedError   = if parameter.stickyError then Node(error) else Node(false.B)
     val nextError       = underrun | overrun | pointerMismatch | retainedError
+
+    layer("Verification"):
+      given ClockEvent = posedge(io.clock)
+
+      Cover((!writeN).S, io.resetN.asBool, "sync_queue_push_accept")
+      Cover(read.S, io.resetN.asBool, "sync_queue_pop_accept")
+      Cover((!writeN & read).S, io.resetN.asBool, "sync_queue_push_pop_same_cycle")
+      Cover((!notEmpty & !writeN).S, io.resetN.asBool, "sync_queue_empty_to_nonempty")
+      Cover((read & !nextNotEmpty).S, io.resetN.asBool, "sync_queue_pop_to_empty")
+      Cover(nextHalfFull.S, io.resetN.asBool, "sync_queue_reach_half_full")
+      Cover(nextAlmostFull.S, io.resetN.asBool, "sync_queue_reach_almost_full")
+      Cover(nextFull.S, io.resetN.asBool, "sync_queue_reach_full")
+      Cover((!writeN & writeAddressAtMax).S, io.resetN.asBool, "sync_queue_write_wrap")
+      Cover((read & readAddressAtMax).S, io.resetN.asBool, "sync_queue_read_wrap")
+      Cover(underrun.S, io.resetN.asBool, "sync_queue_underflow_request")
+      Cover(overrun.S, io.resetN.asBool, "sync_queue_overflow_request")
+      if parameter.enableDiagnostics then
+        Cover(diagnosticClear.S, io.resetN.asBool, "sync_queue_diagnostic_clear")
+        Cover(pointerMismatch.S, io.resetN.asBool, "sync_queue_diagnostic_pointer_mismatch")
+      if parameter.stickyError then Cover(retainedError.S, io.resetN.asBool, "sync_queue_sticky_error_retained")
 
     // Commit pointers, occupancy, status, and error together so the registered outputs describe the same request set.
     notEmpty          := nextNotEmpty
