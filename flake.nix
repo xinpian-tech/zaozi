@@ -72,7 +72,16 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
+          nativeBuildInputs = with pkgs; [
+            mtf
+            nixd
+            jdk25
+            # What the syntheke demo's simulation test runs: verilator for the design, cargo for the probe-rs
+            # debugger it drives the design with.
+            verilator
+            cargo
+            rustc
+          ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
           ];
           env = with pkgs; {

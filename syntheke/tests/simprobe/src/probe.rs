@@ -46,9 +46,9 @@ impl SimProbe {
         let stream = loop {
             match TcpStream::connect(address) {
                 Ok(stream) => break stream,
-                Err(e) if std::time::Instant::now() < deadline => {
-                    let _ = e;
-                    std::thread::sleep(std::time::Duration::from_millis(50));
+                // Nothing listening yet is the expected answer until the simulation reaches its first cycle.
+                Err(_) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(50))
                 }
                 Err(e) => return Err(e),
             }

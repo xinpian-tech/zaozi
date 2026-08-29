@@ -48,9 +48,11 @@ case class DramDpiP(configFile: String, base: Long, periodPs: Long, shape: AxiSh
 class DramDpiPLayers(p: DramDpiP) extends LayerInterface(p):
   def layers = Seq.empty
 class DramDpiPProbe(p: DramDpiP)  extends DVBundle[DramDpiP, DramDpiPLayers](p)
+// The port is the Record flavour of the AXI shape, the same one the harness's own boundary carries, so the two connect
+// as whole aggregates instead of leaf by leaf.
 class DramDpiIO(p: DramDpiP)      extends HWBundle(p):
   val clk = Flipped(new ClockBundle)
-  val in  = Flipped(new Axi4Bundle(p.shape))
+  val in  = Flipped(new AxiPortRecord(p.shape))
 
 case class DramDpiVerilogP(CONFIG: String, BASE: BigInt, PERIOD_PS: BigInt, ID_W: Int, ADDR_W: Int)
     extends VerilogParameter
@@ -195,7 +197,8 @@ module DramDpi #(
         W_RESP:
           if (in_b_valid && in_b_ready) wstate <= W_IDLE;
       endcase
-      if (wstate != W_IDLE) wdone = wdone + dram_dpi_write_done();
+      // Completions arrive whenever Ramulator finishes one; between the address and the response they are counted.
+      if (wstate != W_IDLE) wdone <= wdone + dram_dpi_write_done();
 
       // ---- reads: one beat in flight, streamed back as the model finishes each
       case (rstate)

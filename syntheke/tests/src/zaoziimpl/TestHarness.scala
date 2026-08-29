@@ -116,44 +116,8 @@ object TestHarnessGen extends Generator[TestHarnessP, TestHarnessPLayers, TestHa
     val dram = DramDpi.instantiate(p.dramP)
     dram.io.clk.clock := io.field[Record]("memClock").field[Clock]("clock")
     dram.io.clk.reset := io.field[Record]("memClock").field[Reset]("reset")
-    val mem    = io.field[Record]("memPins")
-    val memAw  = mem.field[Record]("aw")
-    val memW   = mem.field[Record]("w")
-    val memB   = mem.field[Record]("b")
-    val memAr  = mem.field[Record]("ar")
-    val memR   = mem.field[Record]("r")
-    val awBits = memAw.field[Record]("bits")
-    val wBits  = memW.field[Record]("bits")
-    val arBits = memAr.field[Record]("bits")
-    dram.io.in.aw.valid                            := memAw.field[Bool]("valid")
-    memAw.field[Bool]("ready")                     := dram.io.in.aw.ready
-    dram.io.in.aw.bits.id                          := awBits.field[UInt]("id")
-    dram.io.in.aw.bits.addr                        := awBits.field[UInt]("addr")
-    dram.io.in.aw.bits.len                         := awBits.field[UInt]("len")
-    dram.io.in.aw.bits.size                        := awBits.field[UInt]("size")
-    dram.io.in.aw.bits.burst                       := awBits.field[UInt]("burst")
-    dram.io.in.w.valid                             := memW.field[Bool]("valid")
-    memW.field[Bool]("ready")                      := dram.io.in.w.ready
-    dram.io.in.w.bits.data                         := wBits.field[UInt]("data")
-    dram.io.in.w.bits.strb                         := wBits.field[UInt]("strb")
-    dram.io.in.w.bits.last                         := wBits.field[Bool]("last")
-    memB.field[Bool]("valid")                      := dram.io.in.b.valid
-    dram.io.in.b.ready                             := memB.field[Bool]("ready")
-    memB.field[Record]("bits").field[UInt]("id")   := dram.io.in.b.bits.id
-    memB.field[Record]("bits").field[UInt]("resp") := dram.io.in.b.bits.resp
-    dram.io.in.ar.valid                            := memAr.field[Bool]("valid")
-    memAr.field[Bool]("ready")                     := dram.io.in.ar.ready
-    dram.io.in.ar.bits.id                          := arBits.field[UInt]("id")
-    dram.io.in.ar.bits.addr                        := arBits.field[UInt]("addr")
-    dram.io.in.ar.bits.len                         := arBits.field[UInt]("len")
-    dram.io.in.ar.bits.size                        := arBits.field[UInt]("size")
-    dram.io.in.ar.bits.burst                       := arBits.field[UInt]("burst")
-    memR.field[Bool]("valid")                      := dram.io.in.r.valid
-    dram.io.in.r.ready                             := memR.field[Bool]("ready")
-    memR.field[Record]("bits").field[UInt]("id")   := dram.io.in.r.bits.id
-    memR.field[Record]("bits").field[UInt]("data") := dram.io.in.r.bits.data
-    memR.field[Record]("bits").field[UInt]("resp") := dram.io.in.r.bits.resp
-    memR.field[Record]("bits").field[Bool]("last") := dram.io.in.r.bits.last
+    // Both sides carry the same shape with the same flips, so the whole port connects at once.
+    dram.io.in :<>= io.field[AxiPortRecord]("memPins")
 
     // What the GPIO pads are wired to on the board.
     val pads = GpioPadsGen.instantiate(p.padsP)

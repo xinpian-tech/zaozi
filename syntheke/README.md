@@ -180,7 +180,7 @@ program into DRAM over the debug module's system bus, gives each hart its
 start PC through `dpc` and resumes them — hart 0 into the done-spin, hart 1
 into the program. The target description it reads the chip from is written
 out of the settled design: the TAP's IR length comes from the `Jtag` edge,
-the RAM range from the DRAM's, the harts from the debug module's.
+the RAM range from the memory port's, the harts from the debug module's.
 
 The harts' instruction trace reaches the harness the way the framework
 intends verification to work, and it is the only thing in the demo that
@@ -207,9 +207,8 @@ other. The SoC therefore simulates itself: verilator runs the linked
 Verilog, probe-rs brings it up over the bridge, and hart 1 prints "hello
 world" over the UART at 115200 baud, out of a DDR4 the whole time.
 
-To reproduce (needs `verilator`, `cargo` and a C toolchain on PATH, and
-`RAMULATOR_INSTALL_PATH` from the dev shell; the test builds `simprobe`
-itself):
+To reproduce, from `nix develop` (which brings verilator, cargo and
+`RAMULATOR_INSTALL_PATH`; the test builds `simprobe` itself):
 
 ```
 mill syntheke.circt.tests.testForked me.jiuyang.syntheke.circt.tests.AxiVerilogSpec

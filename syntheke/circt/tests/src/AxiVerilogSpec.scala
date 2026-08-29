@@ -33,7 +33,7 @@ object AxiVerilogSpec extends TestSuite:
   val loadBase:  Long = 0x80000000L // the DRAM base: where the debugger puts the program
   val dramBytes: Long = 0x40000000L // one rank of DDR4 8Gb x8, the device the harness's model is configured as
   // The two harts get different work, so the printed line proves both halves of the debug module's hart array: hart 0
-  // wrote the program into memory for the debugger and then parks in the done-spin, hart 1 is the one that runs it.
+  // parks in the done-spin, hart 1 is the one that runs the program.
   val hart0Pc:   Long = loadBase + 0x2c
   val hart1Pc:   Long = loadBase
 
@@ -65,11 +65,22 @@ object AxiVerilogSpec extends TestSuite:
   val jtagPort: Int    = 5555
   val chipName: String = "syntheke-demo"
 
-  /** The target description probe-rs needs, written out of the settled design: the TAP it will find on the pins, the
-    * harts the debug module holds, and the memory the fabric decodes to RAM. Nothing here is stated twice — every
-    * number comes from an edge the negotiation settled.
+  /** The Ramulator configuration, as the model's parameter names it and the simulation finds it. */
+  val dramConfigFile: String = "dram.yaml"
+
+  /** The program as the debugger downloads it: little-endian words, which is how memory holds them. */
+  def programImage: Array[Byte] =
+    program.flatMap(w => (0 until 4).map(b => ((w >> (b * 8)) & 0xff).toByte)).toArray
+
+  /** The target description probe-rs needs, read out of the settled design: the TAP it will find on the pins, the harts
+    * the debug module holds, the memory the fabric decodes to RAM. Nothing here is stated twice — every number comes
+    * from an edge the negotiation settled, which is the same thing the RTL was built from.
     */
-  def probeRsTarget(tap: JtagTap, harts: Int, ramBase: Long, ramSize: Long): String =
+  def probeRsTarget(resolved: ResolvedDesign): String =
+    val root  = ModuleId.root
+    val tap   = resolved.edgeAt(ModuleNodeId(root / "harness", "jtagPins")).edgeAs(Jtag)
+    val harts = resolved.generatorModule(root / "debug" / "dm").get.fullParam.asInstanceOf[DmP].harts
+    val ram   = resolved.edgeAt(ModuleNodeId(root / "harness", "memPins")).edgeAs(Axi4).slave.slaves.head.address.head
     val cores = (0 until harts)
       .map(i => s"""      - name: hart$i
                    |        type: riscv
@@ -85,8 +96,8 @@ object AxiVerilogSpec extends TestSuite:
        |      - !Ram
        |        name: dram
        |        range:
-       |          start: 0x${ramBase.toHexString}
-       |          end: 0x${(ramBase + ramSize).toHexString}
+       |          start: 0x${ram.base.toHexString}
+       |          end: 0x${(ram.base + ram.mask + 1).toHexString}
        |        cores: [${(0 until harts).map(i => s"hart$i").mkString(", ")}]
        |    jtag:
        |      scan_chain:
@@ -96,9 +107,10 @@ object AxiVerilogSpec extends TestSuite:
        |""".stripMargin
 
   /** AxiSocSpec's topology minus the L2 slot (an AXI fabric without coherence gives an L2 nothing testable to do), plus
-    * the debug chain — on-chip transport and debug module, one port per hart, and the module's own bus master.
-    * Everything that is not the chip is in the test harness: the clock, the debug adapter on the JTAG pins, the console
-    * on the serial pins and the board the GPIO pads are wired to. FullParam = the zaozi parameter of each IP.
+    * the debug chain — transport and debug module in a wrapper of their own, one port per hart, and the module's own
+    * bus master. Everything that is not the chip is in the test harness: the clock, the debug adapter on the JTAG pins,
+    * the DRAM on the memory port, the console on the serial pins and the board the GPIO pads are wired to. FullParam =
+    * the zaozi parameter of each IP.
     */
   def buildSoc(refHz: Int = 25000000): DesignSpec =
     Design {
@@ -112,7 +124,7 @@ object AxiVerilogSpec extends TestSuite:
         memBase = loadBase,
         memSize = dramBytes,
         memIdCapBits = 6,
-        dramConfig = "dram.yaml"
+        dramConfig = dramConfigFile
       )
 
       // On the die: the PLL multiplies the reference to the system clock and feeds every consumer.
@@ -242,7 +254,7 @@ object AxiVerilogSpec extends TestSuite:
       // the shim's parameter, so the two shims hold the same deduplicated DitDah32.
       assert(design.verilog.keys.exists(_.startsWith("DitDah32_")))
       assert(design.verilog.keys.exists(_.startsWith("DitDah32Gpr_")))
-      // Every fabric module is real RTL now: the crossbars, the RAM, the bridge and the peripherals hold state.
+      // Every module of the chip is real RTL: the crossbars, the bridge, the debug chain and the peripherals hold state.
       assert(design.verilog.values.exists(_.contains("always @(posedge")))
     }
 
@@ -330,7 +342,7 @@ object AxiVerilogSpec extends TestSuite:
       os.write(simDir / "jtag_dpi.cc", jtagDpiSource)
       os.write(simDir / "DramDpi.sv", dramDpiModel)
       os.write(simDir / "dram_dpi.cc", dramDpiSource)
-      os.write(simDir / "dram.yaml", ddr4Config)
+      os.write(simDir / dramConfigFile, ddr4Config)
       // firtool's own file list is the release build; the layer collateral on top of it is the verification build.
       val layers = design.verilog.keys.toSeq.sorted.filter(_.startsWith("layers-"))
       os.proc(
@@ -363,13 +375,9 @@ object AxiVerilogSpec extends TestSuite:
         )
       ).call(cwd = simDir)
 
-      // What the debugger downloads, and the description it reads the chip from — both written out of the design.
-      os.write(
-        simDir / "program.bin",
-        program.flatMap(w => (0 until 4).map(b => ((w >> (b * 8)) & 0xff).toByte)).toArray
-      )
-      val tap = soc.edgeAt(ModuleNodeId(ModuleId.root / "harness", "jtagPins")).edgeAs(Jtag)
-      os.write(simDir / "target.yaml", probeRsTarget(tap, harts = 2, ramBase = loadBase, ramSize = dramBytes))
+      // What the debugger downloads, and the description it reads the chip from — the latter out of the design itself.
+      os.write(simDir / "program.bin", programImage)
+      os.write(simDir / "target.yaml", probeRsTarget(soc))
 
       // The simulation comes up first and waits on its socket; the debugger then does what a debugger does — attach
       // over JTAG, halt the harts, download, set each hart's PC, resume — and leaves the SoC running.

@@ -35,22 +35,10 @@ object AxiDemoMain:
     os.write.over(dir / "jtag_dpi.cc", jtagDpiSource)
     os.write.over(dir / "DramDpi.sv", dramDpiModel)
     os.write.over(dir / "dram_dpi.cc", dramDpiSource)
-    os.write.over(dir / "dram.yaml", ddr4Config)
+    os.write.over(dir / AxiVerilogSpec.dramConfigFile, ddr4Config)
     // The program the debugger downloads, and the target description it reads the chip from.
-    os.write.over(
-      dir / "program.bin",
-      AxiVerilogSpec.program.flatMap(w => (0 until 4).map(b => ((w >> (b * 8)) & 0xff).toByte)).toArray
-    )
-    val tap      = resolved.edgeAt(ModuleNodeId(ModuleId.root / "harness", "jtagPins")).edgeAs(Jtag)
-    os.write.over(
-      dir / "target.yaml",
-      AxiVerilogSpec.probeRsTarget(
-        tap,
-        harts = 2,
-        ramBase = AxiVerilogSpec.loadBase,
-        ramSize = AxiVerilogSpec.dramBytes
-      )
-    )
+    os.write.over(dir / "program.bin", AxiVerilogSpec.programImage)
+    os.write.over(dir / "target.yaml", AxiVerilogSpec.probeRsTarget(resolved))
     os.write.over(dir / "topology.json", ujson.write(Export.topology(resolved.spec), indent = 2))
     os.write.over(dir / "edges.json", ujson.write(Export.edges(resolved), indent = 2))
     os.write.over(dir / "plan.json", ujson.write(Export.plan(resolved), indent = 2))
