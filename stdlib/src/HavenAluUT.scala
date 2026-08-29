@@ -154,3 +154,63 @@ object HavenAluOpUT
     val probe = summon[ProbeInterface[HavenAluOpUTProbe]]
     layer("Verification"):
       Probes.expose(probe.RESULT, Bits(32), instance.io.result)
+
+/** Directed FP generation: the parameter names the opcode and the two operand values a residual-closing intent
+  * wants driven, so one instance targets one corner case (NaN, infinity, overflow, denormal…).
+  */
+case class HavenAluFpParameter(op: Int, aVal: Long, bVal: Long) extends Parameter
+
+given upickle.default.ReadWriter[HavenAluFpParameter] = upickle.default.macroRW
+
+class HavenAluFpLayers(parameter: HavenAluFpParameter) extends LayerInterface(parameter):
+  def layers = Seq(Layer("Verification"))
+
+/** Same drive-port signature as [[HavenAluOpUTIO]] (a, b, op, start) so witnesses from either UT concatenate into
+  * one stimulus stream.
+  */
+class HavenAluFpUTIO(parameter: HavenAluFpParameter) extends HWBundle(parameter):
+  val clock  = Flipped(Clock())
+  val reset  = Flipped(Reset())
+  val a      = Flipped(Bits(32))
+  val b      = Flipped(Bits(32))
+  val op     = Flipped(Bits(4))
+  val start  = Flipped(Bool())
+  val RESULT = Aligned(Bits(32))
+  val DONE   = Aligned(Bool())
+
+class HavenAluFpUTProbe(parameter: HavenAluFpParameter)
+    extends DVBundle[HavenAluFpParameter, HavenAluFpLayers](parameter):
+  val RESULT = ProbeRead(Bits(32), layers("Verification"))
+
+@generator
+object HavenAluFpUT
+    extends Generator[HavenAluFpParameter, HavenAluFpLayers, HavenAluFpUTIO, HavenAluFpUTProbe]
+    with UT[HavenAluFpParameter, HavenAluFpUTIO]:
+  override def moduleName(p: HavenAluFpParameter): String =
+    s"HavenAluFpUT_op${p.op}_a${p.aVal.toHexString}_b${p.bVal.toHexString}"
+
+  def architecture(parameter: HavenAluFpParameter) =
+    val io       = summon[Interface[HavenAluFpUTIO]]
+    val instance = HavenAlu.instantiate(HavenAluParameter())
+    instance.io.clk   := io.clock
+    instance.io.rst_n := !io.reset.asBool
+    instance.io.a     := io.a
+    instance.io.b     := io.b
+    instance.io.op    := io.op
+    instance.io.start := io.start
+    io.RESULT         := instance.io.result
+    io.DONE           := instance.io.done
+
+    Txn.assumeResetLow(io.reset)
+
+    Generate(
+      Sem.value(
+        (io.op === parameter.op.U(4).asBits) & io.start &
+          (io.a === BigInt(parameter.aVal).U(32).asBits) & (io.b === BigInt(parameter.bVal).U(32).asBits)
+      ),
+      "gen_fp_corner"
+    )
+
+    val probe = summon[ProbeInterface[HavenAluFpUTProbe]]
+    layer("Verification"):
+      Probes.expose(probe.RESULT, Bits(32), instance.io.result)

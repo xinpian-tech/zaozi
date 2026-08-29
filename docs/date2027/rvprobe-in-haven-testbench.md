@@ -44,7 +44,8 @@ be replayed exactly, or expanded to volume by pinning the fields the intent cons
 | | transactions | solver calls | score | line | cond | toggle | branch |
 |---|---|---|---|---|---|---|---|
 | rvprobe, witness replay | 10 | 10 | 44.51 | 67.72 | 52.83 | 8.01 | 55.38 |
-| **rvprobe, volume fill** | **10,000** | **10** | **79.41** | 89.42 | 77.36 | **94.85** | 78.46 |
+| rvprobe, volume fill | 10,000 | 10 | 79.41 | 89.42 | 77.36 | **94.85** | 78.46 |
+| **+ 6 residual-targeted intents** | **10,006** | **16** | **90.40** | 93.12 | 86.32 | 96.02 | 86.15 |
 | HAVEN (15 spec-derived sequences + 3 BO iterations) | 10,110 | — | 95.87 | 97.88 | 92.92 | 97.28 | 95.38 |
 
 **The plumbing works**: solved stimulus runs inside a foreign testbench with only the sequence layer
@@ -56,12 +57,24 @@ solver only has to supply the *structure* — ten BMC calls, once — while the 
 data fields, and the transaction count becomes free. Toggle coverage moves 8.01 → **94.85** under
 exactly this change, confirming the earlier diagnosis that the toggle gap was a volume artifact.
 
-**The remaining 16 points are about intent quality, not mechanism.** At matched volume (10,000 vs
-10,110) HAVEN still leads 95.87 to 79.41 — but our ten intents were mechanically trivial
-(`op == k ∧ start`), with no scenario diversity, no FP corner values, and no coverage feedback,
-whereas HAVEN's fifteen sequences were derived from the datasheet and then tuned by three
-Bayesian-optimization iterations against measured gaps. That is precisely the gap the residual-closing
-loop is supposed to close, and it is now a measurable target rather than an assertion.
+**Closing the residual works, and it is cheap.** Running URG with `-metric` exposes the uncovered
+items, and for this design they were unambiguous: 20 uncovered lines, essentially all FP corner cases
+— `s1_is_nan <= 1'b1`, `fp_result <= {s3_inf_sign, 8'hFF, 23'h0}` (infinity), `fp_flags[FLAG_ZERO]`,
+`fp_flags[FLAG_OVERFLOW]`, denormal handling. Six intents naming those operand patterns (NaN, ∞+∞,
+∞−∞, x−x, max+max, denormal±) added **six transactions** and moved the score **79.41 → 90.40**.
+That is 1.8 coverage points per transaction, against 0.0035 for the bulk fill — the tail-closing
+property the approach claims, measured rather than asserted.
+
+**The remaining gap is 5.5 points, and the residual says what it is.** Thirteen uncovered lines remain, and they are a
+tighter cluster than before: FP rounding/normalization (`s4_new_exp`, `s4_final_frac`,
+`s4_round_up`), underflow (`fp_flags[FLAG_UNDERFLOW]`), and pipeline teardown (`fp_active <= 1'b0`).
+These need operand pairs whose *arithmetic result* lands in a rounding or underflow case — a harder
+intent to state than "a is NaN", and exactly the kind where naming the destination and letting the
+solver find the operands should pay off.
+
+**Caveat on what is automated.** The six intents above were written by hand from the residual report.
+The mechanism — residual → intent → solve → sequence → re-measure — is demonstrated end to end, but
+the LLM writing the intents is the next step, and it is the step the paper's claim actually rests on.
 
 ## What this settles for the experiment design
 
