@@ -81,6 +81,8 @@
 
 生成器内部还可以实例化真外部 Verilog 模块：它以 extmodule 声明进入电路，声明即定义，链接原样保留。RTL 无法企及之处——时钟的起源、仿真的输出——由这类模块的行为级定义补上，与发射出的 Verilog 一起交给仿真器。
 
+链接后的电路以 mlirbc 交出，与各 per-module circuit 同一种形式；FIRRTL 只有字节码，没有文本。Verilog 是一组文件而非一段文本：每个模块一个文件，加上层与探针的附属文件——发布构建取前者，验证构建再加上后者。
+
 == 序列化范围 <sec-serialization-list>
 
 #table(
