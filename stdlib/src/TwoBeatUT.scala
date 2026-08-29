@@ -80,3 +80,34 @@ object TwoBeatUT
     val probe = summon[ProbeInterface[TwoBeatUTProbe]]
     layer("Verification"):
       Probes.expose(probe.SEEN, Bool(), instance.io.SEEN)
+
+/** Partial temporal specification: the two beats are named, but *when* the second follows is left open —
+  * `##(1, Some(3))` says "somewhere in the next one to three cycles" and the solver picks. HAVEN's DSL cannot
+  * express this: its steps are a total program, so every intervening cycle must be spelled out.
+  */
+@generator
+object TwoBeatGapUT
+    extends Generator[TwoBeatParameter, TwoBeatLayers, TwoBeatIO, TwoBeatUTProbe]
+    with UT[TwoBeatParameter, TwoBeatIO]:
+  override def moduleName(p: TwoBeatParameter): String = s"TwoBeatGapUT_width${p.width}"
+
+  def architecture(parameter: TwoBeatParameter) =
+    val io       = summon[Interface[TwoBeatIO]]
+    val instance = TwoBeat.instantiate(parameter)
+    instance.io.clock := io.clock
+    instance.io.reset := io.reset
+    instance.io.A     := io.A
+    io.SEEN           := instance.io.SEEN
+
+    val three = 3.U(parameter.width).asBits
+    val five  = 5.U(parameter.width).asBits
+
+    given ClockEvent = posedge(io.clock)
+    Generate(
+      Sem.temporal((io.A === three).S.##(1, Some(3))((io.A === five).S)),
+      "gen_two_beat_with_gap"
+    )
+
+    val probe = summon[ProbeInterface[TwoBeatUTProbe]]
+    layer("Verification"):
+      Probes.expose(probe.SEEN, Bool(), instance.io.SEEN)
