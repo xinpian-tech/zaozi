@@ -36,3 +36,32 @@ object HavenI2cScaleTest extends TestSuite:
       val txn = solved(outcome)
       println(s"  witness: ${txn.cycles} cycles, ${txn.values.size} traced signals")
       assert(txn.cycles >= 1)
+
+    test("a partially specified temporal intent solves through the i2c hierarchy"):
+      // Two anchors — assert arst_i, then write the control register within 1..3 cycles — with the spacing and
+      // everything in between left to the solver.
+      //
+      // Note on the baseline, corrected after reading its driver: HAVEN's `seq_item` declares an `arst_i` field
+      // and a constraint for it, but `drive_item` never references that field (zero occurrences), so the pin is
+      // never driven from a transaction. The reset paths in bit_ctrl are therefore unreachable by any sequence
+      // its LLM writes — not because a constraint forbids them, but because the template generated a field, a
+      // constraint and a modport entry without the driver assignment that would connect them, and nothing in the
+      // flow detects the gap.
+      val dir   = freshDir("HavenI2c-reset")
+      val param = HavenI2cCtrlParameter(0x80)
+      val files = Seq("i2c_master_top", "i2c_master_byte_ctrl", "i2c_master_bit_ctrl")
+        .map(n => resources / "haven" / s"$n.v")
+
+      val model  = FormalUT.lowerGenerator(HavenI2cResetUT, param, dir)
+      val ip     = SvImport.toHw(files, dir / "imported", include = Some(resources / "haven"))
+      val merged = SvImport.mergeForBmc(model.hw, ip)
+      val t0     = System.currentTimeMillis()
+      val txn    = solved(FormalUT.generate(model.copy(hw = merged), bound = 6))
+      println(s"  solved in ${System.currentTimeMillis() - t0}ms: ${txn.cycles} cycles")
+
+      // The second anchor must appear: a write to the control register (address 2).
+      val adr = txn.values("wb_adr_i")
+      val we  = txn.values("wb_we_i")
+      val hit = adr.indices.exists(i => adr(i) == BigInt(2) && we(i) == BigInt(1))
+      assert(hit)
+      println(s"  wb_adr_i: ${adr.mkString(",")}  wb_we_i: ${we.mkString(",")}")

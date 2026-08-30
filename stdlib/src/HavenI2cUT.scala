@@ -62,14 +62,18 @@ class HavenI2cCtrlLayers(parameter: HavenI2cCtrlParameter) extends LayerInterfac
   * per transaction, so what the intent describes is the *sequence of register accesses*.
   */
 class HavenI2cUTIO(parameter: HavenI2cCtrlParameter) extends HWBundle(parameter):
-  val clock    = Flipped(Clock())
-  val reset    = Flipped(Reset())
-  val wb_adr_i = Flipped(Bits(3))
-  val wb_dat_i = Flipped(Bits(8))
-  val wb_we_i  = Flipped(Bool())
-  val arst_i   = Flipped(Bool())
-  val ACK      = Aligned(Bool())
-  val DAT      = Aligned(Bits(8))
+  val clock     = Flipped(Clock())
+  val reset     = Flipped(Reset())
+  val wb_adr_i  = Flipped(Bits(3))
+  val wb_dat_i  = Flipped(Bits(8))
+  val wb_we_i   = Flipped(Bool())
+  val arst_i    = Flipped(Bool())
+  // The I2C bus lines are solver-driven too: a witness may hold SCL low to stretch the clock, or pull SDA to
+  // acknowledge. HAVEN needs a hand-written slave BFM to produce that behaviour; here it is part of the solution.
+  val scl_pad_i = Flipped(Bool())
+  val sda_pad_i = Flipped(Bool())
+  val ACK       = Aligned(Bool())
+  val DAT       = Aligned(Bits(8))
 
 class HavenI2cUTProbe(parameter: HavenI2cCtrlParameter)
     extends DVBundle[HavenI2cCtrlParameter, HavenI2cCtrlLayers](parameter):
@@ -96,8 +100,8 @@ object HavenI2cCtrlUT
     instance.io.wb_we_i   := io.wb_we_i
     instance.io.wb_stb_i  := true.B
     instance.io.wb_cyc_i  := true.B
-    instance.io.scl_pad_i := true.B
-    instance.io.sda_pad_i := true.B
+    instance.io.scl_pad_i := io.scl_pad_i
+    instance.io.sda_pad_i := io.sda_pad_i
     io.ACK                := instance.io.wb_ack_o
     io.DAT                := instance.io.wb_dat_o
 
@@ -109,6 +113,49 @@ object HavenI2cCtrlUT
           (io.wb_dat_i === parameter.ctrlValue.U(8).asBits)
       ),
       s"gen_ctrl_write_${parameter.ctrlValue}"
+    )
+
+    val probe = summon[ProbeInterface[HavenI2cUTProbe]]
+    layer("Verification"):
+      Probes.expose(probe.ACK, Bits(1), instance.io.wb_ack_o.asBits)
+
+/** Targets what HAVEN's generated `seq_item` forbids itself from reaching.
+  *
+  * Its transaction carries `constraint c_reset { arst_i == 1'b0; }`, pinning the asynchronous reset, so no sequence
+  * it generates can ever exercise the `if (~nReset)` branches — 
+  * they are unreachable by construction of its own constraint, not by anything about the design. Here `arst_i` is
+  * simply an input the intent may name.
+  */
+@generator
+object HavenI2cResetUT
+    extends Generator[HavenI2cCtrlParameter, HavenI2cCtrlLayers, HavenI2cUTIO, HavenI2cUTProbe]
+    with UT[HavenI2cCtrlParameter, HavenI2cUTIO]:
+  override def moduleName(p: HavenI2cCtrlParameter): String = s"HavenI2cResetUT_${p.ctrlValue}"
+
+  def architecture(parameter: HavenI2cCtrlParameter) =
+    val io       = summon[Interface[HavenI2cUTIO]]
+    val instance = HavenI2c.instantiate(HavenI2cParameter())
+    instance.io.wb_clk_i  := io.clock
+    instance.io.wb_rst_i  := io.reset.asBool
+    instance.io.arst_i    := io.arst_i
+    instance.io.wb_adr_i  := io.wb_adr_i
+    instance.io.wb_dat_i  := io.wb_dat_i
+    instance.io.wb_we_i   := io.wb_we_i
+    instance.io.wb_stb_i  := true.B
+    instance.io.wb_cyc_i  := true.B
+    instance.io.scl_pad_i := io.scl_pad_i
+    instance.io.sda_pad_i := io.sda_pad_i
+    io.ACK                := instance.io.wb_ack_o
+    io.DAT                := instance.io.wb_dat_o
+
+    Txn.assumeResetLow(io.reset)
+
+    given ClockEvent = posedge(io.clock)
+    // Partial temporal specification: assert the asynchronous reset, then within one to three cycles perform a
+    // control-register write. What happens in between is the solver's to choose.
+    Generate(
+      Sem.temporal(io.arst_i.S.##(1, Some(3))((io.wb_we_i & (io.wb_adr_i === 2.U(3).asBits)).S)),
+      "gen_async_reset_then_write"
     )
 
     val probe = summon[ProbeInterface[HavenI2cUTProbe]]
