@@ -49,7 +49,7 @@ object ExtAccum
        |""".stripMargin
 
   def verilogModuleName(parameter: ExtAccumParameter) = "ext_accum"
-  def verilogParameter(parameter: ExtAccumParameter)  = ExtAccumVerilogParams()
+  def verilogParameter(parameter:  ExtAccumParameter) = ExtAccumVerilogParams()
 
   // With NO Verilog parameters, firld compares the wrapper's extmodule dump and the instantiating circuit's
   // placeholder strictly — same (empty) parameters force equal defnames, so the hash-suffixed default moduleName

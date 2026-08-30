@@ -16,8 +16,8 @@ given upickle.default.ReadWriter[HavenAluParameter] = upickle.default.macroRW
 class HavenAluLayers(parameter: HavenAluParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
-/** The HAVEN benchmark ALU's own port list (hdl/alu/rtl/alu_top.v): 32-bit ALU with FP add/sub, integer logic,
-  * shifts, FP2INT; `done` pulses when a result lands.
+/** The HAVEN benchmark ALU's own port list (hdl/alu/rtl/alu_top.v): 32-bit ALU with FP add/sub, integer logic, shifts,
+  * FP2INT; `done` pulses when a result lands.
   */
 class HavenAluIO(parameter: HavenAluParameter) extends HWBundle(parameter):
   val clk    = Flipped(Clock())
@@ -38,9 +38,10 @@ case class HavenAluVerilogParams() extends VerilogParameter
   * (`stdlib/tests/resources/haven/alu_top.v`), not inlined — the test hands it to circt-verilog and Verilator.
   */
 @generator
-object HavenAlu extends VerilogWrapper[HavenAluParameter, HavenAluLayers, HavenAluIO, HavenAluProbe, HavenAluVerilogParams]:
+object HavenAlu
+    extends VerilogWrapper[HavenAluParameter, HavenAluLayers, HavenAluIO, HavenAluProbe, HavenAluVerilogParams]:
   def verilogModuleName(parameter: HavenAluParameter) = "alu_top"
-  def verilogParameter(parameter: HavenAluParameter)  = HavenAluVerilogParams()
+  def verilogParameter(parameter:  HavenAluParameter) = HavenAluVerilogParams()
 
   // Parameterless wrapper: firld compares extmodule decls strictly, so the module name must be the plain
   // verilog name (see ExtAccum).
@@ -63,8 +64,8 @@ class HavenAluUTProbe(parameter: HavenAluParameter) extends DVBundle[HavenAluPar
   val RESULT = ProbeRead(Bits(32), layers("Verification"))
   val DONE   = ProbeRead(Bits(1), layers("Verification"))
 
-/** The real-IP formal-CRV example: C = "the ALU completes with result 0xBEEF" — solved through the benchmark's own
-  * XOR datapath and done pipeline (the solver must schedule an input change and invert the XOR).
+/** The real-IP formal-CRV example: C = "the ALU completes with result 0xBEEF" — solved through the benchmark's own XOR
+  * datapath and done pipeline (the solver must schedule an input change and invert the XOR).
   */
 @generator
 object HavenAluUT
@@ -105,9 +106,9 @@ given upickle.default.ReadWriter[HavenAluOpParameter] = upickle.default.macroRW
 class HavenAluOpLayers(parameter: HavenAluOpParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
 
-/** Drive ports match the HAVEN transaction's fields by name (a, b, op, start), so the emitted sequence assigns
-  * straight into its `seq_item` — no packing, because this stimulus goes to a UVM driver rather than the
-  * single-drive Model B callback.
+/** Drive ports match the HAVEN transaction's fields by name (a, b, op, start), so the emitted sequence assigns straight
+  * into its `seq_item` — no packing, because this stimulus goes to a UVM driver rather than the single-drive Model B
+  * callback.
   */
 class HavenAluOpUTIO(parameter: HavenAluOpParameter) extends HWBundle(parameter):
   val clock  = Flipped(Clock())
@@ -124,8 +125,8 @@ class HavenAluOpUTProbe(parameter: HavenAluOpParameter)
   val RESULT = ProbeRead(Bits(32), layers("Verification"))
 
 /** C = "issue the parameterized opcode with start asserted". Deliberately simple: the point of the experiment is the
-  * plumbing — a solved witness replacing the sequence layer of a template-generated testbench — not yet the
-  * cleverness of the intent.
+  * plumbing — a solved witness replacing the sequence layer of a template-generated testbench — not yet the cleverness
+  * of the intent.
   */
 @generator
 object HavenAluOpUT
@@ -156,8 +157,8 @@ object HavenAluOpUT
     layer("Verification"):
       Probes.expose(probe.RESULT, Bits(32), instance.io.result)
 
-/** Directed FP generation: the parameter names the opcode and the two operand values a residual-closing intent
-  * wants driven, so one instance targets one corner case (NaN, infinity, overflow, denormal…).
+/** Directed FP generation: the parameter names the opcode and the two operand values a residual-closing intent wants
+  * driven, so one instance targets one corner case (NaN, infinity, overflow, denormal…).
   */
 case class HavenAluFpParameter(op: Int, aVal: Long, bVal: Long) extends Parameter
 
@@ -166,8 +167,8 @@ given upickle.default.ReadWriter[HavenAluFpParameter] = upickle.default.macroRW
 class HavenAluFpLayers(parameter: HavenAluFpParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
 
-/** Same drive-port signature as [[HavenAluOpUTIO]] (a, b, op, start) so witnesses from either UT concatenate into
-  * one stimulus stream.
+/** Same drive-port signature as [[HavenAluOpUTIO]] (a, b, op, start) so witnesses from either UT concatenate into one
+  * stimulus stream.
   */
 class HavenAluFpUTIO(parameter: HavenAluFpParameter) extends HWBundle(parameter):
   val clock  = Flipped(Clock())
@@ -216,9 +217,9 @@ object HavenAluFpUT
     layer("Verification"):
       Probes.expose(probe.RESULT, Bits(32), instance.io.result)
 
-/** Temporal intents over the FP pipeline: `notDoneCycles` says how many cycles after `start` the intent claims
-  * `done` stays low. Satisfiable for a count the pipeline really takes; Infeasible once it exceeds the pipeline's
-  * latency — and that verdict is the point.
+/** Temporal intents over the FP pipeline: `notDoneCycles` says how many cycles after `start` the intent claims `done`
+  * stays low. Satisfiable for a count the pipeline really takes; Infeasible once it exceeds the pipeline's latency —
+  * and that verdict is the point.
   */
 case class HavenAluSeqParameter(notDoneCycles: Int) extends Parameter
 
@@ -241,8 +242,8 @@ class HavenAluSeqUTProbe(parameter: HavenAluSeqParameter)
     extends DVBundle[HavenAluSeqParameter, HavenAluSeqLayers](parameter):
   val DONE = ProbeRead(Bits(1), layers("Verification"))
 
-/** C = "an FP add starts, and `done` stays low for the next `notDoneCycles` cycles" — a purely temporal intent,
-  * stated with 时序语义 and no reference to internal state.
+/** C = "an FP add starts, and `done` stays low for the next `notDoneCycles` cycles" — a purely temporal intent, stated
+  * with 时序语义 and no reference to internal state.
   */
 @generator
 object HavenAluSeqUT

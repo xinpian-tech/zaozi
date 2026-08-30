@@ -39,7 +39,7 @@ case class HavenSpiVerilogParams() extends VerilogParameter
 object HavenSpi
     extends VerilogWrapper[HavenSpiParameter, HavenSpiLayers, HavenSpiIO, HavenSpiProbe, HavenSpiVerilogParams]:
   def verilogModuleName(parameter: HavenSpiParameter) = "simple_spi_top"
-  def verilogParameter(parameter: HavenSpiParameter)  = HavenSpiVerilogParams()
+  def verilogParameter(parameter:  HavenSpiParameter) = HavenSpiVerilogParams()
 
   // Parameterless wrapper: the plain name keeps the extmodule decls identical for firld (see ExtAccum).
   override def moduleName(parameter: HavenSpiParameter): String = verilogModuleName(parameter)
@@ -47,8 +47,8 @@ object HavenSpi
 class HavenSpiUTLayers(parameter: HavenSpiParameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
 
-/** One 16-bit drive word (DPI-legal width) packs the whole Wishbone request: A[0]=cyc, A[1]=stb, A[3:2]=adr,
-  * A[4]=we, A[12:5]=dat, A[13]=miso, A[15:14] unused.
+/** One 16-bit drive word (DPI-legal width) packs the whole Wishbone request: A[0]=cyc, A[1]=stb, A[3:2]=adr, A[4]=we,
+  * A[12:5]=dat, A[13]=miso, A[15:14] unused.
   */
 class HavenSpiUTIO(parameter: HavenSpiParameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
@@ -61,9 +61,9 @@ class HavenSpiUTProbe(parameter: HavenSpiParameter) extends DVBundle[HavenSpiPar
   val DAT = ProbeRead(Bits(8), layers("Verification"))
   val ACK = ProbeRead(Bits(1), layers("Verification"))
 
-/** The bus-protocol formal-CRV example: C = "a Wishbone write of 0xA5 to the data register completes" — the solver
-  * must discover the handshake (hold cyc∧stb∧we with the address and data until the registered ack rises). The IP
-  * resets *itself* through [[Txn.firstCycle]], so its true reset values (spcr = 0x10) hold in model and replay alike.
+/** The bus-protocol formal-CRV example: C = "a Wishbone write of 0xA5 to the data register completes" — the solver must
+  * discover the handshake (hold cyc∧stb∧we with the address and data until the registered ack rises). The IP resets
+  * *itself* through [[Txn.firstCycle]], so its true reset values (spcr = 0x10) hold in model and replay alike.
   */
 @generator
 object HavenSpiUT

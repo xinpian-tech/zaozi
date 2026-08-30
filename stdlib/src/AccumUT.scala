@@ -44,15 +44,13 @@ object Accum extends Generator[AccumParameter, AccumLayers, AccumIO, AccumUTProb
     layer("Verification"):
       Probes.expose(probe.SUM, Bits(parameter.width), sum)
 
-/** The cross-transaction formal-CRV example: the constraint relates *three different beats* of one stimulus —
-  * C = "the first three beats are pairwise distinct and sum to 12". [[Txn.history]] materializes the two prior beats
-  * as typed state, turning the cross-object relation into a plain boolean over `(hist(1), hist(0), A)` guarded by the
-  * beat counter; the body asserts ¬C and the BMC violation is the three-beat transaction.
+/** The cross-transaction formal-CRV example: the constraint relates *three different beats* of one stimulus — C = "the
+  * first three beats are pairwise distinct and sum to 12". [[Txn.history]] materializes the two prior beats as typed
+  * state, turning the cross-object relation into a plain boolean over `(hist(1), hist(0), A)` guarded by the beat
+  * counter; the body asserts ¬C and the BMC violation is the three-beat transaction.
   */
 @generator
-object AccumUT
-    extends Generator[AccumParameter, AccumLayers, AccumIO, AccumUTProbe]
-    with UT[AccumParameter, AccumIO]:
+object AccumUT extends Generator[AccumParameter, AccumLayers, AccumIO, AccumUTProbe] with UT[AccumParameter, AccumIO]:
   override def moduleName(p: AccumParameter): String = s"AccumUT_width${p.width}"
 
   def architecture(parameter: AccumParameter) =

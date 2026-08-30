@@ -18,16 +18,16 @@ class HavenI2cLayers(parameter: HavenI2cParameter) extends LayerInterface(parame
 
 /** The OpenCores I2C master's Wishbone face, as `i2c_master_top` declares it. */
 class HavenI2cIO(parameter: HavenI2cParameter) extends HWBundle(parameter):
-  val wb_clk_i  = Flipped(Clock())
-  val wb_rst_i  = Flipped(Bool())
-  val arst_i    = Flipped(Bool())
-  val wb_adr_i  = Flipped(Bits(3))
-  val wb_dat_i  = Flipped(Bits(8))
-  val wb_we_i   = Flipped(Bool())
-  val wb_stb_i  = Flipped(Bool())
-  val wb_cyc_i  = Flipped(Bool())
-  val scl_pad_i = Flipped(Bool())
-  val sda_pad_i = Flipped(Bool())
+  val wb_clk_i     = Flipped(Clock())
+  val wb_rst_i     = Flipped(Bool())
+  val arst_i       = Flipped(Bool())
+  val wb_adr_i     = Flipped(Bits(3))
+  val wb_dat_i     = Flipped(Bits(8))
+  val wb_we_i      = Flipped(Bool())
+  val wb_stb_i     = Flipped(Bool())
+  val wb_cyc_i     = Flipped(Bool())
+  val scl_pad_i    = Flipped(Bool())
+  val sda_pad_i    = Flipped(Bool())
   val wb_dat_o     = Aligned(Bits(8))
   val wb_ack_o     = Aligned(Bool())
   val wb_inta_o    = Aligned(Bool())
@@ -43,12 +43,12 @@ case class HavenI2cVerilogParams() extends VerilogParameter
 @generator
 object HavenI2c
     extends VerilogWrapper[HavenI2cParameter, HavenI2cLayers, HavenI2cIO, HavenI2cProbe, HavenI2cVerilogParams]:
-  def verilogModuleName(parameter: HavenI2cParameter) = "i2c_master_top"
-  def verilogParameter(parameter: HavenI2cParameter)  = HavenI2cVerilogParams()
+  def verilogModuleName(parameter:   HavenI2cParameter) = "i2c_master_top"
+  def verilogParameter(parameter:    HavenI2cParameter) = HavenI2cVerilogParams()
   override def moduleName(parameter: HavenI2cParameter): String = verilogModuleName(parameter)
 
-/** `ctrlValue` is the byte an intent wants written to the control register (address 2): bit 7 enables the core,
-  * bit 6 enables interrupts.
+/** `ctrlValue` is the byte an intent wants written to the control register (address 2): bit 7 enables the core, bit 6
+  * enables interrupts.
   */
 case class HavenI2cCtrlParameter(ctrlValue: Int) extends Parameter
 
@@ -58,8 +58,8 @@ class HavenI2cCtrlLayers(parameter: HavenI2cCtrlParameter) extends LayerInterfac
   def layers = Seq(Layer("Verification"))
 
 /** Drive ports carry the same names and widths as HAVEN's `i2c_master_top_seq_item` fields, so a witness renders
-  * straight into its sequence. `stb`/`cyc` are held asserted here — the replay driver performs the full handshake
-  * per transaction, so what the intent describes is the *sequence of register accesses*.
+  * straight into its sequence. `stb`/`cyc` are held asserted here — the replay driver performs the full handshake per
+  * transaction, so what the intent describes is the *sequence of register accesses*.
   */
 class HavenI2cUTIO(parameter: HavenI2cCtrlParameter) extends HWBundle(parameter):
   val clock     = Flipped(Clock())
@@ -79,9 +79,9 @@ class HavenI2cUTProbe(parameter: HavenI2cCtrlParameter)
     extends DVBundle[HavenI2cCtrlParameter, HavenI2cCtrlLayers](parameter):
   val ACK = ProbeRead(Bits(1), layers("Verification"))
 
-/** First i2c intent, deliberately minimal: a write of `ctrlValue` to the control register. Its purpose is to answer
-  * the scaling question — whether circt-bmc solves at all through a three-module I2C hierarchy — before anything
-  * more ambitious is attempted.
+/** First i2c intent, deliberately minimal: a write of `ctrlValue` to the control register. Its purpose is to answer the
+  * scaling question — whether circt-bmc solves at all through a three-module I2C hierarchy — before anything more
+  * ambitious is attempted.
   */
 @generator
 object HavenI2cCtrlUT
@@ -121,10 +121,9 @@ object HavenI2cCtrlUT
 
 /** Targets what HAVEN's generated `seq_item` forbids itself from reaching.
   *
-  * Its transaction carries `constraint c_reset { arst_i == 1'b0; }`, pinning the asynchronous reset, so no sequence
-  * it generates can ever exercise the `if (~nReset)` branches — 
-  * they are unreachable by construction of its own constraint, not by anything about the design. Here `arst_i` is
-  * simply an input the intent may name.
+  * Its transaction carries `constraint c_reset { arst_i == 1'b0; }`, pinning the asynchronous reset, so no sequence it
+  * generates can ever exercise the `if (~nReset)` branches — they are unreachable by construction of its own
+  * constraint, not by anything about the design. Here `arst_i` is simply an input the intent may name.
   */
 @generator
 object HavenI2cResetUT
@@ -162,20 +161,27 @@ object HavenI2cResetUT
     layer("Verification"):
       Probes.expose(probe.ACK, Bits(1), instance.io.wb_ack_o.asBits)
 
-/** Which residual class an intent targets. `nReset` in bit_ctrl is `arst_i` (ARST_LVL is 0, so the XOR is the
-  * identity) and its reset branches are `if (~nReset)`, i.e. taken while `arst_i` is LOW.
+/** Which residual class an intent targets. `nReset` in bit_ctrl is `arst_i` (ARST_LVL is 0, so the XOR is the identity)
+  * and its reset branches are `if (~nReset)`, i.e. taken while `arst_i` is LOW.
   */
 enum I2cTarget:
   /** The `if (~nReset)` branches: pull arst_i low, then release it and do a register write. */
   case ResetPulse
 
-  /** The `slave_wait` branch of the clock-enable generator: a slave holding SCL low stretches the clock. Reaching
-    * it needs bus behaviour, which is why HAVEN needs a slave BFM and a solver does not.
+  /** The `slave_wait` branch of the clock-enable generator: a slave holding SCL low stretches the clock. Reaching it
+    * needs bus behaviour, which is why HAVEN needs a slave BFM and a solver does not.
     */
   case ClockStretch
 
   /** Arbitration lost: SDA reads back low while the master is releasing it. */
   case ArbitrationLost
+
+  /** A complete transfer's *setup*: the register flow that starts one — prescaler, enable, slave address, then
+    * START|WRITE — after which the byte and bit controllers run the transfer on their own for hundreds of cycles. The
+    * intent describes only the writes, because those are the stimulus; the protocol activity that covers byte_ctrl and
+    * bit_ctrl is the design's response to them, not something the testbench drives.
+    */
+  case FullTransfer
 
 case class HavenI2cTargetParameter(targetOrdinal: Int) extends Parameter:
   def target: I2cTarget = I2cTarget.fromOrdinal(targetOrdinal)
@@ -229,15 +235,17 @@ object HavenI2cTargetUT
 
     Txn.assumeResetLow(io.reset)
 
-    given ClockEvent = posedge(io.clock)
-    val ctrlWrite    = io.wb_we_i & (io.wb_adr_i === 2.U(3).asBits)
-    val cmdWrite     = io.wb_we_i & (io.wb_adr_i === 4.U(3).asBits)
+    given ClockEvent                = posedge(io.clock)
+    val ctrlWrite                   = io.wb_we_i & (io.wb_adr_i === 2.U(3).asBits)
+    val cmdWrite                    = io.wb_we_i & (io.wb_adr_i === 4.U(3).asBits)
+    def write(addr: Int, data: Int) =
+      io.arst_i & io.wb_we_i & (io.wb_adr_i === addr.U(3).asBits) & (io.wb_dat_i === data.U(8).asBits)
 
     parameter.target match
-      case I2cTarget.ResetPulse     =>
+      case I2cTarget.ResetPulse      =>
         // arst_i low takes the `if (~nReset)` branches; releasing it and writing proves the core recovers.
         Generate(Sem.temporal((!io.arst_i).S.##(1, Some(3))((io.arst_i & ctrlWrite).S)), "gen_reset_pulse")
-      case I2cTarget.ClockStretch   =>
+      case I2cTarget.ClockStretch    =>
         // Enable the core and start a transfer, then hold SCL low — the solver plays the stretching slave.
         Generate(
           Sem.temporal(
@@ -266,6 +274,92 @@ object HavenI2cTargetUT
           "gen_arbitration_lost"
         )
 
+      case I2cTarget.FullTransfer =>
+        // OpenCores I2C register map: 0/1 = prescaler, 2 = control (bit7 enables), 3 = transmit,
+        // 4 = command (STA 0x80 | WR 0x10). Five anchors, spacing chosen by the solver.
+        //
+        // 0xA0 is the BFM's 7-bit slave address 0x50 shifted left with the write bit clear: the intent has to name
+        // the address the environment's slave model answers to, or the transfer is NACKed immediately.
+        //
+        // `throughout` is load-bearing, not decoration. Constraining arst_i only at the anchors leaves it free in
+        // the solver-chosen gaps, and a free variable is an adversarial one — the first version of this intent came
+        // back with reset asserted in 72 of 98 beats, holding the core in reset right after the command write, so
+        // no transfer ever ran. Under-specification cuts both ways: an invariant that must hold across the gaps has
+        // to be stated as one.
+        // Consecutive steps, no range delays. `throughout` would say this directly but yields an !ltl.property,
+        // which circt-bmc refuses to lower; back-to-back `###` leaves no unconstrained cycle for the solver to put
+        // the core back into reset, at the cost of the under-specification a gap would have allowed.
+        Generate(
+          Sem.temporal(
+            write(0, 0x01).S ### write(1, 0x00).S ### write(2, 0x80).S ### write(3, 0xa0).S ### write(4, 0x90).S
+          ),
+          "gen_full_transfer_setup"
+        )
+
     val probe = summon[ProbeInterface[HavenI2cTargetProbe]]
+    layer("Verification"):
+      Probes.expose(probe.ACK, Bits(1), instance.io.wb_ack_o.asBits)
+
+/** One intent per register address: a write to that address with the core out of reset. The data byte is left
+  * unconstrained, so the emitted sequence pins the address and randomizes the payload — volume with structure, the same
+  * shape the ALU experiment used.
+  */
+case class HavenI2cRegParameter(addr: Int, isWrite: Boolean = true) extends Parameter
+
+given upickle.default.ReadWriter[HavenI2cRegParameter] = upickle.default.macroRW
+
+class HavenI2cRegLayers(parameter: HavenI2cRegParameter) extends LayerInterface(parameter):
+  def layers = Seq(Layer("Verification"))
+
+class HavenI2cRegIO(parameter: HavenI2cRegParameter) extends HWBundle(parameter):
+  val clock     = Flipped(Clock())
+  val reset     = Flipped(Reset())
+  val wb_adr_i  = Flipped(Bits(3))
+  val wb_dat_i  = Flipped(Bits(8))
+  val wb_we_i   = Flipped(Bool())
+  val arst_i    = Flipped(Bool())
+  val scl_pad_i = Flipped(Bool())
+  val sda_pad_i = Flipped(Bool())
+  val ACK       = Aligned(Bool())
+  val DAT       = Aligned(Bits(8))
+
+class HavenI2cRegProbe(parameter: HavenI2cRegParameter)
+    extends DVBundle[HavenI2cRegParameter, HavenI2cRegLayers](parameter):
+  val ACK = ProbeRead(Bits(1), layers("Verification"))
+
+@generator
+object HavenI2cRegUT
+    extends Generator[HavenI2cRegParameter, HavenI2cRegLayers, HavenI2cRegIO, HavenI2cRegProbe]
+    with UT[HavenI2cRegParameter, HavenI2cRegIO]:
+  override def moduleName(p: HavenI2cRegParameter): String =
+    s"HavenI2cRegUT_a${p.addr}_" + (if p.isWrite then "w" else "r")
+
+  def architecture(parameter: HavenI2cRegParameter) =
+    val io       = summon[Interface[HavenI2cRegIO]]
+    val instance = HavenI2c.instantiate(HavenI2cParameter())
+    instance.io.wb_clk_i  := io.clock
+    instance.io.wb_rst_i  := io.reset.asBool
+    instance.io.arst_i    := io.arst_i
+    instance.io.wb_adr_i  := io.wb_adr_i
+    instance.io.wb_dat_i  := io.wb_dat_i
+    instance.io.wb_we_i   := io.wb_we_i
+    instance.io.wb_stb_i  := true.B
+    instance.io.wb_cyc_i  := true.B
+    instance.io.scl_pad_i := io.scl_pad_i
+    instance.io.sda_pad_i := io.sda_pad_i
+    io.ACK                := instance.io.wb_ack_o
+    io.DAT                := instance.io.wb_dat_o
+
+    Txn.assumeResetLow(io.reset)
+
+    Generate(
+      Sem.value(
+        io.arst_i & (if parameter.isWrite then io.wb_we_i else !io.wb_we_i) &
+          (io.wb_adr_i === parameter.addr.U(3).asBits)
+      ),
+      s"gen_reg_${if parameter.isWrite then "write" else "read"}_${parameter.addr}"
+    )
+
+    val probe = summon[ProbeInterface[HavenI2cRegProbe]]
     layer("Verification"):
       Probes.expose(probe.ACK, Bits(1), instance.io.wb_ack_o.asBits)

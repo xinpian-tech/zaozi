@@ -27,8 +27,8 @@ class TwoBeatIO(parameter: TwoBeatParameter) extends HWBundle(parameter):
 class TwoBeatUTProbe(parameter: TwoBeatParameter) extends DVBundle[TwoBeatParameter, TwoBeatLayers](parameter):
   val SEEN = ProbeRead(Bool(), layers("Verification"))
 
-/** A minimal sequential DUT: `SEEN` pulses when the input shows the two-beat pattern `A==3` then `A==5` on
-  * consecutive cycles — one register of history.
+/** A minimal sequential DUT: `SEEN` pulses when the input shows the two-beat pattern `A==3` then `A==5` on consecutive
+  * cycles — one register of history.
   */
 @generator
 object TwoBeat extends Generator[TwoBeatParameter, TwoBeatLayers, TwoBeatIO, TwoBeatUTProbe]:
@@ -51,9 +51,9 @@ object TwoBeat extends Generator[TwoBeatParameter, TwoBeatLayers, TwoBeatIO, Two
     layer("Verification"):
       Probes.expose(probe.SEEN, Bool(), io.SEEN)
 
-/** The temporal formal-CRV example: the generation constraint is a *sequence* — C = `(A==3) ### (A==5)` (##1 in SVA terms) (the two-beat
-  * pattern), written in zaozi's typed SVA surface. The body asserts ¬C so the circt-bmc violation trace is a
-  * multi-cycle transaction matching C — same dual reading as [[AbsValOddUT]], one abstraction level up.
+/** The temporal formal-CRV example: the generation constraint is a *sequence* — C = `(A==3) ### (A==5)` (##1 in SVA
+  * terms) (the two-beat pattern), written in zaozi's typed SVA surface. The body asserts ¬C so the circt-bmc violation
+  * trace is a multi-cycle transaction matching C — same dual reading as [[AbsValOddUT]], one abstraction level up.
   */
 @generator
 object TwoBeatUT
@@ -82,8 +82,8 @@ object TwoBeatUT
       Probes.expose(probe.SEEN, Bool(), instance.io.SEEN)
 
 /** Partial temporal specification: the two beats are named, but *when* the second follows is left open —
-  * `##(1, Some(3))` says "somewhere in the next one to three cycles" and the solver picks. HAVEN's DSL cannot
-  * express this: its steps are a total program, so every intervening cycle must be spelled out.
+  * `##(1, Some(3))` says "somewhere in the next one to three cycles" and the solver picks. HAVEN's DSL cannot express
+  * this: its steps are a total program, so every intervening cycle must be spelled out.
   */
 @generator
 object TwoBeatGapUT
