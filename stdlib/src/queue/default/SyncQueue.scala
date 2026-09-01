@@ -14,7 +14,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-/** Operation-oriented implementation of `DW_fifo_s1_sf`.
+/** Operation-oriented synchronous FIFO implementation.
   *
   * The controller is elaborated in this generator. [[Ram]] and the arithmetic primitives are the queue's child modules.
   */
@@ -280,32 +280,29 @@ given QueueImpl with
   ): Wire[QueueIO[D]] =
     val io = Wire(new QueueIO(parameter))
     if parameter.entries == 1 then
-      given ClockScope = ClockScope.posedge(io.clock)
-      given ResetScope =
-        if parameter.asyncReset then ResetScope.asyncActiveHigh(io.reset)
-        else ResetScope.syncActiveHigh(io.reset)
+      val queue = SingleEntryQueue.instantiate(
+        SingleEntryQueueParameter(
+          width = parameter.gen.width,
+          pipe = parameter.pipe,
+          flow = parameter.flow,
+          asyncReset = parameter.asyncReset,
+          resetMem = parameter.resetMem
+        )
+      )
 
-      val full = RegInit(false.B)
-      val data =
-        if parameter.resetMem then RegInit(BigInt(0).U(parameter.gen.width).asBits)
-        else Reg(Bits(parameter.gen.width))
+      queue.io.clock     := io.clock
+      queue.io.reset     := io.reset
+      queue.io.enq.bits  := io.enq.bits.asBits
+      queue.io.enq.valid := io.enq.valid
+      io.enq.ready       := queue.io.enq.ready
 
-      io.enq.ready := !full | (if parameter.pipe then io.deq.ready else false.B)
-      io.deq.valid := full | (if parameter.flow then io.enq.valid else false.B)
+      val dataOut = queue.io.deq.bits.asType(io.deq.bits.getType)
+      io.deq.bits :<= dataOut
+      io.deq.valid       := queue.io.deq.valid
+      queue.io.deq.ready := io.deq.ready
 
-      val enqueue = io.enq.valid & io.enq.ready
-      val dequeue = io.deq.valid & io.deq.ready
-      val bypass  = if parameter.flow then !full & dequeue else false.B
-      val store   = enqueue & !bypass
-
-      full := store | (full & !dequeue)
-      when(store):
-        data := io.enq.bits.asBits
-
-      val storedData = data.asType(io.deq.bits.getType)
-      io.deq.bits :<= (if parameter.flow then full ? (storedData, io.enq.bits) else storedData)
-      io.empty := !full
-      io.full  := full
+      io.empty := queue.io.empty
+      io.full  := queue.io.full
     else
       val queue = SyncQueue.instantiate(
         SyncQueueParameter(

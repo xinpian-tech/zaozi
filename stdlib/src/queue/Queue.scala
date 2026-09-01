@@ -30,7 +30,7 @@ case class QueueParameter[D <: HardwareDataType](
   /** Assert `almostFull` when occupancy reaches `entries - almostFullLevel`. */
   almostFullLevel:  Int = 1)
     extends Parameter:
-  require(entries >= 1, "Queue entries must be positive")
+  require(entries > 0, "Queue entries must be positive")
 
 /** Backend-independent decoupled Queue interface. */
 class QueueIO[D <: HardwareDataType](
