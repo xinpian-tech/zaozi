@@ -22,13 +22,12 @@ object Main:
     os.makeDir.all(dir)
     os.write.over(dir / "Top.mlirbc", design.mlirbc)
     design.verilog.foreach((name, content) => os.write.over(dir / name, content))
-    os.write.over(dir / "program.bin", Bringup.image)
     os.write.over(dir / "target.yaml", Bringup.probeRsTarget(resolved))
     os.write.over(dir / "topology.json", ujson.write(Export.topology(resolved.spec), indent = 2))
     os.write.over(dir / "edges.json", ujson.write(Export.edges(resolved), indent = 2))
     os.write.over(dir / "plan.json", ujson.write(Export.plan(resolved), indent = 2))
     os.write.over(dir / "params.json", ujson.write(Export.params(resolved), indent = 2))
-    // What the bring-up needs to know about this design, for the script that runs it: where the debugger connects,
-    // what it loads where, and what the harts should be seen doing. Derived here so nothing downstream restates it.
-    os.write.over(dir / "bringup.env", Bringup.env)
-    println(s"wrote ${design.verilog.size} Verilog files, Top.mlirbc, program.bin, target.yaml and the exports to $dir")
+    // What the design tells the build about itself: the addresses the program is assembled against, and where the
+    // debugger knocks. Derived here so nothing downstream restates it.
+    os.write.over(dir / "design.env", Bringup.designEnv)
+    println(s"wrote ${design.verilog.size} Verilog files, Top.mlirbc, target.yaml, design.env and the exports to $dir")

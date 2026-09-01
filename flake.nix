@@ -72,6 +72,7 @@
           syntheke-ramulator-capi = pkgs.syntheke.ramulator-capi;
           syntheke-dpi = pkgs.syntheke.dpi;
           syntheke-simprobe = pkgs.syntheke.simprobe;
+          syntheke-riscv-toolchain = pkgs.syntheke.riscv-toolchain;
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
@@ -116,6 +117,7 @@
           # outside nix: `cargo build` in demo/sim/ binds the C ABI's header, and bindgen wants libclang to do it.
           SYNTHEKE_DPI_INSTALL_PATH = pkgs.syntheke.dpi;
           SIMPROBE_INSTALL_PATH = pkgs.syntheke.simprobe;
+          RISCV_TOOLCHAIN_INSTALL_PATH = pkgs.syntheke.riscv-toolchain;
           RAMULATOR_CAPI_INSTALL_PATH = pkgs.syntheke.ramulator-capi;
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         });

@@ -5,3 +5,5 @@ option('dpi', type: 'string', value: '',
   description: 'syntheke-dpi prefix; defaults to $SYNTHEKE_DPI_INSTALL_PATH')
 option('simprobe', type: 'string', value: '',
   description: 'simprobe prefix; defaults to $SIMPROBE_INSTALL_PATH')
+option('riscv', type: 'string', value: '',
+  description: 'RISC-V toolchain prefix; defaults to $RISCV_TOOLCHAIN_INSTALL_PATH')

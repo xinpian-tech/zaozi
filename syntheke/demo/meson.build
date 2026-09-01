@@ -14,7 +14,11 @@ project(
 
 # The packages only this demo needs. `nix develop .#syntheke` exports all three; the options override them.
 prefixes = {}
-foreach tool : [['dpi', 'SYNTHEKE_DPI_INSTALL_PATH'], ['simprobe', 'SIMPROBE_INSTALL_PATH']]
+foreach tool : [
+  ['dpi', 'SYNTHEKE_DPI_INSTALL_PATH'],
+  ['simprobe', 'SIMPROBE_INSTALL_PATH'],
+  ['riscv', 'RISCV_TOOLCHAIN_INSTALL_PATH'],
+]
   prefix = get_option(tool[0])
   if prefix == ''
     prefix = run_command('sh', '-c', 'printf %s "$' + tool[1] + '"', check: true).stdout()
@@ -37,6 +41,23 @@ artifacts = custom_target(
   build_always_stale: true,
   build_by_default: true,
   console: true,
+)
+
+# ---- the program the debugger downloads ------------------------------------------------------------------------
+# Assembled against the design's own address map, which `design.env` carries out of the elaboration.
+program = custom_target(
+  'program',
+  input: artifacts,
+  output: ['program.bin', 'program.env'],
+  command: [
+    scripts / 'assemble.sh',
+    prefixes['riscv'],
+    meson.current_source_dir() / 'program' / 'hello.S',
+    '@INPUT@',
+    '@OUTPUT0@',
+    '@OUTPUT1@',
+  ],
+  build_by_default: true,
 )
 
 # ---- the simulator -----------------------------------------------------------------------------------------------
@@ -64,7 +85,7 @@ vtop = custom_target(
 test(
   'soc bring-up',
   find_program(scripts / 'bringup.sh'),
-  args: [vtop, simprobe.full_path(), artifacts, sim / 'dram.yaml'],
+  args: [vtop, simprobe.full_path(), artifacts, program, sim / 'dram.yaml'],
   timeout: 600,
   workdir: meson.current_build_dir(),
 )

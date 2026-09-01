@@ -15,5 +15,6 @@ final: prev:
     ramulator-capi = final.callPackage ./syntheke/ramulator-capi.nix { inherit ramulator; };
     dpi = final.callPackage ./syntheke/dpi.nix { inherit ramulator-capi; };
     simprobe = final.callPackage ./syntheke/simprobe.nix { };
+    riscv-toolchain = final.callPackage ./syntheke/riscv-toolchain.nix { };
   };
 }

@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# bringup.sh <VTop> <simprobe> <artifacts-dir> <dram-config>
+# bringup.sh <VTop> <simprobe> <artifacts-dir> <program.bin> <program.env> <dram-config>
 #
 # What a bring-up is: power on a chip that halts out of reset with nothing in memory, attach a debugger over JTAG,
 # download the program, give each hart its start PC, let them go — and read what comes out of the UART.
 #
-# Everything specific to the design comes from `bringup.env`, which the elaboration wrote out of the design itself.
+# Nothing about the design is written here. `design.env` came out of the elaboration and `program.env` out of the
+# program's symbol table; between them they say everything this needs to know.
 set -euo pipefail
 
 # Resolved before the cd below: meson names its outputs relative to the build directory.
-vtop=$(realpath "$1"); simprobe=$2; artifacts=$(realpath "$3"); dram_config=$4
+vtop=$(realpath "$1"); simprobe=$2; artifacts=$(realpath "$3")
+program=$(realpath "$4"); program_env=$(realpath "$5"); dram_config=$6
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$work"
 
 # shellcheck source=/dev/null
-. "$artifacts/bringup.env"
-cp "$artifacts/program.bin" "$artifacts/target.yaml" .
+. "$artifacts/design.env"
+# shellcheck source=/dev/null
+. "$program_env"
+cp "$artifacts/target.yaml" .
+cp "$program" program.bin
 # The memory model's CONFIG parameter names it, and finds it beside the simulation.
 cp "$dram_config" dram.yaml
 

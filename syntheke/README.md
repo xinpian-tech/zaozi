@@ -118,9 +118,16 @@ object worth depending on is separate work.
 The user story splits by file: `AxiLibrary.scala` is what an IP author
 ships (per IP: FullParam, endpoint class, a def binding the registry
 entry), `Soc.scala` is what an SoC integrator writes (instantiate and
-wire), `Bringup.scala` is what someone does to the result afterwards.
+wire). What someone then does to the result is split by what knows it:
+`Bringup.scala` reads the design back (the address map, and the debugger's
+target description out of the settled edges), and `program/hello.S` is the
+software, assembled against those same addresses — so the program cannot
+disagree with the chip about where its UART is, and where each hart starts
+comes from the symbol table rather than an offset someone counted.
+
 The zaozi modules themselves sit under `demo/src/zaoziimpl/`, one real
-implementation per file, zaozi API only — the cores are the vendored DitDah32 RV32EC
+implementation per file, zaozi API only — the cores are the vendored
+DitDah32 RV32EC
 (`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening shim, and Xbar /
 WidthBridge / Uart / Gpio / Dma follow their rocket-chip counterparts
 (AXI4Xbar with address decode and arbitration, a width widget, real
