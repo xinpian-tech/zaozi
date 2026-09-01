@@ -108,14 +108,19 @@ sysXbar.input("core0") <-- core0.mem
 // Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error
 ```
 
-The demo (`demo/`) mirrors rocket-chip's `amba.axi4` parameter model:
-id-space prefixing in the crossbar, upward address aggregation, a 128→32
-width bridge, per-edge conflict reporting, and end-to-end Verilog. The user
-story splits by file: `AxiLibrary.scala` is what an IP author ships (per IP:
-FullParam, endpoint class, a def binding the registry entry), `Soc.scala`
-is what an SoC integrator writes (instantiate and wire). The zaozi modules
-themselves sit under `demo/src/zaoziimpl/`, one real implementation per
-file, zaozi API only — the cores are the vendored DitDah32 RV32EC
+The demo (`demo/`) negotiates over an AXI4 protocol modeled on rocket-chip's
+`amba.axi4`: id-space prefixing in the crossbar, upward address aggregation,
+a 128→32 width bridge, per-edge conflict reporting, and end-to-end Verilog.
+It is the demo's AXI and not a model to build on — enough of the parameter
+algebra to put negotiation through its paces, and no further; a protocol
+object worth depending on is separate work.
+
+The user story splits by file: `AxiLibrary.scala` is what an IP author
+ships (per IP: FullParam, endpoint class, a def binding the registry
+entry), `Soc.scala` is what an SoC integrator writes (instantiate and
+wire), `Bringup.scala` is what someone does to the result afterwards.
+The zaozi modules themselves sit under `demo/src/zaoziimpl/`, one real
+implementation per file, zaozi API only — the cores are the vendored DitDah32 RV32EC
 (`zaoziimpl/ditdah32/`, MIT) behind a Lite→AXI4 widening shim, and Xbar /
 WidthBridge / Uart / Gpio / Dma follow their rocket-chip counterparts
 (AXI4Xbar with address decode and arbitration, a width widget, real

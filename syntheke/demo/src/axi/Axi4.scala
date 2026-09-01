@@ -5,7 +5,12 @@ package me.jiuyang.syntheke.demo.axi
 import me.jiuyang.syntheke.*
 import upickle.default.ReadWriter
 
-/** An AXI4 negotiation protocol modeled on rocket-chip's `amba.axi4.Parameters`:
+/** The demo SoC's AXI4 negotiation protocol, modeled on rocket-chip's `amba.axi4.Parameters`.
+  *
+  * This is the demo's AXI, not an AXI4 model to build on: it carries enough of the parameter algebra to put negotiation
+  * through its paces — id spaces that must stay disjoint and get prefixed, address sets that aggregate upward, widths
+  * that follow from both — and stops there. A protocol object worth depending on is separate work, and would start from
+  * the specification rather than from what one example needed.
   *
   *   - `Down` is the master port: masters with disjoint id ranges (AXI4MasterPortParameters);
   *   - `Up` is the slave port: slaves with disjoint address sets, the bus `beatBytes`, and the id capacity the
