@@ -21,7 +21,7 @@ implemented in pure Scala 3.
   the entry's full parameter. The only module that depends on zaozi.
 - **`syntheke.demo`** — the design document's motivation SoC as a real design,
   and the only thing here that runs end to end. Mill's job ends at its jar;
-  `syntheke/meson.build` takes over from there — elaborate, verilate, bring up.
+  `demo/meson.build` takes over from there — elaborate, verilate, bring up.
 
 The design contract is the Syntheke design document (`syntheke` repository,
 branch `init`, `doc/design/`, Chinese). Correspondence:
@@ -102,7 +102,7 @@ def core(idBits: Int)(using ws: WrapperScope, name: sourcecode.Name, file: sourc
 
 // in any design:
 val core0 = core(idBits = 2)   // instance "core0"
-sysXbar.input("in0") <-- core0.mem
+sysXbar.input("core0") <-- core0.mem
 
 // Elaborate (syntheke.circt): bind entries to backends — syntheke.zaoziBackend has one for zaozi — and get Verilog.
 // Elaborator.elaborate(resolved, backends) // ElaboratedDesign; throws ElaborationException at the first error
@@ -230,14 +230,14 @@ Everything the demo needs beyond the JVM is a nix package of its own
 meson, verilator and all four.
 
 Where the boundary falls: mill compiles Scala into `syntheke.demo.assembly`
-and stops. Everything downstream is `syntheke/meson.build` — run the jar to
+and stops. Everything downstream is `demo/meson.build` — run the jar to
 elaborate the design, compile the testbench's DPI against Ramulator,
 verilate the file set, and bring the result up with a debugger. So the
 whole thing is one command:
 
 ```
 nix develop .#syntheke
-cd syntheke && meson setup build && meson test -C build
+cd syntheke/demo && meson setup build && meson test -C build
 ```
 
 ```
@@ -246,7 +246,7 @@ cd syntheke && meson setup build && meson test -C build
 
 Each step is a target of its own if you want the pieces: `ninja -C build
 artifacts` for the elaborated design, `ninja -C build VTop` for the
-simulator. `syntheke/scripts/` holds the three scripts those targets run,
+simulator. `demo/scripts/` holds the three scripts those targets run,
 and what each needs to know about the design — where the debugger attaches,
 what it loads where, what the harts should then be seen doing — comes from
 `bringup.env`, which the elaboration writes out of the design itself.

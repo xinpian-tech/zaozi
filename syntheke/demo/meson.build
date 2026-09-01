@@ -26,14 +26,14 @@ endforeach
 verilator = find_program('verilator')
 simprobe = find_program(prefixes['simprobe'] / 'bin' / 'simprobe')
 scripts = meson.current_source_dir() / 'scripts'
-sim = meson.current_source_dir() / 'demo' / 'sim'
+sim = meson.current_source_dir() / 'sim'
 
 # ---- the design, out of the jar mill builds ----------------------------------------------------------------------
 # Mill decides what is stale on the Scala side, so this always runs and is quick when nothing changed.
 artifacts = custom_target(
   'artifacts',
   output: 'artifacts',
-  command: [scripts / 'elaborate.sh', meson.current_source_dir() / '..', '@OUTPUT@'],
+  command: [scripts / 'elaborate.sh', meson.current_source_dir() / '..' / '..', '@OUTPUT@'],
   build_always_stale: true,
   build_by_default: true,
   console: true,
