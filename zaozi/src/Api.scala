@@ -38,6 +38,8 @@ trait LayerTree:
         override def parent:   Option[LayerTree] = _parent
     rebuildLayer(this, None)
 
+final class DVLayerScope private[zaozi] ()
+
 /** Serializable Layer definition. */
 case class Layer(name: String, children: Seq[Layer] = Seq.empty):
   layer =>
@@ -341,6 +343,18 @@ trait ConstructorApi:
     sourcecode.Name.Machine,
     InstanceContext
   ):   Wire[T]
+  def Wire[T <: Data & CanProbe](
+    refType:   T,
+    forceable: true
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ):   Wire[T] & ForceableReferable[T]
   def Reg[T <: Data](
     refType: T
   )(
@@ -354,6 +368,20 @@ trait ConstructorApi:
     sourcecode.Name.Machine,
     InstanceContext
   ):   Reg[T]
+  def Reg[T <: Data & CanProbe](
+    refType:   T,
+    forceable: true
+  )(
+    using ClockScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ):   Reg[T] & ForceableReferable[T]
   def RegInit[T <: Data](
     input: Const[T]
   )(
@@ -369,6 +397,22 @@ trait ConstructorApi:
     sourcecode.Name.Machine,
     InstanceContext
   ):   Reg[T]
+  def RegInit[T <: Data & CanProbe](
+    input:     Const[T],
+    forceable: true
+  )(
+    using ClockScope
+  )(
+    using ResetScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ):   Reg[T] & ForceableReferable[T]
   def Node[T <: Data](
     ref: Referable[T]
   )(
@@ -380,6 +424,18 @@ trait ConstructorApi:
     sourcecode.Name.Machine,
     InstanceContext
   ):   Node[T]
+  def Node[T <: Data & CanProbe](
+    ref:       Referable[T],
+    forceable: true
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ):   Node[T] & ForceableReferable[T]
   extension (bigInt: BigInt)
     def U(
       width: Int
@@ -577,6 +633,42 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
       Context,
       Block,
       LayerTree,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+
+trait ProbeWriteApi:
+  def ProbeWrite[T <: Data & CanProbe](
+    target: ForceableReferable[T]
+  )(
+    using Arena,
+    Context,
+    Block,
+    DVLayerScope
+  ): ProbeWrite[T]
+
+  extension [T <: Data & CanProbe](probe: ProbeWrite[T])
+    def force(
+      predicate: Referable[Bool],
+      value:     Referable[T]
+    )(
+      using ClockScope,
+      Arena,
+      Context,
+      Block,
+      DVLayerScope,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+
+    def release(
+      predicate: Referable[Bool]
+    )(
+      using ClockScope,
+      Arena,
+      Context,
+      Block,
+      DVLayerScope,
       sourcecode.File,
       sourcecode.Line
     ): Unit

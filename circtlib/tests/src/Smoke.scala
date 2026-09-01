@@ -99,6 +99,27 @@ object Smoke extends TestSuite:
               w1.operation.appendToBlock()
               summon[ConnectApi].op(w0.result, w1.result, unknownLocation).operation.appendToBlock()
 
+            test("test_ref_release_initial_uses_distinct_operation"):
+              val predicate = summon[ConstantApi].op(
+                input = BigInt(1),
+                width = 1,
+                signed = false,
+                location = unknownLocation
+              )
+              val target    = summon[WireApi].op(
+                name = "forceableTarget",
+                location = unknownLocation,
+                nameKind = FirrtlNameKind.Droppable,
+                tpe = 1.getUInt,
+                forceable = true
+              )
+              val release   = summon[RefReleaseInitialApi].op(
+                predicate.result,
+                target.operation.getResult(1),
+                unknownLocation
+              )
+              assert(release.operation.getName.str == "firrtl.ref.release_initial")
+
           test("Structure"):
             test("Instance"):
               summon[InstanceApi]
