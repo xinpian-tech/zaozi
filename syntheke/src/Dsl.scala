@@ -29,7 +29,7 @@ package me.jiuyang.syntheke
 
 /** Entry point: run `body` as the root wrapper module and freeze everything it declared into an immutable
   * [[DesignSpec]], the input of negotiation. Declaration-site contracts fail on the spot while the body runs; the
-  * design-wide contracts (bind ancestry, exactly one bind per inward node, …) are negotiation's checkpoint.
+  * design-wide contracts (bind ancestry, one bind per node, …) are negotiation's checkpoint.
   */
 object Design:
   def apply(
@@ -99,6 +99,11 @@ def generator[FP, A: Dangles](
 
 /** Declare an inward node (bind target) of protocol `p` on the enclosing generator module, named by the binding val.
   * Attach its mandatory up-parameter function with [[InwardNodeBuilder.uFn]] before the body returns.
+  *
+  * A node takes part in exactly one bind, checked by negotiation. There is no fan-out: one node is one edge is one port
+  * carrying one settled parameter, and that identity is what makes a port's type a consequence of the design rather
+  * than of a rule about how many things happen to be attached. A source feeding several consumers therefore declares
+  * one node per consumer — a clock generator says who it drives, and that is a fact worth writing down.
   */
 def inward(
   p:    Protocol
@@ -113,6 +118,8 @@ def inward(
 
 /** Declare an outward node (bind source) of protocol `p` on the enclosing generator module, named by the binding val.
   * Attach its mandatory down-parameter function with [[OutwardNodeBuilder.dFn]] before the body returns.
+  *
+  * One bind per node, as for [[inward]]: a source that feeds several consumers declares one node for each.
   */
 def outward(
   p:    Protocol
