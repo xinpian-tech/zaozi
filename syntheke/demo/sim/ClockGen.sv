@@ -16,7 +16,13 @@ module ClockGen #(
     repeat (20) @(posedge clock);
     reset = 1'b0;
   end
-  always #(500000000 / FREQ_HZ) clock = ~clock;
+  // Half a period, counted in the picoseconds the timescale resolves: in nanoseconds alone the division truncates,
+  // and a rate whose half period is not a whole number of them becomes a different rate without a word.
+  localparam longint HALF_PS = 64'd500000000000 / FREQ_HZ;
+  initial
+    if (HALF_PS * 2 * FREQ_HZ != 64'd1000000000000)
+      $fatal(1, "[ClockGen] %0d Hz has no whole-picosecond period", FREQ_HZ);
+  always #(HALF_PS * 1ps) clock = ~clock;
   initial begin
     #(WATCHDOG_MS * 1ms);
     $display("[ClockGen] watchdog: simulation did not finish");

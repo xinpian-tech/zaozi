@@ -37,7 +37,12 @@ sim = meson.current_source_dir() / 'sim'
 artifacts = custom_target(
   'artifacts',
   output: 'artifacts',
-  command: [scripts / 'elaborate.sh', meson.current_source_dir() / '..' / '..', '@OUTPUT@'],
+  command: [
+    scripts / 'elaborate.sh',
+    meson.current_source_dir() / '..' / '..',
+    '@OUTPUT@',
+    get_option('config'),
+  ],
   build_always_stale: true,
   build_by_default: true,
   console: true,

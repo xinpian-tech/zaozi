@@ -21,11 +21,11 @@ object Bringup:
   /** What the build needs from the design: the addresses the program is assembled against, and where the debugger
     * knocks. The bring-up reads this beside the program's own half.
     */
-  def designEnv: String =
-    s"""JTAG_BRIDGE=127.0.0.1:${Soc.jtagPort}
+  def designEnv(config: SocConfig): String =
+    s"""JTAG_BRIDGE=127.0.0.1:${config.jtagPort}
        |CHIP=$chipName
-       |LOAD=0x${Soc.loadBase.toHexString}
-       |UART_BASE=0x${Soc.uartBase.toHexString}
+       |LOAD=0x${config.loadBase.toHexString}
+       |UART_BASE=0x${config.uartBase.toHexString}
        |""".stripMargin
 
   /** The target description probe-rs needs, read out of the settled design: the TAP it will find on the pins, the harts

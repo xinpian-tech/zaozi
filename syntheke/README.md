@@ -125,6 +125,15 @@ software, assembled against those same addresses — so the program cannot
 disagree with the chip about where its UART is, and where each hart starts
 comes from the symbol table rather than an offset someone counted.
 
+What that integrator chooses rather than writes is `SocConfig.scala`: the
+rates the chip runs at, the map it decodes, the few numbers a board would
+pick. It is an ordinary serializable parameter with defaults, so
+`meson setup build -Dconfig=my.json` builds a different chip out of the
+same topology — and the elaboration writes the effective configuration
+back out as `config.json` beside the design. The line is what changes the
+design's shape: how many crossbar ports there are, which IPs exist, how
+wide their id spaces are, are `Soc.scala`'s; these are its settings.
+
 The zaozi modules themselves sit under `demo/src/zaoziimpl/`, one real
 implementation per file, zaozi API only — the cores are the vendored
 DitDah32 RV32EC
@@ -258,7 +267,7 @@ cd syntheke/demo && meson setup build && meson test -C build
 
 Each step is a target of its own if you want the pieces: `ninja -C build
 artifacts` for the elaborated design, `ninja -C build VTop` for the
-simulator. `demo/scripts/` holds the three scripts those targets run,
+simulator. `demo/scripts/` holds the four scripts those targets run,
 and what each needs to know about the design — where the debugger attaches,
 what it loads where, what the harts should then be seen doing — comes from
-`bringup.env`, which the elaboration writes out of the design itself.
+`design.env`, which the elaboration writes out of the design itself.

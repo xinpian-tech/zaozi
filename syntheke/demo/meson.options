@@ -7,3 +7,5 @@ option('simprobe', type: 'string', value: '',
   description: 'simprobe prefix; defaults to $SIMPROBE_INSTALL_PATH')
 option('riscv', type: 'string', value: '',
   description: 'RISC-V toolchain prefix; defaults to $RISCV_TOOLCHAIN_INSTALL_PATH')
+option('config', type: 'string', value: '',
+  description: 'SocConfig JSON for the demo; the built-in defaults when empty')

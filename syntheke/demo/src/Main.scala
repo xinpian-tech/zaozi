@@ -14,9 +14,10 @@ import me.jiuyang.syntheke.circt.*
   */
 object Main:
   def main(args: Array[String]): Unit =
-    require(args.length == 1, "usage: syntheke-demo <output directory>")
+    require(args.nonEmpty && args.length <= 2, "usage: syntheke-demo <output directory> [config.json]")
     val dir      = os.Path(args.head, os.pwd)
-    val resolved = Negotiator.negotiate(Soc.build())
+    val config   = SocConfig.load(args.lift(1).map(os.Path(_, os.pwd)))
+    val resolved = Negotiator.negotiate(Soc.build(config))
     val design   = Elaborator.elaborate(resolved, axiBackends)
 
     os.makeDir.all(dir)
@@ -29,5 +30,6 @@ object Main:
     os.write.over(dir / "params.json", ujson.write(Export.params(resolved), indent = 2))
     // What the design tells the build about itself: the addresses the program is assembled against, and where the
     // debugger knocks. Derived here so nothing downstream restates it.
-    os.write.over(dir / "design.env", Bringup.designEnv)
+    os.write.over(dir / "design.env", Bringup.designEnv(config))
+    os.write.over(dir / "config.json", upickle.default.write(config, indent = 2))
     println(s"wrote ${design.verilog.size} Verilog files, Top.mlirbc, target.yaml, design.env and the exports to $dir")

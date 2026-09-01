@@ -22,9 +22,14 @@ module PllAnalog #(
     lock  = 0;
     if (OUT_HZ * DIV != REF_HZ * MULT)
       $fatal(1, "[PllAnalog] %0d Hz * %0d / %0d is not %0d Hz", REF_HZ, MULT, DIV, OUT_HZ);
+    if (HALF_PS * 2 * OUT_HZ != 64'd1000000000000)
+      $fatal(1, "[PllAnalog] %0d Hz has no whole-picosecond period", OUT_HZ);
   end
 
-  always #(500000000 / OUT_HZ) clock = ~clock;
+  // Half a period, counted in the picoseconds the timescale resolves: in nanoseconds alone the division truncates,
+  // and 200 MHz would come out of this loop as 250 MHz without a word.
+  localparam longint HALF_PS = 64'd500000000000 / OUT_HZ;
+  always #(HALF_PS * 1ps) clock = ~clock;
 
   // Lock detector: the loop needs the reference running and out of reset.
   always @(posedge refClock) begin

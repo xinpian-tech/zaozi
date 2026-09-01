@@ -15,26 +15,6 @@ import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
   */
 object Soc:
 
-  /** The address map, in one place. Every IP below is placed from these, and the debugger is told about them out of the
-    * settled edges rather than from here.
-    */
-  val loadBase:      Long = 0x80000000L // DRAM: where the harts run from and the debugger puts the program
-  val dramBytes:     Long = 0x40000000L // one rank of DDR4 8Gb x8, the device the harness's model is configured as
-  val uartBase:      Long = 0x10000000L
-  val gpioBase:      Long = 0x10010000L
-  val periphSize:    Long = 0x1000L
-  // The DMA walks a window inside DRAM, which is why its base is derived from the memory's rather than restated.
-  val dmaWindowLog2: Int  = 10
-  val dmaTarget:     Long = loadBase + 0x800
-
-  /** The TCP port the simulation's JTAG bridge listens on. A property of the harness, which is why it is here; the
-    * debugger reads it back out of [[Bringup]].
-    */
-  val jtagPort: Int = 5555
-
-  /** The Ramulator configuration, as the memory model's parameter names it and the simulation finds it. */
-  val dramConfigFile: String = "dram.yaml"
-
   /** What leaves the debug island. Named rather than a tuple: two of these are clocks of the same type, and a tuple
     * would let them be swapped without a word from the compiler or the negotiation.
     */
@@ -54,7 +34,8 @@ object Soc:
     * The clock plumbing is one tap per consumer because a node takes part in exactly one bind — see the note on
     * [[me.jiuyang.syntheke.outward]]. A clock source therefore declares who it feeds, and this is what that costs.
     */
-  def build(refHz: Int = 25000000): DesignSpec =
+  def build(config: SocConfig = SocConfig()): DesignSpec =
+    import config.*
     Design {
       // Outside the chip: the crystal, the harness's own devices running off it, and the memory the chip's bus port
       // ends in — one rank of DDR4, which is a device to attach, not RTL to write.
@@ -62,7 +43,7 @@ object Soc:
         freqHz = refHz,
         taps = Vector("ref"),
         jtagPort = jtagPort,
-        tckDiv = 2,
+        tckDiv = tckDiv,
         memBase = loadBase,
         memSize = dramBytes,
         memIdCapBits = 6,
@@ -71,7 +52,7 @@ object Soc:
 
       // On the die: the PLL multiplies the reference to the system clock and feeds every consumer.
       val sysPll = pll(
-        outHz = 100000000,
+        outHz = sysHz,
         taps = Vector(
           "core0",
           "core1",
@@ -105,8 +86,8 @@ object Soc:
 
       val periphXbar = axiXbar(Vector("bridge"), Vector("uart", "gpio"), Arbitration.FixedPriority)
 
-      val uart = uartCtrl(base = uartBase, size = periphSize, idCapacityBits = 8, baud = 115200)
-      val gpio = gpioCtrl(base = gpioBase, size = periphSize, idCapacityBits = 8, width = 8)
+      val uart = uartCtrl(base = uartBase, size = periphSize, idCapacityBits = 8, baud = baud)
+      val gpio = gpioCtrl(base = gpioBase, size = periphSize, idCapacityBits = 8, width = gpioWidth)
 
       // The on-chip half of the debug chain is one wrapper module: transport and debug module inside it, and only
       // what leaves the island crossing its boundary — the pins, one port per hart, and the module's bus master,
