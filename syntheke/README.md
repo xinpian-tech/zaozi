@@ -113,11 +113,12 @@ The demo (`demo/`) negotiates over an AXI4 protocol modeled on rocket-chip's
 a 128→32 width bridge, per-edge conflict reporting, and end-to-end Verilog.
 It is the demo's AXI and not a model to build on — enough of the parameter
 algebra to put negotiation through its paces, and no further; a protocol
-object worth depending on is separate work. So `Axi4.scala` sits with the
-demo's other protocol declarations rather than in a package of its own:
-what the design speaks is one layer, and every protocol in it is one file
-named after itself — `Axi4`, `ClockDomain`, `Serial`, `GpioPins`, `Jtag`,
-`Dmi`, `DebugInterrupt`, `RvTrace`.
+object worth depending on is separate work. It is one of eight in
+`protocol/` — `Axi4`, `ClockDomain`, `Serial`, `GpioPins`, `Jtag`, `Dmi`,
+`DebugInterrupt`, `RvTrace` — one file each, named after itself. What the
+design speaks is a layer of its own and not a node's property: `Axi4` is
+spoken by six IPs, the harness and the debug module's bus master, and
+`RvTrace` by no node at all.
 
 The user story splits by directory: `node/` is what an IP author ships —
 one file per IP, the same three declarations in each (FullParam, endpoint
@@ -172,7 +173,7 @@ DMA's beat counter, the debug module's `hartsel`, `data1` and `sbAddress`.
 Both lower to the same FIRRTL type; the difference is that the declaration
 says which signals are numbers, and slicing and concatenating no longer
 round-trip through `asBits` and `asUInt` at every step. The exception is
-the trace, whose types are the vendored core's — see `RvTrace.scala`.
+the trace, whose types are the vendored core's — see `protocol/RvTrace.scala`.
 
 There is no DRAM among them. Memory is not on the die and is not an IP of
 this design, so what the chip has is a memory port: an `Axi4` node the
@@ -185,7 +186,7 @@ pretending to be a DRAM would tell the design nothing about the latency it
 will actually see.
 
 The RISC-V debug chain is three more protocols
-(`demo/src/{Jtag,Dmi,DebugInterrupt}.scala`), one per boundary, because that
+(`protocol/{Jtag,Dmi,DebugInterrupt}.scala`), one per boundary, because that
 is where the parameters actually meet: `Jtag` carries the TAP the
 transport implements down to whoever drives the pins (idcode, IR length,
 the scan-register widths, the instruction selecting DMI), `Dmi` is the
@@ -241,7 +242,7 @@ the RAM range from the memory port's, the harts from the debug module's.
 
 The harts' instruction trace reaches the harness the way the framework
 intends verification to work, and it is the only thing in the demo that
-does: `RvTrace` (`demo/src/RvTrace.scala`) is a `DVProtocol`
+does: `RvTrace` (`protocol/RvTrace.scala`) is a `DVProtocol`
 carrying the core's whole trace surface, and each `CoreNodes` declares one
 `dvSource` of it. That declaration is not a connection — nothing in the
 topology mentions the trace — and the framework forwards every leaf up to
