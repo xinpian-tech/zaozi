@@ -122,7 +122,7 @@ spoken by six IPs, the harness and the debug module's bus master, and
 
 The user story splits by directory: `node/` is what an IP author ships —
 one file per IP, the same three declarations in each (FullParam, endpoint
-class, a def binding the registry entry) — and `Soc.scala` is what an SoC
+class, a def binding the registry entry) — and `soc/Soc.scala` is what an SoC
 integrator writes (instantiate and wire). The testbench is wrapped exactly
 like an IP but is not one, so it keeps to `harness/` — its wrap and its
 zaozi modules together, because what cuts it out of the design is what it
@@ -135,14 +135,15 @@ software, assembled against those same addresses — so the program cannot
 disagree with the chip about where its UART is, and where each hart starts
 comes from the symbol table rather than an offset someone counted.
 
-What that integrator chooses rather than writes is `SocConfig.scala`: the
+What that integrator chooses rather than writes is `soc/SocConfig.scala`: the
 rates the chip runs at, the map it decodes, the few numbers a board would
 pick. It is an ordinary serializable parameter with defaults, so
 `meson setup build -Dconfig=my.json` builds a different chip out of the
 same topology — and the elaboration writes the effective configuration
 back out as `config.json` beside the design. The line is what changes the
 design's shape: how many crossbar ports there are, which IPs exist, how
-wide their id spaces are, are `Soc.scala`'s; these are its settings.
+wide their id spaces are, are `Soc.scala`'s; these are its settings — which
+is why the two sit together.
 
 The zaozi modules themselves sit under `demo/src/zaoziimpl/`, one real
 implementation per file, zaozi API only — the cores are the vendored
