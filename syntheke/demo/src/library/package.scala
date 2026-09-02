@@ -8,7 +8,7 @@ import me.jiuyang.syntheke.demo.zaoziimpl.AxiShape
 /** The syntheke wrap of the chip's zaozi modules (`zaoziimpl/`) — how a plain zaozi IP gets onto the negotiation graph.
   * One file per IP, the same three declarations in each: a registry entry typed by the IP's zaozi Parameter
   * (negotiation computes it as the FullParam, doc @sec-two-layer-params), the endpoint class declaring nodes and
-  * negotiation functions, and a def binding both to the entry. [[axiBackends]] binds every entry to its zaozi generator
+  * negotiation functions, and a def binding both to the entry. [[backends]] binds every entry to its zaozi generator
   * — the only place the two sides meet; the elaborator checks the zaozi ports against every settled interface at
   * instantiation (@dec-binding-check).
   *

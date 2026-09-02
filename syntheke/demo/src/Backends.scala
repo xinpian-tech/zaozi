@@ -11,7 +11,7 @@ import me.jiuyang.syntheke.demo.zaoziimpl.harness.TestHarnessGen
   * negotiation's side and zaozi's side meet. It is its own file because it belongs to neither: `library/` declares the
   * chip's entries, [[Harness]] the testbench's, and both are elaborated through this table.
   */
-val axiBackends: Seq[GeneratorBackend] = Seq(
+val backends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(TestHarness, TestHarnessGen),
   ZaoziBackend(Pll, PllGen),
   ZaoziBackend(Core, CoreDeviceGen),

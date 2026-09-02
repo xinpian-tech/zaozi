@@ -18,7 +18,7 @@ object Main:
     val dir      = os.Path(args.head, os.pwd)
     val config   = SocConfig.load(args.lift(1).map(os.Path(_, os.pwd)))
     val resolved = Negotiator.negotiate(Soc.build(config))
-    val design   = Elaborator.elaborate(resolved, axiBackends)
+    val design   = Elaborator.elaborate(resolved, backends)
 
     os.makeDir.all(dir)
     os.write.over(dir / "Top.mlirbc", design.mlirbc)
