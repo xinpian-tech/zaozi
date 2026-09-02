@@ -75,7 +75,11 @@
 
 `ProtocolInterface` 是可序列化数据。协商期处理该数据，例化期将其翻译为 FIRRTL 类型。
 
-设计协议的接口由 `Bundle`、`Vec`、`UInt`、`SInt`、`Bool`、`Clock` 与 `Reset` 构成。验证协议的接口以 `Probe`（FIRRTL 对内部信号的只读引用，@ch-verification）包装每个信号叶，并在 `Probe` 中记录 `LayerPath`。
+设计协议的接口由 `Bundle`、`Vec`、`Bits`、`UInt`、`SInt`、`Bool`、`Clock` 与 `Reset` 构成。验证协议的接口以 `Probe`（FIRRTL 对内部信号的只读引用，@ch-verification）包装每个信号叶，并在 `Probe` 中记录 `LayerPath`。
+
+#决策([端口默认是 `Bits`，只有算术到达的端口才是 `UInt`])[
+  `Bits`、`UInt` 与 `SInt` 翻译为同一族 FIRRTL 类型，区别只在声明说了什么。端口承载的是位，切片与拼接是对位做的；把不做算术的端口声明为 `UInt`，等于宣称它是一个数，且每次切片都要先撤销这个类型再装回去。因此默认是 `Bits`，只有加减、取模、大小比较真正到达的端口才声明为 `UInt`，转换发生在算术那一处。这条同样适用于生成器模块内部的寄存器与线网。
+] <dec-bits-default>
 
 `ProtocolBundle` 描述源端视角的字段结构。框架为源模块端口赋予 Output 根方向，为目标模块端口赋予 Input 根方向；对齐是无标记的默认，方向取反的字段以 `Flipped` 包装其类型（仅可直接作为字段类型出现）。字段顺序是接口结构的一部分。
 

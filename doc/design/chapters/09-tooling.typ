@@ -8,7 +8,7 @@
 
 `ResolvedDesign` 可按需导出四份 JSON：
 
-- *拓扑*（`topology.json`）：模块树、模块节点、设计 bind、模块内部参数依赖、测试平台模块标识（未声明为 null），以及探针源——每条记录 `Down`、层路径与声明处导出的接口。模块、节点、bind 和探针源包含各自的稳定标识；一条模块内部参数依赖由有序二元组“inward `ModuleNodeId`、outward `ModuleNodeId`”唯一标识。各项同时保存声明顺序和源码位置。
+- *拓扑*（`topology.json`）：模块树、模块节点、设计 bind、模块内部参数依赖、测试平台模块标识（未声明为 null），以及探针源——每条记录 `Down`、层路径与声明处导出的接口。模块、节点、bind 和探针源包含各自的稳定标识；结构模块另记其声明的模块名（@dec-wrapper-module-name）。一条模块内部参数依赖由有序二元组“inward `ModuleNodeId`、outward `ModuleNodeId`”唯一标识。各项同时保存声明顺序和源码位置。
 - *求解结果*（`edges.json`）：`designEdges` 按 bind 声明顺序保存 `BindId`、源与目标节点、传播得到的 `Down` 与 `Up`、`Edge` 和 `ProtocolBundle`。
 - *计划*（`plan.json`）：每个模块的跨层端口计划、连线计划与层声明；每项计划以 `Design(BindId)` 或 `Verification(DVSourceId)` 标记来源，并记录对应声明的源码位置（@sec-punch-planning、@sec-layers）。
 - *整机参数*（`params.json`）：每个生成器模块一条记录，包含模块标识、生成器标识和该实例的 `FullParam` 值；生成器标识确定对应的 `FullParam` 序列化格式。
