@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
+[package]
+name = "syntheke-dpi"
+version = "0.1.0"
+edition = "2021"
+description = "What the demo SoC's testbench does outside the RTL: the debugger's socket, and the memory behind the bus"
+
+[lib]
+# Loaded by the verilated simulation, which resolves the DPI imports against it; a shared object carries its own
+# dependency on the Ramulator C ABI, so whoever links it needs to know nothing about Ramulator.
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[build-dependencies]
+# Ramulator reaches Rust through a C ABI (nix/syntheke/ramulator-capi); the bindings come from its header.
+bindgen = "0.72"

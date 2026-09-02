@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
+package me.jiuyang.syntheke.circt
+
+import me.jiuyang.syntheke.*
+
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{
+  given_FirrtlBundleFieldApi,
+  given_TypeApi,
+  FirrtlBundleField,
+  FirrtlBundleFieldApi,
+  TypeApi as FirrtlTypeApi
+}
+import org.llvm.mlir.scalalib.capi.ir.{
+  given_AttributeApi,
+  given_IdentifierApi,
+  given_TypeApi,
+  Context,
+  Type as MlirType
+}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
+
+import java.lang.foreign.Arena
+
+/** Serializable interface descriptions to MLIR FIRRTL types (doc @sec-protocol-interface: negotiation manipulates the
+  * data, elaboration translates it). Probe types occur only at the root of a translated type — probes route per
+  * interface leaf, so a mixed data-and-probe bundle is never translated and no open aggregates arise.
+  */
+object Translate:
+
+  def tpe(
+    t: ProtocolInterface
+  )(
+    using Arena,
+    Context
+  ): MlirType = t match
+    case ProtocolInterface.Bundle(fields) =>
+      fields.map { f =>
+        val (flip, t) = f.tpe match
+          case ProtocolInterface.Flipped(inner) => (true, inner)
+          case t                                => (false, t)
+        summon[FirrtlBundleFieldApi].createFirrtlBundleField(f.name, flip, tpe(t))
+      }.getBundle
+    case ProtocolInterface.Vec(n, e)      => tpe(e).getVector(n)
+    case ProtocolInterface.Flipped(_)     =>
+      // Direction is a bundle-field flag in FIRRTL; a Flipped outside a field position has no type of its own.
+      throw new IllegalArgumentException("Flipped is legal only directly as a bundle field's type")
+    case ProtocolInterface.Bits(w)        => w.getUInt
+    case ProtocolInterface.UInt(w)        => w.getUInt
+    case ProtocolInterface.SInt(w)        => w.getSInt
+    case ProtocolInterface.Bool           => 1.getUInt
+    case ProtocolInterface.Clock          => summon[FirrtlTypeApi].getClock
+    case ProtocolInterface.Reset          => summon[FirrtlTypeApi].getReset
+    case ProtocolInterface.Probe(i, l)    => tpe(i).getRef(false, l.segments)
+
+  /** A module port field: `isInput` maps to a flipped top-level bundle field. */
+  def portField(
+    name:    String,
+    isInput: Boolean,
+    t:       ProtocolInterface
+  )(
+    using Arena,
+    Context
+  ): FirrtlBundleField =
+    summon[FirrtlBundleFieldApi].createFirrtlBundleField(name, isInput, tpe(t))
+
+  /** The distinct probe layer paths appearing in an interface, name-sorted — a module's layer requirements. */
+  def probeLayers(t: ProtocolInterface): Vector[Vector[String]] =
+    def collect(t: ProtocolInterface): Vector[Vector[String]] = t match
+      case ProtocolInterface.Bundle(fields) => fields.flatMap(f => collect(f.tpe))
+      case ProtocolInterface.Vec(_, e)      => collect(e)
+      case ProtocolInterface.Flipped(inner) => collect(inner)
+      case ProtocolInterface.Probe(_, l)    => Vector(l.segments) // no probes inside a probe, by construction
+      case _                                => Vector.empty
+    collect(t).distinct.sorted(
+      using Ordering.Implicits.seqOrdering[Vector, String]
+    )

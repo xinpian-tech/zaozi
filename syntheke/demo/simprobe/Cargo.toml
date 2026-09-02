@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
+[package]
+name = "simprobe"
+version = "0.1.0"
+edition = "2021"
+description = "A probe-rs debug probe whose JTAG pins are a simulation's, over the DPI bridge"
+
+[dependencies]
+# No default features: the built-in target database and the USB backends are for real hardware, and this probe is
+# neither. The target comes from the YAML beside this crate.
+probe-rs = { version = "0.32", default-features = false }
+bitvec = "1"
+anyhow = "1"
+
+[[bin]]
+name = "simprobe"
+path = "src/main.rs"

@@ -14,6 +14,8 @@
 , add-determinism
 , z3
 , espresso
+, verilator
+, python3
 , mkMavenRepository
 
 }:
@@ -54,6 +56,8 @@ let
       makeWrapper
       z3
       espresso
+      verilator
+      python3 # verilator's generated makefiles call python3
     ];
 
     shellHook = ''

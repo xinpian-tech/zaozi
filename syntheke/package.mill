@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
+package build.syntheke
+
+import mill._
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+
+import build.{circtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
+
+// Syntheke: treaty-driven topology and parameter negotiation framework.
+// Build and Negotiate are pure computation over plain data — the base module
+// depends on no MLIR/CIRCT native code; the Elaborate phase lives in the
+// nested `circt` module, which binds generator modules to zaozi and emits
+// wrapper modules directly through the CIRCT C-API.
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
+  def scalaVersion = Task(v.scala)
+  def mvnDeps      = Seq(v.oslib, v.upickle, v.sourcecode)
+
+  // The Elaborate phase, and nothing about who enacts a module: the elaborator emits wrapper modules through the
+  // CIRCT C-API, links the per-module circuits and lowers them, and reaches generator modules only through the
+  // `GeneratorBackend` contract. No eDSL among its dependencies.
+  object circt extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(m, circtlib)
+
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+
+  // One implementation of that contract: a generator entry enacted by a zaozi Generator. The only module here that
+  // depends on the eDSL.
+  object zaoziBackend extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(circt, zaozi)
+
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+
+  // The demo SoC: the design document's motivation SoC as a real design — the AXI4 protocol library, the zaozi IPs,
+  // the topology, and a main that elaborates it into artifacts. Mill's part ends at that jar; `meson.build` beside it
+  // takes the artifacts from there, through verilator and a debugger, to a design that prints.
+  object demo extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(zaoziBackend, zaozi)
+
+    // The zaozi annotation macros are experimental, and -Xcheck-macros does not survive them.
+    override def scalacOptions: T[Seq[String]] =
+      Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros") ++ Seq("-experimental"))
+
+    override def mainClass: T[Option[String]] = Task(Some("me.jiuyang.syntheke.demo.Main"))
+
+    // C2 miscompiles something on this workload — the JVM dies with SIGSEGV inside JIT-compiled code, at a different
+    // point every run, and never with -Xint or with C1 alone. Elaborating takes two seconds, which C2 cannot pay back
+    // anyway: capped at C1 the run is deterministic *and* twice as fast.
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs() ++ Seq("-XX:TieredStopAtLevel=1")
+    )
+  }
+}

@@ -23,3 +23,8 @@ result*
 *.fst
 *.fsdb
 *.log
+
+syntheke/demo/simprobe/target/
+syntheke/demo/sim/target/
+
+syntheke/demo/build*/
