@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.syntheke.demo.zaoziimpl
+package me.jiuyang.syntheke.demo.zaoziimpl.harness
 
+import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.zaozi.{DVBundle, Generator, HWBundle, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{generator as zaoziGenerator, *, given}
 import me.jiuyang.zaozi.reftpe.Interface

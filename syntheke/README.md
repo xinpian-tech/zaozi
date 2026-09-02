@@ -118,7 +118,11 @@ object worth depending on is separate work.
 The user story splits by file: `AxiLibrary.scala` is what an IP author
 ships (per IP: FullParam, endpoint class, a def binding the registry
 entry), `Soc.scala` is what an SoC integrator writes (instantiate and
-wire). What someone then does to the result is split by what knows it:
+wire). The testbench is wrapped exactly like an IP but is not one, so it
+is `Harness.scala`'s and not the library's, and `Backends.scala` binds
+every entry from both to its zaozi generator — the one table the
+elaboration receives. What someone then does to the result is split by
+what knows it:
 `Bringup.scala` reads the design back (the address map, and the debugger's
 target description out of the settled edges), and `program/hello.S` is the
 software, assembled against those same addresses — so the program cannot
@@ -142,7 +146,10 @@ WidthBridge / Uart / Gpio / Dma follow their rocket-chip counterparts
 (AXI4Xbar with address decode and arbitration, a width widget, real
 peripheral register files; no L2 — an AXI fabric without coherence gives
 one nothing testable to do). `demo/src/AxiLibrary.scala` is the wrap that
-puts them on the negotiation graph.
+puts them on the negotiation graph. What is not on the die keeps to
+`zaoziimpl/harness/` — the clock generator, the console, the board's pads,
+the JTAG adapter, the DRAM and the trace log — so the directory says which
+modules the chip ships and which only surround it.
 
 There is no DRAM among them. Memory is not on the die and is not an IP of
 this design, so what the chip has is a memory port: an `Axi4` node the
@@ -179,7 +186,7 @@ the spec allows, a program buffer, needs the hart to execute the
 debugger's instructions, which this core does not do.
 
 Everything that is not the chip is in one module, the design's
-`testbench`: `TestHarness.scala` publishes the board's 25 MHz reference
+`testbench`: `zaoziimpl/harness/TestHarness.scala` publishes the board's 25 MHz reference
 clock, holds the debug adapter on the JTAG pins, the DRAM on the memory
 port, and terminates the serial and GPIO pins in a console and a board
 model. On the die the reference
@@ -192,8 +199,8 @@ divisor (868 and 217) from the frequency at its own edge. It is a container, not
 monolith — each of those is its own zaozi module instantiated inside it —
 and every rate it needs comes from the settled edges, so the harness
 cannot disagree with the chip about the baud rate or the pin count.
-`UartHarness.scala` is the same thing sized to the UART demo. Nothing in
-the design is test equipment, and no module of the harness is an IP.
+Nothing in the design is test equipment, and no module of the harness is
+an IP — which is why neither the wrap nor the modules sit among them.
 
 There is no boot ROM, and no debugger inside the design either. The
 adapter on the JTAG pins is `JtagDpi.scala`, an external module whose
