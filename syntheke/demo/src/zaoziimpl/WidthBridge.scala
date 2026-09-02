@@ -17,23 +17,23 @@ import java.lang.foreign.Arena
   * direction; ids pass through unchanged.
   */
 
-case class BridgeDeviceP(wide: AxiShape, narrow: AxiShape) extends Parameter derives ReadWriter:
+case class WidthBridgeP(wide: AxiShape, narrow: AxiShape) extends Parameter derives ReadWriter:
   require(wide.dataBits == 128 && narrow.dataBits == 32, s"bridge is 128→32, got ${wide.dataBits}→${narrow.dataBits}")
   require(wide.idBits == narrow.idBits, s"bridge passes ids through, got ${wide.idBits} vs ${narrow.idBits}")
   require(wide.addrBits >= narrow.addrBits, s"narrow addresses embed in wide ones")
 
-class BridgeDevicePLayers(p: BridgeDeviceP) extends LayerInterface(p):
+class WidthBridgePLayers(p: WidthBridgeP) extends LayerInterface(p):
   def layers = Seq.empty
-class BridgeDevicePProbe(p: BridgeDeviceP)  extends DVBundle[BridgeDeviceP, BridgeDevicePLayers](p)
-class BridgeDevicePIO(p: BridgeDeviceP)     extends HWBundle(p):
+class WidthBridgePProbe(p: WidthBridgeP)  extends DVBundle[WidthBridgeP, WidthBridgePLayers](p)
+class WidthBridgePIO(p: WidthBridgeP)     extends HWBundle(p):
   val clk = Flipped(new ClockBundle)
-  val in  = Flipped(new Axi4Bundle(p.wide))
-  val out = Aligned(new Axi4Bundle(p.narrow))
+  val in  = Flipped(new AxiPortBundle(p.wide))
+  val out = Aligned(new AxiPortBundle(p.narrow))
 
 @generator
-object BridgeDeviceGen extends Generator[BridgeDeviceP, BridgeDevicePLayers, BridgeDevicePIO, BridgeDevicePProbe]:
-  def architecture(p: BridgeDeviceP) =
-    val io           = summon[Interface[BridgeDevicePIO]]
+object WidthBridgeGen extends Generator[WidthBridgeP, WidthBridgePLayers, WidthBridgePIO, WidthBridgePProbe]:
+  def architecture(p: WidthBridgeP) =
+    val io           = summon[Interface[WidthBridgePIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 

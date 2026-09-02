@@ -20,34 +20,23 @@ import java.lang.foreign.Arena
   *   - 0x8 IN (R): synchronized pad inputs
   */
 
-case class GpioDeviceP(width: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
+case class GpioP(width: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
   require(width >= 1 && width <= 32, s"gpio width $width must be within 1..32")
   require(dataBits == 32, s"gpio is a 32-bit single-beat slave, got dataBits $dataBits")
   def shape: AxiShape = AxiShape(addrBits, dataBits, idBits)
 
-class GpioPinsBundle(width: Int) extends Bundle:
-  val out = Aligned(Bits(width))
-  val oe  = Aligned(Bits(width))
-  val in  = Flipped(Bits(width))
-
-/** The string-keyed twin, for a module whose ports are named by its parameter (the test harness). */
-class GpioPinsRecord(width: Int) extends Record:
-  val out = Aligned("out", Bits(width))
-  val oe  = Aligned("oe", Bits(width))
-  val in  = Flipped("in", Bits(width))
-
-class GpioDevicePLayers(p: GpioDeviceP) extends LayerInterface(p):
+class GpioPLayers(p: GpioP) extends LayerInterface(p):
   def layers = Seq.empty
-class GpioDevicePProbe(p: GpioDeviceP)  extends DVBundle[GpioDeviceP, GpioDevicePLayers](p)
-class GpioDevicePIO(p: GpioDeviceP)     extends HWBundle(p):
+class GpioPProbe(p: GpioP)  extends DVBundle[GpioP, GpioPLayers](p)
+class GpioPIO(p: GpioP)     extends HWBundle(p):
   val clk  = Flipped(new ClockBundle)
-  val in   = Flipped(new Axi4Bundle(p.shape))
+  val in   = Flipped(new AxiPortBundle(p.shape))
   val pins = Aligned(new GpioPinsBundle(p.width))
 
 @generator
-object GpioDeviceGen extends Generator[GpioDeviceP, GpioDevicePLayers, GpioDevicePIO, GpioDevicePProbe]:
-  def architecture(p: GpioDeviceP) =
-    val io           = summon[Interface[GpioDevicePIO]]
+object GpioGen extends Generator[GpioP, GpioPLayers, GpioPIO, GpioPProbe]:
+  def architecture(p: GpioP) =
+    val io           = summon[Interface[GpioPIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 

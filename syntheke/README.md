@@ -114,9 +114,10 @@ a 128→32 width bridge, per-edge conflict reporting, and end-to-end Verilog.
 It is the demo's AXI and not a model to build on — enough of the parameter
 algebra to put negotiation through its paces, and no further; a protocol
 object worth depending on is separate work. So `Axi4.scala` sits with the
-demo's other protocol declarations (`DemoProtocols.scala`,
-`DebugProtocols.scala`, `TraceProtocol.scala`) rather than in a package of
-its own: what the design speaks is one layer, and this is one of four.
+demo's other protocol declarations rather than in a package of its own:
+what the design speaks is one layer, and every protocol in it is one file
+named after itself — `Axi4`, `ClockDomain`, `Serial`, `GpioPins`, `Jtag`,
+`Dmi`, `DebugInterrupt`, `RvTrace`.
 
 The user story splits by file: `library/` is what an IP author ships —
 one file per IP, the same three declarations in each (FullParam, endpoint
@@ -154,7 +155,12 @@ implementation — and not all of them speak AXI: the PLL negotiates clock
 domains, the debug transport a TAP and a DMI bus. What is not on the die
 keeps to `zaoziimpl/harness/` — the clock generator, the console, the pads,
 the JTAG adapter, the DRAM and the trace log — so the directory says which
-modules the chip ships and which only surround it.
+modules the chip ships and which only surround it. The port shapes every
+module shares are `zaoziimpl/shape/`, one file per protocol rather than one
+per flavour, so the clock and the pins are not filed under AXI: each shape
+comes as a Record (string-keyed, for a module whose port list its parameter
+decides) and as a Bundle (typed read-back, for a fixed port list), and the
+name says which — `AxiPortRecord` / `AxiPortBundle`.
 
 One convention runs through all of them, and through the protocols they
 settle on: a port, a register or a wire is `Bits` unless an arithmetic
@@ -165,7 +171,7 @@ DMA's beat counter, the debug module's `hartsel`, `data1` and `sbAddress`.
 Both lower to the same FIRRTL type; the difference is that the declaration
 says which signals are numbers, and slicing and concatenating no longer
 round-trip through `asBits` and `asUInt` at every step. The exception is
-the trace, whose types are the vendored core's — see `TraceProtocol.scala`.
+the trace, whose types are the vendored core's — see `RvTrace.scala`.
 
 There is no DRAM among them. Memory is not on the die and is not an IP of
 this design, so what the chip has is a memory port: an `Axi4` node the
@@ -178,7 +184,7 @@ pretending to be a DRAM would tell the design nothing about the latency it
 will actually see.
 
 The RISC-V debug chain is three more protocols
-(`demo/src/DebugProtocols.scala`), one per boundary, because that
+(`demo/src/{Jtag,Dmi,DebugInterrupt}.scala`), one per boundary, because that
 is where the parameters actually meet: `Jtag` carries the TAP the
 transport implements down to whoever drives the pins (idcode, IR length,
 the scan-register widths, the instruction selecting DMI), `Dmi` is the
@@ -234,7 +240,7 @@ the RAM range from the memory port's, the harts from the debug module's.
 
 The harts' instruction trace reaches the harness the way the framework
 intends verification to work, and it is the only thing in the demo that
-does: `RvTrace` (`demo/src/TraceProtocol.scala`) is a `DVProtocol`
+does: `RvTrace` (`demo/src/RvTrace.scala`) is a `DVProtocol`
 carrying the core's whole trace surface, and each `CoreNodes` declares one
 `dvSource` of it. That declaration is not a connection — nothing in the
 topology mentions the trace — and the framework forwards every leaf up to

@@ -14,12 +14,12 @@ import me.jiuyang.syntheke.demo.zaoziimpl.harness.TestHarnessGen
 val backends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(TestHarness, TestHarnessGen),
   ZaoziBackend(Pll, PllGen),
-  ZaoziBackend(Core, CoreDeviceGen),
-  ZaoziBackend(Dma, DmaDeviceGen),
+  ZaoziBackend(Core, CoreGen),
+  ZaoziBackend(Dma, DmaGen),
   ZaoziBackend(Xbar, XbarGen),
   ZaoziBackend(Dtm, DtmGen),
   ZaoziBackend(Dm, DmGen),
-  ZaoziBackend(WidthBridge, BridgeDeviceGen),
-  ZaoziBackend(Uart, UartDeviceGen),
-  ZaoziBackend(Gpio, GpioDeviceGen)
+  ZaoziBackend(WidthBridge, WidthBridgeGen),
+  ZaoziBackend(Uart, UartGen),
+  ZaoziBackend(Gpio, GpioGen)
 )

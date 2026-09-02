@@ -5,10 +5,10 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 
-val Core = new GeneratorEntry[CoreDeviceP]
+val Core = new GeneratorEntry[CoreP]
 
-/** One core ([[CoreDeviceGen]], the real DitDah32 RV32EC behind a widening shim): a boundary outward node with a local
-  * id space; the master is named after the instance.
+/** One core ([[CoreGen]], the real DitDah32 RV32EC behind a widening shim): a boundary outward node with a local id
+  * space; the master is named after the instance.
   */
 final class CoreNodes(
   name:        String,
@@ -18,12 +18,12 @@ final class CoreNodes(
   enableDebug: Boolean,
   enableTrace: Boolean
 )(
-  using GeneratorScope[CoreDeviceP])
+  using GeneratorScope[CoreP])
     extends Nodes:
   val clk               = inward(ClockDomain).uFn(_ => Right(()))
   private val debugNode = Option.when(enableDebug) {
     given sourcecode.Name = sourcecode.Name("debug")
-    inward(DebugInterrupt).uFn(_ => Right(DebugHartCap(CoreDeviceP.xlen)))
+    inward(DebugInterrupt).uFn(_ => Right(DebugHartCap(CoreP.xlen)))
   }
 
   /** The hart's debug port, present only on a core built with one. */
@@ -36,12 +36,12 @@ final class CoreNodes(
     */
   private val traceSource = Option.when(enableTrace) {
     given sourcecode.Name = sourcecode.Name("trace")
-    dvSource(RvTrace)(RvTraceShape(CoreDeviceP.xlen, CoreDeviceP.regIndexBits), traceLayer)
+    dvSource(RvTrace)(RvTraceShape(CoreP.xlen, CoreP.regIndexBits), traceLayer)
   }
 
   parameters { view =>
     val s = shapeOf(view, mem)
-    Right(CoreDeviceP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug, enableTrace))
+    Right(CoreP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug, enableTrace))
   }
   val mem =
     outward(Axi4).dFn(_ =>

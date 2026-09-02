@@ -13,23 +13,23 @@ import upickle.default.ReadWriter
   * word, and wraps forever. The read channels are tied off.
   */
 
-case class DmaDeviceP(targetBase: Long, windowLog2: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter
+case class DmaP(targetBase: Long, windowLog2: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter
     derives ReadWriter:
   require(dataBits == 128, s"dma issues 128-bit beats, got dataBits $dataBits")
   require(windowLog2 >= 4 && windowLog2 <= 30, s"dma windowLog2 $windowLog2 must be within 4..30")
   require(targetBase >= 0 && (targetBase & ((1L << windowLog2) - 1)) == 0, s"dma window must be aligned to its size")
 
-class DmaDevicePLayers(p: DmaDeviceP) extends LayerInterface(p):
+class DmaPLayers(p: DmaP) extends LayerInterface(p):
   def layers = Seq.empty
-class DmaDevicePProbe(p: DmaDeviceP)  extends DVBundle[DmaDeviceP, DmaDevicePLayers](p)
-class DmaDevicePIO(p: DmaDeviceP)     extends HWBundle(p):
+class DmaPProbe(p: DmaP)  extends DVBundle[DmaP, DmaPLayers](p)
+class DmaPIO(p: DmaP)     extends HWBundle(p):
   val clk = Flipped(new ClockBundle)
-  val mem = Aligned(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
+  val mem = Aligned(new AxiPortBundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
 
 @generator
-object DmaDeviceGen extends Generator[DmaDeviceP, DmaDevicePLayers, DmaDevicePIO, DmaDevicePProbe]:
-  def architecture(p: DmaDeviceP) =
-    val io           = summon[Interface[DmaDevicePIO]]
+object DmaGen extends Generator[DmaP, DmaPLayers, DmaPIO, DmaPProbe]:
+  def architecture(p: DmaP) =
+    val io           = summon[Interface[DmaPIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 

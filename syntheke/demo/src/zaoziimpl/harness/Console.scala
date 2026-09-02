@@ -53,7 +53,7 @@ object ConsoleGen extends Generator[ConsoleP, ConsolePLayers, ConsolePIO, Consol
     val divW   = math.max(1, 32 - Integer.numberOfLeadingZeros(p.divisor - 1))
     val reload = (p.divisor - 1).U(divW)
 
-    // The UART's receive engine (see [[UartDeviceGen]]), watching the tx line from outside.
+    // The UART's receive engine (see [[UartGen]]), watching the tx line from outside.
     val rxSync = RegInit(true.B)
     rxSync := io.serial.tx
     val rxShift = RegInit(0.B(8))

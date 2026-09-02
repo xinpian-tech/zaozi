@@ -5,10 +5,10 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 
-val Dma = new GeneratorEntry[DmaDeviceP]
+val Dma = new GeneratorEntry[DmaP]
 
-/** The DMA engine ([[DmaDeviceGen]], the real device): an AXI master with its own small id space, walking a write
-  * window from `targetBase`.
+/** The DMA engine ([[DmaGen]], the real device): an AXI master with its own small id space, walking a write window from
+  * `targetBase`.
   */
 final class DmaNodes(
   name:       String,
@@ -17,12 +17,12 @@ final class DmaNodes(
   targetBase: Long,
   windowLog2: Int
 )(
-  using GeneratorScope[DmaDeviceP])
+  using GeneratorScope[DmaP])
     extends Nodes:
   val clk = inward(ClockDomain).uFn(_ => Right(()))
   parameters { view =>
     val s = shapeOf(view, mem)
-    Right(DmaDeviceP(targetBase, windowLog2, s.addrBits, s.dataBits, s.idBits))
+    Right(DmaP(targetBase, windowLog2, s.addrBits, s.dataBits, s.idBits))
   }
   val mem =
     outward(Axi4).dFn(_ =>

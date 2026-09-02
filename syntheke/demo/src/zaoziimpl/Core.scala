@@ -21,7 +21,7 @@ import java.lang.foreign.Arena
   * module speaks — the same adapter role it plays for the memory port.
   */
 
-case class CoreDeviceP(
+case class CoreP(
   resetPc:     Int,
   addrBits:    Int,
   dataBits:    Int,
@@ -32,21 +32,21 @@ case class CoreDeviceP(
   require(dataBits == 32 || dataBits == 128, s"the core shim rides a 32- or 128-bit fabric, got dataBits $dataBits")
   require(addrBits >= 1 && addrBits <= 32, s"the core addresses at most a 32-bit space, got addrBits $addrBits")
   require((resetPc & 0x3) == 0 && resetPc >= 0, s"resetPc 0x${resetPc.toHexString} must be 32-bit aligned")
-  val xlen:         Int = CoreDeviceP.xlen
-  val regIndexBits: Int = CoreDeviceP.regIndexBits
+  val xlen:         Int = CoreP.xlen
+  val regIndexBits: Int = CoreP.regIndexBits
 
-object CoreDeviceP:
+object CoreP:
   /** The vendored core's fixed facts, which its trace is shaped by. */
   val xlen:         Int = 32
   val regIndexBits: Int = 4 // RV32E: sixteen registers
 
-class CoreDevicePLayers(p: CoreDeviceP) extends LayerInterface(p):
+class CorePLayers(p: CoreP) extends LayerInterface(p):
   def layers = if p.enableTrace then Seq(Layer("DV")) else Seq.empty
 
 /** The hart's trace, forwarded from the vendored core and confined to the same layer it colours its probes with. The
   * field order and widths are [[me.jiuyang.syntheke.demo.RvTrace]]'s — the binding checkpoint compares them.
   */
-class CoreDevicePProbe(parameter: CoreDeviceP) extends DVBundle[CoreDeviceP, CoreDevicePLayers](parameter):
+class CorePProbe(parameter: CoreP) extends DVBundle[CoreP, CorePLayers](parameter):
   private def dv              = layers("DV")
   private def word            = UInt(parameter.xlen)
   val trace_valid             = Option.when(parameter.enableTrace)(ProbeRead(Bool(), dv))
@@ -87,15 +87,15 @@ class CoreDevicePProbe(parameter: CoreDeviceP) extends DVBundle[CoreDeviceP, Cor
   val trace_mcause            = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
   val trace_irqPendingMask    = Option.when(parameter.enableTrace)(ProbeRead(word, dv))
 
-class CoreDevicePIO(p: CoreDeviceP) extends HWBundle(p):
+class CorePIO(p: CoreP) extends HWBundle(p):
   val clk   = Flipped(new ClockBundle)
-  val mem   = Aligned(new Axi4Bundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
+  val mem   = Aligned(new AxiPortBundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
   val debug = Option.when(p.enableDebug)(Flipped(new DebugHartBundle(p.xlen)))
 
 @generator
-object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevicePIO, CoreDevicePProbe]:
-  def architecture(p: CoreDeviceP) =
-    val io           = summon[Interface[CoreDevicePIO]]
+object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
+  def architecture(p: CoreP) =
+    val io           = summon[Interface[CorePIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 
@@ -111,7 +111,7 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     // ---- trace: the hart's probes forwarded to the shim's own, one reference each ----
     if p.enableTrace then
       layer("DV"):
-        val probe              = summon[ProbeInterface[CoreDevicePProbe]]
+        val probe              = summon[ProbeInterface[CorePProbe]]
         val t                  = core.probe
         def word               = UInt(p.xlen)
         val validW             = Wire(Bool())

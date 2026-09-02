@@ -21,23 +21,23 @@ import upickle.default.ReadWriter
   * Serial format 8N1, LSB first; `divisor` clocks per bit, receive sampled at mid-bit.
   */
 
-case class UartDeviceP(divisor: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
+case class UartP(divisor: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
   require(divisor >= 8, s"uart divisor $divisor: needs at least 8 clocks per bit")
   require(dataBits == 32, s"uart is a 32-bit single-beat slave, got dataBits $dataBits")
   def shape: AxiShape = AxiShape(addrBits, dataBits, idBits)
 
-class UartDevicePLayers(p: UartDeviceP) extends LayerInterface(p):
+class UartPLayers(p: UartP) extends LayerInterface(p):
   def layers = Seq.empty
-class UartDevicePProbe(p: UartDeviceP)  extends DVBundle[UartDeviceP, UartDevicePLayers](p)
-class UartDevicePIO(p: UartDeviceP)     extends HWBundle(p):
+class UartPProbe(p: UartP)  extends DVBundle[UartP, UartPLayers](p)
+class UartPIO(p: UartP)     extends HWBundle(p):
   val clk    = Flipped(new ClockBundle)
-  val in     = Flipped(new Axi4Bundle(p.shape))
+  val in     = Flipped(new AxiPortBundle(p.shape))
   val serial = Aligned(new SerialBundle)
 
 @generator
-object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevicePIO, UartDevicePProbe]:
-  def architecture(p: UartDeviceP) =
-    val io           = summon[Interface[UartDevicePIO]]
+object UartGen extends Generator[UartP, UartPLayers, UartPIO, UartPProbe]:
+  def architecture(p: UartP) =
+    val io           = summon[Interface[UartPIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 

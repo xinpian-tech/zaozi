@@ -5,7 +5,7 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 
-val WidthBridge = new GeneratorEntry[BridgeDeviceP]
+val WidthBridge = new GeneratorEntry[WidthBridgeP]
 
 /** A width bridge: masters pass down unchanged; upstream it re-presents the narrow peripherals on the wide bus,
   * fragmenting bursts internally, so the supported transfer ceiling grows to its own limit.
@@ -14,7 +14,7 @@ final class WidthBridgeNodes(
   wideBeatBytes:       Int,
   maxUpstreamTransfer: Int
 )(
-  using GeneratorScope[BridgeDeviceP])
+  using GeneratorScope[WidthBridgeP])
     extends Nodes:
   val clk            = inward(ClockDomain).uFn(_ => Right(()))
   val in             = inward(Axi4)
@@ -35,7 +35,7 @@ final class WidthBridgeNodes(
       )
     )
   }
-  parameters(view => Right(BridgeDeviceP(shapeOf(view, in), shapeOf(view, out))))
+  parameters(view => Right(WidthBridgeP(shapeOf(view, in), shapeOf(view, out))))
 
 def widthBridge(
   wideBeatBytes:       Int,

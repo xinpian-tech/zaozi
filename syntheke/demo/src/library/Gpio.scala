@@ -5,10 +5,10 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 
-val Gpio = new GeneratorEntry[GpioDeviceP]
+val Gpio = new GeneratorEntry[GpioP]
 
-/** The GPIO block ([[GpioDeviceGen]], the real device): a boundary inward node serving one address range on a 32-bit
-  * bus, publishing its pin bank.
+/** The GPIO block ([[GpioGen]], the real device): a boundary inward node serving one address range on a 32-bit bus,
+  * publishing its pin bank.
   */
 final class GpioNodes(
   name:           String,
@@ -17,13 +17,13 @@ final class GpioNodes(
   idCapacityBits: Int,
   width:          Int
 )(
-  using GeneratorScope[GpioDeviceP])
+  using GeneratorScope[GpioP])
     extends Nodes:
   val clk  = inward(ClockDomain).uFn(_ => Right(()))
   val pins = outward(GpioPins).dFn(_ => Right(width))
   parameters { view =>
     val s = shapeOf(view, in)
-    Right(GpioDeviceP(width, s.addrBits, s.dataBits, s.idBits))
+    Right(GpioP(width, s.addrBits, s.dataBits, s.idBits))
   }
   val in   = inward(Axi4).uFn(_ =>
     Right(
