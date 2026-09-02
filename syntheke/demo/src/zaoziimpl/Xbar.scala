@@ -104,9 +104,7 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
       Block
     ): Referable[Bool] =
       p.routes(o)
-        .map((base, mask) =>
-          ((addr ^ BigInt(base).B(p.addrBits)) & ~BigInt(mask).B(p.addrBits)) === 0.B(p.addrBits)
-        )
+        .map((base, mask) => ((addr ^ BigInt(base).B(p.addrBits)) & ~BigInt(mask).B(p.addrBits)) === 0.B(p.addrBits))
         .reduce(_ | _)
 
     def grantChain(

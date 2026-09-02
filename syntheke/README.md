@@ -115,14 +115,14 @@ It is the demo's AXI and not a model to build on — enough of the parameter
 algebra to put negotiation through its paces, and no further; a protocol
 object worth depending on is separate work.
 
-The user story splits by file: `AxiLibrary.scala` is what an IP author
-ships (per IP: FullParam, endpoint class, a def binding the registry
-entry), `Soc.scala` is what an SoC integrator writes (instantiate and
-wire). The testbench is wrapped exactly like an IP but is not one, so it
-is `Harness.scala`'s and not the library's, and `Backends.scala` binds
-every entry from both to its zaozi generator — the one table the
-elaboration receives. What someone then does to the result is split by
-what knows it:
+The user story splits by file: `library/` is what an IP author ships —
+one file per IP, the same three declarations in each (FullParam, endpoint
+class, a def binding the registry entry) — and `Soc.scala` is what an SoC
+integrator writes (instantiate and wire). The testbench is wrapped exactly
+like an IP but is not one, so it is `Harness.scala`'s and not the
+library's, and `Backends.scala` binds every entry from both to its zaozi
+generator — the one table the elaboration receives. What someone then does
+to the result is split by what knows it:
 `Bringup.scala` reads the design back (the address map, and the debugger's
 target description out of the settled edges), and `program/hello.S` is the
 software, assembled against those same addresses — so the program cannot
@@ -145,9 +145,11 @@ DitDah32 RV32EC
 WidthBridge / Uart / Gpio / Dma follow their rocket-chip counterparts
 (AXI4Xbar with address decode and arbitration, a width widget, real
 peripheral register files; no L2 — an AXI fabric without coherence gives
-one nothing testable to do). `demo/src/AxiLibrary.scala` is the wrap that
-puts them on the negotiation graph. What is not on the die keeps to
-`zaoziimpl/harness/` — the clock generator, the console, the board's pads,
+one nothing testable to do). `demo/src/library/` is the wrap that puts them
+on the negotiation graph, one file per IP against one file per
+implementation — and not all of them speak AXI: the PLL negotiates clock
+domains, the debug transport a TAP and a DMI bus. What is not on the die
+keeps to `zaoziimpl/harness/` — the clock generator, the console, the pads,
 the JTAG adapter, the DRAM and the trace log — so the directory says which
 modules the chip ships and which only surround it.
 

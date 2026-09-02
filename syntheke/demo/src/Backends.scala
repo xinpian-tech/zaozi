@@ -8,8 +8,8 @@ import me.jiuyang.syntheke.demo.zaoziimpl.*
 import me.jiuyang.syntheke.demo.zaoziimpl.harness.TestHarnessGen
 
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives, and the only place the
-  * negotiation's side and zaozi's side meet. It is its own file because it belongs to neither: [[AxiLibrary]] declares
-  * the chip's entries, [[Harness]] the testbench's, and both are elaborated through this table.
+  * negotiation's side and zaozi's side meet. It is its own file because it belongs to neither: `library/` declares the
+  * chip's entries, [[Harness]] the testbench's, and both are elaborated through this table.
   */
 val axiBackends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(TestHarness, TestHarnessGen),

@@ -6,9 +6,9 @@ import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.axi.Axi4
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 
-/** The demo SoC: the design document's motivation SoC, assembled from the IP library in [[AxiLibrary]] and negotiated
-  * over [[me.jiuyang.syntheke.demo.axi.Axi4]]. This file is the SoC integrator's side — instantiate and wire; what each
-  * IP offers and demands is the library's, and what the design becomes is negotiation's.
+/** The demo SoC: the design document's motivation SoC, assembled from the IP library in `library/` and negotiated over
+  * [[me.jiuyang.syntheke.demo.axi.Axi4]]. This file is the SoC integrator's side — instantiate and wire; what each IP
+  * offers and demands is the library's, and what the design becomes is negotiation's.
   *
   * Nothing here is a test, and nothing here says how the result is started — that is [[Bringup]]'s. The design is
   * elaborated by [[Main]] into artifacts, and what runs them is meson's business, one directory up.

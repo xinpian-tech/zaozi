@@ -8,7 +8,7 @@ import upickle.default.ReadWriter
 
 /** The AXI bundle shapes shared by every zaozi IP of the demo SoC, mirroring `Axi4.interfaceOf` exactly. Each IP lives
   * in its own file in this package; the syntheke wrap — registry entries, endpoint classes, backend bindings — lives in
-  * `AxiLibrary.scala` in the circt test module.
+  * `library/` beside it.
   */
 
 // The @generator macro derives a mainargs CLI for every Parameter; nested fields read as JSON tokens.
