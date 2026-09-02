@@ -1,18 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.syntheke.demo
+package me.jiuyang.syntheke.demo.harness
 
 import me.jiuyang.syntheke.*
+import me.jiuyang.syntheke.demo.{
+  shapeOf,
+  AddressSet,
+  Axi4,
+  AxiSlaveParams,
+  AxiSlavePort,
+  ClockDomain,
+  GpioPins,
+  Jtag,
+  RegionType,
+  RvTraceShape,
+  Serial,
+  TransferSizes
+}
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
-import me.jiuyang.syntheke.demo.zaoziimpl.harness.{*, given}
 
-/** The syntheke wrap of the design's testbench — the same shape as an IP's wrap in `library/`, and deliberately not in
-  * it: the harness is not an IP of this SoC. Nothing here is on the die, so nothing here is something the SoC ships; it
-  * is the board, the debugger's adapter, the terminal and the DRAM, in one module the framework knows as the testbench
+/** The syntheke wrap of the design's testbench — the same shape as an IP's wrap in `node/`, and deliberately not there:
+  * the harness is not an IP of this SoC. Nothing here is on the die, so nothing here is something the SoC ships; it is
+  * the board, the debugger's adapter, the terminal and the DRAM, in one module the framework knows as the testbench
   * (`testbench`, at most one per design).
   *
-  * Its zaozi modules are [[me.jiuyang.syntheke.demo.zaoziimpl.harness]], kept apart from the chip's for the same
-  * reason.
+  * Its zaozi modules are the rest of this package rather than `zaoziimpl/`: the harness is cut out of the design by
+  * what it is, not by which layer it belongs to, so its wrap and its modules live together.
   */
 
 val TestHarness = new GeneratorEntry[TestHarnessP]

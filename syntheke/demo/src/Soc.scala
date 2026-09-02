@@ -3,9 +3,10 @@
 package me.jiuyang.syntheke.demo
 
 import me.jiuyang.syntheke.*
+import me.jiuyang.syntheke.demo.harness.testHarness
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 
-/** The demo SoC: the design document's motivation SoC, assembled from the IP library in `library/` and negotiated over
+/** The demo SoC: the design document's motivation SoC, assembled from the nodes in `node/` and negotiated over
   * [[Axi4]]. This file is the SoC integrator's side — instantiate and wire; what each IP offers and demands is the
   * library's, and what the design becomes is negotiation's.
   *

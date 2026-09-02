@@ -119,15 +119,16 @@ what the design speaks is one layer, and every protocol in it is one file
 named after itself — `Axi4`, `ClockDomain`, `Serial`, `GpioPins`, `Jtag`,
 `Dmi`, `DebugInterrupt`, `RvTrace`.
 
-The user story splits by file: `library/` is what an IP author ships —
+The user story splits by directory: `node/` is what an IP author ships —
 one file per IP, the same three declarations in each (FullParam, endpoint
 class, a def binding the registry entry) — and `Soc.scala` is what an SoC
 integrator writes (instantiate and wire). The testbench is wrapped exactly
-like an IP but is not one, so it is `Harness.scala`'s and not the
-library's, and `Backends.scala` binds every entry from both to its zaozi
-generator — the one table the elaboration receives. What someone then does
-to the result is split by what knows it:
-`Bringup.scala` reads the design back (the address map, and the debugger's
+like an IP but is not one, so it keeps to `harness/` — its wrap and its
+zaozi modules together, because what cuts it out of the design is what it
+is, not which layer it belongs to. `Backends.scala` binds every entry from
+both to its zaozi generator — the one table the elaboration receives. What
+someone then does to the result is split by what knows it: `Bringup.scala`
+reads the design back (the address map, and the debugger's
 target description out of the settled edges), and `program/hello.S` is the
 software, assembled against those same addresses — so the program cannot
 disagree with the chip about where its UART is, and where each hart starts
@@ -149,11 +150,11 @@ DitDah32 RV32EC
 WidthBridge / Uart / Gpio / Dma follow their rocket-chip counterparts
 (AXI4Xbar with address decode and arbitration, a width widget, real
 peripheral register files; no L2 — an AXI fabric without coherence gives
-one nothing testable to do). `demo/src/library/` is the wrap that puts them
+one nothing testable to do). `demo/src/node/` is the wrap that puts them
 on the negotiation graph, one file per IP against one file per
 implementation — and not all of them speak AXI: the PLL negotiates clock
 domains, the debug transport a TAP and a DMI bus. What is not on the die
-keeps to `zaoziimpl/harness/` — the clock generator, the console, the pads,
+keeps to `harness/` — the clock generator, the console, the pads,
 the JTAG adapter, the DRAM and the trace log — so the directory says which
 modules the chip ships and which only surround it. The port shapes every
 module shares are `zaoziimpl/shape/`, one file per protocol rather than one
@@ -208,7 +209,7 @@ the spec allows, a program buffer, needs the hart to execute the
 debugger's instructions, which this core does not do.
 
 Everything that is not the chip is in one module, the design's
-`testbench`: `zaoziimpl/harness/TestHarness.scala` publishes the board's 25 MHz reference
+`testbench`: `harness/TestHarness.scala` publishes the board’s 25 MHz reference
 clock, holds the debug adapter on the JTAG pins, the DRAM on the memory
 port, and terminates the serial and GPIO pins in a console and a board
 model. On the die the reference

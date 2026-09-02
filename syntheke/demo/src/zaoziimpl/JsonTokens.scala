@@ -7,7 +7,7 @@ import upickle.default.ReadWriter
 /** The `@generator` macro derives a mainargs CLI for every Parameter, so a parameter with nested fields needs a reader
   * for them: each such field reads as one JSON token. Every `given …Tokens` in this package is one of these.
   */
-private[zaoziimpl] def jsonTokens[T: ReadWriter](name: String): mainargs.TokensReader.Simple[T] =
+private[demo] def jsonTokens[T: ReadWriter](name: String): mainargs.TokensReader.Simple[T] =
   new mainargs.TokensReader.Simple[T]:
     def shortName = name
     def read(strs: Seq[String]): Either[String, T] =
