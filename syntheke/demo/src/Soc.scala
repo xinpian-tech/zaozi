@@ -92,7 +92,7 @@ object Soc:
       // The on-chip half of the debug chain is one wrapper module: transport and debug module inside it, and only
       // what leaves the island crossing its boundary — the pins, one port per hart, and the module's bus master,
       // which is the path a debugger's download takes.
-      val debug = wrapper {
+      val debug = wrapper("DebugIsland") {
         val dtm = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
         val dm  = debugModule(harts = 2, haltOnReset = true, sbIdBits = 1)
         dm.dmi <-- dtm.dmi

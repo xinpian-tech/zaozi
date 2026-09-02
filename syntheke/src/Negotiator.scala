@@ -59,6 +59,15 @@ object Negotiator:
       seen + e.name
     }
 
+    // Wrapper module names: stated, so two of them can be the same word — and two modules of one name is one module
+    // the emitter cannot write. The root's "Top" takes part like any other.
+    spec.moduleOrder.flatMap(spec.wrapper).foldLeft(Map.empty[String, ModuleId]) { (seen, w) =>
+      seen.get(w.moduleName) match
+        case Some(first) =>
+          fail(s"wrapper module name '${w.moduleName}' declared by both ${first.show} and ${w.id.show}, at ${at(Vector(w.loc))}")
+        case None        => seen + (w.moduleName -> w.id)
+    }
+
     // Design binds : endpoint existence (builders can leak across Design builds), declaration-site ancestry,
     // and the exactly-once discipline. Directions and protocol equality hold by construction.
     spec.binds.foreach { b =>

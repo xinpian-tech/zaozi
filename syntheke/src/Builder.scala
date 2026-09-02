@@ -37,7 +37,7 @@ private[syntheke] final class UndeclaredReadException(val node: ModuleNodeId)
     extends RuntimeException(s"read of ${node.show} which is not a declared dependency of this function")
 
 /** A structural module under construction. */
-final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
+final class WrapperScope private[syntheke] (val id: ModuleId, moduleName: String, st: BuildState):
   private val children = mutable.ArrayBuffer.empty[String]
 
   private def addChild(name: String): ModuleId =
@@ -51,15 +51,17 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
 
   /** Instantiate a child wrapper module; returns the body's dangling nodes. */
   private[syntheke] def wrapper[A: Dangles](
-    name: String
-  )(body: WrapperScope ?=> A
+    name:       String,
+    moduleName: String
+  )(body:       WrapperScope ?=> A
   )(
     using
-    file: sourcecode.File,
-    line: sourcecode.Line
+    file:       sourcecode.File,
+    line:       sourcecode.Line
   ): A =
+    DeclaredName.require(moduleName, s"wrapper module name at instance '$name' in ${id.show}")
     val childId = addChild(name)
-    val scope   = new WrapperScope(childId, st)
+    val scope   = new WrapperScope(childId, moduleName, st)
     val result  = body(
       using scope
     )
@@ -114,7 +116,7 @@ final class WrapperScope private[syntheke] (val id: ModuleId, st: BuildState):
     st.binds += BindDecl(st.binds.size, source, target, id, loc)
 
   private[syntheke] def close(loc: (sourcecode.File, sourcecode.Line)): Unit =
-    st.modules(id) = WrapperModuleSpec(id, children.toVector, loc)
+    st.modules(id) = WrapperModuleSpec(id, moduleName, children.toVector, loc)
 
 /** A generator module under construction: nodes, dependencies, probe sources and parameter functions. */
 final class GeneratorScope[FP] private[syntheke] (val id: ModuleId, st: BuildState, entry: GeneratorEntry[FP]):

@@ -45,6 +45,14 @@ Deviations from the document's surface syntax:
 - Dangle-port name segments encode to FIRRTL-legal identifiers by joining with
   `_` and escaping `_` → `$u`, `-` → `$m`, `$` → `$$` (the document leaves the
   concrete reversible encoding to the implementation).
+- A wrapper states its module name: `wrapper("DebugIsland"){...}`. The instance
+  name is still the binding val's. A generator module is named by its backend
+  from the settled FullParam, but a wrapper has no FullParam to be named after
+  — deriving one from the instance path would name the module after where it
+  sits. Two wrappers of a design may not state the same name (negotiation), and
+  a wrapper may not take a name a generator module of the design also emits
+  (elaboration, where the generator side is known). The root is `Top`: the one
+  wrapper with no binding val to state it at.
 - Verification is publish-only: a `dvSource` declares the probes a module
   publishes (`DVProtocol.interfaceOf(down, layer)`, checked at the
   declaration), and the framework forwards every probe leaf automatically —
@@ -185,7 +193,7 @@ are ordinary IPs, lifted out of the core into `Dm.scala` / `Dtm.scala`: the
 transport holds the tck-to-system crossing, and the module holds a hart
 array selected by `dmcontrol.hartsello`, each hart with its own halt
 request and flags. The core keeps only its hart-side debug port. The two
-sit inside a `wrapper` module of their own, so only what leaves the debug
+sit inside a `wrapper("DebugIsland")` of their own, so only what leaves the
 island — the pins, the hart ports, the bus master — crosses its boundary,
 as dangle ports the framework punches through.
 

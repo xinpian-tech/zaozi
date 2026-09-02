@@ -37,6 +37,7 @@ object Export:
             ujson.Obj(
               "id"       -> moduleId(id),
               "kind"     -> ujson.Str("wrapper"),
+              "moduleName" -> ujson.Str(w.moduleName),
               "children" -> ujson.Arr.from(w.children.map(ujson.Str(_))),
               "loc"      -> loc(w.loc)
             )

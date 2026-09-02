@@ -110,8 +110,9 @@ object Elaborator:
     val backendOf: Map[GeneratorEntry[?], GeneratorBackend] = backends.map(b => (b.entry: GeneratorEntry[?]) -> b).toMap
     val spec = resolved.spec
 
-    // Module names: generator modules are named by their backend (the canonical linking key); wrapper modules by the
-    // reversible encoding of their instance path, "Top" for the root. Structural merging of identical modules is
+    // Module names: generator modules are named by their backend from the settled FullParam (the canonical linking
+    // key, so two instances of one parameterization are one module); wrapper modules by the name their declaration
+    // states, which negotiation has already checked is theirs alone. Structural merging of identical modules is
     // firtool's job (its Dedup pass), not syntheke's.
     val moduleNames: Map[ModuleId, String] = spec.moduleOrder.map { id =>
       id -> (spec.modules(id) match
@@ -121,8 +122,15 @@ object Elaborator:
             .fold(fail(s"missing backend for generator ${g.entry.name} at ${id.show}"))(b =>
               b.moduleName(resolved.generatorModule(id).get.fullParam)
             )
-        case _: WrapperModuleSpec   => if id.path.isEmpty then "Top" else PortName(id.path).encoded)
+        case w: WrapperModuleSpec   => w.moduleName)
     }.toMap
+
+    // The two naming schemes meet in one flat symbol namespace, and only here is the generator side known.
+    val generatorNames = spec.generatorModules.map(g => moduleNames(g.id)).toSet
+    spec.moduleOrder.flatMap(spec.wrapper).foreach { w =>
+      if generatorNames(w.moduleName) then
+        fail(s"wrapper ${w.id.show} is named '${w.moduleName}', which a generator module of this design also takes")
+    }
 
     val arena = Arena.ofConfined()
     try

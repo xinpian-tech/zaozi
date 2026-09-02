@@ -32,6 +32,11 @@ package me.jiuyang.syntheke
   * design-wide contracts (bind ancestry, one bind per node, …) are negotiation's checkpoint.
   */
 object Design:
+  /** The root module is `Top`: it is the one wrapper with no binding val and no instance path, so there is nothing to
+    * state it at and nothing for it to collide with.
+    */
+  val rootModuleName: String = "Top"
+
   def apply(
     body: WrapperScope ?=> Unit
   )(
@@ -40,7 +45,7 @@ object Design:
     line: sourcecode.Line
   ): DesignSpec =
     val st    = new BuildState
-    val scope = new WrapperScope(ModuleId.root, st)
+    val scope = new WrapperScope(ModuleId.root, rootModuleName, st)
     st.moduleOrder += ModuleId.root
     body(
       using scope
@@ -66,19 +71,24 @@ final class GeneratorEntry[FP](
   declaredName: sourcecode.Name):
   val name: String = declaredName.value
 
-/** Instantiate a child structural module named by the binding val: its body composes child instances and `<--` binds
-  * (doc @sec-module-kinds). Returns the body's dangling nodes ([[Dangles]]).
+/** Instantiate a child structural module: its body composes child instances and `<--` binds (doc
+  * @sec-module-kinds). Returns the body's dangling nodes ([[Dangles]]).
+  *
+  * The instance name is the binding val's, like every other declaration. `moduleName` is not: a generator module is
+  * named by its backend from the settled FullParam, and a wrapper has no FullParam to be named after — its content is
+  * whatever its body composed. So it is stated here, and two wrappers of a design may not state the same one.
   */
 def wrapper[A: Dangles](
-  body: WrapperScope ?=> A
+  moduleName: String
+)(body:       WrapperScope ?=> A
 )(
   using
-  ws:   WrapperScope,
-  name: sourcecode.Name,
-  file: sourcecode.File,
-  line: sourcecode.Line
+  ws:         WrapperScope,
+  name:       sourcecode.Name,
+  file:       sourcecode.File,
+  line:       sourcecode.Line
 ): A =
-  ws.wrapper(name.value)(body)
+  ws.wrapper(name.value, moduleName)(body)
 
 /** Instantiate a child generator module named by the binding val, bound to registry entry `entry`: a leaf of the
   * hierarchy, implemented by a hardware generator (doc @sec-module-kinds). Its body declares nodes, dependencies, probe

@@ -57,11 +57,16 @@ sealed trait ModuleSpec:
   def id:  ModuleId
   def loc: (sourcecode.File, sourcecode.Line)
 
-/** A structural module: composes children and declares binds; its circuit is emitted by the framework. */
+/** A structural module: composes children and declares binds; its circuit is emitted by the framework.
+  *
+  * `moduleName` is stated at the declaration rather than derived: a wrapper has no FullParam to be named after, so
+  * nothing but its author knows what the module is. The instance name is the binding val's, as everywhere else.
+  */
 final case class WrapperModuleSpec(
-  id:       ModuleId,
-  children: Vector[String], // instance names in declaration order
-  loc:      (sourcecode.File, sourcecode.Line))
+  id:         ModuleId,
+  moduleName: String,
+  children:   Vector[String], // instance names in declaration order
+  loc:        (sourcecode.File, sourcecode.Line))
     extends ModuleSpec
 
 /** A generator module: leaf of the hierarchy tree, bound to exactly one generator. */
