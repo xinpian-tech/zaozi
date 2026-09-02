@@ -126,7 +126,7 @@ class, a def binding the registry entry) — and `soc/Soc.scala` is what an SoC
 integrator writes (instantiate and wire). The testbench is wrapped exactly
 like an IP but is not one, so it keeps to `harness/` — its wrap and its
 zaozi modules together, because what cuts it out of the design is what it
-is, not which layer it belongs to. `Backends.scala` binds every entry from
+is, not which layer it belongs to. `soc/Backends.scala` binds every entry from
 both to its zaozi generator — the one table the elaboration receives. What
 someone then does to the result is split by what knows it: `Bringup.scala`
 reads the design back (the address map, and the debugger's

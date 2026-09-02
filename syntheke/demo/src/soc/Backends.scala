@@ -8,8 +8,10 @@ import me.jiuyang.syntheke.demo.zaoziimpl.*
 import me.jiuyang.syntheke.demo.harness.{TestHarness, TestHarnessGen}
 
 /** Every registry entry bound to its zaozi generator — what the elaboration call receives, and the only place the
-  * negotiation's side and zaozi's side meet. It is its own file because it belongs to neither: `node/` declares the
-  * chip's entries, [[Harness]] the testbench's, and both are elaborated through this table.
+  * negotiation's side and zaozi's side meet.
+  *
+  * It sits with [[Soc]] because it is this design's table: `node/` declares the chip's entries and `harness/` the
+  * testbench's, but which of them a design enacts, and by what, is the design's own statement.
   */
 val backends: Seq[GeneratorBackend] = Seq(
   ZaoziBackend(TestHarness, TestHarnessGen),
