@@ -3,7 +3,6 @@
 package me.jiuyang.syntheke.demo
 
 import me.jiuyang.syntheke.*
-import me.jiuyang.syntheke.demo.axi.Axi4
 import me.jiuyang.syntheke.demo.zaoziimpl.DmP
 
 /** What a tool needs to be told about the design in [[Soc]] before it can do anything to it: where the debugger

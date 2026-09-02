@@ -4,7 +4,6 @@ package me.jiuyang.syntheke.demo
 
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
-import me.jiuyang.syntheke.demo.axi.{Axi4, Axi4Xbar}
 
 val Xbar = new GeneratorEntry[XbarP]
 

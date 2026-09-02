@@ -113,7 +113,10 @@ The demo (`demo/`) negotiates over an AXI4 protocol modeled on rocket-chip's
 a 128→32 width bridge, per-edge conflict reporting, and end-to-end Verilog.
 It is the demo's AXI and not a model to build on — enough of the parameter
 algebra to put negotiation through its paces, and no further; a protocol
-object worth depending on is separate work.
+object worth depending on is separate work. So `Axi4.scala` sits with the
+demo's other protocol declarations (`DemoProtocols.scala`,
+`DebugProtocols.scala`, `TraceProtocol.scala`) rather than in a package of
+its own: what the design speaks is one layer, and this is one of four.
 
 The user story splits by file: `library/` is what an IP author ships —
 one file per IP, the same three declarations in each (FullParam, endpoint

@@ -5,7 +5,6 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.syntheke.demo.zaoziimpl.harness.{*, given}
-import me.jiuyang.syntheke.demo.axi.{AddressSet, Axi4, AxiSlaveParams, AxiSlavePort, RegionType, TransferSizes}
 
 /** The syntheke wrap of the design's testbench — the same shape as an IP's wrap in `library/`, and deliberately not in
   * it: the harness is not an IP of this SoC. Nothing here is on the die, so nothing here is something the SoC ships; it

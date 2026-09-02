@@ -4,7 +4,6 @@ package me.jiuyang.syntheke.demo
 
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.AxiShape
-import me.jiuyang.syntheke.demo.axi.Axi4
 
 /** The syntheke wrap of the chip's zaozi modules (`zaoziimpl/`) — how a plain zaozi IP gets onto the negotiation graph.
   * One file per IP, the same three declarations in each: a registry entry typed by the IP's zaozi Parameter

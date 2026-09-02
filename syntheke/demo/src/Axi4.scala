@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.syntheke.demo.axi
+package me.jiuyang.syntheke.demo
 
 import me.jiuyang.syntheke.*
 import upickle.default.ReadWriter
