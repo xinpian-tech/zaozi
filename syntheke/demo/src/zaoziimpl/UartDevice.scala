@@ -45,16 +45,16 @@ object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevic
     val reload = (p.divisor - 1).U(divW)
 
     // ---- transmit engine ----
-    val txShift = RegInit(1023.U(10)) // {stop, data, start}; all ones = idle line
+    val txShift = RegInit(1023.B(10)) // {stop, data, start}; all ones = idle line
     val txCnt   = RegInit(0.U(4))
     val txBaud  = RegInit(0.U(divW))
     val txBusy  = txCnt =/= 0.U(4)
-    io.serial.tx := txShift.asBits.bits(0, 0).asBool
+    io.serial.tx := txShift.bits(0, 0).asBool
     when(txBusy) {
       when(txBaud === 0.U(divW)) {
         txBaud  := reload
         txCnt   := (txCnt - 1.U(4)).asBits.bits(3, 0).asUInt
-        txShift := (1.U(1).asBits ## txShift.asBits.bits(9, 1)).asUInt
+        txShift := 1.B(1) ## txShift.bits(9, 1)
       }.otherwise {
         txBaud := (txBaud - 1.U(divW)).asBits.bits(divW - 1, 0).asUInt
       }
@@ -63,33 +63,33 @@ object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevic
     // ---- receive engine state (the engine itself is below the register file: completion beats a read-clear) ----
     val rxSync = RegInit(true.B)
     rxSync := io.serial.rx
-    val rxShift = RegInit(0.U(8))
+    val rxShift = RegInit(0.B(8))
     val rxCnt   = RegInit(0.U(4))
     val rxBaud  = RegInit(0.U(divW))
     val rxBusy  = RegInit(false.B)
-    val rxData  = RegInit(0.U(8))
+    val rxData  = RegInit(0.B(8))
     val rxValid = RegInit(false.B)
 
     // ---- single-beat AXI slave ----
     val bPending = RegInit(false.B)
-    val bId      = RegInit(0.U(p.idBits))
+    val bId      = RegInit(0.B(p.idBits))
     val rPending = RegInit(false.B)
-    val rId      = RegInit(0.U(p.idBits))
-    val rData    = RegInit(0.U(32))
+    val rId      = RegInit(0.B(p.idBits))
+    val rData    = RegInit(0.B(32))
 
     io.in.aw.ready    := (!bPending) & io.in.w.valid
     io.in.w.ready     := (!bPending) & io.in.aw.valid
     io.in.b.valid     := bPending
     io.in.b.bits.id   := bId
-    io.in.b.bits.resp := 0.U(2)
+    io.in.b.bits.resp := 0.B(2)
     val doWrite = io.in.aw.valid & io.in.w.valid & (!bPending)
     when(bPending & io.in.b.ready) { bPending := false.B }
     when(doWrite) {
       bPending := true.B
       bId      := io.in.aw.bits.id
-      val wAddr = io.in.aw.bits.addr.asBits.bits(3, 2).asUInt
-      when((wAddr === 0.U(2)) & (!txBusy)) { // TXDATA
-        txShift := (1.U(1).asBits ## io.in.w.bits.data.asBits.bits(7, 0) ## 0.U(1).asBits).asUInt
+      val wAddr = io.in.aw.bits.addr.bits(3, 2)
+      when((wAddr === 0.B(2)) & (!txBusy)) { // TXDATA
+        txShift := 1.B(1) ## io.in.w.bits.data.bits(7, 0) ## 0.B(1)
         txCnt   := 10.U(4)
         txBaud  := reload
       }
@@ -98,24 +98,24 @@ object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevic
     io.in.ar.ready    := !rPending
     io.in.r.valid     := rPending
     io.in.r.bits.id   := rId
-    io.in.r.bits.resp := 0.U(2)
+    io.in.r.bits.resp := 0.B(2)
     io.in.r.bits.data := rData
     io.in.r.bits.last := true.B
     when(rPending & io.in.r.ready) { rPending := false.B }
     when(io.in.ar.valid & (!rPending)) {
       rPending := true.B
       rId      := io.in.ar.bits.id
-      val rAddr = io.in.ar.bits.addr.asBits.bits(3, 2).asUInt
-      rData := 0.U(32)
-      when(rAddr === 1.U(2)) { // RXDATA
-        rData   := (0.U(24).asBits ## rxData.asBits).asUInt
+      val rAddr = io.in.ar.bits.addr.bits(3, 2)
+      rData := 0.B(32)
+      when(rAddr === 1.B(2)) { // RXDATA
+        rData   := 0.B(24) ## rxData
         rxValid := false.B
       }
-      when(rAddr === 2.U(2)) { // STATUS
-        rData := (0.U(30).asBits ## rxValid.asBits ## txBusy.asBits).asUInt
+      when(rAddr === 2.B(2)) { // STATUS
+        rData := 0.B(30) ## rxValid.asBits ## txBusy.asBits
       }
-      when(rAddr === 3.U(2)) { // DIV
-        rData := p.divisor.U(32)
+      when(rAddr === 3.B(2)) { // DIV
+        rData := p.divisor.B(32)
       }
     }
 
@@ -132,7 +132,7 @@ object UartDeviceGen extends Generator[UartDeviceP, UartDevicePLayers, UartDevic
         rxCnt  := (rxCnt + 1.U(4)).asBits.bits(3, 0).asUInt
         when((rxCnt === 0.U(4)) & rxSync) { rxBusy := false.B } // start bit was a glitch
         when((rxCnt >= 1.U(4)) & (rxCnt <= 8.U(4))) {
-          rxShift := (rxSync.asBits ## rxShift.asBits.bits(7, 1)).asUInt
+          rxShift := rxSync.asBits ## rxShift.bits(7, 1)
         }
         when(rxCnt === 9.U(4)) { // stop bit: byte complete
           rxBusy  := false.B

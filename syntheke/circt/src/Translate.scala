@@ -45,6 +45,7 @@ object Translate:
     case ProtocolInterface.Flipped(_)     =>
       // Direction is a bundle-field flag in FIRRTL; a Flipped outside a field position has no type of its own.
       throw new IllegalArgumentException("Flipped is legal only directly as a bundle field's type")
+    case ProtocolInterface.Bits(w)        => w.getUInt
     case ProtocolInterface.UInt(w)        => w.getUInt
     case ProtocolInterface.SInt(w)        => w.getSInt
     case ProtocolInterface.Bool           => 1.getUInt

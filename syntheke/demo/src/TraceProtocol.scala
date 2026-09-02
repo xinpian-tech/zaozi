@@ -11,6 +11,10 @@ import upickle.default.ReadWriter
   *
   * A [[me.jiuyang.syntheke.dvSource]] of this protocol is a declaration, not a connection: the framework forwards every
   * leaf up the hierarchy on its own, into the testbench's matching data input. Nothing in the design graph carries it.
+  *
+  * Its integer leaves are `UInt` where every other port in this demo is `Bits`, and that is not an oversight: a probe
+  * connection carries the referenced signal's own type, and these reference the vendored core's probes. The trace's
+  * types are DitDah32's, all the way to the harness's inputs.
   */
 final case class RvTraceShape(xlen: Int, regIndexBits: Int) derives ReadWriter:
   require(xlen > 0, s"xlen $xlen must be positive")

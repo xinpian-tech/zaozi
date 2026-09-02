@@ -28,4 +28,4 @@ object GpioPadsGen extends Generator[GpioPadsP, GpioPadsPLayers, GpioPadsPIO, Gp
 
   def architecture(p: GpioPadsP) =
     val io = summon[Interface[GpioPadsPIO]]
-    io.in.in := (io.in.out.asBits & io.in.oe.asBits).asUInt
+    io.in.in := io.in.out & io.in.oe

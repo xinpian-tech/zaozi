@@ -38,9 +38,13 @@ object ProtocolInterface:
     require(size > 0, "Vec size must be positive")
     require(!element.isInstanceOf[Flipped], "Vec elements cannot be Flipped")
 
-  /** Unsigned integer of positive width. `UInt(1)` and [[Bool]] translate to the same hardware type but stay distinct
-    * declarations — what the author wrote is what the spec and the exports carry, told apart by their type tags.
+  /** A bit vector of positive width: the default for a port, because a port carries bits. [[UInt]] is for the ports
+    * an arithmetic operator actually reaches, and `Bits(1)` and [[Bool]] translate to the same hardware type but stay
+    * distinct declarations — what the author wrote is what the spec and the exports carry, told apart by their type
+    * tags.
     */
+  final case class Bits(width: Int) extends ProtocolInterface:
+    require(width > 0, "Bits width must be positive")
   final case class UInt(width: Int) extends ProtocolInterface:
     require(width > 0, "UInt width must be positive")
   final case class SInt(width: Int) extends ProtocolInterface:
@@ -76,6 +80,7 @@ object ProtocolInterface:
       )
     case Vec(n, e)      => ujson.Obj("type" -> ujson.Str("vec"), "size" -> ujson.Num(n), "element" -> encode(e))
     case Flipped(i)     => ujson.Obj("type" -> ujson.Str("flipped"), "inner" -> encode(i))
+    case Bits(w)        => ujson.Obj("type" -> ujson.Str("bits"), "width" -> ujson.Num(w))
     case UInt(w)        => ujson.Obj("type" -> ujson.Str("uint"), "width" -> ujson.Num(w))
     case SInt(w)        => ujson.Obj("type" -> ujson.Str("sint"), "width" -> ujson.Num(w))
     case Bool           => ujson.Obj("type" -> ujson.Str("bool"))
@@ -88,6 +93,7 @@ object ProtocolInterface:
     case "bundle"  => Bundle(v("fields").arr.toVector.map(f => Field(f("name").str, decode(f("tpe")))))
     case "vec"     => Vec(v("size").num.toInt, decode(v("element")))
     case "flipped" => Flipped(decode(v("inner")))
+    case "bits"    => Bits(v("width").num.toInt)
     case "uint"    => UInt(v("width").num.toInt)
     case "sint"    => SInt(v("width").num.toInt)
     case "bool"    => Bool

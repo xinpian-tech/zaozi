@@ -96,7 +96,7 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     // Everything below is generated per (input, output) pair with static indices; the state registers pick the pair.
 
     def decode(
-      addr: Referable[UInt],
+      addr: Referable[Bits],
       o:    Int
     )(
       using Arena,
@@ -105,9 +105,7 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     ): Referable[Bool] =
       p.routes(o)
         .map((base, mask) =>
-          ((addr.asBits ^ BigInt(base).U(p.addrBits).asBits) & (~BigInt(mask).U(p.addrBits).asBits)) === 0
-            .U(p.addrBits)
-            .asBits
+          ((addr ^ BigInt(base).B(p.addrBits)) & ~BigInt(mask).B(p.addrBits)) === 0.B(p.addrBits)
         )
         .reduce(_ | _)
 
@@ -141,7 +139,7 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     // 0 idle, 1 AW+W transfer, 3 B return, 4 DECERR absorb W, 5 DECERR answer B. AW and W forward concurrently in
     // state 1: a slave may hold AWREADY until it sees WVALID (AXI's slave freedom), so W must never wait for the AW
     // handshake (the matching master rule); each channel completes once, B follows when both have.
-    val wState  = RegInit(0.U(3))
+    val wState  = RegInit(0.B(3))
     val wIn     = RegInit(0.U(inW))
     val wOut    = RegInit(0.U(outW))
     val wAwDone = RegInit(false.B)
@@ -152,16 +150,16 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     val wAny = Wire(Bool())
     grantChain(Vector.tabulate(n)(i => ch(in(i), "aw").field[Bool]("valid")), wRr)(wSel, wAny)
 
-    when((wState === 0.U(3)) & wAny) {
+    when((wState === 0.B(3)) & wAny) {
       wIn    := wSel
-      wState := 4.U(3) // no route: DECERR unless a decode hits below
+      wState := 4.B(3) // no route: DECERR unless a decode hits below
       for i <- 0 until n do
         when(wSel === i.U(inW)) {
-          val addr = ch(in(i), "aw").field[Record]("bits").field[UInt]("addr")
+          val addr = ch(in(i), "aw").field[Record]("bits").field[Bits]("addr")
           for o <- 0 until m do
             when(decode(addr, o)) {
               wOut   := o.U(outW)
-              wState := 1.U(3)
+              wState := 1.B(3)
             }
         }
     }
@@ -171,18 +169,18 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
       ch(in(i), "aw").field[Bool]("ready")                     := false.B
       ch(in(i), "w").field[Bool]("ready")                      := false.B
       ch(in(i), "b").field[Bool]("valid")                      := false.B
-      ch(in(i), "b").field[Record]("bits").field[UInt]("id")   := 0.U(p.inputs(i)._2.idBits)
-      ch(in(i), "b").field[Record]("bits").field[UInt]("resp") := 0.U(2)
+      ch(in(i), "b").field[Record]("bits").field[Bits]("id")   := 0.B(p.inputs(i)._2.idBits)
+      ch(in(i), "b").field[Record]("bits").field[Bits]("resp") := 0.B(2)
     for o <- 0 until m do
       ch(out(o), "aw").field[Bool]("valid")                       := false.B
-      ch(out(o), "aw").field[Record]("bits").field[UInt]("id")    := 0.U(p.outputs(o)._2.idBits)
-      ch(out(o), "aw").field[Record]("bits").field[UInt]("addr")  := 0.U(p.outputs(o)._2.addrBits)
-      ch(out(o), "aw").field[Record]("bits").field[UInt]("len")   := 0.U(8)
-      ch(out(o), "aw").field[Record]("bits").field[UInt]("size")  := 0.U(3)
-      ch(out(o), "aw").field[Record]("bits").field[UInt]("burst") := 1.U(2)
+      ch(out(o), "aw").field[Record]("bits").field[Bits]("id")    := 0.B(p.outputs(o)._2.idBits)
+      ch(out(o), "aw").field[Record]("bits").field[Bits]("addr")  := 0.B(p.outputs(o)._2.addrBits)
+      ch(out(o), "aw").field[Record]("bits").field[Bits]("len")   := 0.B(8)
+      ch(out(o), "aw").field[Record]("bits").field[Bits]("size")  := 0.B(3)
+      ch(out(o), "aw").field[Record]("bits").field[Bits]("burst") := 1.B(2)
       ch(out(o), "w").field[Bool]("valid")                        := false.B
-      ch(out(o), "w").field[Record]("bits").field[UInt]("data")   := 0.U(p.dataBits)
-      ch(out(o), "w").field[Record]("bits").field[UInt]("strb")   := 0.U(p.dataBits / 8)
+      ch(out(o), "w").field[Record]("bits").field[Bits]("data")   := 0.B(p.dataBits)
+      ch(out(o), "w").field[Record]("bits").field[Bits]("strb")   := 0.B(p.dataBits / 8)
       ch(out(o), "w").field[Record]("bits").field[Bool]("last")   := false.B
       ch(out(o), "b").field[Bool]("ready")                        := false.B
 
@@ -190,28 +188,28 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
       for o <- 0 until m do
         val active = (wIn === i.U(inW)) & (wOut === o.U(outW))
         // AW forwards with the static id remap; W streams beside it until its last beat.
-        when((wState === 1.U(3)) & active) {
+        when((wState === 1.B(3)) & active) {
           val aw  = ch(in(i), "aw")
           val oaw = ch(out(o), "aw")
           oaw.field[Bool]("valid") := aw.field[Bool]("valid") & (!wAwDone)
           aw.field[Bool]("ready")  := oaw.field[Bool]("ready") & (!wAwDone)
-          val lid = aw.field[Record]("bits").field[UInt]("id")
+          val lid = aw.field[Record]("bits").field[Bits]("id")
           val gid =
-            if n == 1 then lid.asBits.asUInt
-            else if p.localBits == p.inputs(i)._2.idBits then (i.U(p.prefixBits).asBits ## lid.asBits).asUInt
-            else (i.U(p.prefixBits).asBits ## 0.U(p.localBits - p.inputs(i)._2.idBits).asBits ## lid.asBits).asUInt
-          oaw.field[Record]("bits").field[UInt]("id")    := gid
-          oaw.field[Record]("bits").field[UInt]("addr")  :=
-            aw.field[Record]("bits").field[UInt]("addr").asBits.bits(p.outputs(o)._2.addrBits - 1, 0).asUInt
-          oaw.field[Record]("bits").field[UInt]("len")   := aw.field[Record]("bits").field[UInt]("len")
-          oaw.field[Record]("bits").field[UInt]("size")  := aw.field[Record]("bits").field[UInt]("size")
-          oaw.field[Record]("bits").field[UInt]("burst") := aw.field[Record]("bits").field[UInt]("burst")
+            if n == 1 then lid
+            else if p.localBits == p.inputs(i)._2.idBits then i.B(p.prefixBits) ## lid
+            else i.B(p.prefixBits) ## 0.B(p.localBits - p.inputs(i)._2.idBits) ## lid
+          oaw.field[Record]("bits").field[Bits]("id")    := gid
+          oaw.field[Record]("bits").field[Bits]("addr")  :=
+            aw.field[Record]("bits").field[Bits]("addr").bits(p.outputs(o)._2.addrBits - 1, 0)
+          oaw.field[Record]("bits").field[Bits]("len")   := aw.field[Record]("bits").field[Bits]("len")
+          oaw.field[Record]("bits").field[Bits]("size")  := aw.field[Record]("bits").field[Bits]("size")
+          oaw.field[Record]("bits").field[Bits]("burst") := aw.field[Record]("bits").field[Bits]("burst")
           val w  = ch(in(i), "w")
           val ow = ch(out(o), "w")
           ow.field[Bool]("valid")                      := w.field[Bool]("valid") & (!wWDone)
           w.field[Bool]("ready")                       := ow.field[Bool]("ready") & (!wWDone)
-          ow.field[Record]("bits").field[UInt]("data") := w.field[Record]("bits").field[UInt]("data")
-          ow.field[Record]("bits").field[UInt]("strb") := w.field[Record]("bits").field[UInt]("strb")
+          ow.field[Record]("bits").field[Bits]("data") := w.field[Record]("bits").field[Bits]("data")
+          ow.field[Record]("bits").field[Bits]("strb") := w.field[Record]("bits").field[Bits]("strb")
           ow.field[Record]("bits").field[Bool]("last") := w.field[Record]("bits").field[Bool]("last")
           val awHs  = aw.field[Bool]("valid") & oaw.field[Bool]("ready") & (!wAwDone)
           val wLast = w.field[Bool]("valid") & ow.field[Bool]("ready") & (!wWDone) &
@@ -221,20 +219,20 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
           when((wAwDone | awHs) & (wWDone | wLast)) {
             wAwDone := false.B
             wWDone  := false.B
-            wState  := 3.U(3)
+            wState  := 3.B(3)
           }
         }
         // B return with the id un-mapped.
-        when((wState === 3.U(3)) & active) {
+        when((wState === 3.B(3)) & active) {
           val b  = ch(in(i), "b")
           val ob = ch(out(o), "b")
           b.field[Bool]("valid")                      := ob.field[Bool]("valid")
           ob.field[Bool]("ready")                     := b.field[Bool]("ready")
-          b.field[Record]("bits").field[UInt]("id")   :=
-            ob.field[Record]("bits").field[UInt]("id").asBits.bits(p.inputs(i)._2.idBits - 1, 0).asUInt
-          b.field[Record]("bits").field[UInt]("resp") := ob.field[Record]("bits").field[UInt]("resp")
+          b.field[Record]("bits").field[Bits]("id")   :=
+            ob.field[Record]("bits").field[Bits]("id").bits(p.inputs(i)._2.idBits - 1, 0)
+          b.field[Record]("bits").field[Bits]("resp") := ob.field[Record]("bits").field[Bits]("resp")
           when(ob.field[Bool]("valid") & b.field[Bool]("ready")) {
-            wState := 0.U(3)
+            wState := 0.B(3)
             wRr.foreach(
               _ := (if n == 1 then 0.U(inW) else ((wIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
             )
@@ -244,17 +242,17 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     // DECERR: absorb the write burst from the granted input, then answer.
     for i <- 0 until n do
       val active = wIn === i.U(inW)
-      when((wState === 4.U(3)) & active) {
+      when((wState === 4.B(3)) & active) {
         val w = ch(in(i), "w")
         w.field[Bool]("ready") := true.B
-        when(w.field[Bool]("valid") & w.field[Record]("bits").field[Bool]("last")) { wState := 5.U(3) }
+        when(w.field[Bool]("valid") & w.field[Record]("bits").field[Bool]("last")) { wState := 5.B(3) }
       }
-      when((wState === 5.U(3)) & active) {
+      when((wState === 5.B(3)) & active) {
         val b = ch(in(i), "b")
         b.field[Bool]("valid")                      := true.B
-        b.field[Record]("bits").field[UInt]("resp") := 3.U(2) // DECERR
+        b.field[Record]("bits").field[Bits]("resp") := 3.B(2) // DECERR
         when(b.field[Bool]("ready")) {
-          wState := 0.U(3)
+          wState := 0.B(3)
           wRr.foreach(
             _ := (if n == 1 then 0.U(inW) else ((wIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
           )
@@ -263,33 +261,33 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
 
     // ================= read path =================
     // 0 idle, 1 AR forward, 2 R stream, 3 DECERR answer.
-    val rState = RegInit(0.U(2))
+    val rState = RegInit(0.B(2))
     val rIn    = RegInit(0.U(inW))
     val rOut   = RegInit(0.U(outW))
     val rRr    = Option.when(p.arbitration == Arbitration.RoundRobin)(RegInit(0.U(inW)))
-    val rErrId = RegInit(0.U(if n == 1 then p.inputs.head._2.idBits else p.prefixBits + p.localBits))
+    val rErrId = RegInit(0.B(if n == 1 then p.inputs.head._2.idBits else p.prefixBits + p.localBits))
 
     val rSel = Wire(UInt(inW))
     val rAny = Wire(Bool())
     grantChain(Vector.tabulate(n)(i => ch(in(i), "ar").field[Bool]("valid")), rRr)(rSel, rAny)
 
-    when((rState === 0.U(2)) & rAny) {
+    when((rState === 0.B(2)) & rAny) {
       rIn    := rSel
-      rState := 3.U(2)
+      rState := 3.B(2)
       for i <- 0 until n do
         when(rSel === i.U(inW)) {
           val ar   = ch(in(i), "ar")
-          val lid  = ar.field[Record]("bits").field[UInt]("id")
+          val lid  = ar.field[Record]("bits").field[Bits]("id")
           val errW = if n == 1 then p.inputs.head._2.idBits else p.prefixBits + p.localBits
           rErrId := (
-            if errW == p.inputs(i)._2.idBits then lid.asBits.asUInt
-            else (0.U(errW - p.inputs(i)._2.idBits).asBits ## lid.asBits).asUInt
+            if errW == p.inputs(i)._2.idBits then lid
+            else 0.B(errW - p.inputs(i)._2.idBits) ## lid
           ) // captured only for the DECERR answer
-          val addr = ar.field[Record]("bits").field[UInt]("addr")
+          val addr = ar.field[Record]("bits").field[Bits]("addr")
           for o <- 0 until m do
             when(decode(addr, o)) {
               rOut   := o.U(outW)
-              rState := 1.U(2)
+              rState := 1.B(2)
             }
         }
     }
@@ -297,54 +295,54 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
     for i <- 0 until n do
       ch(in(i), "ar").field[Bool]("ready")                     := false.B
       ch(in(i), "r").field[Bool]("valid")                      := false.B
-      ch(in(i), "r").field[Record]("bits").field[UInt]("id")   := 0.U(p.inputs(i)._2.idBits)
-      ch(in(i), "r").field[Record]("bits").field[UInt]("data") := 0.U(p.dataBits)
-      ch(in(i), "r").field[Record]("bits").field[UInt]("resp") := 0.U(2)
+      ch(in(i), "r").field[Record]("bits").field[Bits]("id")   := 0.B(p.inputs(i)._2.idBits)
+      ch(in(i), "r").field[Record]("bits").field[Bits]("data") := 0.B(p.dataBits)
+      ch(in(i), "r").field[Record]("bits").field[Bits]("resp") := 0.B(2)
       ch(in(i), "r").field[Record]("bits").field[Bool]("last") := true.B
     for o <- 0 until m do
       ch(out(o), "ar").field[Bool]("valid")                       := false.B
-      ch(out(o), "ar").field[Record]("bits").field[UInt]("id")    := 0.U(p.outputs(o)._2.idBits)
-      ch(out(o), "ar").field[Record]("bits").field[UInt]("addr")  := 0.U(p.outputs(o)._2.addrBits)
-      ch(out(o), "ar").field[Record]("bits").field[UInt]("len")   := 0.U(8)
-      ch(out(o), "ar").field[Record]("bits").field[UInt]("size")  := 0.U(3)
-      ch(out(o), "ar").field[Record]("bits").field[UInt]("burst") := 1.U(2)
+      ch(out(o), "ar").field[Record]("bits").field[Bits]("id")    := 0.B(p.outputs(o)._2.idBits)
+      ch(out(o), "ar").field[Record]("bits").field[Bits]("addr")  := 0.B(p.outputs(o)._2.addrBits)
+      ch(out(o), "ar").field[Record]("bits").field[Bits]("len")   := 0.B(8)
+      ch(out(o), "ar").field[Record]("bits").field[Bits]("size")  := 0.B(3)
+      ch(out(o), "ar").field[Record]("bits").field[Bits]("burst") := 1.B(2)
       ch(out(o), "r").field[Bool]("ready")                        := false.B
 
     for i <- 0 until n do
       for o <- 0 until m do
         val active = (rIn === i.U(inW)) & (rOut === o.U(outW))
-        when((rState === 1.U(2)) & active) {
+        when((rState === 1.B(2)) & active) {
           val ar  = ch(in(i), "ar")
           val oar = ch(out(o), "ar")
           oar.field[Bool]("valid") := ar.field[Bool]("valid")
           ar.field[Bool]("ready")  := oar.field[Bool]("ready")
-          val lid = ar.field[Record]("bits").field[UInt]("id")
+          val lid = ar.field[Record]("bits").field[Bits]("id")
           val gid =
-            if n == 1 then lid.asBits.asUInt
-            else if p.localBits == p.inputs(i)._2.idBits then (i.U(p.prefixBits).asBits ## lid.asBits).asUInt
-            else (i.U(p.prefixBits).asBits ## 0.U(p.localBits - p.inputs(i)._2.idBits).asBits ## lid.asBits).asUInt
-          oar.field[Record]("bits").field[UInt]("id")    := gid
-          oar.field[Record]("bits").field[UInt]("addr")  :=
-            ar.field[Record]("bits").field[UInt]("addr").asBits.bits(p.outputs(o)._2.addrBits - 1, 0).asUInt
-          oar.field[Record]("bits").field[UInt]("len")   := ar.field[Record]("bits").field[UInt]("len")
-          oar.field[Record]("bits").field[UInt]("size")  := ar.field[Record]("bits").field[UInt]("size")
-          oar.field[Record]("bits").field[UInt]("burst") := ar.field[Record]("bits").field[UInt]("burst")
-          when(ar.field[Bool]("valid") & oar.field[Bool]("ready")) { rState := 2.U(2) }
+            if n == 1 then lid
+            else if p.localBits == p.inputs(i)._2.idBits then i.B(p.prefixBits) ## lid
+            else i.B(p.prefixBits) ## 0.B(p.localBits - p.inputs(i)._2.idBits) ## lid
+          oar.field[Record]("bits").field[Bits]("id")    := gid
+          oar.field[Record]("bits").field[Bits]("addr")  :=
+            ar.field[Record]("bits").field[Bits]("addr").bits(p.outputs(o)._2.addrBits - 1, 0)
+          oar.field[Record]("bits").field[Bits]("len")   := ar.field[Record]("bits").field[Bits]("len")
+          oar.field[Record]("bits").field[Bits]("size")  := ar.field[Record]("bits").field[Bits]("size")
+          oar.field[Record]("bits").field[Bits]("burst") := ar.field[Record]("bits").field[Bits]("burst")
+          when(ar.field[Bool]("valid") & oar.field[Bool]("ready")) { rState := 2.B(2) }
         }
-        when((rState === 2.U(2)) & active) {
+        when((rState === 2.B(2)) & active) {
           val r  = ch(in(i), "r")
           val or = ch(out(o), "r")
           r.field[Bool]("valid")                      := or.field[Bool]("valid")
           or.field[Bool]("ready")                     := r.field[Bool]("ready")
-          r.field[Record]("bits").field[UInt]("id")   :=
-            or.field[Record]("bits").field[UInt]("id").asBits.bits(p.inputs(i)._2.idBits - 1, 0).asUInt
-          r.field[Record]("bits").field[UInt]("data") := or.field[Record]("bits").field[UInt]("data")
-          r.field[Record]("bits").field[UInt]("resp") := or.field[Record]("bits").field[UInt]("resp")
+          r.field[Record]("bits").field[Bits]("id")   :=
+            or.field[Record]("bits").field[Bits]("id").bits(p.inputs(i)._2.idBits - 1, 0)
+          r.field[Record]("bits").field[Bits]("data") := or.field[Record]("bits").field[Bits]("data")
+          r.field[Record]("bits").field[Bits]("resp") := or.field[Record]("bits").field[Bits]("resp")
           r.field[Record]("bits").field[Bool]("last") := or.field[Record]("bits").field[Bool]("last")
           when(
             or.field[Bool]("valid") & r.field[Bool]("ready") & or.field[Record]("bits").field[Bool]("last")
           ) {
-            rState := 0.U(2)
+            rState := 0.B(2)
             rRr.foreach(
               _ := (if n == 1 then 0.U(inW) else ((rIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
             )
@@ -353,14 +351,14 @@ object XbarGen extends Generator[XbarP, XbarPLayers, XbarPIO, XbarPProbe]:
 
     // DECERR: one R beat with the captured id truncated back to the input's width.
     for i <- 0 until n do
-      when((rState === 3.U(2)) & (rIn === i.U(inW))) {
+      when((rState === 3.B(2)) & (rIn === i.U(inW))) {
         val r = ch(in(i), "r")
         r.field[Bool]("valid")                      := true.B
-        r.field[Record]("bits").field[UInt]("id")   := rErrId.asBits.bits(p.inputs(i)._2.idBits - 1, 0).asUInt
-        r.field[Record]("bits").field[UInt]("resp") := 3.U(2)
+        r.field[Record]("bits").field[Bits]("id")   := rErrId.bits(p.inputs(i)._2.idBits - 1, 0)
+        r.field[Record]("bits").field[Bits]("resp") := 3.B(2)
         r.field[Record]("bits").field[Bool]("last") := true.B
         when(r.field[Bool]("ready")) {
-          rState := 0.U(2)
+          rState := 0.B(2)
           rRr.foreach(
             _ := (if n == 1 then 0.U(inW) else ((rIn + 1.U(inW)) % n.U(inW + 1)).asBits.bits(inW - 1, 0).asUInt)
           )

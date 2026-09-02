@@ -123,9 +123,9 @@ object TestHarnessGen extends Generator[TestHarnessP, TestHarnessPLayers, TestHa
     // What the GPIO pads are wired to on the board.
     val pads = GpioPadsGen.instantiate(p.padsP)
     val gpio = io.field[Record]("gpioPins")
-    pads.io.in.out         := gpio.field[UInt]("out")
-    pads.io.in.oe          := gpio.field[UInt]("oe")
-    gpio.field[UInt]("in") := pads.io.in.in
+    pads.io.in.out         := gpio.field[Bits]("out")
+    pads.io.in.oe          := gpio.field[Bits]("oe")
+    gpio.field[Bits]("in") := pads.io.in.in
 
     // One log per hart, clocked by the chip the trace came from.
     val traceClock = io.field[Record]("traceClock").field[Clock]("clock")

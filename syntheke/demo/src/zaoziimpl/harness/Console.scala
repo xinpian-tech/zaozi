@@ -29,7 +29,7 @@ class ConsolePIO(p: ConsoleP)     extends HWBundle(p):
 class SimConsoleIO(p: ConsoleP) extends HWBundle(p):
   val clock = Flipped(Clock())
   val valid = Flipped(Bool())
-  val data  = Flipped(UInt(8))
+  val data  = Flipped(Bits(8))
 
 case class SimConsoleVerilogP() extends VerilogParameter
 
@@ -56,11 +56,11 @@ object ConsoleGen extends Generator[ConsoleP, ConsolePLayers, ConsolePIO, Consol
     // The UART's receive engine (see [[UartDeviceGen]]), watching the tx line from outside.
     val rxSync = RegInit(true.B)
     rxSync := io.serial.tx
-    val rxShift = RegInit(0.U(8))
+    val rxShift = RegInit(0.B(8))
     val rxCnt   = RegInit(0.U(4))
     val rxBaud  = RegInit(0.U(divW))
     val rxBusy  = RegInit(false.B)
-    val rxData  = RegInit(0.U(8))
+    val rxData  = RegInit(0.B(8))
     val strobe  = RegInit(false.B)
     strobe := false.B
     when(!rxBusy) {
@@ -75,7 +75,7 @@ object ConsoleGen extends Generator[ConsoleP, ConsolePLayers, ConsolePIO, Consol
         rxCnt  := (rxCnt + 1.U(4)).asBits.bits(3, 0).asUInt
         when((rxCnt === 0.U(4)) & rxSync) { rxBusy := false.B } // start bit was a glitch
         when((rxCnt >= 1.U(4)) & (rxCnt <= 8.U(4))) {
-          rxShift := (rxSync.asBits ## rxShift.asBits.bits(7, 1)).asUInt
+          rxShift := rxSync.asBits ## rxShift.bits(7, 1)
         }
         when(rxCnt === 9.U(4)) { // stop bit: byte complete
           rxBusy := false.B

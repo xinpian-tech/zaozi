@@ -151,6 +151,17 @@ puts them on the negotiation graph. What is not on the die keeps to
 the JTAG adapter, the DRAM and the trace log — so the directory says which
 modules the chip ships and which only surround it.
 
+One convention runs through all of them, and through the protocols they
+settle on: a port, a register or a wire is `Bits` unless an arithmetic
+operator actually reaches it, and only then is it `UInt`. So the AXI
+address, id, data and strobes are bits, and what is left in `UInt` names
+itself — the crossbar's round-robin pointer, the UART's baud counters, the
+DMA's beat counter, the debug module's `hartsel`, `data1` and `sbAddress`.
+Both lower to the same FIRRTL type; the difference is that the declaration
+says which signals are numbers, and slicing and concatenating no longer
+round-trip through `asBits` and `asUInt` at every step. The exception is
+the trace, whose types are the vendored core's — see `TraceProtocol.scala`.
+
 There is no DRAM among them. Memory is not on the die and is not an IP of
 this design, so what the chip has is a memory port: an `Axi4` node the
 testbench terminates, publishing upward the range it answers for. Behind

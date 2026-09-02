@@ -19,25 +19,25 @@ class SerialBundle extends Bundle:
   val rx = Flipped(Bool())
 
 class AxiAxBundle(s: AxiShape) extends Bundle:
-  val id    = Aligned(UInt(s.idBits))
-  val addr  = Aligned(UInt(s.addrBits))
-  val len   = Aligned(UInt(8))
-  val size  = Aligned(UInt(3))
-  val burst = Aligned(UInt(2))
+  val id    = Aligned(Bits(s.idBits))
+  val addr  = Aligned(Bits(s.addrBits))
+  val len   = Aligned(Bits(8))
+  val size  = Aligned(Bits(3))
+  val burst = Aligned(Bits(2))
 
 class AxiWBundle(s: AxiShape) extends Bundle:
-  val data = Aligned(UInt(s.dataBits))
-  val strb = Aligned(UInt(s.dataBits / 8))
+  val data = Aligned(Bits(s.dataBits))
+  val strb = Aligned(Bits(s.dataBits / 8))
   val last = Aligned(Bool())
 
 class AxiBBundle(s: AxiShape) extends Bundle:
-  val id   = Aligned(UInt(s.idBits))
-  val resp = Aligned(UInt(2))
+  val id   = Aligned(Bits(s.idBits))
+  val resp = Aligned(Bits(2))
 
 class AxiRBundle(s: AxiShape) extends Bundle:
-  val id   = Aligned(UInt(s.idBits))
-  val data = Aligned(UInt(s.dataBits))
-  val resp = Aligned(UInt(2))
+  val id   = Aligned(Bits(s.idBits))
+  val data = Aligned(Bits(s.dataBits))
+  val resp = Aligned(Bits(2))
   val last = Aligned(Bool())
 
 class ChannelBundle[B <: Bundle](bits0: B) extends Bundle:

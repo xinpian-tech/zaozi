@@ -27,26 +27,26 @@ class JtagRecord extends Record:
 
 /** One DMI request/response pair, from the transport's side. */
 class DmiReqBits(abits: Int, dataBits: Int) extends Record:
-  val addr = Aligned("addr", UInt(abits))
-  val data = Aligned("data", UInt(dataBits))
-  val op   = Aligned("op", UInt(2))
+  val addr = Aligned("addr", Bits(abits))
+  val data = Aligned("data", Bits(dataBits))
+  val op   = Aligned("op", Bits(2))
 
 class DmiRespBits(dataBits: Int) extends Record:
-  val data = Aligned("data", UInt(dataBits))
-  val op   = Aligned("op", UInt(2))
+  val data = Aligned("data", Bits(dataBits))
+  val op   = Aligned("op", Bits(2))
 
 class DmiRecord(abits: Int, dataBits: Int) extends Record:
   val req  = Aligned("req", new Channel(new DmiReqBits(abits, dataBits)))
   val resp = Flipped("resp", new Channel(new DmiRespBits(dataBits)))
 
 class DmiReqBundle(abits: Int, dataBits: Int) extends Bundle:
-  val addr = Aligned(UInt(abits))
-  val data = Aligned(UInt(dataBits))
-  val op   = Aligned(UInt(2))
+  val addr = Aligned(Bits(abits))
+  val data = Aligned(Bits(dataBits))
+  val op   = Aligned(Bits(2))
 
 class DmiRespBundle(dataBits: Int) extends Bundle:
-  val data = Aligned(UInt(dataBits))
-  val op   = Aligned(UInt(2))
+  val data = Aligned(Bits(dataBits))
+  val op   = Aligned(Bits(2))
 
 class DmiBundle(abits: Int, dataBits: Int) extends Bundle:
   val req  = Aligned(new ChannelBundle(new DmiReqBundle(abits, dataBits)))
@@ -57,12 +57,12 @@ class DmiBundle(abits: Int, dataBits: Int) extends Bundle:
   */
 class DebugCmd(xlen: Int) extends Record:
   val valid   = Aligned("valid", Bool())
-  val kind    = Aligned("kind", UInt(2))
+  val kind    = Aligned("kind", Bits(2))
   val write   = Aligned("write", Bool())
-  val regno   = Aligned("regno", UInt(16))
-  val size    = Aligned("size", UInt(3))
-  val data    = Aligned("data", UInt(xlen))
-  val address = Aligned("address", UInt(xlen))
+  val regno   = Aligned("regno", Bits(16))
+  val size    = Aligned("size", Bits(3))
+  val data    = Aligned("data", Bits(xlen))
+  val address = Aligned("address", Bits(xlen))
 
 class DebugStatus(xlen: Int) extends Record:
   val halted    = Aligned("halted", Bool())
@@ -70,8 +70,8 @@ class DebugStatus(xlen: Int) extends Record:
   val resumeAck = Aligned("resumeAck", Bool())
   val resetAck  = Aligned("resetAck", Bool())
   val cmdDone   = Aligned("cmdDone", Bool())
-  val cmdError  = Aligned("cmdError", UInt(3))
-  val cmdRdata  = Aligned("cmdRdata", UInt(xlen))
+  val cmdError  = Aligned("cmdError", Bits(3))
+  val cmdRdata  = Aligned("cmdRdata", Bits(xlen))
 
 class DebugHartRecord(xlen: Int) extends Record:
   val halt        = Aligned("halt", Bool())
@@ -83,12 +83,12 @@ class DebugHartRecord(xlen: Int) extends Record:
 
 class DebugCmdBundle(xlen: Int) extends Bundle:
   val valid   = Aligned(Bool())
-  val kind    = Aligned(UInt(2))
+  val kind    = Aligned(Bits(2))
   val write   = Aligned(Bool())
-  val regno   = Aligned(UInt(16))
-  val size    = Aligned(UInt(3))
-  val data    = Aligned(UInt(xlen))
-  val address = Aligned(UInt(xlen))
+  val regno   = Aligned(Bits(16))
+  val size    = Aligned(Bits(3))
+  val data    = Aligned(Bits(xlen))
+  val address = Aligned(Bits(xlen))
 
 class DebugStatusBundle(xlen: Int) extends Bundle:
   val halted    = Aligned(Bool())
@@ -96,8 +96,8 @@ class DebugStatusBundle(xlen: Int) extends Bundle:
   val resumeAck = Aligned(Bool())
   val resetAck  = Aligned(Bool())
   val cmdDone   = Aligned(Bool())
-  val cmdError  = Aligned(UInt(3))
-  val cmdRdata  = Aligned(UInt(xlen))
+  val cmdError  = Aligned(Bits(3))
+  val cmdRdata  = Aligned(Bits(xlen))
 
 class DebugHartBundle(xlen: Int) extends Bundle:
   val halt        = Aligned(Bool())

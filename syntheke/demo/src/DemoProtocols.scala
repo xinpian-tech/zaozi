@@ -35,9 +35,9 @@ object GpioPins extends Protocol:
   def negotiate(down: Int, up: Unit): Either[Violation, Int]           = Right(down)
   def interfaceOf(edge: Int):         ProtocolBundle                   =
     ProtocolBundle(
-      ProtocolInterface.Field("out", ProtocolInterface.UInt(edge)),
-      ProtocolInterface.Field("oe", ProtocolInterface.UInt(edge)),
-      ProtocolInterface.Field("in", ProtocolInterface.Flipped(ProtocolInterface.UInt(edge)))
+      ProtocolInterface.Field("out", ProtocolInterface.Bits(edge)),
+      ProtocolInterface.Field("oe", ProtocolInterface.Bits(edge)),
+      ProtocolInterface.Field("in", ProtocolInterface.Flipped(ProtocolInterface.Bits(edge)))
     )
   val downRW:                         upickle.default.ReadWriter[Int]  = summon
   val upRW:                           upickle.default.ReadWriter[Unit] = summon

@@ -38,44 +38,44 @@ object DmaDeviceGen extends Generator[DmaDeviceP, DmaDevicePLayers, DmaDevicePIO
     val beat   = RegInit(0.U(32))
 
     // States: 0 issue AW and W together (W must not wait for the AW handshake — the AXI master rule), 2 wait B.
-    val state  = RegInit(0.U(2))
+    val state  = RegInit(0.B(2))
     val awDone = RegInit(false.B)
     val wDone  = RegInit(false.B)
 
-    io.mem.aw.valid      := (state === 0.U(2)) & (!awDone)
-    io.mem.aw.bits.id    := 0.U(p.idBits)
-    io.mem.aw.bits.addr  := (((p.targetBase >> offW).toInt).U(p.addrBits - offW).asBits ## offset.asBits).asUInt
-    io.mem.aw.bits.len   := 0.U(8)
-    io.mem.aw.bits.size  := 4.U(3) // 16 bytes per beat
-    io.mem.aw.bits.burst := 1.U(2) // INCR
+    io.mem.aw.valid      := (state === 0.B(2)) & (!awDone)
+    io.mem.aw.bits.id    := 0.B(p.idBits)
+    io.mem.aw.bits.addr  := ((p.targetBase >> offW).toInt).B(p.addrBits - offW) ## offset.asBits
+    io.mem.aw.bits.len   := 0.B(8)
+    io.mem.aw.bits.size  := 4.B(3) // 16 bytes per beat
+    io.mem.aw.bits.burst := 1.B(2) // INCR
 
-    io.mem.w.valid     := (state === 0.U(2)) & (!wDone)
-    io.mem.w.bits.data := (0.U(96).asBits ## beat.asBits).asUInt
-    io.mem.w.bits.strb := 65535.U(16)
+    io.mem.w.valid     := (state === 0.B(2)) & (!wDone)
+    io.mem.w.bits.data := 0.B(96) ## beat.asBits
+    io.mem.w.bits.strb := 65535.B(16)
     io.mem.w.bits.last := true.B
 
-    val awHs = (state === 0.U(2)) & io.mem.aw.ready & (!awDone)
-    val wHs  = (state === 0.U(2)) & io.mem.w.ready & (!wDone)
+    val awHs = (state === 0.B(2)) & io.mem.aw.ready & (!awDone)
+    val wHs  = (state === 0.B(2)) & io.mem.w.ready & (!wDone)
     when(awHs) { awDone := true.B }
     when(wHs) { wDone := true.B }
     when((awDone | awHs) & (wDone | wHs)) {
       awDone := false.B
       wDone  := false.B
-      state  := 2.U(2)
+      state  := 2.B(2)
     }
 
-    io.mem.b.ready := state === 2.U(2)
-    when((state === 2.U(2)) & io.mem.b.valid) {
-      state  := 0.U(2)
+    io.mem.b.ready := state === 2.B(2)
+    when((state === 2.B(2)) & io.mem.b.valid) {
+      state  := 0.B(2)
       offset := (offset + 16.U(offW)).asBits.bits(offW - 1, 0).asUInt
       beat   := (beat + 1.U(32)).asBits.bits(31, 0).asUInt
     }
 
     // The read side is unused: never request, always accept.
     io.mem.ar.valid      := false.B
-    io.mem.ar.bits.id    := 0.U(p.idBits)
-    io.mem.ar.bits.addr  := 0.U(p.addrBits)
-    io.mem.ar.bits.len   := 0.U(8)
-    io.mem.ar.bits.size  := 0.U(3)
-    io.mem.ar.bits.burst := 1.U(2)
+    io.mem.ar.bits.id    := 0.B(p.idBits)
+    io.mem.ar.bits.addr  := 0.B(p.addrBits)
+    io.mem.ar.bits.len   := 0.B(8)
+    io.mem.ar.bits.size  := 0.B(3)
+    io.mem.ar.bits.burst := 1.B(2)
     io.mem.r.ready       := true.B

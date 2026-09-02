@@ -26,15 +26,15 @@ case class GpioDeviceP(width: Int, addrBits: Int, dataBits: Int, idBits: Int) ex
   def shape: AxiShape = AxiShape(addrBits, dataBits, idBits)
 
 class GpioPinsBundle(width: Int) extends Bundle:
-  val out = Aligned(UInt(width))
-  val oe  = Aligned(UInt(width))
-  val in  = Flipped(UInt(width))
+  val out = Aligned(Bits(width))
+  val oe  = Aligned(Bits(width))
+  val in  = Flipped(Bits(width))
 
 /** The string-keyed twin, for a module whose ports are named by its parameter (the test harness). */
 class GpioPinsRecord(width: Int) extends Record:
-  val out = Aligned("out", UInt(width))
-  val oe  = Aligned("oe", UInt(width))
-  val in  = Flipped("in", UInt(width))
+  val out = Aligned("out", Bits(width))
+  val oe  = Aligned("oe", Bits(width))
+  val in  = Flipped("in", Bits(width))
 
 class GpioDevicePLayers(p: GpioDeviceP) extends LayerInterface(p):
   def layers = Seq.empty
@@ -51,10 +51,10 @@ object GpioDeviceGen extends Generator[GpioDeviceP, GpioDevicePLayers, GpioDevic
     given ClockScope = ClockScope.posedge(io.clk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
 
-    val outReg = RegInit(0.U(p.width))
-    val dirReg = RegInit(0.U(p.width))
-    val inMeta = RegInit(0.U(p.width))
-    val inSync = RegInit(0.U(p.width))
+    val outReg = RegInit(0.B(p.width))
+    val dirReg = RegInit(0.B(p.width))
+    val inMeta = RegInit(0.B(p.width))
+    val inSync = RegInit(0.B(p.width))
     inMeta      := io.pins.in
     inSync      := inMeta
     io.pins.out := outReg
@@ -62,48 +62,48 @@ object GpioDeviceGen extends Generator[GpioDeviceP, GpioDevicePLayers, GpioDevic
 
     // ---- single-beat AXI slave ----
     val bPending = RegInit(false.B)
-    val bId      = RegInit(0.U(p.idBits))
+    val bId      = RegInit(0.B(p.idBits))
     val rPending = RegInit(false.B)
-    val rId      = RegInit(0.U(p.idBits))
-    val rData    = RegInit(0.U(32))
+    val rId      = RegInit(0.B(p.idBits))
+    val rData    = RegInit(0.B(32))
 
     io.in.aw.ready    := (!bPending) & io.in.w.valid
     io.in.w.ready     := (!bPending) & io.in.aw.valid
     io.in.b.valid     := bPending
     io.in.b.bits.id   := bId
-    io.in.b.bits.resp := 0.U(2)
+    io.in.b.bits.resp := 0.B(2)
     when(bPending & io.in.b.ready) { bPending := false.B }
     when(io.in.aw.valid & io.in.w.valid & (!bPending)) {
       bPending := true.B
       bId      := io.in.aw.bits.id
-      val wAddr = io.in.aw.bits.addr.asBits.bits(3, 2).asUInt
-      val wVal  = io.in.w.bits.data.asBits.bits(p.width - 1, 0).asUInt
-      when(wAddr === 0.U(2)) { outReg := wVal } // OUT
-      when(wAddr === 1.U(2)) { dirReg := wVal } // DIR
+      val wAddr = io.in.aw.bits.addr.bits(3, 2)
+      val wVal  = io.in.w.bits.data.bits(p.width - 1, 0)
+      when(wAddr === 0.B(2)) { outReg := wVal } // OUT
+      when(wAddr === 1.B(2)) { dirReg := wVal } // DIR
     }
 
     io.in.ar.ready    := !rPending
     io.in.r.valid     := rPending
     io.in.r.bits.id   := rId
-    io.in.r.bits.resp := 0.U(2)
+    io.in.r.bits.resp := 0.B(2)
     io.in.r.bits.data := rData
     io.in.r.bits.last := true.B
     when(rPending & io.in.r.ready) { rPending := false.B }
     when(io.in.ar.valid & (!rPending)) {
       rPending := true.B
       rId      := io.in.ar.bits.id
-      val rAddr = io.in.ar.bits.addr.asBits.bits(3, 2).asUInt
+      val rAddr = io.in.ar.bits.addr.bits(3, 2)
       // The context parameters matter: ops must build in the caller's block, not the block where pad was defined.
       def pad(
-        x: Referable[UInt]
+        x: Referable[Bits]
       )(
         using Arena,
         Context,
         Block
       ) =
-        if p.width == 32 then x.asBits.asUInt else (0.U(32 - p.width).asBits ## x.asBits).asUInt
-      rData := 0.U(32)
-      when(rAddr === 0.U(2)) { rData := pad(outReg) } // OUT
-      when(rAddr === 1.U(2)) { rData := pad(dirReg) } // DIR
-      when(rAddr === 2.U(2)) { rData := pad(inSync) } // IN
+        if p.width == 32 then x else 0.B(32 - p.width) ## x
+      rData := 0.B(32)
+      when(rAddr === 0.B(2)) { rData := pad(outReg) } // OUT
+      when(rAddr === 1.B(2)) { rData := pad(dirReg) } // DIR
+      when(rAddr === 2.B(2)) { rData := pad(inSync) } // IN
     }

@@ -24,25 +24,25 @@ given axiPortsTokens:                                           mainargs.TokensR
 final case class AxiShape(addrBits: Int, dataBits: Int, idBits: Int) derives ReadWriter
 
 class AxBits(s: AxiShape) extends Record:
-  val id    = Aligned("id", UInt(s.idBits))
-  val addr  = Aligned("addr", UInt(s.addrBits))
-  val len   = Aligned("len", UInt(8))
-  val size  = Aligned("size", UInt(3))
-  val burst = Aligned("burst", UInt(2))
+  val id    = Aligned("id", Bits(s.idBits))
+  val addr  = Aligned("addr", Bits(s.addrBits))
+  val len   = Aligned("len", Bits(8))
+  val size  = Aligned("size", Bits(3))
+  val burst = Aligned("burst", Bits(2))
 
 class WBits(s: AxiShape) extends Record:
-  val data = Aligned("data", UInt(s.dataBits))
-  val strb = Aligned("strb", UInt(s.dataBits / 8))
+  val data = Aligned("data", Bits(s.dataBits))
+  val strb = Aligned("strb", Bits(s.dataBits / 8))
   val last = Aligned("last", Bool())
 
 class BBits(s: AxiShape) extends Record:
-  val id   = Aligned("id", UInt(s.idBits))
-  val resp = Aligned("resp", UInt(2))
+  val id   = Aligned("id", Bits(s.idBits))
+  val resp = Aligned("resp", Bits(2))
 
 class RBits(s: AxiShape) extends Record:
-  val id   = Aligned("id", UInt(s.idBits))
-  val data = Aligned("data", UInt(s.dataBits))
-  val resp = Aligned("resp", UInt(2))
+  val id   = Aligned("id", Bits(s.idBits))
+  val data = Aligned("data", Bits(s.dataBits))
+  val resp = Aligned("resp", Bits(2))
   val last = Aligned("last", Bool())
 
 class Channel[B <: Data](bits0: B) extends Record:

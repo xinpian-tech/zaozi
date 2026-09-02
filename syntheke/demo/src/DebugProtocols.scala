@@ -92,8 +92,8 @@ object Dmi extends Protocol:
         )
       )
     ProtocolBundle(
-      Field("req", channel("addr" -> UInt(e.abits), "data" -> UInt(e.dataBits), "op" -> UInt(2))),
-      Field("resp", Flipped(channel("data" -> UInt(e.dataBits), "op" -> UInt(2))))
+      Field("req", channel("addr" -> Bits(e.abits), "data" -> Bits(e.dataBits), "op" -> Bits(2))),
+      Field("resp", Flipped(channel("data" -> Bits(e.dataBits), "op" -> Bits(2))))
     )
 
   val downRW: upickle.default.ReadWriter[DmiMaster] = summon
@@ -130,12 +130,12 @@ object DebugInterrupt extends Protocol:
         Bundle(
           Vector(
             Field("valid", Bool),
-            Field("kind", UInt(2)),
+            Field("kind", Bits(2)),
             Field("write", Bool),
-            Field("regno", UInt(16)),
-            Field("size", UInt(3)),
-            Field("data", UInt(e.xlen)),
-            Field("address", UInt(e.xlen))
+            Field("regno", Bits(16)),
+            Field("size", Bits(3)),
+            Field("data", Bits(e.xlen)),
+            Field("address", Bits(e.xlen))
           )
         )
       ),
@@ -149,8 +149,8 @@ object DebugInterrupt extends Protocol:
               Field("resumeAck", Bool),
               Field("resetAck", Bool),
               Field("cmdDone", Bool),
-              Field("cmdError", UInt(3)),
-              Field("cmdRdata", UInt(e.xlen))
+              Field("cmdError", Bits(3)),
+              Field("cmdRdata", Bits(e.xlen))
             )
           )
         )

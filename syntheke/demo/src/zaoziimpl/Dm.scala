@@ -137,42 +137,42 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
     val resumeAck        = Vector.fill(n)(RegInit(false.B))
     val haveReset        = Vector.fill(n)(RegInit(false.B))
 
-    val data0        = RegInit(0.U(p.dataBits))
+    val data0        = RegInit(0.B(p.dataBits))
     val data1        = RegInit(0.U(p.dataBits))
-    val command      = RegInit(0.U(32))
+    val command      = RegInit(0.B(32))
     val abstractBusy = RegInit(false.B)
-    val commandError = RegInit(AbstractCommandError.NONE.U(3))
-    val abstractHart = RegInit(0.U(sel))
+    val commandError = RegInit(AbstractCommandError.NONE.B(3))
+    val abstractHart = RegInit(0.B(sel))
 
     val resumeReqReg       = RegInit(false.B)
     val abstractValidReg   = RegInit(false.B)
-    val abstractCmdKindReg = RegInit(0.U(2))
+    val abstractCmdKindReg = RegInit(0.B(2))
     val abstractWriteReg   = RegInit(false.B)
-    val abstractRegnoReg   = RegInit(0.U(16))
-    val abstractSizeReg    = RegInit(0.U(3))
-    val abstractDataReg    = RegInit(0.U(p.xlen))
-    val abstractAddressReg = RegInit(0.U(p.xlen))
+    val abstractRegnoReg   = RegInit(0.B(16))
+    val abstractSizeReg    = RegInit(0.B(3))
+    val abstractDataReg    = RegInit(0.B(p.xlen))
+    val abstractAddressReg = RegInit(0.B(p.xlen))
 
     // The system bus master's register file, and the one transaction it may have in flight.
-    val sbAccess     = RegInit(2.U(3))
+    val sbAccess     = RegInit(2.B(3))
     val sbAutoInc    = RegInit(false.B)
     val sbReadOnAddr = RegInit(false.B)
     val sbReadOnData = RegInit(false.B)
-    val sbError      = RegInit(0.U(3))
+    val sbError      = RegInit(0.B(3))
     val sbBusyError  = RegInit(false.B)
     val sbAddress    = RegInit(0.U(32))
-    val sbData       = RegInit(0.U(32))
-    val sbState      = RegInit(0.U(2)) // 0 idle, 1 write, 2 read
-    val sbLane       = RegInit(0.U(2)) // which word of a wide beat this address rides in
+    val sbData       = RegInit(0.B(32))
+    val sbState      = RegInit(0.B(2)) // 0 idle, 1 write, 2 read
+    val sbLane       = RegInit(0.B(2)) // which word of a wide beat this address rides in
     val sbAwDone     = RegInit(false.B)
     val sbWDone      = RegInit(false.B)
     val sbArDone     = RegInit(false.B)
 
     val sbBusy    = Wire(Bool())
     val sbBlocked = Wire(Bool())
-    sbBusy    := sbState =/= 0.U(2)
+    sbBusy    := sbState =/= 0.B(2)
     // While an error stands, the spec forbids starting another access until the debugger clears it.
-    sbBlocked := sbBusy | sbBusyError | (sbError =/= 0.U(3))
+    sbBlocked := sbBusy | sbBusyError | (sbError =/= 0.B(3))
 
     // ---- the selected hart's status, and the acting hart's command completion. A selection past the last hart
     // matches nothing, so it reports as neither halted nor running — which is what nonexistent means. ----
@@ -195,16 +195,16 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
       }
 
     val cmdDone  = Wire(Bool())
-    val cmdError = Wire(UInt(3))
-    val cmdRdata = Wire(UInt(p.xlen))
+    val cmdError = Wire(Bits(3))
+    val cmdRdata = Wire(Bits(p.xlen))
     cmdDone  := false.B
-    cmdError := AbstractCommandError.NONE.U(3)
-    cmdRdata := 0.U(p.xlen)
+    cmdError := AbstractCommandError.NONE.B(3)
+    cmdRdata := 0.B(p.xlen)
     for i <- 0 until n do
-      when(abstractHart === i.U(sel)) {
+      when(abstractHart === i.B(sel)) {
         cmdDone  := statusOf(i).field[Bool]("cmdDone")
-        cmdError := statusOf(i).field[UInt]("cmdError")
-        cmdRdata := statusOf(i).field[UInt]("cmdRdata")
+        cmdError := statusOf(i).field[Bits]("cmdError")
+        cmdRdata := statusOf(i).field[Bits]("cmdRdata")
       }
 
     // ---- readable registers ----
@@ -212,7 +212,7 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
     selHaltRequest := false.B
     for i <- 0 until n do when(hartsel === i.U(sel)) { selHaltRequest := haltRequest(i) }
 
-    val dmcontrolRead = Wire(UInt(32))
+    val dmcontrolRead = Wire(Bits(32))
     dmcontrolRead := (
       selHaltRequest.asBits ##
         0.B(1) ##
@@ -222,9 +222,9 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
         0.B(14) ##
         ndmreset.asBits ##
         dmactive.asBits
-    ).asUInt
+    )
 
-    val dmstatusRead = Wire(UInt(32))
+    val dmstatusRead = Wire(Bits(32))
     dmstatusRead := (
       0.B(7) ##
         ndmreset.asBits ##
@@ -245,86 +245,86 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
         1.B(1) ##
         0.B(1) ##
         3.B(4)
-    ).asUInt
+    )
 
-    val abstractcsRead = Wire(UInt(32))
+    val abstractcsRead = Wire(Bits(32))
     abstractcsRead := (
       0.B(19) ##
         abstractBusy.asBits ##
         0.B(1) ##
-        commandError.asBits ##
+        commandError ##
         0.B(4) ##
         2.B(4)
-    ).asUInt
+    )
 
     // The system bus port as the debugger reads it: this port moves words, so it advertises 32-bit accesses only.
-    val sbcsRead = Wire(UInt(32))
+    val sbcsRead = Wire(Bits(32))
     sbcsRead := (
       1.B(3) ##
         0.B(6) ##
         sbBusyError.asBits ##
         sbBusy.asBits ##
         sbReadOnAddr.asBits ##
-        sbAccess.asBits ##
+        sbAccess ##
         sbAutoInc.asBits ##
         sbReadOnData.asBits ##
-        sbError.asBits ##
+        sbError ##
         p.sbAddrBits.B(7) ##
         0.B(2) ##
         1.B(1) ##
         0.B(2)
-    ).asUInt
+    )
 
     // Every hart's halted bit at once, hart 0 in bit 0.
-    val haltsum0Read = Wire(UInt(32))
+    val haltsum0Read = Wire(Bits(32))
     haltsum0Read := (0.B(32 - n) ## Vector
       .tabulate(n)(i => statusOf(n - 1 - i).field[Bool]("halted").asBits)
       .reduce(
         _ ## _
-      )).asUInt
+      ))
 
-    val dmiReadData = Wire(UInt(p.dataBits))
-    dmiReadData := 0.U(p.dataBits)
-    when(reqBits.field[UInt]("addr") === DebugRegister.DATA0.U(p.abits)) {
+    val dmiReadData = Wire(Bits(p.dataBits))
+    dmiReadData := 0.B(p.dataBits)
+    when(reqBits.field[Bits]("addr") === DebugRegister.DATA0.B(p.abits)) {
       dmiReadData := data0
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.DATA1.U(p.abits)) {
-      dmiReadData := data1
+    when(reqBits.field[Bits]("addr") === DebugRegister.DATA1.B(p.abits)) {
+      dmiReadData := data1.asBits
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.DMCONTROL.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.DMCONTROL.B(p.abits)) {
       dmiReadData := dmcontrolRead
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.DMSTATUS.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.DMSTATUS.B(p.abits)) {
       dmiReadData := dmstatusRead
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.ABSTRACTCS.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.ABSTRACTCS.B(p.abits)) {
       dmiReadData := abstractcsRead
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.COMMAND.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.COMMAND.B(p.abits)) {
       dmiReadData := command
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.HALTSUM0.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.HALTSUM0.B(p.abits)) {
       dmiReadData := haltsum0Read
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.SBCS.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.SBCS.B(p.abits)) {
       dmiReadData := sbcsRead
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.SBADDRESS0.U(p.abits)) {
-      dmiReadData := sbAddress
+    when(reqBits.field[Bits]("addr") === DebugRegister.SBADDRESS0.B(p.abits)) {
+      dmiReadData := sbAddress.asBits
     }
-    when(reqBits.field[UInt]("addr") === DebugRegister.SBDATA0.U(p.abits)) {
+    when(reqBits.field[Bits]("addr") === DebugRegister.SBDATA0.B(p.abits)) {
       dmiReadData := sbData
     }
 
     // ---- the DMI slave: one transaction at a time, answered the cycle after it is accepted ----
     val respValid = RegInit(false.B)
-    val respData  = RegInit(0.U(p.dataBits))
-    val respOp    = RegInit(DmiOp.SUCCESS.U(2))
+    val respData  = RegInit(0.B(p.dataBits))
+    val respOp    = RegInit(DmiOp.SUCCESS.B(2))
 
     req.field[Bool]("ready")                       := !respValid
     resp.field[Bool]("valid")                      := respValid
-    resp.field[Record]("bits").field[UInt]("data") := respData
-    resp.field[Record]("bits").field[UInt]("op")   := respOp
+    resp.field[Record]("bits").field[Bits]("data") := respData
+    resp.field[Record]("bits").field[Bits]("op")   := respOp
     when(respValid & resp.field[Bool]("ready")) { respValid := false.B }
 
     resumeReqReg     := false.B
@@ -339,29 +339,29 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
 
     when(cmdDone & abstractBusy) {
       abstractBusy := false.B
-      when(cmdError =/= AbstractCommandError.NONE.U(3)) {
+      when(cmdError =/= AbstractCommandError.NONE.B(3)) {
         commandError := cmdError
       }.otherwise {
         when(!abstractWriteReg) {
           data0 := cmdRdata
         }
-        when(command.asBits.bits(31, 24) === AbstractCommandType.ACCESS_REGISTER.B(8)) {
-          when(command.asBits.bit(19) & command.asBits.bit(17)) {
+        when(command.bits(31, 24) === AbstractCommandType.ACCESS_REGISTER.B(8)) {
+          when(command.bit(19) & command.bit(17)) {
             command := (
-              command.asBits.bits(31, 16) ##
-                (command.asBits.bits(15, 0).asUInt + 1.U(16)).asBits.bits(15, 0)
-            ).asUInt
+              command.bits(31, 16) ##
+                (command.bits(15, 0).asUInt + 1.U(16)).asBits.bits(15, 0)
+            )
           }
         }
-        when(command.asBits.bits(31, 24) === AbstractCommandType.ACCESS_MEMORY.B(8)) {
-          when(command.asBits.bit(19)) {
-            when(abstractSizeReg === 0.U(3)) {
+        when(command.bits(31, 24) === AbstractCommandType.ACCESS_MEMORY.B(8)) {
+          when(command.bit(19)) {
+            when(abstractSizeReg === 0.B(3)) {
               data1 := (data1 + 1.U(p.dataBits)).asBits.bits(p.dataBits - 1, 0).asUInt
             }
-            when(abstractSizeReg === 1.U(3)) {
+            when(abstractSizeReg === 1.B(3)) {
               data1 := (data1 + 2.U(p.dataBits)).asBits.bits(p.dataBits - 1, 0).asUInt
             }
-            when(abstractSizeReg === 2.U(3)) {
+            when(abstractSizeReg === 2.B(3)) {
               data1 := (data1 + 4.U(p.dataBits)).asBits.bits(p.dataBits - 1, 0).asUInt
             }
           }
@@ -373,32 +373,32 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
     // carried out by the engine after it.
     val sbStartRead  = Wire(Bool())
     val sbStartWrite = Wire(Bool())
-    val sbStartAddr  = Wire(UInt(32))
+    val sbStartAddr  = Wire(Bits(32))
     sbStartRead  := false.B
     sbStartWrite := false.B
-    sbStartAddr  := sbAddress
+    sbStartAddr  := sbAddress.asBits
 
     val reqFire = req.field[Bool]("valid") & (!respValid)
     when(reqFire) {
       respValid := true.B
       respData  := dmiReadData
-      respOp    := DmiOp.SUCCESS.U(2)
+      respOp    := DmiOp.SUCCESS.B(2)
 
-      val addr = reqBits.field[UInt]("addr")
-      val data = reqBits.field[UInt]("data")
+      val addr = reqBits.field[Bits]("addr")
+      val data = reqBits.field[Bits]("data")
 
-      when(reqBits.field[UInt]("op") === DmiOp.READ.U(2)) {
+      when(reqBits.field[Bits]("op") === DmiOp.READ.B(2)) {
         when(
           abstractBusy &
-            ((addr === DebugRegister.DATA0.U(p.abits)) |
-              (addr === DebugRegister.DATA1.U(p.abits)))
+            ((addr === DebugRegister.DATA0.B(p.abits)) |
+              (addr === DebugRegister.DATA1.B(p.abits)))
         ) {
-          when(commandError === AbstractCommandError.NONE.U(3)) {
-            commandError := AbstractCommandError.BUSY.U(3)
+          when(commandError === AbstractCommandError.NONE.B(3)) {
+            commandError := AbstractCommandError.BUSY.B(3)
           }
         }
         // Reading the data register is itself the request for the next word, which is how a debugger streams memory.
-        when(dmactive & (addr === DebugRegister.SBDATA0.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.SBDATA0.B(p.abits))) {
           when(sbBusy) {
             sbBusyError := true.B
           }.otherwise {
@@ -407,57 +407,57 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
         }
       }
 
-      when(reqBits.field[UInt]("op") === DmiOp.WRITE.U(2)) {
-        when(addr === DebugRegister.DMCONTROL.U(p.abits)) {
-          when(!data.asBits.bit(0)) {
+      when(reqBits.field[Bits]("op") === DmiOp.WRITE.B(2)) {
+        when(addr === DebugRegister.DMCONTROL.B(p.abits)) {
+          when(!data.bit(0)) {
             dmactive     := false.B
             ndmreset     := false.B
             hartreset    := false.B
-            data0        := 0.U(p.dataBits)
+            data0        := 0.B(p.dataBits)
             data1        := 0.U(p.dataBits)
-            command      := 0.U(32)
+            command      := 0.B(32)
             abstractBusy := false.B
-            commandError := AbstractCommandError.NONE.U(3)
-            sbAccess     := 2.U(3)
+            commandError := AbstractCommandError.NONE.B(3)
+            sbAccess     := 2.B(3)
             sbAutoInc    := false.B
             sbReadOnAddr := false.B
             sbReadOnData := false.B
-            sbError      := 0.U(3)
+            sbError      := 0.B(3)
             sbBusyError  := false.B
             sbAddress    := 0.U(32)
-            sbData       := 0.U(32)
+            sbData       := 0.B(32)
             for i <- 0 until n do
               haltRequest(i)      := false.B
               resetHaltRequest(i) := false.B
               resumeAck(i)        := false.B
           }.otherwise {
             dmactive  := true.B
-            ndmreset  := data.asBits.bit(1)
-            hartreset := data.asBits.bit(29)
-            hartsel   := data.asBits.bits(16 + sel - 1, 16).asUInt
+            ndmreset  := data.bit(1)
+            hartreset := data.bit(29)
+            hartsel   := data.bits(16 + sel - 1, 16).asUInt
             when(!abstractBusy) {
               // The write acts on the hart it selects, which is the one this very write names — not the one selected
               // before it, which is why the halted bit consulted here is that hart's own.
-              val target = Wire(UInt(sel))
-              target := data.asBits.bits(16 + sel - 1, 16).asUInt
+              val target = Wire(Bits(sel))
+              target := data.bits(16 + sel - 1, 16)
               for i <- 0 until n do
-                when(target === i.U(sel)) {
-                  haltRequest(i) := data.asBits.bit(31)
+                when(target === i.B(sel)) {
+                  haltRequest(i) := data.bit(31)
                   when(
-                    data.asBits.bit(30) &
-                      !data.asBits.bit(31) &
+                    data.bit(30) &
+                      !data.bit(31) &
                       statusOf(i).field[Bool]("halted")
                   ) {
                     resumeReqReg := true.B
                     resumeAck(i) := false.B
                   }
-                  when(data.asBits.bit(28)) {
+                  when(data.bit(28)) {
                     haveReset(i) := false.B
                   }
-                  when(data.asBits.bit(3)) {
+                  when(data.bit(3)) {
                     resetHaltRequest(i) := true.B
                   }
-                  when(data.asBits.bit(2)) {
+                  when(data.bit(2)) {
                     resetHaltRequest(i) := false.B
                   }
                 }
@@ -465,94 +465,94 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
           }
         }
 
-        when(dmactive & (addr === DebugRegister.DATA0.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.DATA0.B(p.abits))) {
           when(abstractBusy) {
-            when(commandError === AbstractCommandError.NONE.U(3)) {
-              commandError := AbstractCommandError.BUSY.U(3)
+            when(commandError === AbstractCommandError.NONE.B(3)) {
+              commandError := AbstractCommandError.BUSY.B(3)
             }
           }.otherwise {
             data0 := data
           }
         }
-        when(dmactive & (addr === DebugRegister.DATA1.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.DATA1.B(p.abits))) {
           when(abstractBusy) {
-            when(commandError === AbstractCommandError.NONE.U(3)) {
-              commandError := AbstractCommandError.BUSY.U(3)
+            when(commandError === AbstractCommandError.NONE.B(3)) {
+              commandError := AbstractCommandError.BUSY.B(3)
             }
           }.otherwise {
-            data1 := data
+            data1 := data.asUInt
           }
         }
-        when(dmactive & (addr === DebugRegister.ABSTRACTCS.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.ABSTRACTCS.B(p.abits))) {
           when(abstractBusy) {
-            when(commandError === AbstractCommandError.NONE.U(3)) {
-              commandError := AbstractCommandError.BUSY.U(3)
+            when(commandError === AbstractCommandError.NONE.B(3)) {
+              commandError := AbstractCommandError.BUSY.B(3)
             }
           }.otherwise {
             commandError := (
-              commandError.asBits &
-                (data.asBits.bits(10, 8) ^ 7.B(3))
-            ).asUInt
+              commandError &
+                (data.bits(10, 8) ^ 7.B(3))
+            )
           }
         }
-        when(dmactive & (addr === DebugRegister.COMMAND.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.COMMAND.B(p.abits))) {
           when(abstractBusy) {
-            when(commandError === AbstractCommandError.NONE.U(3)) {
-              commandError := AbstractCommandError.BUSY.U(3)
+            when(commandError === AbstractCommandError.NONE.B(3)) {
+              commandError := AbstractCommandError.BUSY.B(3)
             }
           }.otherwise {
-            when(commandError === AbstractCommandError.NONE.U(3)) {
+            when(commandError === AbstractCommandError.NONE.B(3)) {
               command := data
-              when(data.asBits.bits(31, 24) === AbstractCommandType.ACCESS_REGISTER.B(8)) {
+              when(data.bits(31, 24) === AbstractCommandType.ACCESS_REGISTER.B(8)) {
                 when(
-                  data.asBits.bit(23) |
-                    data.asBits.bit(18) |
-                    (data.asBits.bits(22, 20) =/= 2.B(3))
+                  data.bit(23) |
+                    data.bit(18) |
+                    (data.bits(22, 20) =/= 2.B(3))
                 ) {
-                  commandError := AbstractCommandError.NOT_SUPPORTED.U(3)
+                  commandError := AbstractCommandError.NOT_SUPPORTED.B(3)
                 }.otherwise {
-                  when(data.asBits.bit(17)) {
+                  when(data.bit(17)) {
                     when(!selHalted) {
-                      commandError := AbstractCommandError.HALT_OR_RESUME.U(3)
+                      commandError := AbstractCommandError.HALT_OR_RESUME.B(3)
                     }.otherwise {
                       abstractBusy       := true.B
                       abstractValidReg   := true.B
-                      abstractHart       := hartsel
-                      abstractCmdKindReg := AbstractCommandType.ACCESS_REGISTER.U(2)
-                      abstractWriteReg   := data.asBits.bit(16)
-                      abstractRegnoReg   := data.asBits.bits(15, 0).asUInt
-                      abstractSizeReg    := 2.U(3)
+                      abstractHart       := hartsel.asBits
+                      abstractCmdKindReg := AbstractCommandType.ACCESS_REGISTER.B(2)
+                      abstractWriteReg   := data.bit(16)
+                      abstractRegnoReg   := data.bits(15, 0)
+                      abstractSizeReg    := 2.B(3)
                       abstractDataReg    := data0
-                      abstractAddressReg := 0.U(p.xlen)
+                      abstractAddressReg := 0.B(p.xlen)
                     }
                   }
                 }
               }.otherwise {
-                when(data.asBits.bits(31, 24) === AbstractCommandType.ACCESS_MEMORY.B(8)) {
+                when(data.bits(31, 24) === AbstractCommandType.ACCESS_MEMORY.B(8)) {
                   when(
-                    (data.asBits.bits(22, 20).asUInt > 2.U(3)) |
-                      (data.asBits.bits(18, 17) =/= 0.B(2)) |
-                      (data.asBits.bits(15, 14) =/= 0.B(2)) |
-                      (data.asBits.bits(13, 0) =/= 0.B(14))
+                    (data.bits(22, 20).asUInt > 2.U(3)) |
+                      (data.bits(18, 17) =/= 0.B(2)) |
+                      (data.bits(15, 14) =/= 0.B(2)) |
+                      (data.bits(13, 0) =/= 0.B(14))
                   ) {
-                    commandError := AbstractCommandError.NOT_SUPPORTED.U(3)
+                    commandError := AbstractCommandError.NOT_SUPPORTED.B(3)
                   }.otherwise {
                     when(!selHalted) {
-                      commandError := AbstractCommandError.HALT_OR_RESUME.U(3)
+                      commandError := AbstractCommandError.HALT_OR_RESUME.B(3)
                     }.otherwise {
                       abstractBusy       := true.B
                       abstractValidReg   := true.B
-                      abstractHart       := hartsel
-                      abstractCmdKindReg := AbstractCommandType.ACCESS_MEMORY.U(2)
-                      abstractWriteReg   := data.asBits.bit(16)
-                      abstractRegnoReg   := 0.U(16)
-                      abstractSizeReg    := data.asBits.bits(22, 20).asUInt
+                      abstractHart       := hartsel.asBits
+                      abstractCmdKindReg := AbstractCommandType.ACCESS_MEMORY.B(2)
+                      abstractWriteReg   := data.bit(16)
+                      abstractRegnoReg   := 0.B(16)
+                      abstractSizeReg    := data.bits(22, 20)
                       abstractDataReg    := data0
-                      abstractAddressReg := data1
+                      abstractAddressReg := data1.asBits
                     }
                   }
                 }.otherwise {
-                  commandError := AbstractCommandError.NOT_SUPPORTED.U(3)
+                  commandError := AbstractCommandError.NOT_SUPPORTED.B(3)
                 }
               }
             }
@@ -561,26 +561,26 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
 
         // The system bus registers: the control word, the address — writing it may itself be the read request — and
         // the data word, whose write is the write request.
-        when(dmactive & (addr === DebugRegister.SBCS.U(p.abits))) {
-          sbReadOnAddr := data.asBits.bit(20)
-          sbAccess     := data.asBits.bits(19, 17).asUInt
-          sbAutoInc    := data.asBits.bit(16)
-          sbReadOnData := data.asBits.bit(15)
-          when(data.asBits.bit(22)) { sbBusyError := false.B }
-          sbError      := (sbError.asBits & (data.asBits.bits(14, 12) ^ 7.B(3))).asUInt
+        when(dmactive & (addr === DebugRegister.SBCS.B(p.abits))) {
+          sbReadOnAddr := data.bit(20)
+          sbAccess     := data.bits(19, 17)
+          sbAutoInc    := data.bit(16)
+          sbReadOnData := data.bit(15)
+          when(data.bit(22)) { sbBusyError := false.B }
+          sbError      := sbError & (data.bits(14, 12) ^ 7.B(3))
         }
-        when(dmactive & (addr === DebugRegister.SBADDRESS0.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.SBADDRESS0.B(p.abits))) {
           when(sbBusy) {
             sbBusyError := true.B
           }.otherwise {
-            sbAddress := data
+            sbAddress := data.asUInt
             when(sbReadOnAddr & !sbBlocked) {
               sbStartRead := true.B
               sbStartAddr := data
             }
           }
         }
-        when(dmactive & (addr === DebugRegister.SBDATA0.U(p.abits))) {
+        when(dmactive & (addr === DebugRegister.SBDATA0.B(p.abits))) {
           when(sbBusy) {
             sbBusyError := true.B
           }.otherwise {
@@ -596,18 +596,18 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
     val sbSizeBad    = Wire(Bool())
     val sbMisaligned = Wire(Bool())
     sbStart      := sbStartRead | sbStartWrite
-    sbSizeBad    := sbAccess =/= 2.U(3)
-    sbMisaligned := sbStartAddr.asBits.bits(1, 0) =/= 0.B(2)
+    sbSizeBad    := sbAccess =/= 2.B(3)
+    sbMisaligned := sbStartAddr.bits(1, 0) =/= 0.B(2)
     when(sbStart) {
-      sbAddress := sbStartAddr
-      sbLane    := sbStartAddr.asBits.bits(3, 2).asUInt
+      sbAddress := sbStartAddr.asUInt
+      sbLane    := sbStartAddr.bits(3, 2)
       when(sbSizeBad) {
-        sbError := 4.U(3) // an access of unsupported size
+        sbError := 4.B(3) // an access of unsupported size
       }.otherwise {
         when(sbMisaligned) {
-          sbError := 3.U(3) // an alignment error
+          sbError := 3.B(3) // an alignment error
         }.otherwise {
-          sbState  := sbStartWrite.?(1.U(2), 2.U(2))
+          sbState  := sbStartWrite.?(1.B(2), 2.B(2))
           sbAwDone := false.B
           sbWDone  := false.B
           sbArDone := false.B
@@ -617,41 +617,41 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
 
     val sbWriting = Wire(Bool())
     val sbReading = Wire(Bool())
-    sbWriting := sbState === 1.U(2)
-    sbReading := sbState === 2.U(2)
+    sbWriting := sbState === 1.B(2)
+    sbReading := sbState === 2.B(2)
 
-    val sbWData = Wire(UInt(p.sbDataBits))
-    val sbWStrb = Wire(UInt(p.sbDataBits / 8))
+    val sbWData = Wire(Bits(p.sbDataBits))
+    val sbWStrb = Wire(Bits(p.sbDataBits / 8))
     if p.sbDataBits == 32 then
       sbWData := sbData
-      sbWStrb := 15.U(4)
+      sbWStrb := 15.B(4)
     else
-      sbWData := (0.U(96).asBits ## sbData.asBits).asUInt
-      sbWStrb := (0.U(12).asBits ## 15.U(4).asBits).asUInt
+      sbWData := 0.B(96) ## sbData
+      sbWStrb := 0.B(12) ## 15.B(4)
       for l <- 1 until 4 do
-        when(sbLane === l.U(2)) {
+        when(sbLane === l.B(2)) {
           if l == 3 then
-            sbWData := (sbData.asBits ## 0.U(96).asBits).asUInt
-            sbWStrb := (15.U(4).asBits ## 0.U(12).asBits).asUInt
+            sbWData := sbData ## 0.B(96)
+            sbWStrb := 15.B(4) ## 0.B(12)
           else
-            sbWData := (0.U((3 - l) * 32).asBits ## sbData.asBits ## 0.U(l * 32).asBits).asUInt
-            sbWStrb := (0.U((3 - l) * 4).asBits ## 15.U(4).asBits ## 0.U(l * 4).asBits).asUInt
+            sbWData := 0.B((3 - l) * 32) ## sbData ## 0.B(l * 32)
+            sbWStrb := 0.B((3 - l) * 4) ## 15.B(4) ## 0.B(l * 4)
         }
 
-    val sbAddrOut = Wire(UInt(p.sbAddrBits))
-    sbAddrOut := sbAddress.asBits.bits(p.sbAddrBits - 1, 0).asUInt
+    val sbAddrOut = Wire(Bits(p.sbAddrBits))
+    sbAddrOut := sbAddress.asBits.bits(p.sbAddrBits - 1, 0)
 
     // AW and W are presented together: a master must never hold WVALID for AWREADY.
     sbCh("aw").field[Bool]("valid")   := sbWriting & (!sbAwDone)
-    sbBits("aw").field[UInt]("id")    := 0.U(p.sbIdBits)
-    sbBits("aw").field[UInt]("addr")  := sbAddrOut
-    sbBits("aw").field[UInt]("len")   := 0.U(8)
-    sbBits("aw").field[UInt]("size")  := 2.U(3)
-    sbBits("aw").field[UInt]("burst") := 1.U(2)
+    sbBits("aw").field[Bits]("id")    := 0.B(p.sbIdBits)
+    sbBits("aw").field[Bits]("addr")  := sbAddrOut
+    sbBits("aw").field[Bits]("len")   := 0.B(8)
+    sbBits("aw").field[Bits]("size")  := 2.B(3)
+    sbBits("aw").field[Bits]("burst") := 1.B(2)
 
     sbCh("w").field[Bool]("valid")  := sbWriting & (!sbWDone)
-    sbBits("w").field[UInt]("data") := sbWData
-    sbBits("w").field[UInt]("strb") := sbWStrb
+    sbBits("w").field[Bits]("data") := sbWData
+    sbBits("w").field[Bits]("strb") := sbWStrb
     sbBits("w").field[Bool]("last") := true.B
 
     val sbAwHs = sbWriting & (!sbAwDone) & sbCh("aw").field[Bool]("ready")
@@ -663,38 +663,38 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
     sbWriteSent                       := sbWriting & (sbAwDone | sbAwHs) & (sbWDone | sbWHs)
     sbCh("b").field[Bool]("ready")    := sbWriteSent
     when(sbWriteSent & sbCh("b").field[Bool]("valid")) {
-      sbState  := 0.U(2)
+      sbState  := 0.B(2)
       sbAwDone := false.B
       sbWDone  := false.B
-      when(sbBits("b").field[UInt]("resp") =/= 0.U(2)) {
-        sbError := 2.U(3) // a bad address was accessed
+      when(sbBits("b").field[Bits]("resp") =/= 0.B(2)) {
+        sbError := 2.B(3) // a bad address was accessed
       }.otherwise {
         when(sbAutoInc) { sbAddress := (sbAddress + 4.U(32)).asBits.bits(31, 0).asUInt }
       }
     }
 
     sbCh("ar").field[Bool]("valid")   := sbReading & (!sbArDone)
-    sbBits("ar").field[UInt]("id")    := 0.U(p.sbIdBits)
-    sbBits("ar").field[UInt]("addr")  := sbAddrOut
-    sbBits("ar").field[UInt]("len")   := 0.U(8)
-    sbBits("ar").field[UInt]("size")  := 2.U(3)
-    sbBits("ar").field[UInt]("burst") := 1.U(2)
+    sbBits("ar").field[Bits]("id")    := 0.B(p.sbIdBits)
+    sbBits("ar").field[Bits]("addr")  := sbAddrOut
+    sbBits("ar").field[Bits]("len")   := 0.B(8)
+    sbBits("ar").field[Bits]("size")  := 2.B(3)
+    sbBits("ar").field[Bits]("burst") := 1.B(2)
     when(sbReading & (!sbArDone) & sbCh("ar").field[Bool]("ready")) { sbArDone := true.B }
 
-    val sbRWord = Wire(UInt(32))
-    sbRWord                        := sbBits("r").field[UInt]("data").asBits.bits(31, 0).asUInt
+    val sbRWord = Wire(Bits(32))
+    sbRWord                        := sbBits("r").field[Bits]("data").bits(31, 0)
     if p.sbDataBits == 128 then
       for l <- 1 until 4 do
-        when(sbLane === l.U(2)) {
-          sbRWord := sbBits("r").field[UInt]("data").asBits.bits(l * 32 + 31, l * 32).asUInt
+        when(sbLane === l.B(2)) {
+          sbRWord := sbBits("r").field[Bits]("data").bits(l * 32 + 31, l * 32)
         }
 
     sbCh("r").field[Bool]("ready") := sbReading
     when(sbReading & sbCh("r").field[Bool]("valid")) {
-      sbState  := 0.U(2)
+      sbState  := 0.B(2)
       sbArDone := false.B
-      when(sbBits("r").field[UInt]("resp") =/= 0.U(2)) {
-        sbError := 2.U(3)
+      when(sbBits("r").field[Bits]("resp") =/= 0.B(2)) {
+        sbError := 2.B(3)
       }.otherwise {
         sbData := sbRWord
         when(sbAutoInc) { sbAddress := (sbAddress + 4.U(32)).asBits.bits(31, 0).asUInt }
@@ -708,10 +708,10 @@ object DmGen extends Generator[DmP, DmPLayers, DmPIO, DmPProbe]:
       hart(i).field[Bool]("reset")       := dmactive & (ndmreset | hartreset)
       hart(i).field[Bool]("haltOnReset") := dmactive & resetHaltRequest(i)
 
-      cmdOf(i).field[Bool]("valid")   := abstractValidReg & (abstractHart === i.U(sel))
-      cmdOf(i).field[UInt]("kind")    := abstractCmdKindReg
+      cmdOf(i).field[Bool]("valid")   := abstractValidReg & (abstractHart === i.B(sel))
+      cmdOf(i).field[Bits]("kind")    := abstractCmdKindReg
       cmdOf(i).field[Bool]("write")   := abstractWriteReg
-      cmdOf(i).field[UInt]("regno")   := abstractRegnoReg
-      cmdOf(i).field[UInt]("size")    := abstractSizeReg
-      cmdOf(i).field[UInt]("data")    := abstractDataReg
-      cmdOf(i).field[UInt]("address") := abstractAddressReg
+      cmdOf(i).field[Bits]("regno")   := abstractRegnoReg
+      cmdOf(i).field[Bits]("size")    := abstractSizeReg
+      cmdOf(i).field[Bits]("data")    := abstractDataReg
+      cmdOf(i).field[Bits]("address") := abstractAddressReg

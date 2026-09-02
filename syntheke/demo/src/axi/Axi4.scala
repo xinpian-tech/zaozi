@@ -222,14 +222,14 @@ object Axi4 extends Protocol:
           Field("bits", Bundle(payload.toVector.map((n, t) => Field(n, t))))
         )
       )
-    val addr = ("addr", UInt(e.addrBits))
-    val id0  = ("id", UInt(e.idBits))
+    val addr = ("addr", Bits(e.addrBits))
+    val id0  = ("id", Bits(e.idBits))
     ProtocolBundle(
-      Field("aw", channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
-      Field("w", channel("data" -> UInt(e.dataBits), "strb" -> UInt(e.dataBits / 8), "last" -> Bool)),
-      Field("b", Flipped(channel(id0, "resp" -> UInt(2)))),
-      Field("ar", channel(id0, addr, "len" -> UInt(8), "size" -> UInt(3), "burst" -> UInt(2))),
-      Field("r", Flipped(channel(id0, "data" -> UInt(e.dataBits), "resp" -> UInt(2), "last" -> Bool)))
+      Field("aw", channel(id0, addr, "len" -> Bits(8), "size" -> Bits(3), "burst" -> Bits(2))),
+      Field("w", channel("data" -> Bits(e.dataBits), "strb" -> Bits(e.dataBits / 8), "last" -> Bool)),
+      Field("b", Flipped(channel(id0, "resp" -> Bits(2)))),
+      Field("ar", channel(id0, addr, "len" -> Bits(8), "size" -> Bits(3), "burst" -> Bits(2))),
+      Field("r", Flipped(channel(id0, "data" -> Bits(e.dataBits), "resp" -> Bits(2), "last" -> Bool)))
     )
 
   val downRW: upickle.default.ReadWriter[AxiMasterPort] = summon

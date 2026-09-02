@@ -44,109 +44,109 @@ object DtmGen extends Generator[DtmP, DtmPLayers, DtmPIO, DtmPProbe]:
     val requestToggleMeta = RegInit(false.B)
     val requestToggleSync = RegInit(false.B)
     val requestToggleSeen = RegInit(false.B)
-    val busAddr           = RegInit(0.U(p.abits))
-    val busData           = RegInit(0.U(p.dataBits))
-    val busOp             = RegInit(0.U(2))
-    val busState          = RegInit(0.U(2)) // 0 idle, 1 request, 2 response
+    val busAddr           = RegInit(0.B(p.abits))
+    val busData           = RegInit(0.B(p.dataBits))
+    val busOp             = RegInit(0.B(2))
+    val busState          = RegInit(0.B(2)) // 0 idle, 1 request, 2 response
     val responseToggle    = RegInit(false.B)
-    val responseData      = RegInit(0.U(p.dataBits))
-    val responseOp        = RegInit(DmiOp.SUCCESS.U(2))
+    val responseData      = RegInit(0.B(p.dataBits))
+    val responseOp        = RegInit(DmiOp.SUCCESS.B(2))
 
     // ---- tck domain: the TAP. It reads the response registers above, stable while their toggle crosses back. ----
     val (requestToggle, requestAddr, requestData, requestOp) = locally {
       given ClockScope = ClockScope.posedge(io.jtag.tck)
 
-      val state   = RegInit(TapState.TEST_LOGIC_RESET.U(4))
-      val ir      = RegInit(JtagInstruction.IDCODE.U(p.irLength))
-      val irShift = RegInit(1.U(p.irLength))
-      val drShift = RegInit(0.U(p.drWidth))
+      val state   = RegInit(TapState.TEST_LOGIC_RESET.B(4))
+      val ir      = RegInit(JtagInstruction.IDCODE.B(p.irLength))
+      val irShift = RegInit(1.B(p.irLength))
+      val drShift = RegInit(0.B(p.drWidth))
       val bypass  = RegInit(false.B)
 
       val requestToggle = RegInit(false.B)
-      val requestAddr   = RegInit(0.U(p.abits))
-      val requestData   = RegInit(0.U(p.dataBits))
-      val requestOp     = RegInit(DmiOp.NOP.U(2))
+      val requestAddr   = RegInit(0.B(p.abits))
+      val requestData   = RegInit(0.B(p.dataBits))
+      val requestOp     = RegInit(DmiOp.NOP.B(2))
       val outstanding   = RegInit(false.B)
 
       val responseToggleMeta = RegInit(false.B)
       val responseToggleSync = RegInit(false.B)
       val responseToggleSeen = RegInit(false.B)
-      val responseAddrReg    = RegInit(0.U(p.abits))
-      val responseDataReg    = RegInit(0.U(p.dataBits))
-      val responseStatusReg  = RegInit(DmiOp.SUCCESS.U(2))
-      val stickyStatus       = RegInit(DmiOp.SUCCESS.U(2))
+      val responseAddrReg    = RegInit(0.B(p.abits))
+      val responseDataReg    = RegInit(0.B(p.dataBits))
+      val responseStatusReg  = RegInit(DmiOp.SUCCESS.B(2))
+      val stickyStatus       = RegInit(DmiOp.SUCCESS.B(2))
 
-      val nextState = Wire(UInt(4))
-      nextState := TapState.TEST_LOGIC_RESET.U(4)
-      when(state === TapState.TEST_LOGIC_RESET.U(4)) {
-        nextState := io.jtag.tms.?(TapState.TEST_LOGIC_RESET.U(4), TapState.RUN_TEST_IDLE.U(4))
+      val nextState = Wire(Bits(4))
+      nextState := TapState.TEST_LOGIC_RESET.B(4)
+      when(state === TapState.TEST_LOGIC_RESET.B(4)) {
+        nextState := io.jtag.tms.?(TapState.TEST_LOGIC_RESET.B(4), TapState.RUN_TEST_IDLE.B(4))
       }
-      when(state === TapState.RUN_TEST_IDLE.U(4)) {
-        nextState := io.jtag.tms.?(TapState.SELECT_DR_SCAN.U(4), TapState.RUN_TEST_IDLE.U(4))
+      when(state === TapState.RUN_TEST_IDLE.B(4)) {
+        nextState := io.jtag.tms.?(TapState.SELECT_DR_SCAN.B(4), TapState.RUN_TEST_IDLE.B(4))
       }
-      when(state === TapState.SELECT_DR_SCAN.U(4)) {
-        nextState := io.jtag.tms.?(TapState.SELECT_IR_SCAN.U(4), TapState.CAPTURE_DR.U(4))
+      when(state === TapState.SELECT_DR_SCAN.B(4)) {
+        nextState := io.jtag.tms.?(TapState.SELECT_IR_SCAN.B(4), TapState.CAPTURE_DR.B(4))
       }
-      when(state === TapState.CAPTURE_DR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.EXIT1_DR.U(4), TapState.SHIFT_DR.U(4))
+      when(state === TapState.CAPTURE_DR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.EXIT1_DR.B(4), TapState.SHIFT_DR.B(4))
       }
-      when(state === TapState.SHIFT_DR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.EXIT1_DR.U(4), TapState.SHIFT_DR.U(4))
+      when(state === TapState.SHIFT_DR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.EXIT1_DR.B(4), TapState.SHIFT_DR.B(4))
       }
-      when(state === TapState.EXIT1_DR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.UPDATE_DR.U(4), TapState.PAUSE_DR.U(4))
+      when(state === TapState.EXIT1_DR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.UPDATE_DR.B(4), TapState.PAUSE_DR.B(4))
       }
-      when(state === TapState.PAUSE_DR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.EXIT2_DR.U(4), TapState.PAUSE_DR.U(4))
+      when(state === TapState.PAUSE_DR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.EXIT2_DR.B(4), TapState.PAUSE_DR.B(4))
       }
-      when(state === TapState.EXIT2_DR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.UPDATE_DR.U(4), TapState.SHIFT_DR.U(4))
+      when(state === TapState.EXIT2_DR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.UPDATE_DR.B(4), TapState.SHIFT_DR.B(4))
       }
-      when(state === TapState.UPDATE_DR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.SELECT_DR_SCAN.U(4), TapState.RUN_TEST_IDLE.U(4))
+      when(state === TapState.UPDATE_DR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.SELECT_DR_SCAN.B(4), TapState.RUN_TEST_IDLE.B(4))
       }
-      when(state === TapState.SELECT_IR_SCAN.U(4)) {
-        nextState := io.jtag.tms.?(TapState.TEST_LOGIC_RESET.U(4), TapState.CAPTURE_IR.U(4))
+      when(state === TapState.SELECT_IR_SCAN.B(4)) {
+        nextState := io.jtag.tms.?(TapState.TEST_LOGIC_RESET.B(4), TapState.CAPTURE_IR.B(4))
       }
-      when(state === TapState.CAPTURE_IR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.EXIT1_IR.U(4), TapState.SHIFT_IR.U(4))
+      when(state === TapState.CAPTURE_IR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.EXIT1_IR.B(4), TapState.SHIFT_IR.B(4))
       }
-      when(state === TapState.SHIFT_IR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.EXIT1_IR.U(4), TapState.SHIFT_IR.U(4))
+      when(state === TapState.SHIFT_IR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.EXIT1_IR.B(4), TapState.SHIFT_IR.B(4))
       }
-      when(state === TapState.EXIT1_IR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.UPDATE_IR.U(4), TapState.PAUSE_IR.U(4))
+      when(state === TapState.EXIT1_IR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.UPDATE_IR.B(4), TapState.PAUSE_IR.B(4))
       }
-      when(state === TapState.PAUSE_IR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.EXIT2_IR.U(4), TapState.PAUSE_IR.U(4))
+      when(state === TapState.PAUSE_IR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.EXIT2_IR.B(4), TapState.PAUSE_IR.B(4))
       }
-      when(state === TapState.EXIT2_IR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.UPDATE_IR.U(4), TapState.SHIFT_IR.U(4))
+      when(state === TapState.EXIT2_IR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.UPDATE_IR.B(4), TapState.SHIFT_IR.B(4))
       }
-      when(state === TapState.UPDATE_IR.U(4)) {
-        nextState := io.jtag.tms.?(TapState.SELECT_DR_SCAN.U(4), TapState.RUN_TEST_IDLE.U(4))
+      when(state === TapState.UPDATE_IR.B(4)) {
+        nextState := io.jtag.tms.?(TapState.SELECT_DR_SCAN.B(4), TapState.RUN_TEST_IDLE.B(4))
       }
 
       val tdo = Wire(Bool())
       tdo         := false.B
-      when(state === TapState.SHIFT_IR.U(4)) {
-        tdo := irShift.asBits.bit(0)
+      when(state === TapState.SHIFT_IR.B(4)) {
+        tdo := irShift.bit(0)
       }
-      when(state === TapState.SHIFT_DR.U(4)) {
-        tdo := drShift.asBits.bit(0)
+      when(state === TapState.SHIFT_DR.B(4)) {
+        tdo := drShift.bit(0)
       }
       io.jtag.tdo := tdo
 
-      val dmiCaptureStatus = Wire(UInt(2))
+      val dmiCaptureStatus = Wire(Bits(2))
       dmiCaptureStatus := stickyStatus
-      when((stickyStatus === DmiOp.SUCCESS.U(2)) & outstanding) {
-        dmiCaptureStatus := DmiOp.BUSY.U(2)
+      when((stickyStatus === DmiOp.SUCCESS.B(2)) & outstanding) {
+        dmiCaptureStatus := DmiOp.BUSY.B(2)
       }
-      when((stickyStatus === DmiOp.SUCCESS.U(2)) & !outstanding) {
+      when((stickyStatus === DmiOp.SUCCESS.B(2)) & !outstanding) {
         dmiCaptureStatus := responseStatusReg
       }
 
-      val dtmcs = Wire(UInt(32))
+      val dtmcs = Wire(Bits(32))
       dtmcs := (
         0.B(11) ##
           0.B(3) ##
@@ -154,10 +154,10 @@ object DtmGen extends Generator[DtmP, DtmPLayers, DtmPIO, DtmPProbe]:
           0.B(1) ##
           0.B(1) ##
           7.B(3) ##
-          stickyStatus.asBits ##
+          stickyStatus ##
           p.abits.B(6) ##
           1.B(4)
-      ).asUInt
+      )
 
       responseToggleMeta := responseToggle
       responseToggleSync := responseToggleMeta
@@ -168,7 +168,7 @@ object DtmGen extends Generator[DtmP, DtmPLayers, DtmPIO, DtmPProbe]:
           responseAddrReg   := requestAddr
           responseDataReg   := responseData
           responseStatusReg := responseOp
-          when(responseOp =/= DmiOp.SUCCESS.U(2)) {
+          when(responseOp =/= DmiOp.SUCCESS.B(2)) {
             stickyStatus := responseOp
           }
         }
@@ -176,119 +176,119 @@ object DtmGen extends Generator[DtmP, DtmPLayers, DtmPIO, DtmPProbe]:
 
       state := nextState
 
-      when(state === TapState.TEST_LOGIC_RESET.U(4)) {
-        ir                := JtagInstruction.IDCODE.U(p.irLength)
-        requestAddr       := 0.U(p.abits)
-        requestData       := 0.U(p.dataBits)
-        requestOp         := DmiOp.NOP.U(2)
+      when(state === TapState.TEST_LOGIC_RESET.B(4)) {
+        ir                := JtagInstruction.IDCODE.B(p.irLength)
+        requestAddr       := 0.B(p.abits)
+        requestData       := 0.B(p.dataBits)
+        requestOp         := DmiOp.NOP.B(2)
         outstanding       := false.B
-        responseAddrReg   := 0.U(p.abits)
-        responseDataReg   := 0.U(p.dataBits)
-        responseStatusReg := DmiOp.SUCCESS.U(2)
-        stickyStatus      := DmiOp.SUCCESS.U(2)
+        responseAddrReg   := 0.B(p.abits)
+        responseDataReg   := 0.B(p.dataBits)
+        responseStatusReg := DmiOp.SUCCESS.B(2)
+        stickyStatus      := DmiOp.SUCCESS.B(2)
       }
 
-      when(state === TapState.CAPTURE_IR.U(4)) {
-        irShift := 1.U(p.irLength)
+      when(state === TapState.CAPTURE_IR.B(4)) {
+        irShift := 1.B(p.irLength)
       }
-      when(state === TapState.SHIFT_IR.U(4)) {
-        irShift := (io.jtag.tdi.asBits ## irShift.asBits.bits(p.irLength - 1, 1)).asUInt
+      when(state === TapState.SHIFT_IR.B(4)) {
+        irShift := (io.jtag.tdi.asBits ## irShift.bits(p.irLength - 1, 1))
       }
-      when(state === TapState.UPDATE_IR.U(4)) {
+      when(state === TapState.UPDATE_IR.B(4)) {
         ir := irShift
       }
 
-      when(state === TapState.CAPTURE_DR.U(4)) {
-        drShift := (0.B(p.drWidth - 1) ## bypass.asBits).asUInt
-        when(ir === JtagInstruction.IDCODE.U(p.irLength)) {
-          drShift := BigInt(p.idcode).U(p.drWidth)
+      when(state === TapState.CAPTURE_DR.B(4)) {
+        drShift := (0.B(p.drWidth - 1) ## bypass.asBits)
+        when(ir === JtagInstruction.IDCODE.B(p.irLength)) {
+          drShift := BigInt(p.idcode).B(p.drWidth)
         }
-        when(ir === JtagInstruction.DTMCS.U(p.irLength)) {
-          drShift := (0.B(p.drWidth - 32) ## dtmcs.asBits).asUInt
+        when(ir === JtagInstruction.DTMCS.B(p.irLength)) {
+          drShift := (0.B(p.drWidth - 32) ## dtmcs)
         }
-        when(ir === JtagInstruction.DMI.U(p.irLength)) {
+        when(ir === JtagInstruction.DMI.B(p.irLength)) {
           drShift := (
-            responseAddrReg.asBits ##
-              responseDataReg.asBits ##
-              dmiCaptureStatus.asBits
-          ).asUInt
-          when((stickyStatus === DmiOp.SUCCESS.U(2)) & outstanding) {
-            stickyStatus := DmiOp.BUSY.U(2)
+            responseAddrReg ##
+              responseDataReg ##
+              dmiCaptureStatus
+          )
+          when((stickyStatus === DmiOp.SUCCESS.B(2)) & outstanding) {
+            stickyStatus := DmiOp.BUSY.B(2)
           }
         }
       }
-      when(state === TapState.SHIFT_DR.U(4)) {
-        when(ir === JtagInstruction.DMI.U(p.irLength)) {
-          drShift := (io.jtag.tdi.asBits ## drShift.asBits.bits(p.drWidth - 1, 1)).asUInt
+      when(state === TapState.SHIFT_DR.B(4)) {
+        when(ir === JtagInstruction.DMI.B(p.irLength)) {
+          drShift := (io.jtag.tdi.asBits ## drShift.bits(p.drWidth - 1, 1))
         }.otherwise {
           when(
-            (ir === JtagInstruction.IDCODE.U(p.irLength)) |
-              (ir === JtagInstruction.DTMCS.U(p.irLength))
+            (ir === JtagInstruction.IDCODE.B(p.irLength)) |
+              (ir === JtagInstruction.DTMCS.B(p.irLength))
           ) {
-            drShift := (0.B(p.drWidth - 32) ## io.jtag.tdi.asBits ## drShift.asBits.bits(31, 1)).asUInt
+            drShift := (0.B(p.drWidth - 32) ## io.jtag.tdi.asBits ## drShift.bits(31, 1))
           }.otherwise {
-            drShift := (0.B(p.drWidth - 1) ## io.jtag.tdi.asBits).asUInt
+            drShift := (0.B(p.drWidth - 1) ## io.jtag.tdi.asBits)
           }
         }
       }
-      when(state === TapState.UPDATE_DR.U(4)) {
-        when(ir === JtagInstruction.DTMCS.U(p.irLength)) {
-          when(drShift.asBits.bit(16)) {
-            stickyStatus      := DmiOp.SUCCESS.U(2)
-            responseStatusReg := DmiOp.SUCCESS.U(2)
+      when(state === TapState.UPDATE_DR.B(4)) {
+        when(ir === JtagInstruction.DTMCS.B(p.irLength)) {
+          when(drShift.bit(16)) {
+            stickyStatus      := DmiOp.SUCCESS.B(2)
+            responseStatusReg := DmiOp.SUCCESS.B(2)
           }
-          when(drShift.asBits.bit(17)) {
-            requestAddr       := 0.U(p.abits)
-            requestData       := 0.U(p.dataBits)
-            requestOp         := DmiOp.NOP.U(2)
+          when(drShift.bit(17)) {
+            requestAddr       := 0.B(p.abits)
+            requestData       := 0.B(p.dataBits)
+            requestOp         := DmiOp.NOP.B(2)
             outstanding       := false.B
-            stickyStatus      := DmiOp.SUCCESS.U(2)
-            responseAddrReg   := 0.U(p.abits)
-            responseDataReg   := 0.U(p.dataBits)
-            responseStatusReg := DmiOp.SUCCESS.U(2)
+            stickyStatus      := DmiOp.SUCCESS.B(2)
+            responseAddrReg   := 0.B(p.abits)
+            responseDataReg   := 0.B(p.dataBits)
+            responseStatusReg := DmiOp.SUCCESS.B(2)
           }
         }
-        when(ir === JtagInstruction.DMI.U(p.irLength)) {
-          val updateOp = drShift.asBits.bits(1, 0).asUInt
-          when((stickyStatus === DmiOp.SUCCESS.U(2)) & (updateOp =/= DmiOp.NOP.U(2))) {
+        when(ir === JtagInstruction.DMI.B(p.irLength)) {
+          val updateOp = drShift.bits(1, 0)
+          when((stickyStatus === DmiOp.SUCCESS.B(2)) & (updateOp =/= DmiOp.NOP.B(2))) {
             when(outstanding) {
-              stickyStatus := DmiOp.BUSY.U(2)
+              stickyStatus := DmiOp.BUSY.B(2)
             }.otherwise {
-              when((updateOp === DmiOp.READ.U(2)) | (updateOp === DmiOp.WRITE.U(2))) {
-                requestAddr   := drShift.asBits.bits(p.drWidth - 1, p.drWidth - p.abits).asUInt
-                requestData   := drShift.asBits.bits(p.drWidth - p.abits - 1, 2).asUInt
+              when((updateOp === DmiOp.READ.B(2)) | (updateOp === DmiOp.WRITE.B(2))) {
+                requestAddr   := drShift.bits(p.drWidth - 1, p.drWidth - p.abits)
+                requestData   := drShift.bits(p.drWidth - p.abits - 1, 2)
                 requestOp     := updateOp
                 requestToggle := !requestToggle
                 outstanding   := true.B
               }.otherwise {
-                stickyStatus := DmiOp.FAILED.U(2)
+                stickyStatus := DmiOp.FAILED.B(2)
               }
             }
           }
         }
         when(
-          (ir =/= JtagInstruction.IDCODE.U(p.irLength)) &
-            (ir =/= JtagInstruction.DTMCS.U(p.irLength)) &
-            (ir =/= JtagInstruction.DMI.U(p.irLength))
+          (ir =/= JtagInstruction.IDCODE.B(p.irLength)) &
+            (ir =/= JtagInstruction.DTMCS.B(p.irLength)) &
+            (ir =/= JtagInstruction.DMI.B(p.irLength))
         ) {
-          bypass := drShift.asBits.bit(0)
+          bypass := drShift.bit(0)
         }
       }
 
       when(!io.jtag.trstN) {
-        state             := TapState.TEST_LOGIC_RESET.U(4)
-        ir                := JtagInstruction.IDCODE.U(p.irLength)
-        irShift           := 1.U(p.irLength)
-        drShift           := 0.U(p.drWidth)
+        state             := TapState.TEST_LOGIC_RESET.B(4)
+        ir                := JtagInstruction.IDCODE.B(p.irLength)
+        irShift           := 1.B(p.irLength)
+        drShift           := 0.B(p.drWidth)
         bypass            := false.B
-        requestAddr       := 0.U(p.abits)
-        requestData       := 0.U(p.dataBits)
-        requestOp         := DmiOp.NOP.U(2)
+        requestAddr       := 0.B(p.abits)
+        requestData       := 0.B(p.dataBits)
+        requestOp         := DmiOp.NOP.B(2)
         outstanding       := false.B
-        responseAddrReg   := 0.U(p.abits)
-        responseDataReg   := 0.U(p.dataBits)
-        stickyStatus      := DmiOp.SUCCESS.U(2)
-        responseStatusReg := DmiOp.SUCCESS.U(2)
+        responseAddrReg   := 0.B(p.abits)
+        responseDataReg   := 0.B(p.dataBits)
+        stickyStatus      := DmiOp.SUCCESS.B(2)
+        responseStatusReg := DmiOp.SUCCESS.B(2)
       }
 
       (requestToggle, requestAddr, requestData, requestOp)
@@ -302,18 +302,18 @@ object DtmGen extends Generator[DtmP, DtmPLayers, DtmPIO, DtmPProbe]:
       busAddr           := requestAddr
       busData           := requestData
       busOp             := requestOp
-      busState          := 1.U(2)
+      busState          := 1.B(2)
     }
 
-    io.dmi.req.valid     := busState === 1.U(2)
+    io.dmi.req.valid     := busState === 1.B(2)
     io.dmi.req.bits.addr := busAddr
     io.dmi.req.bits.data := busData
     io.dmi.req.bits.op   := busOp
-    when((busState === 1.U(2)) & io.dmi.req.ready) { busState := 2.U(2) }
+    when((busState === 1.B(2)) & io.dmi.req.ready) { busState := 2.B(2) }
 
-    io.dmi.resp.ready := busState === 2.U(2)
-    when((busState === 2.U(2)) & io.dmi.resp.valid) {
-      busState       := 0.U(2)
+    io.dmi.resp.ready := busState === 2.B(2)
+    when((busState === 2.B(2)) & io.dmi.resp.valid) {
+      busState       := 0.B(2)
       responseData   := io.dmi.resp.bits.data
       responseOp     := io.dmi.resp.bits.op
       responseToggle := !responseToggle

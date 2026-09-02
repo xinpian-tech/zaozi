@@ -234,57 +234,57 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
       h.resetReq        := d.reset
       h.haltOnResetReq  := d.haltOnReset
       h.abstractValid   := d.cmd.valid
-      h.abstractCmdType := d.cmd.kind
+      h.abstractCmdType := d.cmd.kind.asUInt
       h.abstractWrite   := d.cmd.write
-      h.abstractRegno   := d.cmd.regno
-      h.abstractSize    := d.cmd.size
-      h.abstractData    := d.cmd.data
-      h.abstractAddress := d.cmd.address
+      h.abstractRegno   := d.cmd.regno.asUInt
+      h.abstractSize    := d.cmd.size.asUInt
+      h.abstractData    := d.cmd.data.asUInt
+      h.abstractAddress := d.cmd.address.asUInt
       d.hart.halted     := h.hartHalted
       d.hart.running    := h.hartRunning
       d.hart.resumeAck  := h.hartResumeAck
       d.hart.resetAck   := h.hartResetAck
       d.hart.cmdDone    := h.abstractDone
-      d.hart.cmdError   := h.abstractError
-      d.hart.cmdRdata   := h.abstractRdata
+      d.hart.cmdError   := h.abstractError.asBits
+      d.hart.cmdRdata   := h.abstractRdata.asBits
     }
 
     // ---- AW / W: forwarded concurrently — W must not wait for the AW handshake (the AXI master rule; the peripheral
     // slaves hold AWREADY until they see WVALID). The write lane follows the live AW address until that handshake and
     // the latch afterwards; W flows whenever a lane is known. ----
-    val awLane = RegInit(0.U(2))
+    val awLane = RegInit(0.B(2))
     val awDone = RegInit(false.B)
     val wDone  = RegInit(false.B)
 
     io.mem.aw.valid      := core.io.axi.aw.valid & (!awDone)
     core.io.axi.aw.ready := io.mem.aw.ready & (!awDone)
-    io.mem.aw.bits.id    := 0.U(p.idBits)
-    io.mem.aw.bits.addr  := core.io.axi.aw.bits.addr.asBits.bits(p.addrBits - 1, 0).asUInt
-    io.mem.aw.bits.len   := 0.U(8)
-    io.mem.aw.bits.size  := 2.U(3)
-    io.mem.aw.bits.burst := 1.U(2)
+    io.mem.aw.bits.id    := 0.B(p.idBits)
+    io.mem.aw.bits.addr  := core.io.axi.aw.bits.addr.asBits.bits(p.addrBits - 1, 0)
+    io.mem.aw.bits.len   := 0.B(8)
+    io.mem.aw.bits.size  := 2.B(3)
+    io.mem.aw.bits.burst := 1.B(2)
 
-    val lane = Wire(UInt(2))
-    lane := core.io.axi.aw.bits.addr.asBits.bits(3, 2).asUInt
+    val lane = Wire(Bits(2))
+    lane := core.io.axi.aw.bits.addr.asBits.bits(3, 2)
     when(awDone) { lane := awLane }
     val laneKnown = awDone | core.io.axi.aw.valid
 
-    val wData = Wire(UInt(p.dataBits))
-    val wStrb = Wire(UInt(p.dataBits / 8))
+    val wData = Wire(Bits(p.dataBits))
+    val wStrb = Wire(Bits(p.dataBits / 8))
     if p.dataBits == 32 then
-      wData := core.io.axi.w.bits.data
-      wStrb := core.io.axi.w.bits.strb
+      wData := core.io.axi.w.bits.data.asBits
+      wStrb := core.io.axi.w.bits.strb.asBits
     else
-      wData := (0.U(96).asBits ## core.io.axi.w.bits.data.asBits).asUInt
-      wStrb := (0.U(12).asBits ## core.io.axi.w.bits.strb.asBits).asUInt
+      wData := 0.B(96) ## core.io.axi.w.bits.data.asBits
+      wStrb := 0.B(12) ## core.io.axi.w.bits.strb.asBits
       for l <- 1 until 4 do
-        when(lane === l.U(2)) {
+        when(lane === l.B(2)) {
           if l == 3 then
-            wData := (core.io.axi.w.bits.data.asBits ## 0.U(96).asBits).asUInt
-            wStrb := (core.io.axi.w.bits.strb.asBits ## 0.U(12).asBits).asUInt
+            wData := core.io.axi.w.bits.data.asBits ## 0.B(96)
+            wStrb := core.io.axi.w.bits.strb.asBits ## 0.B(12)
           else
-            wData := (0.U((3 - l) * 32).asBits ## core.io.axi.w.bits.data.asBits ## 0.U(l * 32).asBits).asUInt
-            wStrb := (0.U((3 - l) * 4).asBits ## core.io.axi.w.bits.strb.asBits ## 0.U(l * 4).asBits).asUInt
+            wData := 0.B((3 - l) * 32) ## core.io.axi.w.bits.data.asBits ## 0.B(l * 32)
+            wStrb := 0.B((3 - l) * 4) ## core.io.axi.w.bits.strb.asBits ## 0.B(l * 4)
         }
 
     io.mem.w.valid      := core.io.axi.w.valid & laneKnown & (!wDone)
@@ -297,7 +297,7 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     val wHs  = core.io.axi.w.valid & io.mem.w.ready & laneKnown & (!wDone)
     when(awHs) {
       awDone := true.B
-      awLane := core.io.axi.aw.bits.addr.asBits.bits(3, 2).asUInt
+      awLane := core.io.axi.aw.bits.addr.asBits.bits(3, 2)
     }
     when(wHs) { wDone := true.B }
     when((awDone | awHs) & (wDone | wHs)) {
@@ -308,29 +308,29 @@ object CoreDeviceGen extends Generator[CoreDeviceP, CoreDevicePLayers, CoreDevic
     // ---- B / AR / R ----
     core.io.axi.b.valid     := io.mem.b.valid
     io.mem.b.ready          := core.io.axi.b.ready
-    core.io.axi.b.bits.resp := io.mem.b.bits.resp
+    core.io.axi.b.bits.resp := io.mem.b.bits.resp.asUInt
 
-    val arLane = RegInit(0.U(2))
+    val arLane = RegInit(0.B(2))
     io.mem.ar.valid      := core.io.axi.ar.valid
     core.io.axi.ar.ready := io.mem.ar.ready
-    io.mem.ar.bits.id    := 0.U(p.idBits)
-    io.mem.ar.bits.addr  := core.io.axi.ar.bits.addr.asBits.bits(p.addrBits - 1, 0).asUInt
-    io.mem.ar.bits.len   := 0.U(8)
-    io.mem.ar.bits.size  := 2.U(3)
-    io.mem.ar.bits.burst := 1.U(2)
+    io.mem.ar.bits.id    := 0.B(p.idBits)
+    io.mem.ar.bits.addr  := core.io.axi.ar.bits.addr.asBits.bits(p.addrBits - 1, 0)
+    io.mem.ar.bits.len   := 0.B(8)
+    io.mem.ar.bits.size  := 2.B(3)
+    io.mem.ar.bits.burst := 1.B(2)
     when(core.io.axi.ar.valid & io.mem.ar.ready) {
-      arLane := core.io.axi.ar.bits.addr.asBits.bits(3, 2).asUInt
+      arLane := core.io.axi.ar.bits.addr.asBits.bits(3, 2)
     }
 
-    val rWord = Wire(UInt(32))
-    rWord := io.mem.r.bits.data.asBits.bits(31, 0).asUInt
+    val rWord = Wire(Bits(32))
+    rWord := io.mem.r.bits.data.bits(31, 0)
     if p.dataBits == 128 then
       for lane <- 1 until 4 do
-        when(arLane === lane.U(2)) {
-          rWord := io.mem.r.bits.data.asBits.bits(lane * 32 + 31, lane * 32).asUInt
+        when(arLane === lane.B(2)) {
+          rWord := io.mem.r.bits.data.bits(lane * 32 + 31, lane * 32)
         }
 
     core.io.axi.r.valid     := io.mem.r.valid
     io.mem.r.ready          := core.io.axi.r.ready
-    core.io.axi.r.bits.data := rWord
-    core.io.axi.r.bits.resp := io.mem.r.bits.resp
+    core.io.axi.r.bits.data := rWord.asUInt
+    core.io.axi.r.bits.resp := io.mem.r.bits.resp.asUInt
