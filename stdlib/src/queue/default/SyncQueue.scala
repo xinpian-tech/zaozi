@@ -6,7 +6,7 @@ import java.lang.foreign.Arena
 
 import me.jiuyang.stdlib.*
 import me.jiuyang.stdlib.default.{*, given}
-import me.jiuyang.stdlib.queue.*
+import me.jiuyang.stdlib.queue.{SyncQueueIO, SyncQueueImpl, SyncQueueLayers, SyncQueueParameter, SyncQueueProbe, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.ltltpe.*
@@ -18,86 +18,6 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
   *
   * The controller is elaborated in this generator. [[Ram]] and the arithmetic primitives are the queue's child modules.
   */
-case class SyncQueueParameter(
-  /** Number of bits stored in each queue entry. */
-  width:             Int,
-  /** Logical number of entries available to the queue. */
-  depth:             Int,
-  /** Assert almost-empty when occupancy is at most this value. */
-  almostEmptyLevel:  Int,
-  /** Assert almost-full when occupancy reaches `depth - almostFullLevel`. */
-  almostFullLevel:   Int,
-  /** Keep overflow, underflow, and enabled diagnostic errors asserted until reset. */
-  stickyError:       Boolean,
-  /** Enable pointer-consistency diagnostics controlled by `diagnosticN`; requires sticky errors. */
-  enableDiagnostics: Boolean,
-  /** Use asynchronous active-low reset when true, or synchronous active-low reset when false. */
-  asyncReset:        Boolean,
-  /** Reset all RAM entries to zero when true; otherwise reset only queue control state. */
-  resetMem:          Boolean)
-    extends Parameter:
-  require(width >= 1 && width <= 2048, s"SyncQueue width must be 1..2048, got $width")
-  require(depth >= 2 && depth <= 1024, s"SyncQueue depth must be 2..1024, got $depth")
-  require(
-    almostEmptyLevel >= 1 && almostEmptyLevel <= depth - 1,
-    s"SyncQueue almostEmptyLevel must be 1..depth-1, got $almostEmptyLevel"
-  )
-  require(
-    almostFullLevel >= 1 && almostFullLevel <= depth - 1,
-    s"SyncQueue almostFullLevel must be 1..depth-1, got $almostFullLevel"
-  )
-  require(stickyError || !enableDiagnostics, "SyncQueue diagnostics require stickyError=true")
-
-  /** Number of bits used by the read and write addresses. */
-  def addressWidth: Int = QueueHelper.bitWidth(depth)
-
-given upickle.default.ReadWriter[SyncQueueParameter] = upickle.default.macroRW
-
-class SyncQueueLayers(parameter: SyncQueueParameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("Verification"))
-
-class SyncQueueIO(parameter: SyncQueueParameter) extends HWBundle(parameter):
-  /** Clock shared by the queue controller and RAM writes. */
-  val clock = Flipped(Clock())
-
-  /** Active-low reset for control state and, when enabled, RAM contents. */
-  val resetN = Flipped(Reset())
-
-  /** Active-low request to enqueue `dataIn`. */
-  val pushRequestN = Flipped(Bool())
-
-  /** Active-low request to dequeue the current entry. */
-  val popRequestN = Flipped(Bool())
-
-  /** Active-low diagnostic control used only when `enableDiagnostics` is true. */
-  val diagnosticN = Flipped(Bool())
-
-  /** Data written when a push request is accepted. */
-  val dataIn = Flipped(UInt(parameter.width))
-
-  /** Indicates that the queue contains no entries. */
-  val empty = Aligned(Bool())
-
-  /** Indicates occupancy at or below `almostEmptyLevel`. */
-  val almostEmpty = Aligned(Bool())
-
-  /** Indicates occupancy at or above half the logical depth. */
-  val halfFull = Aligned(Bool())
-
-  /** Indicates occupancy at or above `depth - almostFullLevel`. */
-  val almostFull = Aligned(Bool())
-
-  /** Indicates that all logical entries are occupied. */
-  val full = Aligned(Bool())
-
-  /** Registered overflow, underflow, or enabled diagnostic error indication. */
-  val error = Aligned(Bool())
-
-  /** Data at the current read address. */
-  val dataOut = Aligned(UInt(parameter.width))
-
-class SyncQueueProbe(parameter: SyncQueueParameter) extends DVBundle[SyncQueueParameter, SyncQueueLayers](parameter)
-
 @generator
 object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueueIO, SyncQueueProbe]:
   override def moduleName(p: SyncQueueParameter): String =
@@ -108,6 +28,8 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
   def expectedGtechCells(p: SyncQueueParameter): Map[String, Int] = Map.empty
 
   def architecture(parameter: SyncQueueParameter) =
+    require(parameter.depth >= 2, s"SyncQueue requires depth>=2, got ${parameter.depth}")
+
     val io           = summon[Interface[SyncQueueIO]]
     given ClockScope = ClockScope.posedge(io.clock)
 
@@ -266,9 +188,9 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
 
     io.dataOut := ram.io.readData
 
-given QueueImpl with
-  def apply[D <: HardwareDataType](
-    parameter: QueueParameter[D]
+given SyncQueueImpl with
+  def apply(
+    parameter: SyncQueueParameter
   )(
     using Arena,
     Context,
@@ -277,65 +199,25 @@ given QueueImpl with
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): Wire[QueueIO[D]] =
-    val io = Wire(new QueueIO(parameter))
-    if parameter.entries == 1 then
-      val queue = SingleEntryQueue.instantiate(
-        SingleEntryQueueParameter(
-          width = parameter.gen.width,
-          pipe = parameter.pipe,
-          flow = parameter.flow,
-          asyncReset = parameter.asyncReset,
-          resetMem = parameter.resetMem
-        )
-      )
+  ): Wire[SyncQueueIO] =
+    val io    = Wire(new SyncQueueIO(parameter))
+    val queue =
+      if parameter.depth == 1 then SingleEntrySyncQueue.instantiate(parameter)
+      else SyncQueue.instantiate(parameter)
 
-      queue.io.clock     := io.clock
-      queue.io.reset     := io.reset
-      queue.io.enq.bits  := io.enq.bits.asBits
-      queue.io.enq.valid := io.enq.valid
-      io.enq.ready       := queue.io.enq.ready
-
-      val dataOut = queue.io.deq.bits.asType(io.deq.bits.getType)
-      io.deq.bits :<= dataOut
-      io.deq.valid       := queue.io.deq.valid
-      queue.io.deq.ready := io.deq.ready
-
-      io.empty := queue.io.empty
-      io.full  := queue.io.full
-    else
-      val queue = SyncQueue.instantiate(
-        SyncQueueParameter(
-          width = parameter.gen.width,
-          depth = parameter.entries,
-          almostEmptyLevel = parameter.almostEmptyLevel,
-          almostFullLevel = parameter.almostFullLevel,
-          stickyError = false,
-          enableDiagnostics = false,
-          asyncReset = parameter.asyncReset,
-          resetMem = parameter.resetMem
-        )
-      )
-
-      queue.io.clock       := io.clock
-      queue.io.resetN      := (!io.reset.asBool).asReset
-      queue.io.diagnosticN := true.B
-      queue.io.dataIn      := io.enq.bits.asBits.asUInt
-
-      // `pipe` lets a same-cycle dequeue make room in a full queue. `flow` bypasses an empty queue without writing RAM.
-      io.enq.ready          := !queue.io.full | (if parameter.pipe then io.deq.ready else false.B)
-      queue.io.pushRequestN :=
-        !(io.enq.fire & (if parameter.flow then !(queue.io.empty & io.deq.ready) else true.B))
-
-      io.deq.valid         := !queue.io.empty | (if parameter.flow then io.enq.valid else false.B)
-      queue.io.popRequestN := !(io.deq.ready & !queue.io.empty)
-      val storedData = queue.io.dataOut.asBits.asType(io.deq.bits.getType)
-      io.deq.bits :<= (if parameter.flow then queue.io.empty ? (io.enq.bits, storedData) else storedData)
-
-      io.empty := queue.io.empty
-      io.full  := queue.io.full
-      io.almostEmpty.foreach(_ := queue.io.almostEmpty)
-      io.almostFull.foreach(_ := queue.io.almostFull)
+    queue.io.clock        := io.clock
+    queue.io.resetN       := io.resetN
+    queue.io.pushRequestN := io.pushRequestN
+    queue.io.popRequestN  := io.popRequestN
+    queue.io.diagnosticN  := io.diagnosticN
+    queue.io.dataIn       := io.dataIn
+    io.empty              := queue.io.empty
+    io.almostEmpty        := queue.io.almostEmpty
+    io.halfFull           := queue.io.halfFull
+    io.almostFull         := queue.io.almostFull
+    io.full               := queue.io.full
+    io.error              := queue.io.error
+    io.dataOut            := queue.io.dataOut
 
     io
 

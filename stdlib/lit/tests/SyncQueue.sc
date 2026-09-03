@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" --
+// DEFINE: %{core} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" --
+// DEFINE: %{single} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SingleEntrySyncQueue" --
 
-// RUN: rm -rf %t.dir && mkdir -p %t.dir
+// RUN: rm -rf %t.dir %t.depth1.dir && mkdir -p %t.dir %t.depth1.dir
 
 // Asynchronous reset with resettable RAM.
-// RUN: cd %t.dir && %{test} config async.json --width 8 --depth 4 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError false --enableDiagnostics false --asyncReset true --resetMem true
-// RUN: cd %t.dir && %{test} design async.json
+// RUN: cd %t.dir && %{core} config async.json --width 8 --depth 4 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError false --enableDiagnostics false --asyncReset true --resetMem true
+// RUN: cd %t.dir && %{core} design async.json
 // RUN: cd %t.dir && firtool Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue.mlirbc | FileCheck %s --check-prefix=ASYNC-RAM
 // RUN: cd %t.dir && firtool SyncQueue_width8_depth4_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResettrue_resetMemtrue.mlirbc | FileCheck %s --check-prefix=ASYNC
 
 // Synchronous reset, non-power-of-two depth, sticky diagnostic mode.
-// RUN: cd %t.dir && %{test} config sync.json --width 8 --depth 3 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError true --enableDiagnostics true --asyncReset false --resetMem false
-// RUN: cd %t.dir && %{test} design sync.json
+// RUN: cd %t.dir && %{core} config sync.json --width 8 --depth 3 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError true --enableDiagnostics true --asyncReset false --resetMem false
+// RUN: cd %t.dir && %{core} design sync.json
 // RUN: cd %t.dir && firtool Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC-RAM
 // RUN: cd %t.dir && firtool SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC
-// RUN: rm -rf %t.dir
+
+// Depth one uses the single-entry sync queue.
+// RUN: cd %t.depth1.dir && %{single} config depth1.json --width 8 --depth 1 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError false --enableDiagnostics false --asyncReset true --resetMem true
+// RUN: cd %t.depth1.dir && %{single} design depth1.json
+// RUN: cd %t.depth1.dir && firtool SingleEntrySyncQueue_width8_depth1_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResettrue_resetMemtrue.mlirbc | FileCheck %s --check-prefix=DEPTH1
+// RUN: rm -rf %t.dir %t.depth1.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
 // ASYNC-RAM: input clock,
@@ -72,3 +78,31 @@
 // SYNC: BrentKungAdder_width2_radix4
 // SYNC: Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse ram (
 // SYNC-NOT: GTECH_
+
+// DEPTH1-LABEL: module SingleEntrySyncQueue_width8_depth1_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResettrue_resetMemtrue_Verification();
+// DEPTH1: single_entry_queue_push_accept:
+// DEPTH1: single_entry_queue_pop_accept:
+// DEPTH1: single_entry_queue_push_pop_same_cycle:
+// DEPTH1: single_entry_queue_empty_to_full:
+// DEPTH1: single_entry_queue_full_to_empty:
+// DEPTH1: single_entry_queue_underflow_request:
+// DEPTH1: single_entry_queue_overflow_request:
+// DEPTH1-LABEL: module SingleEntrySyncQueue_width8_depth1_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResettrue_resetMemtrue(
+// DEPTH1: reg{{ +}}[[FULL:[_A-Za-z0-9]+]];
+// DEPTH1: wire{{ +}}[[QUEUE_RESET:[_A-Za-z0-9]+]] = ~resetN;
+// DEPTH1: reg{{ +}}[7:0] [[DATA:[_A-Za-z0-9]+]];
+// DEPTH1: reg{{ +}}[[ERROR:[_A-Za-z0-9]+]];
+// DEPTH1: wire{{ +}}[[EMPTY:[_A-Za-z0-9]+]] = ~[[FULL]];
+// DEPTH1: wire{{ +}}[[PUSH:[_A-Za-z0-9]+]] = ~pushRequestN & ([[EMPTY]] | ~popRequestN);
+// DEPTH1: always @(posedge clock or posedge [[QUEUE_RESET]]) begin
+// DEPTH1: if ([[QUEUE_RESET]]) begin
+// DEPTH1: [[FULL]] <= 1'h0;
+// DEPTH1: [[DATA]] <= 8'h0;
+// DEPTH1: [[ERROR]] <= 1'h0;
+// DEPTH1: assign empty = [[EMPTY]];
+// DEPTH1: assign almostEmpty = 1'h1;
+// DEPTH1: assign halfFull = [[FULL]];
+// DEPTH1: assign almostFull = 1'h1;
+// DEPTH1: assign full = [[FULL]];
+// DEPTH1: assign error = [[ERROR]];
+// DEPTH1: assign dataOut = [[DATA]];
