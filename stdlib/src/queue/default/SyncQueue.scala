@@ -278,39 +278,67 @@ given QueueImpl with
     sourcecode.Name.Machine,
     InstanceContext
   ): Wire[QueueIO[D]] =
-    val io    = Wire(new QueueIO(parameter))
-    val queue = SyncQueue.instantiate(
-      SyncQueueParameter(
-        width = parameter.gen.width,
-        depth = parameter.entries,
-        almostEmptyLevel = parameter.almostEmptyLevel,
-        almostFullLevel = parameter.almostFullLevel,
-        stickyError = false,
-        enableDiagnostics = false,
-        asyncReset = parameter.asyncReset,
-        resetMem = parameter.resetMem
+    val io = Wire(new QueueIO(parameter))
+    if parameter.entries == 1 then
+      given ClockScope = ClockScope.posedge(io.clock)
+      given ResetScope =
+        if parameter.asyncReset then ResetScope.asyncActiveHigh(io.reset)
+        else ResetScope.syncActiveHigh(io.reset)
+
+      val full = RegInit(false.B)
+      val data =
+        if parameter.resetMem then RegInit(BigInt(0).U(parameter.gen.width).asBits)
+        else Reg(Bits(parameter.gen.width))
+
+      io.enq.ready := !full | (if parameter.pipe then io.deq.ready else false.B)
+      io.deq.valid := full | (if parameter.flow then io.enq.valid else false.B)
+
+      val enqueue = io.enq.valid & io.enq.ready
+      val dequeue = io.deq.valid & io.deq.ready
+      val bypass  = if parameter.flow then !full & dequeue else false.B
+      val store   = enqueue & !bypass
+
+      full := store | (full & !dequeue)
+      when(store):
+        data := io.enq.bits.asBits
+
+      val storedData = data.asType(io.deq.bits.getType)
+      io.deq.bits :<= (if parameter.flow then full ? (storedData, io.enq.bits) else storedData)
+      io.empty := !full
+      io.full  := full
+    else
+      val queue = SyncQueue.instantiate(
+        SyncQueueParameter(
+          width = parameter.gen.width,
+          depth = parameter.entries,
+          almostEmptyLevel = parameter.almostEmptyLevel,
+          almostFullLevel = parameter.almostFullLevel,
+          stickyError = false,
+          enableDiagnostics = false,
+          asyncReset = parameter.asyncReset,
+          resetMem = parameter.resetMem
+        )
       )
-    )
 
-    queue.io.clock       := io.clock
-    queue.io.resetN      := (!io.reset.asBool).asReset
-    queue.io.diagnosticN := true.B
-    queue.io.dataIn      := io.enq.bits.asBits.asUInt
+      queue.io.clock       := io.clock
+      queue.io.resetN      := (!io.reset.asBool).asReset
+      queue.io.diagnosticN := true.B
+      queue.io.dataIn      := io.enq.bits.asBits.asUInt
 
-    // `pipe` lets a same-cycle dequeue make room in a full queue. `flow` bypasses an empty queue without writing RAM.
-    io.enq.ready          := !queue.io.full | (if parameter.pipe then io.deq.ready else false.B)
-    queue.io.pushRequestN :=
-      !(io.enq.fire & (if parameter.flow then !(queue.io.empty & io.deq.ready) else true.B))
+      // `pipe` lets a same-cycle dequeue make room in a full queue. `flow` bypasses an empty queue without writing RAM.
+      io.enq.ready          := !queue.io.full | (if parameter.pipe then io.deq.ready else false.B)
+      queue.io.pushRequestN :=
+        !(io.enq.fire & (if parameter.flow then !(queue.io.empty & io.deq.ready) else true.B))
 
-    io.deq.valid         := !queue.io.empty | (if parameter.flow then io.enq.valid else false.B)
-    queue.io.popRequestN := !(io.deq.ready & !queue.io.empty)
-    val storedData = queue.io.dataOut.asBits.asType(io.deq.bits.getType)
-    io.deq.bits :<= (if parameter.flow then queue.io.empty ? (io.enq.bits, storedData) else storedData)
+      io.deq.valid         := !queue.io.empty | (if parameter.flow then io.enq.valid else false.B)
+      queue.io.popRequestN := !(io.deq.ready & !queue.io.empty)
+      val storedData = queue.io.dataOut.asBits.asType(io.deq.bits.getType)
+      io.deq.bits :<= (if parameter.flow then queue.io.empty ? (io.enq.bits, storedData) else storedData)
 
-    io.empty := queue.io.empty
-    io.full  := queue.io.full
-    io.almostEmpty.foreach(_ := queue.io.almostEmpty)
-    io.almostFull.foreach(_ := queue.io.almostFull)
+      io.empty := queue.io.empty
+      io.full  := queue.io.full
+      io.almostEmpty.foreach(_ := queue.io.almostEmpty)
+      io.almostFull.foreach(_ := queue.io.almostFull)
 
     io
 
