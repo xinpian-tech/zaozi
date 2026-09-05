@@ -3,7 +3,7 @@
 //
 // The i2c transaction-flow arm: five command flows and two reset-midway intents, solved through the vendored
 // OpenCores RTL and rendered as UVM sequences for HAVEN's unmodified i2c testbench (experiments/haven_tb/i2c/).
-// Installed into the experiments slot by ut_harness.py: `ut_harness.py experiments/I2cFlowDriver.scala --out out/experiments/i2c-flow`.
+// Installed into the experiments slot by ut_harness.py: `ut_harness.py experiments/legacy/drivers/I2cFlowDriver.scala --out out/experiments/i2c-flow`.
 import me.jiuyang.stdlib.*
 import me.jiuyang.utlib.*
 
@@ -12,7 +12,7 @@ import me.jiuyang.utlib.*
   */
 object Generated extends UTExperiment:
   def run(outDir: os.Path): ujson.Value =
-    val base  = os.Path("/root/yjh-workspace/rvprobe-workspace/zaozi/stdlib/tests/resources/haven")
+    val base  = os.Path("experiments/fixtures/haven", os.pwd)
     val files = Seq("i2c_master_top", "i2c_master_byte_ctrl", "i2c_master_bit_ctrl").map(n => base / s"$n.v")
     val ip    = SvImport.toHw(files, outDir / "imported", include = Some(base))
 

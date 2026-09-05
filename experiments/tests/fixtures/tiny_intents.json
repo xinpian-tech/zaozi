@@ -1,0 +1,9 @@
+{
+  "intents": [
+    {"label": "input_value", "expression": "Sem.value(io.valid & (io.payload === 7.U(8).asBits))"},
+    {"label": "observed_result", "expression": "Sem.state(io.done & (io.result === 9.U(8).asBits))"},
+    {"label": "two_beats", "expression": "Sem.temporal(io.valid.S ### (!io.valid).S)"},
+    {"label": "history", "expression": "{ val history = Txn.window(io.payload, 8, 1); Sem.relation(history)(w => !(w.past(1) === io.payload)) }"}
+  ],
+  "proofObligations": []
+}

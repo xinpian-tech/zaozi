@@ -6,6 +6,9 @@
   */
 @main def utRun(outDirPath: String): Unit =
   val outDir = os.Path(outDirPath, os.pwd)
-  val report = Generated.run(outDir)
+  val experiment = Class.forName("Generated$").getField("MODULE$").get(null)
+    .asInstanceOf[me.jiuyang.utlib.UTExperiment]
+  os.makeDir.all(outDir)
+  val report = experiment.run(outDir)
   os.write.over(outDir / "report.json", ujson.write(report))
   println("UTCLI-RESULT " + ujson.write(report))

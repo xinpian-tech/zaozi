@@ -5,14 +5,14 @@
 // as one UVM sequence for HAVEN's unmodified testbench (experiments/haven_tb/sdram/). A held Wishbone request in
 // the witness is one transaction for the driver, and an idle stretch is a wait -- the strobe-aware codec.
 // Installed into the experiments slot by ut_harness.py:
-//   ZAOZI_EDA_SHELL=… ut_harness.py experiments/SdramFlowDriver.scala --out out/experiments/sdram-flow
+//   ZAOZI_EDA_SHELL=… ut_harness.py experiments/legacy/drivers/SdramFlowDriver.scala --out out/experiments/sdram-flow
 import me.jiuyang.stdlib.*
 import me.jiuyang.utlib.*
 
 object Generated extends UTExperiment:
   def run(outDir: os.Path): ujson.Value =
     require(JasperGold.available, "the sdram flows need JasperGold (set ZAOZI_EDA_SHELL)")
-    val rtlDir = os.Path("/root/yjh-workspace/rvprobe-workspace/zaozi/stdlib/tests/resources/haven/sdram")
+    val rtlDir = os.Path("experiments/fixtures/haven/sdram", os.pwd)
     val files  = Seq(
       "sdrc_define", "async_fifo", "sync_fifo", "sdrc_bank_fsm", "sdrc_bank_ctl", "sdrc_bs_convert", "sdrc_req_gen",
       "sdrc_xfr_ctl", "sdrc_core", "wb2sdrc", "sdrc_top_split"

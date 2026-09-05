@@ -11,10 +11,10 @@ object FrameworkExamplesTest extends TestSuite:
   )
 
   val tests: Tests = Tests:
-    test("tuple example preserves caller data and pending metadata"):
-      val (cases, proofs) = FrameworkDataExample.declarations("example", 2, 7L, 13L, "pending", "caller reason")
-      assert(cases == Seq(("example", 2, 7L, 13L)))
-      assert(proofs == Seq(("pending", "caller reason")))
+    test("response example preserves caller expression and pending metadata"):
+      val response = FrameworkDataExample.response("example", "caller_expression", "pending", "caller reason")
+      assert(response("intents")(0)("expression").str == "caller_expression")
+      assert(response("proofObligations")(0)("reason").str == "caller reason")
 
     test("generated outcome becomes ABI stimulus"):
       val trace = Trace(1, Map("payload" -> Vector(BigInt(7)), "unused" -> Vector(BigInt(9))))

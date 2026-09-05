@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "top": "tiny_external",
+  "sources": ["tiny_external.v"],
+  "ports": [
+    {"name": "clk", "direction": "input", "width": 1, "kind": "clock"},
+    {"name": "rst", "direction": "input", "width": 1, "kind": "bool"},
+    {"name": "payload", "direction": "input", "width": 8},
+    {"name": "valid", "direction": "input", "width": 1, "kind": "bool"},
+    {"name": "result", "direction": "output", "width": 8},
+    {"name": "done", "direction": "output", "width": 1, "kind": "bool"}
+  ],
+  "clock": "clk",
+  "reset": {"port": "rst", "active_low": false},
+  "sequence": {"name": "tiny_seq", "item_type": "tiny_item"},
+  "context": "Synthetic regression DUT. Inputs are sampled on the rising clock edge when valid is high."
+}

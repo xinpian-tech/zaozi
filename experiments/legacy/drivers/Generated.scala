@@ -21,7 +21,7 @@ object Generated extends UTExperiment:
     case other        => throw RuntimeException(s"expected a number, got $other")
 
   def run(outDir: os.Path): ujson.Value =
-    val base = os.Path("/root/yjh-workspace/rvprobe-workspace/zaozi/stdlib/tests/resources/haven")
+    val base = os.Path("experiments/fixtures/haven", os.pwd)
     val ip   = SvImport.toHw(Seq(base / "alu_top.v"), outDir / "imported")
     val spec = ujson.read(os.read(outDir / "spec.json"))
 

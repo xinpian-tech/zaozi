@@ -17,7 +17,7 @@ class HavenSdramLayers(parameter: HavenSdramParameter) extends LayerInterface(pa
   def layers = Seq.empty
 
 /** `sdrc_top_split`: the HAVEN benchmark's SDRAM controller (OpenCores sdr_ctrl) with the bidirectional data pad
-  * split into `sdr_dq_i`/`sdr_dq_o` (`stdlib/tests/resources/haven/sdram/sdrc_top_split.v`, the only model-prep
+  * split into `sdr_dq_i`/`sdr_dq_o` (`experiments/fixtures/haven/sdram/sdrc_top_split.v`, the only model-prep
   * change). Wishbone on one side, the SDRAM command bus on the other; every configuration is an input.
   */
 class HavenSdramIO(parameter: HavenSdramParameter) extends HWBundle(parameter):

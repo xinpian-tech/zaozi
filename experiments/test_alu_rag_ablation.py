@@ -8,6 +8,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import alu_rag_ablation as ablation
@@ -109,6 +110,43 @@ class AblationSummaryTest(unittest.TestCase):
         del manifest["corpus_scope"]
         ablation.save(self.root / "manifest.json", manifest)
         self.assertEqual(self.summary()["evaluation_status"], "invalid-for-framework-rag")
+
+    def test_old_static_ut_contract_cannot_enter_new_solver(self):
+        with self.assertRaisesRegex(ValueError, "archived generation contract"):
+            ablation.current_manifest(self.root)
+        self.assertEqual(self.summary()["generation_contract"], "legacy-static-ut")
+
+    def test_new_contract_is_preserved_in_summary(self):
+        manifest = json.loads((self.root / "manifest.json").read_text())
+        manifest["generation_contract"] = ablation.CONTRACT
+        ablation.save(self.root / "manifest.json", manifest)
+        self.assertEqual(ablation.current_manifest(self.root), manifest)
+        self.assertEqual(self.summary()["generation_contract"], ablation.CONTRACT)
+
+    def test_generation_materializes_runtime_sources_in_both_arms(self):
+        tb = self.root / "bench"
+        divider = "=" * 72
+        for report in ("urgReport", "round2_urg"):
+            path = tb / report
+            path.mkdir(parents=True)
+            (path / "modinfo.txt").write_text(f"{divider}\nModule : alu_top\n{divider}\n  10 0/1 current_task;\n")
+        output = self.root / "new-run"
+        args = SimpleNamespace(out=output, tb=tb, model="test", temperature=0.3, samples=1, workers=1, timeout=1)
+        response = json.dumps({"intents": [{"label": "observed", "expression": "Sem.state(io.done)"}],
+                               "proofObligations": []})
+        with patch.object(ablation.loop, "invoke", return_value=(response, 10)) as invoke, \
+                contextlib.redirect_stdout(io.StringIO()):
+            ablation.generate(args)
+        self.assertEqual(invoke.call_count, 4)
+        manifest = ablation.current_manifest(output)
+        self.assertEqual(manifest["generation_contract"], ablation.CONTRACT)
+        for job in manifest["jobs"]:
+            directory = output / job["name"]
+            self.assertTrue(json.loads((directory / "generation.json").read_text())["ok"])
+            self.assertTrue((directory / "sources/DesignBinding.scala").is_file())
+            code = (directory / "sources/Generated.scala").read_text()
+            self.assertIn(str(output / "alu_top.v"), code)
+            self.assertNotIn("HavenAlu", code)
 
 
 if __name__ == "__main__":

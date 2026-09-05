@@ -8,7 +8,8 @@
 | 层次 | 入口 | 已完成工作 |
 |---|---|---|
 | 框架与求解后端 | [`utlib/src/`](../../utlib/src/) | 四类 `Sem` 意图、`Txn` 历史窗口、外部 SV 导入、circt-bmc / JasperGold、trace → ABI → stimulus / UVM；配套 CIRCT 版本与接口调整 |
-| 基准适配 | [`stdlib/src/`](../../stdlib/src/)、[`stdlib/tests/`](../../stdlib/tests/) | ALU、SPI、I2C、SDRAM、CAN 的 DUT 包装、验证意图与测试；保留第三方 RTL |
+| 外部设计接口 | [`experiments/designs/`](../../experiments/designs/)、[`fixtures/`](../../experiments/fixtures/) | 原始 RTL 与 IO manifest；运行时生成共享 wrapper，不在 stdlib 复刻 DUT |
+| 历史基准回归 | [`experiments/legacy/`](../../experiments/legacy/) | 旧手写 UT、driver 和测试，独立模块，不参与当前 LLM / RAG |
 | 实验流程 | [`experiments/`](../../experiments/) | 编译反馈、同 testbench 回放、统一 URG 计分、2×2 消融、ALU 残余闭合及 RAG 对照工具 |
 | 结果与审计 | 本目录及 [`data/`](data/) | 复现结果、原始 prompt / response、模型成本、覆盖测量、失败记录与结论更正 |
 
@@ -35,13 +36,16 @@
 
 ## 当前维护的 prompt / RAG 入口
 
-[`alu_residual_loop.py`](../../experiments/alu_residual_loop.py) 从当前 URG 残余和对应 RTL 窗口构造任务，
-LLM 只返回 `cases` 与 `proofObligations` 两段类型化声明，由固定 Scala / JasperGold runner 执行。
-通用自由格式 harness 的契约另见 [`PROMPT.md`](../../experiments/PROMPT.md)，不要混用两种输出约定。
+当前契约为 `runtime-ut-v1`：[`sequence_experiment.py`](../../experiments/sequence_experiment.py)
+从当前 URG 残余、RTL 窗口及 IO manifest 构造任务；LLM 返回 JSON 中的实际 `Sem.Intent` 表达式，
+框架为本轮每条意图生成 UT，并共用一个外部 VerilogWrapper。活动模块不依赖 stdlib。
+旧 `cases` 列表和完整 Scala response 仅属于历史流程，不能混入当前消融。
+架构、支持范围和无需 LLM 的复现命令见 [`experiments/README.md`](../../experiments/README.md)，
+输出契约见 [`PROMPT.md`](../../experiments/PROMPT.md)。
 
 RAG 只提供框架信息：[`framework_api.json`](../../experiments/rag/framework_api.json) 的源路径白名单、
 源码原文校验和哈希记录，加上 [`src/rag/`](../../experiments/src/rag/) 的三个可编译、参数化写法示例
-（数据声明、四类语义组合、求解结果处理及 UVM 导出）。示例不提供 DUT 操作数、设计谓词或历史答案。
+（JSON 数据封装、四类语义组合、求解结果处理及 UVM 导出，语料版本 4）。示例不提供 DUT 操作数、设计谓词或历史答案。
 来源检查不能代替内容审查；元数据和新增框架文档仍须人工检查。
 
 旧 ALU 答案语料已退出检索入口并归档；其离线测量及 20 次在线调用的收益结论已撤回。
@@ -58,14 +62,18 @@ RAG 只提供框架信息：[`framework_api.json`](../../experiments/rag/framewo
 在仓库根目录执行不需要模型凭据的回归检查：
 
 ```sh
-python3 -m unittest discover -s experiments -p 'test_*rag*.py' -v
+python3 -m unittest discover -s experiments -p 'test_*.py' -v
 nix develop . -c mill --no-server experiments.compile
 nix develop . -c mill --no-server experiments.tests.testForked
 nix develop . -c mill --no-server utlib.tests.testForked
 ```
 
-Python 检查检索边界、声明约定和对照统计；Scala 示例测试使用合成数据；`utlib` 测试包含
+Python 检查检索边界、动态生成契约、IO / 输入一致性和对照统计；Scala 示例测试使用合成数据；`utlib` 测试包含
 circt-bmc 的小规模实际求解。这些检查不等于 JasperGold / VCS 全量复现或模型效果评测。
+
+结构重构另用独立外部小 RTL 验证了四类动态 UT 的 JasperGold 求解和 sequence 导出。
+这不是重新测量历史 ALU 覆盖，也没有重新进行在线模型 / RAG 对照。历史资料中的旧路径映射见
+[`legacy/README.md`](../../experiments/legacy/README.md)；原始数据不改写。
 
 Prompt-only 和本地检索不需要模型凭据，但仍需提供当前任务的 URG 报告。
 在线生成需要配置模型服务；JasperGold / VCS / URG 回放需要本机工具、许可证与保存的 HAVEN bench。

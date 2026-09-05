@@ -6,14 +6,14 @@
 // driver (experiments/haven_tb/can/). The receive and bus-off flows are solved too, for the record: their witnesses
 // drive the CAN bus, which the bench's reactive BFM owns, so they cannot be replayed through it.
 // Installed into the experiments slot by ut_harness.py:
-//   ZAOZI_EDA_SHELL=… ut_harness.py experiments/CanFlowDriver.scala --out out/experiments/can-flow
+//   ZAOZI_EDA_SHELL=… ut_harness.py experiments/legacy/drivers/CanFlowDriver.scala --out out/experiments/can-flow
 import me.jiuyang.stdlib.*
 import me.jiuyang.utlib.*
 
 object Generated extends UTExperiment:
   def run(outDir: os.Path): ujson.Value =
     require(JasperGold.available, "the can flows need JasperGold (set ZAOZI_EDA_SHELL)")
-    val rtlDir = os.Path("/root/yjh-workspace/rvprobe-workspace/zaozi/stdlib/tests/resources/haven/can")
+    val rtlDir = os.Path("experiments/fixtures/haven/can", os.pwd)
     val files  = Seq(
       "can_defines", "can_crc", "can_ibo", "can_acf", "can_register", "can_register_asyn", "can_register_asyn_syn",
       "can_register_syn", "can_fifo", "can_btl", "can_bsp", "can_registers", "can_top"

@@ -9,13 +9,17 @@ import mill.scalalib.scalafmt._
 
 import build.{circtlib, stdlib, utlib, v, zaozi, ZaoziScalaModule}
 
-/** The LLM experiment sandbox: `src/Generated.scala` is overwritten by the harness (`ut_harness.py`) with the
-  * generated typed-DSL experiment, compiled against the full framework, and run through the fixed `Runner`. Everything
-  * a generated file may use — zaozi, utlib, stdlib DUTs — is on the classpath.
+/** Generic sequence experiments. Per-run Scala sources are explicit build inputs, never a shared source slot.
+  * No design-specific stdlib or historical UT is on the active experiment's classpath.
   */
 object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
   def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(zaozi, utlib, stdlib)
+  def moduleDeps   = Seq(zaozi, utlib)
+
+  def runSources: T[Seq[PathRef]] = Task.Input {
+    Task.env.get("RVPROBE_EXPERIMENT_SOURCES").toSeq.map(p => PathRef(os.Path(p)))
+  }
+  override def sources: T[Seq[PathRef]] = Task(super.sources() ++ runSources())
 
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
@@ -29,5 +33,37 @@ object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
     override def moduleDeps: Seq[JavaModule] = Seq(m)
     override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
     override def forkArgs: T[Seq[String]] = Task(super.forkArgs() ++ circtlib.forkArgs())
+  }
+
+  // Explicit historical regression arm. Kept out of the LLM runner and its RAG source allowlist.
+  // The old package names are retained only here so archived Scala answers remain replayable.
+  object legacy extends ZaoziScalaModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps = Seq(zaozi, utlib, stdlib)
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+    override def forkArgs: T[Seq[String]] = Task(super.forkArgs() ++ circtlib.forkArgs())
+
+    object tests extends ScalaTests with Utest {
+      def mvnDeps = Seq(v.utest)
+      override def moduleDeps: Seq[JavaModule] = Seq(legacy)
+      override def forkArgs: T[Seq[String]] = Task(
+        super.forkArgs() ++ circtlib.forkArgs() ++ Seq(
+          s"-Dzaozi.utlib.outDir=${mill.api.BuildCtx.workspaceRoot / "out" / "experiments" / "legacy-tests"}",
+          s"-Dzaozi.stdlib.testResources=${mill.api.BuildCtx.workspaceRoot / "experiments" / "fixtures"}"
+        )
+      )
+    }
+
+    // Only an explicit --legacy harness run compiles a saved driver with these historical definitions.
+    object replay extends ZaoziScalaModule {
+      def scalaVersion = Task(v.scala)
+      def moduleDeps = Seq(legacy)
+      override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+      override def forkArgs: T[Seq[String]] = Task(super.forkArgs() ++ circtlib.forkArgs())
+      def fixedRunner: T[Seq[PathRef]] = Task.Sources(m.moduleDir / "src" / "Runner.scala")
+      override def sources: T[Seq[PathRef]] = Task(
+        fixedRunner() ++ m.runSources()
+      )
+    }
   }
 }

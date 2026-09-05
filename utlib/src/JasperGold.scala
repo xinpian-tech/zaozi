@@ -6,7 +6,8 @@ import me.jiuyang.zaozi.*
 
 /** A UT lowered for a SystemVerilog formal engine: firtool's single-file SV of the linked design (zaozi's
   * `assert property (not (…))` and `assume property` emitted as-is), the external RTL the wrapper's extern binds to,
-  * and the top's clock and reset port names.
+  * and the top's clock and reset port names. Runtime generators explicitly name their generation assertions;
+  * an empty generationLabels set retains the historical negation-spelling-based conversion.
   */
 final case class JgModel(
   sv:      os.Path,
@@ -14,7 +15,8 @@ final case class JgModel(
   rtl:     Seq[os.Path],
   include: Option[os.Path] = None,
   clock:   String = "clock",
-  reset:   String = "reset")
+  reset:   String = "reset",
+  generationLabels: Set[String] = Set.empty)
 
 /** The second formal backend: JasperGold, for the depth circt-bmc does not reach.
   *
@@ -70,7 +72,7 @@ object JasperGold:
     os.remove.all(workDir / "jgproj") // a project directory left by an interrupted run refuses a new session
     val vcd     = workDir / "witness.vcd"
     val sv      = workDir / model.sv.last
-    os.write.over(sv, asCover(os.read(model.sv)))
+    os.write.over(sv, asCover(os.read(model.sv), model.generationLabels))
     val include = model.include.map(p => s"+incdir+$p ").getOrElse("")
     // Vendored `.v` files are read as Verilog-2001 and everything else as SystemVerilog: legacy RTL uses SV keywords
     // as identifiers (the CAN controller has a port named `do`), which is also why HAVEN's VCS line carries
@@ -80,6 +82,12 @@ object JasperGold:
       Option.when(v2k.nonEmpty)(s"analyze -v2k $include${v2k.map(_.toString).mkString(" ")}"),
       Option.when(sv12.nonEmpty)(s"analyze -sv12 $include${sv12.map(_.toString).mkString(" ")}")
     ).flatten.mkString("\n")
+    // External RTL may itself contain covers. Only a selected generation property can supply this witness.
+    val selected = model.generationLabels.toSeq.sorted.map { label =>
+      require(label.matches("[A-Za-z_][A-Za-z0-9_]*"), s"unsupported generation label: $label")
+      s"[string match {*::${model.top}.$label} $$p] || [string equal {${model.top}.$label} $$p]"
+    }.mkString(" || ")
+    val filter = if selected.isEmpty then "" else s"if {!($selected)} { continue }"
     val tcl     = workDir / "generate.tcl"
     os.write.over(
       tcl,
@@ -93,6 +101,7 @@ object JasperGold:
           |set found ""
           |foreach p [get_property_list -include {type cover}] {
           |  if {[string match "*:live" $$p]} { continue }
+          |  $filter
           |  set st [get_property_info $$p -list status]
           |  puts "JGSTATUS $$p $$st"
           |  if {$$st == "covered" && $$found == ""} { set found $$p }
@@ -121,8 +130,24 @@ object JasperGold:
     else if statuses.nonEmpty && statuses.forall(_._2 == "unreachable") then GenerateOutcome.Infeasible
     else GenerateOutcome.Unknown(s"cover statuses: ${statuses.map((n, s) => s"$n=$s").mkString(", ")}")
 
-  /** `label: assert property (not (S));` → `label: cover property ((S));`, for every generation assertion. */
-  private[utlib] def asCover(sv: String): String =
+  /** Turn selected generation assertions into covers of their negation; preserve the legacy heuristic if unmarked. */
+  private[utlib] def asCover(sv: String, labels: Set[String] = Set.empty): String =
+    // A runtime UT identifies its generation properties explicitly. Negate the emitted assertion,
+    // not its source spelling: firtool may fold !done to ~done, !(!done) to done, or a constant.
+    // Never reinterpret an unrelated assertion as a generation request.
+    if labels.nonEmpty then
+      val found = collection.mutable.Set.empty[String]
+      val result = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);".r.replaceAllIn(
+        sv,
+        m => java.util.regex.Matcher.quoteReplacement(
+          if labels.contains(m.group(1)) then
+            found += m.group(1)
+            s"${m.group(1)}:${m.group(2)}cover property (not (${m.group(3)}));"
+          else m.matched
+        )
+      )
+      require(found.toSet == labels, s"generation labels missing from emitted assertions: ${labels -- found}")
+      return result
     // FIRRTL emits temporal negation as `not (S)` and combinational negation as `~(S)`.
     // Both are the same generation assertion and must become a cover; otherwise JasperGold finds a
     // counterexample to the assertion but the witness collector (correctly) sees no cover property.

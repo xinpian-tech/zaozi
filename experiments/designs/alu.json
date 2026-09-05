@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "top": "alu_top",
+  "sources": [
+    "../fixtures/haven/alu_top.v"
+  ],
+  "ports": [
+    {
+      "name": "clk",
+      "direction": "input",
+      "width": 1,
+      "kind": "clock"
+    },
+    {
+      "name": "rst_n",
+      "direction": "input",
+      "width": 1,
+      "kind": "bool"
+    },
+    {
+      "name": "a",
+      "direction": "input",
+      "width": 32,
+      "kind": "bits"
+    },
+    {
+      "name": "b",
+      "direction": "input",
+      "width": 32,
+      "kind": "bits"
+    },
+    {
+      "name": "op",
+      "direction": "input",
+      "width": 4,
+      "kind": "bits"
+    },
+    {
+      "name": "start",
+      "direction": "input",
+      "width": 1,
+      "kind": "bool"
+    },
+    {
+      "name": "result",
+      "direction": "output",
+      "width": 32,
+      "kind": "bits"
+    },
+    {
+      "name": "flags",
+      "direction": "output",
+      "width": 4,
+      "kind": "bits"
+    },
+    {
+      "name": "done",
+      "direction": "output",
+      "width": 1,
+      "kind": "bool"
+    }
+  ],
+  "clock": "clk",
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "sequence": {
+    "name": "rvprobe_llm_seq",
+    "item_type": "alu_top_seq_item"
+  },
+  "context": "32-bit ALU. Opcodes: 0=FP_ADD, 1=FP_SUB, 2=AND, 3=OR, 4=XOR, 5=SLL, 6=SRL, 7=SRA, 8=FP2INT, 9=NOT. Flag bits: 3=OVERFLOW, 2=UNDERFLOW, 1=ZERO, 0=INVALID. The existing replay driver owns clock, reset and transaction handshaking. Derive candidate values and predicates from the current RTL, not historical scenarios."
+}

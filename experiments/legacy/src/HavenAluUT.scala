@@ -35,7 +35,7 @@ class HavenAluProbe(parameter: HavenAluParameter) extends DVBundle[HavenAluParam
 case class HavenAluVerilogParams() extends VerilogParameter
 
 /** The first real HAVEN IP through the typed harness. The RTL is a vendored test resource
-  * (`stdlib/tests/resources/haven/alu_top.v`), not inlined — the test hands it to circt-verilog and Verilator.
+  * (`experiments/fixtures/haven/alu_top.v`), not inlined — the test hands it to circt-verilog and Verilator.
   */
 @generator
 object HavenAlu

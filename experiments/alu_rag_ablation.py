@@ -21,8 +21,18 @@ import subprocess
 import time
 
 import alu_residual_loop as loop
+import sequence_framework as framework
 from prompt_rag import load_corpus, render_hits, retrieve_diverse
 import urg_score
+
+CONTRACT = "runtime-ut-v1"
+
+
+def current_manifest(directory: Path) -> dict:
+    manifest = json.loads((directory / "manifest.json").read_text())
+    if manifest.get("generation_contract") != CONTRACT:
+        raise ValueError("archived generation contract: use legacy replay or summarize; do not solve with the new generator")
+    return manifest
 
 
 def save(path: Path, value: object) -> None:
@@ -36,6 +46,8 @@ def digest(path: Path) -> str:
 def generate(args) -> None:
     version, documents = load_corpus(loop.DEFAULT_RAG_CORPUS)
     args.out.mkdir(parents=True, exist_ok=False)
+    shutil.copyfile(loop.DEFAULT_RTL, args.out / "alu_top.v")
+    design = framework.load_design().with_rtl(args.out / "alu_top.v")
     inputs = {
         1: args.tb / "urgReport/modinfo.txt",
         2: args.tb / "round2_urg/modinfo.txt",
@@ -44,6 +56,9 @@ def generate(args) -> None:
         "experiment": "ALU framework-only RAG ablation",
         "date": time.strftime("%Y-%m-%d", time.gmtime()),
         "corpus_scope": "framework-only", "corpus_version": version,
+        "generation_contract": CONTRACT, "design": design.record(),
+        "generator_sha256": digest(Path(framework.__file__)),
+        "design_manifest_sha256": digest(framework.DEFAULT_DESIGN),
         "model": args.model, "temperature": args.temperature,
         "samples_per_mode_per_round": args.samples, "attempts_per_sample": 1,
         "order_seed": 20260905, "llm_workers": args.workers,
@@ -66,7 +81,7 @@ def generate(args) -> None:
                 directory = args.out / name
                 directory.mkdir()
                 context = render_hits(hits if mode == "local" else [])
-                prompt = loop.build_prompt(uncovered, loop.DEFAULT_RTL, "120s", context)
+                prompt = loop.build_prompt(uncovered, design.sources[0], "120s", context, design=design)
                 (directory / "prompt.txt").write_text(prompt)
                 save(directory / "residual.json", uncovered)
                 save(directory / "rag.json", {
@@ -84,7 +99,8 @@ def generate(args) -> None:
     manifest["jobs"] = jobs
     save(args.out / "manifest.json", manifest)
     shutil.copyfile(loop.DEFAULT_RAG_CORPUS, args.out / "corpus.json")
-    shutil.copyfile(loop.DEFAULT_RTL, args.out / "alu_top.v")
+    shutil.copyfile(Path(framework.__file__), args.out / "generator-snapshot.py")
+    shutil.copyfile(framework.DEFAULT_DESIGN, args.out / "design-manifest.json")
     shutil.copyfile(Path(loop.__file__), args.out / "loop-snapshot.py")
     shutil.copyfile(Path(__file__), args.out / "ablation-snapshot.py")
     for source in {document.source for document in documents}:
@@ -100,9 +116,11 @@ def generate(args) -> None:
             raw, tokens = loop.invoke((directory / "prompt.txt").read_text(),
                                       args.model, args.temperature, args.timeout)
             (directory / "response.txt").write_text(raw)
-            code, response_format, errors = loop.materialize_response(loop.strip_fence(raw), "120s")
+            response = loop.strip_fence(raw)
+            code, response_format, errors = loop.materialize_response(response, "120s", design)
             errors += loop.backend_errors(code)
-            (directory / "Generated.scala").write_text(code)
+            if not errors:
+                framework.write_sources(directory / "sources", design, framework.parse_response(response))
             result = {**job, "ok": not errors, "tokens": tokens,
                       "response_format": response_format, "errors": errors,
                       "response_characters": len(raw)}
@@ -122,7 +140,7 @@ def generate(args) -> None:
 
 
 def solve(args) -> None:
-    jobs = json.loads((args.out / "manifest.json").read_text())["jobs"]
+    jobs = current_manifest(args.out)["jobs"]
     for job in jobs:
         directory = args.out / job["name"]
         if (directory / "harness.json").exists():
@@ -134,7 +152,7 @@ def solve(args) -> None:
             continue
         print(f"solve {job['name']}", flush=True)
         started = time.monotonic()
-        report, log = loop.harness(directory / "Generated.scala", directory / "solve", args.eda_shell)
+        report, log = loop.harness(directory / "sources", directory / "solve", args.eda_shell)
         (directory / "harness.log").write_text(log)
         report["wall_seconds"] = round(time.monotonic() - started, 3)
         save(directory / "harness.json", report)
@@ -153,13 +171,17 @@ def eda(args, directory: Path, command: list[str], log: Path, timeout=900):
 
 def replay(args) -> None:
     """Build all sample sequences together; pair each with the same-build baseline."""
+    manifest = current_manifest(args.out)
+    # The solver and simulator must see the same DUT implementation.
+    if digest(args.tb / "alu_top.v") != manifest["rtl_sha256"]:
+        raise ValueError("replay bench RTL differs from the generation RTL")
     work = args.out / "tb"
     work.mkdir(exist_ok=False)
     for source in args.tb.iterdir():
         if source.is_file() and (source.suffix in (".v", ".sv") or source.name == "filelist.f"):
             shutil.copyfile(source, work / source.name)
     # Keep the original bulk fill, driver, DUT, monitor and scoreboard.
-    jobs = json.loads((args.out / "manifest.json").read_text())["jobs"]
+    jobs = manifest["jobs"]
     valid = []
     for job in jobs:
         report_file = args.out / job["name"] / "harness.json"
@@ -289,6 +311,7 @@ def summarize(args) -> None:
             "generation_seconds": generation["seconds"],
             "harness_ok": harness.get("ok"), "status": result.get("status"),
             "candidate_count": len(result["intents"]) if "intents" in result else None,
+            "intent_outcomes": result.get("intents"),
             "proof_obligations": result.get("proofObligations"),
             "candidate_solver_ms": sum(int(intent["ms"]) for intent in result.get("intents", []))
                 if "intents" in result else None,
@@ -330,6 +353,7 @@ def summarize(args) -> None:
         "experiment": manifest.get("experiment", "ALU legacy answer-contaminated RAG ablation"),
         "date": manifest.get("date", "2026-09-05"),
         "corpus_scope": manifest.get("corpus_scope", "legacy-answer-contaminated"),
+        "generation_contract": manifest.get("generation_contract", "legacy-static-ut"),
         "evaluation_status": "framework-only" if manifest.get("corpus_scope") == "framework-only"
             else "invalid-for-framework-rag",
         "model": manifest["model"], "temperature": manifest["temperature"],
@@ -338,7 +362,8 @@ def summarize(args) -> None:
             not row["generation_ok"] or row["harness_ok"] is False or
             (row["harness_ok"] is True and "coverage_score" in row) for row in rows),
         "limitation": manifest["limitation"],
-        "comparison": "Same revised prompt and typed-fragment contract; only RAG context differs.",
+        "comparison": "Same prompt and generation contract within this run; only RAG context differs. "
+            "Different generation contracts must not be pooled.",
         "generation_manifest": manifest,
         "summary_script_sha256": digest(Path(__file__)),
         "replay": "One VCS build; simulation seed 1; same baseline per round; DUT-only 4-metric score.",

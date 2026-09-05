@@ -1,155 +1,66 @@
-# Typed Verification Semantics — generation target spec
+# rvprobe 动态 UT / LLM 输出契约
 
-> DATE ALU note: the maintained residual-closing entry is `experiments/alu_residual_loop.py`. It uses
-> JasperGold's cover flow, not circt-bmc. Its prompt is assembled from the current URG residual, the matching RTL
-> window, and framework API excerpts in `experiments/rag/framework_api.json`; every run saves the exact prompt and
-> retrieval record.
+当前契约：`runtime-ut-v1`。入口为 `sequence_experiment.py`（`alu_residual_loop.py` 保留兼容命令名），
+生成器为 `sequence_framework.py`。旧的 `cases: Seq[(String, Int, Long, Long)]` 不是当前模型输出。
 
-This is the specification an LLM sees when asked to express a verification intent in zaozi's typed DSL. The
-harness (`ut_harness.py`) typechecks the generated file against the full framework, runs it, and returns one JSON
-line; type errors come back with `file:line:col` plus the compiler's message for repair.
+## 分工
 
-## Prompt assembly and RAG boundary
+- 人提供原始 RTL、版本化 IO / 时钟 / 复位 manifest、当前 URG 残余及必要的协议说明。
+- 框架据 manifest 生成一个共享 `VerilogWrapper`，只描述端口和外部模块绑定，不实现 DUT 逻辑。
+- LLM 为每个候选返回实际的 `Sem.Intent` 表达式。
+- 框架为每条意图生成独立 UT，接线后将该表达式放进 `Generate(expression, label)`。
+- 固定 runner 执行编译、JasperGold、trace → ABI → stimulus → UVM；不从预写的设计专用 UT 中选模板。
 
-The maintained ALU loop treats its inputs in this order:
+每轮生成文件在 `<run>/attempt-N/sources/`，通过 `RVPROBE_EXPERIMENT_SOURCES` 成为显式编译输入。
+仓库不再有共享的 `experiments/src/Generated.scala` 槽位。活动 classpath 只有 zaozi / utlib，不含 stdlib。
 
-1. **Authoritative evidence:** the current URG residual and the current RTL source window.
-2. **Retrieved framework documentation:** API signatures, types, runner/codec contracts, and compiled generic usage examples.
-3. **Output contract:** two typed Scala intent declarations; the experiment injects them into its fixed
-   Scala/JasperGold runner.
-4. **Repair feedback:** compiler or runner diagnostics from the immediately preceding attempt.
+## 输出
 
-RAG must not contain DUT-specific operand recipes, historical model responses, solver witnesses, coverage-closure
-answers, or design-specific invariants/proof conclusions. Current RTL and coverage residuals remain separate task
-evidence, identical in the on/off arms. Retrieval queries name framework interfaces, not residual RTL branches.
-The loader requires `scope=framework-only`, approved framework source paths, and verbatim source excerpts, and logs
-source hashes. Additions still require content review; a provenance check is not a semantic leakage detector.
+只返回一个 JSON 对象，恰有 `intents` 和 `proofObligations` 两个字段：
 
-The default six interface queries now retrieve three parameterized few-shot examples from `experiments/src/rag/`:
-typed tuple construction, four-kind `Sem` composition, and solver-outcome handling plus UVM export. Each example
-specifies a task and supplied inputs; no candidate values, design predicates, or historical answers are supplied.
-They are compiled Scala sources, not untested code copied into documentation. `whole_source` retrieval is allowed
-only for explicitly approved example files. The current response remains two declarations: examples do not authorize
-the model to emit helpers, replace the runner, or leave their parameter names unresolved in a literal-only response.
-
-The previous ALU answer corpus is retired and archived in `docs/date2027/data/alu-rag-contaminated-corpus.json`.
-Its online/offline measurements are invalid as evidence for framework-only RAG; do not reuse them as the clean baseline.
-
-For each residual cluster, derive the controlling predicates first. Emit one candidate when they are consistent;
-when they contradict a state invariant, emit a proof obligation instead of guessing another input. Keep the evidence
-levels distinct: model candidate → JasperGold legal witness → VCS/URG coverage replay → dedicated dead-code proof.
-
-The local retriever needs neither an embedding model nor an API key. Use `--rag local` (the default) or `--rag off`
-on otherwise identical `--prompt-only` runs to inspect or ablate the injected context. The run directory records
-`rag.json`, `attempt-N/prompt.txt`, and `attempt-N/prompt.json` for reproduction.
-
-## The contract
-
-The contract below is the general free-form typed-DSL target. The ALU residual loop uses the narrower two-declaration
-contract above because its UT and JasperGold runner are fixed by the experiment.
-
-Produce ONE Scala 3 file. It must define `object Generated extends UTExperiment` whose `run` performs one
-solve-and-save via `UTCli.generateReport`, plus the UT module(s) it solves. Skeleton:
-
-```scala
-import me.jiuyang.stdlib.*            // stock DUTs (AbsVal, Accum, TwoBeat, Queue, …)
-import me.jiuyang.utlib.*             // UT, UTCli, UTExperiment, Txn
-import me.jiuyang.zaozi.*             // the typed DSL
-import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.ltltpe.*      // temporal: Sequence, ClockEvent (only if needed)
-import me.jiuyang.zaozi.reftpe.*
-import me.jiuyang.zaozi.valuetpe.*
-
-// … UT module definition(s) …
-
-object Generated extends UTExperiment:
-  def run(outDir: os.Path): ujson.Value =
-    UTCli.generateReport(<YourUT>, <ItsParameter>, bound = <cycles to unroll>, outDir)
+```json
+{"intents": [], "proofObligations": []}
 ```
 
-## Expressing a constraint: the four typed semantic kinds
+这只是空的格式示意，不是推荐模型返回空答案。每条 intent 为
+`{"label": "唯一的_snake_case", "expression": "返回 Sem.Intent 的 Scala 表达式"}`；
+proof 为 `{"label": "唯一的_snake_case", "reason": "待独立验证的精确矛盾"}`。
+实际 label 只能使用小写 ASCII 字母、数字、下划线，以字母开头。两类记录之间也不能重名。
 
-Verification intent is written as a typed `Sem.Intent` — four kinds of meaning, composed with `&&`, lowered by
-`Generate(intent, label)` in the module **body** (never inside `layer("Verification"){}` — layers are stripped from
-the formal model). The solver's counterexample IS a stimulus satisfying the whole intent. Composition uses
-fire-cycle semantics: value/relation/state conjuncts hold at the cycle the scenario fires; each temporal sequence
-matches forward from that cycle.
+表达式可以使用 `Sem.value`、`Sem.state`、`Sem.relation`、`Sem.temporal` 以及 `&&` 组合。
+也可以使用 Scala block 声明局部谓词 / `Txn.window`，最后返回意图。
+端口以当前 prompt 的 `io.<port>` 为准；框架提供 `io.clock`、`io.reset`、
+`ClockEvent`、`ClockScope`、`ResetScope`。不要再次调用 Generate、声明 DUT、替换 runner 或引用内部信号。
+表达式由真实 Scala 编译器检查，不是字符串检查后映射到某个历史用例。
 
-```scala
-Generate(
-  Sem.value(...)                 // 值语义: predicate over the driven object's fields
-    && Sem.relation(w) { w => ... } // 关系语义: relates different beats, from a declared window
-    && Sem.state(...)            // 状态语义: predicate over the DUT's outputs (what it is observed to have become)
-    && Sem.temporal(...),        // 时序语义: clocked SVA sequence (needs `given ClockEvent`)
-  "label"
-)
-```
+## Prompt 与 RAG
 
-### Value semantics (值) — one object's fields
+任务证据和检索资料分开：
 
-```scala
-Generate(Sem.value(io.A.bit(0)), "gen_a_odd")   // C = "A is odd"
-```
-Comparisons: `===`, `>`/`<` (via `.asSInt`/`.asUInt`), bit access `.bit(i)` / `.bits(hi, lo)`, boolean `!`, `&`, `|`.
+1. 当前未覆盖行、对应 RTL 窗口、IO 类型、协议说明。
+2. framework-only API 原文及三个可编译的参数化示例：JSON 数据封装、四类 Sem 组合、求解与导出。
+3. 当前 JSON / 表达式契约。
+4. 仅紧邻上一轮的编译或求解反馈。
 
-### Relation semantics (关系) — between different beats
+语料版本为 4。来源白名单、原文匹配与源文件哈希由 `prompt_rag.py` 检查；
+示例直接读取 `src/rag/` 中实际参与编译的源码，不维护第二份示例。
+检索 query 只描述框架接口，不包含 DUT 名、残余分支或答案。
+禁止历史 response、设计操作数、witness、覆盖结论和设计专用不变量进入语料。
+来源验证不能替代新增语料的人工审查。
 
-```scala
-given ClockScope = ClockScope.posedge(io.clock)
-given ResetScope = ResetScope.syncActiveHigh(io.reset)
-val w = Txn.window(io.A, width, 2)              // w.past(1) = previous beat, w.past(2) = two back
-Generate(
-  Sem.relation(w) { w =>
-    val distinct = !(w.past(2) === w.past(1)) & !(w.past(2) === io.A) & !(w.past(1) === io.A)
-    val sum3     = (w.past(2).asUInt + w.past(1).asUInt + io.A.asUInt).asBits.bits(width - 1, 0)
-    distinct & (sum3 === 12.U(width).asBits)
-  },
-  "gen_three_distinct_sum12"
-)
-```
-The window's reality guard is conjoined automatically — a relation can never fire on fake history, and the
-declared depth is a type: `w.past(3)` on a depth-2 window fails to COMPILE.
+两组对照必须使用同一个生成契约和任务证据，只改变 RAG 上下文。
+旧污染语料保存在审计目录，loader 拒绝使用；旧静态 UT 结果也不能混入新契约的对照。
 
-### Temporal semantics (时序) — ordering between events
+## 证据与安全边界
 
-```scala
-given ClockEvent = posedge(io.clock)
-Generate(Sem.temporal((io.A === three).S ### (io.A === five).S), "gen_two_beat")
-```
-`.S` lifts a boolean to a clocked sequence atom (a `ClockEvent` must be in scope — an unclocked temporal constraint
-does not compile); combinators: `###` (SVA ##1), `##(n)`, `*` (repeat), `|->`, `throughout`, `until`, `iff`.
+编译通过 ≠ 意图正确；witness ≠ 覆盖目标闭合；proofObligation ≠ 不可达证明。
+JasperGold 的 `infeasible` 表示该意图在其模型假设下不可达，不自动证明某个 RTL 分支是 dead code。
+`unknown` 不计为成功；VCS / URG 才决定覆盖增量。
 
-### State semantics (状态) — conditions on the DUT's observation face
+每条 witness 独立从 formal reset 后搜索。导出的 UVM sequence 不负责实现协议 driver，
+也不在串接 witness 之间自动 reset；握手等待可能改变周期关系。
+必须验证 driver 的时序映射和初始状态，必要时独立回放各 intent。原始 VCD、逐 intent stimulus 和 sequence 均保留。
 
-```scala
-Generate(Sem.state(instance.io.done & (instance.io.result === 48879.U(32).asBits)), "gen_alu_xor_beef")
-```
-References the DUT's output ports (status registers read back through them included) — what the design is
-observed to have *become*, not what is driven. Intents never name internal signals: reaching an internal condition
-is the solver's job, so a goal over the outputs is satisfied by whatever route the solver finds cheapest. When a
-coverage target is an internal path, state the *route* as a temporal flow instead (see Temporal semantics).
-
-### Constraints through an external SystemVerilog IP
-
-Wrap the IP as a `VerilogWrapper` (see `stdlib/src/ExtAccumUT.scala`), instantiate it in the UT, and state
-value/state semantics over its ports. In a sequential UT add `Txn.assumeResetLow(io.reset)` and feed
-`Txn.firstCycle()` into the IP's reset so it initializes itself. `bound` must cover the cycles the intent needs
-(a k-beat relation needs bound ≥ k+1). Probe re-export is one line per signal:
-`Probes.expose(probe.SUM, Bits(width), instance.io.sum)` inside `layer("Verification")`.
-
-## Worked examples (all in-tree, all green)
-
-| Semantic kinds | UT module | Test |
-|---|---|---|
-| value | `stdlib/src/AbsValOddUT.scala` | `AbsValFormalGenTest` |
-| temporal | `stdlib/src/TwoBeatUT.scala` | `TwoBeatFormalGenTest` |
-| relation | `stdlib/src/AccumUT.scala` | `AccumFormalGenTest` |
-| **all four composed** | `stdlib/src/SemAccumUT.scala` | `SemAccumFormalGenTest` |
-| state, through an external SV IP | `stdlib/src/ExtAccumUT.scala`, `HavenAluUT.scala` | `ExtAccumFormalGenTest`, `HavenAluFormalGenTest` |
-| value ∧ state on a bus protocol | `stdlib/src/HavenSpiUT.scala` | `HavenSpiFormalGenTest` |
-
-## Result semantics
-
-`{"phase":"solve","result":{"status":"generated","cycles":N,"trace":{...},"stimulusFile":...}}` — a witness; the
-stimulus file replays on the Model B testbench. `"infeasible"` — no trace within `bound` satisfies C (the flow
-worked; raise `bound` or weaken C). `"unknown"` — the solver could not decide; the `detail` field says why.
+模型输出是会被编译执行的 Scala。JSON 校验、类型系统和历史依赖检查均不是安全沙箱；
+运行不可信输出前须审查，或使用隔离执行环境，不向执行进程暴露模型密钥等不必要凭据。
+复现命令与当前支持范围见 [README](README.md)；历史驱动见 [legacy](legacy/README.md)。

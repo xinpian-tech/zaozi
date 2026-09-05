@@ -18,7 +18,7 @@ class HavenCanLayers(parameter: HavenCanParameter) extends LayerInterface(parame
 
 /** `can_top`, the OpenCores CAN controller in its Wishbone build (`CAN_WISHBONE_IF` in can_defines.v): an 8-bit
   * register bus on one side, the CAN bus (`rx_i`/`tx_o`) on the other. Vendored unmodified in
-  * `stdlib/tests/resources/haven/can/`.
+  * `experiments/fixtures/haven/can/`.
   */
 class HavenCanIO(parameter: HavenCanParameter) extends HWBundle(parameter):
   val wb_clk_i   = Flipped(Clock())

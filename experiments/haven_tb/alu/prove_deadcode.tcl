@@ -1,5 +1,5 @@
 clear -all
-analyze -v2k stdlib/tests/resources/haven/alu_top.v
+analyze -v2k experiments/fixtures/haven/alu_top.v
 analyze -sv12 experiments/haven_tb/alu/alu_deadcode_formal.sv
 elaborate -top alu_deadcode_formal
 clock clock

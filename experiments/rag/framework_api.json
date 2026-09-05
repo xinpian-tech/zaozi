@@ -1,14 +1,14 @@
 {
-  "version": 3,
+  "version": 4,
   "scope": "framework-only",
   "documents": [
     {
       "id": "framework-data-example",
-      "title": "Few-shot typed tuple construction example",
+      "title": "Few-shot intent response serialization",
       "source": "experiments/src/rag/FrameworkDataExample.scala",
       "kind": "example",
       "whole_source": true,
-      "tags": ["fewshot", "data-example", "declarations", "cases", "proofObligations", "tuple", "caller-supplied"]
+      "tags": ["fewshot", "data-example", "response", "envelope", "caller-supplied"]
     },
     {
       "id": "framework-semantics-example",
@@ -27,11 +27,11 @@
       "tags": ["fewshot", "pipeline-example", "exportSequence", "interpret", "GenerateOutcome", "UTGenerator", "JasperGold", "UvmSequence"]
     },
     {
-      "id": "fixed-runner-fragment",
-      "title": "Fixed-runner Scala response interface",
+      "id": "runtime-ut-contract",
+      "title": "Runtime-generated UT JSON expression contract",
       "source": "experiments/rag/framework_contract.md",
-      "tags": ["fixed-runner", "Scala", "fragment", "cases", "proofObligations", "declarations", "types"],
-      "content": "The model returns two Scala declarations: `cases: Seq[(String, Int, Long, Long)]` and\n`proofObligations: Seq[(String, String)]`. Each case holds a label, an integer code, and two\nLong values. Each obligation holds a label and a reason string. The runner supplies imports,\nthe experiment object, solver calls, and output serialization; the response must not replace them.\n\nUse unique labels, quoted strings, comma-separated tuples, and balanced parentheses for both\neach tuple and its enclosing `Seq`. Scala Long literals require the `L` suffix. An empty list\nis `Seq()`. Return both declarations without a markdown fence or extra statements."
+      "tags": ["runtime-generated", "UT", "JSON", "intents", "expression", "proofObligations", "response", "contract"],
+      "content": "The model returns one JSON object with exactly `intents` and `proofObligations`.\nEach intent contains `label` and `expression`: a Scala expression returning a typed `Sem.Intent`.\nEach proof obligation contains `label` and `reason`: metadata requiring a separate formal check.\nLabels are unique snake_case identifiers. JSON strings escape embedded quotes and newlines.\n\nThe experiment manifest defines the imported RTL, ports, clock/reset wiring and sequence item type.\nThe framework generates one shared `VerilogWrapper` binding and a new UT for each intent in the run directory.\nOnly the model's expression is inserted into `Generate(expression, label)` in that UT's module body.\nNo benchmark-specific UT, stdlib module, historical scenario or DUT implementation is available to the active runner."
     },
     {
       "id": "utgenerator-abi",
@@ -87,7 +87,7 @@
       "title": "Proof metadata and witness interface boundary",
       "source": "experiments/rag/framework_contract.md",
       "tags": ["proofObligations", "metadata", "witness", "coverage", "replay"],
-      "content": "`proofObligations` is metadata for a separate proof step. Merely returning an entry does not\nrun that proof or establish its conclusion. A solver witness satisfies the encoded intent;\ncoverage of a target not encoded in that intent must be measured separately during replay."
+      "content": "`proofObligations` are pending metadata, not solver results. `Generated` supplies a witness only for the encoded intent.\nAn input-only constraint does not prove a coverage target was reached. Replay establishes coverage gain, and a dedicated\nreachability property is needed to prove dead code. `Unknown` must not be reported as `Infeasible` or coverage closure."
     }
   ]
 }

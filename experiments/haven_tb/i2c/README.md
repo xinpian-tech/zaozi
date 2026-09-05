@@ -1,5 +1,9 @@
 # rvprobe stimulus inside HAVEN's i2c testbench
 
+Historical manual-UT replay, not the active LLM generation flow. Drivers and UTs now live in
+[experiments/legacy](../../legacy/README.md); use the explicit `--legacy` harness. See the
+[current framework](../../README.md) for runtime-generated UTs.
+
 Everything but the sequence layer is HAVEN's own output (`output-*/…_i2c_master_top/final/`): copy those `.sv`/`.v`
 files, `filelist.f` and `bfm_i2c_slave.sv` beside these two files, add the rvprobe sequences to the package:
 

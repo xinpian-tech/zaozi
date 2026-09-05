@@ -1,27 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Task: represent a caller-supplied candidate and a pending proof using typed tuples.
-// Given: the caller has derived all values and the pending reason from its own task.
-// Example solution: a reusable helper, not a ready-made response to a design task.
-// A fragment-only response copies the two declaration shapes, not this object/helper.
+// Task: serialize a caller-supplied typed intent expression and pending proof metadata.
+// Given: a label, a Scala Sem expression, and an independently supplied proof reason.
+// Example solution: the expression is later typechecked in a run-generated UT.
+// This example provides no port names, candidate values, predicates or proof conclusions.
 object FrameworkDataExample:
-  def declarations(
-    label: String,
-    command: Int,
-    left: Long,
-    right: Long,
-    pendingLabel: String,
-    pendingReason: String
-  ): (Seq[(String, Int, Long, Long)], Seq[(String, String)]) =
-    val cases: Seq[(String, Int, Long, Long)] = Seq(
-      (label, command, left, right)
+  def response(label: String, expression: String, proofLabel: String, reason: String): ujson.Value =
+    ujson.Obj(
+      "intents" -> ujson.Arr(ujson.Obj("label" -> label, "expression" -> expression)),
+      "proofObligations" -> ujson.Arr(ujson.Obj("label" -> proofLabel, "reason" -> reason))
     )
-    val proofObligations: Seq[(String, String)] = Seq(
-      (pendingLabel, pendingReason)
-    )
-    (cases, proofObligations)
-
-  // Use Seq() for either declaration when its list is empty.
-  // In a literal-only response, replace supplied names with task-derived literals;
-  // write a Long as a hexadecimal literal ending in L. No values are prescribed here.
-  // A pending reason is metadata, not a discharged proof or a solver outcome.

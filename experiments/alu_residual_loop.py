@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-"""Close the HAVEN ALU coverage residual with a local RAG prompt and JasperGold.
+"""Generate per-run verification UTs for external RTL and close coverage residuals.
 
 Pipeline:
 
-  URG modinfo.txt + framework API retrieval -> prompt -> LLM writes an intent fragment -> scalac
-  -> JasperGold cover witness -> drop-in UVM sequence
+  Design manifest + URG residual + framework RAG -> LLM Sem expressions -> generated UTs -> scalac
+  -> original RTL + JasperGold cover witness -> UVM sequence
 
 Every prompt, response, compiler report, and solver artifact is written below
 ``--out`` so a run can be synced off an ephemeral host.  The script has no
@@ -29,20 +29,14 @@ import urllib.request
 from pathlib import Path
 
 from prompt_rag import RagHit, load_corpus, render_hits, retrieve_diverse
+from sequence_framework import DEFAULT_DESIGN, Design, load_design, parse_response, render_program, write_sources
 
 
 ZAOZI = Path(__file__).resolve().parent.parent
-DEFAULT_RTL = ZAOZI / "stdlib/tests/resources/haven/alu_top.v"
+DEFAULT_RTL = ZAOZI / "experiments/fixtures/haven/alu_top.v"
 DEFAULT_EDA_SHELL = ZAOZI / "experiments/haven_tb/eda-shell"
 DEFAULT_MODEL = "deepseek-v4-flash-vision-exp"
 DEFAULT_RAG_CORPUS = ZAOZI / "experiments/rag/framework_api.json"
-SLOT = ZAOZI / "experiments/src/Generated.scala"
-CASES_HEAD = re.compile(
-    r"val\s+cases:\s*Seq\[\(String,\s*Int,\s*Long,\s*Long\)\]\s*=\s*Seq\("
-)
-PROOFS_HEAD = re.compile(
-    r"val\s+proofObligations:\s*Seq\[\(String,\s*String\)\]\s*=\s*Seq\("
-)
 
 
 def load_env_file(path: Path) -> None:
@@ -95,70 +89,16 @@ def source_window(rtl: Path, lines: list[int], radius: int = 6) -> str:
     return "\n".join(chunks)
 
 
-def scala_example() -> str:
-    """The only two declarations a new model response needs to contain."""
-    return '''val cases: Seq[(String, Int, Long, Long)] = Seq()
-val proofObligations: Seq[(String, String)] = Seq()'''
-
-
-def scala_program(intent_block: str, time_limit: str) -> str:
-    """Place model-authored intent data inside the experiment-owned runner."""
-    indented = "\n".join(f"    {line}" for line in intent_block.strip().splitlines())
-    return f'''import me.jiuyang.stdlib.*
-import me.jiuyang.utlib.*
-
-object Generated extends UTExperiment:
-  def run(outDir: os.Path): ujson.Value =
-    require(JasperGold.available, "the ALU residual loop requires JasperGold")
-    val svFile = os.Path("stdlib/tests/resources/haven/alu_top.v", os.pwd)
-    // The model-authored block contains only typed data: one (label, opcode, a, b)
-    // tuple per intent, followed by suspected-unreachable paths for separate proof.
-    // A proof obligation is not a dead-code claim. It records a suspected-unreachable
-    // path and the contradictory/invariant predicates that a separate property must prove.
-{indented}
-    val rows = collection.mutable.ArrayBuffer.empty[ujson.Obj]
-    val stimuli = cases.map {{ (label, op, a, b) =>
-      val param = HavenAluFpParameter(op, a, b)
-      val dir   = outDir / label
-      val spec  = UTGenerator(HavenAluFpUT, param, dir).abi.spec
-      val t0    = System.currentTimeMillis()
-      val out   = JasperGold.generate(
-        JasperGold.lower(HavenAluFpUT, param, dir, Seq(svFile)),
-        dir / "jg",
-        timeLimit = "{time_limit}"
-      )
-      val ms = System.currentTimeMillis() - t0
-      out match
-        case GenerateOutcome.Generated(trace) =>
-          rows += ujson.Obj("label" -> label, "engine" -> "jaspergold", "ms" -> ms, "cycles" -> trace.cycles)
-          AbstractStimulus.fromTrace(trace, spec)
-        case other => throw RuntimeException(s"$label: $other after ${{ms}}ms")
-    }}
-    val spec = UTGenerator(HavenAluFpUT, HavenAluFpParameter(0, 0L, 0L), outDir).abi.spec
-    val all  = UvmSequence.concat(spec, stimuli)
-    val sv   = UvmSequence(
-      "rvprobe_llm_seq", "alu_top_seq_item",
-      pinned = Some(Set("op", "a", "b", "start"))
-    ).write(all, outDir / "rvprobe_llm_seq.sv")
-    val status =
-      if cases.nonEmpty then "generated"
-      else if proofObligations.nonEmpty then "proof-required"
-      else "no-candidates"
-    ujson.Obj(
-      "status" -> status, "engine" -> "jaspergold", "beats" -> all.cycles,
-      "sequenceFile" -> sv.toString, "intents" -> ujson.Arr(rows.toSeq*),
-      "proofObligations" -> ujson.Arr(proofObligations.map {{ (label, reason) =>
-        ujson.Obj("label" -> label, "reason" -> reason)
-      }}*)
-    )
-'''
+def response_example() -> str:
+    """An empty envelope demonstrates the format without supplying any DUT answer."""
+    return json.dumps({"intents": [], "proofObligations": []})
 
 
 def retrieval_queries() -> list[str]:
-    """Query only the interfaces used by this runner, independently of DUT answers."""
+    """Framework queries do not depend on DUT names, residuals or historical answers."""
     return [
-        "fixed-runner Scala fragment cases proofObligations declarations types",
-        "fewshot data-example declarations tuple caller-supplied",
+        "runtime-generated UT JSON intents expression proofObligations response contract",
+        "fewshot data-example response envelope caller-supplied",
         "fewshot semantics-example Sem compose Value Relation State Temporal",
         "fewshot pipeline-example exportSequence interpret GenerateOutcome",
         "UTGenerator abi spec typed drive probe",
@@ -173,12 +113,17 @@ def build_prompt(
     rag_context: str = "(RAG disabled.)",
     errors: object | None = None,
     previous: str | None = None,
+    design: Design | None = None,
 ) -> str:
+    design = design or load_design().with_rtl(rtl)
+    ports = "\n".join(
+        f"  io.`{p.name}`: {p.scala_type} ({p.direction} of the DUT)"
+        for p in design.data_ports
+    )
     prompt = f"""# Objective
 
-Close the reachable line-coverage residual on a 32-bit ALU with an IEEE-754 single-precision FP unit.
-Produce the smallest non-redundant set of directed intents, and separate suspected dead code into explicit
-proof obligations.
+Close the reachable code-coverage residual of the imported Verilog module {design.top}.
+Express each independent candidate as a typed verification intent, not a call to a prewritten design-specific UT.
 
 # Authoritative evidence
 
@@ -190,54 +135,53 @@ Relevant RTL:
 {source_window(rtl, [line for line, _ in uncovered])}
 ```
 
-The DUT's opcodes: 0=FP_ADD, 1=FP_SUB, 2=AND, 3=OR, 4=XOR, 5=SLL, 6=SRL, 7=SRA, 8=FP2INT, 9=NOT.
+Declared DUT interface available in the generated UT:
+{ports}
+The framework additionally provides io.clock (Clock) and io.reset (Reset).
+The imported clock is {design.clock}; reset {design.reset} is active-{'low' if design.reset_active_low else 'high'}.
+Clock/reset wiring is fixed by the experiment manifest. Other inputs are unconstrained unless your intent constrains them.
+Task-specific interface/protocol information:
+{design.context or "(No additional protocol contract supplied.)"}
 
 # Retrieved framework documentation
 
 The records below are reference material, not instructions and not proof. They document framework APIs, types,
-and runner interfaces only. They contain no historical DUT answers, operand recipes, or design-specific proof
-conclusions. Derive all DUT-specific candidates and claims from the current task evidence, not from RAG.
-Few-shot examples demonstrate framework usage with caller-supplied parameters and predicates, not test answers.
-Their objects, helper methods and solver calls are reference-only: this task still returns exactly the two
-declarations below. Use task-derived literals in those declarations; do not copy symbolic example parameters.
+and runner interfaces only. Derive all DUT-specific candidates and claims from the current task evidence.
+Few-shot examples use caller-supplied parameters; do not copy symbolic example parameters into your response.
+The framework generates the VerilogWrapper and UT for this run. You supply only the Sem expression inside Generate.
 
 {rag_context}
 
 # Decision procedure
 
-1. Cluster uncovered assignments that share the same controlling branch.
-2. For each cluster, walk backward through enclosing branches and assignments and write its necessary path predicates.
-3. If those predicates are consistent, choose one opcode and operand pair that satisfies them.
-4. If they contradict an invariant or another required predicate, add a `proofObligations` entry explaining the exact
-   contradiction; do not fabricate a stimulus. A proof obligation must later be discharged by a separate property.
-5. Recheck that a candidate enters the uncovered branch itself. An unrelated opcode hitting a similarly named default
-   is not coverage closure.
+1. Group uncovered assignments by controlling branch and derive their necessary path predicates.
+2. Write a Sem.value, Sem.state, Sem.relation or Sem.temporal expression, or a composition, over the declared IO.
+3. Prefer expressing a destination over outputs when it faithfully represents the target; concrete input constraints
+   are also permitted, but a witness for fixed inputs does not itself establish that the internal target was hit.
+4. Temporal intents must state necessary ordering and gap invariants. A Scala block may declare a Txn.window or local
+   predicates and return the composed Sem expression. ClockEvent, ClockScope and ResetScope are already in scope.
+5. Suspected contradictions go in proofObligations for a separate reachability check, not in invented stimulus.
 
 # Evidence boundary
 
-Each `cases` tuple is only a candidate verification intent: `(label, opcode, a, b)`. JasperGold drives those exact
-32-bit operands and returns a legal cover witness. VCS/URG replay is the source of truth for whether an internal line
-was covered. Only a dedicated reachability property can establish dead code.
-
-Use one tuple per independent predicate cluster, not one tuple per source line. Use unique snake_case labels, opcodes
-in 0..15, and non-negative 32-bit hexadecimal Long literals with an `L` suffix. Do not modify the runner, imports,
-backend, time limit, output codec, or report shape.
+Each expression becomes the body of a NEW per-run UT. scalac checks the actual expression against its typed ports.
+JasperGold searches for a witness to that expression (per-intent time limit: {time_limit}); VCS/URG determines whether
+the requested coverage item closed. A separate property is required for a dead-code claim.
+Do not define/import modules, replace the runner, call solvers, use stdlib benchmark UTs, or name DUT internal signals.
+The expression must return a Sem.Intent, not call Generate itself. This is compiled Scala, not a security sandbox.
 
 # Output contract
 
-Reply with ONLY the Scala fragment, no markdown fence. Use exactly this shape and change only the `cases` and
-`proofObligations` lists. The empty lists illustrate types, not a recommended answer.
-Return these two declarations only; the experiment owns and adds the fixed runner:
+Return one JSON object with exactly "intents" and "proofObligations".
+Each intent is {{"label": "unique_snake_case", "expression": "a Scala expression returning Sem.Intent"}}.
+Each proof obligation is {{"label": "unique_snake_case", "reason": "the precise suspected contradiction"}}.
+Use actual task-derived port names and predicates. JSON strings must escape embedded quotes and newlines.
+No Markdown fences or extra text. This empty envelope illustrates structure, not a recommended answer:
 
-{scala_example()}"""
+{response_example()}"""
     if errors is not None:
-        prompt += (
-            "\n\nYour previous attempt failed:\n"
-            + json.dumps(errors, indent=2)
-            + "\n\nPrevious file:\n"
-            + (previous or "")
-            + "\n\nFix it."
-        )
+        prompt += ("\n\nYour previous attempt failed:\n" + json.dumps(errors, indent=2) +
+                   "\n\nPrevious response:\n" + (previous or "") + "\n\nFix it.")
     return prompt
 
 
@@ -281,103 +225,43 @@ def strip_fence(text: str) -> str:
     return re.sub(r"^```[a-zA-Z0-9_+-]*\n|\n```$", "", text.strip(), flags=re.MULTILINE)
 
 
-def declaration_end(text: str, start: int, head: re.Pattern[str]) -> int | None:
-    """Return the end of one `val ... = Seq(...)`, respecting strings and nesting."""
-    match = head.match(text, start)
-    if match is None:
-        return None
-    depth = 1
-    quoted = False
-    escaped = False
-    for index in range(match.end(), len(text)):
-        char = text[index]
-        if quoted:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                quoted = False
-        elif char == '"':
-            quoted = True
-        elif char == "(":
-            depth += 1
-        elif char == ")":
-            depth -= 1
-            if depth == 0:
-                return index + 1
-    return None
-
-
-def valid_fragment(response: str) -> bool:
-    """Accept exactly the two Seq declarations, with no top-level statements."""
-    position = len(response) - len(response.lstrip())
-    position = declaration_end(response, position, CASES_HEAD) or -1
-    if position < 0:
-        return False
-    position += len(response[position:]) - len(response[position:].lstrip())
-    position = declaration_end(response, position, PROOFS_HEAD) or -1
-    return position >= 0 and not response[position:].strip()
-
-
-def materialize_response(response: str, time_limit: str) -> tuple[str, str, list[str]]:
-    """Turn a small intent fragment into Scala, while accepting saved legacy full files."""
-    if re.search(r"(?m)^\s*object Generated extends UTExperiment:", response):
-        return response, "legacy-full-file", []
-
-    errors = []
-    for declaration in (
-        "val cases: Seq[(String, Int, Long, Long)]",
-        "val proofObligations: Seq[(String, String)]",
-    ):
-        if declaration not in response:
-            errors.append(f"response must contain `{declaration}`")
-    if not valid_fragment(response):
-        errors.append("response must contain only the two typed Seq declarations from the output contract")
-    return scala_program(response, time_limit), "intent-fragment", errors
+def materialize_response(response: str, time_limit: str, design: Design | None = None) -> tuple[str, str, list[str]]:
+    """Compile the model's own intent, never select a benchmark-specific UT."""
+    try:
+        data = parse_response(response)
+        return render_program(design or load_design(), data, time_limit), "intent-json", []
+    except (ValueError, KeyError, TypeError) as error:
+        return "", "intent-json", [str(error)]
 
 
 def backend_errors(code: str) -> list[str]:
-    """Refuse a stale response that silently puts circt-bmc back in the loop."""
-    errors = []
-    for required in ("JasperGold.lower", "JasperGold.generate"):
-        if required not in code:
-            errors.append(f"generated Scala must call {required}")
-    for forbidden in ("FormalUT.generate", "FormalUT.lowerGenerator", "circt-bmc"):
-        if forbidden in code:
-            errors.append(f"generated Scala must not contain {forbidden}")
-    return errors
+    # A useful regression guard, not an execution security boundary.
+    if "me.jiuyang.stdlib" in code or re.search(r"\bHaven\w*UT\b", code):
+        return ["the active experiment must not depend on stdlib or archived benchmark UTs"]
+    return []
 
 
-def harness(generated: Path, out_dir: Path, eda_shell: Path) -> tuple[dict, str]:
+def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool = False) -> tuple[dict, str]:
     env = os.environ.copy()
     env["ZAOZI_EDA_SHELL"] = str(eda_shell.resolve())
-    original = SLOT.read_bytes()
-    try:
-        process = subprocess.run(
-            [
-                "nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py",
-                str(generated.resolve()), "--out", str(out_dir.resolve()),
-            ],
-            cwd=ZAOZI,
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-    finally:
-        SLOT.write_bytes(original)
-    lines = process.stdout.strip().splitlines()
-    for line in reversed(lines):
+    source = generated.parent if generated.is_file() and (generated.parent / "DesignBinding.scala").exists() else generated
+    command = [
+        "nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py",
+        str(source.resolve()), "--out", str(out_dir.resolve()),
+    ]
+    if compile_only:
+        command.append("--compile-only")
+    process = subprocess.run(command, cwd=ZAOZI, env=env, capture_output=True, text=True)
+    for line in reversed(process.stdout.strip().splitlines()):
         if line.lstrip().startswith("{"):
             try:
-                return json.loads(line), process.stdout + process.stderr
+                report = json.loads(line)
+                if report.get("result", {}).get("status") in ("unknown", "infeasible"):
+                    report["ok"] = False
+                return report, process.stdout + process.stderr
             except json.JSONDecodeError:
                 pass
-    return {
-        "phase": "harness",
-        "ok": False,
-        "detail": (process.stdout + process.stderr)[-2000:],
-    }, process.stdout + process.stderr
+    return {"phase": "harness", "ok": False, "detail": (process.stdout + process.stderr)[-2000:]}, process.stdout + process.stderr
 
 
 def feedback(report: dict) -> object:
@@ -388,8 +272,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--modinfo", type=Path, required=True, help="baseline URG modinfo.txt")
     parser.add_argument("--out", type=Path, required=True, help="durable output directory")
-    parser.add_argument("--rtl", type=Path, default=DEFAULT_RTL)
-    parser.add_argument("--module", default="alu_top")
+    parser.add_argument("--design", type=Path, default=DEFAULT_DESIGN, help="versioned RTL/IO/clock/reset/codec manifest")
+    parser.add_argument("--rtl", type=Path, help="replace the single RTL source in BOTH prompt and solver")
+    parser.add_argument("--module", help="coverage module (defaults to the design top)")
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--temperature", type=float, default=0.3)
     parser.add_argument("--attempts", type=int, default=3)
@@ -399,9 +284,11 @@ def main() -> int:
     parser.add_argument("--env-file", type=Path, help="optional provider KEY=VALUE file for live inference")
     parser.add_argument(
         "--response-file", type=Path,
-        help="skip the LLM call and run a saved intent fragment or legacy full Scala response",
+        help="skip the LLM call and run a saved intent JSON response",
     )
     parser.add_argument("--prompt-only", action="store_true", help="write prompt.txt and stop before calling the model")
+    parser.add_argument("--prepare-only", action="store_true", help="with --response-file: generate source artifacts without compiling or solving")
+    parser.add_argument("--compile-only", action="store_true", help="with --response-file: generate and typecheck without solving")
     parser.add_argument(
         "--rag", choices=("local", "off"), default="local",
         help="inject reviewed framework API excerpts only (default: local)",
@@ -410,17 +297,28 @@ def main() -> int:
     parser.add_argument("--rag-top-k", type=int, default=6)
     args = parser.parse_args()
 
+    design = load_design(args.design)
+    if args.rtl:
+        design = design.with_rtl(args.rtl)
+    args.rtl = design.sources[0]
+    args.module = args.module or design.top
+    if (args.prepare_only or args.compile_only) and not args.response_file:
+        parser.error("--prepare-only/--compile-only require --response-file")
     if args.env_file:
         load_env_file(args.env_file)
     if args.rag_top_k < 0:
         parser.error("--rag-top-k must be >= 0")
-    if not args.prompt_only and not args.eda_shell.exists():
+    if args.attempts < 1:
+        parser.error("--attempts must be positive")
+    if not (args.prompt_only or args.prepare_only or args.compile_only) and not args.eda_shell.exists():
         raise FileNotFoundError(f"EDA shell not found: {args.eda_shell}")
 
     uncovered = residual(args.modinfo, args.module)
     if not uncovered:
         raise RuntimeError(f"no uncovered executable lines found for {args.module} in {args.modinfo}")
-    args.out.mkdir(parents=True, exist_ok=True)
+    args.out = args.out.resolve()
+    args.out.mkdir(parents=True, exist_ok=False)
+    (args.out / "design.json").write_text(json.dumps(design.record(), indent=2) + "\n")
     (args.out / "residual.json").write_text(json.dumps(uncovered, indent=2) + "\n")
 
     queries = retrieval_queries()
@@ -453,7 +351,7 @@ def main() -> int:
         attempt_dir = args.out / f"attempt-{attempt}"
         attempt_dir.mkdir(parents=True, exist_ok=True)
         prompt = build_prompt(
-            uncovered, args.rtl, args.jg_time_limit, rag_context, errors, previous
+            uncovered, args.rtl, args.jg_time_limit, rag_context, errors, previous, design
         )
         (attempt_dir / "prompt.txt").write_text(prompt)
         prompt_record = {
@@ -490,10 +388,11 @@ def main() -> int:
         (attempt_dir / "response.txt").write_text(raw)
         response = strip_fence(raw)
         code, response_format, response_check = materialize_response(
-            response, args.jg_time_limit
+            response, args.jg_time_limit, design
         )
-        generated = attempt_dir / "Generated.scala"
-        generated.write_text(code)
+        if not response_check:
+            write_sources(attempt_dir / "sources", design, parse_response(response), args.jg_time_limit)
+        generated = attempt_dir / "sources" / "Generated.scala"
 
         if response_check:
             report = {"phase": "response-check", "ok": False, "errors": response_check}
@@ -504,8 +403,11 @@ def main() -> int:
                 report = {"phase": "backend-check", "ok": False, "errors": wrong_backend}
                 log = "\n".join(wrong_backend) + "\n"
             else:
-                print(f"attempt {attempt}: starting JasperGold harness", file=sys.stderr, flush=True)
-                report, log = harness(generated, attempt_dir / "solve", args.eda_shell)
+                print(f"attempt {attempt}: processing generated sources", file=sys.stderr, flush=True)
+                if args.prepare_only:
+                    report, log = {"phase": "prepare", "ok": True, "sources": str(generated.parent)}, ""
+                else:
+                    report, log = harness(generated, attempt_dir / "solve", args.eda_shell, args.compile_only)
         (attempt_dir / "harness.log").write_text(log)
         (attempt_dir / "harness.json").write_text(json.dumps(report, indent=2) + "\n")
         history.append({
@@ -520,7 +422,10 @@ def main() -> int:
         if report.get("ok"):
             result = report.get("result") or {}
             summary = {
-                "status": result.get("status", "generated"),
+                "status": result.get("status", report.get("phase", "generated")),
+                "sources": str(generated.parent),
+                "design": design.record(),
+                "contract": "runtime-ut-v1",
                 "backend": "jaspergold",
                 "model": "saved-response" if args.response_file else args.model,
                 "temperature": args.temperature,
@@ -539,6 +444,7 @@ def main() -> int:
 
     summary = {
         "status": "failed",
+        "contract": "runtime-ut-v1",
         "backend": "jaspergold",
         "model": "saved-response" if args.response_file else args.model,
         "temperature": args.temperature,

@@ -24,6 +24,6 @@ object FrameworkSemanticsExample:
       Sem.state(observedPredicate) &&
       Sem.temporal(scenario)
 
-  // A UT author can pass the returned intent to Generate(intent, label) in the
-  // module body, using that body's elaboration context. A fixed-runner fragment
-  // must not add this helper or change the runner's existing UT.
+  // The framework inserts the model's expression into Generate(expression, label)
+  // inside a newly generated UT. The response returns an expression, not this
+  // helper object, a DUT implementation, or a replacement solver runner.

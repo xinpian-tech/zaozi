@@ -36,9 +36,9 @@ import sys
 import time
 from pathlib import Path
 
-ZAOZI = Path(__file__).resolve().parent.parent
+ZAOZI = Path(__file__).resolve().parents[2]
 SCRATCH = Path("/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad")
-RTL = ZAOZI / "stdlib/tests/resources/haven/alu_top.v"
+RTL = ZAOZI / "experiments/fixtures/haven/alu_top.v"
 SNPS_SHELL = Path("/root/yjh-workspace/rvprobe-workspace/artifact/haven-deepseek-2026-08-28/snps-shell")
 MODEL = "deepseek-v4-flash-vision-exp"
 DUT_MODULE = "alu_top"
@@ -199,7 +199,7 @@ def run_typed(code: str, out_dir: Path) -> dict:
     gen = out_dir / "Generated.scala"
     gen.write_text(code)
     proc = subprocess.run(
-        ["nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py", str(gen), "--out", str(out_dir)],
+        ["nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py", "--legacy", str(gen), "--out", str(out_dir)],
         cwd=ZAOZI, capture_output=True, text=True,
     )
     return harness_report(proc)
@@ -215,8 +215,8 @@ def run_untyped(code: str, out_dir: Path) -> dict:
         # this arm is meant to exhibit.  Report it the way the driver would.
         return {"phase": "run", "ok": False, "detail": f"spec.json is not valid JSON: {e}"}
     proc = subprocess.run(
-        ["nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py",
-         str(ZAOZI / "experiments/AblationDriver.scala"), "--out", str(out_dir)],
+        ["nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py", "--legacy",
+         str(ZAOZI / "experiments/legacy/drivers/AblationDriver.scala"), "--out", str(out_dir)],
         cwd=ZAOZI, capture_output=True, text=True,
     )
     return harness_report(proc)

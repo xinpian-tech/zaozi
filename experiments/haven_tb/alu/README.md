@@ -1,103 +1,69 @@
-# ALU residual closure on JasperGold
+# ALU 动态意图实验
 
-`experiments/alu_residual_loop.py` turns the uncovered `alu_top` lines in an URG `modinfo.txt` into a prompt,
-typechecks the returned Scala, and uses JasperGold to turn each candidate intent into a concrete UVM sequence.
-Before assembling the prompt it retrieves reviewed framework API excerpts from `experiments/rag/framework_api.json`
-using queries about the runner's interfaces. RTL and residuals remain separate task evidence, not RAG documents.
-The sequence must then be replayed under VCS/URG: a JasperGold witness proves that
-the candidate input constraint is legal, while replay is what establishes coverage closure.
+通用架构和无模型复现流程见 [experiments/README](../../README.md)，输出契约见
+[PROMPT](../../PROMPT.md)。当前 ALU 只维护 [端口 manifest](../../designs/alu.json)；
+原始 RTL 在 [fixtures/haven/alu_top.v](../../fixtures/haven/alu_top.v)，没有活动的 `HavenAlu*UT` 依赖。
 
-Generate and inspect a RAG-augmented prompt entirely offline:
+## 任务输入与模型调用
+
+在仓库根目录生成并检查 prompt，不需要模型密钥：
 
 ```sh
-python3 experiments/alu_residual_loop.py \
+python3 experiments/sequence_experiment.py \
+  --design experiments/designs/alu.json \
   --modinfo out/experiments/alu-main-baseline/urgReport/modinfo.txt \
-  --out /tmp/alu-prompt-rag --prompt-only
+  --out out/experiments/alu-runtime-prompt --prompt-only
 ```
 
-Use `--rag off` as the control arm. Each run saves `rag.json` (queries, corpus version, hits, scores), plus the exact
-`attempt-1/prompt.txt` and its hash/metadata in `prompt.json`. Neither mode needs a model credential. A saved model
-answer can also be checked without a live model using `--response-file Generated.scala`; only live inference needs
-an OpenAI-compatible provider, configured through `RVPROBE_LLM_API_KEY` and `RVPROBE_LLM_BASE_URL` (the older
-`OPENAI_*` names remain aliases).
+输出目录必须是新的。用 `--rag off` 建立对照。每轮保存 prompt、哈希和检索 provenance。
+本地 response 使用 `--response-file /path/to/response.json`；可加 `--prepare-only` 或
+`--compile-only`。不再接受旧的两段 Scala 列表或整个 Generated object。
 
-The response contains only two typed declarations: concrete `cases` and `proofObligations`. The script places them
-inside its fixed JasperGold runner before typechecking, so the model cannot accidentally replace the backend or
-output codec. Legacy saved responses containing a complete `object Generated` remain replayable. An obligation
-records a precise suspected contradiction for a separate formal check; it does not by itself classify the line as
-dead code.
+在线调用需要配置 `RVPROBE_LLM_API_KEY` 和 `RVPROBE_LLM_BASE_URL`，
+旧 `OPENAI_*` 变量仅为别名，不要求 OpenAI 提供商。检索、离线生成和编译都不需要这些凭据。
+JasperGold 和 VCS / URG 分别需要本机工具、许可证及 bench。
 
-RAG accepts framework APIs, types, and runner/codec interface contracts only. Historical answers, DUT operand
-recipes, solver witnesses, and design-specific proof conclusions are forbidden. The loader enforces an explicit
-source allowlist and checks each excerpt against its source; source hashes are retained for auditing. This does not
-replace content review when framework documentation or corpus metadata changes.
-
-Corpus version 3 also includes three generic, compiled few-shot examples in `experiments/src/rag/`: typed tuple
-construction, composition of the four `Sem` kinds, and the ABI → JasperGold → outcome handling → UVM export flow.
-The default queries retrieve all three alongside interface documentation (at most six records total). Inputs,
-predicates and pending reasons remain caller parameters; the examples contain no design solutions. The loader reads
-these approved source files directly, so the injected code is the code compiled by `experiments.compile`.
-See `experiments/rag/framework_contract.md` for the examples and their boundary with the two-declaration response.
-
-The earlier offline regression (`docs/date2027/data/alu-rag-offline-eval.json`) and 20-request online comparison
-(`docs/date2027/alu-rag-evaluation.md`, `docs/date2027/data/alu-rag-live-eval.json`) used an answer-contaminated corpus
-and are **invalid as evidence for framework-only RAG**. They remain historical audit artifacts, not clean results.
-The old corpus is archived at `docs/date2027/data/alu-rag-contaminated-corpus.json` and is rejected by the loader.
-No corrected online comparison has been run yet. Both arms must be regenerated with the current prompt for a new test.
-
-Repeated online comparison uses `experiments/alu_rag_ablation.py`. All samples use the revised fragment contract;
-the two arms differ only in retrieved context. The default is five samples per arm on each of the two historical
-residuals (20 requests), one model attempt per sample, temperature 0.3. Requests run with two workers in a recorded
-order; Scala/JasperGold runs serially because the harness has one shared `Generated.scala` slot.
-These are two fixed residual tasks, not adaptive round-2 continuations of each newly generated round-1 sample.
+## RAG 对照
 
 ```sh
-python3 experiments/alu_rag_ablation.py generate --out out/experiments/alu-rag-my-run --env-file /path/to/provider.env
-python3 experiments/alu_rag_ablation.py solve --out out/experiments/alu-rag-my-run
-python3 experiments/alu_rag_ablation.py replay --out out/experiments/alu-rag-my-run
-python3 experiments/alu_rag_ablation.py summarize --out out/experiments/alu-rag-my-run
+python3 experiments/alu_rag_ablation.py generate --out out/experiments/alu-runtime-ablation --env-file /path/to/provider.env
+python3 experiments/alu_rag_ablation.py solve --out out/experiments/alu-runtime-ablation
+python3 experiments/alu_rag_ablation.py replay --out out/experiments/alu-runtime-ablation
+python3 experiments/alu_rag_ablation.py summarize --out out/experiments/alu-runtime-ablation
 ```
 
-The output directory must be new for `generate`; `solve` skips completed samples. Replay copies the original bench
-into this run's directory, builds all successful samples together, and uses seed 1 for both same-build baselines
-and all sample replays. Round 2 includes the saved historical round-1 sequence. Reports retain provider failures,
-structure failures, solver outcomes, raw responses, token totals, wall times and DUT-only coverage bins. Prompt
-and corpus hashes are recorded before requests; responses are never replaced with historical answers.
-To overlap inference with solving, run one `solve --follow` process in a second terminal while `generate` runs.
-Wait for both to finish before the final replay. The summary's `complete` field is false while any planned sample
-still awaits generation, harness execution, or a successful sample's coverage replay. Failure counts remain visible;
-means report their own measured-sample denominators rather than treating missing results as zero.
+默认两条历史残余任务、每条每组 5 次、共 20 次调用；temperature 0.3，每个样本一次。
+它们是固定任务，不是每个 round-1 新样本的自适应 round-2。
+RAG 版本 4 只含框架资料和参数化写法；两组只改变检索上下文。
+每个样本有自己的 source 目录，串行求解用于共享 Mill 缓存与 EDA 资源，不再因为共享源码槽位。
+可在另一终端运行一个 `solve --follow`，完成后再 replay。
 
-Report target-line closure separately from the four-metric score: an extra candidate can improve condition or toggle
-bins without hitting any residual line. `proof_only_samples` counts routing decisions, not discharged proofs. The
-preserved baseline scoreboard only counts transactions; this experiment measures coverage, not arithmetic correctness.
-The current RAG corpus contains framework documentation only. A single-design test still cannot establish
-cross-design transfer; do not mix its results with those from the retired answer-contaminated corpus.
+生成 manifest 记录 `runtime-ut-v1`、RTL / IO / generator / prompt / corpus 哈希并保存快照。
+求解及回放拒绝旧契约；summarize 可审计旧结果，但明确保留 `legacy-static-ut` 分类。
+回放会核对 bench RTL 哈希，使用同一次 VCS build、seed 1 和每轮相同的 baseline。
+失败和缺失样本保留分母；coverage 均值只按实际测量样本统计，不能把未测量当作 0。
 
-Run the credential-free retrieval, fragment-contract, and summary-accounting tests with:
+注意：当前 bench driver 按 transaction 等待 done，不是逐周期 driver。
+动态 temporal witness 的周期关系、独立 witness 的 reset 初态不由 sequence 导出自动保证。
+因此仍需检查回放；不能把所有 generated 样本直接算作复现了意图。
+`proof_only_samples` 也不是已完成证明的数量。现有 scoreboard 只计数，不校验算术结果。
 
-```sh
-python3 -m unittest discover -s experiments -p 'test_*rag*.py' -v
-nix develop . -c mill --no-server experiments.compile
-nix develop . -c mill --no-server experiments.tests.testForked
-```
+## 复现边界与历史结果
 
-The Scala tests exercise tuple construction, all solver outcome branches, missing ABI signals, and UVM rendering
-with synthetic data outside the RAG source allowlist. The semantic composition and generic backend call chain are
-typechecked; these checks do not run JasperGold or make provider requests and do not measure model effectiveness.
+本仓库包含原始 ALU RTL、IO manifest、框架和脚本。
+完整 HAVEN bench、两个 URG 残余、历史 round-1 sequence 位于旧主机的 `out/`，没有纳入 Git；
+上述消融还需通过 `--tb`、`--previous-sequence` 提供这些输入。只 clone 不足以重放历史覆盖分。
 
-The 2026-09-04 run stopped with two uncovered executable lines. They are structural dead code rather than missing
-stimulus. `alu_deadcode_formal.sv` states their exact path conditions as cover properties, and `prove_deadcode.tcl`
-proves both unreachable:
+2026-09-04 的 95.00 / 177-of-179 是旧静态 UT 流程结果，不是当前动态 UT 的评测。
+旧污染 RAG 的在线 / 离线收益结论已经撤回；纠正后的在线对照尚未执行。
+原始审计文件保持不变。
+
+历史两行不可达属性保存在 `alu_deadcode_formal.sv` / `prove_deadcode.tcl`，不进入 RAG：
 
 ```sh
 experiments/haven_tb/eda-shell -c \
   'cd /path/to/zaozi && jg -batch -tcl experiments/haven_tb/alu/prove_deadcode.tcl -proj out/alu-deadcode-jg'
 ```
 
-Expected statuses:
-
-```text
-JGSTATUS <embedded>::alu_deadcode_formal.line_336_fp_counter_default unreachable
-JGSTATUS <embedded>::alu_deadcode_formal.line_401_f2i_shift_ge_32 unreachable
-```
+历史预期状态为 `line_336_fp_counter_default unreachable` 和
+`line_401_f2i_shift_ge_32 unreachable`；本次结构重构没有重新执行这两个证明。

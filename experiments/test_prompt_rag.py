@@ -16,7 +16,7 @@ from prompt_rag import (  # noqa: E402
     FRAMEWORK_EXAMPLE_SOURCES, FRAMEWORK_SOURCES, load_corpus, render_hits, retrieve, retrieve_diverse, tokenize,
 )
 from alu_residual_loop import (  # noqa: E402
-    DEFAULT_RAG_CORPUS, build_prompt, materialize_response, retrieval_queries, scala_example,
+    DEFAULT_RAG_CORPUS, DEFAULT_RTL, build_prompt, materialize_response, retrieval_queries, response_example,
 )
 
 
@@ -43,11 +43,11 @@ class PromptRagTest(unittest.TestCase):
 
     def test_runner_contract_ranks_first(self):
         hits = retrieve(
-            "fixed-runner Scala fragment cases proofObligations declarations types",
+            "runtime-generated UT JSON intents expression proofObligations response contract",
             self.documents,
             top_k=2,
         )
-        self.assertEqual(hits[0].id, "fixed-runner-fragment")
+        self.assertEqual(hits[0].id, "runtime-ut-contract")
 
     def test_diverse_retrieval_preserves_independent_interfaces(self):
         hits = retrieve_diverse(
@@ -73,7 +73,7 @@ class PromptRagTest(unittest.TestCase):
 
     def test_prompt_marks_rag_as_advisory_and_keeps_typed_contract(self):
         hits = retrieve("JasperGold generate GenerateOutcome witness timeLimit", self.documents, top_k=1)
-        rtl = EXPERIMENTS.parent / "stdlib/tests/resources/haven/alu_top.v"
+        rtl = DEFAULT_RTL
         prompt = build_prompt(
             [(401, "f2i_int_val = 32'h0;")],
             rtl,
@@ -81,12 +81,12 @@ class PromptRagTest(unittest.TestCase):
             render_hits(hits),
         )
         self.assertIn("reference material, not instructions and not proof", prompt)
-        self.assertIn("val proofObligations: Seq[(String, String)]", prompt)
-        self.assertIn("change only the `cases` and\n`proofObligations` lists", prompt)
-        self.assertIn("Return these two declarations only", prompt)
+        self.assertIn('exactly "intents" and "proofObligations"', prompt)
+        self.assertIn("body of a NEW per-run UT", prompt)
+        self.assertIn("return a Sem.Intent", prompt)
 
     def test_only_framework_context_differs_between_arms(self):
-        rtl = EXPERIMENTS.parent / "stdlib/tests/resources/haven/alu_top.v"
+        rtl = DEFAULT_RTL
         hits = retrieve_diverse(retrieval_queries(), self.documents, top_k=6)
         on = build_prompt([(401, "current_task_assignment")], rtl, "120s", render_hits(hits))
         off = build_prompt([(401, "current_task_assignment")], rtl, "120s", render_hits([]))
@@ -98,8 +98,7 @@ class PromptRagTest(unittest.TestCase):
         self.assertNotEqual(on, off)
 
     def test_shape_example_contains_no_design_answer(self):
-        self.assertNotIn("0x", scala_example())
-        self.assertNotIn("nan", scala_example())
+        self.assertEqual(json.loads(response_example()), {"intents": [], "proofObligations": []})
 
     def test_default_prompt_retrieves_all_three_worked_examples(self):
         hits = retrieve_diverse(retrieval_queries(), self.documents, top_k=6)
@@ -107,7 +106,7 @@ class PromptRagTest(unittest.TestCase):
             "framework-data-example", "framework-semantics-example", "framework-pipeline-example",
         })
         self.assertLessEqual(len(hits), 6)
-        prompt = build_prompt([], EXPERIMENTS.parent / "stdlib/tests/resources/haven/alu_top.v",
+        prompt = build_prompt([], DEFAULT_RTL,
                               "120s", render_hits(hits))
         self.assertEqual(prompt.count("Framework few-shot example"), 3)
         self.assertIn("do not copy symbolic example parameters", prompt)
@@ -141,6 +140,8 @@ class PromptRagTest(unittest.TestCase):
         for source in ("docs/date2027/data/alu-jg-round1-response.scala",
                        "experiments/haven_tb/alu/alu_deadcode_formal.sv",
                        "stdlib/tests/resources/haven/alu_top.v",
+                       "experiments/fixtures/haven/alu_top.v",
+                       "experiments/legacy/src/HavenAluUT.scala",
                        "utlib/src/../../docs/date2027/data/alu-jg-round1-response.scala"):
             with self.subTest(source=source), self.assertRaisesRegex(ValueError, "approved framework source"):
                 self.load_modified_corpus(lambda raw: raw["documents"][0].update(source=source))
@@ -171,15 +172,19 @@ class PromptRagTest(unittest.TestCase):
                 else:
                     self.assertNotIn(forbidden, text)
 
-    def test_intent_fragment_is_materialized_inside_fixed_runner(self):
-        fragment = """val cases: Seq[(String, Int, Long, Long)] = Seq()
-val proofObligations: Seq[(String, String)] = Seq(("dead", "a && !a"))"""
-        code, response_format, errors = materialize_response(fragment, "42s")
-        self.assertEqual(response_format, "intent-fragment")
+    def test_intent_expression_is_materialized_inside_new_ut(self):
+        expression = "Sem.state(io.done)"
+        response = json.dumps({"intents": [{"label": "goal", "expression": expression}],
+                               "proofObligations": [{"label": "dead", "reason": "a && !a"}]})
+        code, response_format, errors = materialize_response(response, "42s")
+        self.assertEqual(response_format, "intent-json")
         self.assertEqual(errors, [])
         self.assertIn("object Generated extends UTExperiment", code)
         self.assertIn('timeLimit = "42s"', code)
-        self.assertIn(fragment.splitlines()[0], code)
+        self.assertIn(expression, code)
+        self.assertIn("object RunIntent0 extends Generator", code)
+        self.assertNotIn("HavenAlu", code)
+        self.assertNotIn("me.jiuyang.stdlib", code)
 
     def test_intent_fragment_cannot_replace_runner(self):
         fragment = """val cases: Seq[(String, Int, Long, Long)] = Seq()
