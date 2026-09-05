@@ -1,0 +1,7 @@
+arm,description,score,line,cond,toggle,branch,fsm,fsm_transitions
+baseline,13 single-beat intents (bulk+residual+poll),67.51,85.76,53.91,72.59,83.61,41.67,20/48
+handflow,"+5 flows, hand-written",80.42,99.05,56.52,83.97,95.9,66.67,32/48
+handrst,"+5 flows +reset sweep, hand-written",87.33,99.05,57.39,84.31,95.9,100.0,48/48
+solver,"+5 flows +reset sweep, solver-derived (I2cFlowDriver, ACK-aware writes)",87.5,99.05,58.26,84.31,95.9,100.0,48/48
+solver-jg,"+5 flows +reset sweep, JasperGold-derived: flows prove their own completion in the model (prescaler 2), no timing fill",87.5,99.05,58.26,84.31,95.9,100.0,48/48
+haven-deepseek,"HAVEN on DeepSeek V4 Flash, final report, same rule",75.15,86.39,58.26,83.28,81.15,66.67,32/48

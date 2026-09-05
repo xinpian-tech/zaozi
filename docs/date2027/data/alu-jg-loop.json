@@ -1,0 +1,153 @@
+{
+  "date": "2026-09-04",
+  "design": "alu_top",
+  "scope": "DUT module only",
+  "metrics": [
+    "line",
+    "cond",
+    "toggle",
+    "branch"
+  ],
+  "score_rule": "unweighted mean of the four URG percentages",
+  "simulation": {
+    "tool": "VCS V-2023.12",
+    "seed": 1,
+    "failures": 0
+  },
+  "model": {
+    "name": "deepseek-v4-flash-vision-exp",
+    "temperature": 0.3,
+    "total_tokens": 67059
+  },
+  "formal": {
+    "tool": "JasperGold 2021.03p002",
+    "mode": "cover",
+    "total_candidate_solver_ms": 51064
+  },
+  "baseline": {
+    "score": 90.27,
+    "uncovered_executable_lines": 13,
+    "line": "166/179 (92.74%)",
+    "cond": "183/212 (86.32%)",
+    "toggle": "1837/1916 (95.88%)",
+    "branch": "56/65 (86.15%)"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "attempts": 1,
+      "tokens": 50347,
+      "input_residual_lines": 13,
+      "intents": [
+        {
+          "label": "fp_add_round_carry",
+          "op": 0,
+          "a": "0x3fffffff",
+          "b": "0x40000000",
+          "jaspergold_ms": 6464
+        },
+        {
+          "label": "fp_sub_underflow_zero",
+          "op": 1,
+          "a": "0x00800001",
+          "b": "0x00800000",
+          "jaspergold_ms": 6392
+        },
+        {
+          "label": "fp2int_nan",
+          "op": 8,
+          "a": "0x7fc00000",
+          "b": "0x00000000",
+          "jaspergold_ms": 6468
+        },
+        {
+          "label": "fp2int_small_zero",
+          "op": 8,
+          "a": "0x3f000000",
+          "b": "0x00000000",
+          "jaspergold_ms": 6423
+        },
+        {
+          "label": "and_default_fp_inactive",
+          "op": 2,
+          "a": "0x00000000",
+          "b": "0x00000000",
+          "jaspergold_ms": 6189
+        },
+        {
+          "label": "reserved_opcode_default",
+          "op": 10,
+          "a": "0x00000000",
+          "b": "0x00000000",
+          "jaspergold_ms": 6437
+        }
+      ],
+      "replay": {
+        "score": 94.73,
+        "uncovered_executable_lines": 2,
+        "line": "177/179 (98.88%)",
+        "cond": "190/212 (89.62%)",
+        "toggle": "1850/1916 (96.56%)",
+        "branch": "61/65 (93.85%)"
+      }
+    },
+    {
+      "round": 2,
+      "attempts": 1,
+      "tokens": 16712,
+      "input_residual_lines": 2,
+      "intents": [
+        {
+          "label": "f2i_shift_ge_32",
+          "op": 8,
+          "a": "0x3f000000",
+          "b": "0x00000000",
+          "jaspergold_ms": 6549,
+          "note": "duplicates round 1 and does not reach line 401"
+        },
+        {
+          "label": "not_default_fp_inactive",
+          "op": 9,
+          "a": "0x00000000",
+          "b": "0x00000000",
+          "jaspergold_ms": 6142
+        }
+      ],
+      "replay": {
+        "score": 95.0,
+        "uncovered_executable_lines": 2,
+        "line": "177/179 (98.88%)",
+        "cond": "192/212 (90.57%)",
+        "toggle": "1853/1916 (96.71%)",
+        "branch": "61/65 (93.85%)"
+      }
+    }
+  ],
+  "termination": {
+    "reason": "all remaining executable-line residuals are formally unreachable",
+    "properties": [
+      {
+        "rtl_line": 336,
+        "source": "fp_active <= 1'b0;",
+        "property": "line_336_fp_counter_default",
+        "jaspergold_status": "unreachable"
+      },
+      {
+        "rtl_line": 401,
+        "source": "f2i_int_val = 32'h0;",
+        "property": "line_401_f2i_shift_ge_32",
+        "jaspergold_status": "unreachable"
+      }
+    ]
+  },
+  "artifacts": {
+    "loop": "experiments/alu_residual_loop.py",
+    "prompt_template_note": "experiments/PROMPT.md",
+    "round1_prompt": "docs/date2027/data/alu-jg-round1-prompt.txt",
+    "round1_response": "docs/date2027/data/alu-jg-round1-response.scala",
+    "round2_prompt": "docs/date2027/data/alu-jg-round2-prompt.txt",
+    "round2_response": "docs/date2027/data/alu-jg-round2-response.scala",
+    "deadcode_harness": "experiments/haven_tb/alu/alu_deadcode_formal.sv",
+    "deadcode_tcl": "experiments/haven_tb/alu/prove_deadcode.tcl"
+  }
+}

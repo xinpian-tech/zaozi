@@ -1,0 +1,17 @@
+design,run,attempts,compile_status,metrics,score_published,score_lctb,line,cond,toggle,fsm,branch,cov_iterations,gpt_baseline,delta_published,delta_lctb,prompt_tokens,completion_tokens,total_tokens,llm_calls,wall_clock_s,scoreboard_pass,scoreboard_fail
+aes_core,20260828_122429_aes_core,1,completed,line+cond+toggle+fsm+branch,96.496,99.787,99.98,100.0,99.58,83.33,99.59,3,96.5,-0.0,3.29,60691,143572,204263,14,1323.3,2246,0
+alu_top,20260828_104316_alu_top,7,completed,line+cond+toggle+branch,95.865,95.865,97.88,92.92,97.28,,95.38,3,96.1,-0.23,-0.23,57586,110506,168092,14,1051.4,10110,0
+keccak,20260828_145747_keccak,1,completed,line+cond+toggle+branch,95.088,95.088,100.0,95.76,87.03,,97.56,3,95.7,-0.61,-0.61,51797,108383,160180,14,1091.8,10060,0
+gpio,20260828_114914_gpio,1,completed,line+cond+toggle+branch,93.545,93.545,98.34,86.36,94.98,,94.5,3,,,,170149,547516,717665,44,4745.3,13130,0
+timer,20260828_114635_timer,1,completed,line+cond+toggle+branch,93.38,93.38,98.44,81.67,98.35,,95.06,3,,,,98575,227471,326046,22,2050.6,16885,0
+spi_top,20260828_123915_spi_top,1,completed,line+cond+toggle+fsm+branch,93.484,91.855,92.9,91.89,95.29,100.0,87.34,3,93.1,0.38,-1.24,130848,403992,534840,29,3479.8,35341,0
+uart_top,20260828_133721_uart_top,1,completed,line+cond+toggle+fsm+branch,88.432,90.897,96.66,86.89,89.8,78.57,90.24,3,87.2,1.23,3.7,100331,217748,318079,19,2025.0,45442,0
+simple_spi_top,20260828_130815_simple_spi_top,1,completed,line+cond+toggle+fsm+branch,88.528,89.828,93.04,93.0,82.47,83.33,90.8,3,,,,70819,164118,234937,17,1454.0,13451,0
+gpio_top,20260828_124643_gpio_top,1,completed,line+cond+toggle+branch,84.052,84.052,99.42,72.58,89.0,,75.21,3,,,,76233,168695,244928,20,1605.0,6379,0
+uart_lite,20260828_114850_uart_lite,1,completed,line+cond+toggle+branch,83.463,83.463,94.31,82.97,70.48,,86.09,3,,,,127735,347194,474929,28,3020.9,143114,0
+axil_ram,20260828_111224_axil_ram,1,completed,line+cond+toggle+branch,82.0,82.0,100.0,58.06,78.27,,91.67,3,,,,83724,227392,311116,19,2049.9,13407,0
+i2c_master_top,20260828_110247_i2c_master_top,1,completed,line+cond+toggle+fsm+branch,63.242,67.112,76.13,46.26,74.73,47.76,71.33,3,90.0,-26.76,-22.89,128466,324527,452993,27,2826.1,13087,0
+sdrc_top,20260828_110143_sdrc_top,1,completed,line+cond+toggle+fsm+branch,11.024,13.78,21.75,12.72,8.95,0.0,11.7,3,70.0,-58.98,-56.22,137154,325701,462855,24,2842.6,3,0
+can_top,20260828_110155_can_top,1,failed,,,,,,,,,0,90.6,,,83117,206782,289899,17,1615.6,,
+ethmac,20260828_145808_ethmac,2,failed,,,,,,,,,0,69.7,,,116181,269878,386059,27,2200.9,,
+spi_lite,20260828_112843_spi_lite,1,failed,,,,,,,,,0,,,,133511,425177,558688,34,3351.1,,

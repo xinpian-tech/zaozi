@@ -1,0 +1,114 @@
+{
+  "evaluation_status": "invalid-for-framework-rag-answer-contamination",
+  "correction": "Retrieval expected same-ALU answers and proofs, contrary to the framework-only RAG requirement. These regression metrics do not establish framework-RAG quality. Retained only for audit.",
+  "date": "2026-09-05",
+  "design": "alu_top",
+  "status": "offline-regression-complete_live-ablation-blocked-by-sandbox",
+  "scope": "retrieval, prompt assembly, response boundary, and generated-Scala typecheck",
+  "not_measured": [
+    "live-model RAG-on versus RAG-off response quality",
+    "JasperGold candidate execution",
+    "VCS/URG coverage replay"
+  ],
+  "environment_blockers": {
+    "provider": "socket creation denied with EPERM before the configured endpoint was reached",
+    "eda": "the FHS wrapper could not create its bwrap namespace"
+  },
+  "fairness_note": "The corpus contains patterns distilled from this ALU's historical run and dead-code proofs. Precision and recall below are regression metrics for project memory, not held-out or cross-design generalization.",
+  "checks": {
+    "python_unittests": {
+      "passed": 9,
+      "failed": 0
+    },
+    "python_compile": "passed",
+    "scala_typecheck": {
+      "compiler": "Scala 3.8.4 from the existing repository build artifacts",
+      "candidate_fragment": "passed",
+      "proof_only_fragment": "passed"
+    },
+    "credential_free_prompt_only": "passed"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "input_residual_lines": 13,
+      "expected_pattern_ids": [
+        "fp-rounding-carry-pattern",
+        "fp2int-special-value-pattern",
+        "fp2int-path-consistency",
+        "fp-cancellation-underflow-pattern",
+        "fp-counter-default-reachability",
+        "opcode-output-mux-pattern"
+      ],
+      "retrieved_pattern_ids": [
+        "fp-rounding-carry-pattern",
+        "fp2int-special-value-pattern",
+        "fp2int-path-consistency",
+        "fp-cancellation-underflow-pattern",
+        "fp-counter-default-reachability",
+        "opcode-output-mux-pattern"
+      ],
+      "retrieval_precision": 1.0,
+      "retrieval_recall": 1.0,
+      "prompt_characters": {
+        "historical": 7519,
+        "new_rag_off": 7373,
+        "new_rag_local": 10102,
+        "rag_local_change_from_historical_percent": 34.4
+      },
+      "same_cases_response_characters": {
+        "historical_full_scala": 2044,
+        "new_intent_fragment": 436,
+        "reduction_percent": 78.7
+      },
+      "historical_outcome": {
+        "model_tokens": 50347,
+        "candidate_count": 6,
+        "candidate_jaspergold_ms": 38373,
+        "uncovered_lines_before": 13,
+        "uncovered_lines_after": 2,
+        "closed_line_fraction": 0.8462
+      }
+    },
+    {
+      "round": 2,
+      "input_residual_lines": 2,
+      "expected_pattern_ids": [
+        "fp2int-path-consistency",
+        "fp-counter-default-reachability"
+      ],
+      "retrieved_pattern_ids": [
+        "fp2int-path-consistency",
+        "fp-counter-default-reachability"
+      ],
+      "retrieval_precision": 1.0,
+      "retrieval_recall": 1.0,
+      "prompt_characters": {
+        "historical": 3602,
+        "new_rag_off": 3453,
+        "new_rag_local": 4352,
+        "rag_local_change_from_historical_percent": 20.8
+      },
+      "same_cases_response_characters": {
+        "historical_full_scala": 1805,
+        "new_intent_fragment": 213,
+        "reduction_percent": 88.2
+      },
+      "historical_outcome": {
+        "model_tokens": 16712,
+        "candidate_count": 2,
+        "candidate_jaspergold_ms": 12691,
+        "uncovered_lines_before": 2,
+        "uncovered_lines_after": 2,
+        "closed_line_fraction": 0.0,
+        "candidate_failures": [
+          "the FP2INT 0.5 input took an earlier branch and did not reach line 401",
+          "the NOT input did not make the internal FP-counter default at line 336 reachable"
+        ]
+      },
+      "rag_observation": "Both retrieved records describe the exact contradictions later proven unreachable; the new output schema can represent them as proofObligations rather than speculative cases.",
+      "potential_jaspergold_ms_avoided_if_the_model_follows_the_patterns": 12691
+    }
+  ],
+  "conclusion": "Local retrieval is exact on the two historical ALU residuals and directly addresses the unproductive second round. A live repeated A/B run is still required before claiming improved model success rate, token usage, solver time, or coverage."
+}

@@ -1,0 +1,104 @@
+{
+ "arms": [
+  {
+   "arm": "haven-published",
+   "description": "HAVEN on DeepSeek V4 Flash: no compiling testbench in five repair attempts (seq_item lacks the wb_dat_o field its template's monitor and driver read; its sequences carry SystemVerilog syntax errors)",
+   "score": 0.0,
+   "line": 0,
+   "cond": 0,
+   "toggle": 0,
+   "branch": 0,
+   "sim_cycles": null
+  },
+  {
+   "arm": "rvprobe-flows",
+   "description": "2 replayable flows (leave reset; request a frame and see its start), JasperGold-derived, in HAVEN's bench with the one-field fix and its sequences excluded; capped at 300 us",
+   "score": 50.47,
+   "sim_cycles": 30000,
+   "line": 79.28,
+   "cond": 36.27,
+   "toggle": 17.2,
+   "branch": 69.12
+  }
+ ],
+ "solver": {
+  "status": "generated",
+  "beats": 146,
+  "sequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/can-flow/rvprobe_can_flow_seq.sv",
+  "flows": [
+   {
+    "flow": "leave_reset",
+    "engine": "jaspergold",
+    "ms": "8771",
+    "cycles": 51,
+    "requests": 50
+   },
+   {
+    "flow": "sof",
+    "engine": "jaspergold",
+    "ms": "11357",
+    "cycles": 95,
+    "requests": 91
+   },
+   {
+    "flow": "transmit",
+    "engine": "jaspergold",
+    "ms": "307483",
+    "outcome": "Unknown(cover statuses: <embedded>::HavenCanFlowUT_transmit.can_transmit=undetermined)"
+   },
+   {
+    "flow": "receive",
+    "engine": "jaspergold",
+    "ms": "306966",
+    "outcome": "Unknown(cover statuses: <embedded>::HavenCanFlowUT_receive.can_receive=undetermined)"
+   },
+   {
+    "flow": "busoff",
+    "engine": "jaspergold",
+    "ms": "306582",
+    "outcome": "Unknown(cover statuses: <embedded>::HavenCanFlowUT_busoff.can_busoff=undetermined)"
+   }
+  ]
+ },
+ "engine_limits": [
+  {
+   "flow": "transmit (interrupt register TI)",
+   "partner": "free drive",
+   "result": "undetermined 900 s"
+  },
+  {
+   "flow": "transmit (TI)",
+   "partner": "ack-once (one dominant bit time, engine picks the moment)",
+   "result": "undetermined 900 s"
+  },
+  {
+   "flow": "receive (interrupt register RI)",
+   "partner": "free drive",
+   "result": "undetermined 900 s"
+  },
+  {
+   "flow": "busoff (bus_off_on falls) without a transmit request",
+   "partner": "free drive",
+   "result": "unreachable, proven in 10 s (only the transmit error counter reaches 256)"
+  },
+  {
+   "flow": "busoff with a transmit request",
+   "partner": "free drive",
+   "result": "undetermined 300 s"
+  },
+  {
+   "probe": "bind cover node_bus_off / tx_err_cnt>=255 with the drive free from reset",
+   "result": "covered in 6-10 cycles: the transmit error counter register written 255 in reset mode -- the shortcut the flows' pinned writes exclude"
+  }
+ ],
+ "traps": [
+  "irq_on is the core's active-low irq_n",
+  "bus_off_on is high while the node is ON the bus",
+  "an interrupt line alone is satisfied by an error frame the engine provokes in four cycles; completion is the interrupt register's TI/RI bit",
+  "can_ibo.v has a port named `do`: vendored .v files are analyzed as Verilog-2001"
+ ],
+ "bench_fixes": [
+  "can_top_seq_item.sv: logic [7:0] wb_dat_o (the template's monitor and driver read it; the generated item lacked it)",
+  "can_top_pkg.sv: HAVEN's sequence_*.sv excluded (SystemVerilog syntax errors)"
+ ]
+}

@@ -1,0 +1,287 @@
+{
+ "arms": [
+  {
+   "arm": "baseline",
+   "description": "13 single-beat intents (bulk+residual+poll)",
+   "score": "67.51",
+   "line": "85.76",
+   "cond": "53.91",
+   "toggle": "72.59",
+   "branch": "83.61",
+   "fsm": "41.67",
+   "fsm_transitions": "20/48"
+  },
+  {
+   "arm": "handflow",
+   "description": "+5 flows, hand-written",
+   "score": "80.42",
+   "line": "99.05",
+   "cond": "56.52",
+   "toggle": "83.97",
+   "branch": "95.9",
+   "fsm": "66.67",
+   "fsm_transitions": "32/48"
+  },
+  {
+   "arm": "handrst",
+   "description": "+5 flows +reset sweep, hand-written",
+   "score": "87.33",
+   "line": "99.05",
+   "cond": "57.39",
+   "toggle": "84.31",
+   "branch": "95.9",
+   "fsm": "100.0",
+   "fsm_transitions": "48/48"
+  },
+  {
+   "arm": "solver",
+   "description": "+5 flows +reset sweep, solver-derived (I2cFlowDriver, ACK-aware writes)",
+   "score": "87.5",
+   "line": "99.05",
+   "cond": "58.26",
+   "toggle": "84.31",
+   "branch": "95.9",
+   "fsm": "100.0",
+   "fsm_transitions": "48/48"
+  },
+  {
+   "arm": "solver-jg",
+   "description": "+5 flows +reset sweep, JasperGold-derived: flows prove their own completion in the model (prescaler 2), no timing fill",
+   "score": 87.5,
+   "fsm_transitions": "48/48",
+   "line": "99.05",
+   "cond": "58.26",
+   "toggle": "84.31",
+   "branch": "95.9",
+   "fsm": "100.0"
+  },
+  {
+   "arm": "haven-deepseek",
+   "description": "HAVEN on DeepSeek V4 Flash, final report, same rule",
+   "score": "75.15",
+   "line": "86.39",
+   "cond": "58.26",
+   "toggle": "83.28",
+   "branch": "81.15",
+   "fsm": "66.67",
+   "fsm_transitions": "32/48"
+  }
+ ],
+ "solver": {
+  "status": "generated",
+  "beats": 350,
+  "sequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/i2c-flow2/rvprobe_i2c_flow_seq.sv",
+  "resetBeats": 5220,
+  "resetSequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/i2c-flow2/rvprobe_i2c_rst_seq.sv",
+  "flows": [
+   {
+    "flow": "wr_sto",
+    "ms": "591",
+    "cycles": 11,
+    "kept": 70,
+    "cmd": 208
+   },
+   {
+    "flow": "rd_sto",
+    "ms": "566",
+    "cycles": 11,
+    "kept": 70,
+    "cmd": 232
+   },
+   {
+    "flow": "wr",
+    "ms": "565",
+    "cycles": 11,
+    "kept": 70,
+    "cmd": 16
+   },
+   {
+    "flow": "rd",
+    "ms": "1962",
+    "cycles": 11,
+    "kept": 70,
+    "cmd": 40
+   },
+   {
+    "flow": "sto",
+    "ms": "565",
+    "cycles": 11,
+    "kept": 70,
+    "cmd": 64
+   },
+   {
+    "flow": "rst_wr",
+    "ms": "1926",
+    "cycles": 27,
+    "solverGap": 1,
+    "sweep": 60
+   },
+   {
+    "flow": "rst_rd",
+    "ms": "1926",
+    "cycles": 27,
+    "solverGap": 1,
+    "sweep": 60
+   }
+  ]
+ },
+ "bmc_cost_probes": [
+  {
+   "intent": "flow wr_sto, wait as (calm & !IF)[*1:60] then IF",
+   "bound": 68,
+   "result": "no verdict, killed after 3h10m"
+  },
+  {
+   "intent": "flow wr_sto, wait as ##[1:60] IF",
+   "bound": 68,
+   "result": "no verdict, killed after 1h55m"
+  },
+  {
+   "intent": "single control-register write",
+   "bound": 60,
+   "result": "witness at cycle 1 in 1.8s (solver never reaches depth)"
+  }
+ ],
+ "jaspergold_probes": [
+  {
+   "property": "flow wr_sto, wait as (calm & !IF)[*52] then IF (firtool SV of HavenI2cFlowUT, pre-ACK-fix)",
+   "engine": "JasperGold 2021.03, prove -all",
+   "result": "cex 67+2 cycles in 11.7 s; VCD: prer=0, ctr=0x80, cr=0xD0 land, bit_ctrl walks start/wr/stop, but al (arbitration lost to the looped-back bus, 2-cycle synchronizer lag at prescaler 0) at cycle 62 sets irq_flag \u2014 NOT a clean completion; anchor now requires SR.AL clear"
+  },
+  {
+   "property": "flow wr_sto, wait as ##[1:60] IF (pre-ACK-fix)",
+   "engine": "JasperGold",
+   "result": "cex 8+2 cycles in 0.09 s \u2014 a genuine hole in the intent: DAT lags the address by one cycle and the free beat before the anchor read PRER's 0xFF byte as IF"
+  },
+  {
+   "property": "bind cover: byte_ctrl leaves ST_ACK (assume arst_i=1, wb_rst_i=0)",
+   "engine": "JasperGold",
+   "result": "covered, 51 cycles, 0.35 s"
+  },
+  {
+   "property": "bind cover: done",
+   "engine": "JasperGold",
+   "result": "covered, 12 cycles, 0.06 s"
+  },
+  {
+   "property": "flow wr_sto, completion in model (ACK writes, polls between, (calm&!IF&!AL)[*1:300], calm&IF&!AL), prescaler 2, as COVER (JasperGold backend)",
+   "engine": "JasperGold 2021.03 cover engines",
+   "result": "covered: 221-cycle witness in 11.3 s; command at 7, irq_flag at 218, al never set (HavenI2cFlowJgTest)"
+  },
+  {
+   "property": "same flow as ASSERT (not S), prescaler 2",
+   "engine": "JasperGold",
+   "result": "cex 222+2 cycles in 8.0 s"
+  },
+  {
+   "property": "same flow as ASSERT, prescaler 0/1/2, start pinned to cycle 0, maxWait 200",
+   "engine": "JasperGold",
+   "result": "undetermined after 600 s each"
+  },
+  {
+   "property": "same flow as COVER, prescaler 0, start pinned to cycle 0",
+   "engine": "JasperGold",
+   "result": "unreachable, proven in 1.94 s (no acknowledge the cycle after reset)"
+  },
+  {
+   "property": "bind cover: WRITE byte reaches ST_ACK with assume(!al), prescaler 0/1/2 (engine chooses the data)",
+   "engine": "JasperGold",
+   "result": "covered at 51 cycles, 0.5-1.6 s"
+  },
+  {
+   "property": "VCS simulation of the looped-back wrapper, five acknowledged writes, TXR=0xA0, CR=0xD0",
+   "engine": "VCS (no formal)",
+   "result": "prescaler 0: al at cycle 47, no done; prescaler 2: done at cycle 232, no al"
+  }
+ ],
+ "solver_jaspergold": {
+  "status": "generated",
+  "beats": 829,
+  "sequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/i2c-flow-jg/rvprobe_i2c_flow_seq.sv",
+  "resetBeats": 5100,
+  "resetSequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/i2c-flow-jg/rvprobe_i2c_rst_seq.sv",
+  "flows": [
+   {
+    "flow": "wr_sto",
+    "engine": "jaspergold",
+    "ms": "11853",
+    "cycles": 222,
+    "kept": 222,
+    "cmd": 208,
+    "prer": 2
+   },
+   {
+    "flow": "rd_sto",
+    "engine": "jaspergold",
+    "ms": "11880",
+    "cycles": 222,
+    "kept": 222,
+    "cmd": 232,
+    "prer": 2
+   },
+   {
+    "flow": "wr",
+    "engine": "jaspergold",
+    "ms": "9959",
+    "cycles": 179,
+    "kept": 179,
+    "cmd": 16,
+    "prer": 2
+   },
+   {
+    "flow": "rd",
+    "engine": "jaspergold",
+    "ms": "9853",
+    "cycles": 179,
+    "kept": 179,
+    "cmd": 40,
+    "prer": 2
+   },
+   {
+    "flow": "sto",
+    "engine": "jaspergold",
+    "ms": "7157",
+    "cycles": 27,
+    "kept": 27,
+    "cmd": 64,
+    "prer": 2
+   },
+   {
+    "flow": "rst_wr",
+    "engine": "jaspergold",
+    "ms": "8060",
+    "cycles": 15,
+    "solverGap": 1,
+    "sweep": 60
+   },
+   {
+    "flow": "rst_rd",
+    "engine": "jaspergold",
+    "ms": "6360",
+    "cycles": 15,
+    "solverGap": 1,
+    "sweep": 60
+   }
+  ]
+ },
+ "jaspergold_only_shapes": [
+  {
+   "style": "unbounded",
+   "sva": "setup ### (calm & !IF)[*1:$] ### (calm & IF)",
+   "jaspergold": "witness 222 cycles, 11.1 s",
+   "circt-bmc": "failed to legalize operation 'verif.assert' (bound 12)"
+  },
+  {
+   "style": "throughout",
+   "sva": "setup ### calm throughout (calm ##[+] (calm & IF))",
+   "jaspergold": "witness 222 cycles, 8.5 s",
+   "circt-bmc": "failed to legalize operation 'verif.assert'"
+  },
+  {
+   "style": "goto",
+   "sva": "setup ### calm throughout ((calm & TIP)[->3] ##[+] (calm & IF))",
+   "jaspergold": "witness 222 cycles, 10.4 s",
+   "circt-bmc": "failed to legalize operation 'verif.assert'"
+  }
+ ]
+}

@@ -1,0 +1,4 @@
+design,rerun_score,rule,fsm,previous_score
+i2c_master_top,87.5,5 metrics,48/48,87.5
+sdrc_top,71.02,5 metrics,24/41,71.03
+can_top,50.47,4 metrics,n/a,50.47

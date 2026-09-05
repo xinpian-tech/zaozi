@@ -1,0 +1,1635 @@
+{
+  "evaluation_status": "invalid-for-framework-rag-answer-contamination",
+  "corpus_scope": "legacy-answer-contaminated",
+  "correction": "The user required framework information only. This run injected same-ALU historical inputs and proof conclusions. Measurements are retained for audit, but framework-RAG benefit claims are withdrawn. A clean online comparison has not been run.",
+  "retired_corpus": "docs/date2027/data/alu-rag-contaminated-corpus.json",
+  "experiment": "ALU same-design memory RAG ablation",
+  "date": "2026-09-05",
+  "model": "deepseek-v4-flash-vision-exp",
+  "temperature": 0.3,
+  "attempts_per_sample": 1,
+  "samples_planned": 20,
+  "complete": true,
+  "limitation": "Same-design historical answers and proofs are in the RAG corpus.",
+  "comparison": "Same revised prompt and typed-fragment contract; only RAG context differs.",
+  "generation_manifest": {
+    "model": "deepseek-v4-flash-vision-exp",
+    "temperature": 0.3,
+    "samples_per_mode_per_round": 5,
+    "attempts_per_sample": 1,
+    "order_seed": 20260905,
+    "llm_workers": 2,
+    "limitation": "Same-design historical answers and proofs are in the RAG corpus.",
+    "rtl_sha256": "fcf5852bffae3a32f3a6ddfc04374e5ce323a6793ef923dc85a94356a385e5c5",
+    "corpus_sha256": "f2ed5094bcedc2cbc2a795401caa8839d5515f1f47eb91c7948670d5dc923f07",
+    "script_sha256": "7107f7db05141fdf39158d0346e189f9715059d1a24e0ec982d9cca8203343e3",
+    "loop_sha256": "669e5d45941999a5f75add2eb72527f47750877d63015a31a4c94c8f04e67f2d",
+    "jobs": [
+      {
+        "name": "round1-off-5",
+        "round": 1,
+        "mode": "off",
+        "sample": 5,
+        "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round2-local-4",
+        "round": 2,
+        "mode": "local",
+        "sample": 4,
+        "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round2-local-2",
+        "round": 2,
+        "mode": "local",
+        "sample": 2,
+        "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round1-off-3",
+        "round": 1,
+        "mode": "off",
+        "sample": 3,
+        "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round2-off-5",
+        "round": 2,
+        "mode": "off",
+        "sample": 5,
+        "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round1-off-4",
+        "round": 1,
+        "mode": "off",
+        "sample": 4,
+        "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round2-off-2",
+        "round": 2,
+        "mode": "off",
+        "sample": 2,
+        "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round1-local-3",
+        "round": 1,
+        "mode": "local",
+        "sample": 3,
+        "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round1-local-1",
+        "round": 1,
+        "mode": "local",
+        "sample": 1,
+        "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round1-local-2",
+        "round": 1,
+        "mode": "local",
+        "sample": 2,
+        "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round2-off-3",
+        "round": 2,
+        "mode": "off",
+        "sample": 3,
+        "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round2-off-1",
+        "round": 2,
+        "mode": "off",
+        "sample": 1,
+        "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round1-off-1",
+        "round": 1,
+        "mode": "off",
+        "sample": 1,
+        "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round1-local-4",
+        "round": 1,
+        "mode": "local",
+        "sample": 4,
+        "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round2-local-3",
+        "round": 2,
+        "mode": "local",
+        "sample": 3,
+        "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round2-local-1",
+        "round": 2,
+        "mode": "local",
+        "sample": 1,
+        "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round2-off-4",
+        "round": 2,
+        "mode": "off",
+        "sample": 4,
+        "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      },
+      {
+        "name": "round1-off-2",
+        "round": 1,
+        "mode": "off",
+        "sample": 2,
+        "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round1-local-5",
+        "round": 1,
+        "mode": "local",
+        "sample": 5,
+        "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+        "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711"
+      },
+      {
+        "name": "round2-local-5",
+        "round": 2,
+        "mode": "local",
+        "sample": 5,
+        "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+        "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca"
+      }
+    ]
+  },
+  "summary_script_sha256": "edeeaf6eb6a6da283d9f0408d065bb863a63bff0382fc3e76c1b9a7d4adec198",
+  "replay": "One VCS build; simulation seed 1; same baseline per round; DUT-only 4-metric score.",
+  "cells": [
+    {
+      "round": 1,
+      "mode": "off",
+      "samples_returned": 5,
+      "samples_planned": 5,
+      "generation_passes": 5,
+      "harness_passes": 5,
+      "proof_only_samples": 0,
+      "replays": 5,
+      "tokens": {
+        "n": 5,
+        "mean": 51421.2,
+        "min": 43508,
+        "max": 57980
+      },
+      "generation_seconds": {
+        "n": 5,
+        "mean": 423.1292,
+        "min": 354.318,
+        "max": 477.67
+      },
+      "candidate_count": {
+        "n": 5,
+        "mean": 4.4,
+        "min": 4,
+        "max": 5
+      },
+      "candidate_solver_ms": {
+        "n": 5,
+        "mean": 29212.4,
+        "min": 25375,
+        "max": 33682
+      },
+      "coverage_score": {
+        "n": 5,
+        "mean": 94.50218110964994,
+        "min": 93.9578786225076,
+        "max": 94.72670012766196
+      },
+      "score_gain": {
+        "n": 5,
+        "mean": 4.229966669459122,
+        "min": 3.6856641823167706,
+        "max": 4.454485687471134
+      },
+      "closed_target_count": {
+        "n": 5,
+        "mean": 10.6,
+        "min": 9,
+        "max": 11
+      }
+    },
+    {
+      "round": 1,
+      "mode": "local",
+      "samples_returned": 5,
+      "samples_planned": 5,
+      "generation_passes": 5,
+      "harness_passes": 5,
+      "proof_only_samples": 0,
+      "replays": 5,
+      "tokens": {
+        "n": 5,
+        "mean": 28792.2,
+        "min": 20909,
+        "max": 36190
+      },
+      "generation_seconds": {
+        "n": 5,
+        "mean": 222.0112,
+        "min": 154.26,
+        "max": 286.283
+      },
+      "candidate_count": {
+        "n": 5,
+        "mean": 4,
+        "min": 4,
+        "max": 4
+      },
+      "candidate_solver_ms": {
+        "n": 5,
+        "mean": 26541,
+        "min": 25516,
+        "max": 28400
+      },
+      "coverage_score": {
+        "n": 5,
+        "mean": 94.60877559936006,
+        "min": 94.60877559936006,
+        "max": 94.60877559936006
+      },
+      "score_gain": {
+        "n": 5,
+        "mean": 4.336561159169236,
+        "min": 4.336561159169236,
+        "max": 4.336561159169236
+      },
+      "closed_target_count": {
+        "n": 5,
+        "mean": 11,
+        "min": 11,
+        "max": 11
+      }
+    },
+    {
+      "round": 2,
+      "mode": "off",
+      "samples_returned": 5,
+      "samples_planned": 5,
+      "generation_passes": 5,
+      "harness_passes": 5,
+      "proof_only_samples": 0,
+      "replays": 5,
+      "tokens": {
+        "n": 5,
+        "mean": 31019,
+        "min": 15866,
+        "max": 38708
+      },
+      "generation_seconds": {
+        "n": 5,
+        "mean": 258.4728,
+        "min": 129.498,
+        "max": 323.479
+      },
+      "candidate_count": {
+        "n": 5,
+        "mean": 1.6,
+        "min": 1,
+        "max": 2
+      },
+      "candidate_solver_ms": {
+        "n": 5,
+        "mean": 10701,
+        "min": 7246,
+        "max": 12886
+      },
+      "coverage_score": {
+        "n": 5,
+        "mean": 95.00169323437011,
+        "min": 95.00169323437011,
+        "max": 95.00169323437011
+      },
+      "score_gain": {
+        "n": 5,
+        "mean": 0.2749931067081519,
+        "min": 0.2749931067081519,
+        "max": 0.2749931067081519
+      },
+      "closed_target_count": {
+        "n": 5,
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    {
+      "round": 2,
+      "mode": "local",
+      "samples_returned": 5,
+      "samples_planned": 5,
+      "generation_passes": 4,
+      "harness_passes": 4,
+      "proof_only_samples": 4,
+      "replays": 4,
+      "tokens": {
+        "n": 5,
+        "mean": 10857.4,
+        "min": 6214,
+        "max": 13178
+      },
+      "generation_seconds": {
+        "n": 5,
+        "mean": 82.7382,
+        "min": 42.7,
+        "max": 102.764
+      },
+      "candidate_count": {
+        "n": 4,
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "candidate_solver_ms": {
+        "n": 4,
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "coverage_score": {
+        "n": 4,
+        "mean": 94.72670012766196,
+        "min": 94.72670012766196,
+        "max": 94.72670012766196
+      },
+      "score_gain": {
+        "n": 4,
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      },
+      "closed_target_count": {
+        "n": 4,
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  ],
+  "samples": [
+    {
+      "name": "round1-local-1",
+      "round": 1,
+      "mode": "local",
+      "sample": 1,
+      "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 29750,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_cancel_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_carry\", 0, 0x3fffffffL, 0x40000000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L),\n  (\"reserved_opcode_default\", 10, 0x00000000L, 0x00000000L)\n)\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_counter_default_unreachable\", \"While fp_active is high, fp_counter only takes values 1,2,3,4; state 4 clears fp_active, so the sequential-case default that deasserts fp_active is structurally unreachable.\"),\n  (\"fp2int_intval_zero_unreachable\", \"The normal-conversion FP2INT arm is entered only for 127 <= f2i_exp < 158, hence f2i_shift_right = 158 - f2i_exp <= 31, so the condition f2i_shift_right >= 32 at line 401 is impossible. Values below 1 are handled by the separate f2i_exp < 127 zero-result branch.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 229.097,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp_counter_default_unreachable",
+          "reason": "While fp_active is high, fp_counter only takes values 1,2,3,4; state 4 clears fp_active, so the sequential-case default that deasserts fp_active is structurally unreachable."
+        },
+        {
+          "label": "fp2int_intval_zero_unreachable",
+          "reason": "The normal-conversion FP2INT arm is entered only for 127 <= f2i_exp < 158, hence f2i_shift_right = 158 - f2i_exp <= 31, so the condition f2i_shift_right >= 32 at line 401 is impossible. Values below 1 are handled by the separate f2i_exp < 127 zero-result branch."
+        }
+      ],
+      "candidate_solver_ms": 28400,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-local-2",
+      "round": 1,
+      "mode": "local",
+      "sample": 2,
+      "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 20909,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_underflow_zero\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_carry\", 0, 0x3fffffffL, 0x40000000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L),\n  (\"reserved_op_output_default\", 0xA, 0x00000001L, 0x00000002L)\n)\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_active_default_unreachable\", \"The fp_active state-machine counter only visits 1..4 and state 4 clears fp_active, so the default arm at line 336 cannot execute unless the state invariant is violated.\"),\n  (\"f2i_shift_ge_32_unreachable\", \"In the FP2INT normal-conversion arm, f2i_exp is constrained to 127..157, so f2i_shift_right = 158 - f2i_exp is at most 31; thus f2i_shift_right >= 32 at line 401 is unreachable.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 154.26,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp_active_default_unreachable",
+          "reason": "The fp_active state-machine counter only visits 1..4 and state 4 clears fp_active, so the default arm at line 336 cannot execute unless the state invariant is violated."
+        },
+        {
+          "label": "f2i_shift_ge_32_unreachable",
+          "reason": "In the FP2INT normal-conversion arm, f2i_exp is constrained to 127..157, so f2i_shift_right = 158 - f2i_exp is at most 31; thus f2i_shift_right >= 32 at line 401 is unreachable."
+        }
+      ],
+      "candidate_solver_ms": 26942,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-local-3",
+      "round": 1,
+      "mode": "local",
+      "sample": 3,
+      "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 36190,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_cancel_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_carry\", 0, 0x3fffffffL, 0x40000000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L),\n  (\"reserved_opcode_output_default\", 15, 0x00000001L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_counter_default_unreachable\", \"fp_active implies fp_counter is 1..4; the fp_counter case default (line 336) is structurally unreachable and needs an invariant proof.\"),\n  (\"f2i_shift_right_ge32_impossible\", \"FP2INT normal conversion constrains f2i_exp to 127..157, so f2i_shift_right = 158 - f2i_exp is 1..31; the f2i_shift_right >= 32 branch (line 401) is dead.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 286.283,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp_counter_default_unreachable",
+          "reason": "fp_active implies fp_counter is 1..4; the fp_counter case default (line 336) is structurally unreachable and needs an invariant proof."
+        },
+        {
+          "label": "f2i_shift_right_ge32_impossible",
+          "reason": "FP2INT normal conversion constrains f2i_exp to 127..157, so f2i_shift_right = 158 - f2i_exp is 1..31; the f2i_shift_right >= 32 branch (line 401) is dead."
+        }
+      ],
+      "candidate_solver_ms": 26194,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-local-4",
+      "round": 1,
+      "mode": "local",
+      "sample": 4,
+      "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 25720,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_add_round_carry\", 0, 0x3fffffffL, 0x40000000L),\n  (\"fp_sub_cancel_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L),\n  (\"reserved_opcode_default\", 10, 0x12345678L, 0x9abcdef0L)\n)\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_active_default_unreachable\", \"While fp_active is asserted the fp_counter state machine only visits states 1..4; state 4 clears fp_active, so the case default at line 336 cannot be entered.\"),\n  (\"fp2int_shift_ge32_unreachable\", \"In the FP2INT normal-conversion branch 127 <= f2i_exp < 158, so f2i_shift_right = 158 - f2i_exp is in 1..31; the nested condition f2i_shift_right >= 32 at line 401 is unreachable.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 195.637,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp_active_default_unreachable",
+          "reason": "While fp_active is asserted the fp_counter state machine only visits states 1..4; state 4 clears fp_active, so the case default at line 336 cannot be entered."
+        },
+        {
+          "label": "fp2int_shift_ge32_unreachable",
+          "reason": "In the FP2INT normal-conversion branch 127 <= f2i_exp < 158, so f2i_shift_right = 158 - f2i_exp is in 1..31; the nested condition f2i_shift_right >= 32 at line 401 is unreachable."
+        }
+      ],
+      "candidate_solver_ms": 25653,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-local-5",
+      "round": 1,
+      "mode": "local",
+      "sample": 5,
+      "prompt_sha256": "aa6524110d9d26b1c2fa06cd591ce90c7ca206f060ef5af78abc2a252604b00a",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 31392,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_cancel_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_carry\", 0, 0x3fffffffL, 0x40000000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L),\n  (\"reserved_opcode_default\", 10, 0x00000000L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp2int_shift_right_ge_32_unreachable\", \"Normal FP2INT conversion requires 127 <= f2i_exp < 158, so f2i_shift_right = 158 - f2i_exp is in [1,31]; the >=32 guard around line 401 cannot be true.\"),\n  (\"fp_counter_default_unreachable\", \"While fp_active is true the fp_counter only visits 1..4, and state 4 clears fp_active; the default arm at line 336 is structurally unreachable.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 244.779,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp2int_shift_right_ge_32_unreachable",
+          "reason": "Normal FP2INT conversion requires 127 <= f2i_exp < 158, so f2i_shift_right = 158 - f2i_exp is in [1,31]; the >=32 guard around line 401 cannot be true."
+        },
+        {
+          "label": "fp_counter_default_unreachable",
+          "reason": "While fp_active is true the fp_counter only visits 1..4, and state 4 clears fp_active; the default arm at line 336 is structurally unreachable."
+        }
+      ],
+      "candidate_solver_ms": 25516,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-off-1",
+      "round": 1,
+      "mode": "off",
+      "sample": 1,
+      "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 57980,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_carry\", 0, 0x3f800000L, 0x3f7fffffL),\n  (\"fp2int_nan\", 8, 0x7fc00000L, 0x00000000L),\n  (\"reserved_opcode_default\", 10, 0x00000000L, 0x00000000L)\n)\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp2int_shift_ge32_unreachable\", \"Line 401 is unreachable: the FP2INT normal-conversion else branch is entered only after the preceding else if (f2i_exp < 8'd127) is false, so f2i_exp >= 8'd127. Therefore f2i_shift_right = 8'd158 - f2i_exp <= 31, and the guard f2i_shift_right >= 32 at line 400 can never be true.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 477.67,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp2int_shift_ge32_unreachable",
+          "reason": "Line 401 is unreachable: the FP2INT normal-conversion else branch is entered only after the preceding else if (f2i_exp < 8'd127) is false, so f2i_exp >= 8'd127. Therefore f2i_shift_right = 8'd158 - f2i_exp <= 31, and the guard f2i_shift_right >= 32 at line 400 can never be true."
+        }
+      ],
+      "candidate_solver_ms": 27424,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-off-2",
+      "round": 1,
+      "mode": "off",
+      "sample": 2,
+      "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 52979,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_underflow_zero\", 1, 0x00800000L, 0x00800001L),\n  (\"fp_add_round_overflow\", 0, 0x3f800000L, 0x3f7fffffL),\n  (\"reserved_defaults\", 10, 0x00000000L, 0x00000000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L)\n)\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp2int_shift_right_ge_32_unreachable\", \"The FP2INT normal-conversion else branch is entered only after f2i_is_nan, f2i_is_zero, overflow/f2i_exp>=158, and f2i_exp<127 branches are excluded. Therefore f2i_exp is in [127,157] and f2i_shift_right = 158 - f2i_exp is always in [1,31], so the guard f2i_shift_right >= 32 at line 400 can never be true. A dedicated reachability property is required to prove this branch is dead.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 439.187,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "fp2int_shift_right_ge_32_unreachable",
+          "reason": "The FP2INT normal-conversion else branch is entered only after f2i_is_nan, f2i_is_zero, overflow/f2i_exp>=158, and f2i_exp<127 branches are excluded. Therefore f2i_exp is in [127,157] and f2i_shift_right = 158 - f2i_exp is always in [1,31], so the guard f2i_shift_right >= 32 at line 400 can never be true. A dedicated reachability property is required to prove this branch is dead."
+        }
+      ],
+      "candidate_solver_ms": 25375,
+      "coverage_score": 93.9578786225076,
+      "score_gain": 3.6856641823167706,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386
+      ],
+      "remaining_target_lines": [
+        336,
+        401,
+        475,
+        476
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 97.76536312849161,
+        "cond": 89.15094339622641,
+        "toggle": 96.60751565762004,
+        "branch": 92.3076923076923
+      },
+      "closed_target_count": 9
+    },
+    {
+      "name": "round1-off-3",
+      "round": 1,
+      "mode": "off",
+      "sample": 3,
+      "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 51436,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_min_underflow_zero\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_carry\", 0, 0x3f800000L, 0x3f7fffffL),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x00000000L),\n  (\"fp2int_small_underflow\", 8, 0x3f000000L, 0x00000000L),\n  (\"reserved_opcode_default\", 10, 0x00000000L, 0x00000000L)\n)\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_state_default_unreachable\", \"Default FP state arm at line 336 is unreachable by legal opcode/operand path; needs dedicated reachability proof.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 421.947,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 5,
+      "proof_obligations": [
+        {
+          "label": "fp_state_default_unreachable",
+          "reason": "Default FP state arm at line 336 is unreachable by legal opcode/operand path; needs dedicated reachability proof."
+        }
+      ],
+      "candidate_solver_ms": 31943,
+      "coverage_score": 94.72670012766196,
+      "score_gain": 4.454485687471134,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.62264150943396,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-off-4",
+      "round": 1,
+      "mode": "off",
+      "sample": 4,
+      "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 51203,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"sub_tiny_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"add_round_overflow\", 0, 0x3f800000L, 0x3f7fffffL),\n  (\"fp2int_nan\", 8, 0x7fc00000L, 0x7fc00000L),\n  (\"fp2int_small\", 8, 0x3f000000L, 0x3f000000L),\n  (\"reserved_op\", 10, 0x00000000L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_active_default_dead\", \"Line 336 default fp_active<=0 appears reachable only through an undefined FP controller state; no legal opcode/operand combination selects it. Prove dead code.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 422.524,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 5,
+      "proof_obligations": [
+        {
+          "label": "fp_active_default_dead",
+          "reason": "Line 336 default fp_active<=0 appears reachable only through an undefined FP controller state; no legal opcode/operand combination selects it. Prove dead code."
+        }
+      ],
+      "candidate_solver_ms": 33682,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round1-off-5",
+      "round": 1,
+      "mode": "off",
+      "sample": 5,
+      "prompt_sha256": "ec6552f5be0cc3eef4467d6d6f8388589a23df7a870f8eda11488164988b5656",
+      "modinfo_sha256": "d801b1436c6ef82a69d3d6eb0d908c7c9e0abca14c606b5cd19517cce682b711",
+      "generation_ok": true,
+      "tokens": 43508,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp_sub_tiny_underflow\", 1, 0x00800001L, 0x00800000L),\n  (\"fp_add_round_overflow\", 0, 0x3fffffffL, 0x33800000L),\n  (\"fp2int_nan_invalid\", 8, 0x7fc00000L, 0x7fc00000L),\n  (\"reserved_opcode_default\", 10, 0x00000000L, 0x00000000L)\n)\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"line_401_f2i_int_val_zero_unreachable\", \"Line 401 is dead: it is inside the normal conversion else block, reached only when the f2i_exp < 8'd127 branch is false. Therefore f2i_exp >= 8'd127, so f2i_shift_right = 8'd158 - f2i_exp <= 8'd31. The f2i_shift_right >= 32 guard cannot be true.\"),\n  (\"line_336_fp_state_default_unreachable\", \"Line 336 is dead: the default item in the fp_state case can only execute when fp_state holds an unenumerated value. fp_state is an internal state register reset to an enumerated state and no legal opcode/operand stimulus can drive it to an illegal state.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 354.318,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 4,
+      "proof_obligations": [
+        {
+          "label": "line_401_f2i_int_val_zero_unreachable",
+          "reason": "Line 401 is dead: it is inside the normal conversion else block, reached only when the f2i_exp < 8'd127 branch is false. Therefore f2i_exp >= 8'd127, so f2i_shift_right = 8'd158 - f2i_exp <= 8'd31. The f2i_shift_right >= 32 guard cannot be true."
+        },
+        {
+          "label": "line_336_fp_state_default_unreachable",
+          "reason": "Line 336 is dead: the default item in the fp_state case can only execute when fp_state holds an unenumerated value. fp_state is an internal state register reset to an enumerated state and no legal opcode/operand stimulus can drive it to an illegal state."
+        }
+      ],
+      "candidate_solver_ms": 27638,
+      "coverage_score": 94.60877559936006,
+      "score_gain": 4.336561159169236,
+      "closed_target_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        385,
+        386,
+        475,
+        476
+      ],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.15094339622641,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 11
+    },
+    {
+      "name": "round2-local-1",
+      "round": 2,
+      "mode": "local",
+      "sample": 1,
+      "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 13002,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq()\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"line_336_fp_counter_default_unreachable\", \"line 336 is the default arm of the fp_counter case. The FP2INT state-machine invariant is that while fp_active is high, fp_counter is constrained to 1, 2, 3, or 4, and state 4 clears fp_active. Therefore no legal opcode can enter this default; it must be proven unreachable by a state-invariant property.\"),\n  (\"line_401_fp2int_shift_right_ge_32_unreachable\", \"line 401 lies in the FP2INT normal-conversion arm. That arm is only entered with 127 <= f2i_exp < 158, so f2i_shift_right = 8'd158 - f2i_exp is always in 1..31. The condition f2i_shift_right >= 32 cannot be true; line 401 must be proven dead by a branch-path reachability property.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 101.527,
+      "harness_ok": true,
+      "status": "proof-required",
+      "candidate_count": 0,
+      "proof_obligations": [
+        {
+          "label": "line_336_fp_counter_default_unreachable",
+          "reason": "line 336 is the default arm of the fp_counter case. The FP2INT state-machine invariant is that while fp_active is high, fp_counter is constrained to 1, 2, 3, or 4, and state 4 clears fp_active. Therefore no legal opcode can enter this default; it must be proven unreachable by a state-invariant property."
+        },
+        {
+          "label": "line_401_fp2int_shift_right_ge_32_unreachable",
+          "reason": "line 401 lies in the FP2INT normal-conversion arm. That arm is only entered with 127 <= f2i_exp < 158, so f2i_shift_right = 8'd158 - f2i_exp is always in 1..31. The condition f2i_shift_right >= 32 cannot be true; line 401 must be proven dead by a branch-path reachability property."
+        }
+      ],
+      "candidate_solver_ms": 0,
+      "coverage_score": 94.72670012766196,
+      "score_gain": 0,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.62264150943396,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-local-2",
+      "round": 2,
+      "mode": "local",
+      "sample": 2,
+      "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 11670,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq()\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_counter_default_unreachable\", \"Line 336: fp_active <= 1'b0 is the default arm of the fp_counter case inside the fp_active state machine. The state machine invariant is that while fp_active is high, fp_counter is only 1,2,3,4, and state 4 clears fp_active; no opcode/operand pair can drive fp_counter into that default arm. This is a reachability proof obligation, not a cover target.\"),\n  (\"fp2int_shift_ge_32_unreachable\", \"Line 401: f2i_int_val = 32'h0 is guarded by f2i_shift_right >= 32. This arm is only reached from FP2INT normal conversion, which requires 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, the guard implies f2i_exp <= 126, contradicting the normal-conversion predicate. Recorded as a proof obligation for a separate dead-code property.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 89.779,
+      "harness_ok": true,
+      "status": "proof-required",
+      "candidate_count": 0,
+      "proof_obligations": [
+        {
+          "label": "fp_counter_default_unreachable",
+          "reason": "Line 336: fp_active <= 1'b0 is the default arm of the fp_counter case inside the fp_active state machine. The state machine invariant is that while fp_active is high, fp_counter is only 1,2,3,4, and state 4 clears fp_active; no opcode/operand pair can drive fp_counter into that default arm. This is a reachability proof obligation, not a cover target."
+        },
+        {
+          "label": "fp2int_shift_ge_32_unreachable",
+          "reason": "Line 401: f2i_int_val = 32'h0 is guarded by f2i_shift_right >= 32. This arm is only reached from FP2INT normal conversion, which requires 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, the guard implies f2i_exp <= 126, contradicting the normal-conversion predicate. Recorded as a proof obligation for a separate dead-code property."
+        }
+      ],
+      "candidate_solver_ms": 0,
+      "coverage_score": 94.72670012766196,
+      "score_gain": 0,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.62264150943396,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-local-3",
+      "round": 2,
+      "mode": "local",
+      "sample": 3,
+      "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": false,
+      "tokens": 6214,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq()\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_active_default_unreachable\", \"While fp_active is true, fp_counter visits 1, 2, 3, or 4; state 4 clears fp_active. The default arm at line 335-336 is structurally unreachable.\"),\n  (\"f2i_shift_right_ge_32_unreachable\", \"Normal FP2INT conversion arm requires 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, f2i_shift_right is in 0..31, so the condition f2i_shift_right >= 32 at line 400 is false. The assignment at line 401 is a proof obligation.\")",
+      "response_format": "intent-fragment",
+      "generation_errors": [
+        "response must contain only the two typed Seq declarations from the output contract"
+      ],
+      "generation_error_type": null,
+      "generation_seconds": 42.7,
+      "harness_ok": null,
+      "status": null,
+      "candidate_count": null,
+      "proof_obligations": null,
+      "candidate_solver_ms": null
+    },
+    {
+      "name": "round2-local-4",
+      "round": 2,
+      "mode": "local",
+      "sample": 4,
+      "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 13178,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq()\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_counter_default_unreachable\", \"The fp_counter state machine is constrained so that, while fp_active is high, fp_counter is only 1, 2, 3, or 4; state 4 clears fp_active. Therefore the sequential case default at line 336 cannot be entered and must be discharged by a reachability proof.\"),\n  (\"f2i_shift_right_ge32_unreachable\", \"The FP2INT normal-conversion arm is only entered for 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, f2i_shift_right is in 1..31, so the guard f2i_shift_right >= 32 at line 401 is unreachable; 0.5 is handled by the earlier f2i_exp < 127 branch.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 102.764,
+      "harness_ok": true,
+      "status": "proof-required",
+      "candidate_count": 0,
+      "proof_obligations": [
+        {
+          "label": "fp_counter_default_unreachable",
+          "reason": "The fp_counter state machine is constrained so that, while fp_active is high, fp_counter is only 1, 2, 3, or 4; state 4 clears fp_active. Therefore the sequential case default at line 336 cannot be entered and must be discharged by a reachability proof."
+        },
+        {
+          "label": "f2i_shift_right_ge32_unreachable",
+          "reason": "The FP2INT normal-conversion arm is only entered for 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, f2i_shift_right is in 1..31, so the guard f2i_shift_right >= 32 at line 401 is unreachable; 0.5 is handled by the earlier f2i_exp < 127 branch."
+        }
+      ],
+      "candidate_solver_ms": 0,
+      "coverage_score": 94.72670012766196,
+      "score_gain": 0,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.62264150943396,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-local-5",
+      "round": 2,
+      "mode": "local",
+      "sample": 5,
+      "prompt_sha256": "3d34838bb3be4eb19b8cf087cdfc531c71e7d195c801c0217cacef260dea6745",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 10223,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq()\n\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"f2i_normal_shift_ge_32_unreachable\",\n    \"Line 401 is in the FP2INT normal-conversion arm, which is entered only when 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, f2i_shift_right <= 31 in this arm, so the condition f2i_shift_right >= 32 is contradictory. A separate reachability property must discharge this suspected dead code. In particular, 0x3f000000 (0.5) is not a candidate because it takes the earlier f2i_exp < 127 branch.\"),\n  (\"fp_counter_default_unreachable\",\n    \"Line 336 is the default arm of the fp_counter state machine while fp_active is high. The state transition invariant restricts fp_counter to 1..4, and state 4 clears fp_active, so no legal state can reach the default arm. No opcode/operand pair covers it; a separate reachability property must prove it dead.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 76.921,
+      "harness_ok": true,
+      "status": "proof-required",
+      "candidate_count": 0,
+      "proof_obligations": [
+        {
+          "label": "f2i_normal_shift_ge_32_unreachable",
+          "reason": "Line 401 is in the FP2INT normal-conversion arm, which is entered only when 127 <= f2i_exp < 158. Since f2i_shift_right = 158 - f2i_exp, f2i_shift_right <= 31 in this arm, so the condition f2i_shift_right >= 32 is contradictory. A separate reachability property must discharge this suspected dead code. In particular, 0x3f000000 (0.5) is not a candidate because it takes the earlier f2i_exp < 127 branch."
+        },
+        {
+          "label": "fp_counter_default_unreachable",
+          "reason": "Line 336 is the default arm of the fp_counter state machine while fp_active is high. The state transition invariant restricts fp_counter to 1..4, and state 4 clears fp_active, so no legal state can reach the default arm. No opcode/operand pair covers it; a separate reachability property must prove it dead."
+        }
+      ],
+      "candidate_solver_ms": 0,
+      "coverage_score": 94.72670012766196,
+      "score_gain": 0,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 89.62264150943396,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-off-1",
+      "round": 2,
+      "mode": "off",
+      "sample": 1,
+      "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 33303,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp2int_small_positive_zero\", 8, 0x3f000000L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq(\n  (\"fp_active_default_reachability\", \"Line 336 is the default branch of the opcode decode case. The documented DUT opcode set is 0..9, so no legal opcode can enter that default; reaching it would require an opcode outside the documented set. This is suspected dead code and needs a dedicated reachability property.\")\n)",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 278.554,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 1,
+      "proof_obligations": [
+        {
+          "label": "fp_active_default_reachability",
+          "reason": "Line 336 is the default branch of the opcode decode case. The documented DUT opcode set is 0..9, so no legal opcode can enter that default; reaching it would require an opcode outside the documented set. This is suspected dead code and needs a dedicated reachability property."
+        }
+      ],
+      "candidate_solver_ms": 7246,
+      "coverage_score": 95.00169323437011,
+      "score_gain": 0.2749931067081519,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 90.56603773584905,
+        "toggle": 96.71189979123173,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-off-2",
+      "round": 2,
+      "mode": "off",
+      "sample": 2,
+      "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 28774,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"reserved_opcode_default_fp_active\", 10, 0x00000000L, 0x00000000L),\n  (\"fp2int_small_magnitude_zero\", 8, 0x3f000000L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq()",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 238.997,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 2,
+      "proof_obligations": [],
+      "candidate_solver_ms": 12886,
+      "coverage_score": 95.00169323437011,
+      "score_gain": 0.2749931067081519,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 90.56603773584905,
+        "toggle": 96.71189979123173,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-off-3",
+      "round": 2,
+      "mode": "off",
+      "sample": 3,
+      "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 38444,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"fp2int_small_positive_to_zero\", 8, 0x3f000000L, 0x00000000L)\n)\n\nval proofObligations: Seq[(String, String)] = Seq()",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 321.836,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 1,
+      "proof_obligations": [],
+      "candidate_solver_ms": 7973,
+      "coverage_score": 95.00169323437011,
+      "score_gain": 0.2749931067081519,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 90.56603773584905,
+        "toggle": 96.71189979123173,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-off-4",
+      "round": 2,
+      "mode": "off",
+      "sample": 4,
+      "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 15866,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"invalid_opcode_default_clears_fp_active\", 10, 0x00000000L, 0x00000000L),\n  (\"fp2int_small_exponent_zero_result\", 8, 0x3f000000L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq()",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 129.498,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 2,
+      "proof_obligations": [],
+      "candidate_solver_ms": 12709,
+      "coverage_score": 95.00169323437011,
+      "score_gain": 0.2749931067081519,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 90.56603773584905,
+        "toggle": 96.71189979123173,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    },
+    {
+      "name": "round2-off-5",
+      "round": 2,
+      "mode": "off",
+      "sample": 5,
+      "prompt_sha256": "b5f1f14ba219817384fa5d6964b7ce2894a7d2f7828ba8f308e605579279abdd",
+      "modinfo_sha256": "f1be75246ffa2e31dcf2ab48279a4923fbfa4b92ace243620229a0baae0bdaca",
+      "generation_ok": true,
+      "tokens": 38708,
+      "raw_response": "val cases: Seq[(String, Int, Long, Long)] = Seq(\n  (\"invalid_opcode_fp_active_default\", 10, 0x00000000L, 0x00000000L),\n  (\"fp2int_shift_right_ge_32\", 8, 0x3f000000L, 0x00000000L)\n)\nval proofObligations: Seq[(String, String)] = Seq()",
+      "response_format": "intent-fragment",
+      "generation_errors": [],
+      "generation_error_type": null,
+      "generation_seconds": 323.479,
+      "harness_ok": true,
+      "status": "generated",
+      "candidate_count": 2,
+      "proof_obligations": [],
+      "candidate_solver_ms": 12691,
+      "coverage_score": 95.00169323437011,
+      "score_gain": 0.2749931067081519,
+      "closed_target_lines": [],
+      "remaining_target_lines": [
+        336,
+        401
+      ],
+      "targets_already_covered_in_baseline": [],
+      "baseline_uncovered_lines": [
+        336,
+        401
+      ],
+      "coverage_percent": {
+        "line": 98.88268156424581,
+        "cond": 90.56603773584905,
+        "toggle": 96.71189979123173,
+        "branch": 93.84615384615384
+      },
+      "closed_target_count": 0
+    }
+  ],
+  "baselines": [
+    {
+      "name": "baseline-round1",
+      "round": 1,
+      "score": 90.27221444019082,
+      "percent": {
+        "line": 92.73743016759776,
+        "cond": 86.32075471698113,
+        "toggle": 95.87682672233821,
+        "branch": 86.15384615384616
+      },
+      "bins": {
+        "line": [
+          179,
+          166
+        ],
+        "cond": [
+          212,
+          183
+        ],
+        "toggle": [
+          1916,
+          1837
+        ],
+        "branch": [
+          65,
+          56
+        ]
+      },
+      "uncovered_lines": [
+        300,
+        301,
+        302,
+        316,
+        317,
+        327,
+        328,
+        336,
+        385,
+        386,
+        401,
+        475,
+        476
+      ],
+      "wall_seconds": 2.487
+    },
+    {
+      "name": "baseline-round2",
+      "round": 2,
+      "score": 94.72670012766196,
+      "percent": {
+        "line": 98.88268156424581,
+        "cond": 89.62264150943396,
+        "toggle": 96.5553235908142,
+        "branch": 93.84615384615384
+      },
+      "bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          190
+        ],
+        "toggle": [
+          1916,
+          1850
+        ],
+        "branch": [
+          65,
+          61
+        ]
+      },
+      "uncovered_lines": [
+        336,
+        401
+      ],
+      "wall_seconds": 2.437
+    }
+  ],
+  "artifacts": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/alu-rag-live-20260905",
+  "audit": {
+    "unit_tests": {
+      "passed": 16,
+      "command": "python3 -m unittest discover -s experiments -p 'test_*rag*.py'"
+    },
+    "formal_recheck": {
+      "log": "out/experiments/alu-rag-live-20260905/deadcode-proof/sessionLogs/session_0/jg_session_0.log",
+      "properties": {
+        "line_336_fp_counter_default": "unreachable",
+        "line_401_f2i_shift_ge_32": "unreachable"
+      },
+      "scope": "The existing dedicated properties under reset initialization and deasserted reset; no operand restrictions.",
+      "assumption_checks": "JasperGold log reports noConflict/noDeadEnd proven and live covered."
+    },
+    "observations": [
+      {
+        "sample": "round2-local-3",
+        "finding": "Missing final closing parenthesis for proofObligations Seq. Rejected, not repaired or retried; cost remains included."
+      },
+      {
+        "sample": "round2-local-1",
+        "finding": "The fp_active/fp_counter invariant is stated correctly, but the prose incorrectly names this the FP2INT state machine. Do not describe all explanations as error-free."
+      },
+      {
+        "sample": "round2-off-1",
+        "finding": "Misidentifies the line-336 sequential counter default as an opcode-decode default."
+      },
+      {
+        "sample": "round1-off-2",
+        "finding": "Replay leaves reachable lines 475 and 476 uncovered despite proposing reserved opcode 10. It places that case before FP2INT NaN; a timing/order cause was not isolated. Do not claim the operand itself was illegal."
+      }
+    ],
+    "inference_limits": [
+      "Five samples per cell and one simulation seed; descriptive results, not a significance claim.",
+      "Same revised prompt contract in both arms, not a rerun of the historical full-file prompt.",
+      "Two fixed historical residuals; round 2 is not an adaptive continuation of each sampled round-1 sequence.",
+      "Same-ALU historical answers and invariants are retrieved; not a style-only or held-out transfer experiment.",
+      "LLM seconds are per-request latency, not end-to-end wall-time speedup. Token totals are provider-reported usage.",
+      "The baseline scoreboard counts transactions and does not check arithmetic correctness."
+    ]
+  }
+}

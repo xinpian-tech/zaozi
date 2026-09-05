@@ -1,0 +1,13 @@
+run,design,outcome,haven_headline,best_iteration,pinned_score,rule,sequences,rollbacks,p6_compile_fails,bench_fixes
+20260903_113147_sdrc_top,sdrc_top,completed,69.91,69.91,70.57,5 metrics,4->12,1,0,top: assign vif.sdram_clk = clk; sdram agent driver: 28 assignments to cfg_*/sdram_clk removed
+20260903_114836_i2c_master_top,i2c_master_top,completed,59.56,59.56,70.13,5 metrics,12->24,0,0,wb driver: drive arst_i from the item
+20260903_120544_gpio,gpio,completed,81.2,81.2,81.79,4 metrics,9->9,2,0,axi-lite driver: drive gpio_input_i from the item
+20260903_122208_can_top,can_top,HAVEN's own simulation timed out (300 s cap) on every attempt,,,,,,0,1,seq_item: wb_dat_o field
+20260903_124406_spi_lite,spi_lite,completed,55.38,55.38,56.73,4 metrics,24->28,1,0,driver: enum literal referenced directly (spi_lite_seq_item::WRITE does not resolve)
+20260903_130953_ethmac,ethmac,"HAVEN's own code crashed (repair reply failed to parse, unguarded None)",,,,,,0,4,top: MII clocks tied to clk; seq_item: wb_dat_o; mii subscriber: super.new(name); wb master subscriber: cross removed
+20260903_132701_sdrc_top,sdrc_top,completed,69.85,69.85,70.5,5 metrics,4->8,1,0,top: assign vif.sdram_clk = clk; sdram agent driver: 28 assignments to cfg_*/sdram_clk removed
+20260903_134703_i2c_master_top,i2c_master_top,completed,59.56,59.56,70.13,5 metrics,14->26,0,0,wb driver: drive arst_i from the item
+20260903_140505_gpio,gpio,completed,91.37,91.37,91.86,4 metrics,9->15,1,0,axi-lite driver: drive gpio_input_i from the item
+20260903_141816_can_top,can_top,HAVEN's own simulation timed out (300 s cap) on every attempt,,,,,,0,1,seq_item: wb_dat_o field
+20260903_143903_spi_lite,spi_lite,completed,55.83,55.83,57.03,4 metrics,18->30,0,0,driver: enum literal referenced directly (spi_lite_seq_item::WRITE does not resolve)
+20260903_150404_ethmac,ethmac,HAVEN's own repair loop exhausted,,,,,,0,5,top: MII clocks tied to clk; seq_item: wb_dat_o; mii subscriber: super.new(name); wb master subscriber: cross removed

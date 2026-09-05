@@ -1,0 +1,3 @@
+arm,description,score,line,cond,toggle,branch,sim_cycles
+haven-published,HAVEN on DeepSeek V4 Flash: no compiling testbench in five repair attempts (seq_item lacks the wb_dat_o field its template's monitor and driver read; its sequences carry SystemVerilog syntax errors),0.0,0,0,0,0,
+rvprobe-flows,"2 replayable flows (leave reset; request a frame and see its start), JasperGold-derived, in HAVEN's bench with the one-field fix and its sequences excluded; capped at 300 us",50.47,79.28,36.27,17.2,69.12,30000

@@ -1,0 +1,87 @@
+You are closing a coverage residual on a 32-bit ALU with an IEEE-754 single-precision FP unit.
+
+These RTL lines are NOT covered by the current stimulus:
+  line 336: fp_active <= 1'b0;
+  line 401: f2i_int_val = 32'h0;
+
+Relevant RTL:
+```verilog
+...
+ 331|                             end
+ 332|                         end
+ 333|                     end
+ 334|
+ 335|                     default: begin
+ 336|                         fp_active <= 1'b0;
+ 337|                     end
+ 338|                 endcase
+ 339|             end
+ 340|         end
+ 341|     end
+ 342|
+...
+ 396|                         // Normal conversion (using module-level regs)
+ 397|                         f2i_mant_ext = {1'b1, f2i_frac, 8'h0};
+ 398|                         f2i_shift_right = 8'd158 - f2i_exp;
+ 399|
+ 400|                         if (f2i_shift_right >= 32)
+ 401|                             f2i_int_val = 32'h0;
+ 402|                         else
+ 403|                             f2i_int_val = f2i_mant_ext >> f2i_shift_right;
+ 404|
+ 405|                         if (f2i_sign)
+ 406|                             fp2int_result <= ~f2i_int_val + 1;
+ 407|                         else
+```
+
+The DUT's opcodes: 0=FP_ADD, 1=FP_SUB, 2=AND, 3=OR, 4=XOR, 5=SLL, 6=SRL, 7=SRA, 8=FP2INT, 9=NOT.
+
+You write a Scala file that states verification INTENT. Each entry of `cases` is one intent: an
+opcode and two 32-bit operand values (as Long literals, e.g. 0x7fc00000L). JasperGold drives the
+DUT with those operands and returns a cover witness; you only choose values that will make the
+uncovered lines execute.
+
+Reason about the FP arithmetic: to hit a rounding path you need operands whose SUM requires rounding;
+to hit underflow you need a result too small to represent normally; and so on.
+
+Reply with ONLY the Scala file, no markdown fence, exactly this shape (change only the `cases` list):
+
+import me.jiuyang.stdlib.*
+import me.jiuyang.utlib.*
+
+object Generated extends UTExperiment:
+  def run(outDir: os.Path): ujson.Value =
+    require(JasperGold.available, "the ALU residual loop requires JasperGold")
+    val svFile = os.Path("stdlib/tests/resources/haven/alu_top.v", os.pwd)
+    // (label, opcode, a, b) — each entry is one directed intent.
+    val cases = Seq(
+      ("nan_a", 0, 0x7fc00000L, 0x3f800000L)
+    )
+    val rows = collection.mutable.ArrayBuffer.empty[ujson.Obj]
+    val stimuli = cases.map { (label, op, a, b) =>
+      val param = HavenAluFpParameter(op, a, b)
+      val dir   = outDir / label
+      val spec  = UTGenerator(HavenAluFpUT, param, dir).abi.spec
+      val t0    = System.currentTimeMillis()
+      val out   = JasperGold.generate(
+        JasperGold.lower(HavenAluFpUT, param, dir, Seq(svFile)),
+        dir / "jg",
+        timeLimit = "120s"
+      )
+      val ms = System.currentTimeMillis() - t0
+      out match
+        case GenerateOutcome.Generated(trace) =>
+          rows += ujson.Obj("label" -> label, "engine" -> "jaspergold", "ms" -> ms, "cycles" -> trace.cycles)
+          AbstractStimulus.fromTrace(trace, spec)
+        case other => throw RuntimeException(s"$label: $other after ${ms}ms")
+    }
+    val spec = UTGenerator(HavenAluFpUT, HavenAluFpParameter(0, 0L, 0L), outDir).abi.spec
+    val all  = UvmSequence.concat(spec, stimuli)
+    val sv   = UvmSequence(
+      "rvprobe_llm_seq", "alu_top_seq_item",
+      pinned = Some(Set("op", "a", "b", "start"))
+    ).write(all, outDir / "rvprobe_llm_seq.sv")
+    ujson.Obj(
+      "status" -> "generated", "engine" -> "jaspergold", "beats" -> all.cycles,
+      "sequenceFile" -> sv.toString, "intents" -> ujson.Arr(rows.toSeq*)
+    )

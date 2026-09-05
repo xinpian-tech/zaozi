@@ -29,6 +29,11 @@ Developers adding new dialects to Zaozi should expose them in CIRCT and include 
 The core DSL implementation, encompassing the type system and build entries.
 It focuses on module-level construction, allowing modules to implement specific interfaces without extending from a base class.
 
+## rvprobe / DATE experiments
+
+See the [DATE branch overview](docs/date2027/README.md) for the formal-generation framework,
+HAVEN benchmark adapters, experiment entry points, measured results, and framework-only RAG status.
+
 ## Design Philosophy
 
 Zaozi emphasizes a modular and minimalistic approach, delegating build processes to MLIR via C-API.

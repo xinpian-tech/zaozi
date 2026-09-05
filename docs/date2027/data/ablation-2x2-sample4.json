@@ -1,0 +1,94 @@
+[
+  {
+    "cell": "plan/typed",
+    "attempts": 1,
+    "tokens": 62872,
+    "history": [
+      {
+        "attempt": 1,
+        "phase": "solve",
+        "ok": true
+      }
+    ],
+    "caught_by": [],
+    "wall_clock_s": 539.6,
+    "beats": 8,
+    "coverage": {
+      "ok": true,
+      "score": 95.82,
+      "line": 98.88,
+      "cond": 90.57,
+      "toggle": 96.92,
+      "branch": 96.92
+    }
+  },
+  {
+    "cell": "goal/typed",
+    "attempts": 1,
+    "tokens": 45530,
+    "history": [
+      {
+        "attempt": 1,
+        "phase": "solve",
+        "ok": true
+      }
+    ],
+    "caught_by": [],
+    "wall_clock_s": 407.4,
+    "beats": 44,
+    "coverage": {
+      "ok": true,
+      "score": 93.08,
+      "line": 95.53,
+      "cond": 87.74,
+      "toggle": 96.76,
+      "branch": 92.31
+    }
+  },
+  {
+    "cell": "plan/untyped",
+    "attempts": 1,
+    "tokens": 35950,
+    "history": [
+      {
+        "attempt": 1,
+        "phase": "solve",
+        "ok": true
+      }
+    ],
+    "caught_by": [],
+    "wall_clock_s": 317.9,
+    "beats": 8,
+    "coverage": {
+      "ok": true,
+      "score": 95.82,
+      "line": 98.88,
+      "cond": 90.57,
+      "toggle": 96.92,
+      "branch": 96.92
+    }
+  },
+  {
+    "cell": "goal/untyped",
+    "attempts": 1,
+    "tokens": 52249,
+    "history": [
+      {
+        "attempt": 1,
+        "phase": "solve",
+        "ok": true
+      }
+    ],
+    "caught_by": [],
+    "wall_clock_s": 461.5,
+    "beats": 58,
+    "coverage": {
+      "ok": true,
+      "score": 92.84,
+      "line": 95.53,
+      "cond": 88.21,
+      "toggle": 96.87,
+      "branch": 90.77
+    }
+  }
+]

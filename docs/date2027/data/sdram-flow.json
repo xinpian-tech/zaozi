@@ -1,0 +1,198 @@
+{
+ "arms": [
+  {
+   "arm": "haven-published",
+   "description": "HAVEN on DeepSeek V4 Flash as run (SDRAM clock undriven, config zeroed by its SDRAM-side agent)",
+   "score": "11.02",
+   "line": "13.78",
+   "cond": "21.75",
+   "toggle": "12.72",
+   "branch": "0.0",
+   "fsm": "8.95",
+   "fsm_transitions": "0/41",
+   "sim_cycles": ""
+  },
+  {
+   "arm": "haven-clock-fixed",
+   "description": "HAVEN's 18 sequences, SDRAM clock tied to clk",
+   "score": "25.15",
+   "line": "49.17",
+   "cond": "30.85",
+   "toggle": "9.1",
+   "branch": "36.65",
+   "fsm": "0.0",
+   "fsm_transitions": "0/41",
+   "sim_cycles": "1238587"
+  },
+  {
+   "arm": "haven-fixed",
+   "description": "HAVEN's 18 sequences, clock fixed and its SDRAM-side agent no longer zeroing the static configuration",
+   "score": "70.59",
+   "line": "81.82",
+   "cond": "66.48",
+   "toggle": "71.89",
+   "branch": "76.65",
+   "fsm": "56.1",
+   "fsm_transitions": "23/41",
+   "sim_cycles": "201160"
+  },
+  {
+   "arm": "rvprobe-flows",
+   "description": "5 flows (init, write, read, precharge, refresh), JasperGold-derived, strobe-aware replay, same two bench fixes",
+   "score": "63.44",
+   "line": "81.82",
+   "cond": "63.26",
+   "toggle": "43.34",
+   "branch": "75.14",
+   "fsm": "53.66",
+   "fsm_transitions": "22/41",
+   "sim_cycles": "4134"
+  },
+  {
+   "arm": "rvprobe-8flows",
+   "description": "8 flows (+ write-after-read, read-after-write, enable withdrawn and restored), JasperGold-derived, same fixes + driver drives the enable from the item",
+   "score": 65.02,
+   "fsm_transitions": "24/41",
+   "sim_cycles": 5275,
+   "line": 81.82,
+   "cond": 64.64,
+   "toggle": 43.79,
+   "branch": 76.3,
+   "fsm": 58.54
+  },
+  {
+   "arm": "rvprobe-8flows-fill",
+   "description": "8 flows + volume fill: the write and read requests with direction/byte-enables/cycle-type/enable pinned and address/data randomized, 500 per request",
+   "score": 71.03,
+   "fsm_transitions": "24/41",
+   "sim_cycles": 148746,
+   "line": 81.82,
+   "cond": 65.65,
+   "toggle": 72.48,
+   "branch": 76.65,
+   "fsm": 58.54
+  }
+ ],
+ "solver": {
+  "status": "generated",
+  "beats": 3869,
+  "sequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/sdram-flow/rvprobe_sdram_flow_seq.sv",
+  "flows": [
+   {
+    "flow": "init",
+    "engine": "jaspergold",
+    "ms": "8404",
+    "cycles": 167,
+    "requests": 0
+   },
+   {
+    "flow": "write",
+    "engine": "jaspergold",
+    "ms": "7587",
+    "cycles": 183,
+    "requests": 9
+   },
+   {
+    "flow": "read",
+    "engine": "jaspergold",
+    "ms": "10405",
+    "cycles": 192,
+    "requests": 25
+   },
+   {
+    "flow": "precharge",
+    "engine": "jaspergold",
+    "ms": "11512",
+    "cycles": 195,
+    "requests": 7
+   },
+   {
+    "flow": "refresh",
+    "engine": "jaspergold",
+    "ms": "28310",
+    "cycles": 3132,
+    "requests": 0
+   }
+  ]
+ },
+ "missing_fsm": {
+  "both arms": [
+   "bank_fsm: IDLE->ACT, ACT->IDLE, PRE->IDLE, XFR->DMA_LAST_PRE, DMA_LAST_PRE->IDLE",
+   "xfr_ctl: RDWT->READ, RDWT->WRITE, WRITE->READ, READ->IDLE (read-after-write / write-after-read sequences)",
+   "xfr_ctl: seven MGM_*->MGM_POWERUP (cfg_sdr_en deasserted mid-operation; the generated driver never drives cfg pins)",
+   "req_gen: REQ_ACTIVE->REQ_PAGE_WRAP->REQ_IDLE (a burst crossing a page)"
+  ],
+  "rvprobe only": [
+   "bank_fsm: XFR->ACT, IDLE->XFR on some banks (five transactions touch few banks)"
+  ]
+ },
+ "bench_fixes": [
+  "assign vif.sdram_clk = clk (interface signal never driven; seq_item lists it as a random bit)",
+  "sdrc_top_sdram_agent__driver.sv: 26 assignments zeroing cfg_* removed (static configuration is the top's, from haven.json)",
+  "sdrc_top_wb_agent__driver.sv drive_item: vif.cfg_sdr_en <= item.cfg_sdr_en (the generated driver never drove any configuration pin from the item)"
+ ],
+ "solver_8flows": {
+  "status": "generated",
+  "beats": 4605,
+  "sequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/sdram-flow/rvprobe_sdram_flow_seq.sv",
+  "bulkSequenceFile": "/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/sdram-flow/rvprobe_sdram_bulk_seq.sv",
+  "flows": [
+   {
+    "flow": "init",
+    "engine": "jaspergold",
+    "ms": "9338",
+    "cycles": 167,
+    "requests": 0
+   },
+   {
+    "flow": "write",
+    "engine": "jaspergold",
+    "ms": "12360",
+    "cycles": 183,
+    "requests": 11
+   },
+   {
+    "flow": "read",
+    "engine": "jaspergold",
+    "ms": "13007",
+    "cycles": 192,
+    "requests": 24
+   },
+   {
+    "flow": "precharge",
+    "engine": "jaspergold",
+    "ms": "35121",
+    "cycles": 195,
+    "requests": 4
+   },
+   {
+    "flow": "refresh",
+    "engine": "jaspergold",
+    "ms": "294778",
+    "cycles": 3132,
+    "requests": 0
+   },
+   {
+    "flow": "wrrd",
+    "engine": "jaspergold",
+    "ms": "25567",
+    "cycles": 200,
+    "requests": 18
+   },
+   {
+    "flow": "rdwr",
+    "engine": "jaspergold",
+    "ms": "14492",
+    "cycles": 199,
+    "requests": 28
+   },
+   {
+    "flow": "powerdown",
+    "engine": "jaspergold",
+    "ms": "79119",
+    "cycles": 337,
+    "requests": 2
+   }
+  ]
+ }
+}

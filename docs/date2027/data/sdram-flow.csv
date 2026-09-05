@@ -1,0 +1,7 @@
+arm,description,score,line,cond,toggle,branch,fsm,fsm_transitions,sim_cycles
+haven-published,"HAVEN on DeepSeek V4 Flash as run (SDRAM clock undriven, config zeroed by its SDRAM-side agent)",11.02,13.78,21.75,12.72,0.0,8.95,0/41,
+haven-clock-fixed,"HAVEN's 18 sequences, SDRAM clock tied to clk",25.15,49.17,30.85,9.1,36.65,0.0,0/41,1238587
+haven-fixed,"HAVEN's 18 sequences, clock fixed and its SDRAM-side agent no longer zeroing the static configuration",70.59,81.82,66.48,71.89,76.65,56.1,23/41,201160
+rvprobe-flows,"5 flows (init, write, read, precharge, refresh), JasperGold-derived, strobe-aware replay, same two bench fixes",63.44,81.82,63.26,43.34,75.14,53.66,22/41,4134
+rvprobe-8flows,"8 flows (+ write-after-read, read-after-write, enable withdrawn and restored), JasperGold-derived, same fixes + driver drives the enable from the item",65.02,81.82,64.64,43.79,76.3,58.54,24/41,5275
+rvprobe-8flows-fill,"8 flows + volume fill: the write and read requests with direction/byte-enables/cycle-type/enable pinned and address/data randomized, 500 per request",71.03,81.82,65.65,72.48,76.65,58.54,24/41,148746

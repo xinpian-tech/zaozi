@@ -1,0 +1,5 @@
+cell,form,check,attempts,tokens,wall_clock_s,beats,score,line,cond,toggle,branch,gain_vs_baseline,residual_closed,residual_total,caught_by
+plan/typed,plan,typed,1,45300,398.7,9,95.82,98.88,90.57,96.92,96.92,10.42,16,18,
+goal/typed,goal,typed,2,47218,382.1,44,93.21,94.97,88.68,96.87,92.31,7.81,9,18,typecheck
+plan/untyped,plan,untyped,1,35732,306.0,8,95.82,98.88,90.57,96.92,96.92,10.42,16,18,
+goal/untyped,goal,untyped,1,41809,362.2,55,93.35,95.53,88.68,96.87,92.31,7.95,10,18,

@@ -1,0 +1,161 @@
+You are closing a coverage residual on a 32-bit ALU with an IEEE-754 single-precision FP unit.
+
+These RTL lines are NOT covered by the current stimulus:
+  line 300: s4_new_exp = 8'h0;
+  line 301: s4_final_frac = 23'h0;
+  line 302: s4_round_up = 1'b0;
+  line 316: s4_new_exp = s4_new_exp + 1;
+  line 317: s4_final_frac = s4_rounded_mant[23:1];
+  line 327: fp_result <= 32'h0;
+  line 328: fp_flags[FLAG_UNDERFLOW] <= 1'b1;
+  line 336: fp_active <= 1'b0;
+  line 385: fp2int_result <= 32'h0;
+  line 386: fp2int_invalid <= 1'b1;
+  line 401: f2i_int_val = 32'h0;
+  line 475: result <= 32'h0;
+  line 476: flags <= 4'h0;
+
+Relevant RTL:
+```verilog
+...
+ 295|                                 s4_round_up = s3_mant_sum[2] && (s3_mant_sum[1:0] != 0 || s3_mant_sum[3]);
+ 296|                             end else begin
+ 297|                                 // Need to normalize (shift left)
+ 298|                                 s4_shift_amt = {3'b0, lzc(s3_mant_sum)};
+ 299|                                 if (s4_shift_amt > s3_exp + 1) begin
+ 300|                                     s4_new_exp = 8'h0;
+ 301|                                     s4_final_frac = 23'h0;
+ 302|                                     s4_round_up = 1'b0;
+ 303|                                 end else begin
+ 304|                                     s4_shifted_mant = s3_mant_sum << (s4_shift_amt - 1);
+ 305|                                     s4_new_exp = s3_exp - (s4_shift_amt - 1);
+ 306|                                     s4_final_frac = s4_shifted_mant[25:3];
+ 307|                                     s4_round_up = s4_shifted_mant[2] && (s4_shifted_mant[1:0] != 0 || s4_shifted_mant[3]);
+ 308|                                 end
+...
+ 311|                             // Apply rounding
+ 312|                             s4_rounded_mant = {1'b0, s4_final_frac} + {23'b0, s4_round_up};
+ 313|
+ 314|                             // Check for overflow from rounding
+ 315|                             if (s4_rounded_mant[23]) begin
+ 316|                                 s4_new_exp = s4_new_exp + 1;
+ 317|                                 s4_final_frac = s4_rounded_mant[23:1];
+ 318|                             end else begin
+ 319|                                 s4_final_frac = s4_rounded_mant[22:0];
+ 320|                             end
+ 321|
+ 322|                             // Check for exponent overflow/underflow
+ 323|                             if (s4_new_exp >= 8'hFF) begin
+ 324|                                 fp_result <= {s3_result_sign, 8'hFF, 23'h0};
+ 325|                                 fp_flags[FLAG_OVERFLOW] <= 1'b1;
+ 326|                             end else if (s4_new_exp == 0) begin
+ 327|                                 fp_result <= 32'h0;
+ 328|                                 fp_flags[FLAG_UNDERFLOW] <= 1'b1;
+ 329|                             end else begin
+ 330|                                 fp_result <= {s3_result_sign, s4_new_exp, s4_final_frac};
+ 331|                             end
+ 332|                         end
+ 333|                     end
+ 334|
+ 335|                     default: begin
+ 336|                         fp_active <= 1'b0;
+ 337|                     end
+ 338|                 endcase
+ 339|             end
+ 340|         end
+ 341|     end
+ 342|
+...
+ 380|                     fp2int_active <= 1'b0;
+ 381|                     fp2int_done <= 1'b1;
+ 382|                     fp2int_invalid <= 1'b0;
+ 383|
+ 384|                     if (f2i_is_nan) begin
+ 385|                         fp2int_result <= 32'h0;
+ 386|                         fp2int_invalid <= 1'b1;
+ 387|                     end else if (f2i_is_zero) begin
+ 388|                         fp2int_result <= 32'h0;
+ 389|                     end else if (f2i_is_inf || f2i_exp >= 8'd158) begin
+ 390|                         // Overflow: exp >= 127+31 = 158
+ 391|                         fp2int_result <= f2i_sign ? 32'h8000_0000 : 32'h7FFF_FFFF;
+ 392|                     end else if (f2i_exp < 8'd127) begin
+...
+ 396|                         // Normal conversion (using module-level regs)
+ 397|                         f2i_mant_ext = {1'b1, f2i_frac, 8'h0};
+ 398|                         f2i_shift_right = 8'd158 - f2i_exp;
+ 399|
+ 400|                         if (f2i_shift_right >= 32)
+ 401|                             f2i_int_val = 32'h0;
+ 402|                         else
+ 403|                             f2i_int_val = f2i_mant_ext >> f2i_shift_right;
+ 404|
+ 405|                         if (f2i_sign)
+ 406|                             fp2int_result <= ~f2i_int_val + 1;
+ 407|                         else
+...
+ 470|                         result <= shift_result;
+ 471|                         flags[FLAG_ZERO] <= (shift_result == 32'h0);
+ 472|                     end
+ 473|                     default: begin
+ 474|                         // Reserved opcodes
+ 475|                         result <= 32'h0;
+ 476|                         flags <= 4'h0;
+ 477|                     end
+ 478|                 endcase
+ 479|                 done <= 1'b1;
+ 480|             end
+ 481|         end
+ 482|     end
+```
+
+The DUT's opcodes: 0=FP_ADD, 1=FP_SUB, 2=AND, 3=OR, 4=XOR, 5=SLL, 6=SRL, 7=SRA, 8=FP2INT, 9=NOT.
+
+You write a Scala file that states verification INTENT. Each entry of `cases` is one intent: an
+opcode and two 32-bit operand values (as Long literals, e.g. 0x7fc00000L). JasperGold drives the
+DUT with those operands and returns a cover witness; you only choose values that will make the
+uncovered lines execute.
+
+Reason about the FP arithmetic: to hit a rounding path you need operands whose SUM requires rounding;
+to hit underflow you need a result too small to represent normally; and so on.
+
+Reply with ONLY the Scala file, no markdown fence, exactly this shape (change only the `cases` list):
+
+import me.jiuyang.stdlib.*
+import me.jiuyang.utlib.*
+
+object Generated extends UTExperiment:
+  def run(outDir: os.Path): ujson.Value =
+    require(JasperGold.available, "the ALU residual loop requires JasperGold")
+    val svFile = os.Path("stdlib/tests/resources/haven/alu_top.v", os.pwd)
+    // (label, opcode, a, b) — each entry is one directed intent.
+    val cases = Seq(
+      ("nan_a", 0, 0x7fc00000L, 0x3f800000L)
+    )
+    val rows = collection.mutable.ArrayBuffer.empty[ujson.Obj]
+    val stimuli = cases.map { (label, op, a, b) =>
+      val param = HavenAluFpParameter(op, a, b)
+      val dir   = outDir / label
+      val spec  = UTGenerator(HavenAluFpUT, param, dir).abi.spec
+      val t0    = System.currentTimeMillis()
+      val out   = JasperGold.generate(
+        JasperGold.lower(HavenAluFpUT, param, dir, Seq(svFile)),
+        dir / "jg",
+        timeLimit = "120s"
+      )
+      val ms = System.currentTimeMillis() - t0
+      out match
+        case GenerateOutcome.Generated(trace) =>
+          rows += ujson.Obj("label" -> label, "engine" -> "jaspergold", "ms" -> ms, "cycles" -> trace.cycles)
+          AbstractStimulus.fromTrace(trace, spec)
+        case other => throw RuntimeException(s"$label: $other after ${ms}ms")
+    }
+    val spec = UTGenerator(HavenAluFpUT, HavenAluFpParameter(0, 0L, 0L), outDir).abi.spec
+    val all  = UvmSequence.concat(spec, stimuli)
+    val sv   = UvmSequence(
+      "rvprobe_llm_seq", "alu_top_seq_item",
+      pinned = Some(Set("op", "a", "b", "start"))
+    ).write(all, outDir / "rvprobe_llm_seq.sv")
+    ujson.Obj(
+      "status" -> "generated", "engine" -> "jaspergold", "beats" -> all.cycles,
+      "sequenceFile" -> sv.toString, "intents" -> ujson.Arr(rows.toSeq*)
+    )

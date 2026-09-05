@@ -1,0 +1,182 @@
+{
+ "scores": [
+  {
+   "design": "i2c_master_top",
+   "rerun_score": 87.5,
+   "rule": "5 metrics",
+   "fsm": "48/48",
+   "previous_score": 87.5
+  },
+  {
+   "design": "sdrc_top",
+   "rerun_score": 71.02,
+   "rule": "5 metrics",
+   "fsm": "24/41",
+   "previous_score": 71.03
+  },
+  {
+   "design": "can_top",
+   "rerun_score": 50.47,
+   "rule": "4 metrics",
+   "fsm": "n/a",
+   "previous_score": 50.47
+  }
+ ],
+ "solver": {
+  "I2cFlow": [
+   {
+    "flow": "wr_sto",
+    "engine": "jaspergold",
+    "ms": "12998",
+    "cycles": 222,
+    "kept": 222,
+    "cmd": 208,
+    "prer": 2
+   },
+   {
+    "flow": "rd_sto",
+    "engine": "jaspergold",
+    "ms": "11825",
+    "cycles": 222,
+    "kept": 222,
+    "cmd": 232,
+    "prer": 2
+   },
+   {
+    "flow": "wr",
+    "engine": "jaspergold",
+    "ms": "9964",
+    "cycles": 179,
+    "kept": 179,
+    "cmd": 16,
+    "prer": 2
+   },
+   {
+    "flow": "rd",
+    "engine": "jaspergold",
+    "ms": "10060",
+    "cycles": 179,
+    "kept": 179,
+    "cmd": 40,
+    "prer": 2
+   },
+   {
+    "flow": "sto",
+    "engine": "jaspergold",
+    "ms": "6995",
+    "cycles": 27,
+    "kept": 27,
+    "cmd": 64,
+    "prer": 2
+   },
+   {
+    "flow": "rst_wr",
+    "engine": "jaspergold",
+    "ms": "7586",
+    "cycles": 15,
+    "solverGap": 1,
+    "sweep": 60
+   },
+   {
+    "flow": "rst_rd",
+    "engine": "jaspergold",
+    "ms": "6381",
+    "cycles": 15,
+    "solverGap": 1,
+    "sweep": 60
+   }
+  ],
+  "SdramFlow": [
+   {
+    "flow": "init",
+    "engine": "jaspergold",
+    "ms": "8245",
+    "cycles": 167,
+    "requests": 0
+   },
+   {
+    "flow": "write",
+    "engine": "jaspergold",
+    "ms": "11446",
+    "cycles": 183,
+    "requests": 11
+   },
+   {
+    "flow": "read",
+    "engine": "jaspergold",
+    "ms": "12109",
+    "cycles": 192,
+    "requests": 24
+   },
+   {
+    "flow": "precharge",
+    "engine": "jaspergold",
+    "ms": "35911",
+    "cycles": 195,
+    "requests": 5
+   },
+   {
+    "flow": "refresh",
+    "engine": "jaspergold",
+    "ms": "577918",
+    "cycles": 3132,
+    "requests": 0
+   },
+   {
+    "flow": "wrrd",
+    "engine": "jaspergold",
+    "ms": "22531",
+    "cycles": 200,
+    "requests": 18
+   },
+   {
+    "flow": "rdwr",
+    "engine": "jaspergold",
+    "ms": "14029",
+    "cycles": 199,
+    "requests": 28
+   },
+   {
+    "flow": "powerdown",
+    "engine": "jaspergold",
+    "ms": "82475",
+    "cycles": 337,
+    "requests": 2
+   }
+  ],
+  "CanFlow": [
+   {
+    "flow": "leave_reset",
+    "engine": "jaspergold",
+    "ms": "7308",
+    "cycles": 51,
+    "requests": 50
+   },
+   {
+    "flow": "sof",
+    "engine": "jaspergold",
+    "ms": "10508",
+    "cycles": 95,
+    "requests": 91
+   },
+   {
+    "flow": "transmit",
+    "engine": "jaspergold",
+    "ms": "308445",
+    "outcome": "Unknown(cover statuses: <embedded>::HavenCanFlowUT_transmit.can_transmit=undetermined)"
+   },
+   {
+    "flow": "receive",
+    "engine": "jaspergold",
+    "ms": "306510",
+    "outcome": "Unknown(cover statuses: <embedded>::HavenCanFlowUT_receive.can_receive=undetermined)"
+   },
+   {
+    "flow": "busoff",
+    "engine": "jaspergold",
+    "ms": "306467",
+    "outcome": "Unknown(cover statuses: <embedded>::HavenCanFlowUT_busoff.can_busoff=undetermined)"
+   }
+  ]
+ }
+}
