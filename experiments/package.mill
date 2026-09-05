@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
+package build.experiments
+
+import mill._
+import mill.scalalib._
+import mill.scalalib.TestModule.Utest
+import mill.scalalib.scalafmt._
+
+import build.{circtlib, stdlib, utlib, v, zaozi, ZaoziScalaModule}
+
+/** The LLM experiment sandbox: `src/Generated.scala` is overwritten by the harness (`ut_harness.py`) with the
+  * generated typed-DSL experiment, compiled against the full framework, and run through the fixed `Runner`. Everything
+  * a generated file may use — zaozi, utlib, stdlib DUTs — is on the classpath.
+  */
+object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
+  def scalaVersion = Task(v.scala)
+  def moduleDeps   = Seq(zaozi, utlib, stdlib)
+
+  override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+  override def forkArgs: T[Seq[String]] = Task(
+    super.forkArgs() ++ circtlib.forkArgs()
+  )
+
+  // Framework RAG examples are compiled with the runner; these tests use no solver or provider.
+  object tests extends ScalaTests with Utest {
+    def mvnDeps = Seq(v.utest)
+    override def moduleDeps: Seq[JavaModule] = Seq(m)
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+    override def forkArgs: T[Seq[String]] = Task(super.forkArgs() ++ circtlib.forkArgs())
+  }
+}

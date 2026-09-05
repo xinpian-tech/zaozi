@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "status": "retired-answer-contaminated; audit only, forbidden as framework RAG input",
+  "documents": [
+    {
+      "id": "backward-slice-before-stimulus",
+      "title": "Derive a candidate from the controlling predicates",
+      "source": "experiments/haven_tb/alu/alu_deadcode_formal.sv",
+      "tags": ["coverage", "residual", "rtl", "branch", "predicate", "reachability", "deadcode", "unreachable"],
+      "content": "For each uncovered assignment, first walk backward through its enclosing if/case predicates and data dependencies. Write the necessary path condition before choosing operands. If two necessary predicates contradict each other, emit a proof obligation instead of a speculative stimulus. A satisfiable fixed-input witness establishes legality, not execution of the internal line."
+    },
+    {
+      "id": "fp-rounding-carry-pattern",
+      "title": "FP normalization and rounding-carry candidate",
+      "source": "docs/date2027/data/alu-jg-round1-response.scala",
+      "tags": ["fp", "fp_add", "round", "rounding", "guard", "sticky", "mantissa", "s4_round_up", "s4_rounded_mant", "s4_final_frac", "s4_new_exp", "carry"],
+      "content": "For a rounding branch, target its guard/sticky predicate and the carry out of the rounded fraction, not merely a large result. A prior ALU run used (FP_ADD, 0x3fffffff, 0x40000000) for the round-carry cluster. Treat that tuple as a project-local example: reuse it only when the current backward slice contains the same normalization and rounding predicates."
+    },
+    {
+      "id": "fp-cancellation-underflow-pattern",
+      "title": "FP cancellation into the underflow path",
+      "source": "docs/date2027/data/alu-jg-round1-response.scala",
+      "tags": ["fp", "fp_sub", "underflow", "zero", "normalize", "shift", "s4_shift_amt", "s4_new_exp", "flag_underflow", "denormal", "cancellation"],
+      "content": "For subtraction underflow, choose close small normal operands so cancellation forces a left normalization beyond the available exponent. The prior ALU run used (FP_SUB, 0x00800001, 0x00800000). This is a pattern for the s4_shift_amt/s4_new_exp/UNDERFLOW cluster, not a generic answer for every zero-result line."
+    },
+    {
+      "id": "fp2int-path-consistency",
+      "title": "Check FP2INT interval arithmetic before proposing input",
+      "source": "experiments/haven_tb/alu/alu_deadcode_formal.sv",
+      "tags": ["fp2int", "f2i", "f2i_exp", "f2i_shift_right", "shift_right", "158", "127", "32", "normal conversion", "unreachable"],
+      "content": "Translate nested FP2INT branches into one interval before selecting bits. In this ALU, the normal-conversion arm requires 127 <= f2i_exp < 158, while f2i_shift_right = 158 - f2i_exp. Therefore the nested condition f2i_shift_right >= 32 cannot hold in that arm; record it for a reachability proof. Do not repeat the 0.5 input: it takes the earlier f2i_exp < 127 branch."
+    },
+    {
+      "id": "fp2int-special-value-pattern",
+      "title": "FP2INT special values select their own early branches",
+      "source": "docs/date2027/data/alu-jg-round1-response.scala",
+      "tags": ["fp2int", "f2i", "f2i_is_nan", "nan", "invalid", "fp2int_invalid", "fp2int_result", "7fc00000", "special"],
+      "content": "Target FP2INT NaN/invalid through the special-value predicate, before normal conversion. A prior ALU run used (FP2INT, 0x7fc00000, 0x00000000) to enter f2i_is_nan and set fp2int_invalid. Keep this separate from finite values below 1, which take the f2i_exp < 127 zero-result branch."
+    },
+    {
+      "id": "fp-counter-default-reachability",
+      "title": "A case default may be structurally unreachable",
+      "source": "experiments/haven_tb/alu/alu_deadcode_formal.sv",
+      "tags": ["fp_active", "fp_counter", "counter", "case", "default", "state", "fsm", "unreachable", "line_336"],
+      "content": "Do not target a sequential case default through an unrelated opcode. Check the state transition invariant. In this ALU, while fp_active is true fp_counter visits 1, 2, 3, and 4; state 4 clears fp_active. The default arm is therefore a proof obligation, not an AND/NOT stimulus candidate."
+    },
+    {
+      "id": "opcode-output-mux-pattern",
+      "title": "Distinguish opcode decode branches from internal FP branches",
+      "source": "stdlib/tests/resources/haven/alu_top.v",
+      "tags": ["opcode", "reserved", "op_r", "int_done_r", "output", "mux", "default", "result", "flags", "done"],
+      "content": "For an output-mux default guarded by int_done_r, use a reserved opcode (0xA..0xF) and force an input change so the done pipeline fires. This can cover the reserved-op output branch, but it cannot cover defaults inside the fp_active or fp2int_active state machines. Keep those obligations separate."
+    },
+    {
+      "id": "scala-case-writing-contract",
+      "title": "Write one typed Scala tuple per independent intent",
+      "source": "stdlib/src/HavenAluUT.scala",
+      "tags": ["scala", "cases", "tuple", "label", "opcode", "operand", "long", "jaspergold", "HavenAluFpParameter"],
+      "content": "Use a short unique snake_case label and a tuple (label, opcode, a, b). Spell each 32-bit bit-pattern as a non-negative hexadecimal Long literal with the L suffix, including zero as 0x00000000L. Group lines governed by the same predicate into one intent; do not create one redundant tuple per assignment line."
+    },
+    {
+      "id": "evidence-ladder",
+      "title": "Separate candidate, witness, replay, and proof",
+      "source": "experiments/haven_tb/alu/README.md",
+      "tags": ["candidate", "jaspergold", "witness", "vcs", "urg", "replay", "coverage", "proof", "unreachable"],
+      "content": "Use four distinct claims: the model proposes a candidate; JasperGold finds a legal witness; VCS/URG replay establishes coverage closure; a dedicated reachability property establishes dead code. Never report a solved fixed-input cover as evidence that a particular internal RTL line executed."
+    }
+  ]
+}

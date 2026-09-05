@@ -1,0 +1,93 @@
+{
+  "version": 3,
+  "scope": "framework-only",
+  "documents": [
+    {
+      "id": "framework-data-example",
+      "title": "Few-shot typed tuple construction example",
+      "source": "experiments/src/rag/FrameworkDataExample.scala",
+      "kind": "example",
+      "whole_source": true,
+      "tags": ["fewshot", "data-example", "declarations", "cases", "proofObligations", "tuple", "caller-supplied"]
+    },
+    {
+      "id": "framework-semantics-example",
+      "title": "Few-shot Sem composition example",
+      "source": "experiments/src/rag/FrameworkSemanticsExample.scala",
+      "kind": "example",
+      "whole_source": true,
+      "tags": ["fewshot", "semantics-example", "Sem", "compose", "Value", "Relation", "State", "Temporal"]
+    },
+    {
+      "id": "framework-pipeline-example",
+      "title": "Few-shot solver outcome and UVM export example",
+      "source": "experiments/src/rag/FrameworkPipelineExample.scala",
+      "kind": "example",
+      "whole_source": true,
+      "tags": ["fewshot", "pipeline-example", "exportSequence", "interpret", "GenerateOutcome", "UTGenerator", "JasperGold", "UvmSequence"]
+    },
+    {
+      "id": "fixed-runner-fragment",
+      "title": "Fixed-runner Scala response interface",
+      "source": "experiments/rag/framework_contract.md",
+      "tags": ["fixed-runner", "Scala", "fragment", "cases", "proofObligations", "declarations", "types"],
+      "content": "The model returns two Scala declarations: `cases: Seq[(String, Int, Long, Long)]` and\n`proofObligations: Seq[(String, String)]`. Each case holds a label, an integer code, and two\nLong values. Each obligation holds a label and a reason string. The runner supplies imports,\nthe experiment object, solver calls, and output serialization; the response must not replace them.\n\nUse unique labels, quoted strings, comma-separated tuples, and balanced parentheses for both\neach tuple and its enclosing `Seq`. Scala Long literals require the `L` suffix. An empty list\nis `Seq()`. Return both declarations without a markdown fence or extra statements."
+    },
+    {
+      "id": "utgenerator-abi",
+      "title": "UTGenerator typed ABI",
+      "source": "utlib/src/UTGenerator.scala",
+      "tags": ["UTGenerator", "abi", "spec", "drive", "probe", "typed"],
+      "content": "/** The ABI contract as a dependent type on this DUT's `(I, P)`: `abi.drive.<port>` and `abi.probe.<point>` are\n    * checked at compile time against the DUT's IO and Probe, and `abi.spec` is the serializable specification derived\n    * from those interfaces. Deterministic in the constructor state, so derived once.\n    */"
+    },
+    {
+      "id": "jaspergold-lower",
+      "title": "JasperGold lower signature",
+      "source": "utlib/src/JasperGold.scala",
+      "tags": ["JasperGold", "lower", "JgModel", "Generator", "parameter", "rtl"],
+      "content": "def lower[\n    PARAM <: Parameter,\n    L <: LayerInterface[PARAM],\n    I <: HWInterface[PARAM],\n    P <: DVInterface[PARAM, L]\n  ](dut:       Generator[PARAM, L, I, P],\n    parameter: PARAM,\n    outDir:    os.Path,\n    rtl:       Seq[os.Path],\n    include:   Option[os.Path] = None\n  ): JgModel ="
+    },
+    {
+      "id": "jaspergold-generate",
+      "title": "JasperGold witness generation signature",
+      "source": "utlib/src/JasperGold.scala",
+      "tags": ["JasperGold", "generate", "GenerateOutcome", "witness", "timeLimit", "workDir"],
+      "content": "def generate(model: JgModel, workDir: os.Path, timeLimit: String = \"600s\"): GenerateOutcome ="
+    },
+    {
+      "id": "abstract-stimulus-trace",
+      "title": "AbstractStimulus fromTrace interface",
+      "source": "utlib/src/Stimulus.scala",
+      "tags": ["AbstractStimulus", "fromTrace", "TraceBinding", "ABI", "drive", "ports"],
+      "content": "/** Cross the interface: extract the ABI drive columns from an ABI-named trace. The trace must already be rebound\n    * ([[TraceBinding.rebind]]) — lookup here is exact, and a miss names what the trace does hold.\n    */\n  def fromTrace(trace: Trace, spec: AbiSpec): AbstractStimulus ="
+    },
+    {
+      "id": "uvm-sequence-options",
+      "title": "UvmSequence codec options",
+      "source": "utlib/src/UvmSequence.scala",
+      "tags": ["UvmSequence", "pinned", "repeatPerBeat", "strobe", "periodNs", "StimulusCodec"],
+      "content": "final case class UvmSequence(\n  sequenceName:  String,\n  itemType:      String,\n  pinned:        Option[Set[String]] = None,\n  repeatPerBeat: Int = 1,\n  strobe:        Option[String] = None,\n  periodNs:      Int = 10)\n    extends StimulusCodec:"
+    },
+    {
+      "id": "uvm-sequence-concat",
+      "title": "UvmSequence concat ABI compatibility",
+      "source": "utlib/src/UvmSequence.scala",
+      "tags": ["UvmSequence", "concat", "signature", "stimuli", "AbiSpec"],
+      "content": "def concat(spec: AbiSpec, stimuli: Seq[AbstractStimulus]): AbstractStimulus =\n    def signature(s: AbiSpec) = s.drive.map(p => (p.name, p.width, p.signed))\n    val want                  = signature(spec)\n    for s <- stimuli do\n      require(\n        signature(s.spec) == want,\n        s\"witness from ${s.spec.dut} drives ${signature(s.spec)}, but the stream's ABI drives $want\"\n      )\n    AbstractStimulus(spec, stimuli.flatMap(_.beats).toVector)"
+    },
+    {
+      "id": "semantic-intent-kinds",
+      "title": "Sem typed intent composition",
+      "source": "utlib/src/Sem.scala",
+      "tags": ["Sem", "Intent", "Kinds", "Value", "Relation", "State", "Temporal"],
+      "content": "object Kinds:\n    sealed trait Value\n    sealed trait Relation\n    sealed trait State\n    sealed trait Temporal\n\n  sealed trait Intent[+K]:\n    infix def &&[K2](that: Intent[K2]): Intent[K | K2] = Intent.And(this, that)"
+    },
+    {
+      "id": "runner-proof-metadata",
+      "title": "Proof metadata and witness interface boundary",
+      "source": "experiments/rag/framework_contract.md",
+      "tags": ["proofObligations", "metadata", "witness", "coverage", "replay"],
+      "content": "`proofObligations` is metadata for a separate proof step. Merely returning an entry does not\nrun that proof or establish its conclusion. A solver witness satisfies the encoded intent;\ncoverage of a target not encoded in that intent must be measured separately during replay."
+    }
+  ]
+}

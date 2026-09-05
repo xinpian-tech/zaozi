@@ -1,0 +1,16 @@
++incdir+.
+async_fifo.v
+sdrc_bank_ctl.v
+sdrc_bank_fsm.v
+sdrc_bs_convert.v
+sdrc_core.v
+sdrc_define.v
+sdrc_req_gen.v
+sdrc_top.v
+sdrc_xfr_ctl.v
+sync_fifo.v
+wb2sdrc.v
+bfm_sdram_model.sv
+sdrc_top_interface.sv
+sdrc_top_pkg.sv
+sdrc_top_top.sv
