@@ -6,11 +6,6 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_DialectApi, DialectApi as FirrtlDialectApi}
-import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi as given_LTLDialectApi, DialectApi as LTLDialectApi}
-import org.llvm.circt.scalalib.capi.dialect.verif.{
-  given_DialectApi as given_VerifDialectApi,
-  DialectApi as VerifDialectApi
-}
 import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
 
 import java.lang.foreign.Arena
@@ -40,9 +35,9 @@ final class UTGenerator[
 
   /** The ABI contract as a dependent type on this DUT's `(I, P)`: `abi.drive.<port>` and `abi.probe.<point>` are
     * checked at compile time against the DUT's IO and Probe, and `abi.spec` is the serializable specification derived
-    * from those interfaces.
+    * from those interfaces. Deterministic in the constructor state, so derived once.
     */
-  def abi: Abi[I, P] =
+  lazy val abi: Abi[I, P] =
     val arena = Arena.ofConfined()
     try
       given Arena   = arena
@@ -70,17 +65,8 @@ final class UTGenerator[
     val harness          = new LibHarnessGenerator(dut, parameter)
     val topModule        = harness.moduleName(harnessParameter)
     val moduleDir        = outDir / s"lib_mlir_${harnessParameter.hashCode.toHexString}"
-    os.makeDir.all(moduleDir)
-
-    elaborate(harness, harnessParameter, moduleDir)
-    val modules = os.list(moduleDir).filter(_.ext == "mlirbc").sortBy(_.last)
-    require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
-    val linked  = moduleDir / "linked.mlir"
-    os.proc(
-      Seq("firld", s"--base-circuit=$topModule", "--no-mangle") ++ modules.map(_.toString) ++ Seq("-o", linked.toString)
-    ).call()
-
-    val emitted = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
+    val linked           = Lower.elaborateAndLink(harness, harnessParameter, moduleDir, topModule)
+    val emitted          = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
     LibModel(topModule, Seq(emitted.primary) ++ emitted.splitFiles.values.toSeq)
 
   /** Emit the Model-B testbench: the sim-dialect harness (which calls `import "DPI-C" <dut>_tick` each cycle), a tiny
@@ -95,48 +81,20 @@ final class UTGenerator[
     val harness          = new DpiHarnessGenerator(dut, parameter)
     val harnessTop       = harness.moduleName(harnessParameter)
     val moduleDir        = outDir / s"tb_mlir_${harnessParameter.hashCode.toHexString}"
-    os.makeDir.all(moduleDir)
+    val linked           = Lower.elaborateAndLink(harness, harnessParameter, moduleDir, harnessTop)
 
-    elaborate(harness, harnessParameter, moduleDir)
-    val modules = os.list(moduleDir).filter(_.ext == "mlirbc").sortBy(_.last)
-    require(modules.nonEmpty, s"elaboration produced no .mlirbc files under $moduleDir")
-    val linked  = moduleDir / "linked.mlir"
-    os.proc(
-      Seq("firld", s"--base-circuit=$harnessTop", "--no-mangle") ++ modules
-        .map(_.toString) ++ Seq("-o", linked.toString)
-    ).call()
-
-    val emitted    = SvEmitter.writeVerilog(SvEmitter.verilogString(os.read.bytes(linked)), outDir)
+    // A generation constraint asserted in the module body renders as a concurrent SVA property with per-atom
+    // clocking — Verilator cannot parse that form, and replay checks through probes (the build passes --no-assert
+    // anyway), so strip concurrent assertion statements before the testbench copy hits disk.
+    val verilog    = SvEmitter
+      .verilogString(os.read.bytes(linked))
+      .replaceAll("""(?s)(\w+:\s*)?(assert|assume|cover) property \([^;]*\);""", "")
+    val emitted    = SvEmitter.writeVerilog(verilog, outDir)
     val driverPath = outDir / s"${Driver.topModuleName}.sv"
     os.write.over(driverPath, Driver.topString(harnessTop, trace = false, traceFile = "trace.vcd"))
     val capiPath   = outDir / s"${spec.dut}_tick.c"
     os.write.over(capiPath, Testbench.tickCapi(spec))
     Testbench(Driver.topModuleName, Seq(emitted.primary, driverPath) ++ emitted.splitFiles.values.toSeq :+ capiPath)
-
-  private def elaborate[
-    HP <: Parameter,
-    HL <: LayerInterface[HP],
-    HI <: HWInterface[HP],
-    HProbe <: DVInterface[
-      HP,
-      HL
-    ]
-  ](harness:   Generator[HP, HL, HI, HProbe],
-    parameter: HP,
-    outDir:    os.Path
-  ): Unit =
-    val arena = Arena.ofConfined()
-    try
-      given Arena   = arena
-      given Context = summon[ContextApi].contextCreate
-      summon[FirrtlDialectApi].loadDialect
-      summon[LTLDialectApi].loadDialect
-      summon[VerifDialectApi].loadDialect
-      Elaboration.inOutputDirectory(outDir) {
-        harness.dumpMlirbc(parameter)
-      }
-      summon[Context].destroy()
-    finally arena.close()
 
 object UTGenerator:
   def apply[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](

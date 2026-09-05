@@ -9,16 +9,16 @@
         "slang-src": "slang-src"
       },
       "locked": {
-        "lastModified": 1786705190,
-        "narHash": "sha256-RTa5b+sgY0UFjQyRnV14wOgh6Oz445NHa5LLsp1/3o0=",
+        "lastModified": 1787227817,
+        "narHash": "sha256-/7VY9e5u6XlxTeATerFrrOjDmaWONk9UJly94/pvdTw=",
         "owner": "xinpian-tech",
         "repo": "circt-nix",
-        "rev": "7640149ba35aef83cbe21386eea883d3434b8ed2",
+        "rev": "9200ec8f76c26acdd73dacd8b0a636eeef80f2cf",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
-        "ref": "xinpian-main",
+        "ref": "utlib-circtpin",
         "repo": "circt-nix",
         "type": "github"
       }
