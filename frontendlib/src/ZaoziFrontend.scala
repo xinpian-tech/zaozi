@@ -20,9 +20,7 @@ final case class StatusSignal(name: String, category: String)
 
 /** A structured description of a Zaozi DUT's transaction interface.
   *
-  * Today this is supplied directly (or hand-derived from a module's `QueueIO` style typed IO). Auto-deriving it from
-  * the Chisel/Zaozi Object Model is idea#9 L1; because Zaozi lowers to the same CIRCT IR as the constraints, the ports
-  * and status signals are first-class there.
+  * This is supplied directly or derived by the caller from a module's typed IO.
   */
 final case class TransactionInterface(
   dutName: String,
@@ -42,17 +40,13 @@ final case class ZaoziArtifact(
   transactions: Seq[Transaction])
     extends SolvedArtifact
 
-/** The Zaozi leg of the [[DutFrontend]] contract — a transaction-level frontend for Decoupled Zaozi modules (Queue,
-  * FIFO, arbiters, …). It is the second leg, and it proves the contract generalizes beyond RISC-V:
+/** A transaction-level [[DutFrontend]] for Decoupled Zaozi modules (Queue, FIFO, arbiters, …).
   *
-  *   - `alphabet` — transaction kinds derived from the Decoupled ports (Drive ⇒ enqueue, Monitor ⇒ dequeue), not an
-  *     instruction set.
-  *   - `whitebox` — the module's internal status signals (empty/full/…), the Decoupled-world analogue of RISC-V µarch
-  *     predicates.
-  *   - `backend` — a ChiselSim-style poke/peek/step driver, not GAS assembly.
+  *   - `alphabet` — transaction kinds derived from the Decoupled ports (Drive ⇒ enqueue, Monitor ⇒ dequeue).
+  *   - `whitebox` — the module's internal status signals (empty/full/…).
+  *   - `backend` — a ChiselSim-style poke/peek/step driver.
   *
-  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics belong to this frontend;
-  * neither rvprobe nor utlib depends on it.
+  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics belong to this frontend.
   *
   * The default strategy is a smoke sequence: drive every Drive port once, drain every Monitor port once. It keeps this
   * leg usable — and its tests env-independent — without pulling in Z3.

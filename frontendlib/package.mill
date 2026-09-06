@@ -7,17 +7,12 @@ import mill.scalalib.TestModule.Utest
 import mill.scalalib._
 import mill.scalalib.scalafmt._
 
-import build.{circtlib, rvprobe, v, ZaoziScalaModule}
+import build.{v, ZaoziScalaModule}
 
 object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
   def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(rvprobe)
 
   object tests extends ScalaTests with ScalafmtModule with Utest {
     def mvnDeps = Seq(v.utest)
-
-    override def forkArgs: T[Seq[String]] = Task(
-      super.forkArgs() ++ circtlib.forkArgs()
-    )
   }
 }
