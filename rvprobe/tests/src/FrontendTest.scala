@@ -6,9 +6,9 @@ import me.jiuyang.rvprobe.frontend.*
 
 import utest.*
 
-/** Exercises the DutFrontend contract through its public API. The Zaozi leg is
-  * self-contained (deterministic solve, no SMT/env), so it validates the seam —
-  * alphabet, whitebox, solve -> artifact -> render — end to end. */
+/** Exercises the DutFrontend contract through its public API. The Zaozi leg is self-contained (deterministic solve, no
+  * SMT/env), so it validates the seam — alphabet, whitebox, solve -> artifact -> render — end to end.
+  */
 object FrontendTest extends TestSuite:
   private def queueIface = TransactionInterface(
     dutName = "Queue",

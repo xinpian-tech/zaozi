@@ -45,10 +45,9 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Ref[T]
 
-  /** Declare an SMT value with an explicit name (rather than the sourcecode-derived
-    * name). Required where the declared name is semantically meaningful — e.g. the
-    * generated constraints encode an index into the name (`opcode_3`, `freg_1`) and
-    * later parse the solver model back by that name.
+  /** Declare an SMT value with an explicit name (rather than the sourcecode-derived name). Required where the declared
+    * name is semantically meaningful — e.g. the generated constraints encode an index into the name (`opcode_3`,
+    * `freg_1`) and later parse the solver model back by that name.
     */
   def smtValue[T <: Data](
     name:      String,
