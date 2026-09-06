@@ -1,0 +1,289 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
+package org.llvm.circt.scalalib.dialect.sim.operation
+
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, Type, Value}
+import org.llvm.mlir.scalalib.capi.support.HasOperation
+
+import java.lang.foreign.Arena
+
+class FormatLiteral(val _operation: Operation)
+trait FormatLiteralApi extends HasOperation[FormatLiteral]:
+  /** `sim.fmt.literal` — a constant ASCII fragment. */
+  def op(
+    literal:  String,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FormatLiteral
+
+  extension (ref: FormatLiteral)
+    def result(
+      using Arena
+    ): Value
+end FormatLiteralApi
+
+class FormatDec(val _operation: Operation)
+trait FormatDecApi extends HasOperation[FormatDec]:
+  /** `sim.fmt.dec` — format an integer as decimal. */
+  def op(
+    value:    Value,
+    isSigned: Boolean,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FormatDec
+
+  extension (ref: FormatDec)
+    def result(
+      using Arena
+    ): Value
+end FormatDecApi
+
+class FormatHex(val _operation: Operation)
+trait FormatHexApi extends HasOperation[FormatHex]:
+  /** `sim.fmt.hex` — format an integer as hexadecimal. */
+  def op(
+    value:       Value,
+    isUppercase: Boolean,
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): FormatHex
+
+  extension (ref: FormatHex)
+    def result(
+      using Arena
+    ): Value
+end FormatHexApi
+
+class FormatChar(val _operation: Operation)
+trait FormatCharApi extends HasOperation[FormatChar]:
+  /** `sim.fmt.char` — format an integer as a single character. */
+  def op(
+    value:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FormatChar
+
+  extension (ref: FormatChar)
+    def result(
+      using Arena
+    ): Value
+end FormatCharApi
+
+class FormatCurrentTime(val _operation: Operation)
+trait FormatCurrentTimeApi extends HasOperation[FormatCurrentTime]:
+  /** `sim.fmt.current_time` — resolves to simulation time when printed. */
+  def op(
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FormatCurrentTime
+
+  extension (ref: FormatCurrentTime)
+    def result(
+      using Arena
+    ): Value
+end FormatCurrentTimeApi
+
+class FormatConcat(val _operation: Operation)
+trait FormatConcatApi extends HasOperation[FormatConcat]:
+  /** `sim.fmt.concat` — concatenate format strings left to right. */
+  def op(
+    inputs:   Seq[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FormatConcat
+
+  extension (ref: FormatConcat)
+    def result(
+      using Arena
+    ): Value
+end FormatConcatApi
+
+class StdoutStream(val _operation: Operation)
+trait StdoutStreamApi extends HasOperation[StdoutStream]:
+  /** `sim.stdout_stream` — a handle to the standard output stream. */
+  def op(
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): StdoutStream
+
+  extension (ref: StdoutStream)
+    def result(
+      using Arena
+    ): Value
+end StdoutStreamApi
+
+class StderrStream(val _operation: Operation)
+trait StderrStreamApi extends HasOperation[StderrStream]:
+  /** `sim.stderr_stream` — a handle to the standard error stream. */
+  def op(
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): StderrStream
+
+  extension (ref: StderrStream)
+    def result(
+      using Arena
+    ): Value
+end StderrStreamApi
+
+class PrintFormatted(val _operation: Operation)
+trait PrintFormattedApi extends HasOperation[PrintFormatted]:
+  /** `sim.print` — print `input` on the rising edge of `clock` when `condition` is true. `stream` defaults to the
+    * simulation console.
+    */
+  def op(
+    input:     Value,
+    clock:     Value,
+    condition: Value,
+    stream:    Option[Value],
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): PrintFormatted
+end PrintFormattedApi
+
+class PrintFormattedProc(val _operation: Operation)
+trait PrintFormattedProcApi extends HasOperation[PrintFormattedProc]:
+  /** `sim.proc.print` — print `input` from inside a procedural region. */
+  def op(
+    input:    Value,
+    stream:   Option[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): PrintFormattedProc
+end PrintFormattedProcApi
+
+class Triggered(val _operation: Operation)
+trait TriggeredApi extends HasOperation[Triggered]:
+  /** `sim.triggered` — a procedural region executed on the rising edge of `clock`, optionally guarded by `condition`.
+    */
+  def op(
+    clock:     Value,
+    condition: Option[Value],
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): Triggered
+
+  extension (ref: Triggered)
+    /** The single block of the triggered region — append the body here. */
+    def block(
+      using Arena
+    ): Block
+end TriggeredApi
+
+class Terminate(val _operation: Operation)
+trait TerminateApi extends HasOperation[Terminate]:
+  /** `sim.terminate` — `$finish` (success) or `$fatal` (failure). Procedural. */
+  def op(
+    success:  Boolean,
+    verbose:  Boolean,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Terminate
+end TerminateApi
+
+class ClockedTerminate(val _operation: Operation)
+trait ClockedTerminateApi extends HasOperation[ClockedTerminate]:
+  /** `sim.clocked_terminate` — terminate when `condition` holds on the rising edge of `clock`. */
+  def op(
+    clock:     Value,
+    condition: Value,
+    success:   Boolean,
+    verbose:   Boolean,
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): ClockedTerminate
+end ClockedTerminateApi
+
+class Pause(val _operation: Operation)
+trait PauseApi extends HasOperation[Pause]:
+  /** `sim.pause` — `$stop`. Procedural. */
+  def op(
+    verbose:  Boolean,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Pause
+end PauseApi
+
+class ClockedPause(val _operation: Operation)
+trait ClockedPauseApi extends HasOperation[ClockedPause]:
+  /** `sim.clocked_pause` — pause when `condition` holds on the rising edge of `clock`. */
+  def op(
+    clock:     Value,
+    condition: Value,
+    verbose:   Boolean,
+    location:  Location
+  )(
+    using Arena,
+    Context
+  ): ClockedPause
+end ClockedPauseApi
+
+class PlusArgsTest(val _operation: Operation)
+trait PlusArgsTestApi extends HasOperation[PlusArgsTest]:
+  /** `sim.plusargs.test` — SystemVerilog `$test$plusargs`. */
+  def op(
+    formatString: String,
+    location:     Location
+  )(
+    using Arena,
+    Context
+  ): PlusArgsTest
+
+  extension (ref: PlusArgsTest)
+    /** i1: whether the switch was present on the command line. */
+    def found(
+      using Arena
+    ): Value
+end PlusArgsTestApi
+
+class PlusArgsValue(val _operation: Operation)
+trait PlusArgsValueApi extends HasOperation[PlusArgsValue]:
+  /** `sim.plusargs.value` — SystemVerilog `$value$plusargs`. */
+  def op(
+    formatString: String,
+    resultType:   Type,
+    location:     Location
+  )(
+    using Arena,
+    Context
+  ): PlusArgsValue
+
+  extension (ref: PlusArgsValue)
+    /** i1: whether the switch was present on the command line. */
+    def found(
+      using Arena
+    ): Value
+
+    /** The parsed value, of the `resultType` passed to `op`. */
+    def value(
+      using Arena
+    ): Value
+end PlusArgsValueApi

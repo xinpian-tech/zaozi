@@ -34,6 +34,11 @@ trait ContextApi extends HasSegment[Context] with HasSizeOf[Context]:
     inline def appendDialectRegistry(registry:  DialectRegistry): Unit
     inline def enableMultithreading(enable:     Boolean):         Unit
     inline def loadAllAvailableDialects():                        Unit
+    inline def isRegisteredOperation(
+      name:        String
+    )(
+      using arena: Arena
+    ):                                                            Boolean
     inline def setThreadPool(threadPool:        LlvmThreadPool):  Unit
     def attachDiagnosticHandler(
       handler:     Diagnostic => Boolean
@@ -564,7 +569,18 @@ trait TypeApi extends HasSegment[Type] with HasSizeOf[Type]:
       using arena: Arena,
       context:     Context
     ): Type
-  extension (tpe:   Type)
+
+  /** Parse a type from its textual form. The owning dialect must be loaded in `context`; otherwise MLIR emits a
+    * diagnostic and returns a null type.
+    */
+  inline def typeParseGet(
+    tpe:         String
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Type
+
+  extension (tpe: Type)
     inline def equal(that: Type): Boolean
     inline def print(
       callback:    String => Unit
