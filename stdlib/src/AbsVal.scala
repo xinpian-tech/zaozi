@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
+import me.jiuyang.stdlib.adder.PrefixAdderParameter
+import me.jiuyang.stdlib.adder.default.Incrementer
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
@@ -34,10 +36,10 @@ object AbsVal extends Generator[AbsValParameter, AbsValLayers, AbsValIO, AbsValP
   def architecture(parameter: AbsValParameter) =
     val io   = summon[Interface[AbsValIO]]
     val sign = io.A.bit(parameter.width - 1)
-    val neg  = Incrementer.instantiate(BKAIncrementerParameter(parameter.width))
-    neg.io.A := ~io.A
+    val neg  = Incrementer.instantiate(PrefixAdderParameter(parameter.width))
+    neg.io.a := ~io.A
 
-    val absVal        = sign ? (neg.io.SUM, io.A)
+    val absVal        = sign ? (neg.io.sum, io.A)
     val checkedAbsVal = Contract(absVal) { value =>
       val negExpected = (0.U(parameter.width) - io.A.asUInt).asBits.bits(parameter.width - 1, 0)
       val expected    = sign ? (negExpected, io.A)

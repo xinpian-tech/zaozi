@@ -5,6 +5,8 @@ package me.jiuyang.stdlib.queue.default
 import java.lang.foreign.Arena
 
 import me.jiuyang.stdlib.*
+import me.jiuyang.stdlib.adder.{Adder, PrefixAdderParameter}
+import me.jiuyang.stdlib.adder.default.{Incrementer, given}
 import me.jiuyang.stdlib.default.{*, given}
 import me.jiuyang.stdlib.queue.*
 import me.jiuyang.zaozi.*
@@ -139,9 +141,9 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val writeN = io.pushRequestN | (full & io.popRequestN)
     val read   = !io.popRequestN & notEmpty
 
-    val writeAddressIncrementer = Incrementer.instantiate(BKAIncrementerParameter(addressWidth))
-    writeAddressIncrementer.io.A := writeAddress.asBits
-    val writeAddressPlusOne = writeAddressIncrementer.io.SUM.asUInt
+    val writeAddressIncrementer = Incrementer.instantiate(PrefixAdderParameter(addressWidth))
+    writeAddressIncrementer.io.a := writeAddress.asBits
+    val writeAddressPlusOne = writeAddressIncrementer.io.sum.asUInt
     val nextWriteAddress    = Wire(UInt(addressWidth))
     nextWriteAddress := writeAddress
     when(!writeN) {
@@ -152,9 +154,9 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
       }
     }
 
-    val readAddressIncrementer = Incrementer.instantiate(BKAIncrementerParameter(addressWidth))
-    readAddressIncrementer.io.A := readAddress.asBits
-    val readAddressPlusOne = readAddressIncrementer.io.SUM.asUInt
+    val readAddressIncrementer = Incrementer.instantiate(PrefixAdderParameter(addressWidth))
+    readAddressIncrementer.io.a := readAddress.asBits
+    val readAddressPlusOne = readAddressIncrementer.io.sum.asUInt
     // Diagnostic mode follows the DWBB interface: pulling diagnosticN low returns the read pointer to address zero.
     val diagnosticClear    = if parameter.enableDiagnostics then !io.diagnosticN else Node(false.B)
     val nextReadAddress    = Wire(UInt(addressWidth))
@@ -177,16 +179,14 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val incrementWordCount   =
       (!io.pushRequestN & io.popRequestN & !full) | (!io.pushRequestN & !notEmpty)
     val decrementWordCount   = io.pushRequestN & !io.popRequestN & notEmpty
-    val wordCountIncrementer = Incrementer.instantiate(BKAIncrementerParameter(addressWidth))
-    wordCountIncrementer.io.A := wordCount.asBits
-    val wordCountPlusOne    = wordCountIncrementer.io.SUM.asUInt
-    val wordCountSubtractor = BrentKungAdder.instantiate(BrentKungAdderParameter(addressWidth, 4))
-    val wordCountSubtractIO =
-      wordCountSubtractor.io.asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
-    wordCountSubtractIO.A  := wordCount.asBits
-    wordCountSubtractIO.B  := ~1.U(addressWidth).asBits
-    wordCountSubtractIO.CI := true.B
-    val wordCountMinusOne = wordCountSubtractIO.SUM.asUInt
+    val wordCountIncrementer = Incrementer.instantiate(PrefixAdderParameter(addressWidth))
+    wordCountIncrementer.io.a := wordCount.asBits
+    val wordCountPlusOne    = wordCountIncrementer.io.sum.asUInt
+    val wordCountSubtractIO = Adder(PrefixAdderParameter(addressWidth, 4))
+    wordCountSubtractIO.a  := wordCount.asBits
+    wordCountSubtractIO.b  := ~1.U(addressWidth).asBits
+    wordCountSubtractIO.ci := true.B
+    val wordCountMinusOne = wordCountSubtractIO.sum.asUInt
     val advancedWordCount = decrementWordCount ? (wordCountMinusOne, wordCountPlusOne)
     val nextWordCount     = (incrementWordCount | decrementWordCount) ? (advancedWordCount, Node(wordCount))
 

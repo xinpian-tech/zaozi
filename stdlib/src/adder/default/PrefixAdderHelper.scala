@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
-package me.jiuyang.stdlib
+package me.jiuyang.stdlib.adder.default
 
 import java.lang.foreign.Arena
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
@@ -95,16 +95,3 @@ def prefixTreeGenerates(
   internal.foldLeft(gMap0)((g, nd) =>
     g + (nd -> nd.leafs.tail.foldLeft[Referable[Bool]](g(nd.leafs.head))((acc, ch) => (propagates(ch) & acc) | g(ch)))
   )
-
-trait PrefixAdderParameter:
-  def width: Int
-
-class PrefixAdderLayers[P <: Parameter & PrefixAdderParameter](parameter: P) extends LayerInterface(parameter):
-  def layers = Seq.empty
-
-class PrefixAdderIO[P <: Parameter & PrefixAdderParameter](parameter: P) extends HWBundle[P](parameter):
-  val A   = Flipped(Bits(parameter.width))
-  val B   = Flipped(Bits(parameter.width))
-  val CI  = Flipped(Bool())
-  val CO  = Aligned(Bool())
-  val SUM = Aligned(Bits(parameter.width))

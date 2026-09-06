@@ -1,27 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
-package me.jiuyang.stdlib
+package me.jiuyang.stdlib.adder.default
 
+import me.jiuyang.stdlib.adder.{PrefixAdderParameter, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-// same parameters as BrentKungAdder
-case class BKAIncrementerParameter(width: Int, radix: Int = 4) extends Parameter with PrefixAdderParameter:
-  require(width > 0, "width must be positive")
-  require(radix >= 2, "radix must be at least 2")
+class IncrementerLayers(parameter: PrefixAdderParameter) extends LayerInterface(parameter):
+  def layers = Seq.empty
 
-given upickle.default.ReadWriter[BKAIncrementerParameter] = upickle.default.macroRW
+class IncrementerIO(parameter: PrefixAdderParameter) extends HWBundle(parameter):
+  val a   = Flipped(Bits(parameter.width))
+  val sum = Aligned(Bits(parameter.width))
 
-class IncrementerLayers(parameter: BKAIncrementerParameter) extends PrefixAdderLayers(parameter)
-
-class IncrementerIO(parameter: BKAIncrementerParameter) extends HWBundle(parameter):
-  val A   = Flipped(Bits(parameter.width))
-  val SUM = Aligned(Bits(parameter.width))
-
-class IncrementerProbe(parameter: BKAIncrementerParameter)
-    extends DVBundle[BKAIncrementerParameter, IncrementerLayers](parameter)
+class IncrementerProbe(parameter: PrefixAdderParameter)
+    extends DVBundle[PrefixAdderParameter, IncrementerLayers](parameter)
 
 /** Radix carry-look-ahead incrementer, `SUM = A + 1` mod 2^width.
   *
@@ -32,14 +27,14 @@ class IncrementerProbe(parameter: BKAIncrementerParameter)
 @generator
 object Incrementer
     extends Generator[
-      BKAIncrementerParameter,
+      PrefixAdderParameter,
       IncrementerLayers,
       IncrementerIO,
       IncrementerProbe
     ]:
-  override def moduleName(p: BKAIncrementerParameter): String = s"Incrementer_width${p.width}_radix${p.radix}"
+  override def moduleName(p: PrefixAdderParameter): String = s"Incrementer_width${p.width}_radix${p.radix}"
 
-  def architecture(parameter: BKAIncrementerParameter) =
+  def architecture(parameter: PrefixAdderParameter) =
     val io       = summon[Interface[IncrementerIO]]
     val treeRoot = buildBrentKungPrefixTree(parameter.width, parameter.radix)
     val allNodes = flattenPrefixTree(treeRoot)
@@ -47,7 +42,7 @@ object Incrementer
     val width    = leaves.map(_.idx).max + 1
 
     val internal   = prefixTreeInternalNodes(treeRoot, allNodes)
-    val propagates = prefixTreePropagates(leaves, internal)(n => io.A.bit(n.idx))
+    val propagates = prefixTreePropagates(leaves, internal)(n => io.a.bit(n.idx))
 
     val leafCarries = threadPrefixCarries(treeRoot, true.B) { (child, c) =>
       propagates(child) & c
@@ -57,8 +52,8 @@ object Incrementer
     val sumWord   = (1 until width).foldLeft(sumBitMap(0).asBits)((acc, i) => sumBitMap(i).asBits ## acc)
 
     val checkedSUM = Contract(sumWord) { sum =>
-      val expected = (io.A.asUInt + 1.U(width)).asBits.bits(width - 1, 0)
+      val expected = (io.a.asUInt + 1.U(width)).asBits.bits(width - 1, 0)
       Ensure((sum === expected).I, "incrementer_matches_add")
     }
 
-    io.SUM := checkedSUM
+    io.sum := checkedSUM
