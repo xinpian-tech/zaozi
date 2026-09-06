@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
+package build.frontendlib
+
+import mill._
+import mill.scalalib.TestModule.Utest
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+
+import build.{circtlib, rvprobe, v, ZaoziScalaModule}
+
+object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
+  def scalaVersion = Task(v.scala)
+  def moduleDeps   = Seq(rvprobe)
+
+  object tests extends ScalaTests with ScalafmtModule with Utest {
+    def mvnDeps = Seq(v.utest)
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+}

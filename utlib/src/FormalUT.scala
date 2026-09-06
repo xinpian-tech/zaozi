@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.ut
+package me.jiuyang.utlib
 
 import me.jiuyang.smtlib.Z3
 import me.jiuyang.smtlib.default.{*, given}
@@ -27,8 +27,8 @@ enum UtOutcome:
   /** The solver could not decide (e.g. returned `unknown`). */
   case Unknown(status: String)
 
-/** A formal unit test over the SMT layer — the formal flavor of the CIRCT-native UT framework: rvprobe's SMT machinery
-  * supplies solver-guaranteed stimulus, and the property is the verif-style oracle. No simulation, no `sim` dialect.
+/** A formal unit test over the SMT layer. The solver searches for inputs that violate the property under the given
+  * assumptions, without running a simulation.
   *
   * A test declares symbolic inputs and assumptions (the constrained stimulus / preconditions) and returns the property
   * that should hold. [[FormalUT.check]] asks the solver whether any stimulus satisfying the assumptions can violate the
@@ -36,7 +36,6 @@ enum UtOutcome:
   *   - UNSAT(assumptions ∧ ¬property) ⇒ property proven ⇒ [[UtOutcome.Pass]]
   *   - SAT ⇒ counterexample ⇒ [[UtOutcome.Fail]]
   *
-  * This generalizes the sat/unsat pattern the RISC-V spec tests already use into a reusable, DUT-agnostic harness.
   * Wiring a real hardware DUT's transfer function into `spec` (hw -> smt) is the natural next step; today `spec` is
   * expressed directly in the SMT layer.
   */
@@ -82,7 +81,7 @@ object FormalUT:
         sb.toString()
       }
       // Turn the trailing (reset) into (get-model) so a SAT result yields the
-      // counterexample assignment (mirrors the RISC-V solve path).
+      // counterexample assignment.
       val z3in   = smtlib.replace("(reset)", "(get-model)")
       val output = Z3.run(z3in)
       val result = parseZ3Output(output)

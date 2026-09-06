@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.tests
+package me.jiuyang.frontendlib.tests
 
-import me.jiuyang.rvprobe.frontend.*
+import me.jiuyang.frontendlib.*
 
 import utest.*
 

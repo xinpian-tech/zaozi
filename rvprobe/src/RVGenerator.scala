@@ -1101,31 +1101,23 @@ trait RVGenerator:
     lines.toSeq
   }
 
-  /** Solve the recipe and return it formatted as GAS assembly lines (newline-joined).
-    *
-    * If the program contains directives or labels, the full statement ordering is used. Otherwise falls back to legacy
-    * NOP-padding for explicit-index programs.
-    */
-  /** Solve the recipe into the frontend-agnostic [[frontend.SolvedSequence]] (the SMT core's output) plus the RISC-V
-    * statement layout the GAS backend needs. The statement layout is design-specific and rides alongside the solved
-    * values — a finding worth folding into the DutFrontend contract as the abstraction matures.
-    */
-  def solveRecipe(): (frontend.SolvedSequence, Seq[Statement]) = {
+  /** Solve the instruction choices and arguments, retaining the statement layout for rendering. */
+  def solveRecipe(): SolvedRecipe = {
     val (opcodes, statements) = solveOpcodes()
     val args                  = solveArgs(opcodes)
-    (frontend.SolvedSequence(opcodes, args), statements)
+    SolvedRecipe(opcodes, args, statements)
   }
 
   /** Render an already-solved recipe to GAS assembly (the RISC-V backend). */
-  def renderRecipeAsm(solved: frontend.SolvedSequence, statements: Seq[Statement]): String = {
-    val hasDirectives = statements.exists { case _: Statement.Inst => false; case _ => true }
-    if hasDirectives then assembleStatementsGas(statements, solved.selections, solved.fields).mkString("\n")
-    else assembleInstructionsGas(solved.selections, solved.fields).mkString("\n")
+  def renderRecipeAsm(solved: SolvedRecipe): String = {
+    val hasDirectives = solved.statements.exists { case _: Statement.Inst => false; case _ => true }
+    if hasDirectives then assembleStatementsGas(solved.statements, solved.opcodes, solved.args).mkString("\n")
+    else assembleInstructionsGas(solved.opcodes, solved.args).mkString("\n")
   }
 
+  /** Solve the recipe and return GAS assembly, preserving directives or padding explicit instruction indices. */
   def toRecipeAsm(): String = {
-    val (solved, statements) = solveRecipe()
-    renderRecipeAsm(solved, statements)
+    renderRecipeAsm(solveRecipe())
   }
 
   /** Unified output API.

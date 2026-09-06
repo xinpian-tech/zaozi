@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.frontend
+package me.jiuyang.frontendlib
 
-import me.jiuyang.rvprobe.{getMergedInstructions, RVGenerator, Statement}
+import me.jiuyang.rvprobe.{getMergedInstructions, RVGenerator, SolvedRecipe, Statement}
 
 /** The RISC-V leg's solved artifact: the frontend-agnostic [[SolvedSequence]] plus the recipe statement layout the GAS
   * backend needs to render.
@@ -37,10 +37,10 @@ final class RiscvFrontend(gen: RVGenerator) extends DutFrontend:
       }
 
   def solve(): RiscvArtifact =
-    val (sequence, statements) = gen.solveRecipe()
-    RiscvArtifact(sequence, statements)
+    val recipe = gen.solveRecipe()
+    RiscvArtifact(SolvedSequence(recipe.opcodes, recipe.args), recipe.statements)
 
   def backend: StimulusBackend[RiscvArtifact] = new StimulusBackend[RiscvArtifact]:
     def kind:                          String = "gas-asm"
     def render(solved: RiscvArtifact): String =
-      gen.renderRecipeAsm(solved.sequence, solved.statements)
+      gen.renderRecipeAsm(SolvedRecipe(solved.sequence.selections, solved.sequence.fields, solved.statements))
