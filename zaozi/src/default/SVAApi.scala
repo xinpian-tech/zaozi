@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
-import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlEventControl, FirrtlNameKind}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLAndIntrinsicApi,
   given_LTLClockedAtomIntrinsicApi,
@@ -22,6 +22,9 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLIntersectIntrinsicApi,
   given_LTLNotIntrinsicApi,
   given_LTLOrIntrinsicApi,
+  given_ConnectApi,
+  given_NodeApi,
+  given_RegApi,
   given_VerifAssertApi,
   given_VerifAssumeApi,
   given_VerifCoverApi,
@@ -38,6 +41,9 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   LTLIntersectIntrinsicApi as IntersectApi,
   LTLNotIntrinsicApi as NotApi,
   LTLOrIntrinsicApi as OrApi,
+  ConnectApi,
+  NodeApi,
+  RegApi,
   VerifAssertApi as AssertApi,
   VerifAssumeApi as AssumeApi,
   VerifCoverApi as CoverApi
@@ -60,13 +66,50 @@ import org.llvm.mlir.scalalib.capi.ir.{
 
 import java.lang.foreign.Arena
 
-export given_SVAApi.{always, eventually, negedge, posedge, Assert, Assume, Cover}
+export given_SVAApi.{always, eventually, negedge, past, posedge, Assert, Assume, Cover}
 
 given SVAApi with
   def posedge(clock: Referable[Clock]): ClockEvent =
     ClockEvent(FirrtlEventControl.AtPosEdge, clock)
   def negedge(clock: Referable[Clock]): ClockEvent =
     ClockEvent(FirrtlEventControl.AtNegEdge, clock)
+
+  def past[T <: Referable[Bool]](
+    value:       T,
+    delay:       Int = 1
+  )(
+    using clock: ClockEvent
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Node[Bool] =
+    require(delay >= 0, s"past delay ($delay) must be greater than or equal to 0")
+    val result =
+      if delay == 0 then value.refer
+      else
+        (0 until delay).foldLeft(value.refer): (sample, _) =>
+          val reg = summon[RegApi].op(
+            name = s"_past_${summon[InstanceContext].anonSignalCounter.inc()}",
+            location = locate,
+            nameKind = FirrtlNameKind.Droppable,
+            tpe = sample.getType,
+            clock = clock.clock.refer,
+            clockEdge = clock.edge
+          )
+          reg.operation.appendToBlock()
+          val result = reg.operation.getResult(0)
+          summon[ConnectApi].op(sample, result, locate).operation.appendToBlock()
+          result
+    val nodeOp = summon[NodeApi].op(valName, locate, FirrtlNameKind.Interesting, result)
+    nodeOp.operation.appendToBlock()
+    new Node[Bool]:
+      val _tpe:   Bool  = new Object with Bool
+      val _refer: Value = nodeOp.operation.getResult(0)
 
   def always(
     property:    Immediate | Sequence | Property
