@@ -870,6 +870,25 @@ object SVASpec extends TestSuite:
           "@(posedge clock) ib0 until ib0 and ib1"
         )
 
+      test("past"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val previous     = past(io.ib0, 2)
+
+            Assert(previous.S iff io.ib1.S, "past")
+
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          "reg _past_0;",
+          "reg _past_1;",
+          "assert property (not ((@(posedge clock) _past_1) or (@(posedge clock) ib1))",
+          "or (@(posedge clock) _past_1) and (@(posedge clock) ib1));"
+        )
+
     test("Clock"):
       test("Simple"):
         @generator
