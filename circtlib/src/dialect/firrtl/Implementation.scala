@@ -897,6 +897,35 @@ given VerifEnsureApi with
 end given
 // Expression
 
+given VerbatimExprApi with
+  def op(
+    text:          String,
+    substitutions: Seq[Value],
+    resultType:    Type,
+    location:      Location
+  )(
+    using Arena,
+    Context
+  ): VerbatimExpr =
+    VerbatimExpr(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.verbatim.expr",
+        location = location,
+        operands = substitutions,
+        resultsTypes = Some(Seq(resultType)),
+        namedAttributes = Seq(
+          summon[NamedAttributeApi].namedAttributeGet("text".identifierGet, text.stringAttrGet),
+          summon[NamedAttributeApi].namedAttributeGet("symbols".identifierGet, Seq.empty.arrayAttrGet)
+        )
+      )
+    )
+  extension (ref: VerbatimExpr)
+    def operation: Operation = ref._operation
+    def result(
+      using Arena
+    ): Value = ref.operation.getResult(0)
+end given
+
 given LTLAndIntrinsicApi with
   def op(
     inputs:   Seq[Value],
