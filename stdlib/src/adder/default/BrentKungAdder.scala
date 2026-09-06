@@ -1,26 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
-package me.jiuyang.stdlib
+package me.jiuyang.stdlib.adder.default
 
+import java.lang.foreign.Arena
+
+import me.jiuyang.stdlib.adder.{AdderIO, AdderImpl, AdderLayers, AdderProbe, PrefixAdderParameter, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 import scala.collection.immutable.SeqMap
-
-case class BrentKungAdderParameter(width: Int, radix: Int) extends Parameter with PrefixAdderParameter:
-  require(width > 0, "width must be positive")
-  require(radix >= 2, "radix must be at least 2")
-
-given upickle.default.ReadWriter[BrentKungAdderParameter] = upickle.default.macroRW
-
-class BrentKungAdderLayers(parameter: BrentKungAdderParameter) extends PrefixAdderLayers(parameter)
-
-class BrentKungAdderIO(parameter: BrentKungAdderParameter) extends PrefixAdderIO(parameter)
-
-class BrentKungAdderProbe(parameter: BrentKungAdderParameter)
-    extends DVBundle[BrentKungAdderParameter, BrentKungAdderLayers](parameter)
 
 private def buildBrentKungPrefixTree(width: Int, radix: Int): PrefixNode =
   // width here is including the carry-out column for the adder,
@@ -45,15 +36,15 @@ private def buildBrentKungPrefixTree(width: Int, radix: Int): PrefixNode =
 @generator
 object BrentKungAdder
     extends Generator[
-      BrentKungAdderParameter,
-      BrentKungAdderLayers,
-      BrentKungAdderIO,
-      BrentKungAdderProbe
+      PrefixAdderParameter,
+      AdderLayers[PrefixAdderParameter],
+      AdderIO[PrefixAdderParameter],
+      AdderProbe[PrefixAdderParameter]
     ]:
-  override def moduleName(p: BrentKungAdderParameter): String = s"BrentKungAdder_width${p.width}_radix${p.radix}"
+  override def moduleName(p: PrefixAdderParameter): String = s"BrentKungAdder_width${p.width}_radix${p.radix}"
 
-  def architecture(parameter: BrentKungAdderParameter) =
-    val io       = summon[Interface[BrentKungAdderIO]].asInstanceOf[Interface[PrefixAdderIO[BrentKungAdderParameter]]]
+  def architecture(parameter: PrefixAdderParameter) =
+    val io       = summon[Interface[AdderIO[PrefixAdderParameter]]]
     val treeRoot = buildBrentKungPrefixTree(parameter.width + 1, parameter.radix)
     val allNodes = flattenPrefixTree(treeRoot)
     val leaves   = prefixTreeLeaves(allNodes)
@@ -62,8 +53,8 @@ object BrentKungAdder
     // Bit i of A/B, zero-extended: real bit for i < width, else constant 0. The
     // extra column i == width is the carry-out column — a real leaf of the tree
     // with A=B=0, whose sum bit (0^0)^carry_width = carry_width IS the adder CO.
-    def aBit(i: Int): Referable[Bool] = if i < width then io.A.bit(i) else false.B
-    def bBit(i: Int): Referable[Bool] = if i < width then io.B.bit(i) else false.B
+    def aBit(i: Int): Referable[Bool] = if i < width then io.a.bit(i) else false.B
+    def bBit(i: Int): Referable[Bool] = if i < width then io.b.bit(i) else false.B
 
     // A node's group (G, P) is formed only where some ancestor's carry-threading
     // will consume it. The rightmost spine — root, then last-child down to the top
@@ -96,7 +87,7 @@ object BrentKungAdder
     // own — its children's carries are threaded straight from CI. That makes the
     // root just another internal node in the down-sweep: one unified recursion,
     // no carry-out cell. The carry into the CO column already IS the carry-out.
-    val leafCarries = threadPrefixCarries(treeRoot, io.CI) { (child, c) =>
+    val leafCarries = threadPrefixCarries(treeRoot, io.ci) { (child, c) =>
       (propagates(child) & c) | generates(child)
     }.toMap
 
@@ -110,9 +101,31 @@ object BrentKungAdder
 
     val (checkedCO, checkedSUM) = Contract((carryOut, sumWord)) { case (co, sum) =>
       val observed = (co.asBits ## sum).asUInt
-      val expected = (io.A.asUInt + io.B.asUInt + io.CI.asBits.asUInt).asBits.bits(width, 0).asUInt
+      val expected = (io.a.asUInt + io.b.asUInt + io.ci.asBits.asUInt).asBits.bits(width, 0).asUInt
       Ensure((observed === expected).I, "prefix_adder_matches_add")
     }
 
-    io.SUM := checkedSUM
-    io.CO  := checkedCO
+    io.sum := checkedSUM
+    io.co  := checkedCO
+
+given AdderImpl with
+  def apply(
+    parameter: PrefixAdderParameter
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Wire[AdderIO[PrefixAdderParameter]] =
+    val io      = Wire(new AdderIO(parameter))
+    val adderIO = BrentKungAdder.instantiate(parameter).io
+
+    adderIO.a  := io.a
+    adderIO.b  := io.b
+    adderIO.ci := io.ci
+    io.co      := adderIO.co
+    io.sum     := adderIO.sum
+    io
