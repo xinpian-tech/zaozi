@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.frontend
+package me.jiuyang.frontendlib
 
 /** Direction of a Decoupled transaction port, from the testbench's view. */
 enum PortDir:
@@ -51,8 +51,8 @@ final case class ZaoziArtifact(
   *     predicates.
   *   - `backend` — a ChiselSim-style poke/peek/step driver, not GAS assembly.
   *
-  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics remain rvprobe-owned;
-  * generic solver process support is shared through `smtlib`, and utlib has no dependency on this frontend.
+  * Sequence solving is supplied by `strategy` rather than fixed here. Transaction semantics belong to this frontend;
+  * neither rvprobe nor utlib depends on it.
   *
   * The default strategy is a smoke sequence: drive every Drive port once, drain every Monitor port once. It keeps this
   * leg usable — and its tests env-independent — without pulling in Z3.

@@ -1,45 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.frontend
+package me.jiuyang.frontendlib
 
-/** ============================================================================
-  * DUT frontend contract — the HDL-agnostic seam of RVProbe.
+/** A DUT frontend describes its stimulus alphabet and optional internal signals, solves a recipe, and renders the
+  * result through a matching backend.
   *
-  * RVProbe's core is language-independent: two-stage SMT solving, the
-  * sequence-level cover API (coverRAW/WAR/WAW), fresh-register allocation, and
-  * lowering to the shared CIRCT/MLIR SMT dialect. What is *specific* to a design
-  * is confined to a [[DutFrontend]], which contributes:
-  *
-  *   1. [[DutFrontend.alphabet]] — the legal atomic stimuli and their field-level
-  *      legality. For a RISC-V core this is the instruction set (opcodes +
-  *      operand fields, generated from riscv-opcodes). For a Decoupled Chisel
-  *      module it is the transaction kinds read off the typed IO. For raw Verilog
-  *      it is a user-supplied interface description.
-  *
-  *   2. [[DutFrontend.whitebox]] — design-internal microarchitectural signals
-  *      lifted as first-class constraint variables (Chisel/Zaozi Object Model;
-  *      Verilog annotations). Empty ⇒ the DUT is treated black-box.
-  *
-  *   3. [[DutFrontend.solve]] / [[DutFrontend.backend]] — solve the DUT's recipe
-  *      into a frontend-specific [[SolvedArtifact]], then render that artifact
-  *      into runnable stimulus (RISC-V: GAS assembly; a Decoupled module:
-  *      ChiselSim poke/peek/step). The lowering of DUT + constraints into CIRCT
-  *      is shared across every frontend.
-  *
-  * The artifact is frontend-specific on purpose: wiring the RISC-V leg showed
-  * that rendering needs more than the [[SolvedSequence]] field values (it needs
-  * the recipe's statement layout). Each frontend therefore defines its own
-  * `Artifact <: SolvedArtifact`, carrying the [[SolvedSequence]] plus whatever
-  * its backend needs — so `render` never has to re-solve.
-  *
-  * Planned legs, cleanest first (see wishing/9-rvprobe-multilang-frontend):
-  *   - Zaozi   — same IR, structured metadata: the reference for new legs.
-  *   - Chisel  — Object Model extraction generalized beyond the T1 case.
-  *   - Verilog — hardest/most valuable (no Object Model): alphabet from a
-  *               supplied interface, whitebox from annotations/architectural
-  *               state only. Lets a Verilog core (e.g. cv32e40x) be targeted
-  *               without rewriting it in Chisel.
-  * ============================================================================
+  * Each frontend owns its artifact type so it can retain the information needed to render without solving again. For
+  * example, the RISC-V frontend retains the assembly statement layout alongside the solved instruction fields.
   */
 trait DutFrontend:
   /** The frontend-specific solved artifact its backend renders. */

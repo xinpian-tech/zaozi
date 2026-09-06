@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jianhao Ye <Clo91eaf@qq.com>
-package me.jiuyang.rvprobe.tests
+package me.jiuyang.utlib.tests
 
-import me.jiuyang.rvprobe.ut.*
+import me.jiuyang.utlib.*
 
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.tpe.*
@@ -13,9 +13,9 @@ import java.lang.foreign.Arena
 
 import utest.*
 
-/** Exercises the formal-UT framework end to end (runs z3): a property that holds
-  * proves out to Pass, and a violable property yields Fail with a concrete
-  * counterexample. */
+/** Exercises the formal-UT framework end to end (runs z3): a property that holds proves out to Pass, and a violable
+  * property yields Fail with a concrete counterexample.
+  */
 object FormalUtTest extends TestSuite:
   val tests = Tests:
 
@@ -48,4 +48,4 @@ object FormalUtTest extends TestSuite:
           assert(cex.contains("x"))
           // the counterexample satisfies the assumption but violates the property
           assert(cex("x") >= 0 && cex("x") < 5)
-        case other => assert(false)
+        case other               => assert(false)
