@@ -97,7 +97,7 @@ import MretStaleLib.*
 // The ld triggers a page fault — if BTB corrupted mepc, trap handler can't recover.
 @main def BTBMretStaleLuiLd(outputPath: String): Unit =
   object BTBMretStaleLuiLd extends RVGenerator:
-    val sets = btbSets()
+    val sets          = btbSets()
     def constraints() =
       prologue()
       jal(x1, "switch_to_s_mode")
@@ -111,7 +111,7 @@ import MretStaleLib.*
 // Variant B: lui only (no unmapped ld). Isolates BTB corruption from page fault cascade.
 @main def BTBMretStaleLui(outputPath: String): Unit =
   object BTBMretStaleLui extends RVGenerator:
-    val sets = btbSets()
+    val sets          = btbSets()
     def constraints() =
       prologue()
       jal(x1, "switch_to_s_mode")
@@ -125,7 +125,7 @@ import MretStaleLib.*
 // Variant C: addi at fall-through. Tests that bug isn't lui-specific.
 @main def BTBMretStaleAddi(outputPath: String): Unit =
   object BTBMretStaleAddi extends RVGenerator:
-    val sets = btbSets()
+    val sets          = btbSets()
     def constraints() =
       prologue()
       addi(x10, x0, 100)
@@ -140,7 +140,7 @@ import MretStaleLib.*
 // Variant D: ld from mapped address at fall-through. Tests load instructions.
 @main def BTBMretStaleLd(outputPath: String): Unit =
   object BTBMretStaleLd extends RVGenerator:
-    val sets = btbSets()
+    val sets          = btbSets()
     def constraints() =
       prologue()
       la(x10, "buf")
@@ -160,7 +160,7 @@ import MretStaleLib.*
 // If bug only triggers at jal+4, nops should suppress it (confirming exact-PC aliasing).
 @main def BTBMretStaleNopPad(outputPath: String): Unit =
   object BTBMretStaleNopPad extends RVGenerator:
-    val sets = btbSets()
+    val sets          = btbSets()
     def constraints() =
       prologue()
       jal(x1, "switch_to_s_mode")
@@ -176,7 +176,7 @@ import MretStaleLib.*
 // Variant F: sd at fall-through. Tests store instructions.
 @main def BTBMretStaleSd(outputPath: String): Unit =
   object BTBMretStaleSd extends RVGenerator:
-    val sets = btbSets()
+    val sets          = btbSets()
     def constraints() =
       prologue()
       la(x10, "buf")

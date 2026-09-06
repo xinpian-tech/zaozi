@@ -193,7 +193,7 @@ def constraintsArgSmtName(name: String): String =
   getArgLut().foreach { case (name, arg) =>
     val argName: String = translateToCamelCase(name)
     val argNameLowered = constraintsArgIdent(name)
-    val hasName = if (argNameLowered == "opcodeBits") "OpcodeBits" else argName
+    val hasName        = if (argNameLowered == "opcodeBits") "OpcodeBits" else argName
 
     val width = arg.msb - arg.lsb + 1
     val range = if (argName.toLowerCase.contains("imm") && !argName.contains("lo") && !argName.contains("hi")) {

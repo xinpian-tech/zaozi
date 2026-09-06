@@ -72,9 +72,12 @@ def instruction[T <: OpcodeConstraint](
 def inst[T <: OpcodeConstraint](
   opcode: Index ?=> T
 )(
-  using Arena, Context, Block, Recipe, SpecFor[T]
-)(
-  params: Index ?=> ArgConstraint
+  using Arena,
+  Context,
+  Block,
+  Recipe,
+  SpecFor[T]
+)(params: Index ?=> ArgConstraint
 ): Int = instruction(summon[Recipe].nextIdx(), opcode)(params)
 
 // get an instruction with given index
@@ -272,9 +275,7 @@ def crossFields(
   */
 class Fragment(
   val fixedRegs: Set[Register]
-)(
-  val emit: (Arena, Context, Block, Recipe) ?=> Unit
-)
+)(val emit: (Arena, Context, Block, Recipe) ?=> Unit)
 
 /** Compose fragments sequentially. Records all fixed registers, then emits all fragment code. */
 def compose(

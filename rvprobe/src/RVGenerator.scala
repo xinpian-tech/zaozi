@@ -22,9 +22,8 @@ import scala.compiletime.uninitialized
 
 /** Parse a Z3 output string, throwing with context if the result is not SAT.
   *
-  * Local replacement for the smtlib `parseZ3OutputOrFail` helper that was
-  * removed upstream; the `z3Runner` parameter is retained for call-site
-  * compatibility (the upstream unsat-core dump it drove is no longer wired up).
+  * Local replacement for the smtlib `parseZ3OutputOrFail` helper that was removed upstream; the `z3Runner` parameter is
+  * retained for call-site compatibility (the upstream unsat-core dump it drove is no longer wired up).
   */
 private def parseZ3OutputOrFail(
   z3Output: String,
@@ -1125,11 +1124,10 @@ trait RVGenerator:
     * If the program contains directives or labels, the full statement ordering is used. Otherwise falls back to legacy
     * NOP-padding for explicit-index programs.
     */
-  /** Solve the recipe into the frontend-agnostic [[frontend.SolvedSequence]]
-    * (the SMT core's output) plus the RISC-V statement layout the GAS backend
-    * needs. The statement layout is design-specific and rides alongside the
-    * solved values — a finding worth folding into the DutFrontend contract as
-    * the abstraction matures. */
+  /** Solve the recipe into the frontend-agnostic [[frontend.SolvedSequence]] (the SMT core's output) plus the RISC-V
+    * statement layout the GAS backend needs. The statement layout is design-specific and rides alongside the solved
+    * values — a finding worth folding into the DutFrontend contract as the abstraction matures.
+    */
   def solveRecipe(): (frontend.SolvedSequence, Seq[Statement]) = {
     val (opcodes, statements) = solveOpcodes()
     val args                  = solveArgs(opcodes)

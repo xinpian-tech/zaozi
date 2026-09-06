@@ -21,7 +21,7 @@ object CoverageLib:
   private val CoverageSectionSeparator = "\n\n"
   // Trap handler that skips faulting instruction (4 bytes for non-compressed).
   // Needed because solver-generated code may trash ra/sp or access invalid addresses.
-  private val TrapHandler =
+  private val TrapHandler              =
     """
       |    # Set up trap handler to skip faulting instructions
       |    la   t0, _skip_trap_handler
@@ -36,8 +36,8 @@ object CoverageLib:
       |_after_trap_handler:
       |""".stripMargin
 
-  private val BaremetalPreamble        = HTIFLib.asmTextStart() + TrapHandler
-  private val ScratchBuf =
+  private val BaremetalPreamble = HTIFLib.asmTextStart() + TrapHandler
+  private val ScratchBuf        =
     """
       |    .data
       |    .balign 16
@@ -46,7 +46,7 @@ object CoverageLib:
       |    .fill 256, 1, 0
       |""".stripMargin
 
-  private val BaremetalEpilogue        =
+  private val BaremetalEpilogue =
     s"""${HTIFLib.asmExit()}
        |
        |${HTIFLib.asmTohostSection()}
@@ -109,7 +109,7 @@ object CoverageLib:
         rdRange(1, 32) & rs1Range(1, 32) & rs2Range(1, 32)
       }
     }
-    val seq = sequence(start, start + n)
+    val seq   = sequence(start, start + n)
     seq.coverBins(_.rd, allRegs)
     seq.coverBins(_.rs1, allRegs)
     seq.coverBins(_.rs2, allRegs)
@@ -136,9 +136,9 @@ object CoverageLib:
     *   the AsmApi function for this instruction (e.g. `and`)
     */
   def rTypeLogical(
-    n:     Int,
+    n:      Int,
     opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
-    asmOp: (Referable[SInt], Referable[SInt], Referable[SInt]) => (Arena, Context, Block, Recipe) ?=> Int
+    asmOp:  (Referable[SInt], Referable[SInt], Referable[SInt]) => (Arena, Context, Block, Recipe) ?=> Int
   )(
     using Arena,
     Context,
@@ -151,16 +151,16 @@ object CoverageLib:
     li(rIdent, 42)
     asmOp(freshReg(), rIdent, rIdent)
     // OPPOSITE: all 32 bits differ
-    val rOppA = freshReg()
-    val rOppB = freshReg()
+    val rOppA  = freshReg()
+    val rOppB  = freshReg()
     li(rOppA, 0x55555555L)
-    li(rOppB, 0xAAAAAAAAL.toInt.toLong) // = ~0x55555555 sign-extended
+    li(rOppB, 0xaaaaaaaaL.toInt.toLong) // = ~0x55555555 sign-extended
     asmOp(freshReg(), rOppA, rOppB)
     // DIFFERENT: ≥5 bits differ
     val rDiffA = freshReg()
     val rDiffB = freshReg()
     li(rDiffA, 0L)
-    li(rDiffB, 0xFFL)
+    li(rDiffB, 0xffL)
     asmOp(freshReg(), rDiffA, rDiffB)
 
   /** I-type ALU instruction coverage: 2-register + imm12 with register bins, imm boundary bins + hazards.
@@ -211,9 +211,9 @@ object CoverageLib:
     *   the AsmApi function (e.g. `andi`)
     */
   def iTypeLogical(
-    n:     Int,
+    n:      Int,
     opcode: (Arena, Context, Block, Index, Recipe) ?=> OpcodeConstraint,
-    asmOp: (Referable[SInt], Referable[SInt], Int) => (Arena, Context, Block, Recipe) ?=> Int
+    asmOp:  (Referable[SInt], Referable[SInt], Int) => (Arena, Context, Block, Recipe) ?=> Int
   )(
     using Arena,
     Context,
@@ -226,13 +226,13 @@ object CoverageLib:
     li(rIdent, 42L)
     asmOp(freshReg(), rIdent, 42)
     // OPPOSITE: rs1_value bits all differ from imm (within 12-bit signed range)
-    val rOpp = freshReg()
+    val rOpp   = freshReg()
     li(rOpp, 0x555L)
     asmOp(freshReg(), rOpp, -1366) // -1366 = 0xFFFFFAAA sign-extended, ~0x555 in low 12 bits
     // DIFFERENT: ≥5 bits differ
     val rDiff = freshReg()
     li(rDiff, 0L)
-    asmOp(freshReg(), rDiff, 0xFF)
+    asmOp(freshReg(), rDiff, 0xff)
 
   /** Shift-immediate instruction coverage: 2-register (rd, rs1) with register bins + hazards (no imm bins).
     *
@@ -381,8 +381,7 @@ object CoverageLib:
 
   /** JALR instruction coverage: rd + rs1 register bins + hazards.
     *
-    * JALR is I-type but used for jumps. rd=x0 means discard return address,
-    * rd=x2 (SP) is a key coverage target.
+    * JALR is I-type but used for jumps. rd=x0 means discard return address, rd=x2 (SP) is a key coverage target.
     */
   def jalrCov(
     n:      Int,
@@ -408,8 +407,8 @@ object CoverageLib:
 
   /** CSR instruction coverage: rd + rs1 register bins + hazards.
     *
-    * CSR instructions (csrrw, csrrs, csrrc) have rd and rs1 fields.
-    * rd=x0 means read-only, rd=SP is a key coverage target.
+    * CSR instructions (csrrw, csrrs, csrrc) have rd and rs1 fields. rd=x0 means read-only, rd=SP is a key coverage
+    * target.
     */
   def csr(
     n:      Int,
@@ -435,8 +434,7 @@ object CoverageLib:
 
   /** CSR-immediate instruction coverage: rd register bins + hazards.
     *
-    * CSR-immediate instructions (csrrwi, csrrsi, csrrci) have rd field only.
-    * rd=SP is a key coverage target.
+    * CSR-immediate instructions (csrrwi, csrrsi, csrrci) have rd field only. rd=SP is a key coverage target.
     */
   def csrImm(
     n:      Int,
