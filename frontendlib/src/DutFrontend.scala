@@ -5,8 +5,7 @@ package me.jiuyang.frontendlib
 /** A DUT frontend describes its stimulus alphabet and optional internal signals, solves a recipe, and renders the
   * result through a matching backend.
   *
-  * Each frontend owns its artifact type so it can retain the information needed to render without solving again. For
-  * example, the RISC-V frontend retains the assembly statement layout alongside the solved instruction fields.
+  * Each frontend owns its artifact type so it can retain the information needed to render without solving again.
   */
 trait DutFrontend:
   /** The frontend-specific solved artifact its backend renders. */
@@ -37,27 +36,26 @@ trait DutFrontend:
   * @param selections
   *   sequence index -> chosen alphabet element id
   * @param fields
-  *   solved field name (e.g. "rs1_3", "imm12_8") -> value
+  *   solved field name (e.g. "enq_bits_3") -> value
   */
 final case class SolvedSequence(
   selections: Map[Int, Int],
   fields:     Map[String, BigInt])
 
 /** A frontend's fully-solved artifact: the frontend-agnostic [[SolvedSequence]] plus whatever design-specific structure
-  * its backend needs to render (for the RISC-V leg, the recipe statement layout). Backends render from this, so no
-  * stage is re-run at render time.
+  * its backend needs to render. Backends render from this, so no stage is re-run at render time.
   */
 trait SolvedArtifact:
   def sequence: SolvedSequence
 
-/** One atomic stimulus kind in a DUT's alphabet (an instruction opcode, a transaction kind, …). Its legality is
-  * expressed as constraints over the shared SMT layer by the owning frontend.
+/** One atomic stimulus kind in a DUT's alphabet. Its legality is expressed as constraints over the shared SMT layer by
+  * the owning frontend.
   */
 trait StimulusKind:
   /** Stable id used in [[SolvedSequence.selections]]. */
   def id: Int
 
-  /** Human-readable mnemonic (instruction name, transaction kind, …). */
+  /** Human-readable name of the stimulus kind. */
   def mnemonic: String
 
 /** The set of atomic stimuli a DUT accepts. */
@@ -76,9 +74,9 @@ trait WhiteboxPredicate:
   * artifact type so no re-solve is needed at render time.
   */
 trait StimulusBackend[A <: SolvedArtifact]:
-  /** e.g. "gas-asm", "chiselsim". */
+  /** Backend name, e.g. "chiselsim". */
   def kind: String
 
-  /** Produce the concrete stimulus artifact (assembly text, a ChiselSim script, …) from a solved artifact.
+  /** Produce the concrete stimulus artifact (e.g. a ChiselSim script) from a solved artifact.
     */
   def render(solved: A): String
