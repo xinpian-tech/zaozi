@@ -35,7 +35,7 @@ object SvImport:
     *      plain eq/ne under the two-state semantics the bounded model works in — and circt-bmc cannot lower the
     *      four-state forms.
     *   3. Registers arrive with reset folded into their input mux and NO initial value — [[MlirBmc.pinFirregs]] pins
-    *      them (the caller assumes the reset input low, and [[Txn.firstCycle]] lets the RTL reset itself, so the
+    *      them (the caller must model the RTL's reset preamble explicitly, so the
     *      pinned zero only has to match Verilator's two-state startup).
     *   4. Small `seq.firmem` memories are expanded into per-slot registers ([[expandFirmems]]).
     */

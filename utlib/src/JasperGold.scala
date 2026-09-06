@@ -6,17 +6,19 @@ import me.jiuyang.zaozi.*
 
 /** A UT lowered for a SystemVerilog formal engine: firtool's single-file SV of the linked design (zaozi's
   * `assert property (not (…))` and `assume property` emitted as-is), the external RTL the wrapper's extern binds to,
-  * and the top's clock and reset port names. Runtime generators explicitly name their generation assertions;
-  * an empty generationLabels set retains the historical negation-spelling-based conversion.
+  * and the top's clock and reset port names. Generation assertions must be named explicitly; ordinary assertions
+  * and external RTL covers are never interpreted as generation requests.
   */
 final case class JgModel(
   sv:      os.Path,
   top:     String,
   rtl:     Seq[os.Path],
+  generationLabels: Set[String],
   include: Option[os.Path] = None,
   clock:   String = "clock",
-  reset:   String = "reset",
-  generationLabels: Set[String] = Set.empty)
+  reset:   String = "reset"):
+  require(generationLabels.nonEmpty, "generation labels must not be empty")
+  require(generationLabels.forall(_.matches("[A-Za-z_][A-Za-z0-9_]*")), "invalid generation label")
 
 /** The second formal backend: JasperGold, for the depth circt-bmc does not reach.
   *
@@ -27,7 +29,7 @@ final case class JgModel(
   * "no trace at any depth", not "none within the bound".
   *
   * The engine runs through `ZAOZI_EDA_SHELL` when set (a wrapper invoked as `<shell> -c "<command>"` that provides the
-  * license environment — see `experiments/haven_tb/eda-shell`), else `jg` from `PATH`. The counterexample is dumped
+  * license environment — see `experiments/eda-shell`), else `jg` from `PATH`. The counterexample is dumped
   * as VCD and read back per rising clock edge into the same [[Trace]] shape circt-bmc's parser produces: top-level
   * ports by name, internal signals by `scope/…/name` below the top.
   */
@@ -48,6 +50,7 @@ object JasperGold:
     parameter: PARAM,
     outDir:    os.Path,
     rtl:       Seq[os.Path],
+    generationLabels: Set[String],
     include:   Option[os.Path] = None
   ): JgModel =
     os.makeDir.all(outDir)
@@ -55,8 +58,11 @@ object JasperGold:
     val moduleDir = outDir / s"jg_mlir_${parameter.hashCode.toHexString}"
     val linked    = Lower.elaborateAndLink(dut, parameter, moduleDir, top)
     val sv        = outDir / s"$top.sv"
-    os.proc(CirctTools("firtool"), linked.toString, "-o", sv.toString).call(check = true)
-    JgModel(sv, top, rtl, include)
+    // Keep generation assertions even when their condition folds to true (an impossible goal).
+    // Dropping such an assertion loses the distinction between unreachable and a missing property.
+    // The external DUT RTL is unchanged, and JasperGold still optimizes the elaborated model.
+    os.proc(CirctTools("firtool"), "--disable-opt", linked.toString, "-o", sv.toString).call(check = true)
+    JgModel(sv, top, rtl, generationLabels, include)
 
   /** Generate a witness for the UT's intent. `timeLimit` is JasperGold's per-run proof limit.
     *
@@ -87,7 +93,7 @@ object JasperGold:
       require(label.matches("[A-Za-z_][A-Za-z0-9_]*"), s"unsupported generation label: $label")
       s"[string match {*::${model.top}.$label} $$p] || [string equal {${model.top}.$label} $$p]"
     }.mkString(" || ")
-    val filter = if selected.isEmpty then "" else s"if {!($selected)} { continue }"
+    val filter = s"if {!($selected)} { continue }"
     val tcl     = workDir / "generate.tcl"
     os.write.over(
       tcl,
@@ -130,32 +136,24 @@ object JasperGold:
     else if statuses.nonEmpty && statuses.forall(_._2 == "unreachable") then GenerateOutcome.Infeasible
     else GenerateOutcome.Unknown(s"cover statuses: ${statuses.map((n, s) => s"$n=$s").mkString(", ")}")
 
-  /** Turn selected generation assertions into covers of their negation; preserve the legacy heuristic if unmarked. */
-  private[utlib] def asCover(sv: String, labels: Set[String] = Set.empty): String =
+  /** Turn explicitly selected generation assertions into covers of their negation. */
+  private[utlib] def asCover(sv: String, labels: Set[String]): String =
     // A runtime UT identifies its generation properties explicitly. Negate the emitted assertion,
     // not its source spelling: firtool may fold !done to ~done, !(!done) to done, or a constant.
     // Never reinterpret an unrelated assertion as a generation request.
-    if labels.nonEmpty then
-      val found = collection.mutable.Set.empty[String]
-      val result = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);".r.replaceAllIn(
-        sv,
-        m => java.util.regex.Matcher.quoteReplacement(
-          if labels.contains(m.group(1)) then
-            found += m.group(1)
-            s"${m.group(1)}:${m.group(2)}cover property (not (${m.group(3)}));"
-          else m.matched
-        )
+    require(labels.nonEmpty, "generation labels must not be empty")
+    val found = collection.mutable.Set.empty[String]
+    val result = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);".r.replaceAllIn(
+      sv,
+      m => java.util.regex.Matcher.quoteReplacement(
+        if labels.contains(m.group(1)) then
+          require(found.add(m.group(1)), s"ambiguous generation label: ${m.group(1)}")
+          s"${m.group(1)}:${m.group(2)}cover property (not (${m.group(3)}));"
+        else m.matched
       )
-      require(found.toSet == labels, s"generation labels missing from emitted assertions: ${labels -- found}")
-      return result
-    // FIRRTL emits temporal negation as `not (S)` and combinational negation as `~(S)`.
-    // Both are the same generation assertion and must become a cover; otherwise JasperGold finds a
-    // counterexample to the assertion but the witness collector (correctly) sees no cover property.
-    raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((?:not\s*|~)\((.*?)\)\);".r
-      .replaceAllIn(
-        sv,
-        m => java.util.regex.Matcher.quoteReplacement(s"${m.group(1)}:${m.group(2)}cover property ((${m.group(3)}));")
-      )
+    )
+    require(found.toSet == labels, s"generation labels missing from emitted assertions: ${labels -- found}")
+    result
 
   /** The window JasperGold dumps holds the property's cone, under the names the cone uses — a top-level output
     * that merely forwards an instance pin appears as the pin, not the port. firtool's SV states every such

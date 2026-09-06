@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Task: serialize a caller-supplied typed intent expression and pending proof metadata.
-// Given: a label, a Scala Sem expression, and an independently supplied proof reason.
+// Task: serialize a caller-supplied generation expression and pending proof metadata.
+// Given: a label, a Scala predicate/sequence/property, and an independently supplied proof reason.
 // Example solution: the expression is later typechecked in a run-generated UT.
 // This example provides no port names, candidate values, predicates or proof conclusions.
 object FrameworkDataExample:

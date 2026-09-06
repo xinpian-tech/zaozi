@@ -69,5 +69,5 @@
     "name": "rvprobe_llm_seq",
     "item_type": "alu_top_seq_item"
   },
-  "context": "32-bit ALU. Opcodes: 0=FP_ADD, 1=FP_SUB, 2=AND, 3=OR, 4=XOR, 5=SLL, 6=SRL, 7=SRA, 8=FP2INT, 9=NOT. Flag bits: 3=OVERFLOW, 2=UNDERFLOW, 1=ZERO, 0=INVALID. The existing replay driver owns clock, reset and transaction handshaking. Derive candidate values and predicates from the current RTL, not historical scenarios."
+  "context": "32-bit ALU. Opcodes: 0=FP_ADD, 1=FP_SUB, 2=AND, 3=OR, 4=XOR, 5=SLL, 6=SRL, 7=SRA, 8=FP2INT, 9=NOT. Flag bits: 3=OVERFLOW, 2=UNDERFLOW, 1=ZERO, 0=INVALID. In cycle-replay-v1 every witness starts from reset, one beat drives one clock cycle, and the driver does not wait for done. Explicit drain cycles follow each witness but are not part of its formal goal. Derive candidate values and predicates from the current RTL, not historical scenarios."
 }

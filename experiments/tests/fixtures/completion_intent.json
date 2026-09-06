@@ -1,0 +1,4 @@
+{
+  "intents": [{"label": "completion", "expression": "io.done"}],
+  "proofObligations": []
+}

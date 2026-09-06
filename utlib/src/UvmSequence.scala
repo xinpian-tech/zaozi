@@ -13,9 +13,9 @@ package me.jiuyang.utlib
   * Two fills, because an intent is a *constraint* and a witness is only one of its solutions:
   *   - `pinned = None` replays the witness exactly — one concrete transaction per beat.
   *   - `pinned = Some(fields)` pins just the fields the intent constrained and randomizes the rest, so one solved
-  *     witness expands into `repeatPerBeat` transactions that all still satisfy it. This is how directed generation
-  *     reaches volume without paying a solver call per transaction: the solver supplies the structure, the simulator
-  *     fills the free data.
+  *     witness expands into `repeatPerBeat` transactions. This is a stimulus mutation, not a proof that an arbitrary
+  *     Gen goal remains satisfied; temporal/data dependencies must be validated again. The checked experiment flow
+  *     uses neither partial pinning nor transaction compression.
   */
 final case class UvmSequence(
   sequenceName:  String,
@@ -67,8 +67,7 @@ final case class UvmSequence(
                 |      start_item(txn);
                 |$assignments
                 |      finish_item(txn);""".stripMargin
-          // Only the fields the intent actually constrained are pinned; the rest randomize, so one solved
-          // witness expands into `repeatPerBeat` transactions that all still satisfy the intent.
+          // The caller chooses the pinned fields. Randomizing the rest does not preserve an arbitrary goal.
           case Some(keys) =>
             val constraints = stimulus.spec.drive
               .filter(p => keys.contains(p.name))
@@ -113,6 +112,8 @@ object UvmSequence:
     * The witnesses need not come from the same module: directed generation typically solves one intent per
     * *parameterization* of a UT, so the DUT names differ by construction. What must agree is the drive-port
     * signature, since that is what a beat assigns and what the transaction's fields are named after.
+    * This joins data only: it does not reset the DUT or preserve independent witnesses' starting states.
+    * Checked experiment replay resets each witness separately and does not use this helper.
     */
   def concat(spec: AbiSpec, stimuli: Seq[AbstractStimulus]): AbstractStimulus =
     def signature(s: AbiSpec) = s.drive.map(p => (p.name, p.width, p.signed))

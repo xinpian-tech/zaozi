@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "contract": "cycle-replay-v1",
+  "design": "tiny_design.json",
+  "reset_cycles": 2,
+  "drain_cycles": 2,
+  "idle": {"payload": 0, "valid": 0},
+  "baseline": {
+    "seed": 1,
+    "samples": 2,
+    "active_cycles": 1,
+    "idle_cycles": 1,
+    "random_ports": ["payload"],
+    "asserted": {"valid": 1}
+  }
+}

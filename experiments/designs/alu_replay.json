@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "contract": "cycle-replay-v1",
+  "design": "alu.json",
+  "reset_cycles": 2,
+  "drain_cycles": 16,
+  "idle": {"a": 0, "b": 0, "op": 0, "start": 0},
+  "baseline": {
+    "seed": 1,
+    "samples": 1024,
+    "active_cycles": 1,
+    "idle_cycles": 16,
+    "random_ports": ["a", "b", "op"],
+    "asserted": {"start": 1}
+  }
+}

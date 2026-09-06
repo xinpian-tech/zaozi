@@ -21,10 +21,11 @@ object JasperGoldTest extends TestSuite:
           |  assert property (done);
           |""".stripMargin
 
-      assert(JasperGold.asCover(temporal).contains("cover property (((a) ##1 (b)));"))
-      assert(JasperGold.asCover(combinational).contains("value: cover property ((op == 4'h0 & start));"))
-      assert(JasperGold.asCover(combinational).contains("cover property ((a == 1'b1));"))
-      assert(JasperGold.asCover(ordinary) == ordinary)
+      val converted = JasperGold.asCover(temporal + combinational + ordinary, Set("flow", "value", "short"))
+      assert(converted.contains("cover property (not (not ((a) ##1 (b))));"))
+      assert(converted.contains("value: cover property (not (~(op == 4'h0 & start)));"))
+      assert(converted.contains("cover property (not (~(a == 1'b1)));"))
+      assert(converted.contains(ordinary))
 
     test("explicit generation labels survive firtool boolean simplification"):
       val sv = """completion: assert property (~_dut_done);
@@ -43,4 +44,17 @@ object JasperGoldTest extends TestSuite:
     test("a missing generation label fails instead of returning a misleading cover result"):
       intercept[IllegalArgumentException] {
         JasperGold.asCover("ordinary: assert property (done);", Set("missing"))
+      }
+
+    test("unmarked or ambiguous generation assertions are rejected"):
+      intercept[IllegalArgumentException] {
+        JasperGold.asCover("old: assert property (not (done));", Set.empty)
+      }
+      intercept[IllegalArgumentException] {
+        JasperGold.asCover("goal: assert property (~done);\ngoal: assert property (~done);", Set("goal"))
+      }
+
+    test("generation model requires labels"):
+      intercept[IllegalArgumentException] {
+        JgModel(os.pwd / "unused.sv", "top", Seq.empty, Set.empty)
       }

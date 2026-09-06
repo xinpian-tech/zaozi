@@ -21,6 +21,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DESIGN = ROOT / "experiments/designs/alu.json"
+CONTRACT = "runtime-ut-v2"
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 LABEL = re.compile(r"[a-z][a-z0-9_]{0,79}\Z")
 
@@ -228,11 +229,11 @@ object RunIntent{index} extends Generator[RunParameter, RunLayers, RunIO, RunPro
     val io = summon[Interface[RunIO]]
     val dut = ImportedDut.instantiate(parameter)
 {chr(10).join(connections)}
-    Txn.assumeResetLow(io.reset)
+    Assume((!io.reset.asBool).I, "rst_low")
     given ClockEvent = posedge(io.clock)
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
-    Generate((
+    Gen((
 {expression}
     ), "rvprobe_generated_{index}")
 """)
@@ -246,12 +247,11 @@ object RunIntent{index} extends Generator[RunParameter, RunLayers, RunIO, RunPro
       val generator = UTGenerator(RunIntent{index}, parameter, dir)
       generator.saveAbi()
       val began = System.currentTimeMillis()
-      val model = JasperGold.lower(RunIntent{index}, parameter, dir / "lowered", rtl, include = {include})
-        .copy(generationLabels = Set("rvprobe_generated_{index}"))
+      val model = JasperGold.lower(RunIntent{index}, parameter, dir / "lowered", rtl,
+        generationLabels = Set("rvprobe_generated_{index}"), include = {include})
       JasperGold.generate(model, dir / "jg", timeLimit = {scala_string(time_limit)}) match
         case GenerateOutcome.Generated(trace) =>
           val stimulus = AbstractStimulus.fromTrace(trace, generator.abi.spec)
-          stimuli += stimulus
           val beats = ujson.Arr(stimulus.beats.map(b =>
             ujson.Obj.from(b.values.toSeq.map((name, value) => name -> ujson.Str(value.toString))))*)
           os.write.over(dir / "stimulus.json", ujson.write(beats, indent = 2))
@@ -259,7 +259,8 @@ object RunIntent{index} extends Generator[RunParameter, RunLayers, RunIO, RunPro
             .write(stimulus, dir / {scala_string(design.sequence_name + '.sv')})
           rows += ujson.Obj("label" -> label, "status" -> "generated", "engine" -> "jaspergold",
             "ms" -> (System.currentTimeMillis() - began), "cycles" -> trace.cycles,
-            "sequenceFile" -> individual.toString, "stimulusFile" -> (dir / "stimulus.json").toString)
+            "sequenceFile" -> individual.toString, "stimulusFile" -> (dir / "stimulus.json").toString,
+            "witnessFile" -> (dir / "jg" / "witness.vcd").toString)
         case GenerateOutcome.Infeasible =>
           rows += ujson.Obj("label" -> label, "status" -> "infeasible", "engine" -> "jaspergold",
             "ms" -> (System.currentTimeMillis() - began))
@@ -274,29 +275,18 @@ object Generated extends UTExperiment:
     val parameter = RunParameter()
     val rtl = Seq({sources})
     val rows = collection.mutable.ArrayBuffer.empty[ujson.Obj]
-    val stimuli = collection.mutable.ArrayBuffer.empty[AbstractStimulus]
 {chr(10).join(rows)}
     val proofs = ujson.read({proofs})
-    val sequence = stimuli.headOption.map {{ first =>
-      val all = UvmSequence.concat(first.spec, stimuli.toSeq)
-      val codec = UvmSequence({scala_string(design.sequence_name)}, {scala_string(design.item_type)})
-      codec.write(all, outDir / {scala_string(design.sequence_name + '.sv')}).toString
-    }}
-    // Empty/proof-only runs still need an executable empty sequence for baseline replay.
-    val sequencePath = sequence.getOrElse {{
-      val spec = AbiSpec({scala_string(design.top)}, Seq.empty, AbiSpec.AbiVersion)
-      UvmSequence({scala_string(design.sequence_name)}, {scala_string(design.item_type)})
-        .write(AbstractStimulus(spec, Vector.empty), outDir / {scala_string(design.sequence_name + '.sv')}).toString
-    }}
     val status =
       if rows.exists(_("status").str == "unknown") then "unknown"
       else if rows.exists(_("status").str == "infeasible") then "infeasible"
       else if rows.nonEmpty then "generated"
       else if proofs.arr.nonEmpty then "proof-required"
       else "no-candidates"
-    ujson.Obj("status" -> status, "engine" -> "jaspergold", "beats" -> stimuli.map(_.cycles).sum,
-      "replayContract" -> "drive fields per witness beat; driver timing and reset between witnesses require replay validation",
-      "sequenceFile" -> sequencePath, "intents" -> ujson.Arr(rows.toSeq*), "proofObligations" -> proofs)
+    ujson.Obj("status" -> status, "engine" -> "jaspergold",
+      "beats" -> rows.filter(_("status").str == "generated").map(_("cycles").num.toInt).sum,
+      "replayContract" -> "cycle-replay-v1",
+      "intents" -> ujson.Arr(rows.toSeq*), "proofObligations" -> proofs)
 """)
     return "\n".join(parts)
 

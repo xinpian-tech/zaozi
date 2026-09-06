@@ -1,0 +1,20 @@
+#!/bin/sh
+# EDA command wrapper: proxies stripped (the license servers are local), Cadence/Synopsys license
+# files set, run inside the Synopsys FHS env. Invoked by utlib as: eda-shell -c "<command>".
+# Point ZAOZI_EDA_SHELL at this file; override SNPS_FHS_ENV if the FHS environment lives elsewhere.
+unset http_proxy https_proxy ftp_proxy all_proxy rsync_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY RSYNC_PROXY JAVA_TOOL_OPTIONS
+export CDS_LIC_FILE=${CDS_LIC_FILE:-28000@license0.caat}
+export INTERRAD_LICENSE_FILE=${INTERRAD_LICENSE_FILE:-30000@license0.caat}
+export SNPSLMD_LICENSE_FILE=${SNPSLMD_LICENSE_FILE:-27000@license0.caat}
+export JASPER_HOME=${JASPER_HOME:-/opt/cadence/JASPER2103}
+export VC_STATIC_HOME=${VC_STATIC_HOME:-/opt/synopsys/vc_static/V-2023.12}
+export DWBB_DIR=${DWBB_DIR:-/opt/synopsys/fusioncompiler/V-2023.12/dw}
+export FC_HOME=${FC_HOME:-/opt/synopsys}
+export FM_HOME=${FM_HOME:-/opt/synopsys/fm/V-2023.12-SP5}
+export LC_HOME=${LC_HOME:-/opt/synopsys/lc/V-2023.12}
+export MC2_INSTALL_DIR=${MC2_INSTALL_DIR:-/opt/tsmc/MC2_2012.02.00.d}
+export TSMC_FILELIST=${TSMC_FILELIST:-/var/storage/workspaces/TSMC28/filelist}
+export PATH=$JASPER_HOME/bin:$PATH
+FHS=${SNPS_FHS_ENV:-/root/yjh-workspace/rvprobe-workspace/snps-fhs-gcroot/bin/snps-fhs-env}
+shift
+exec "$FHS" -c "$*"

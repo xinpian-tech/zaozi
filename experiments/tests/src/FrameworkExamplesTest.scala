@@ -37,7 +37,6 @@ object FrameworkExamplesTest extends TestSuite:
     test("a synthetic ABI stimulus can be exported through the codec"):
       val trace = Trace(1, Map("payload" -> Vector(BigInt(7))))
       val stimulus = FrameworkPipelineExample.interpret(GenerateOutcome.Generated(trace), spec).toOption.get
-      val stream = UvmSequence.concat(spec, Seq(stimulus))
-      val rendered = UvmSequence("example_seq", "example_item", pinned = Some(Set("payload"))).render(stream)
+      val rendered = UvmSequence("example_seq", "example_item").render(stimulus)
       assert(rendered.contains("class example_seq extends uvm_sequence #(example_item)"))
-      assert(rendered.contains("payload == 8'h7;"))
+      assert(rendered.contains("txn.payload = 8'h7;"))

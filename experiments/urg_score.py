@@ -47,7 +47,8 @@ _MODULE_SCORE = re.compile(r"^SCORE\s+[A-Z ]*\n\s*([\d.]+)\s", re.M)
 
 def parse(path):
     """Read a URG modinfo.txt into {module: ({metric: (total_bins, covered_bins)}, urg_score)}."""
-    parts = _MODULE_SPLIT.split(open(path, errors="replace").read())
+    with open(path, errors="replace") as source:
+        parts = _MODULE_SPLIT.split(source.read())
     report = {}
     for name, body in zip(parts[1::2], parts[2::2]):
         sections = {m.group(1): m.group(2) for m in _SECTION.finditer(body)}
