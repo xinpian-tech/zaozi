@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.Incrementer" %s --
+// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.adder.default.Incrementer" %s --
 // DEFINE: %{bmc} = circt-bmc %t.dir/w8.contract.hw.mlir --module=Incrementer_width8_radix4_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
 
 // width 8
@@ -22,8 +22,8 @@
 // CONTRACT8: firrtl.int.verif.ensure
 
 // VERILOG8-LABEL: module Incrementer_width8_radix4
-// VERILOG8: input{{ +}}[7:0]{{ +}}A,
-// VERILOG8: output{{ +}}[7:0]{{ +}}SUM
+// VERILOG8: input{{ +}}[7:0]{{ +}}a,
+// VERILOG8: output{{ +}}[7:0]{{ +}}sum
 
 // LOWERED8-LABEL: hw.module @Incrementer_width8_radix4
 // LOWERED8: verif.assume
