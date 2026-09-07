@@ -870,6 +870,42 @@ object SVASpec extends TestSuite:
           "@(posedge clock) ib0 until ib0 and ib1"
         )
 
+      test("past"):
+        @generator
+        object SimpleSVA
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasVerilogTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+            val previous     = past(io.ib0, 2)
+
+            Assert(previous.S iff io.ib1.S, "past")
+
+        println(SimpleSVA.verilogString(SVASpecParameter(32)))
+        SimpleSVA.verilogTest(SVASpecParameter(32))(
+          "$past(ib0, 2, , @(posedge clock));"
+        )
+
+      test("past rejects non-positive delays"):
+        @generator
+        object InvalidPast
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasCompileErrorTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+
+            val zeroDelay = intercept[IllegalArgumentException]:
+              past(io.ib0, 0)
+            assert(zeroDelay.getMessage.contains("past delay (0)"))
+
+            val negativeDelay = intercept[IllegalArgumentException]:
+              past(io.ib0, -1)
+            assert(negativeDelay.getMessage.contains("past delay (-1)"))
+
+        InvalidPast.compileErrorTest(SVASpecParameter(32))
+
     test("Clock"):
       test("Simple"):
         @generator

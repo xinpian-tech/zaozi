@@ -1217,6 +1217,21 @@ trait SVAApi:
   def posedge(clock: Referable[Clock]): ClockEvent
   def negedge(clock: Referable[Clock]): ClockEvent
 
+  def past[T <: Referable[Bool]](
+    value: T,
+    delay: Int = 1
+  )(
+    using ClockEvent
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Node[Bool]
+
   /** SVA: always p
     */
   def always(
