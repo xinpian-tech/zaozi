@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
-import me.jiuyang.stdlib.adder.PrefixAdderParameter
+import me.jiuyang.stdlib.adder.default.PrefixAdderParameter
 import me.jiuyang.stdlib.adder.default.Incrementer
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}

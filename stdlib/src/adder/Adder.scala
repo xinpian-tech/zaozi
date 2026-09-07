@@ -14,12 +14,6 @@ import java.lang.foreign.Arena
 trait AdderParameter extends Parameter:
   def width: Int
 
-case class PrefixAdderParameter(width: Int, radix: Int = 4) extends AdderParameter:
-  require(width > 0, "width must be positive")
-  require(radix >= 2, "radix must be at least 2")
-
-given upickle.default.ReadWriter[PrefixAdderParameter] = upickle.default.macroRW
-
 class AdderLayers[P <: AdderParameter](parameter: P) extends LayerInterface(parameter):
   def layers = Seq.empty
 
@@ -34,8 +28,8 @@ class AdderIO[P <: AdderParameter](parameter: P) extends HWBundle(parameter):
 class AdderProbe[P <: AdderParameter](parameter: P) extends DVBundle[P, AdderLayers[P]](parameter)
 
 object Adder:
-  def apply(
-    parameter: PrefixAdderParameter
+  def apply[P <: AdderParameter](
+    parameter: P
   )(
     using Arena,
     AdderImpl,
@@ -45,12 +39,12 @@ object Adder:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): Wire[AdderIO[PrefixAdderParameter]] = summon[AdderImpl].apply(parameter)
+  ): Wire[AdderIO[P]] = summon[AdderImpl].apply(parameter)
 
 /** Implementation hook for the portable [[Adder]] interface. */
 trait AdderImpl:
-  def apply(
-    parameter: PrefixAdderParameter
+  def apply[P <: AdderParameter](
+    parameter: P
   )(
     using Arena,
     Context,
@@ -59,4 +53,4 @@ trait AdderImpl:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): Wire[AdderIO[PrefixAdderParameter]]
+  ): Wire[AdderIO[P]]

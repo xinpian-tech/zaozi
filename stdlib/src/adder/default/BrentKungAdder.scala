@@ -2,14 +2,11 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib.adder.default
 
-import java.lang.foreign.Arena
-
-import me.jiuyang.stdlib.adder.{AdderIO, AdderImpl, AdderLayers, AdderProbe, PrefixAdderParameter, given}
+import me.jiuyang.stdlib.adder.{AdderIO, AdderLayers, AdderProbe}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 import scala.collection.immutable.SeqMap
 
@@ -107,25 +104,3 @@ object BrentKungAdder
 
     io.sum := checkedSUM
     io.co  := checkedCO
-
-given AdderImpl with
-  def apply(
-    parameter: PrefixAdderParameter
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line,
-    sourcecode.Name.Machine,
-    InstanceContext
-  ): Wire[AdderIO[PrefixAdderParameter]] =
-    val io      = Wire(new AdderIO(parameter))
-    val adderIO = BrentKungAdder.instantiate(parameter).io
-
-    adderIO.a  := io.a
-    adderIO.b  := io.b
-    adderIO.ci := io.ci
-    io.co      := adderIO.co
-    io.sum     := adderIO.sum
-    io

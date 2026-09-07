@@ -5,8 +5,7 @@ package me.jiuyang.stdlib.queue.default
 import java.lang.foreign.Arena
 
 import me.jiuyang.stdlib.*
-import me.jiuyang.stdlib.adder.{Adder, PrefixAdderParameter}
-import me.jiuyang.stdlib.adder.default.{Incrementer, given}
+import me.jiuyang.stdlib.adder.default.{BrentKungAdder, Incrementer, PrefixAdderParameter}
 import me.jiuyang.stdlib.default.{*, given}
 import me.jiuyang.stdlib.queue.*
 import me.jiuyang.zaozi.*
@@ -182,7 +181,7 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val wordCountIncrementer = Incrementer.instantiate(PrefixAdderParameter(addressWidth))
     wordCountIncrementer.io.a := wordCount.asBits
     val wordCountPlusOne    = wordCountIncrementer.io.sum.asUInt
-    val wordCountSubtractIO = Adder(PrefixAdderParameter(addressWidth, 4))
+    val wordCountSubtractIO = BrentKungAdder.instantiate(PrefixAdderParameter(addressWidth, 4)).io
     wordCountSubtractIO.a  := wordCount.asBits
     wordCountSubtractIO.b  := ~1.U(addressWidth).asBits
     wordCountSubtractIO.ci := true.B
