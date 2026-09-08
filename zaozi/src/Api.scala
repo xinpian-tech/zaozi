@@ -331,7 +331,8 @@ trait ConstructorApi:
   ): Unit
 
   def Wire[T <: Data](
-    refType: T
+    refType:   T,
+    forceable: Boolean = false
   )(
     using Arena,
     Context,
@@ -342,7 +343,8 @@ trait ConstructorApi:
     InstanceContext
   ):   Wire[T]
   def Reg[T <: Data](
-    refType: T
+    refType:   T,
+    forceable: Boolean = false
   )(
     using ClockScope
   )(
@@ -355,7 +357,8 @@ trait ConstructorApi:
     InstanceContext
   ):   Reg[T]
   def RegInit[T <: Data](
-    input: Const[T]
+    input:     Const[T],
+    forceable: Boolean = false
   )(
     using ClockScope
   )(
@@ -370,7 +373,8 @@ trait ConstructorApi:
     InstanceContext
   ):   Reg[T]
   def Node[T <: Data](
-    ref: Referable[T]
+    ref:       Referable[T],
+    forceable: Boolean = false
   )(
     using Arena,
     Context,
@@ -572,6 +576,54 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
     @targetName("resolve")
     def <==(
       that: PROBE
+    )(
+      using Arena,
+      Context,
+      Block,
+      LayerTree,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+
+/** Force/release writable probes, on a rising clock edge or at initialization. */
+trait ProbeForce[D <: Data & CanProbe]:
+  extension (ref: Referable[RWProbe[D]])
+    def force(
+      value:  Referable[D],
+      clock:  Referable[Clock],
+      enable: Referable[Bool]
+    )(
+      using Arena,
+      Context,
+      Block,
+      LayerTree,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+    def release(
+      clock:  Referable[Clock],
+      enable: Referable[Bool]
+    )(
+      using Arena,
+      Context,
+      Block,
+      LayerTree,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+    def forceInitial(
+      value:  Referable[D],
+      enable: Referable[Bool]
+    )(
+      using Arena,
+      Context,
+      Block,
+      LayerTree,
+      sourcecode.File,
+      sourcecode.Line
+    ): Unit
+    def releaseInitial(
+      enable: Referable[Bool]
     )(
       using Arena,
       Context,

@@ -137,7 +137,8 @@ given ConstructorApi with
     )
 
   def Wire[T <: Data](
-    refType: T
+    refType:   T,
+    forceable: Boolean = false
   )(
     using Arena,
     Context,
@@ -151,7 +152,8 @@ given ConstructorApi with
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
-      tpe = refType.toMlirType
+      tpe = refType.toMlirType,
+      forceable = forceable
     )
     wireOp.operation.appendToBlock()
     new Wire[T]:
@@ -159,7 +161,8 @@ given ConstructorApi with
       val _refer: Value = wireOp.operation.getResult(0)
 
   def Reg[T <: Data](
-    refType: T
+    refType:   T,
+    forceable: Boolean = false
   )(
     using ClockScope
   )(
@@ -178,7 +181,8 @@ given ConstructorApi with
       nameKind = FirrtlNameKind.Interesting,
       tpe = refType.toMlirType,
       clock = clockScope.clock.refer,
-      clockEdge = clockScope.clockEdge
+      clockEdge = clockScope.clockEdge,
+      forceable = forceable
     )
     regOp.operation.appendToBlock()
     new Reg[T]:
@@ -186,7 +190,8 @@ given ConstructorApi with
       val _refer: Value = regOp.operation.getResult(0)
 
   def RegInit[T <: Data](
-    input: Const[T]
+    input:     Const[T],
+    forceable: Boolean = false
   )(
     using ClockScope
   )(
@@ -212,7 +217,8 @@ given ConstructorApi with
       resetValue = input.refer,
       clockEdge = clockScope.clockEdge,
       resetType = resetScope.resetType,
-      resetPolarity = resetScope.resetPolarity
+      resetPolarity = resetScope.resetPolarity,
+      forceable = forceable
     )
     regResetOp.operation.appendToBlock()
     new Reg[T]:
@@ -220,7 +226,8 @@ given ConstructorApi with
       val _refer: Value = regResetOp.operation.getResult(0)
 
   def Node[T <: Data](
-    ref: Referable[T]
+    ref:       Referable[T],
+    forceable: Boolean = false
   )(
     using Arena,
     Context,
@@ -234,7 +241,8 @@ given ConstructorApi with
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
-      input = ref.refer
+      input = ref.refer,
+      forceable = forceable
     )
     nodeOp.operation.appendToBlock()
     new Node[T]:

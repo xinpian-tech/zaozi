@@ -37,7 +37,8 @@ trait RegApi      extends HasOperation[Reg]:
     nameKind:    FirrtlNameKind,
     tpe:         Type,
     clock:       Value,
-    clockEdge:   FirrtlEventControl
+    clockEdge:   FirrtlEventControl,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context
@@ -95,7 +96,8 @@ trait RegResetApi extends HasOperation[RegReset]:
     resetValue:    Value,
     clockEdge:     FirrtlEventControl,
     resetType:     RegResetType,
-    resetPolarity: RegResetPolarity
+    resetPolarity: RegResetPolarity,
+    forceable:     Boolean = false
   )(
     using arena:   Arena,
     context:       Context
@@ -107,7 +109,8 @@ trait WireApi     extends HasOperation[Wire]:
     name:        String,
     location:    Location,
     nameKind:    FirrtlNameKind,
-    tpe:         Type
+    tpe:         Type,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context

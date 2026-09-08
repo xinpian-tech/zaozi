@@ -6,7 +6,7 @@ import scala.annotation.targetName
 
 import me.jiuyang.zaozi.reftpe.Referable
 import me.jiuyang.zaozi.valuetpe.{CanProbe, Data, RProbe, RWProbe}
-import me.jiuyang.zaozi.{nameHierarchy, LayerTree, ProbeConnect}
+import me.jiuyang.zaozi.{LayerTree, ProbeConnect}
 
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   ConnectApi,
@@ -16,12 +16,37 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   RefSendApi,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
 import java.lang.foreign.Arena
 
 given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]
   : ProbeConnect[D, P, DATA, PROBE] with
+  private def source(
+    ref:  PROBE,
+    that: DATA
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value = ref.getType match
+    case _: RWProbe[?] =>
+      val op = that.definingOp.getOrElse(
+        throw IllegalArgumentException("RWProbe binding requires a forceable Wire, Reg, or Node")
+      )
+      require(
+        Set("firrtl.wire", "firrtl.reg", "firrtl.regreset", "firrtl.node").contains(op.getName.str) &&
+          op.getNumResults == 2,
+        "RWProbe binding requires a whole Wire, Reg, or Node created with forceable = true"
+      )
+      op.getResult(1)
+    case _: RProbe[?]  =>
+      val op = summon[RefSendApi].op(that.refer, locate)
+      op.operation.appendToBlock()
+      op.result
+
   extension (ref: PROBE)
     @targetName("send")
     def <==(
@@ -34,20 +59,8 @@ given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], 
       sourcecode.File,
       sourcecode.Line
     ): Unit =
-      val refSendOp   = summon[RefSendApi]
-        .op(
-          that.refer,
-          locate
-        )
-      val refCastOp   = summon[RefCastApi]
-        .op(refSendOp.result, ref.refer.getType, locate)
-      val refDefineOp = summon[RefDefineApi]
-        .op(
-          ref.refer,
-          refCastOp.result,
-          locate
-        )
-      refSendOp.operation.appendToBlock()
+      val refCastOp   = summon[RefCastApi].op(source(ref, that), ref.refer.getType, locate)
+      val refDefineOp = summon[RefDefineApi].op(ref.refer, refCastOp.result, locate)
       refCastOp.operation.appendToBlock()
       refDefineOp.operation.appendToBlock()
 

@@ -12,6 +12,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   given
 }
 import org.llvm.mlir.scalalib.capi.ir.{
+  AttributeApi,
   Block,
   Context,
   Location,
@@ -432,7 +433,8 @@ given NodeApi with
     name:        String,
     location:    Location,
     nameKind:    FirrtlNameKind,
-    input:       Value
+    input:       Value,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context
@@ -452,12 +454,14 @@ given NodeApi with
             namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet)
             // ::circt::hw::InnerSymAttr
             // namedAttributeApi.namedAttributeGet("inner_sym".identifierGet, ???),
-            // ::mlir::UnitAttr
-            // namedAttributeApi.namedAttributeGet("forceable".identifierGet, ???)
-          )
+          ) ++ Option
+            .when(forceable)(
+              namedAttributeApi.namedAttributeGet("forceable".identifierGet, summon[AttributeApi].unitAttrGet)
+            )
+            .toSeq
         ,
         operands = Seq(input),
-        inferredResultsTypes = Some(1)
+        inferredResultsTypes = Some(if forceable then 2 else 1)
       )
     )
   extension (ref: Node) def operation: Operation = ref._operation
@@ -470,7 +474,8 @@ given RegApi with
     nameKind:    FirrtlNameKind,
     tpe:         Type,
     clock:       Value,
-    clockEdge:   FirrtlEventControl
+    clockEdge:   FirrtlEventControl,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context
@@ -494,12 +499,14 @@ given RegApi with
           )
           // ::circt::hw::InnerSymAttr
           // namedAttributeApi.namedAttributeGet("inner_sym".identifierGet, ???),
-          // ::mlir::UnitAttr
-          // namedAttributeApi.namedAttributeGet("forceable".identifierGet, ???)
-        )
+        ) ++ Option
+          .when(forceable)(
+            namedAttributeApi.namedAttributeGet("forceable".identifierGet, summon[AttributeApi].unitAttrGet)
+          )
+          .toSeq
       ,
       operands = Seq(clock),
-      resultsTypes = Some(Seq(tpe))
+      resultsTypes = Some(if forceable then Seq(tpe, tpe.getRef(true)) else Seq(tpe))
     )
   )
   extension (ref: Reg) def operation: Operation = ref._operation
@@ -515,7 +522,8 @@ given RegResetApi with
     resetValue:    Value,
     clockEdge:     FirrtlEventControl,
     resetType:     RegResetType,
-    resetPolarity: RegResetPolarity
+    resetPolarity: RegResetPolarity,
+    forceable:     Boolean = false
   )(
     using arena:   Arena,
     context:       Context
@@ -549,12 +557,14 @@ given RegResetApi with
           )
           // ::circt::hw::InnerSymAttr
           // namedAttributeApi.namedAttributeGet("inner_sym".identifierGet, ???),
-          // ::mlir::UnitAttr
-          // namedAttributeApi.namedAttributeGet("forceable".identifierGet, ???)
-        )
+        ) ++ Option
+          .when(forceable)(
+            namedAttributeApi.namedAttributeGet("forceable".identifierGet, summon[AttributeApi].unitAttrGet)
+          )
+          .toSeq
       ,
       operands = Seq(clock, reset, resetValue),
-      resultsTypes = Some(Seq(tpe))
+      resultsTypes = Some(if forceable then Seq(tpe, tpe.getRef(true)) else Seq(tpe))
     )
   )
   extension (ref: RegReset) def operation: Operation = ref._operation
@@ -564,7 +574,8 @@ given WireApi with
     name:        String,
     location:    Location,
     nameKind:    FirrtlNameKind,
-    tpe:         Type
+    tpe:         Type,
+    forceable:   Boolean = false
   )(
     using arena: Arena,
     context:     Context
@@ -584,11 +595,13 @@ given WireApi with
             namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet)
             // ::circt::hw::InnerSymAttr
             // namedAttributeApi.namedAttributeGet("inner_sym".identifierGet, ???),
-            // ::mlir::UnitAttr
-            // namedAttributeApi.namedAttributeGet("forceable".identifierGet, ???)
-          )
+          ) ++ Option
+            .when(forceable)(
+              namedAttributeApi.namedAttributeGet("forceable".identifierGet, summon[AttributeApi].unitAttrGet)
+            )
+            .toSeq
         ,
-        resultsTypes = Some(Seq(tpe))
+        resultsTypes = Some(if forceable then Seq(tpe, tpe.getRef(true)) else Seq(tpe))
       )
     )
   extension (ref: Wire)
@@ -723,7 +736,7 @@ given RefReleaseInitialApi with
   ): RefReleaseInitial =
     RefReleaseInitial(
       summon[OperationApi].operationCreate(
-        name = "firrtl.ref.release",
+        name = "firrtl.ref.release_initial",
         location = location,
         operands = Seq(predicate, dest)
       )
