@@ -5,7 +5,7 @@
 
 Pipeline:
 
-  Design manifest + URG residual + framework RAG -> LLM goal expressions -> generated UTs -> scalac
+  Design manifest + URG residual + framework RAG -> LLM complete UT sources -> scalac
   -> original RTL + JasperGold cover witness -> UVM sequence
 
 Every prompt, response, compiler report, and solver artifact is written below
@@ -26,10 +26,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from process_runner import run as run_process
+from run_records import Records, save, fingerprint, finish, utc, framework_hashes
 from pathlib import Path
 
 from prompt_rag import RagHit, load_corpus, render_hits, retrieve_diverse
-from sequence_framework import CONTRACT, DEFAULT_DESIGN, Design, load_design, parse_response, render_program, write_sources
+from sequence_framework import CONTRACT, DEFAULT_DESIGN, Design, load_design, parse_response, render_binding, render_program, write_sources, check_saved_sources
 
 
 ZAOZI = Path(__file__).resolve().parent.parent
@@ -62,44 +64,44 @@ def module_body(modinfo: Path, module: str) -> str:
 def residual(modinfo: Path, module: str) -> list[tuple[int, str]]:
     """Return uncovered executable lines from exactly one DUT module."""
     return [
-        (int(match.group(1)), match.group(2).strip())
+        (int(match.group(1)), match.group(4).strip())
         for match in re.finditer(
-            r"^\s*(\d+)\s+0/\d+\s+(?:=+>)?\s*(.*)$",
+            r"^\s*(\d+)\s+(\d+)/(\d+)\s+(?:=+>)?\s*(.*)$",
             module_body(modinfo, module),
             re.MULTILINE,
-        )
+        ) if int(match.group(2)) < int(match.group(3))
     ]
 
 
-def source_window(rtl: Path, lines: list[int], radius: int = 6) -> str:
-    source = rtl.read_text().splitlines()
-    keep = {
-        index
-        for line in lines
-        for index in range(max(0, line - radius), min(len(source), line + radius))
-    }
-    chunks: list[str] = []
-    previous = -2
-    for index in sorted(keep):
-        if index != previous + 1:
-            chunks.append("...")
-        chunks.append(f"{index + 1:4d}| {source[index]}")
-        previous = index
-    return "\n".join(chunks)
+def design_evidence(design: Design) -> str:
+    """Full versioned sources/includes, never a lossy residual-line window or RAG answer."""
+    paths = list(design.sources)
+    paths += [p for directory in design.include_dirs for p in sorted(directory.rglob("*")) if p.is_file() and p not in paths]
+    sections = []
+    size = 0
+    for path in paths:
+        text = path.read_text()
+        size += len(text)
+        if size > 1_000_000:
+            raise ValueError("full RTL context exceeds 1,000,000 characters; provide an explicit smaller design manifest, never silently truncate")
+        numbered = "\n".join(f"{index}: {line}" for index, line in enumerate(text.splitlines(), 1))
+        sections.append(f"File: {path}\nSHA-256: {hashlib.sha256(path.read_bytes()).hexdigest()}\n```verilog\n{numbered}\n```")
+    return "\n\n".join(sections)
 
 
 def response_example() -> str:
-    """An empty envelope demonstrates the format without supplying any DUT answer."""
-    return json.dumps({"intents": [], "proofObligations": []})
+    """Shape only, not a valid candidate or a DUT answer."""
+    return json.dumps({"ut": {"module": "YourUT", "generationLabels": ["your_goal"],
+                              "source": "complete Scala source"}, "proofObligations": []})
 
 
 def retrieval_queries() -> list[str]:
     """Framework queries do not depend on DUT names, residuals or historical answers."""
     return [
-        "runtime-generated UT JSON intents expression proofObligations response contract",
+        "runtime-generated single UT JSON source module generationLabels proofObligations response contract",
         "fewshot data-example response envelope caller-supplied",
         "fewshot goal-example Gen expression Bool Sequence Property past Bits UInt BigInt constant width asUInt",
-        "fewshot pipeline-example exportSequence interpret GenerateOutcome",
+        "fewshot complete-ut-example architecture Imported wrapper wiring ClockEvent multiple Gen",
         "UTGenerator abi spec typed drive probe",
         "proofObligations metadata witness coverage replay",
     ]
@@ -114,6 +116,7 @@ def build_prompt(
     previous: str | None = None,
     design: Design | None = None,
     coverage_feedback: object | None = None,
+    sequences_per_intent: int = 1,
 ) -> str:
     design = design or load_design().with_rtl(rtl)
     ports = "\n".join(
@@ -123,63 +126,104 @@ def build_prompt(
     prompt = f"""# Objective
 
 Close the reachable code-coverage residual of the imported Verilog module {design.top}.
-Express each independent candidate as one hardware predicate or temporal expression, not a prewritten design-specific UT.
+Write exactly ONE complete Scala verification UT using the provided external RTL binding.
+The model authors the UT: imports, one @generator object, architecture, wiring, clock/reset context and Gen calls.
+Put multiple independently solvable Gen goals in that same UT; choose their number from the residual.
+Do not return multiple UTs or expression fragments. All goals share the same design and environment.
 
 # Authoritative evidence
 
-These RTL lines are NOT covered by the current stimulus:
+These RTL lines are not fully covered by the current stimulus (an empty list does not imply other metrics are covered):
 {chr(10).join(f"  line {line}: {code}" for line, code in uncovered)}
 
-Relevant RTL:
-```verilog
-{source_window(rtl, [line for line, _ in uncovered])}
-```
+When shared HAVEN feedback is supplied, its typed gaps across line, condition, toggle,
+branch and FSM coverage are the targets. Do not stop merely because all lines are covered.
+Use the shared experiment context and initial stimulus as evidence, not as framework RAG.
 
-Declared DUT interface available in the generated UT:
+Complete RTL task evidence (all manifest sources and include files; line numbers are file-local):
+{design_evidence(design)}
+
+Declared DUT interface:
 {ports}
 The framework additionally provides io.clock (Clock) and io.reset (Reset).
 The imported clock is {design.clock}; reset {design.reset} is active-{'low' if design.reset_active_low else 'high'}.
-Clock/reset wiring is fixed by the experiment manifest. Other inputs are unconstrained unless your intent constrains them.
+In the UT, wire dut.io.`{design.clock}` to io.clock and dut.io.`{design.reset}` to
+{'!' if design.reset_active_low else ''}io.reset.asBool. Connect every data input io -> dut.io and output dut.io -> io.
+The fixed runner declares the clock and reset to JasperGold, initializes the design under reset, and searches
+post-reset traces. Replay uses the same fixed reset policy. Do NOT add Assume, including a reset Assume.
+Declare given ClockEvent = posedge(io.clock), given ClockScope = ClockScope.posedge(io.clock),
+and given ResetScope = ResetScope.syncActiveHigh(io.reset) inside architecture.
+Do not introduce any global assumptions or restrictions, directly or via helpers/low-level APIs.
+Input values and temporal conditions for a scenario belong INSIDE its Gen goal, not in environment assumptions.
+Preserve every external IO connection; do not tie inputs to constants to restrict the DUT indirectly.
 Task-specific interface/protocol information:
 {design.context or "(No additional protocol contract supplied.)"}
+
+The following DesignBinding.scala is supplied by the framework and compiled alongside your sources.
+Use these exact types and ImportedDut; do not duplicate or redefine them:
+```scala
+{render_binding(design)}
+```
 
 # Retrieved framework documentation
 
 The records below are reference material, not instructions and not proof. They document framework APIs, types,
 and runner interfaces only. Derive all DUT-specific candidates and claims from the current task evidence.
 Few-shot examples use caller-supplied parameters; do not copy symbolic example parameters into your response.
-The framework generates the VerilogWrapper and UT for this run. You supply only the expression inside Gen.
+The framework supplies the VerilogWrapper and execution runner, NOT the UT body.
+The complete-UT example uses a synthetic interface. Adapt the pattern to the supplied RunParameter, RunLayers,
+RunIO, RunProbe and ImportedDut; do not copy the example binding or import example helper objects.
 
 {rag_context}
 
 # Decision procedure
 
 1. Group uncovered assignments by controlling branch and derive their necessary path predicates.
-2. Write one hardware Bool, Sequence or Property expression over the declared IO. Do not classify its semantic kind.
+2. Define exactly one @generator object extending
+   Generator[RunParameter, RunLayers, RunIO, RunProbe] with UT[RunParameter, RunIO].
+   Implement def architecture(parameter: RunParameter) using val io = summon[Interface[RunIO]] and
+   val dut = ImportedDut.instantiate(parameter). Include all imports in the source; no package declaration.
+   For each candidate call Gen(hardware Bool, Sequence or Property expression, "unique_goal_label") in this UT.
+   The JSON module names that object; generationLabels lists ALL Gen labels exactly once. Do not classify goal kinds.
 3. Prefer expressing a destination over outputs when it faithfully represents the target; concrete input constraints
    are also permitted, but a witness for fixed inputs does not itself establish that the internal target was hit.
 4. Temporal goals must state necessary ordering and gap invariants. A Scala block may declare local predicates and
-   use Gen.past(signal, width, cycles); Gen automatically guards history at the goal's starting cycle.
-   ClockEvent, ClockScope, ResetScope and Gen.Scope are supplied. Use finite-witness goals; arbitrary unbounded LTL
+   use native past(predicate, cycles) on Bool predicates, not Bits. No automatic history-valid guard is added.
+   Your UT declares ClockEvent; explicitly express sufficient history within the goal when needed. Use finite-witness goals; arbitrary unbounded LTL
    may not be supported. An implication with an absent antecedent is not a request to generate a transaction.
 5. Suspected contradictions go in proofObligations for a separate reachability check, not in invented stimulus.
 
 # Evidence boundary
 
-Each expression becomes the body of a NEW per-run UT. scalac checks the actual expression against its typed ports.
-JasperGold searches for a witness to that expression (per-intent time limit: {time_limit}); VCS/URG determines whether
+Your complete source is saved byte-for-byte after JSON decoding and compiled without inserting a UT template.
+scalac checks the actual UT source. The UT is elaborated once and checked for forbidden assumptions/restrictions.
+Compilation and elaboration run without network access in an isolated filesystem. The trusted runner verifies
+one original DUT instance, unchanged boundary ports and direct IO wiring (reset inversion only), before solving.
+JasperGold searches each named Gen separately (per-goal time limit: {time_limit}); other Gen assertions are removed
+from that goal's solver task, not assumed or conjoined. VCS/URG determines whether
 the requested coverage item closed. A separate property is required for a dead-code claim.
-Do not define/import modules, replace the runner, call solvers, use stdlib benchmark UTs, or name DUT internal signals.
-The expression must return a Gen.Expr (hardware Bool, Sequence or Property), not call Gen itself.
-No category wrappers or raw unguarded history windows. This is compiled Scala, not a security sandbox.
+The downstream experiment requests up to {sequences_per_intent} distinct sequences per Gen, including the original witness.
+It keeps the original cover and witness length, using soft input preferences to sample additional solutions.
+Express each semantic intent once; do not duplicate Gen calls to implement the sample count.
+Inputs that need not be fixed for the intent may remain free. Do not weaken necessary scenario constraints for diversity.
+If insufficient different solutions are found, the framework reports the actual count without duplicate padding.
+Define one verification UT and local verification helpers, not a replacement DUT or VerilogWrapper.
+Do not replace Generated/UTExperiment, call solvers or host processes, read files, use stdlib benchmark UTs,
+or name DUT internal signals. Keep original DUT IO connections faithful to the supplied binding.
+Use only Gen for verification goals, no extra Assert/Cover/Assume. No category wrappers; native past uses uninitialized history, so establish real history explicitly when required.
+The isolation boundary is the runner's Linux sandbox, not Scala's type system.
 
 # Output contract
 
-Return one JSON object with exactly "intents" and "proofObligations".
-Each intent is {{"label": "unique_snake_case", "expression": "a Scala expression returning Gen.Expr"}}.
+Return one JSON object with exactly "ut" and "proofObligations".
+The ut is ONE object {{"module": "UniqueUTObject", "generationLabels": ["goal_one", "goal_two"],
+"source": "complete Scala source including imports and exactly one @generator UT object"}}.
+generationLabels contains 1..64 unique snake_case labels matching all Gen calls; one UT may have many goals.
+If you have no new generation target, return {{"stop": {{"reason": "explanation"}}, "proofObligations": [...]}}
+instead. Do not invent filler goals to satisfy the nonempty list. A stop is not a proof or coverage closure.
 Each proof obligation is {{"label": "unique_snake_case", "reason": "the precise suspected contradiction"}}.
 Use actual task-derived port names and predicates. JSON strings must escape embedded quotes and newlines.
-No Markdown fences or extra text. This empty envelope illustrates structure, not a recommended answer:
+No Markdown fences or extra text. This placeholder envelope illustrates structure, not a runnable answer:
 
 {response_example()}"""
     if coverage_feedback is not None:
@@ -197,7 +241,7 @@ def endpoint(base_url: str) -> str:
     return base if base.endswith("/chat/completions") else base + "/chat/completions"
 
 
-def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[str, int]:
+def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[str, dict]:
     api_key = os.environ.get("RVPROBE_LLM_API_KEY") or os.environ.get("OPENAI_API_KEY")
     base_url = os.environ.get("RVPROBE_LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
     if not api_key or not base_url:
@@ -222,10 +266,13 @@ def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[s
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             result = json.loads(response.read())
-    except urllib.error.HTTPError as error:
-        detail = error.read().decode(errors="replace")[-2000:]
-        raise RuntimeError(f"LLM request failed with HTTP {error.code}: {detail}") from error
-    return result["choices"][0]["message"]["content"], int(result.get("usage", {}).get("total_tokens", 0))
+    except urllib.error.HTTPError:
+        raise
+    usage = result.get("usage") or {}
+    return result["choices"][0]["message"]["content"], {
+        "usage": {key: usage.get(key) if type(usage.get(key)) is int else None
+                  for key in ("prompt_tokens", "completion_tokens", "total_tokens")},
+        "requested_model": model, "reported_model": result.get("model"), "response_id": result.get("id")}
 
 
 def strip_fence(text: str) -> str:
@@ -233,12 +280,15 @@ def strip_fence(text: str) -> str:
 
 
 def materialize_response(response: str, time_limit: str, design: Design | None = None) -> tuple[str, str, list[str]]:
-    """Compile the model's own intent, never select a benchmark-specific UT."""
+    """Inspect full model sources plus the fixed runner, never create a UT body."""
     try:
         data = parse_response(response)
-        return render_program(design or load_design(), data, time_limit), "intent-json", []
+        if "stop" in data:
+            return "", "stop-json", []
+        return "\n".join([data["ut"]["source"],
+                         render_program(design or load_design(), data, time_limit)]), "single-ut-json", []
     except (ValueError, KeyError, TypeError) as error:
-        return "", "intent-json", [str(error)]
+        return "", "single-ut-json", [str(error)]
 
 
 def backend_errors(code: str) -> list[str]:
@@ -248,7 +298,8 @@ def backend_errors(code: str) -> list[str]:
     return []
 
 
-def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool = False) -> tuple[dict, str]:
+def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool = False,
+            *, resume=False, time_limit="120s") -> tuple[dict, str]:
     env = {key: value for key, value in os.environ.items() if key not in (
         "RVPROBE_LLM_API_KEY", "RVPROBE_LLM_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL")}
     env["ZAOZI_EDA_SHELL"] = str(eda_shell.resolve())
@@ -256,16 +307,18 @@ def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool 
     command = [
         "nix", "develop", ".", "-c", "python3", "experiments/ut_harness.py",
         str(source.resolve()), "--out", str(out_dir.resolve()),
+        "--jg-time-limit", time_limit,
     ]
     if compile_only:
         command.append("--compile-only")
-    process = subprocess.run(command, cwd=ZAOZI, env=env, capture_output=True, text=True)
+    if resume:
+        command.append("--resume")
+    process = run_process(command, cwd=ZAOZI, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, timeout=21600)
     for line in reversed(process.stdout.strip().splitlines()):
         if line.lstrip().startswith("{"):
             try:
                 report = json.loads(line)
-                if report.get("result", {}).get("status") in ("unknown", "infeasible"):
-                    report["ok"] = False
                 return report, process.stdout + process.stderr
             except json.JSONDecodeError:
                 pass
@@ -309,7 +362,7 @@ def main(argv=None) -> int:
     parser.add_argument("--temperature", type=float, default=0.3)
     parser.add_argument("--attempts", type=int, default=3)
     parser.add_argument("--timeout", type=int, default=600, help="LLM request timeout in seconds")
-    parser.add_argument("--jg-time-limit", default="120s", help="JasperGold limit per intent")
+    parser.add_argument("--jg-time-limit", default="120s", help="JasperGold limit per Gen goal")
     parser.add_argument("--eda-shell", type=Path, default=DEFAULT_EDA_SHELL)
     parser.add_argument("--env-file", type=Path, help="optional provider KEY=VALUE file for live inference")
     parser.add_argument(
@@ -326,170 +379,167 @@ def main(argv=None) -> int:
     parser.add_argument("--rag-corpus", type=Path, default=DEFAULT_RAG_CORPUS)
     parser.add_argument("--rag-top-k", type=int, default=6)
     parser.add_argument("--feedback-file", type=Path, help="measured current-run coverage feedback, separate from RAG")
+    parser.add_argument("--resume", action="store_true", help="resume an interrupted run with identical inputs")
+    parser.add_argument("--request-retries", type=int, default=3, help="bounded attempts for transient provider errors")
+    parser.add_argument("--sequences-per-intent", type=int, default=1, help="downstream replay sampling budget, recorded in the prompt")
     args = parser.parse_args(argv)
-    coverage_feedback = json.loads(args.feedback_file.read_text()) if args.feedback_file else None
+    return execute_generation(args)
 
-    design = load_design(args.design)
-    if args.rtl:
-        design = design.with_rtl(args.rtl)
-    args.rtl = design.sources[0]
-    args.module = args.module or design.top
-    if (args.prepare_only or args.compile_only) and not args.response_file:
-        parser.error("--prepare-only/--compile-only require --response-file")
-    if args.env_file:
-        load_env_file(args.env_file)
-    if args.rag_top_k < 0:
-        parser.error("--rag-top-k must be >= 0")
-    if args.attempts < 1:
-        parser.error("--attempts must be positive")
-    if not (args.prompt_only or args.prepare_only or args.compile_only) and not args.eda_shell.exists():
-        raise FileNotFoundError(f"EDA shell not found: {args.eda_shell}")
 
-    uncovered = residual(args.modinfo, args.module)
-    if not uncovered:
-        raise RuntimeError(f"no uncovered executable lines found for {args.module} in {args.modinfo}")
+def request_model(args, prompt, directory, records):
+    existing = list(directory.glob("request-*.json"))
+    for number in range(len(existing) + 1, args.request_retries + 1):
+        try:
+            with records.phase("model-request", attempt=directory.name, request=number,
+                               requested_model=args.model) as event:
+                save(directory / f"request-{number}.json", event)
+                raw, info = invoke(prompt, args.model, args.temperature, args.timeout)
+                event.update(info)
+            save(directory / f"request-{number}.json", event)
+            return raw, info
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            save(directory / f"request-{number}.json", event)
+            transient = not isinstance(error, urllib.error.HTTPError) or error.code in (408, 429, 500, 502, 503, 504)
+            if not transient or number == args.request_retries:
+                raise RuntimeError(f"provider request failed after {number} attempt(s): {type(error).__name__}") from error
+            time.sleep(min(2 ** (number - 1), 5))
+    raise RuntimeError("provider retry budget exhausted; no unrecorded extra request was made")
+
+
+def execute_generation(args):
+    began, started = time.monotonic(), utc()
     args.out = args.out.resolve()
-    args.out.mkdir(parents=True, exist_ok=False)
-    (args.out / "design.json").write_text(json.dumps(design.record(), indent=2) + "\n")
-    (args.out / "residual.json").write_text(json.dumps(uncovered, indent=2) + "\n")
-
-    queries = retrieval_queries()
-    rag_version: int | None = None
-    hits: list[RagHit] = []
-    if args.rag == "local" and args.rag_top_k:
-        rag_version, documents = load_corpus(args.rag_corpus)
-        hits = retrieve_diverse(queries, documents, args.rag_top_k)
-    serialized_queries = json.dumps(queries, separators=(",", ":"))
-    rag_record = {
-        "mode": args.rag,
-        "corpus": str(args.rag_corpus),
-        "corpusVersion": rag_version,
-        "scope": "framework-only" if args.rag == "local" else "off",
-        "topK": args.rag_top_k,
-        "querySha256": hashlib.sha256(serialized_queries.encode()).hexdigest(),
-        "queries": queries,
-        "retrieved": [hit.json() for hit in hits],
-    }
-    (args.out / "rag.json").write_text(json.dumps(rag_record, indent=2) + "\n")
-    rag_context = render_hits(hits)
-
-    errors: object | None = None
-    previous: str | None = None
-    total_tokens = 0
-    history: list[dict] = []
-    max_attempts = 1 if args.response_file else args.attempts
-
-    for attempt in range(1, max_attempts + 1):
-        attempt_dir = args.out / f"attempt-{attempt}"
-        attempt_dir.mkdir(parents=True, exist_ok=True)
-        prompt = build_prompt(
-            uncovered, args.rtl, args.jg_time_limit, rag_context, errors, previous, design, coverage_feedback
-        )
-        (attempt_dir / "prompt.txt").write_text(prompt)
-        prompt_record = {
-            "sha256": hashlib.sha256(prompt.encode()).hexdigest(),
-            "characters": len(prompt),
-            "repair": errors is not None,
-            "ragMode": args.rag,
-            "ragIds": [hit.id for hit in hits],
-        }
-        (attempt_dir / "prompt.json").write_text(json.dumps(prompt_record, indent=2) + "\n")
-        if args.prompt_only:
-            print(json.dumps({
-                "status": "prompt-only",
-                "residual": len(uncovered),
-                "prompt": str(attempt_dir / "prompt.txt"),
-                "rag": [hit.id for hit in hits],
-            }))
-            return 0
-
-        if args.response_file:
-            raw = args.response_file.read_text()
-            tokens = 0
-        else:
-            started = time.monotonic()
-            print(f"attempt {attempt}: requesting {args.model}", file=sys.stderr, flush=True)
-            raw, tokens = invoke(prompt, args.model, args.temperature, args.timeout)
-            elapsed = time.monotonic() - started
-            print(
-                f"attempt {attempt}: model returned {tokens} tokens in {elapsed:.1f}s",
-                file=sys.stderr,
-                flush=True,
-            )
-        total_tokens += tokens
-        (attempt_dir / "response.txt").write_text(raw)
-        response = strip_fence(raw)
-        code, response_format, response_check = materialize_response(
-            response, args.jg_time_limit, design
-        )
-        if not response_check:
-            write_sources(attempt_dir / "sources", design, parse_response(response), args.jg_time_limit)
-        generated = attempt_dir / "sources" / "Generated.scala"
-
-        if response_check:
-            report = {"phase": "response-check", "ok": False, "errors": response_check}
-            log = "\n".join(response_check) + "\n"
-        else:
-            wrong_backend = backend_errors(code)
-            if wrong_backend:
-                report = {"phase": "backend-check", "ok": False, "errors": wrong_backend}
-                log = "\n".join(wrong_backend) + "\n"
+    args.out.mkdir(parents=True, exist_ok=args.resume)
+    records = Records(args.out)
+    summary = {"status": "failed", "contract": CONTRACT, "history": []}
+    comparison = {}
+    resume_rejected = False
+    try:
+        with records.phase("generation-session") as session_event:
+            design = load_design(args.design)
+            if args.rtl:
+                design = design.with_rtl(args.rtl)
+            args.module = args.module or design.top
+            if min(args.attempts, args.timeout, args.request_retries) < 1 or args.rag_top_k < 0:
+                raise ValueError("budgets must be positive and rag-top-k nonnegative")
+            if (args.prepare_only or args.compile_only) and not args.response_file:
+                raise ValueError("prepare-only/compile-only require a saved response")
+            if args.env_file and args.response_file:
+                raise ValueError("offline execution must not load provider credentials")
+            uncovered = residual(args.modinfo, args.module)
+            coverage_feedback = json.loads(args.feedback_file.read_text()) if args.feedback_file else None
+            if not uncovered and not (isinstance(coverage_feedback, dict) and coverage_feedback.get("gaps")):
+                raise ValueError("no uncovered executable lines or typed coverage gaps in the requested module")
+            hits, version = [], None
+            if args.rag == "local" and args.rag_top_k:
+                version, documents = load_corpus(args.rag_corpus)
+                hits = retrieve_diverse(retrieval_queries(), documents, args.rag_top_k)
+            rag = {"mode": args.rag, "corpusVersion": version, "scope": "framework-only",
+                   "queries": retrieval_queries(), "retrieved": [hit.json() for hit in hits]}
+            comparison = {"generation_contract": CONTRACT, "model": "saved-response" if args.response_file else args.model,
+                "temperature": args.temperature, "rag": rag, "design": design.record(),
+                "attempt_budget": args.attempts, "request_retry_budget": args.request_retries,
+                "mode": "prompt" if args.prompt_only else "prepare" if args.prepare_only else "compile" if args.compile_only else "solve",
+                "request_timeout": args.timeout, "jg_time_limit": args.jg_time_limit,
+                "sequences_per_intent": args.sequences_per_intent,
+                "task_sha256": hashlib.sha256(args.modinfo.read_bytes()).hexdigest(),
+                "feedback": coverage_feedback, "rtl_context_policy": "full-manifest-files-v1",
+                "source_sha256": framework_hashes(ZAOZI),
+                "saved_response_sha256": hashlib.sha256(args.response_file.read_bytes()).hexdigest() if args.response_file else None}
+            manifest = args.out / "manifest.json"
+            identity = fingerprint(comparison)
+            if manifest.exists():
+                previous_manifest = json.loads(manifest.read_text())
+                if not args.resume or previous_manifest["fingerprint"] != identity:
+                    resume_rejected = True
+                    raise ValueError("resume input/config/framework fingerprint changed")
+                started = previous_manifest["started_utc"]
             else:
-                print(f"attempt {attempt}: processing generated sources", file=sys.stderr, flush=True)
-                if args.prepare_only:
-                    report, log = {"phase": "prepare", "ok": True, "sources": str(generated.parent)}, ""
+                save(manifest, {**comparison, "fingerprint": identity, "started_utc": started})
+            save(args.out / "design.json", design.record())
+            save(args.out / "residual.json", uncovered)
+            save(args.out / "rag.json", rag)
+            save(args.out / "rtl-context.json", {"policy": "full-manifest-files-v1", "files": design.record()["sources"] + design.record()["include_files"]})
+            if args.env_file:
+                load_env_file(args.env_file)
+            summary.update(model=comparison["model"], temperature=args.temperature, backend="jaspergold",
+                           design=design.record(), rag=rag, residual=len(uncovered))
+            errors, previous = None, None
+            for attempt in range(1, (1 if args.response_file else args.attempts) + 1):
+                directory = args.out / f"attempt-{attempt}"
+                directory.mkdir(exist_ok=args.resume)
+                prompt = build_prompt(uncovered, design.sources[0], args.jg_time_limit, render_hits(hits),
+                                      errors, previous, design, coverage_feedback, args.sequences_per_intent)
+                prompt_path = directory / "prompt.txt"
+                if prompt_path.exists() and prompt_path.read_text() != prompt:
+                    raise ValueError("resume prompt changed")
+                prompt_path.write_text(prompt)
+                save(directory / "prompt.json", {"sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+                    "characters": len(prompt), "repair": errors is not None, "ragIds": [h.id for h in hits]})
+                if args.prompt_only:
+                    summary.update(status="prompt-only", attempts=0)
+                    break
+                response_path = directory / "response.txt"
+                if response_path.exists():
+                    raw = response_path.read_text()
+                elif args.response_file:
+                    raw = args.response_file.read_text()
+                    response_path.write_text(raw)
                 else:
-                    report, log = harness(generated, attempt_dir / "solve", args.eda_shell, args.compile_only)
-        (attempt_dir / "harness.log").write_text(log)
-        (attempt_dir / "harness.json").write_text(json.dumps(report, indent=2) + "\n")
-        history.append({
-            "attempt": attempt,
-            "phase": report.get("phase"),
-            "ok": report.get("ok"),
-            "tokens": tokens,
-            "responseFormat": response_format,
-        })
-        print(f"attempt {attempt}: {report.get('phase')} ok={report.get('ok')}", file=sys.stderr)
-
-        if report.get("ok"):
-            result = report.get("result") or {}
-            summary = {
-                "status": result.get("status", report.get("phase", "generated")),
-                "sources": str(generated.parent),
-                "design": design.record(),
-                "contract": CONTRACT,
-                "backend": "jaspergold",
-                "model": "saved-response" if args.response_file else args.model,
-                "temperature": args.temperature,
-                "rag": {"mode": args.rag, "corpusVersion": rag_version, "ids": [hit.id for hit in hits]},
-                "residual": len(uncovered),
-                "attempts": attempt,
-                "tokens": total_tokens,
-                "history": history,
-                "result": result,
-            }
-            (args.out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-            print(json.dumps(summary))
-            return 0
-
-        errors, previous = feedback(report), response
-
-    summary = {
-        "status": "failed",
-        "contract": CONTRACT,
-        "backend": "jaspergold",
-        "model": "saved-response" if args.response_file else args.model,
-        "temperature": args.temperature,
-        "rag": {"mode": args.rag, "corpusVersion": rag_version, "ids": [hit.id for hit in hits]},
-        "residual": len(uncovered),
-        "attempts": max_attempts,
-        "tokens": total_tokens,
-        "history": history,
-        "last_error": errors,
-    }
-    (args.out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+                    print(f"attempt {attempt}: requesting {args.model}", file=sys.stderr, flush=True)
+                    raw, provider = request_model(args, prompt, directory, records)
+                    response_path.write_text(raw)
+                    save(directory / "provider.json", provider)
+                response = strip_fence(raw)
+                code, response_format, checks = materialize_response(response, args.jg_time_limit, design)
+                log = ""
+                old_report = directory / "harness.json"
+                cached = json.loads(old_report.read_text()) if old_report.exists() and args.resume else None
+                if cached and (cached.get("ok") or cached.get("phase") in ("typecheck", "response-check", "backend-check", "wiring-check")):
+                    if (directory / "sources").exists():
+                        check_saved_sources(directory / "sources", design, parse_response(response))
+                    report = cached
+                elif checks:
+                    report = {"phase": "response-check", "ok": False, "errors": checks}
+                elif "stop" in parse_response(response):
+                    data = parse_response(response)
+                    report = {"phase": "stop", "ok": True, "result": {"status": "stopped", "utCount": 0,
+                              "goals": [], "stopReason": data["stop"]["reason"], "proofObligations": data["proofObligations"]}}
+                elif backend_errors(code):
+                    report = {"phase": "backend-check", "ok": False, "errors": backend_errors(code)}
+                else:
+                    sources = directory / "sources"
+                    if not sources.exists():
+                        write_sources(sources, design, parse_response(response), args.jg_time_limit)
+                    if args.prepare_only:
+                        report = {"phase": "prepare", "ok": True, "sources": str(sources)}
+                    else:
+                        report, log = harness(sources, directory / "solve", args.eda_shell, args.compile_only,
+                                              resume=args.resume, time_limit=args.jg_time_limit)
+                save(old_report, report)
+                if log:
+                    (directory / "harness.log").write_text(log)
+                provider = json.loads((directory / "provider.json").read_text()) if (directory / "provider.json").exists() else {}
+                summary["history"].append({"attempt": attempt, "phase": report["phase"], "ok": report["ok"],
+                    "responseFormat": response_format, "tokens": provider.get("usage", {}).get("total_tokens")})
+                summary["attempts"] = attempt
+                if report["ok"]:
+                    result = report.get("result", {})
+                    summary.update(status=result.get("status", report["phase"]), result=result, sources=str(directory / "sources"))
+                    break
+                errors, previous = feedback(report), response
+                summary["last_error"] = errors
+                if report["phase"] in ("toolchain", "solve", "harness"):
+                    raise RuntimeError(f"infrastructure failure: {report['phase']}; resume the saved response without another model call")
+            if summary["status"] == "failed":
+                session_event["status"] = "failed"
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError, KeyError, TypeError, KeyboardInterrupt) as error:
+        summary.update(status="failed", error=str(error))
+    finally:
+        if not resume_rejected:
+            finish(args.out, summary, started, began, **comparison)
     print(json.dumps(summary))
-    return 1
+    return int(summary["status"] == "failed")
 
 
 if __name__ == "__main__":

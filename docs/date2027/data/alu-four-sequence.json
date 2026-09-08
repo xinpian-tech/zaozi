@@ -1,0 +1,1134 @@
+{
+  "date": "2026-09-06",
+  "model": "deepseek-v4-flash-vision-exp",
+  "sequences_per_intent": 4,
+  "sampling_seed": 20260906,
+  "roots": [
+    "out/experiments/alu-four-sequence-live-20260906",
+    "out/experiments/alu-four-sequence-20260906-final",
+    "out/experiments/alu-four-sequence-flow-20260906"
+  ],
+  "stages": [
+    {
+      "status": "failed",
+      "started_utc": "2026-09-06T23:05:05.237+00:00",
+      "finished_utc": "2026-09-06T23:17:21.435+00:00",
+      "elapsed_seconds": 736.198,
+      "active_seconds": 736.1854463573545,
+      "tokens": 64021,
+      "stop_reason": null,
+      "costs": {
+        "requests": 1,
+        "usage_reported": {
+          "prompt_tokens": 17136,
+          "completion_tokens": 46885,
+          "total_tokens": 64021
+        },
+        "model_request_seconds": 359.05306013673544
+      },
+      "final": {
+        "percent": {
+          "line": 22.905027932960895,
+          "cond": 19.339622641509433,
+          "toggle": 0.15657620041753653,
+          "branch": 15.384615384615385
+        },
+        "bins": {
+          "line": [
+            179,
+            41
+          ],
+          "cond": [
+            212,
+            41
+          ],
+          "toggle": [
+            1916,
+            3
+          ],
+          "branch": [
+            65,
+            10
+          ]
+        },
+        "score": 14.446460539875812,
+        "uncovered": [
+          [
+            86,
+            "OP_AND:  int_result = a & b;"
+          ],
+          [
+            87,
+            "OP_OR:   int_result = a | b;"
+          ],
+          [
+            88,
+            "OP_XOR:  int_result = a ^ b;"
+          ],
+          [
+            89,
+            "OP_NOT:  int_result = ~a;"
+          ],
+          [
+            102,
+            "OP_SLL:  shift_result = a << shamt;"
+          ],
+          [
+            103,
+            "OP_SRL:  shift_result = a >> shamt;"
+          ],
+          [
+            104,
+            "OP_SRA:  shift_result = a_signed >>> shamt;"
+          ],
+          [
+            171,
+            "lzc = 5'd28;"
+          ],
+          [
+            172,
+            "for (i = 27; i >= 0; i = i - 1) begin"
+          ],
+          [
+            173,
+            "if (val[i] && lzc == 5'd28)"
+          ],
+          [
+            174,
+            "lzc = 5'd27 - i[4:0];"
+          ],
+          [
+            192,
+            "fp_active <= 1'b1;"
+          ],
+          [
+            193,
+            "fp_a_reg <= a;"
+          ],
+          [
+            194,
+            "fp_b_reg <= b;"
+          ],
+          [
+            195,
+            "fp_is_sub <= (op == OP_FP_SUB);"
+          ],
+          [
+            196,
+            "fp_counter <= 3'd1;"
+          ],
+          [
+            198,
+            "fp_counter <= fp_counter + 1'b1;"
+          ],
+          [
+            200,
+            "case (fp_counter)"
+          ],
+          [
+            203,
+            "s1_is_nan <= a_is_nan || b_is_nan;"
+          ],
+          [
+            204,
+            "s1_is_inf <= a_is_inf || b_is_inf;"
+          ],
+          [
+            207,
+            "if (a_is_inf && b_is_inf && (a_sign != b_sign)) begin"
+          ],
+          [
+            208,
+            "s1_is_nan <= 1'b1;"
+          ],
+          [
+            209,
+            "s1_is_inf <= 1'b0;"
+          ],
+          [
+            212,
+            "s1_inf_sign <= a_is_inf ? a_sign : b_sign;"
+          ],
+          [
+            213,
+            "s1_is_zero_result <= a_is_zero && b_is_zero;"
+          ],
+          [
+            216,
+            "if (a_exp > b_exp || (a_exp == b_exp && a_mant >= b_mant)) begin"
+          ],
+          [
+            217,
+            "s1_large_mant <= a_mant;"
+          ],
+          [
+            218,
+            "s1_small_mant <= b_mant;"
+          ],
+          [
+            219,
+            "s1_large_sign <= a_sign;"
+          ],
+          [
+            220,
+            "s1_large_exp <= a_exp;"
+          ],
+          [
+            221,
+            "s1_exp_diff <= a_exp - b_exp;"
+          ],
+          [
+            223,
+            "s1_large_mant <= b_mant;"
+          ],
+          [
+            224,
+            "s1_small_mant <= a_mant;"
+          ],
+          [
+            225,
+            "s1_large_sign <= b_sign;"
+          ],
+          [
+            226,
+            "s1_large_exp <= b_exp;"
+          ],
+          [
+            227,
+            "s1_exp_diff <= b_exp - a_exp;"
+          ],
+          [
+            229,
+            "s1_same_sign <= (a_sign == b_sign);"
+          ],
+          [
+            234,
+            "s2_is_nan <= s1_is_nan;"
+          ],
+          [
+            235,
+            "s2_is_inf <= s1_is_inf;"
+          ],
+          [
+            236,
+            "s2_inf_sign <= s1_inf_sign;"
+          ],
+          [
+            237,
+            "s2_is_zero_result <= s1_is_zero_result;"
+          ],
+          [
+            238,
+            "s2_exp <= s1_large_exp;"
+          ],
+          [
+            239,
+            "s2_large_sign <= s1_large_sign;"
+          ],
+          [
+            240,
+            "s2_same_sign <= s1_same_sign;"
+          ],
+          [
+            243,
+            "s2_large_mant_ext <= {s1_large_mant, 3'b000};"
+          ],
+          [
+            246,
+            "if (s1_exp_diff >= 8'd27)"
+          ],
+          [
+            247,
+            "s2_aligned_small <= 27'h0;"
+          ],
+          [
+            249,
+            "s2_aligned_small <= {s1_small_mant, 3'b000} >> s1_exp_diff;"
+          ],
+          [
+            254,
+            "s3_is_nan <= s2_is_nan;"
+          ],
+          [
+            255,
+            "s3_is_inf <= s2_is_inf;"
+          ],
+          [
+            256,
+            "s3_inf_sign <= s2_inf_sign;"
+          ],
+          [
+            257,
+            "s3_is_zero_result <= s2_is_zero_result;"
+          ],
+          [
+            258,
+            "s3_exp <= s2_exp;"
+          ],
+          [
+            259,
+            "s3_result_sign <= s2_large_sign;"
+          ],
+          [
+            261,
+            "if (s2_same_sign) begin"
+          ],
+          [
+            263,
+            "s3_mant_sum <= {1'b0, s2_large_mant_ext} + {1'b0, s2_aligned_small};"
+          ],
+          [
+            266,
+            "s3_mant_sum <= {1'b0, s2_large_mant_ext} - {1'b0, s2_aligned_small};"
+          ],
+          [
+            272,
+            "fp_active <= 1'b0;"
+          ],
+          [
+            273,
+            "fp_done <= 1'b1;"
+          ],
+          [
+            274,
+            "fp_flags <= 4'h0;"
+          ],
+          [
+            276,
+            "if (s3_is_nan) begin"
+          ],
+          [
+            277,
+            "fp_result <= 32'h7FC0_0000; // Quiet NaN"
+          ],
+          [
+            278,
+            "fp_flags[FLAG_INVALID] <= 1'b1;"
+          ],
+          [
+            279,
+            "end else if (s3_is_inf) begin"
+          ],
+          [
+            280,
+            "fp_result <= {s3_inf_sign, 8'hFF, 23'h0};"
+          ],
+          [
+            281,
+            "end else if (s3_is_zero_result || s3_mant_sum == 0) begin"
+          ],
+          [
+            282,
+            "fp_result <= 32'h0;"
+          ],
+          [
+            283,
+            "fp_flags[FLAG_ZERO] <= 1'b1;"
+          ],
+          [
+            286,
+            "if (s3_mant_sum[27]) begin"
+          ],
+          [
+            288,
+            "s4_new_exp = s3_exp + 1;"
+          ],
+          [
+            289,
+            "s4_final_frac = s3_mant_sum[26:4];"
+          ],
+          [
+            290,
+            "s4_round_up = s3_mant_sum[3] && (s3_mant_sum[2:0] != 0 || s3_mant_sum[4]);"
+          ],
+          [
+            291,
+            "end else if (s3_mant_sum[26]) begin"
+          ],
+          [
+            293,
+            "s4_new_exp = s3_exp;"
+          ],
+          [
+            294,
+            "s4_final_frac = s3_mant_sum[25:3];"
+          ],
+          [
+            295,
+            "s4_round_up = s3_mant_sum[2] && (s3_mant_sum[1:0] != 0 || s3_mant_sum[3]);"
+          ],
+          [
+            298,
+            "s4_shift_amt = {3'b0, lzc(s3_mant_sum)};"
+          ],
+          [
+            299,
+            "if (s4_shift_amt > s3_exp + 1) begin"
+          ],
+          [
+            300,
+            "s4_new_exp = 8'h0;"
+          ],
+          [
+            301,
+            "s4_final_frac = 23'h0;"
+          ],
+          [
+            302,
+            "s4_round_up = 1'b0;"
+          ],
+          [
+            304,
+            "s4_shifted_mant = s3_mant_sum << (s4_shift_amt - 1);"
+          ],
+          [
+            305,
+            "s4_new_exp = s3_exp - (s4_shift_amt - 1);"
+          ],
+          [
+            306,
+            "s4_final_frac = s4_shifted_mant[25:3];"
+          ],
+          [
+            307,
+            "s4_round_up = s4_shifted_mant[2] && (s4_shifted_mant[1:0] != 0 || s4_shifted_mant[3]);"
+          ],
+          [
+            312,
+            "s4_rounded_mant = {1'b0, s4_final_frac} + {23'b0, s4_round_up};"
+          ],
+          [
+            315,
+            "if (s4_rounded_mant[23]) begin"
+          ],
+          [
+            316,
+            "s4_new_exp = s4_new_exp + 1;"
+          ],
+          [
+            317,
+            "s4_final_frac = s4_rounded_mant[23:1];"
+          ],
+          [
+            319,
+            "s4_final_frac = s4_rounded_mant[22:0];"
+          ],
+          [
+            323,
+            "if (s4_new_exp >= 8'hFF) begin"
+          ],
+          [
+            324,
+            "fp_result <= {s3_result_sign, 8'hFF, 23'h0};"
+          ],
+          [
+            325,
+            "fp_flags[FLAG_OVERFLOW] <= 1'b1;"
+          ],
+          [
+            326,
+            "end else if (s4_new_exp == 0) begin"
+          ],
+          [
+            327,
+            "fp_result <= 32'h0;"
+          ],
+          [
+            328,
+            "fp_flags[FLAG_UNDERFLOW] <= 1'b1;"
+          ],
+          [
+            330,
+            "fp_result <= {s3_result_sign, s4_new_exp, s4_final_frac};"
+          ],
+          [
+            336,
+            "fp_active <= 1'b0;"
+          ],
+          [
+            369,
+            "fp2int_active <= 1'b1;"
+          ],
+          [
+            370,
+            "fp2int_a_reg <= a;"
+          ],
+          [
+            371,
+            "fp2int_counter <= 1'b0;"
+          ],
+          [
+            373,
+            "fp2int_counter <= fp2int_counter + 1'b1;"
+          ],
+          [
+            375,
+            "if (fp2int_counter == 1'b0) begin"
+          ],
+          [
+            380,
+            "fp2int_active <= 1'b0;"
+          ],
+          [
+            381,
+            "fp2int_done <= 1'b1;"
+          ],
+          [
+            382,
+            "fp2int_invalid <= 1'b0;"
+          ],
+          [
+            384,
+            "if (f2i_is_nan) begin"
+          ],
+          [
+            385,
+            "fp2int_result <= 32'h0;"
+          ],
+          [
+            386,
+            "fp2int_invalid <= 1'b1;"
+          ],
+          [
+            387,
+            "end else if (f2i_is_zero) begin"
+          ],
+          [
+            388,
+            "fp2int_result <= 32'h0;"
+          ],
+          [
+            389,
+            "end else if (f2i_is_inf || f2i_exp >= 8'd158) begin"
+          ],
+          [
+            391,
+            "fp2int_result <= f2i_sign ? 32'h8000_0000 : 32'h7FFF_FFFF;"
+          ],
+          [
+            392,
+            "end else if (f2i_exp < 8'd127) begin"
+          ],
+          [
+            394,
+            "fp2int_result <= 32'h0;"
+          ],
+          [
+            397,
+            "f2i_mant_ext = {1'b1, f2i_frac, 8'h0};"
+          ],
+          [
+            398,
+            "f2i_shift_right = 8'd158 - f2i_exp;"
+          ],
+          [
+            400,
+            "if (f2i_shift_right >= 32)"
+          ],
+          [
+            401,
+            "f2i_int_val = 32'h0;"
+          ],
+          [
+            403,
+            "f2i_int_val = f2i_mant_ext >> f2i_shift_right;"
+          ],
+          [
+            405,
+            "if (f2i_sign)"
+          ],
+          [
+            406,
+            "fp2int_result <= ~f2i_int_val + 1;"
+          ],
+          [
+            408,
+            "fp2int_result <= f2i_int_val;"
+          ],
+          [
+            455,
+            "result <= fp_result;"
+          ],
+          [
+            456,
+            "flags <= fp_flags;"
+          ],
+          [
+            457,
+            "done <= 1'b1;"
+          ],
+          [
+            459,
+            "result <= fp2int_result;"
+          ],
+          [
+            460,
+            "flags[FLAG_INVALID] <= fp2int_invalid;"
+          ],
+          [
+            461,
+            "flags[FLAG_ZERO] <= (fp2int_result == 32'h0);"
+          ],
+          [
+            462,
+            "done <= 1'b1;"
+          ],
+          [
+            464,
+            "case (op_r)"
+          ],
+          [
+            466,
+            "result <= int_result;"
+          ],
+          [
+            467,
+            "flags[FLAG_ZERO] <= (int_result == 32'h0);"
+          ],
+          [
+            470,
+            "result <= shift_result;"
+          ],
+          [
+            471,
+            "flags[FLAG_ZERO] <= (shift_result == 32'h0);"
+          ],
+          [
+            475,
+            "result <= 32'h0;"
+          ],
+          [
+            476,
+            "flags <= 4'h0;"
+          ],
+          [
+            479,
+            "done <= 1'b1;"
+          ]
+        ],
+        "replay": {
+          "contract": "cycle-replay-v1",
+          "passed": true,
+          "sampled_cycles": 3,
+          "witness_cycles": 0,
+          "output_checks": 0,
+          "reset_per_witness": true,
+          "sample_phase": "clocking input #1step before posedge",
+          "clock_period_ns": 10,
+          "arithmetic_correctness_checked": false,
+          "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+        }
+      },
+      "final_witness_only": {
+        "percent": null,
+        "bins": null,
+        "score": null
+      },
+      "cells": [],
+      "rounds": []
+    },
+    {
+      "status": "complete",
+      "started_utc": "2026-09-06T23:18:59.649+00:00",
+      "finished_utc": "2026-09-06T23:22:51.197+00:00",
+      "elapsed_seconds": 231.548,
+      "active_seconds": 231.53158721979707,
+      "tokens": 0,
+      "stop_reason": null,
+      "costs": {
+        "requests": 0,
+        "usage_reported": {
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "total_tokens": 0
+        },
+        "model_request_seconds": null
+      },
+      "final": {
+        "percent": {
+          "line": 97.76536312849161,
+          "cond": 85.37735849056604,
+          "toggle": 89.09185803757829,
+          "branch": 92.3076923076923
+        },
+        "bins": {
+          "line": [
+            179,
+            175
+          ],
+          "cond": [
+            212,
+            181
+          ],
+          "toggle": [
+            1916,
+            1707
+          ],
+          "branch": [
+            65,
+            60
+          ]
+        },
+        "score": 91.13556799108207,
+        "uncovered": [
+          [
+            316,
+            "s4_new_exp = s4_new_exp + 1;"
+          ],
+          [
+            317,
+            "s4_final_frac = s4_rounded_mant[23:1];"
+          ],
+          [
+            336,
+            "fp_active <= 1'b0;"
+          ],
+          [
+            401,
+            "f2i_int_val = 32'h0;"
+          ]
+        ],
+        "replay": {
+          "contract": "cycle-replay-v1",
+          "passed": true,
+          "sampled_cycles": 2731,
+          "witness_cycles": 640,
+          "output_checks": 1920,
+          "reset_per_witness": true,
+          "sample_phase": "clocking input #1step before posedge",
+          "clock_period_ns": 10,
+          "arithmetic_correctness_checked": false,
+          "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+        }
+      },
+      "final_witness_only": {
+        "percent": null,
+        "bins": null,
+        "score": null
+      },
+      "cells": [
+        {
+          "requested_per_intent": 1,
+          "sequences": 29,
+          "complete": true,
+          "coverage": {
+            "percent": {
+              "line": 97.76536312849161,
+              "cond": 83.49056603773585,
+              "toggle": 75.62630480167014,
+              "branch": 92.3076923076923
+            },
+            "bins": {
+              "line": [
+                179,
+                175
+              ],
+              "cond": [
+                212,
+                177
+              ],
+              "toggle": [
+                1916,
+                1449
+              ],
+              "branch": [
+                65,
+                60
+              ]
+            },
+            "score": 87.29748156889748
+          },
+          "witness_only_coverage": {
+            "percent": {
+              "line": 97.76536312849161,
+              "cond": 82.54716981132076,
+              "toggle": 75.62630480167014,
+              "branch": 92.3076923076923
+            },
+            "bins": {
+              "line": [
+                179,
+                175
+              ],
+              "cond": [
+                212,
+                175
+              ],
+              "toggle": [
+                1916,
+                1449
+              ],
+              "branch": [
+                65,
+                60
+              ]
+            },
+            "score": 87.0616325122937
+          }
+        },
+        {
+          "requested_per_intent": 4,
+          "sequences": 116,
+          "complete": true,
+          "coverage": {
+            "percent": {
+              "line": 97.76536312849161,
+              "cond": 85.37735849056604,
+              "toggle": 89.09185803757829,
+              "branch": 92.3076923076923
+            },
+            "bins": {
+              "line": [
+                179,
+                175
+              ],
+              "cond": [
+                212,
+                181
+              ],
+              "toggle": [
+                1916,
+                1707
+              ],
+              "branch": [
+                65,
+                60
+              ]
+            },
+            "score": 91.13556799108207
+          },
+          "witness_only_coverage": {
+            "percent": {
+              "line": 97.76536312849161,
+              "cond": 84.43396226415095,
+              "toggle": 86.6910229645094,
+              "branch": 92.3076923076923
+            },
+            "bins": {
+              "line": [
+                179,
+                175
+              ],
+              "cond": [
+                212,
+                179
+              ],
+              "toggle": [
+                1916,
+                1661
+              ],
+              "branch": [
+                65,
+                60
+              ]
+            },
+            "score": 90.29951016621106
+          }
+        }
+      ],
+      "rounds": []
+    },
+    {
+      "status": "completed",
+      "started_utc": "2026-09-06T23:27:18.298+00:00",
+      "finished_utc": "2026-09-06T23:43:00.472+00:00",
+      "elapsed_seconds": 942.174,
+      "active_seconds": 942.1025830609724,
+      "tokens": 143739,
+      "stop_reason": "no_line_progress",
+      "costs": {
+        "requests": 1,
+        "usage_reported": {
+          "prompt_tokens": 107821,
+          "completion_tokens": 35918,
+          "total_tokens": 143739
+        },
+        "model_request_seconds": 274.8116998374462
+      },
+      "final": {
+        "percent": {
+          "line": 97.76536312849161,
+          "cond": 85.84905660377359,
+          "toggle": 89.19624217118998,
+          "branch": 92.3076923076923
+        },
+        "bins": {
+          "line": [
+            179,
+            175
+          ],
+          "cond": [
+            212,
+            182
+          ],
+          "toggle": [
+            1916,
+            1709
+          ],
+          "branch": [
+            65,
+            60
+          ]
+        },
+        "score": 91.27958855278688,
+        "uncovered": [
+          [
+            316,
+            "s4_new_exp = s4_new_exp + 1;"
+          ],
+          [
+            317,
+            "s4_final_frac = s4_rounded_mant[23:1];"
+          ],
+          [
+            336,
+            "fp_active <= 1'b0;"
+          ],
+          [
+            401,
+            "f2i_int_val = 32'h0;"
+          ]
+        ],
+        "replay": {
+          "contract": "cycle-replay-v1",
+          "passed": true,
+          "sampled_cycles": 2831,
+          "witness_cycles": 668,
+          "output_checks": 2004,
+          "reset_per_witness": true,
+          "sample_phase": "clocking input #1step before posedge",
+          "clock_period_ns": 10,
+          "arithmetic_correctness_checked": false,
+          "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+        }
+      },
+      "final_witness_only": {
+        "percent": {
+          "line": 97.76536312849161,
+          "cond": 84.90566037735849,
+          "toggle": 89.03966597077245,
+          "branch": 92.3076923076923
+        },
+        "bins": {
+          "line": [
+            179,
+            175
+          ],
+          "cond": [
+            212,
+            180
+          ],
+          "toggle": [
+            1916,
+            1706
+          ],
+          "branch": [
+            65,
+            60
+          ]
+        },
+        "score": 91.00459544607871
+      },
+      "cells": [],
+      "rounds": [
+        {
+          "round": 1,
+          "ut_count": 1,
+          "intents": 29,
+          "sequence_count": 116,
+          "coverage": {
+            "line": 97.76536312849161,
+            "cond": 85.37735849056604,
+            "toggle": 89.09185803757829,
+            "branch": 92.3076923076923
+          },
+          "score": 91.13556799108207,
+          "closed_lines": [
+            86,
+            87,
+            88,
+            89,
+            102,
+            103,
+            104,
+            171,
+            172,
+            173,
+            174,
+            192,
+            193,
+            194,
+            195,
+            196,
+            198,
+            200,
+            203,
+            204,
+            207,
+            208,
+            209,
+            212,
+            213,
+            216,
+            217,
+            218,
+            219,
+            220,
+            221,
+            223,
+            224,
+            225,
+            226,
+            227,
+            229,
+            234,
+            235,
+            236,
+            237,
+            238,
+            239,
+            240,
+            243,
+            246,
+            247,
+            249,
+            254,
+            255,
+            256,
+            257,
+            258,
+            259,
+            261,
+            263,
+            266,
+            272,
+            273,
+            274,
+            276,
+            277,
+            278,
+            279,
+            280,
+            281,
+            282,
+            283,
+            286,
+            288,
+            289,
+            290,
+            291,
+            293,
+            294,
+            295,
+            298,
+            299,
+            300,
+            301,
+            302,
+            304,
+            305,
+            306,
+            307,
+            312,
+            315,
+            319,
+            323,
+            324,
+            325,
+            326,
+            327,
+            328,
+            330,
+            369,
+            370,
+            371,
+            373,
+            375,
+            380,
+            381,
+            382,
+            384,
+            385,
+            386,
+            387,
+            388,
+            389,
+            391,
+            392,
+            394,
+            397,
+            398,
+            400,
+            403,
+            405,
+            406,
+            408,
+            455,
+            456,
+            457,
+            459,
+            460,
+            461,
+            462,
+            464,
+            466,
+            467,
+            470,
+            471,
+            475,
+            476,
+            479
+          ],
+          "remaining_lines": [
+            316,
+            317,
+            336,
+            401
+          ],
+          "tokens": 0
+        },
+        {
+          "round": 2,
+          "ut_count": 1,
+          "intents": 1,
+          "sequence_count": 4,
+          "coverage": {
+            "line": 97.76536312849161,
+            "cond": 85.84905660377359,
+            "toggle": 89.19624217118998,
+            "branch": 92.3076923076923
+          },
+          "score": 91.27958855278688,
+          "closed_lines": [],
+          "remaining_lines": [
+            316,
+            317,
+            336,
+            401
+          ],
+          "tokens": 143739
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "requests": 2,
+    "tokens": 207760,
+    "prompt_tokens": 124957,
+    "completion_tokens": 82803,
+    "active_seconds": 1909.819616638124,
+    "elapsed_stage_seconds": 1909.92,
+    "wall_interval_seconds": 2275.235,
+    "money": null,
+    "money_note": "Provider pricing unavailable; tokens are not a currency estimate."
+  },
+  "audit": "out/experiments/alu-four-sequence-live-20260906-control/audit-continuation.json",
+  "notes": [
+    "Initial run failed at sampling validation; failure retained.",
+    "JG omits default min_length 1. Fixed validator; UT and witness horizons unchanged.",
+    "Fixed-UT 1/4 comparison uses nested prefixes of a single new UT.",
+    "Continuation reuses verified first UT and four-sample pools, not first-request cost events. Tokens counted once across stages.",
+    "All 120 sequences replayed; no_line_progress stop is not full coverage or proof of unreachable lines.",
+    "Runtime, RTL and prompt frozen throughout corrected sampling and continuation."
+  ]
+}

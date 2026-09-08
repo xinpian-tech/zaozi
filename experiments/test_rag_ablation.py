@@ -89,11 +89,12 @@ class AblationTest(unittest.TestCase):
                 return {"tokens": 0, "attempts": 1,
                         "result": {"status": "proof-required" if proof_only else "generated",
                                    "proofObligations": [{"label": "pending", "reason": "requires proof"}] if proof_only else [],
-                                   "intents": [] if proof_only else [{"label": "target", "status": "generated", "ms": "3"}]}}
+                                   "utCount": 1, "goals": [] if proof_only else [{"label": "target", "status": "generated", "ms": "3"}]}}
             with patch.object(ablation, "preflight"), patch.object(ablation.Replay, "compile") as compile, \
                  patch.object(ablation.Replay, "simulate", side_effect=[baseline, measured, measured]) as simulate, \
                  patch.object(ablation, "run_generation", side_effect=generate), \
-                 patch.object(ablation, "witness_frames", return_value=[]) as frames, \
+                 patch.object(ablation, "expand_goals", side_effect=lambda r, *a: r["result"]["goals"]), \
+                 patch.object(ablation, "measure_goals", return_value=([{"status": "replayed"}], [{}])) as frames, \
                  contextlib.redirect_stdout(io.StringIO()):
                 code = ablation.main(["--replay-config", str(FIXTURES / "tiny_replay.json"), "--out", str(root),
                     "--samples", "1", "--response-file", str(FIXTURES / "completion_intent.json")])
@@ -119,10 +120,10 @@ class AblationTest(unittest.TestCase):
 
     def test_proof_only_does_not_replay_or_exclude_residual(self):
         code, summary, simulations, frames = self.run_flow(proof_only=True)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertEqual(simulations, 1)
         self.assertEqual(frames, 0)
-        self.assertEqual(summary["cells"][0]["proof_only"], 1)
+        self.assertEqual(summary["cells"][0]["failures"], 1)
 
 
 if __name__ == "__main__":

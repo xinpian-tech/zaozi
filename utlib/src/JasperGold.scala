@@ -35,6 +35,14 @@ final case class JgModel(
   */
 object JasperGold:
 
+  /** Only full-design traces may supply expected outputs to checked replay. */
+  val witnessContract = "jg-full-design-v1"
+
+  private[utlib] def fullTraceExported(exitCode: Int, log: String): Boolean =
+    val lines = log.linesIterator.map(_.trim).toSet
+    exitCode == 0 && lines.contains("JGDONE") && lines.contains("JGTRACE standard") &&
+      !log.contains("WVS028")
+
   /** Is an engine reachable — a wrapper configured, or `jg` on the path? Tests skip rather than fail without one. */
   lazy val available: Boolean =
     sys.env.get("ZAOZI_EDA_SHELL").exists(p => os.exists(os.Path(p, os.pwd))) ||
@@ -61,8 +69,36 @@ object JasperGold:
     // Keep generation assertions even when their condition folds to true (an impossible goal).
     // Dropping such an assertion loses the distinction between unreachable and a missing property.
     // The external DUT RTL is unchanged, and JasperGold still optimizes the elaborated model.
-    os.proc(CirctTools("firtool"), "--disable-opt", linked.toString, "-o", sv.toString).call(check = true)
+    os.proc(CirctTools("firtool"), "--disable-opt", "--disable-all-randomization", linked.toString, "-o", sv.toString).call(check = true)
     JgModel(sv, top, rtl, generationLabels, include)
+
+  /** Experiment policy: model code may describe goals, never invent environment restrictions.
+    * Inspect emitted SV as well as source checks, so aliases/helpers cannot hide an assumption.
+    * This checks the UT artifact only; externally supplied RTL remains an authoritative design input.
+    */
+  def requireUnconstrainedUT(model: JgModel): Unit =
+    val code = os.read(model.sv).replaceAll("(?s)/\\*.*?\\*/|//[^\\n]*", " ")
+    require(!raw"\b(assume|restrict)\b".r.findFirstIn(code).isDefined,
+      "model-authored assumptions/restrictions are forbidden; express scenario conditions inside Gen")
+    val assertions = generationAssertions.findAllMatchIn(code).map(_.group(1)).toSeq
+    require(assertions.distinct.size == assertions.size && assertions.toSet == model.generationLabels,
+      "UT assertions must match generationLabels exactly; declare every Gen and no extra assertions")
+    require(!raw"\bcover\s+property\b".r.findFirstIn(code).isDefined, "use named Gen goals, not extra covers")
+
+  /** Select one goal from a single elaborated UT. Other Gen assertions are removed, not conjoined or proved.
+    * Shared design, wiring, state and environment stay unchanged for every goal.
+    */
+  def selectGoal(model: JgModel, label: String, outDir: os.Path): JgModel =
+    require(model.generationLabels.contains(label), s"unknown generation label: $label")
+    val text = os.read(model.sv)
+    asCover(text, model.generationLabels) // Validate all labels before selecting any one of them.
+    val selected = generationAssertions.replaceAllIn(text, m =>
+      java.util.regex.Matcher.quoteReplacement(
+        if model.generationLabels.contains(m.group(1)) && m.group(1) != label then "" else m.matched))
+    os.makeDir.all(outDir)
+    val sv = outDir / model.sv.last
+    os.write.over(sv, selected)
+    model.copy(sv = sv, generationLabels = Set(label))
 
   /** Generate a witness for the UT's intent. `timeLimit` is JasperGold's per-run proof limit.
     *
@@ -74,6 +110,7 @@ object JasperGold:
     * in 2 s for the identical scenario.
     */
   def generate(model: JgModel, workDir: os.Path, timeLimit: String = "600s"): GenerateOutcome =
+    require(model.generationLabels.size == 1, "selectGoal must select one goal before witness generation")
     os.makeDir.all(workDir)
     os.remove.all(workDir / "jgproj") // a project directory left by an interrupted run refuses a new session
     val vcd     = workDir / "witness.vcd"
@@ -94,6 +131,8 @@ object JasperGold:
       s"[string match {*::${model.top}.$label} $$p] || [string equal {${model.top}.$label} $$p]"
     }.mkString(" || ")
     val filter = s"if {!($selected)} { continue }"
+    // JG's default AR dump can encode out-of-cone vector bits as known 0/1 placeholders.
+    // Reconstruct the full design before exporting expected outputs; proof search can still use COI reduction.
     val tcl     = workDir / "generate.tcl"
     os.write.over(
       tcl,
@@ -113,8 +152,11 @@ object JasperGold:
           |  if {$$st == "covered" && $$found == ""} { set found $$p }
           |}
           |if {$$found != ""} {
+          |  set_trace_optimization standard
+          |  if {[get_trace_optimization] != "standard"} { error "full-design trace required" }
           |  visualize -cover -property $$found -window visualize:0
           |  visualize -save -vcd $vcd -force -window visualize:0
+          |  puts "JGTRACE [get_trace_optimization]"
           |  puts "JGCOVERED $$found"
           |}
           |puts "JGDONE"
@@ -129,12 +171,17 @@ object JasperGold:
     os.write.over(workDir / "jg.log", log)
 
     val statuses = log.linesIterator.collect { case s"JGSTATUS $name $status" => name.trim -> status.trim }.toSeq
-    if !log.contains("JGDONE") then GenerateOutcome.Unknown(s"jg did not finish: ${log.linesIterator.toSeq.takeRight(5).mkString(" | ")}")
+    if run.exitCode != 0 || !log.linesIterator.exists(_.trim == "JGDONE") then
+      GenerateOutcome.Unknown(s"jg did not finish: ${log.linesIterator.toSeq.takeRight(5).mkString(" | ")}")
     else if os.exists(vcd) && statuses.exists(_._2 == "covered") then
-      val trace = withAliases(parseVcd(vcd, model.clock), svAliases(model.sv, model.top))
-      GenerateOutcome.Generated(withFreeInputs(trace, svInputs(model.sv, model.top)))
+      if !fullTraceExported(run.exitCode, log) then GenerateOutcome.Unknown("jg did not export a full-design trace")
+      else
+        val trace = withAliases(parseVcd(vcd, model.clock), svAliases(model.sv, model.top))
+        GenerateOutcome.Generated(withFreeInputs(trace, svInputs(model.sv, model.top)))
     else if statuses.nonEmpty && statuses.forall(_._2 == "unreachable") then GenerateOutcome.Infeasible
     else GenerateOutcome.Unknown(s"cover statuses: ${statuses.map((n, s) => s"$n=$s").mkString(", ")}")
+
+  private val generationAssertions = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);".r
 
   /** Turn explicitly selected generation assertions into covers of their negation. */
   private[utlib] def asCover(sv: String, labels: Set[String]): String =
@@ -143,7 +190,7 @@ object JasperGold:
     // Never reinterpret an unrelated assertion as a generation request.
     require(labels.nonEmpty, "generation labels must not be empty")
     val found = collection.mutable.Set.empty[String]
-    val result = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);".r.replaceAllIn(
+    val result = generationAssertions.replaceAllIn(
       sv,
       m => java.util.regex.Matcher.quoteReplacement(
         if labels.contains(m.group(1)) then
@@ -155,8 +202,7 @@ object JasperGold:
     require(found.toSet == labels, s"generation labels missing from emitted assertions: ${labels -- found}")
     result
 
-  /** The window JasperGold dumps holds the property's cone, under the names the cone uses — a top-level output
-    * that merely forwards an instance pin appears as the pin, not the port. firtool's SV states every such
+  /** JasperGold may dump a forwarded top-level output under its instance pin's name. firtool's SV states every such
     * forwarding (`assign PORT = net;`, and `.pin(net)` on the instance), so read the top module's wiring once and
     * make each alias resolvable: a trace column for `PORT` is a copy of the column its net or pin has.
     */

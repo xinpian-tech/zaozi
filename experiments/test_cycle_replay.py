@@ -13,12 +13,13 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from cycle_replay import (CONTRACT, Replay, baseline_frames, check_drive, frame,
+from cycle_replay import (CONTRACT, WITNESS_CONTRACT, Replay, baseline_frames, check_drive, digest, frame,
                           load_config, read_vcd, render_bench, validate_samples, validate_schedule, witness_frames)
-from coverage_flow import compare
-import coverage_flow
+from cycle_diagnostic import compare
+import cycle_diagnostic as coverage_flow
 import sequence_experiment as loop
 import sequence_framework as framework
+from test_support import full_ut, append_goals
 
 FIXTURES = Path(__file__).resolve().parent / "tests/fixtures"
 
@@ -37,6 +38,27 @@ class CycleReplayTest(unittest.TestCase):
         changed = copy.deepcopy(self.config)
         changed["baseline"]["seed"] += 1
         self.assertNotEqual(first, baseline_frames(self.design, changed))
+
+    def test_alu_initialization_has_no_random_inputs_or_requests(self):
+        design, config = load_config(framework.ROOT / "experiments/designs/alu_replay.json")
+        with patch("cycle_replay.random.Random", side_effect=AssertionError("random must not be used")):
+            rows = baseline_frames(design, config)
+        self.assertEqual([row["kind"] for row in rows], ["reset", "reset", "baseline"])
+        self.assertTrue(all(row["drive"] == config["idle"] for row in rows))
+
+    def test_baseline_mode_and_fields_are_explicit(self):
+        for baseline in ({"mode": "reset-only", "idle_cycles": 0},
+                         {"mode": "reset-only", "idle_cycles": True},
+                         {"mode": "reset-only", "idle_cycles": 1, "samples": 1024},
+                         {"mode": "random"}, {"mode": "unknown"}):
+            config = copy.deepcopy(self.config)
+            config["design"] = str(FIXTURES / "tiny_design.json")
+            config["baseline"] = baseline
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "replay.json"
+                path.write_text(json.dumps(config))
+                with self.subTest(baseline=baseline), self.assertRaises(ValueError):
+                    load_config(path)
 
     def test_drive_fields_are_exact_unsigned_bit_patterns(self):
         for bad in ({"payload": -1, "valid": 0}, {"payload": 256, "valid": 0},
@@ -101,7 +123,8 @@ b00101010 o
             (directory / "witness.vcd").write_text(self.vcd())
             stimulus = directory / "stimulus.json"
             stimulus.write_text(json.dumps([{"payload": "42", "valid": "1"}, {"payload": "7", "valid": "0"}]))
-            row = {"stimulusFile": str(stimulus), "witnessFile": str(directory / "witness.vcd"), "cycles": 2}
+            row = {"stimulusFile": str(stimulus), "witnessFile": str(directory / "witness.vcd"), "cycles": 2,
+                   "witnessContract": WITNESS_CONTRACT, "witnessSha256": digest(directory / "witness.vcd")}
             frames = witness_frames(self.design, self.config, row, 1)
             self.assertEqual([r["kind"] for r in frames], ["reset", "reset", "witness", "witness", "drain", "drain"])
             self.assertEqual(frames[2]["expected"]["result"], [3, 15])
@@ -117,6 +140,24 @@ b00101010 o
             stimulus.write_text(json.dumps([{"payload": 99, "valid": 1}, {"payload": 7, "valid": 0}]))
             with self.assertRaisesRegex(ValueError, "disagrees with witness"):
                 witness_frames(self.design, self.config, row, 2)
+
+    def test_replay_rejects_legacy_coi_trace_or_modified_vcd(self):
+        with tempfile.TemporaryDirectory() as directory:
+            witness = Path(directory) / "witness.vcd"
+            witness.write_text(self.vcd())
+            row = {"witnessFile": str(witness), "stimulusFile": str(Path(directory) / "stimulus.json"),
+                   "witnessSha256": digest(witness)}
+            for contract in (None, "jg-coi-v1"):
+                row["witnessContract"] = contract
+                with self.assertRaisesRegex(ValueError, "full-design witness"):
+                    witness_frames(self.design, self.config, row, 0)
+            row["witnessContract"] = WITNESS_CONTRACT
+            witness.write_text(self.vcd() + "\n")
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                witness_frames(self.design, self.config, row, 0)
+            del row["witnessSha256"]
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                witness_frames(self.design, self.config, row, 0)
 
     def sample_log(self, frames):
         lines = ["UVM_ERROR : 0", "UVM_FATAL : 0", f"RVPROBE_REPLAY_PASS {len(frames)}"]
@@ -171,13 +212,15 @@ class CoverageFlowTest(unittest.TestCase):
                 out.mkdir(parents=True)
                 (out / "summary.json").write_text(json.dumps({
                     "status": "failed" if failure else "generated", "tokens": 0, "attempts": 1,
-                    "result": {"intents": [] if proofs else [{"label": "fake", "status": "generated"}],
+                    "result": {"utCount": 1, "utModule": "FakeUT", "goals": [{"label": "fake", "status": "generated"}],
                                "proofObligations": [{"label": "pending", "reason": "requires proof"}] if proofs else []}}))
             return subprocess.CompletedProcess(command, int(failure and "--modinfo" in command))
-        with patch.object(coverage_flow.subprocess, "run", side_effect=run), \
+        with patch.object(coverage_flow, "run_process", side_effect=run), \
+             patch.object(coverage_flow, "preflight"), \
+             patch.object(coverage_flow, "expand_goals", side_effect=lambda r, *a: r["result"]["goals"]), \
              patch.object(coverage_flow.Replay, "compile"), \
-             patch.object(coverage_flow.Replay, "simulate", side_effect=[baseline, candidate, candidate]), \
-             patch.object(coverage_flow, "witness_frames", return_value=[]), \
+             patch.object(coverage_flow.Replay, "simulate", side_effect=[baseline, candidate, candidate, candidate, candidate]), \
+             patch.object(coverage_flow, "measure_goals", return_value=([{"status": "replayed"}], [{"kind": "witness"}])), \
              contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             code = coverage_flow.main(["--replay-config", str(FIXTURES / "tiny_replay.json"),
                 "--out", str(directory / "flow"), "--rounds", "3",
@@ -202,9 +245,9 @@ class CoverageFlowTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             code, summary, calls = self.fake_run(Path(directory), proofs=True)
             self.assertEqual(code, 0)
-            self.assertEqual(summary["stop_reason"], "proof_required")
+            self.assertEqual(summary["stop_reason"], "no_line_progress")
             self.assertFalse(summary["coverage_closed"])
-            self.assertEqual(len(summary["final"]["uncovered"]), 2)
+            self.assertEqual(len(summary["final"]["uncovered"]), 1)
             self.assertEqual(summary["pending_proofs"][0]["label"], "pending")
 
     def test_failed_generation_is_not_a_completed_experiment(self):
@@ -223,33 +266,65 @@ class LicensedReplayTest(unittest.TestCase):
         out.mkdir(parents=True, exist_ok=True)
         cls.root = Path(tempfile.mkdtemp(prefix="cycle-replay-regression-", dir=out))
 
+    def test_split_output_assignments_reconstruct_bits_outside_goal(self):
+        design, config = load_config(FIXTURES / "tiny_replay.json")
+        design = design.with_rtl(FIXTURES / "split_output.v")
+        root = self.root / "split-output"
+        response = {"ut": full_ut("split_bits",
+                    "(io.valid & (io.payload === BigInt(1).B(8))).S ### (io.done & io.result(0)).S", design),
+                    "proofObligations": []}
+        sources = framework.write_sources(root / "sources", design, response)
+        report, log = loop.harness(sources, root / "solve", loop.DEFAULT_EDA_SHELL)
+        (root / "solve.log").write_text(log)
+        self.assertTrue(report["ok"], report)
+        frames = witness_frames(design, config, report["result"]["goals"][0], 0)
+        # Independently assigned result[1] must be 1, although the goal only uses bit 0.
+        match = next(row for row in frames if row["expected"].get("done") == [1, 1])
+        self.assertEqual(match["expected"]["result"], [3, 255])
+        replay = Replay(design, config, root, loop.DEFAULT_EDA_SHELL)
+        replay.compile()
+        self.assertTrue(replay.simulate("positive", frames)["replay"]["passed"])
+        match["expected"]["result"][0] ^= 2
+        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+            replay.simulate("negative-output", frames)
+        self.assertIn("output result disagrees with formal pre-edge sample: expected=01 mask=ff actual=03",
+                      (root / "negative-output/sim.log").read_text())
+
     def test_unified_goals_and_independent_reset_replay_then_negative_output_check(self):
         design, config = load_config(FIXTURES / "tiny_replay.json")
         response = framework.parse_response((FIXTURES / "tiny_intents.json").read_text())
-        response["intents"] += [
+        additional = [
             {"label": "property_goal", "expression": "!((!io.valid).S)"},
-            {"label": "guarded_history", "expression":
-             "(Gen.past(io.payload, 8, 2) === BigInt(5).B(8)) & "
-             "(Gen.past(io.payload, 8, 1) === BigInt(7).B(8))"},
+            {"label": "explicit_history", "expression":
+             "(io.valid | !io.valid).S.##(2)((past(io.payload === BigInt(5).B(8), 2) & "
+             "past(io.payload === BigInt(7).B(8), 1)).S)"},
             {"label": "history_then_sequence", "expression":
-             "(Gen.past(io.payload, 8, 2) === BigInt(0).B(8)).S ### io.valid.S"},
+             "(io.valid | !io.valid).S.##(2)(past(io.payload === BigInt(0).B(8), 2).S) ### io.valid.S"},
             {"label": "history_property", "expression":
-             "!(!(Gen.past(io.payload, 8, 2) === BigInt(0).B(8)).S)"},
-            {"label": "zero_history", "expression": "Gen.past(io.payload, 8, 2) === BigInt(0).B(8)"},
+             "!(!((io.valid | !io.valid).S.##(2)(past(io.payload === BigInt(0).B(8), 2).S)))"},
+            {"label": "zero_history", "expression": "(io.valid | !io.valid).S.##(2)(past(io.payload === BigInt(0).B(8), 2).S)"},
             {"label": "after_history", "expression": "io.valid"},
             {"label": "bounded_gap", "expression":
              "(io.valid & (io.payload === BigInt(5).B(8))).S.##(2, Some(4))("
              "(io.valid & (io.payload === BigInt(7).B(8))).S)"},
             {"label": "repetition", "expression": "io.valid.S.*(3)"},
+            {"label": "partial_output", "expression":
+             "(io.valid & (io.payload === BigInt(165).B(8))).S ### (io.done & io.result(0)).S"},
         ]
+        append_goals(response["ut"], [(item["label"], item["expression"]) for item in additional])
         sources = framework.write_sources(self.root / "sources", design, response)
         report, log = loop.harness(sources, self.root / "solve", loop.DEFAULT_EDA_SHELL)
         (self.root / "solve.log").write_text(log)
         self.assertTrue(report["ok"], report)
-        rows = {row["label"]: row for row in report["result"]["intents"]}
-        for name, depth in (("history", 1), ("guarded_history", 2), ("history_property", 2), ("zero_history", 2)):
+        rows = {row["label"]: row for row in report["result"]["goals"]}
+        # Only result[0] occurs in the goal; full trace reconstruction must still
+        # recover result[7:1], rather than trust COI placeholders as expected bits.
+        partial = witness_frames(design, config, rows["partial_output"], 99)
+        self.assertTrue(any(row["expected"].get("result") == [165, 255]
+                            and row["expected"].get("done") == [1, 1] for row in partial), partial)
+        for name, depth in (("history", 1), ("explicit_history", 2), ("history_property", 2), ("zero_history", 2)):
             self.assertGreaterEqual(rows[name]["cycles"], depth + 1, rows[name])
-        beats = json.loads(Path(rows["guarded_history"]["stimulusFile"]).read_text())
+        beats = json.loads(Path(rows["explicit_history"]["stimulusFile"]).read_text())
         self.assertTrue(any(int(beats[t - 2]["payload"]) == 5 and int(beats[t - 1]["payload"]) == 7
                             for t in range(2, len(beats))), beats)
         for name in ("history_property", "zero_history"):
@@ -261,7 +336,7 @@ class LicensedReplayTest(unittest.TestCase):
         # of a real start/match on the trace, not an assumed offset from its tail.
         self.assertTrue(any(int(beats[t - 2]["payload"]) == 0 and int(beats[t + 1]["valid"]) == 1
                             for t in range(2, len(beats) - 1)), beats)
-        self.assertEqual(rows["after_history"]["cycles"], 1, "history guard leaked to another goal")
+        self.assertEqual(rows["after_history"]["cycles"], 1, "independent immediate goal should need only one cycle")
         beats = json.loads(Path(rows["bounded_gap"]["stimulusFile"]).read_text())
         self.assertTrue(any(int(beats[t]["valid"]) == 1 and int(beats[t]["payload"]) == 5
                             and int(beats[t + gap]["valid"]) == 1 and int(beats[t + gap]["payload"]) == 7
@@ -272,18 +347,21 @@ class LicensedReplayTest(unittest.TestCase):
         replay = Replay(design, config, self.root, loop.DEFAULT_EDA_SHELL)
         replay.compile()
         frames = baseline_frames(design, config)
-        for index, row in enumerate(report["result"]["intents"]):
+        for index, row in enumerate(report["result"]["goals"]):
             frames += witness_frames(design, config, row, index)
         measured = replay.simulate("positive", frames)
         self.assertGreater(measured["replay"]["output_checks"], 0)
         self.assertTrue(measured["replay"]["passed"])
         # Corrupt one known formal expectation. A passing simulation must become a failure.
         broken = copy.deepcopy(frames)
-        row = next(row for row in broken if row["expected"])
-        value = next(iter(row["expected"].values()))
-        value[0] ^= value[1] & -value[1]
+        row = next(row for row in broken if row["segment"] == len(rows) - 1
+                   and row["expected"].get("result") == [165, 255])
+        # A wrong bit OUTSIDE the goal's COI must still fail checked replay.
+        row["expected"]["result"][0] ^= 128
         with self.assertRaises((ValueError, subprocess.CalledProcessError)):
             replay.simulate("negative-output", broken)
+        self.assertIn("output result disagrees with formal pre-edge sample: expected=25 mask=ff actual=a5",
+                      (self.root / "negative-output/sim.log").read_text())
 
 
 if __name__ == "__main__":

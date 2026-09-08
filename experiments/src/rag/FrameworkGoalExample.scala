@@ -41,16 +41,15 @@ object FrameworkGoalExample:
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
   ): Sequence = before.S.##(gap)(after.S)
 
-  // Gen.past is available only inside the Gen expression context. It captures clock cycles,
-  // not handshake-qualified beats. Gen automatically requires real history at the goal's start.
-  def changed(signal: Referable[Bits], width: Int, cycles: Int)(using Gen.Scope, ClockScope, ResetScope)(using
+  // Native past samples Bool predicates, not Bits values; no automatic history guard.
+  def previously(predicate: Referable[Bool], cycles: Int)(using ClockEvent)(using
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
-  ): Referable[Bool] = !(Gen.past(signal, width, cycles) === signal)
+  ): Referable[Bool] = past(predicate, cycles)
 
   // A bounded sequence describes an event to witness. Implication can be vacuously true
   // when its antecedent never occurs; it does not by itself request a transaction.
-  // The framework calls Gen once. The JSON response supplies ONLY the expression,
-  // not this helper object, a DUT implementation, or another Gen call.
-  def emit(expression: Gen.Scope ?=> Gen.Expr, label: String)(using ClockEvent)(using
+  // The single model-authored UT calls Gen for each goal, listing all labels in generationLabels.
+  // Its complete source owns imports, architecture and clock/reset context.
+  def emit(expression: Gen.Expr, label: String)(using ClockEvent)(using
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
   ): Unit = Gen(expression, label)

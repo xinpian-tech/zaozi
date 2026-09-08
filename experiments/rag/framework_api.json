@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 12,
   "scope": "framework-only",
   "documents": [
     {
@@ -59,19 +59,21 @@
     },
     {
       "id": "runtime-ut-contract",
-      "title": "Runtime-generated UT JSON expression contract",
+      "title": "Runtime-generated complete UT JSON source contract",
       "source": "experiments/rag/framework_contract.md",
       "tags": [
         "runtime-generated",
         "UT",
         "JSON",
-        "intents",
-        "expression",
+        "ut",
         "proofObligations",
         "response",
-        "contract"
+        "contract",
+        "source",
+        "module",
+        "generationLabels"
       ],
-      "content": "The model returns one JSON object with exactly `intents` and `proofObligations`.\nEach intent contains `label` and `expression`: a Scala expression returning `Gen.Expr` (hardware Bool, Sequence or Property).\nEach proof obligation contains `label` and `reason`: metadata requiring a separate formal check.\nLabels are unique snake_case identifiers. JSON strings escape embedded quotes and newlines.\n\nThe experiment manifest defines the imported RTL, ports, clock/reset wiring and sequence item type.\nThe framework generates one shared `VerilogWrapper` binding and a new UT for each intent in the run directory.\nOnly the model's expression is inserted into `Gen(expression, label)` in that UT's module body.\nNo benchmark-specific UT, stdlib module, historical scenario or DUT implementation is available to the active runner."
+      "content": "The model returns one JSON object with exactly `ut` and `proofObligations`.\nThe `ut` object contains `module`, `generationLabels` and `source`: ONE complete Scala verification UT source.\n`generationLabels` lists all Gen labels exactly once (1..64 unique snake_case labels).\nEach proof obligation contains `label` and `reason`: metadata requiring a separate formal check.\nLabels are unique snake_case identifiers. JSON strings escape quotes and newlines. Multi-UT responses are rejected.\n\nThe experiment manifest defines the imported RTL, ports, clock/reset wiring and sequence item type.\nThe framework generates one shared `VerilogWrapper` binding and a fixed runner, NOT a UT body.\nThe model supplies imports and exactly one @generator object extending Generator with UT, implements architecture,\ninstantiates ImportedDut, faithfully wires every IO and clock/reset, declares clock/reset scopes and calls Gen for each goal.\nSource is compiled verbatim. The single UT is lowered once; each goal is solved separately against that same model.\nOther Gen assertions are removed from a selected goal's solver task, not conjoined or assumed.\nExpression-only responses are rejected; no source fragments are wrapped automatically.\nNo benchmark-specific UT, stdlib module, historical scenario or DUT implementation is available to the active runner.\n\nIf no useful generation target remains, return exactly `stop` and `proofObligations` instead:\n`{\"stop\":{\"reason\":\"explain the lack of a new goal\"},\"proofObligations\":[]}`.\nNo UT is generated in that case. Do not invent filler goals. A stop does not prove coverage closure."
     },
     {
       "id": "utgenerator-abi",
@@ -167,6 +169,25 @@
         "replay"
       ],
       "content": "`proofObligations` are pending metadata, not solver results. `Generated` supplies a witness only for the encoded intent.\nAn input-only constraint does not prove a coverage target was reached. Replay establishes coverage gain, and a dedicated\nreachability property is needed to prove dead code. `Unknown` must not be reported as `Infeasible` or coverage closure."
+    },
+    {
+      "id": "framework-ut-example",
+      "title": "Few-shot complete verification UT architecture and wrapper wiring",
+      "source": "experiments/src/rag/FrameworkUTExample.scala",
+      "kind": "example",
+      "whole_source": true,
+      "tags": [
+        "fewshot",
+        "complete-ut-example",
+        "architecture",
+        "Imported",
+        "wrapper",
+        "wiring",
+        "ClockEvent",
+        "Gen",
+        "multiple",
+        "Gen"
+      ]
     }
   ]
 }

@@ -21,6 +21,7 @@ from sequence_framework import ROOT, Design, load_design
 import urg_score
 
 CONTRACT = "cycle-replay-v1"
+WITNESS_CONTRACT = "jg-full-design-v1"
 METRICS = "line+cond+tgl+branch"
 
 
@@ -41,7 +42,19 @@ def load_config(path: Path) -> tuple[Design, dict]:
         if type(raw[key]) is not int or not 1 <= raw[key] <= maximum:
             raise ValueError(f"invalid {key}")
     check_drive(design, raw["idle"])
+    requests = raw["request"]
+    if not requests or not set(requests) <= set(design.drive_names):
+        raise ValueError("request must identify declared input controls")
+    check_drive(design, {**raw["idle"], **requests})
     baseline = raw["baseline"]
+    if baseline.get("mode") == "reset-only":
+        if set(baseline) != {"mode", "idle_cycles"} or type(baseline["idle_cycles"]) is not int or not 1 <= baseline["idle_cycles"] <= 100:
+            raise ValueError("reset-only baseline requires 1..100 idle_cycles")
+        return design, raw
+    if baseline.get("mode") != "random":
+        raise ValueError("baseline mode must be reset-only or random")
+    if set(baseline) != {"mode", "seed", "samples", "active_cycles", "idle_cycles"}:
+        raise ValueError("random baseline requires seed, samples, active_cycles and idle_cycles")
     for key in ("samples", "active_cycles", "idle_cycles"):
         if type(baseline[key]) is not int or not 1 <= baseline[key] <= 100000:
             raise ValueError(f"invalid baseline {key}")
@@ -49,12 +62,6 @@ def load_config(path: Path) -> tuple[Design, dict]:
         raise ValueError("baseline exceeds two million cycles")
     if type(baseline["seed"]) is not int:
         raise ValueError("seed must be an integer")
-    names = set(design.drive_names)
-    if set(baseline["random_ports"]) | set(baseline["asserted"]) != names:
-        raise ValueError("baseline random_ports and asserted must cover every drive port")
-    if set(baseline["random_ports"]) & set(baseline["asserted"]):
-        raise ValueError("baseline random and asserted ports must not overlap")
-    check_drive(design, {**raw["idle"], **baseline["asserted"]})
     return design, raw
 
 
@@ -75,15 +82,17 @@ def frame(kind, drive, *, expected=None, segment=-1, beat=-1):
 
 def baseline_frames(design: Design, config: dict) -> list[dict]:
     spec = config["baseline"]
+    frames = [frame("reset", config["idle"]) for _ in range(config["reset_cycles"])]
+    if spec["mode"] == "reset-only":
+        return frames + [frame("baseline", config["idle"]) for _ in range(spec["idle_cycles"])]
     rng = random.Random(spec["seed"])
     widths = {p.name: p.width for p in design.data_ports}
-    frames = [frame("reset", config["idle"]) for _ in range(config["reset_cycles"])]
     for _ in range(spec["samples"]):
         # Explicit seed + getrandbits: independent of simulator randomization and model output.
-        drive = {name: rng.getrandbits(widths[name]) for name in spec["random_ports"]}
-        drive.update(spec["asserted"])
+        drive = {name: rng.getrandbits(widths[name]) for name in design.drive_names if name not in config["request"]}
+        drive.update(config["request"])
         frames += [frame("baseline", drive) for _ in range(spec["active_cycles"])]
-        quiet = {**drive, **{name: config["idle"][name] for name in spec["asserted"]}}
+        quiet = {**drive, **{name: config["idle"][name] for name in config["request"]}}
         frames += [frame("baseline", quiet) for _ in range(spec["idle_cycles"])]
     return frames
 
@@ -138,8 +147,12 @@ def read_vcd(path: Path, clock="clock") -> list[dict[str, tuple[int, int]]]:
 
 
 def witness_frames(design: Design, config: dict, row: dict, segment: int) -> list[dict]:
+    if row.get("witnessContract") != WITNESS_CONTRACT:
+        raise ValueError("replay requires a full-design witness; regenerate legacy/COI-only traces")
     stimulus = Path(row["stimulusFile"])
-    witness = Path(row.get("witnessFile", stimulus.parent / "jg/witness.vcd"))
+    witness = Path(row["witnessFile"])
+    if row.get("witnessSha256") != digest(witness):
+        raise ValueError("witness SHA-256 disagrees with generation record")
     beats = json.loads(stimulus.read_text())
     trace = read_vcd(witness)
     if len(beats) != len(trace) or len(beats) != row["cycles"] or not beats:
@@ -155,7 +168,7 @@ def witness_frames(design: Design, config: dict, row: dict, segment: int) -> lis
         if sample.get("reset") != (0, 1):
             raise ValueError("witness is not entirely post-reset")
         for name, value in drive.items():
-            # Inputs optimized out of the cone are allowed; known inputs must agree.
+            # Unspecified inputs are zero-filled by the generator; known inputs must agree.
             expected, mask = sample.get(name, sample.get("dut/" + name, (0, 0)))
             if value & mask != expected & mask:
                 raise ValueError(f"stimulus disagrees with witness: {name} beat {index}")
@@ -168,7 +181,7 @@ def witness_frames(design: Design, config: dict, row: dict, segment: int) -> lis
         frames.append(frame("witness", drive, expected=observed, segment=segment, beat=index))
     # Drain is explicit protocol configuration, not part of the formal witness.
     # Preserve data; deassert configured request controls instead of changing the operation.
-    quiet = {**drive, **{name: config["idle"][name] for name in config["baseline"]["asserted"]}}
+    quiet = {**drive, **{name: config["idle"][name] for name in config["request"]}}
     frames += [frame("drain", quiet, segment=segment) for _ in range(config["drain_cycles"])]
     return frames
 
@@ -184,7 +197,8 @@ def render_bench(design: Design) -> str:
     writes = "\n".join(f"vif.{p.name} = txn.{p.name};" for p in inputs)
     compares = "\n".join(
         f'if ((vif.rvprobe_sample.{p.name} & txn.mask_{p.name}) !== (txn.expected_{p.name} & txn.mask_{p.name})) '
-        f'`uvm_fatal("WITNESS", $sformatf("row %0d output {p.name} disagrees with formal pre-edge sample", txn.ordinal))'
+        f'`uvm_fatal("WITNESS", $sformatf("row %0d output {p.name} disagrees with formal pre-edge sample: '
+        f'expected=%h mask=%h actual=%h", txn.ordinal, txn.expected_{p.name}, txn.mask_{p.name}, vif.rvprobe_sample.{p.name}))'
         for p in outputs)
     print_format = " ".join(["%h"] * len(inputs) + ["%b"] * len(outputs))
     print_values = "".join(f", vif.rvprobe_sample.{p.name}" for p in inputs + outputs)
@@ -310,25 +324,39 @@ def preflight(design_path: Path, directory: Path) -> None:
                "check_interface(load_design(Path(sys.argv[1])), Path(sys.argv[2]))",
                str(design_path), str(directory / "interface")]
     with (directory / "interface.log").open("w") as log:
-        subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
+        from process_runner import run
+        run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
 
 
 class Replay:
-    def __init__(self, design: Design, config: dict, root: Path, eda_shell: Path):
+    def __init__(self, design: Design, config: dict, root: Path, eda_shell: Path, *, resume=False):
         self.design, self.config, self.root = design, config, root.resolve()
         self.eda_shell = eda_shell.resolve()
         self.build = self.root / "build"
+        self.resume = resume
 
     def command(self, cwd, command, log, timeout=900):
+        from run_records import Records
+        from process_runner import run
         with (self.root / "commands.jsonl").open("a") as stream:
             stream.write(json.dumps({"cwd": str(cwd), "command": command, "log": str(log)}) + "\n")
         with log.open("w") as stream:
             env = {key: value for key, value in os.environ.items() if key not in (
                 "RVPROBE_LLM_API_KEY", "RVPROBE_LLM_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL")}
-            subprocess.run([str(self.eda_shell), "-c", shlex.join(command)], cwd=cwd,
-                           env=env, stdout=stream, stderr=subprocess.STDOUT, check=True, timeout=timeout)
+            phase = "vcs-build" if command[0] == "vcs" else "urg" if command[0] == "urg" else "vcs-replay"
+            with Records(self.root).phase(phase, log=str(log)):
+                run([str(self.eda_shell), "-c", shlex.join(command)], cwd=cwd,
+                    env=env, stdout=stream, stderr=subprocess.STDOUT, check=True, timeout=timeout)
 
     def compile(self):
+        if self.resume and (self.build / "manifest.json").exists():
+            record = json.loads((self.build / "manifest.json").read_text())
+            if record["design"] != self.design.record() or record["bench_sha256"] != digest(self.build / "rvprobe_cycle.sv"):
+                raise ValueError("resume replay build differs from the fixed inputs")
+            if (self.build / "simv").is_file():
+                return
+        if self.resume and self.build.exists():
+            self.build.rename(self.root / f"build.interrupted-{len(list(self.root.glob('build.interrupted-*')))}")
         self.build.mkdir(parents=True, exist_ok=False)
         bench = self.build / "rvprobe_cycle.sv"
         bench.write_text(render_bench(self.design))
@@ -341,6 +369,7 @@ class Replay:
                                            "contract": CONTRACT})
 
     def simulate(self, name: str, frames: list[dict]) -> dict:
+        from run_records import fingerprint
         compiled = json.loads((self.build / "manifest.json").read_text())
         if compiled["design"] != self.design.record():
             raise ValueError("design inputs changed since VCS compilation")
@@ -348,6 +377,14 @@ class Replay:
             raise ValueError("replay bench changed since VCS compilation")
         validate_schedule(self.design, frames, self.config["reset_cycles"])
         directory = self.root / name
+        identity = fingerprint({"frames": frames, "compiled": compiled})
+        if self.resume and (directory / "coverage.json").exists():
+            cached = json.loads((directory / "coverage.json").read_text())
+            if cached.get("fingerprint") != identity or any(digest(Path(p)) != sha for p, sha in cached["artifact_sha256"].items()):
+                raise ValueError("resume replay schedule or artifacts changed")
+            return cached
+        if self.resume and directory.exists():
+            directory.rename(self.root / f"{name}.interrupted-{len(list(self.root.glob(name + '.interrupted-*')))}")
         directory.mkdir(exist_ok=False)
         save(directory / "schedule.json", frames)
         inputs = [p for p in self.design.data_ports if p.direction == "input"]
@@ -384,6 +421,8 @@ class Replay:
             raise ValueError("replay requires measurable DUT line coverage")
         from sequence_experiment import residual
         result = {"score": score, "percent": percent, "bins": bins,
+                  "fingerprint": identity,
+                  "artifact_sha256": {str(p): digest(p) for p in (modinfo, directory / "sim.log", directory / "schedule.json")},
                   "requested_metrics": list(urg_score.DEFAULT_METRICS), "scored_metrics": list(percent),
                   "uncovered": residual(modinfo, self.design.top), "modinfo": str(modinfo),
                   "replay": validation, "coverage_database": str(db)}

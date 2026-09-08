@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sequence_framework as framework
 import sequence_experiment as loop
+from test_support import full_ut, ut_with_goals
 
 FIXTURES = Path(__file__).resolve().parent / "tests/fixtures"
 
@@ -31,20 +32,26 @@ class SequenceFrameworkTest(unittest.TestCase):
             path.write_text(json.dumps(raw))
             return framework.load_design(path)
 
-    def test_one_binding_and_four_new_ut_bodies(self):
+    def test_one_binding_and_model_authored_ut_bodies_are_not_regenerated(self):
         binding = framework.render_binding(self.design)
         program = framework.render_program(self.design, self.response)
         self.assertEqual(binding.count("extends VerilogWrapper["), 1)
         self.assertNotIn("extends VerilogWrapper[", program)
-        self.assertEqual(program.count("extends Generator["), 4)
-        self.assertEqual(program.count("val dut = ImportedDut.instantiate"), 4)
-        self.assertEqual(program.count("Gen(("), 4)
+        self.assertNotIn("extends Generator[", program)
+        self.assertNotIn("def architecture", program)
+        self.assertNotIn("Gen((", program)
         self.assertNotIn("Sem.", program)
         self.assertNotIn("Generate((", program)
         self.assertNotIn("Txn.", program)
         self.assertNotIn("UvmSequence.concat", program)
-        for intent in self.response["intents"]:
-            self.assertIn(intent["expression"], program)
+        self.assertIn(f"UTGenerator({self.response['ut']['module']},", program)
+        self.assertEqual(program.count("JasperGold.lower("), 1)
+        self.assertNotIn("JasperGold.generate", program)
+        trusted = (framework.ROOT / "experiments/src/TrustedSolver.scala").read_text()
+        self.assertIn("JasperGold.requireUnconstrainedUT(model)", trusted)
+        self.assertIn("JasperGold.selectGoal(model, label", trusted)
+        for label in self.response["ut"]["generationLabels"]:
+            self.assertIn(f'"{label}"', program)
         self.assertFalse(loop.backend_errors(binding + program))
 
     def test_binding_contains_only_interface_not_rtl_behavior(self):
@@ -68,10 +75,10 @@ class SequenceFrameworkTest(unittest.TestCase):
             self.assertIn("unrecognized arguments: --legacy", result.stderr)
 
     def test_explicit_reset_polarity(self):
-        program = framework.render_program(self.design, self.response)
-        self.assertIn("dut.io.`rst` := io.reset.asBool", program)
+        prompt = loop.build_prompt([], self.design.sources[0], "5s", design=self.design)
+        self.assertIn("dut.io.`rst` to\nio.reset.asBool", prompt)
         low = self.changed_manifest(lambda raw: raw["reset"].update(active_low=True))
-        self.assertIn("dut.io.`rst` := !io.reset.asBool", framework.render_program(low, self.response))
+        self.assertIn("dut.io.`rst` to\n!io.reset.asBool", loop.build_prompt([], low.sources[0], "5s", design=low))
 
     def test_invalid_interface_is_rejected(self):
         changes = [lambda r: r["ports"].append(r["ports"][0]),
@@ -95,7 +102,7 @@ class SequenceFrameworkTest(unittest.TestCase):
     def test_duplicate_and_path_labels_are_rejected(self):
         for label in ("../escape", "same/slash", "a-b", "input_value"):
             raw = copy.deepcopy(self.response)
-            raw["intents"][1]["label"] = label
+            raw["ut"]["generationLabels"][1] = label
             with self.subTest(label=label), self.assertRaises(ValueError):
                 framework.parse_response(json.dumps(raw))
 
@@ -105,13 +112,32 @@ class SequenceFrameworkTest(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 framework.parse_response(raw)
 
-    def test_empty_and_proof_only_are_not_fabricated_witnesses(self):
-        for proofs in ([], [{"label": "pending", "reason": "requires a separate check"}]):
-            program = framework.render_program(self.design, {"intents": [], "proofObligations": proofs})
-            self.assertNotIn("JasperGold.generate(", program)
-            self.assertNotIn("extends Generator[", program)
-            self.assertIn('"proof-required"', program)
-            self.assertIn('"no-candidates"', program)
+    def test_old_expressions_and_unsafe_module_metadata_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "expression-only"):
+            framework.parse_response(json.dumps({"intents": [{"label": "old", "expression": "io.done"}],
+                                                  "proofObligations": []}))
+        for field, value in (("module", "Generated"), ("module", "Bad;code"),
+                             ("generationLabels", ["../goal"]), ("generationLabels", [])):
+            raw = copy.deepcopy(self.response)
+            raw["ut"][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                framework.parse_response(json.dumps(raw))
+
+    def test_exactly_one_ut_and_nonempty_goals_are_required(self):
+        for ut in (None, [], [self.response["ut"]], {**self.response["ut"], "generationLabels": []}):
+            with self.subTest(ut=ut), self.assertRaises(ValueError):
+                framework.parse_response(json.dumps({"ut": ut, "proofObligations": []}))
+
+    def test_model_assumptions_and_multiple_generator_objects_are_rejected(self):
+        for extra, message in (("    Assume(io.valid.I, \"limit\")\n", "Assume"),
+                               ("\n@generator\nobject SecondUT\n", "exactly one")):
+            raw = copy.deepcopy(self.response)
+            raw["ut"]["source"] += extra
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, message):
+                framework.parse_response(json.dumps(raw))
+        raw = copy.deepcopy(self.response)
+        raw["ut"]["source"] += '// Do not use Assume\n'
+        self.assertEqual(framework.parse_response(json.dumps(raw)), raw)
 
     def test_rtl_override_affects_both_prompt_and_solver(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -122,17 +148,50 @@ class SequenceFrameworkTest(unittest.TestCase):
             prompt = loop.build_prompt([(line, "unique_override")], rtl, "5s", design=design)
             program = framework.render_program(design, self.response)
             self.assertIn("unique_override", prompt)
-            self.assertIn(str(rtl), program)
+            self.assertEqual(design.record()["sources"][0]["path"], str(rtl))
+            self.assertNotIn(str(rtl), program)  # Real RTL only enters the trusted solver, not model elaboration.
             self.assertNotIn(str(self.design.sources[0]), program)
 
     def test_sources_and_input_hashes_are_run_local(self):
         with tempfile.TemporaryDirectory() as directory:
             target = framework.write_sources(Path(directory), self.design, self.response)
             self.assertEqual({p.name for p in target.iterdir()},
-                             {"DesignBinding.scala", "Generated.scala", "intent.json", "design.json"})
+                             {"DesignBinding.scala", "Generated.scala", "response.json", "design.json", "model-sources.json", "ModelUT.scala"})
+            self.assertEqual((target / "ModelUT.scala").read_bytes(), self.response["ut"]["source"].encode())
             record = json.loads((target / "design.json").read_text())
             self.assertEqual(len(record["sources"][0]["sha256"]), 64)
         self.assertFalse((framework.ROOT / "experiments/src/Generated.scala").exists())
+
+    def test_resume_never_trusts_a_replaced_binding_or_runner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = framework.write_sources(Path(directory), self.design, self.response)
+            framework.check_saved_sources(target, self.design, self.response)
+            for name in ("DesignBinding.scala", "Generated.scala"):
+                path = target / name
+                original = path.read_bytes()
+                path.write_bytes(original + b"// altered\n")
+                with self.assertRaisesRegex(ValueError, "saved source changed"):
+                    framework.check_saved_sources(target, self.design, self.response)
+                path.write_bytes(original)
+            (target / "Extra.scala").write_text("object Extra\n")
+            with self.assertRaisesRegex(ValueError, "inventory"):
+                framework.check_saved_sources(target, self.design, self.response)
+
+    def test_complete_source_helpers_whitespace_and_hash_are_preserved(self):
+        response = copy.deepcopy(self.response)
+        response["ut"]["source"] += "\n// model-authored helper\nobject CallerHelper:\n  val width = 8\n\n"
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            sources = framework.write_sources(directory / "sources", self.design, response)
+            model_file = sources / "ModelUT.scala"
+            self.assertEqual(model_file.read_bytes(), response["ut"]["source"].encode())
+            model_file.write_text(model_file.read_text() + "// changed after recording\n")
+            result = subprocess.run([sys.executable, str(framework.ROOT / "experiments/ut_harness.py"),
+                str(sources), "--out", str(directory / "solve"), "--compile-only"], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            report = json.loads(result.stdout)
+            self.assertEqual(report["phase"], "input-check")
+            self.assertIn("model UT source changed", report["detail"])
 
     def test_circt_import_checks_manifest_against_elaborated_ports(self):
         header = "hw.module @tiny_external(" + ", ".join(
@@ -174,7 +233,7 @@ class SequenceFrameworkTest(unittest.TestCase):
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             summary = json.loads(result.stdout)
-            self.assertEqual(summary["contract"], "runtime-ut-v2")
+            self.assertEqual(summary["contract"], "runtime-ut-v5")
             self.assertEqual(summary["status"], "prepare")
             self.assertTrue((Path(summary["sources"]) / "DesignBinding.scala").is_file())
 
@@ -190,7 +249,7 @@ class RuntimeToolTest(unittest.TestCase):
 
     def compile(self, name, expression):
         sources = framework.write_sources(self.artifacts / name / "sources", self.design, {
-            "intents": [{"label": "target", "expression": expression}], "proofObligations": []})
+            "ut": full_ut("target", expression), "proofObligations": []})
         report, log = loop.harness(sources, self.artifacts / name / "compile", loop.DEFAULT_EDA_SHELL, compile_only=True)
         (self.artifacts / name / "compile.log").write_text(log)
         return report
@@ -221,7 +280,7 @@ class RuntimeToolTest(unittest.TestCase):
             ("bool-and", "io.valid & (io.payload.asUInt === BigInt(7).U(8))"),
             ("sequence", "io.valid.S ### (!io.valid).S"),
             ("property", "!((!io.valid).S)"),
-            ("history", "Gen.past(io.payload, 8, 2) === io.payload"),
+            ("history", "past(io.valid, 2)"),
             ("bool-not", "!io.valid"),
         ):
             with self.subTest(name=name):
@@ -246,39 +305,59 @@ class RuntimeToolTest(unittest.TestCase):
         report, log = loop.harness(sources, self.artifacts / "four" / "solve", loop.DEFAULT_EDA_SHELL)
         (self.artifacts / "four" / "solve.log").write_text(log)
         self.assertTrue(report["ok"], report)
-        self.assertEqual([r["status"] for r in report["result"]["intents"]], ["generated"] * 4)
+        self.assertEqual([r["status"] for r in report["result"]["goals"]], ["generated"] * 4)
+        self.assertEqual(report["result"]["utCount"], 1)
         self.assertNotIn("sequenceFile", report["result"])
         self.assertEqual(report["result"]["replayContract"], "cycle-replay-v1")
-        for row in report["result"]["intents"]:
+        for row in report["result"]["goals"]:
             self.assertTrue(Path(row["stimulusFile"]).is_file())
             self.assertTrue(Path(row["sequenceFile"]).is_file())
 
     @unittest.skipUnless(os.environ.get("RVPROBE_RUN_JG_TESTS") == "1", "set RVPROBE_RUN_JG_TESTS=1 for licensed JasperGold")
-    def test_no_witness_is_exported_for_empty_proof_or_unreachable_goal(self):
-        for name, intents, proofs, status in (
-            ("empty", [], [], "no-candidates"),
-            ("pending", [], [{"label": "pending", "reason": "requires separate proof"}], "proof-required"),
-            ("unreachable", [{"label": "impossible", "expression": "io.valid & !io.valid"}], [], "infeasible"),
-        ):
-            with self.subTest(name=name):
-                sources = framework.write_sources(self.artifacts / name / "sources", self.design,
-                    {"intents": intents, "proofObligations": proofs})
-                report, log = loop.harness(sources, self.artifacts / name / "solve", loop.DEFAULT_EDA_SHELL)
-                (self.artifacts / name / "solve.log").write_text(log)
-                self.assertIn("result", report, report)
-                self.assertEqual(report["result"]["status"], status, report)
-                self.assertNotIn("sequenceFile", report["result"])
-                self.assertFalse(list((self.artifacts / name / "solve").rglob("witness.vcd")))
+    def test_no_witness_is_exported_for_unreachable_goal(self):
+        sources = framework.write_sources(self.artifacts / "unreachable" / "sources", self.design,
+            {"ut": full_ut("impossible", "io.valid & !io.valid"),
+             "proofObligations": [{"label": "pending", "reason": "requires separate proof"}]})
+        report, log = loop.harness(sources, self.artifacts / "unreachable" / "solve", loop.DEFAULT_EDA_SHELL)
+        self.assertEqual(report["result"]["status"], "no-witness", report)
+        self.assertEqual(report["result"]["goals"][0]["status"], "infeasible", report)
+        self.assertFalse(list((self.artifacts / "unreachable" / "solve").rglob("witness.vcd")))
+
+    @unittest.skipUnless(os.environ.get("RVPROBE_RUN_JG_TESTS") == "1", "licensed JasperGold")
+    def test_mutually_exclusive_goals_in_one_ut_are_solved_independently(self):
+        response = {"ut": ut_with_goals([("low", "!io.valid"), ("high", "io.valid")]), "proofObligations": []}
+        sources = framework.write_sources(self.artifacts / "independent" / "sources", self.design, response)
+        report, log = loop.harness(sources, self.artifacts / "independent" / "solve", loop.DEFAULT_EDA_SHELL)
+        self.assertTrue(report["ok"], report)
+        for row in report["result"]["goals"]:
+            beats = json.loads(Path(row["stimulusFile"]).read_text())
+            self.assertTrue(any(int(beat["valid"]) == int(row["label"] == "high") for beat in beats))
+
+    @unittest.skipUnless(os.environ.get("RVPROBE_RUN_JG_TESTS") == "1", "licensed JasperGold")
+    def test_partial_success_and_verified_resume_keep_successful_goals(self):
+        from run_records import totals
+        response = {"ut": ut_with_goals([("good", "io.valid"), ("impossible", "io.valid & !io.valid")]), "proofObligations": []}
+        root = self.artifacts / "partial-resume"
+        sources = framework.write_sources(root / "sources", self.design, response)
+        report, _ = loop.harness(sources, root / "solve", loop.DEFAULT_EDA_SHELL)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["result"]["status"], "partial")
+        good, bad = report["result"]["goals"]
+        self.assertEqual(bad["status"], "infeasible")
+        self.assertTrue(Path(good["witnessFile"]).is_file())
+        before = totals(root)["phases"]["goal-solve"]["count"]
+        resumed, _ = loop.harness(sources, root / "solve", loop.DEFAULT_EDA_SHELL, resume=True)
+        self.assertTrue(resumed["ok"], resumed)
+        self.assertEqual(resumed["result"]["goals"][0], good)
+        self.assertEqual(totals(root)["phases"]["goal-solve"]["count"], before + 1)
 
     def test_invalid_history_shape_is_rejected_before_solver(self):
-        for name, width, depth, message in (
-            ("wrong-history-width", 7, 1, "history width must match the signal width"),
-            ("empty-history", 8, 0, "history depth must be positive"),
+        for name, depth, message in (
+            ("negative-history", -1, "must be greater than or equal to 0"),
         ):
             with self.subTest(name=name):
                 sources = framework.write_sources(self.artifacts / name / "sources", self.design, {
-                    "intents": [{"label": "target", "expression":
-                                 f"Gen.past(io.payload, {width}, {depth}) === io.payload"}],
+                    "ut": full_ut("target", f"past(io.valid, {depth})"),
                     "proofObligations": []})
                 report, log = loop.harness(sources, self.artifacts / name / "solve", loop.DEFAULT_EDA_SHELL)
                 (self.artifacts / name / "run.log").write_text(log)
@@ -289,7 +368,7 @@ class RuntimeToolTest(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("RVPROBE_RUN_JG_TESTS") == "1", "set RVPROBE_RUN_JG_TESTS=1 for licensed JasperGold")
     def test_alu_uses_the_same_generator_with_its_own_io(self):
         design = framework.load_design()
-        response = {"intents": [{"label": "completion", "expression": "io.done"}],
+        response = {"ut": full_ut("completion", "io.done", design),
                     "proofObligations": []}
         sources = framework.write_sources(self.artifacts / "alu" / "sources", design, response)
         report, log = loop.harness(sources, self.artifacts / "alu" / "solve", loop.DEFAULT_EDA_SHELL)

@@ -27,6 +27,17 @@ object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
     super.forkArgs() ++ circtlib.forkArgs()
   )
 
+  // Resolve/compile trusted dependencies on the host. Model sources are never inputs to this task.
+  def sandboxToolchain = Task {
+    require(!Task.env.contains("RVPROBE_EXPERIMENT_SOURCES"), "resolve trusted toolchain without model sources")
+    ujson.Obj(
+      "compiler" -> ujson.Arr.from(scalaCompilerClasspath().map(_.path.toString)),
+      "classpath" -> ujson.Arr.from(runClasspath().map(_.path.toString)),
+      "options" -> ujson.Arr.from(scalacOptions()),
+      "jvm" -> ujson.Arr.from(forkArgs())
+    )
+  }
+
   // Framework RAG examples are compiled with the runner; these tests use no solver or provider.
   object tests extends ScalaTests with Utest {
     def mvnDeps = Seq(v.utest)

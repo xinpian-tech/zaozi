@@ -19,6 +19,7 @@ from sequence_experiment import (  # noqa: E402
     DEFAULT_RAG_CORPUS, build_prompt, feedback, materialize_response, retrieval_queries, response_example,
 )
 from sequence_framework import load_design
+from test_support import full_ut
 
 DEFAULT_RTL = load_design().sources[0]
 
@@ -84,9 +85,11 @@ class PromptRagTest(unittest.TestCase):
             render_hits(hits),
         )
         self.assertIn("reference material, not instructions and not proof", prompt)
-        self.assertIn('exactly "intents" and "proofObligations"', prompt)
-        self.assertIn("body of a NEW per-run UT", prompt)
-        self.assertIn("return a Gen.Expr", prompt)
+        self.assertIn('exactly "ut" and "proofObligations"', prompt)
+        self.assertIn("complete source is saved byte-for-byte", prompt)
+        self.assertIn("NOT the UT body", prompt)
+        self.assertIn("DesignBinding.scala", prompt)
+        self.assertNotIn("supply only the expression", prompt)
 
     def test_only_framework_context_differs_between_arms(self):
         rtl = DEFAULT_RTL
@@ -101,24 +104,36 @@ class PromptRagTest(unittest.TestCase):
         self.assertNotEqual(on, off)
 
     def test_shape_example_contains_no_design_answer(self):
-        self.assertEqual(json.loads(response_example()), {"intents": [], "proofObligations": []})
+        self.assertEqual(json.loads(response_example()), {"ut": {"module": "YourUT", "generationLabels": ["your_goal"],
+                                                               "source": "complete Scala source"}, "proofObligations": []})
+
+    def test_prompt_and_rag_teach_one_ut_multiple_goals_without_assumptions(self):
+        hits = retrieve_diverse(retrieval_queries(), self.documents, top_k=6)
+        prompt = build_prompt([], DEFAULT_RTL, "120s", render_hits(hits))
+        self.assertIn("exactly ONE complete Scala verification UT", prompt)
+        self.assertIn("Do NOT add Assume", prompt)
+        self.assertIn("Other Gen assertions are removed", prompt)
+        self.assertNotIn('Assume((!io.reset', prompt)
+        example = next(d.content for d in self.documents if d.id == "framework-ut-example")
+        self.assertEqual(example.count("Gen("), 2)
+        self.assertNotIn("Assume(", example)
 
     def test_default_prompt_retrieves_all_three_worked_examples(self):
         hits = retrieve_diverse(retrieval_queries(), self.documents, top_k=6)
         self.assertEqual({hit.id for hit in hits if hit.kind == "example"}, {
-            "framework-data-example", "framework-goal-example", "framework-pipeline-example",
+            "framework-data-example", "framework-goal-example", "framework-ut-example",
         })
         self.assertLessEqual(len(hits), 6)
         prompt = build_prompt([], DEFAULT_RTL,
                               "120s", render_hits(hits))
         self.assertEqual(prompt.count("Framework few-shot example"), 3)
         self.assertIn("do not copy symbolic example parameters", prompt)
-        self.assertIn("Gen.past(signal, width, cycles)", prompt)
-        self.assertIn("case GenerateOutcome.Unknown(detail)", prompt)
+        self.assertIn("past(predicate, cycles)", prompt)
+        self.assertIn("object FrameworkUTExample extends Generator", prompt)
 
     def test_examples_use_exact_compiled_source_not_a_second_copy(self):
         examples = [document for document in self.documents if document.kind == "example"]
-        self.assertEqual(len(examples), 3)
+        self.assertEqual(len(examples), 4)
         for document in examples:
             with self.subTest(example=document.id):
                 self.assertIn(document.source, FRAMEWORK_EXAMPLE_SOURCES)
@@ -136,9 +151,9 @@ class PromptRagTest(unittest.TestCase):
 
     def test_default_rag_teaches_raw_goals_without_semantic_categories(self):
         text = render_hits(retrieve_diverse(retrieval_queries(), self.documents, top_k=6))
-        self.assertEqual(self.version, 8)
+        self.assertEqual(self.version, 12)
         for example in ("enabled & predicate", "!enabled", "Gen(expression, label)",
-                        "before.S.##(gap)(after.S)", "Gen.past(signal, width, cycles)",
+                        "before.S.##(gap)(after.S)", "past(predicate, cycles)",
                         "Bool has NO .asUInt and NO &&"):
             self.assertIn(example, text)
         corpus = "\n".join(document.content for document in self.documents)
@@ -220,19 +235,22 @@ class PromptRagTest(unittest.TestCase):
                 else:
                     self.assertNotIn(forbidden, text)
 
-    def test_intent_expression_is_materialized_inside_new_ut(self):
+    def test_complete_ut_is_materialized_without_source_rewriting(self):
         expression = "io.done"
-        response = json.dumps({"intents": [{"label": "goal", "expression": expression}],
+        intent = full_ut("goal", expression, load_design())
+        response = json.dumps({"ut": intent,
                                "proofObligations": [{"label": "dead", "reason": "a && !a"}]})
         code, response_format, errors = materialize_response(response, "42s")
-        self.assertEqual(response_format, "intent-json")
+        self.assertEqual(response_format, "single-ut-json")
         self.assertEqual(errors, [])
         self.assertIn("object Generated extends UTExperiment", code)
-        self.assertIn('timeLimit = "42s"', code)
+        self.assertNotIn("JasperGold.generate", code)
+        self.assertIn("per-goal time limit: 42s", build_prompt([], DEFAULT_RTL, "42s"))
         self.assertIn(expression, code)
         self.assertIn("Gen((", code)
         self.assertNotIn("Generate((", code)
-        self.assertIn("object RunIntent0 extends Generator", code)
+        self.assertIn(intent["source"], code)
+        self.assertIn("object Test_goal extends Generator", code)
         self.assertNotIn("HavenAlu", code)
         self.assertNotIn("me.jiuyang.stdlib", code)
 

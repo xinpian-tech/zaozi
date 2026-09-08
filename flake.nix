@@ -72,6 +72,7 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
           nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator z3 ] ++ lib.optionals stdenv.isLinux [
+            bubblewrap
             scala3BspSemanticLs
           ];
           env = with pkgs; {

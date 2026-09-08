@@ -25,6 +25,7 @@ FRAMEWORK_EXAMPLE_SOURCES = frozenset({
     "experiments/src/rag/FrameworkDataExample.scala",
     "experiments/src/rag/FrameworkGoalExample.scala",
     "experiments/src/rag/FrameworkPipelineExample.scala",
+    "experiments/src/rag/FrameworkUTExample.scala",
 })
 FRAMEWORK_SOURCES = frozenset({
     "experiments/rag/framework_contract.md",

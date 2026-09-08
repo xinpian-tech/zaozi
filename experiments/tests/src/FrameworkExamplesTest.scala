@@ -11,9 +11,16 @@ object FrameworkExamplesTest extends TestSuite:
   )
 
   val tests: Tests = Tests:
-    test("response example preserves caller expression and pending metadata"):
-      val response = FrameworkDataExample.response("example", "caller_expression", "pending", "caller reason")
-      assert(response("intents")(0)("expression").str == "caller_expression")
+    test("stop needs no filler UT or goal and proves nothing"):
+      val response = FrameworkDataExample.stop("caller reason")
+      assert(response("stop")("reason").str == "caller reason")
+      assert(!response.obj.contains("ut"))
+
+    test("response example preserves complete UT source and pending metadata"):
+      val response = FrameworkDataExample.response("CallerUT", Seq("caller_goal", "second_goal"), "caller_source", "pending", "caller reason")
+      assert(response("ut")("source").str == "caller_source")
+      assert(response("ut")("module").str == "CallerUT")
+      assert(response("ut")("generationLabels").arr.map(_.str).toSeq == Seq("caller_goal", "second_goal"))
       assert(response("proofObligations")(0)("reason").str == "caller reason")
 
     test("generated outcome becomes ABI stimulus"):

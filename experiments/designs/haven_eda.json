@@ -1,0 +1,14 @@
+{
+  "eda_tools": {
+    "vcs": {
+      "bin": "vcs",
+      "flags": ["-full64", "-sverilog", "-ntb_opts", "uvm-1.2", "-timescale=1ns/1ps"]
+    },
+    "urg": {
+      "bin": "urg",
+      "format": "text",
+      "metrics": ["line", "cond", "tgl", "branch", "fsm"]
+    }
+  },
+  "simulation": {"timeout_seconds": 300}
+}

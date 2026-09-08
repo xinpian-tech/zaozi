@@ -1,9 +1,13 @@
 {
-  "intents": [
-    {"label": "input_value", "expression": "io.valid & (io.payload === BigInt(7).B(8))"},
-    {"label": "observed_result", "expression": "io.done & (io.result === BigInt(9).B(8))"},
-    {"label": "two_beats", "expression": "io.valid.S ### (!io.valid).S"},
-    {"label": "history", "expression": "!(Gen.past(io.payload, 8, 1) === io.payload)"}
-  ],
+  "ut": {
+    "module": "TestUT",
+    "generationLabels": [
+      "input_value",
+      "observed_result",
+      "two_beats",
+      "history"
+    ],
+    "source": "// Generated for this run. No DUT behavior or historical scenario is implemented here.\nimport me.jiuyang.utlib.*\nimport me.jiuyang.zaozi.*\nimport me.jiuyang.zaozi.default.{*, given}\nimport me.jiuyang.zaozi.ltltpe.*\nimport me.jiuyang.zaozi.reftpe.*\nimport me.jiuyang.zaozi.valuetpe.*\n\n@generator\nobject TestUT extends Generator[RunParameter, RunLayers, RunIO, RunProbe] with UT[RunParameter, RunIO]:\n  override def moduleName(parameter: RunParameter): String = \"TestUT\"\n  def architecture(parameter: RunParameter) =\n    val io = summon[Interface[RunIO]]\n    val dut = ImportedDut.instantiate(parameter)\n    dut.io.`clk` := io.clock\n    dut.io.`rst` := io.reset.asBool\n    dut.io.`payload` := io.`payload`\n    dut.io.`valid` := io.`valid`\n    io.`result` := dut.io.`result`\n    io.`done` := dut.io.`done`\n    given ClockEvent = posedge(io.clock)\n    given ClockScope = ClockScope.posedge(io.clock)\n    given ResetScope = ResetScope.syncActiveHigh(io.reset)\n    Gen((\n      io.valid & (io.payload === BigInt(7).B(8))\n    ), \"input_value\")\n    Gen((\n      io.done & (io.result === BigInt(9).B(8))\n    ), \"observed_result\")\n    Gen((\n      io.valid.S ### (!io.valid).S\n    ), \"two_beats\")\n    Gen((\n      io.valid.S ### (past(io.valid) & !io.valid).S\n    ), \"history\")\n"
+  },
   "proofObligations": []
 }

@@ -1,4 +1,10 @@
 {
-  "intents": [{"label": "completion", "expression": "io.done"}],
+  "ut": {
+    "module": "Test_completion",
+    "generationLabels": [
+      "completion"
+    ],
+    "source": "// Generated for this run. No DUT behavior or historical scenario is implemented here.\nimport me.jiuyang.utlib.*\nimport me.jiuyang.zaozi.*\nimport me.jiuyang.zaozi.default.{*, given}\nimport me.jiuyang.zaozi.ltltpe.*\nimport me.jiuyang.zaozi.reftpe.*\nimport me.jiuyang.zaozi.valuetpe.*\n\n@generator\nobject Test_completion extends Generator[RunParameter, RunLayers, RunIO, RunProbe] with UT[RunParameter, RunIO]:\n  override def moduleName(parameter: RunParameter): String = \"Test_completion\"\n  def architecture(parameter: RunParameter) =\n    val io = summon[Interface[RunIO]]\n    val dut = ImportedDut.instantiate(parameter)\n    dut.io.`clk` := io.clock\n    dut.io.`rst_n` := !io.reset.asBool\n    dut.io.`a` := io.`a`\n    dut.io.`b` := io.`b`\n    dut.io.`op` := io.`op`\n    dut.io.`start` := io.`start`\n    io.`result` := dut.io.`result`\n    io.`flags` := dut.io.`flags`\n    io.`done` := dut.io.`done`\n    given ClockEvent = posedge(io.clock)\n    given ClockScope = ClockScope.posedge(io.clock)\n    given ResetScope = ResetScope.syncActiveHigh(io.reset)\n    Gen((\n      io.done\n    ), \"completion\")\n"
+  },
   "proofObligations": []
 }

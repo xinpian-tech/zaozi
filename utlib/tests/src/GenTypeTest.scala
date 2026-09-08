@@ -6,7 +6,7 @@ import utest.*
 
 object GenTypeTest extends TestSuite:
   val tests: Tests = Tests:
-    test("history is available inside the single Gen expression context"):
+    test("native Bool history is accepted by Gen"):
       val accepted = typeChecks("""
         import me.jiuyang.utlib.Gen
         import me.jiuyang.zaozi.*
@@ -18,11 +18,11 @@ object GenTypeTest extends TestSuite:
         import java.lang.foreign.Arena
         def build(signal: Referable[Bits])(using ClockEvent, ClockScope, ResetScope,
           Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
-        ): Unit = Gen(Gen.past(signal, 8, 2) === signal, "target")
+        ): Unit = Gen(past(signal === 5.B(8), 2), "target")
       """)
       assert(accepted)
 
-    test("history outside Gen lacks its guard-owning scope"):
+    test("native history rejects Bits"):
       val errors = typeCheckErrors("""
         import me.jiuyang.utlib.Gen
         import me.jiuyang.zaozi.*
@@ -34,9 +34,9 @@ object GenTypeTest extends TestSuite:
         import java.lang.foreign.Arena
         def build(signal: Referable[Bits])(using ClockEvent, ClockScope, ResetScope,
           Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
-        ): Referable[Bits] = Gen.past(signal, 8, 2)
+        ): Referable[Bits] = past(signal, 2)
       """)
-      assert(errors.exists(_.message.contains("Gen.Scope")))
+      assert(errors.nonEmpty)
 
     test("Expr accepts hardware Bool, Sequence and Property but not Bits"):
       assert(typeChecks("""

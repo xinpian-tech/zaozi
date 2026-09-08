@@ -4,7 +4,7 @@
 
 Port declarations are explicit, versioned experiment inputs. They describe an
 interface, not a reimplementation of the DUT. The only executable scenario code
-comes from this run's intent expressions; no stdlib benchmark UT is imported.
+comes from this run's complete model-authored UT sources; no stdlib benchmark UT is imported.
 Generated Scala must be reviewed or run in an appropriate execution sandbox.
 JSON validation and scalac type checking are not a security sandbox.
 """
@@ -21,7 +21,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DESIGN = ROOT / "experiments/designs/alu.json"
-CONTRACT = "runtime-ut-v2"
+CONTRACT = "runtime-ut-v5"
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 LABEL = re.compile(r"[a-z][a-z0-9_]{0,79}\Z")
 
@@ -149,27 +149,59 @@ def load_design(path: Path = DEFAULT_DESIGN) -> Design:
 
 
 def parse_response(text: str) -> dict:
-    """Validate the envelope, leaving actual intent typing to scalac."""
+    """One complete UT per response; goals share the same unmodified environment."""
     try:
         raw = json.loads(text)
     except json.JSONDecodeError as error:
-        raise ValueError(f"response must be intent JSON: {error.msg}") from error
-    if not isinstance(raw, dict) or set(raw) != {"intents", "proofObligations"}:
-        raise ValueError("response must contain exactly intents and proofObligations")
+        raise ValueError(f"response must be UT JSON: {error.msg}") from error
+    stopping = isinstance(raw, dict) and set(raw) == {"stop", "proofObligations"}
+    if stopping:
+        if not isinstance(raw["stop"], dict) or set(raw["stop"]) != {"reason"} or not isinstance(raw["stop"]["reason"], str) or not 1 <= len(raw["stop"]["reason"].strip()) <= 20000:
+            raise ValueError("stop requires a nonempty reason; stopping is not a proof or coverage closure")
+        # Reuse proof validation without inventing a UT or goal.
+        seen = set()
+        validate_proofs(raw["proofObligations"], seen)
+        return raw
+    if not isinstance(raw, dict) or set(raw) != {"ut", "proofObligations"}:
+        raise ValueError("response must contain exactly ut and proofObligations; multi-UT and expression-only responses are not supported")
+    ut = raw["ut"]
+    if not isinstance(ut, dict) or set(ut) != {"module", "generationLabels", "source"}:
+        raise ValueError("ut must be one object with exactly module, generationLabels and source")
+    module = identifier(ut["module"], "UT module")
+    if module in {"Generated", "ImportedDut", "RunParameter", "RunLayers", "RunProbe", "RunIO", "DesignIO", "ImportedParameters"}:
+        raise ValueError("UT module must not replace framework definitions")
+    if not isinstance(ut["source"], str) or not ut["source"].strip() or len(ut["source"]) > 100000:
+        raise ValueError("source must be a nonempty string of at most 100000 characters")
+    # Early feedback, not a security boundary. The lowered SV is checked again before any solver runs.
+    code = re.sub(r'""".*?"""|"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', ' ', ut["source"], flags=re.S)
+    if re.search(r"\bAssume\b", code):
+        raise ValueError("model-authored Assume is forbidden; put scenario conditions and timing inside Gen")
+    if len(re.findall(r"@generator\b", code)) != 1:
+        raise ValueError("source must declare exactly one @generator UT")
+    labels = ut["generationLabels"]
+    if not isinstance(labels, list) or not 1 <= len(labels) <= 64:
+        raise ValueError("generationLabels must contain 1..64 goals in the single UT")
     seen = set()
-    for key, field in (("intents", "expression"), ("proofObligations", "reason")):
-        if not isinstance(raw[key], list) or len(raw[key]) > 64:
-            raise ValueError(f"{key} must be a list of at most 64 records")
-        for item in raw[key]:
-            if not isinstance(item, dict) or set(item) != {"label", field}:
-                raise ValueError(f"{key} records require exactly label and {field}")
-            label = item["label"]
-            if not isinstance(label, str) or not LABEL.fullmatch(label) or label in seen:
-                raise ValueError("labels must be unique safe snake_case identifiers")
-            seen.add(label)
-            if not isinstance(item[field], str) or not item[field].strip() or len(item[field]) > 20000:
-                raise ValueError(f"{field} must be a nonempty string of at most 20000 characters")
+    for label in labels:
+        if not isinstance(label, str) or not LABEL.fullmatch(label) or label in seen:
+            raise ValueError("goal labels must be unique safe snake_case identifiers")
+        seen.add(label)
+    validate_proofs(raw["proofObligations"], seen)
     return raw
+
+
+def validate_proofs(proofs, seen):
+    if not isinstance(proofs, list) or len(proofs) > 64:
+        raise ValueError("proofObligations must be a list of at most 64 records")
+    for item in proofs:
+        if not isinstance(item, dict) or set(item) != {"label", "reason"}:
+            raise ValueError("proofObligations records require exactly label and reason")
+        label, reason = item["label"], item["reason"]
+        if not isinstance(label, str) or not LABEL.fullmatch(label) or label in seen:
+            raise ValueError("proof labels must be unique safe snake_case identifiers")
+        seen.add(label)
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 20000:
+            raise ValueError("reason must be a nonempty string of at most 20000 characters")
 
 
 IMPORTS = """// Generated for this run. No DUT behavior or historical scenario is implemented here.
@@ -211,91 +243,34 @@ class RunIO(parameter: RunParameter) extends HWBundle(parameter):
 
 
 def render_program(design: Design, response: dict, time_limit: str = "120s") -> str:
-    """One shared imported binding, one newly generated UT per intent, one fixed runner."""
+    """Sandbox entry: elaborate only. No solver, license, host processes or model classpath on the trusted side."""
     parse_response(json.dumps(response))
-    connections = [f"    dut.io.`{design.clock}` := io.clock",
-                   f"    dut.io.`{design.reset}` := {'!' if design.reset_active_low else ''}io.reset.asBool"]
-    for port in design.data_ports:
-        connections.append(f"    dut.io.`{port.name}` := io.`{port.name}`" if port.direction == "input" else
-                           f"    io.`{port.name}` := dut.io.`{port.name}`")
-    parts = [IMPORTS]
-    for index, intent in enumerate(response["intents"]):
-        expression = "\n".join("      " + line for line in intent["expression"].strip().splitlines())
-        parts.append(f"""
-@generator
-object RunIntent{index} extends Generator[RunParameter, RunLayers, RunIO, RunProbe] with UT[RunParameter, RunIO]:
-  override def moduleName(parameter: RunParameter): String = "RunIntent{index}"
-  def architecture(parameter: RunParameter) =
-    val io = summon[Interface[RunIO]]
-    val dut = ImportedDut.instantiate(parameter)
-{chr(10).join(connections)}
-    Assume((!io.reset.asBool).I, "rst_low")
-    given ClockEvent = posedge(io.clock)
-    given ClockScope = ClockScope.posedge(io.clock)
-    given ResetScope = ResetScope.syncActiveHigh(io.reset)
-    Gen((
-{expression}
-    ), "rvprobe_generated_{index}")
-""")
-    sources = ", ".join(f"os.Path({scala_string(str(p))})" for p in design.sources)
-    include = f"Some(os.Path({scala_string(str(design.include_dirs[0]))}))" if design.include_dirs else "None"
-    rows = []
-    for index, intent in enumerate(response["intents"]):
-        rows.append(f"""    {{
-      val label = {scala_string(intent['label'])}
-      val dir = outDir / label
-      val generator = UTGenerator(RunIntent{index}, parameter, dir)
-      generator.saveAbi()
-      val began = System.currentTimeMillis()
-      val model = JasperGold.lower(RunIntent{index}, parameter, dir / "lowered", rtl,
-        generationLabels = Set("rvprobe_generated_{index}"), include = {include})
-      JasperGold.generate(model, dir / "jg", timeLimit = {scala_string(time_limit)}) match
-        case GenerateOutcome.Generated(trace) =>
-          val stimulus = AbstractStimulus.fromTrace(trace, generator.abi.spec)
-          val beats = ujson.Arr(stimulus.beats.map(b =>
-            ujson.Obj.from(b.values.toSeq.map((name, value) => name -> ujson.Str(value.toString))))*)
-          os.write.over(dir / "stimulus.json", ujson.write(beats, indent = 2))
-          val individual = UvmSequence({scala_string(design.sequence_name)}, {scala_string(design.item_type)})
-            .write(stimulus, dir / {scala_string(design.sequence_name + '.sv')})
-          rows += ujson.Obj("label" -> label, "status" -> "generated", "engine" -> "jaspergold",
-            "ms" -> (System.currentTimeMillis() - began), "cycles" -> trace.cycles,
-            "sequenceFile" -> individual.toString, "stimulusFile" -> (dir / "stimulus.json").toString,
-            "witnessFile" -> (dir / "jg" / "witness.vcd").toString)
-        case GenerateOutcome.Infeasible =>
-          rows += ujson.Obj("label" -> label, "status" -> "infeasible", "engine" -> "jaspergold",
-            "ms" -> (System.currentTimeMillis() - began))
-        case GenerateOutcome.Unknown(detail) =>
-          rows += ujson.Obj("label" -> label, "status" -> "unknown", "detail" -> detail,
-            "engine" -> "jaspergold", "ms" -> (System.currentTimeMillis() - began))
-    }}""")
-    proofs = scala_string(json.dumps(response["proofObligations"]))
-    parts.append(f"""
+    ut = response["ut"]
+    labels = ", ".join(scala_string(label) for label in ut["generationLabels"])
+    return IMPORTS + f"""
 object Generated extends UTExperiment:
   def run(outDir: os.Path): ujson.Value =
     val parameter = RunParameter()
-    val rtl = Seq({sources})
-    val rows = collection.mutable.ArrayBuffer.empty[ujson.Obj]
-{chr(10).join(rows)}
-    val proofs = ujson.read({proofs})
-    val status =
-      if rows.exists(_("status").str == "unknown") then "unknown"
-      else if rows.exists(_("status").str == "infeasible") then "infeasible"
-      else if rows.nonEmpty then "generated"
-      else if proofs.arr.nonEmpty then "proof-required"
-      else "no-candidates"
-    ujson.Obj("status" -> status, "engine" -> "jaspergold",
-      "beats" -> rows.filter(_("status").str == "generated").map(_("cycles").num.toInt).sum,
-      "replayContract" -> "cycle-replay-v1",
-      "intents" -> ujson.Arr(rows.toSeq*), "proofObligations" -> proofs)
-""")
-    return "\n".join(parts)
+    val generator = UTGenerator({ut['module']}, parameter, outDir / "ut")
+    generator.saveAbi()
+    val model = JasperGold.lower({ut['module']}, parameter, outDir / "ut" / "lowered", Seq.empty,
+      generationLabels = Set({labels}))
+    ujson.Obj("status" -> "lowered", "top" -> model.top, "sv" -> model.sv.toString,
+      "abiFile" -> (outDir / "ut" / "abi.json").toString)
+"""
 
 
 def write_sources(directory: Path, design: Design, response: dict, time_limit: str = "120s") -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "DesignBinding.scala").write_text(render_binding(design))
     (directory / "Generated.scala").write_text(render_program(design, response, time_limit))
-    (directory / "intent.json").write_text(json.dumps(response, indent=2) + "\n")
+    ut = response["ut"]
+    # Preserve exactly the model's decoded source, including whitespace.
+    (directory / "ModelUT.scala").write_bytes(ut["source"].encode())
+    authored = [{"file": "ModelUT.scala", "module": ut["module"], "generationLabels": ut["generationLabels"],
+                "sha256": hashlib.sha256(ut["source"].encode()).hexdigest()}]
+    (directory / "model-sources.json").write_text(json.dumps(authored, indent=2) + "\n")
+    (directory / "response.json").write_text(json.dumps(response, indent=2) + "\n")
     (directory / "design.json").write_text(json.dumps(design.record(), indent=2) + "\n")
     return directory
 
@@ -326,6 +301,16 @@ def check_interface(design: Design, directory: Path) -> None:
     (directory / "io-check.json").write_text(json.dumps({"top": design.top, "ports": actual}, indent=2) + "\n")
 
 
+def check_saved_sources(directory: Path, design: Design, response: dict) -> None:
+    expected = {"ModelUT.scala": response["ut"]["source"], "DesignBinding.scala": render_binding(design),
+                "Generated.scala": render_program(design, response)}
+    if {p.name for p in directory.glob("*.scala")} != set(expected):
+        raise ValueError("saved source inventory differs from the fixed runner/binding and model UT")
+    for name, text in expected.items():
+        if (directory / name).read_bytes() != text.encode():
+            raise ValueError(f"saved source changed: {name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--design", type=Path, required=True)
@@ -337,11 +322,16 @@ def main() -> None:
     design = load_design(args.design)
     response = parse_response(args.response_file.read_text())
     args.out.mkdir(parents=True, exist_ok=False)
+    if "stop" in response:
+        (args.out / "response.json").write_text(json.dumps(response, indent=2) + "\n")
+        print(json.dumps({"status": "stopped", "top": design.top, "utCount": 0,
+                          "stopReason": response["stop"]["reason"], "proofObligations": response["proofObligations"]}))
+        return
     if args.check_io:
         check_interface(design, args.out / "interface")
     directory = write_sources(args.out / "sources", design, response, args.jg_time_limit)
     print(json.dumps({"status": "prepared", "top": design.top, "sources": str(directory.resolve()),
-                      "intents": len(response["intents"])}))
+                      "utCount": 1, "goals": len(response["ut"]["generationLabels"])}))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,334 @@
+{
+  "method": "soft-input-resample-v1",
+  "source_run": "alu-v5-live-20260906T143755Z",
+  "source_ut_sha256": "70b63d93baae0439f476bf8ecefbf350077217ba7943e66c66df9f3524fe0e1f",
+  "seed": 20260906,
+  "status": "complete",
+  "started_utc": "2026-09-06T16:31:04.193+00:00",
+  "finished_utc": "2026-09-06T16:42:38.704+00:00",
+  "elapsed_seconds": 694.511,
+  "costs": {
+    "requests": 0,
+    "usage_reported": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0
+    },
+    "reported_models": [],
+    "token_accounting_complete": true,
+    "requests_without_usage": 0,
+    "phases": {
+      "sampling-session": {
+        "count": 1,
+        "seconds": 694.4997099321336,
+        "failures": 0
+      },
+      "goal-sampling": {
+        "count": 29,
+        "seconds": 659.0455218693241,
+        "failures": 0
+      },
+      "vcs-build": {
+        "count": 1,
+        "seconds": 7.297744456678629,
+        "failures": 0
+      },
+      "vcs-replay": {
+        "count": 8,
+        "seconds": 11.863932863809168,
+        "failures": 0
+      },
+      "urg": {
+        "count": 8,
+        "seconds": 10.868487471714616,
+        "failures": 0
+      }
+    },
+    "note": "phase timings may nest; do not add them to estimate wall time"
+  },
+  "cells": [
+    {
+      "requested_per_intent": 1,
+      "sequences": 29,
+      "complete": true,
+      "accepted_replot_seconds": 0,
+      "measured_replay_seconds": 4.435699128545821,
+      "full_percent": {
+        "line": 98.88268156424581,
+        "cond": 83.49056603773585,
+        "toggle": 55.897703549060545,
+        "branch": 95.38461538461539
+      },
+      "full_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          177
+        ],
+        "toggle": [
+          1916,
+          1071
+        ],
+        "branch": [
+          65,
+          62
+        ]
+      },
+      "full_score": 83.4138916339144,
+      "witness_only_percent": {
+        "line": 98.88268156424581,
+        "cond": 83.49056603773585,
+        "toggle": 55.897703549060545,
+        "branch": 95.38461538461539
+      },
+      "witness_only_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          177
+        ],
+        "toggle": [
+          1916,
+          1071
+        ],
+        "branch": [
+          65,
+          62
+        ]
+      },
+      "witness_only_score": 83.4138916339144,
+      "replay": {
+        "contract": "cycle-replay-v1",
+        "passed": true,
+        "sampled_cycles": 705,
+        "witness_cycles": 180,
+        "output_checks": 540,
+        "reset_per_witness": true,
+        "sample_phase": "clocking input #1step before posedge",
+        "clock_period_ns": 10,
+        "arithmetic_correctness_checked": false,
+        "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+      }
+    },
+    {
+      "requested_per_intent": 4,
+      "sequences": 116,
+      "complete": true,
+      "accepted_replot_seconds": 18.901,
+      "measured_replay_seconds": 4.854650340043008,
+      "full_percent": {
+        "line": 98.88268156424581,
+        "cond": 87.26415094339623,
+        "toggle": 93.42379958246346,
+        "branch": 95.38461538461539
+      },
+      "full_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          185
+        ],
+        "toggle": [
+          1916,
+          1790
+        ],
+        "branch": [
+          65,
+          62
+        ]
+      },
+      "full_score": 93.73881186868022,
+      "witness_only_percent": {
+        "line": 98.88268156424581,
+        "cond": 85.37735849056604,
+        "toggle": 85.4384133611691,
+        "branch": 95.38461538461539
+      },
+      "witness_only_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          181
+        ],
+        "toggle": [
+          1916,
+          1637
+        ],
+        "branch": [
+          65,
+          62
+        ]
+      },
+      "witness_only_score": 91.27076720014908,
+      "replay": {
+        "contract": "cycle-replay-v1",
+        "passed": true,
+        "sampled_cycles": 2811,
+        "witness_cycles": 720,
+        "output_checks": 2160,
+        "reset_per_witness": true,
+        "sample_phase": "clocking input #1step before posedge",
+        "clock_period_ns": 10,
+        "arithmetic_correctness_checked": false,
+        "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+      }
+    },
+    {
+      "requested_per_intent": 16,
+      "sequences": 464,
+      "complete": true,
+      "accepted_replot_seconds": 96.166,
+      "measured_replay_seconds": 6.028847323730588,
+      "full_percent": {
+        "line": 98.88268156424581,
+        "cond": 90.09433962264151,
+        "toggle": 95.4070981210856,
+        "branch": 96.92307692307692
+      },
+      "full_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          191
+        ],
+        "toggle": [
+          1916,
+          1828
+        ],
+        "branch": [
+          65,
+          63
+        ]
+      },
+      "full_score": 95.32679905776246,
+      "witness_only_percent": {
+        "line": 98.88268156424581,
+        "cond": 86.79245283018868,
+        "toggle": 87.42171189979123,
+        "branch": 96.92307692307692
+      },
+      "witness_only_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          184
+        ],
+        "toggle": [
+          1916,
+          1675
+        ],
+        "branch": [
+          65,
+          63
+        ]
+      },
+      "witness_only_score": 92.50498080432567,
+      "replay": {
+        "contract": "cycle-replay-v1",
+        "passed": true,
+        "sampled_cycles": 11235,
+        "witness_cycles": 2880,
+        "output_checks": 8640,
+        "reset_per_witness": true,
+        "sample_phase": "clocking input #1step before posedge",
+        "clock_period_ns": 10,
+        "arithmetic_correctness_checked": false,
+        "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+      }
+    },
+    {
+      "requested_per_intent": 64,
+      "sequences": 1856,
+      "complete": true,
+      "accepted_replot_seconds": 409.401,
+      "measured_replay_seconds": 10.207131901755929,
+      "full_percent": {
+        "line": 98.88268156424581,
+        "cond": 95.28301886792453,
+        "toggle": 96.81628392484342,
+        "branch": 96.92307692307692
+      },
+      "full_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          202
+        ],
+        "toggle": [
+          1916,
+          1855
+        ],
+        "branch": [
+          65,
+          63
+        ]
+      },
+      "full_score": 96.97626532002266,
+      "witness_only_percent": {
+        "line": 98.88268156424581,
+        "cond": 88.20754716981132,
+        "toggle": 87.839248434238,
+        "branch": 96.92307692307692
+      },
+      "witness_only_bins": {
+        "line": [
+          179,
+          177
+        ],
+        "cond": [
+          212,
+          187
+        ],
+        "toggle": [
+          1916,
+          1683
+        ],
+        "branch": [
+          65,
+          63
+        ]
+      },
+      "witness_only_score": 92.96313852284301,
+      "replay": {
+        "contract": "cycle-replay-v1",
+        "passed": true,
+        "sampled_cycles": 44931,
+        "witness_cycles": 11520,
+        "output_checks": 34560,
+        "reset_per_witness": true,
+        "sample_phase": "clocking input #1step before posedge",
+        "clock_period_ns": 10,
+        "arithmetic_correctness_checked": false,
+        "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"
+      }
+    }
+  ],
+  "limitations": [
+    "one frozen UT and one seed",
+    "nested prefixes, not independent arm runtime",
+    "soft whole-port preferences, not uniform sampling",
+    "full replay includes drain; witness-only is separate",
+    "no new model calls; no new HAVEN or RAG comparison"
+  ]
+}
