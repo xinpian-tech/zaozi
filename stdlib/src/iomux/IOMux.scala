@@ -37,10 +37,12 @@ case class IOMuxParameter(
   hsSlots:      Int,
   dataWidth:    Int,
   addressWidth: Int,
-  lsPools:      Seq[IOMuxLsPool] = Seq.empty)
+  lsPools:      Seq[IOMuxLsPool] = Seq.empty,
+  version:      Long = 0)
     extends Parameter:
-  require(pinCount >= 1 && pinCount <= 256, "pin indices must fit the 8-bit LS pin selector")
-  require(hsSlots >= 1 && hsSlots <= 16, "HS slots must fit the four-bit selector lane")
+  require(pinCount > 0, "pinCount must be positive")
+  require(hsSlots > 0, "hsSlots must be positive")
+  require(version >= 0 && version <= 0xffffffffL, "version must fit an unsigned 32-bit word")
   require(dataWidth == 32 || dataWidth == 64, "dataWidth must be 32 or 64")
   require(
     routes.forall(r => r.pin >= 0 && r.pin < pinCount && r.slot >= 0 && r.slot < hsSlots),
@@ -50,11 +52,10 @@ case class IOMuxParameter(
 
   private val lsPins     = lsPools.flatMap(_.pins)
   private val lsChannels = lsPools.flatMap(_.channels.map(_.channel))
-  require(lsPools.size <= 255, "LS pool count must fit one byte")
   require(lsPools.forall(p => p.pins.nonEmpty && p.channels.nonEmpty), "LS pools need pins and channels")
   require(lsPins.forall(p => p >= 0 && p < pinCount), "LS pin is out of range")
   require(lsPins.distinct.size == lsPins.size, "an LS pin must belong to one pool")
-  require(lsChannels.forall(c => c >= 0 && c <= 255), "LS channel must fit one byte")
+  require(lsChannels.forall(_ >= 0), "LS channel must be nonnegative")
   require(lsChannels.distinct.size == lsChannels.size, "an LS channel must belong to one pool")
   require(
     lsPools.forall(p => p.reset.forall(c => p.channels.exists(_.channel == c))),
@@ -62,37 +63,67 @@ case class IOMuxParameter(
   )
   require(!routes.exists(r => r.slot == 0 && lsPins.contains(r.pin)), "LS pins reserve HS slot 0")
 
-  val lsChannelCount        = lsChannels.maxOption.fold(0)(_ + 1)
-  val lsPoolByPin           = lsPools.flatMap(pool => pool.pins.map(_ -> pool)).toMap
-  val lsPoolByReceiver      = lsPools.flatMap(pool => pool.channels.filter(_.receive).map(_.channel -> pool)).toMap
-  val byteBits              = Integer.numberOfTrailingZeros(dataWidth / 8)
-  val windowBytes           = (BigInt(1) << addressWidth).min(0x4000)
-  val selectorWidth         = (Integer.SIZE - Integer.numberOfLeadingZeros(hsSlots - 1)).max(1)
-  val verification          = Layer("Verification")
-  val kind                  = RegField("type", 32).readValue
-  val capability            = RegField("capability", 32).readValue
-  val feature               = RegField("feature", 32).readValue
-  val lsCapability          = Option.when(lsPools.nonEmpty)(RegField("ls_capability", 32).readValue)
-  val lsSelectors           = lsPins.sorted.map(p => p -> RegField(s"pin_${p}_ls_select", 8).readValue.writeValue)
-  val lsRxPins              = lsPoolByReceiver.keys.toSeq.sorted.map(c => c -> RegField(s"ls_${c}_rx_pin", 8).readValue.writeValue)
-  val selectors             = (0 until pinCount).map(p => RegField(s"pin_${p}_select", selectorWidth).readValue.writeValue)
+  private val lsSpan = lsChannels.maxOption.fold(BigInt(0))(c => BigInt(c) + 1)
+  require(lsSpan.isValidInt, "LS channel span must fit the vector size type")
+
+  val lsChannelCount   = lsSpan.toInt
+  val lsPoolByPin      = lsPools.flatMap(pool => pool.pins.map(_ -> pool)).toMap
+  val lsPoolByReceiver = lsPools.flatMap(pool => pool.channels.filter(_.receive).map(_.channel -> pool)).toMap
+  val byteBits         = Integer.numberOfTrailingZeros(dataWidth / 8)
+  val selectorWidth    = (BigInt(hsSlots) - 1).bitLength.max(1)
+  val lsSelectorWidth  = (lsSpan - 1).max(0).bitLength.max(8)
+  val lsRxWidth        = (BigInt(pinCount) - 1).bitLength.max(8)
+
+  private def laneWidth(width:  Int, minimum: Int): Int    = 1 << BigInt(width.max(minimum) - 1).bitLength
+  private def arrayBytes(count: Int, lane:    Int): BigInt = ((BigInt(count) * lane + 63) / 64) * 8
+
+  val selectorLaneWidth   = laneWidth(selectorWidth, 4)
+  val lsSelectorLaneWidth = laneWidth(lsSelectorWidth, 8)
+  val lsRxLaneWidth       = laneWidth(lsRxWidth, 8)
+  val selectorBase        = BigInt(0x100)
+  val lsSelectorBase      = selectorBase + arrayBytes(pinCount, selectorLaneWidth)
+  val lsRxBase            = lsSelectorBase + (if lsPools.nonEmpty then arrayBytes(pinCount, lsSelectorLaneWidth) else 0)
+  val windowBytes         = lsRxBase + arrayBytes(lsChannelCount, lsRxLaneWidth)
+  val verification        = Layer("Verification")
+
+  val identity = Seq(
+    (0x00, "version", BigInt(version)),
+    (0x04, "type", BigInt(0x494f4d58)),
+    (0x08, "pin_count", BigInt(pinCount)),
+    (0x0c, "feature", BigInt(if lsPools.nonEmpty then 0x20 else 0)),
+    (0x10, "hs_slots", BigInt(hsSlots)),
+    (0x14, "ls_channel_count", lsSpan),
+    (0x18, "ls_pool_count", BigInt(lsPools.size))
+  ).map((offset, name, value) => (BigInt(offset), RegField(name, 32).readValue, value))
+
+  // Byte fields let a wide selector retain bytes that a write does not select.
+  private def selectorFields(name: String, width: Int)
+    : Seq[ReadWriteFieldDefinition[ValueReadDefinition, ValueWriteDefinition]] =
+    (0 until width by 8).map(bit => RegField(s"${name}_${bit / 8}", (width - bit).min(8)).readValue.writeValue)
+
+  val selectors             = (0 until pinCount).map(p => selectorFields(s"pin_${p}_select", selectorWidth))
+  val lsSelectors           = lsPins.sorted.map(p => p -> selectorFields(s"pin_${p}_ls_select", lsSelectorWidth))
+  val lsRxPins              = lsPoolByReceiver.keys.toSeq.sorted.map(c => c -> selectorFields(s"ls_${c}_rx_pin", lsRxWidth))
   private val selectorWords = selectors.zipWithIndex
-    .grouped(dataWidth / 4)
+    .grouped(dataWidth / selectorLaneWidth)
     .zipWithIndex
     .map: (word, index) =>
-      (0x100 + index * (dataWidth / 8)) -> word.flatMap: (field, pin) =>
-        Seq(field) ++ Option.when(selectorWidth < 4)(RegField.reserved(s"pin_${pin}_reserved", 4 - selectorWidth))
+      RegMapRegister(
+        selectorBase + BigInt(index) * (dataWidth / 8),
+        word.flatMap: (fields, pin) =>
+          fields ++ Option.when(selectorWidth < selectorLaneWidth)(
+            RegField.reserved(s"pin_${pin}_reserved", selectorLaneWidth - selectorWidth)
+          )
+      )
   val regMap                = RegMapDefinition(
     indexWidth = addressWidth - byteBits,
     dataWidth = dataWidth,
     assertionLayer = verification,
     queueEntries = 1,
-    reportError = true
-  )(
-    (Seq(0x4 -> Seq(kind), 0x8 -> Seq(capability), 0xc -> Seq(feature)) ++ selectorWords ++
-      lsCapability.toSeq.map(f => 0x10 -> Seq(f)) ++
-      lsSelectors.map((p, f) => (0xc00 + p) -> Seq(f)) ++
-      lsRxPins.map((c, f) => (0xd00 + c) -> Seq(f)))*
+    reportError = true,
+    registers = identity.map((offset, field, _) => RegMapRegister(offset, Seq(field))) ++ selectorWords ++
+      lsSelectors.map((p, fields) => RegMapRegister(lsSelectorBase + BigInt(p) * lsSelectorLaneWidth / 8, fields)) ++
+      lsRxPins.map((c, fields) => RegMapRegister(lsRxBase + BigInt(c) * lsRxLaneWidth / 8, fields))
   )
 
 given upickle.default.ReadWriter[IOMuxParameter] = upickle.default.macroRW
@@ -132,6 +163,28 @@ class IOMuxProbe(parameter: IOMuxParameter) extends DVBundle[IOMuxParameter, IOM
 
 @generator
 object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]:
+  // header <config> writes software constants from the same layout used by design.
+  def main(args: Array[String]): Unit = args.toList match
+    case "header" :: config :: Nil =>
+      val p         = upickle.default.read[IOMuxParameter](os.read(os.Path(config, os.pwd)))
+      val constants = p.identity.flatMap: (offset, field, value) =>
+        Seq(
+          s"${field.name.toUpperCase(java.util.Locale.ROOT)}_OFFSET" -> offset,
+          s"${field.name.toUpperCase(java.util.Locale.ROOT)}_VALUE"  -> value
+        )
+      val arrays    = Seq(
+        "HS_SELECT_OFFSET"    -> p.selectorBase,
+        "HS_SELECT_LANE_BITS" -> BigInt(p.selectorLaneWidth),
+        "LS_SELECT_OFFSET"    -> p.lsSelectorBase,
+        "LS_SELECT_LANE_BITS" -> BigInt(p.lsSelectorLaneWidth),
+        "LS_RX_PIN_OFFSET"    -> p.lsRxBase,
+        "LS_RX_PIN_LANE_BITS" -> BigInt(p.lsRxLaneWidth),
+        "APERTURE"            -> p.windowBytes
+      )
+      (constants ++ arrays).foreach: (name, value) =>
+        println(s"#define IOMUX_$name 0x${value.toString(16)}ULL")
+    case _                         => this.mainImpl(args)
+
   def architecture(parameter: IOMuxParameter) =
     val io           = summon[Interface[IOMuxIO]]
     given ClockScope = ClockScope.posedge(io.clock)
@@ -155,34 +208,34 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
     req.valid      := io.req.valid
     io.req.ready   := req.ready
 
-    val selectors        = parameter.selectors.map(field => RegInit(BigInt(0).B(field.width)))
-    val lsSelectors      = parameter.lsSelectors.map: (pin, field) =>
-      pin -> RegInit(BigInt(parameter.lsPoolByPin(pin).reset.getOrElse(0)).B(field.width))
-    val lsRxPins         = parameter.lsRxPins.map((channel, field) => channel -> RegInit(BigInt(0).B(field.width)))
-    val lsSelectByPin    = lsSelectors.toMap
-    val lsRxPinByChannel = lsRxPins.toMap
-    val accesses         = Seq(
-      parameter.kind.read(BigInt(0x494f4d58).B(32)),
-      parameter.capability.read(BigInt(parameter.pinCount | (parameter.hsSlots << 16)).B(32)),
-      parameter.feature.read(BigInt(if parameter.lsPools.nonEmpty then 0x20 else 0).B(32))
-    ) ++ parameter.lsCapability.toSeq.map(
-      _.read(BigInt(parameter.lsChannelCount | (parameter.lsPools.size << 16)).B(32))
-    ) ++ parameter.selectors
-      .zip(selectors)
-      .flatMap: (field, value) =>
-        Seq(field.read(value), field.write(value))
-    val lsAccesses       = (parameter.lsSelectors ++ parameter.lsRxPins)
-      .zip(lsSelectors ++ lsRxPins)
-      .flatMap:
-        case ((_, field), (_, value)) => Seq(field.read(value), field.write(value))
-    parameter.regMap(req, io.rsp, zeroFillBytes = parameter.windowBytes)((accesses ++ lsAccesses)*)
+    def selector(
+      fields: Seq[ReadWriteFieldDefinition[ValueReadDefinition, ValueWriteDefinition]],
+      reset:  BigInt
+    ): (Referable[Bits], Seq[AppliedRegAccess]) =
+      val bytes    = fields.zipWithIndex.map: (field, index) =>
+        RegInit(((reset >> (index * 8)) & ((BigInt(1) << field.width) - 1)).B(field.width))
+      val value    = bytes.reverse.map(byte => byte: Referable[Bits]).reduce(_ ## _)
+      val accesses = fields.zip(bytes).flatMap((field, byte) => Seq(field.read(byte), field.write(byte)))
+      (value, accesses)
+
+    val hsRegisters      = parameter.selectors.map(fields => selector(fields, 0))
+    val lsRegisters      = parameter.lsSelectors.map: (pin, fields) =>
+      pin -> selector(fields, BigInt(parameter.lsPoolByPin(pin).reset.getOrElse(0)))
+    val lsRxRegisters    = parameter.lsRxPins.map((channel, fields) => channel -> selector(fields, 0))
+    val selectors        = hsRegisters.map(_._1)
+    val lsSelectByPin    = lsRegisters.map((pin, register) => pin -> register._1).toMap
+    val lsRxPinByChannel = lsRxRegisters.map((channel, register) => channel -> register._1).toMap
+    val accesses         = parameter.identity.map((_, field, value) => field.read(value.B(32))) ++
+      hsRegisters.flatMap(_._2) ++ (lsRegisters ++ lsRxRegisters).flatMap(_._2._2)
+    parameter.regMap(req, io.rsp, zeroFillBytes = parameter.windowBytes)(accesses*)
 
     def select(pin: Int, values: Referable[Bits], lsValues: Option[Referable[Bits]]): Referable[Bool] =
       val slow = parameter.lsPoolByPin
         .get(pin)
         .fold(false.B: Referable[Bool]): pool =>
           val selected = pool.channels.foldLeft(false.B: Referable[Bool]): (result, channel) =>
-            (lsSelectByPin(pin) === BigInt(channel.channel).B(8)) ? (lsValues.get.bit(channel.channel), result)
+            (lsSelectByPin(pin) === BigInt(channel.channel)
+              .B(parameter.lsSelectorWidth)) ? (lsValues.get.bit(channel.channel), result)
           (selectors(pin) === BigInt(0).B(parameter.selectorWidth)) & selected
       parameter.routes.zipWithIndex
         .filter(_._1.pin == pin)
@@ -207,7 +260,7 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
             .get(channel)
             .fold(false.B: Referable[Bool]): pool =>
               pool.pins.foldLeft(false.B: Referable[Bool]): (result, pin) =>
-                (lsRxPinByChannel(channel) === BigInt(pin).B(8)) ? (io.padInputValue.bit(pin), result)
+                (lsRxPinByChannel(channel) === BigInt(pin).B(parameter.lsRxWidth)) ? (io.padInputValue.bit(pin), result)
         .toVec
         .asBits
 
@@ -221,18 +274,18 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
           s"iomux_hs_pin_${route.pin}_slot_${route.slot}"
         )
       parameter.lsPools.zipWithIndex.foreach: (pool, index) =>
-        val transmit = pool.pins.map: pin =>
+        val selection = pool.pins.map: pin =>
           (selectors(pin) === BigInt(0).B(parameter.selectorWidth)) &
-            pool.channels.map(c => lsSelectByPin(pin) === BigInt(c.channel).B(8)).reduce(_ | _)
-        Cover(transmit.reduce(_ | _).S, io.resetN.asBool, s"iomux_ls_pool_${index}_transmit")
+            pool.channels.map(c => lsSelectByPin(pin) === BigInt(c.channel).B(parameter.lsSelectorWidth)).reduce(_ | _)
+        Cover(selection.reduce(_ | _).S, io.resetN.asBool, s"iomux_ls_pool_${index}_selection")
         pool.channels
           .filter(_.receive)
           .foreach: channel =>
-            val receiveWithoutTransmit = pool.pins.map: pin =>
-              (lsRxPinByChannel(channel.channel) === BigInt(pin).B(8)) &
+            val receiveWithHs = pool.pins.map: pin =>
+              (lsRxPinByChannel(channel.channel) === BigInt(pin).B(parameter.lsRxWidth)) &
                 (selectors(pin) =/= BigInt(0).B(parameter.selectorWidth))
             Cover(
-              (receiveWithoutTransmit.reduce(_ | _) & io.lsInputValue.get.bit(channel.channel)).S,
+              (receiveWithHs.reduce(_ | _) & io.lsInputValue.get.bit(channel.channel)).S,
               io.resetN.asBool,
               s"iomux_ls_channel_${channel.channel}_independent_receive"
             )

@@ -18,9 +18,15 @@
 // RUN: cd %t.dir/ls32 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefixes=LS-COVER,LS,LS32
 // RUN: cd %t.dir/ls64 && %{test} config config.json %{ls} --dataWidth 64 && %{test} design config.json
 // RUN: cd %t.dir/ls64 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefixes=LS-COVER,LS,LS64
-// RUN: mkdir -p %t.dir/wide
-// RUN: cd %t.dir/wide && %{test} config config.json --pinCount 1 --hsSlots 16 --dataWidth 32 --addressWidth 9 --routes '{"pin":0,"slot":15}' && %{test} design config.json
-// RUN: cd %t.dir/wide && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=WIDE
+// DEFINE: %{wide} = --pinCount 257 --hsSlots 257 --addressWidth 16 --version 4294967295 --routes '{"pin":256,"slot":256}' --lsPools '{"pins":[0,256],"channels":[{"channel":0,"receive":true},{"channel":256,"receive":true}],"reset":256}'
+// RUN: mkdir -p %t.dir/wide32 %t.dir/wide64
+// RUN: cd %t.dir/wide32 && %{test} config config.json %{wide} --dataWidth 32 && %{test} design config.json
+// RUN: cd %t.dir/wide32 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=WIDE
+// RUN: cd %t.dir/wide32 && %{test} header config.json > registers.h && FileCheck %s --check-prefix=HEADER < registers.h
+// RUN: cd %t.dir/wide64 && %{test} config config.json %{wide} --dataWidth 64 && %{test} design config.json
+// RUN: cd %t.dir/wide64 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefixes=WIDE,WIDE64
+// RUN: cd %t.dir/wide64 && %{test} header config.json > registers.h
+// RUN: cmp %t.dir/wide32/registers.h %t.dir/wide64/registers.h
 // RUN: rm -rf %t.dir
 
 // HS-COVER: iomux_hs_pin_0_slot_1:
@@ -30,11 +36,11 @@
 
 // COMMON-LABEL: module IOMux_{{[0-9a-f]+}}(
 // W32: wire [[UNALIGNED:.*]] = |(req_bits_address[1:0]);
-// W32-NEXT: wire [[WINDOW:.*]] = req_bits_address < 16'h4000;
+// W32-NEXT: wire [[WINDOW:.*]] = req_bits_address < 16'h108;
 // W32: [[UNALIGNED]] & [[WINDOW]] ? 14'h20 : req_bits_address[15:2];
 // W32: req_bits_mask_layerCapture = req_bits_read ? 4'hF : req_bits_mask;
 // W64: wire [[UNALIGNED:.*]] = |(req_bits_address[2:0]);
-// W64-NEXT: wire [[WINDOW:.*]] = req_bits_address < 16'h4000;
+// W64-NEXT: wire [[WINDOW:.*]] = req_bits_address < 16'h110;
 // W64: [[UNALIGNED]] & [[WINDOW]] ? 13'h10 : req_bits_address[15:3];
 // W64: req_bits_mask_layerCapture = req_bits_read ? 8'hFF : req_bits_mask;
 // COMMON: reg [1:0] [[PIN0:_GEN_[0-9]+(_layerCapture)?]];
@@ -46,8 +52,8 @@
 // W64: req_bits_index_layerCapture == 13'h20;
 // W64: req_bits_index_layerCapture == 13'h21;
 // COMMON: wire rsp_bits_error_0 =
-// W32: | [[RESPONSE]][{{[0-9]+:[0-9]+}}] < 14'h1000);
-// W64: | [[RESPONSE]][{{[0-9]+:[0-9]+}}] < 13'h800);
+// W32: | [[RESPONSE]][{{[0-9]+:[0-9]+}}] < 14'h42);
+// W64: | [[RESPONSE]][{{[0-9]+:[0-9]+}}] < 13'h22);
 // COMMON-DAG: wire [[LAST2:_GEN_[0-9]+(_layerCapture)?]] = [[LASTPIN:_GEN_[0-9]+(_layerCapture)?]] == 2'h2;
 // COMMON-DAG: wire [[LAST0:_GEN_[0-9]+(_layerCapture)?]] = [[LASTPIN]] == 2'h0;
 // COMMON-DAG: wire [[P1S0:_GEN_[0-9]+(_layerCapture)?]] = [[PIN1]] == 2'h0;
@@ -61,9 +67,9 @@
 // COMMON: [[PIN0]] <= req_bits_data[1:0];
 // COMMON: [[PIN1]] <= req_bits_data[5:4];
 // COMMON: [[LASTPIN]] <= req_bits_data[1:0];
-// W32: ? 32'h30009
+// W32: ? 32'h9
 // W32: ? 32'h494F4D58
-// W64: ? 64'h30011
+// W64: ? 64'h11
 // W64: ? 64'h494F4D5800000000 : 64'h0,
 // COMMON: assign padInputEnable =
 // COMMON-NEXT: {[[LAST2]] ? inputEnable[4] : [[LAST0]] & inputEnable[3],
@@ -91,22 +97,22 @@
 // EMPTY-NEXT: assign padOutputValue = 1'h0;
 // EMPTY-NEXT: assign padOutputEnable = 1'h0;
 
-// LS-COVER: iomux_ls_pool_0_transmit:
+// LS-COVER: iomux_ls_pool_0_selection:
 // LS-COVER: cover property
 // LS-COVER: iomux_ls_channel_0_independent_receive:
 // LS-COVER: cover property
-// LS-COVER: iomux_ls_pool_1_transmit:
+// LS-COVER: iomux_ls_pool_1_selection:
 // LS-COVER: cover property
 // LS-COVER: iomux_ls_channel_255_independent_receive:
 // LS-COVER: cover property
 
 // LS-LABEL: module IOMux_{{[0-9a-f]+}}(
-// LS32: req_bits_index_layerCapture == 10'h300;
-// LS64: req_bits_index_layerCapture == 9'h180;
-// LS32: req_bits_index_layerCapture == 10'h340;
-// LS64: req_bits_index_layerCapture == 9'h1A0;
-// LS32: req_bits_index_layerCapture == 10'h37F;
-// LS64: req_bits_index_layerCapture == 9'h1BF;
+// LS32: req_bits_index_layerCapture == 10'h42;
+// LS64: req_bits_index_layerCapture == 9'h21;
+// LS32: req_bits_index_layerCapture == 10'h44;
+// LS64: req_bits_index_layerCapture == 9'h22;
+// LS32: req_bits_index_layerCapture == 10'h83;
+// LS64: req_bits_index_layerCapture == 9'h41;
 // LS: wire [[P0C0:_GEN_[0-9]+(_layerCapture)?]] = [[TX0:_GEN_[0-9]+(_layerCapture)?]] == 8'h0;
 // LS-NEXT: wire [[P0C7:_GEN_[0-9]+(_layerCapture)?]] = [[TX0]] == 8'h7;
 // LS-NEXT: wire [[HS0:_GEN_[0-9]+(_layerCapture)?]] = {{.*}} == 2'h0;
@@ -126,10 +132,10 @@
 // LS: [[TX1]] <= req_bits_data[15:8];
 // LS32: [[RX255]] <= req_bits_data[31:24];
 // LS64: [[RX255]] <= req_bits_data[63:56];
-// LS32: ? 32'h20100
+// LS32: ? 32'h100
 // LS32: ? 32'h20
-// LS64: ? 64'h20100
-// LS64: ? 64'h2000040003
+// LS64: ? 64'h10000000004
+// LS64: ? 64'h2000000003
 // LS: assign padInputEnable =
 // LS-NEXT: {[[HS2]] & [[P2C255]] & lsInputEnable[255],
 // LS-NEXT: [[HS1]]
@@ -147,8 +153,27 @@
 // LS-NEXT: ? padInputValue[1]
 // LS-NEXT: : [[RX0P0]] & padInputValue[0]};
 
-// WIDE: iomux_hs_pin_0_slot_15:
+// WIDE: iomux_hs_pin_256_slot_256:
 // WIDE: cover property
 // WIDE-LABEL: module IOMux_{{[0-9a-f]+}}(
-// WIDE: <= req_bits_data[3:0];
-// WIDE: assign padOutputEnable = {{.*}} & outputEnable;
+// WIDE: req_bits_address < 16'h718;
+// WIDE: req_bits_mask_layerCapture[0];
+// WIDE-NEXT: {{.*}}req_bits_mask_layerCapture[1];
+// WIDE64: ? 64'h494F4D58FFFFFFFF
+// WIDE: <= req_bits_data[7:0];
+// WIDE: <= req_bits_data[8];
+// WIDE: assign inputValue = padInputValue[256];
+// WIDE: assign lsInputValue =
+// WIDE: ? padInputValue[256]
+
+// HEADER: #define IOMUX_VERSION_VALUE 0xffffffffULL
+// HEADER: #define IOMUX_PIN_COUNT_VALUE 0x101ULL
+// HEADER: #define IOMUX_HS_SLOTS_VALUE 0x101ULL
+// HEADER: #define IOMUX_LS_CHANNEL_COUNT_VALUE 0x101ULL
+// HEADER: #define IOMUX_HS_SELECT_OFFSET 0x100ULL
+// HEADER-NEXT: #define IOMUX_HS_SELECT_LANE_BITS 0x10ULL
+// HEADER-NEXT: #define IOMUX_LS_SELECT_OFFSET 0x308ULL
+// HEADER-NEXT: #define IOMUX_LS_SELECT_LANE_BITS 0x10ULL
+// HEADER-NEXT: #define IOMUX_LS_RX_PIN_OFFSET 0x510ULL
+// HEADER-NEXT: #define IOMUX_LS_RX_PIN_LANE_BITS 0x10ULL
+// HEADER-NEXT: #define IOMUX_APERTURE 0x718ULL
