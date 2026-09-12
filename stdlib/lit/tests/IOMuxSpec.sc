@@ -27,6 +27,14 @@
 // RUN: cd %t.dir/wide64 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefixes=WIDE,WIDE64
 // RUN: cd %t.dir/wide64 && %{test} header config.json > registers.h
 // RUN: cmp %t.dir/wide32/registers.h %t.dir/wide64/registers.h
+// DEFINE: %{options} = --pinCount 2 --hsSlots 2 --addressWidth 12 --option '{"gpio":true,"interrupt":true,"padControl":true,"invert":true,"rxOverride":true}' --routes '{"pin":0,"slot":0,"tie":true}' --lsPools '{"pins":[1],"channels":[{"channel":1,"receive":true,"tie":false}]}' --pad '{"classes":[{"control":[{"name":"drive","table":{"width":2,"rows":[{"name":"low","value":"0"},{"name":"high","value":"3"}]}}],"safe":{}}],"pinClass":[0,0]}'
+// RUN: mkdir -p %t.dir/options32 %t.dir/options64
+// RUN: cd %t.dir/options32 && %{test} config config.json %{options} --dataWidth 32 && %{test} design config.json
+// RUN: cd %t.dir/options32 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=OPTIONS
+// RUN: cd %t.dir/options32 && %{test} header config.json > registers.h
+// RUN: cd %t.dir/options64 && %{test} config config.json %{options} --dataWidth 64 && %{test} design config.json
+// RUN: cd %t.dir/options64 && %{test} header config.json > registers.h
+// RUN: cmp %t.dir/options32/registers.h %t.dir/options64/registers.h
 // RUN: rm -rf %t.dir
 
 // HS-COVER: iomux_hs_pin_0_slot_1:
@@ -177,3 +185,24 @@
 // HEADER-NEXT: #define IOMUX_LS_RX_PIN_OFFSET 0x510ULL
 // HEADER-NEXT: #define IOMUX_LS_RX_PIN_LANE_BITS 0x10ULL
 // HEADER-NEXT: #define IOMUX_APERTURE 0x718ULL
+
+// OPTIONS: iomux_output_value_source_3:
+// OPTIONS: cover property
+// OPTIONS: iomux_rise_pending_disabled:
+// OPTIONS: cover property
+// OPTIONS: iomux_interrupt_delivery:
+// OPTIONS: cover property
+// OPTIONS: iomux_hs_pin_0_slot_0_override:
+// OPTIONS: cover property
+// OPTIONS: iomux_ls_channel_1_override:
+// OPTIONS: cover property
+// OPTIONS: iomux_pad_force:
+// OPTIONS: cover property
+// OPTIONS: iomux_pad_control_0_register:
+// OPTIONS: cover property
+// OPTIONS-LABEL: module IOMux_{{[0-9a-f]+}}(
+// OPTIONS: input          pad_force,
+// OPTIONS: output {{.*}} pad_control_0,
+// OPTIONS: output {{.*}} pad_pin_0_control_0,
+// OPTIONS-NEXT: pad_pin_1_control_0,
+// OPTIONS: output        interrupt,
