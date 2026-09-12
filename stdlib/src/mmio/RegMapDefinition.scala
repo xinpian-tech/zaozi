@@ -63,9 +63,10 @@ final case class RegMapDefinition(
   require(definitions.map(_.name).distinct.size == definitions.size, "register field names must be distinct")
 
   def apply(
-    req:      Referable[DecoupledIO[RegMapRequest]] & Writable[DecoupledIO[RegMapRequest]],
-    rsp:      Referable[DecoupledIO[RegMapResponse]] & Writable[DecoupledIO[RegMapResponse]]
-  )(accesses: AppliedRegAccess*
+    req:           Referable[DecoupledIO[RegMapRequest]] & Writable[DecoupledIO[RegMapRequest]],
+    rsp:           Referable[DecoupledIO[RegMapResponse]] & Writable[DecoupledIO[RegMapResponse]],
+    zeroFillBytes: BigInt = 0
+  )(accesses:      AppliedRegAccess*
   )(
     using Arena,
     Context,
@@ -92,6 +93,11 @@ final case class RegMapDefinition(
       writeInputReady:  Referable[Bool],
       writeOutputValid: Referable[Bool])
 
+    require(
+      zeroFillBytes >= 0 && zeroFillBytes % (dataWidth / 8) == 0 &&
+        zeroFillBytes / (dataWidth / 8) <= (BigInt(1) << indexWidth),
+      "zeroFillBytes must be word-aligned and fit the index width"
+    )
     require(req.bits.getType.indexWidth == indexWidth, "request index width does not match RegMap")
     require(req.bits.getType.dataWidth == dataWidth, "request data width does not match RegMap")
     require(rsp.bits.getType.dataWidth == dataWidth, "response data width does not match RegMap")
@@ -373,7 +379,10 @@ final case class RegMapDefinition(
     req.ready     := frontReady & selectedInputReady
     rsp.valid     := backValid & selectedOutputValid
     rsp.bits.read := backRead
-    rsp.bits.error.foreach(_ := !requestMapped)
+    val inZeroFillWindow =
+      if zeroFillBytes == 0 then false.B
+      else backIndex <= ((zeroFillBytes - 1) / (dataWidth / 8)).U(indexWidth)
+    rsp.bits.error.foreach(_ := !(requestMapped | inZeroFillWindow))
 
     def assembleWord(fields: Seq[FieldCircuit], data: FieldCircuit => Referable[Bits]): Referable[Bits] =
       val segments               = fields
