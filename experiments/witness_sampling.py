@@ -24,15 +24,17 @@ from run_records import Records, begin, fingerprint, finish, framework_hashes, s
 from sequence_framework import ROOT, check_saved_sources, parse_response
 from ut_validation import validate
 
-ASSERTION = re.compile(r"(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);", re.S)
+COVER = re.compile(r"(\w+):((?:[^\n]*\n)?\s*)cover property \((.*?)\);", re.S)
+SAMPLING_METHOD = "soft-input-resample-v2"
+MAX_SOFT_PREFERENCES = 64
 
 
 def select_cover(sv, labels, label):
-    matches = list(ASSERTION.finditer(sv))
+    matches = list(COVER.finditer(sv))
     found = [m[1] for m in matches]
     if len(set(found)) != len(found) or set(found) != set(labels) or label not in found:
-        raise ValueError("UT assertion labels differ from prepared job")
-    return ASSERTION.sub(lambda m: f"{m[1]}:{m[2]}cover property (not ({m[3]}));"
+        raise ValueError("UT cover labels differ from prepared job")
+    return COVER.sub(lambda m: m[0]
                          if m[1] == label else "", sv)
 
 
@@ -45,27 +47,39 @@ def tcl_word(value):
 
 def render_sampling(job, label, sv, out, drives, cycles, count, seed, limit):
     """Stable per-label preferences; count only controls the prefix length."""
-    rng = random.Random(f"rvprobe-soft-input-v1:{seed}:{label}")
+    rng = random.Random(f"{SAMPLING_METHOD}:{seed}:{label}")
     analyze = []
-    include = "" if job["include"] is None else tcl_word("+incdir+" + job["include"]) + " "
+    include = ''.join(tcl_word('+incdir+' + p) + ' ' for p in job['includeDirs'])
     for suffix, flag in ((True, "-v2k"), (False, "-sv12")):
         paths = [Path(p) for p in [*job["rtl"], str(sv)] if (Path(p).suffix == ".v") == suffix]
         if paths:
             analyze.append(f"analyze {flag} {include}" + " ".join(map(tcl_word, paths)))
-    # Whole-port preferences per beat avoid quadratic bit-level soft objectives.
+    # Bound optimization cost independently of initialization/trace length.
+    # These are soft preferences only; the original cover and horizon stay fixed.
+    for port in drives:
+        if not re.fullmatch(r"[A-Za-z_]\w*", port['name']):
+            raise ValueError("sampling requires simple input identifiers")
+    cells = cycles * len(drives)
     preferences = []
     for attempt in range(max(0, count - 1) * 2):
         terms = []
-        for cycle in range(1, cycles + 1):
-            for port in drives:
-                name, width = port["name"], port["width"]
-                if not re.fullmatch(r"[A-Za-z_]\w*", name):
-                    raise ValueError("sampling requires simple input identifiers")
-                terms.append((f"{name} == {width}'h{rng.getrandbits(width):x}", cycle))
+        for cell in sorted(rng.sample(range(cells), min(cells, MAX_SOFT_PREFERENCES))):
+            cycle, port_index = divmod(cell, len(drives))
+            name, width = drives[port_index]['name'], drives[port_index]['width']
+            terms.append((f"{name} == {width}'h{rng.getrandbits(width):x}", cycle + 1))
         preferences.append(terms)
-    # All attempts stay at the original witness length. A trace cannot become
-    # different merely by appending irrelevant extra cycles.
-    script = ["clear -all", *analyze, f"elaborate -top {job['top']}", "clock clock", "reset reset",
+    # All attempts in a pool stay at the requested length (normally the original
+    # witness length). Diagnostic concretization may explicitly request a larger
+    # horizon; ordinary diversity never appends irrelevant cycles.
+    reset = f"reset -sequence {tcl_word(out / 'reset.seq')}" if job.get('resetSequence') else "reset reset"
+    if job.get('initialState'):
+        if job.get('resetSequence'):
+            raise ValueError("conflicting formal initialization policies")
+        reset = f"reset reset -init_state {tcl_word(out / 'initial.state')}"
+    clock_setup = ([f"clock {c['port']} -factor {c['factor']}" for c in job['clocks']] +
+                   ['clock -rate -default clock']) if job.get('clocks') else ['clock clock']
+    environment_setup = [f"assume -env {{{term}}}" for term in job.get('environmentAssumptions', [])]
+    script = ["clear -all", *analyze, f"elaborate -disable_auto_bbox -top {job['top']}", *clock_setup, reset, *environment_setup,
               f"set_prove_time_limit {limit}", "prove -all", 'set target ""',
               "foreach p [get_property_list -include {type cover}] {",
               f"  if {{[string match {{*::{job['top']}.{label}}} $p] || [string equal {{{job['top']}.{label}}} $p]}} {{ set target $p }}",
@@ -123,23 +137,24 @@ def validate_sample_config(path, top, label, cycles):
         raise ValueError("sample configuration changed witness length")
 
 
-def import_sample(path, label, design):
-    trace = read_vcd(path)
+def import_sample(path, label, design, event_mode=False):
+    from event_trace import FORMAL_CLOCK, CONTRACT as EVENT_CONTRACT
+    trace = read_vcd(path, FORMAL_CLOCK if event_mode else 'clock')
     beats = []
     for sample in trace:
         drive = {}
         for port in design.data_ports:
-            if port.direction == "input":
+            if port.direction == "input" and port.kind != 'clock':
                 value, mask = sample.get(port.name, sample.get("dut/" + port.name, (0, 0)))
                 # Refuse ambiguous completions: do not mutate unknown inputs after solving.
-                if mask != (1 << port.width) - 1:
+                if mask != (1 << port.width) - 1 and not (event_mode and port.kind == 'clock'):
                     raise ValueError(f"sample has unknown input bits: {port.name}")
                 drive[port.name] = str(value)
         beats.append(drive)
     stimulus = path.with_suffix(".json")
     save(stimulus, beats)
     return {"label": label, "status": "generated", "cycles": len(beats),
-            "witnessContract": WITNESS_CONTRACT, "witnessFile": str(path), "witnessSha256": digest(path),
+            "witnessContract": EVENT_CONTRACT if event_mode else WITNESS_CONTRACT, "witnessFile": str(path), "witnessSha256": digest(path),
             "stimulusFile": str(stimulus), "stimulusSha256": digest(stimulus),
             "inputFingerprint": fingerprint(beats), "origin": "soft-input-resample"}
 
@@ -148,7 +163,7 @@ def frozen_inputs(source, config_path):
     source = source.resolve()
     design, config = load_config(config_path)
     generated = source.parent / "sources"
-    response = parse_response((generated / "response.json").read_text())
+    response = parse_response((generated / "model.ltl").read_text())
     check_saved_sources(generated, design, response)
     job = json.loads((source / "prepared.json").read_text())
     if job["fingerprint"] != fingerprint({k: v for k, v in job.items() if k != "fingerprint"}):
@@ -158,8 +173,12 @@ def frozen_inputs(source, config_path):
         raise ValueError("frozen UT source or lowering changed")
     if json.loads((generated / "design.json").read_text()) != design.record():
         raise ValueError("frozen design inputs changed")
-    if job["rtl"] != [str(p) for p in design.sources] or job["labels"] != response["ut"]["generationLabels"]:
+    if job["rtl"] != [str(p) for p in design.sources] or job["labels"] != response["labels"]:
         raise ValueError("prepared job differs from frozen source")
+    from rtl_initial_state import verify_prepared
+    verify_prepared(job, design, config)
+    from environment_contract import verify_solver_environment
+    verify_solver_environment(job, design, config)
     validate(sv.read_text(), design, job["top"], job["labels"])
     goals = []
     for label in job["labels"]:
@@ -179,10 +198,17 @@ def frozen_inputs(source, config_path):
     return design, config, job, goals
 
 
-def sample_goal(job, goal, design, config, directory, count, seed, limit, eda_shell, *, resume=False):
-    """One original plus diverse solutions; a shared implementation for all experiment entry points."""
+def sample_goal(job, goal, design, config, directory, count, seed, limit, eda_shell, *, resume=False, horizon=None):
+    """Original plus diverse solutions; horizon expansion is diagnostic-only opt-in.
+
+    The default production path keeps the original length. An explicit horizon
+    is recorded and bounded independently; it does not rewrite the native Cover.
+    """
     if not 1 <= count <= 256 or not re.fullmatch(r"[1-9][0-9]*s", limit):
         raise ValueError("invalid sampling count or time limit")
+    cycles = goal['cycles'] if horizon is None else horizon
+    if type(cycles) is not int or cycles < goal['cycles'] or cycles > 4 * goal['cycles']:
+        raise ValueError('concretization horizon must be between original length and four times that length')
     directory = Path(directory).resolve()
     label = goal["label"]
     goal = dict(goal)
@@ -197,7 +223,8 @@ def sample_goal(job, goal, design, config, directory, count, seed, limit, eda_sh
         "RVPROBE_LLM_API_KEY", "RVPROBE_LLM_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL")}
     manifest = directory / "pool.json"
     identity = fingerprint({"job": job["fingerprint"], "original": goal["inputFingerprint"], "count": count,
-                            "seed": seed, "limit": limit, "replay": config, "method": "soft-input-resample-v1"})
+                            "seed": seed, "limit": limit, "replay": config, "method": SAMPLING_METHOD,
+                            "max_soft_preferences": MAX_SOFT_PREFERENCES, "horizon": cycles})
     if resume and manifest.exists():
         if json.loads((directory / "sampling-inputs.json").read_text())["fingerprint"] != identity:
             raise ValueError("sampling resume configuration changed")
@@ -210,19 +237,28 @@ def sample_goal(job, goal, design, config, directory, count, seed, limit, eda_sh
                 conf = Path(row["configFile"])
                 if digest(conf) != row["configSha256"]:
                     raise ValueError("cached sampler configuration changed")
-                validate_sample_config(conf, job["top"], label, goal["cycles"])
+                validate_sample_config(conf, job["top"], label, cycles)
+                if row['cycles'] != cycles:
+                    raise ValueError('cached sampled witness length differs from requested horizon')
         if pool[0]["inputFingerprint"] != goal["inputFingerprint"] or len({r["inputFingerprint"] for r in pool}) != len(pool):
             raise ValueError("cached pool changed original witness or contains duplicates")
     elif count > 1:
         if resume and directory.exists():
             directory.rename(directory.with_name(label + f".interrupted-{time.time_ns()}"))
         directory.mkdir(parents=True, exist_ok=False)
-        save(directory / "sampling-inputs.json", {"fingerprint": identity})
+        save(directory / "sampling-inputs.json", {"fingerprint": identity,
+             "original_cycles": goal['cycles'], "horizon": cycles,
+             "purpose": 'native-concretization' if horizon is not None else 'fixed-horizon-diversity'})
+        if job.get("resetSequence"):
+            (directory / "reset.seq").write_text(job["resetSequence"])
+        if job.get("initialState"):
+            (directory / "initial.state").write_text(job["initialState"])
         sv = directory / Path(job["sv"]).name
         sv.write_text(select_cover(Path(job["sv"]).read_text(), job["labels"], label))
-        drives = [p for p in job["abi"]["ports"] if p["role"] == "Drive"]
+        clock_names = {c['port'] for c in job.get('clocks', [])}
+        drives = [p for p in job["abi"]["ports"] if p["role"] == "Drive" and p['name'] not in clock_names]
         tcl = directory / "sample.tcl"
-        tcl.write_text(render_sampling(job, label, sv, directory, drives, goal["cycles"],
+        tcl.write_text(render_sampling(job, label, sv, directory, drives, cycles,
                                       count, seed, limit))
         with records.phase("goal-sampling", label=label) as event:
             with (directory / "jg.log").open("w") as log:
@@ -238,9 +274,9 @@ def sample_goal(job, goal, design, config, directory, count, seed, limit, eda_sh
             seen = {goal["inputFingerprint"]}
             for attempt, replot_ms in accepted:
                 conf = directory / f"sample-{attempt}.config.tcl"
-                validate_sample_config(conf, job["top"], label, goal["cycles"])
-                row = import_sample(directory / f"sample-{attempt}.vcd", label, design)
-                if row["cycles"] != goal["cycles"]:
+                validate_sample_config(conf, job["top"], label, cycles)
+                row = import_sample(directory / f"sample-{attempt}.vcd", label, design, bool(job.get('clocks')))
+                if row["cycles"] != cycles:
                     raise ValueError("sampled witness length changed")
                 row.update(attempt=int(attempt), replot_ms=int(replot_ms),
                            configFile=str(conf), configSha256=digest(conf))
@@ -263,7 +299,8 @@ def sampling_options(parser):
 def sampling_policy(args):
     if not 1 <= args.sequences_per_intent <= 256 or not re.fullmatch(r"[1-9][0-9]*s", args.sampling_time_limit):
         raise ValueError("invalid sampling count or time limit")
-    return {"method": "soft-input-resample-v1", "sequences_per_intent": args.sequences_per_intent,
+    return {"method": SAMPLING_METHOD, "max_soft_preferences": MAX_SOFT_PREFERENCES,
+            "sequences_per_intent": args.sequences_per_intent,
             "seed": args.sampling_seed, "time_limit": args.sampling_time_limit}
 
 
@@ -320,12 +357,13 @@ def main():
             ap.error("unknown labels")
         goals = [g for g in goals if g["label"] in args.labels]
     out = args.out.resolve()
-    comparison = {"method": "soft-input-resample-v1", "source_solve": str(args.source_solve.resolve()),
+    comparison = {"method": SAMPLING_METHOD, "max_soft_preferences": MAX_SOFT_PREFERENCES,
+                  "source_solve": str(args.source_solve.resolve()),
                   "source_job": job, "design": design.record(), "replay": config,
                   "originals": goals, "counts": counts, "seed": args.seed,
                   "time_limit": args.jg_time_limit, "framework": framework_hashes(ROOT),
                   "model_requests": 0, "new_model_tokens": 0,
-                  "sampling_note": "whole-port soft preferences on every original witness beat; fixed length; deduplicated inputs; not uniform or exhaustive"}
+                  "sampling_note": "bounded whole-port soft preferences across original witness beats; fixed length; deduplicated inputs; not uniform or exhaustive"}
     started = begin(out, comparison, resume=args.resume)
     began = time.monotonic()
     records = Records(out)

@@ -9,6 +9,30 @@ import time
 import uuid
 
 
+def fresh_directory(path):
+    """Claim a previously absent run directory without overwriting any artifact.
+
+    Some network filesystems can report EEXIST after creating an empty directory.
+    A unique, exclusive owner file arbitrates concurrent creators in that case.
+    Existing paths (including empty directories and symlinks) are never reused.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() or path.is_symlink():
+        raise FileExistsError(f'output already exists: {path}')
+    recovered = False
+    try:
+        path.mkdir()
+    except FileExistsError:
+        if path.is_symlink() or not path.is_dir() or any(path.iterdir()):
+            raise
+        recovered = True
+    with (path/'.rvprobe-directory-owner').open('x') as stream:
+        json.dump({'id':str(uuid.uuid4()),'pid':os.getpid(),
+                   'recovered_empty_create':recovered,'created_utc':utc()},stream)
+    return path
+
+
 def utc():
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
@@ -23,6 +47,40 @@ def save(path, value):
 
 def fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+USAGE_DETAILS = {
+    "reasoning_tokens": ("completion_tokens_details", "reasoning_tokens"),
+    "cached_tokens": ("prompt_tokens_details", "cached_tokens"),
+    "prompt_cache_hit_tokens": ("prompt_cache_hit_tokens",),
+    "prompt_cache_miss_tokens": ("prompt_cache_miss_tokens",),
+}
+
+
+def model_usage(response):
+    """Retain numeric provider usage only; no reasoning text or inferred token counts."""
+    usage = response.get("usage") or {}
+    def number(path):
+        value = usage
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        return value if type(value) is int and value >= 0 else None
+    return {"usage": {key: number((key,)) for key in ("prompt_tokens", "completion_tokens", "total_tokens")},
+            "usage_details": {key: number(path) for key, path in USAGE_DETAILS.items()}}
+
+
+def response_metadata(response):
+    """Persist provider termination and output size, never private reasoning text."""
+    choice = response["choices"][0]
+    message = choice["message"]
+    content = message.get("content")
+    reason = choice.get("finish_reason")
+    status = ("truncated" if reason == "length" else "filtered" if reason == "content_filter" else
+              "tool_call" if message.get("tool_calls") else
+              "complete" if isinstance(content, str) and content.strip() else "empty")
+    return {"finish_reason": reason, "response_status": status,
+            "output_characters": len(content) if isinstance(content, str) else 0,
+            "reasoning_characters": len(message.get("reasoning_content") or "")}
 
 
 def begin(directory, comparison, resume=False):
@@ -48,7 +106,7 @@ def framework_hashes(root):
                                ("zaozi-compiler-plugin/src", "*.scala")):
         paths.update(p for p in (root / directory).rglob(pattern) if p.is_file())
     paths.add(root / "experiments/package.mill")
-    paths.update(root / name for name in ("build.mill", "flake.nix", "flake.lock", "experiments/eda-shell") if (root / name).is_file())
+    paths.update(root / name for name in ("build.mill", "flake.nix", "flake.lock", "experiments/eda-shell", "rvprobe-skill.md") if (root / name).is_file())
     return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
@@ -74,6 +132,8 @@ class Records:
                 event["status"] = "ok"
         except BaseException as error:
             event.update(status="failed", error_type=type(error).__name__)
+            if getattr(error, "code", None) is not None:
+                event["error_code"] = error.code
             raise
         finally:
             event.update(finished_utc=utc(), seconds=time.monotonic() - began)
@@ -92,8 +152,13 @@ def totals(directory):
                 records[str(path) + "-incomplete"] = {"phase": "incomplete-record", "status": "failed"}
     events = list(records.values())
     requests = [e for e in events if e["phase"] == "model-request"]
-    usage = {key: sum(e.get("usage", {}).get(key) or 0 for e in requests)
-             for key in ("prompt_tokens", "completion_tokens", "total_tokens")}
+    usage = {}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        known = [e.get("usage", {}).get(key) for e in requests]
+        known = [value for value in known if type(value) is int and value >= 0]
+        # No calls really costs zero. Calls without any usage evidence are
+        # unknown, not zero; a partially known total remains a reported subtotal.
+        usage[key] = sum(known) if known or not requests else None
     phases = {}
     for event in events:
         phase = event["phase"]
@@ -101,7 +166,14 @@ def totals(directory):
         row["count"] += 1
         row["seconds"] += event.get("seconds", 0)
         row["failures"] += event.get("status") in ("failed", "running")
-    return {"requests": len(requests), "usage_reported": usage,
+    detail_totals = {}
+    for key in USAGE_DETAILS:
+        values = [e.get("usage_details", {}).get(key) for e in requests]
+        known = [value for value in values if type(value) is int and value >= 0]
+        detail_totals[key] = {"reported_tokens": sum(known) if known else None,
+                              "requests_with_usage": len(known), "requests_without_usage": len(values) - len(known),
+                              "complete": len(known) == len(values)}
+    return {"requests": len(requests), "usage_reported": usage, "usage_breakdown": detail_totals,
             "reported_models": sorted({e["reported_model"] for e in requests if e.get("reported_model")}),
             "token_accounting_complete": all(e.get("usage", {}).get("total_tokens") is not None for e in requests),
             "requests_without_usage": sum(e.get("usage", {}).get("total_tokens") is None for e in requests),

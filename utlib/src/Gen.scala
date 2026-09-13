@@ -22,7 +22,7 @@ object Gen:
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
   ): Unit =
     goal match
-      case sequence: Sequence => Assert(!sequence, label)
-      case property: Property => Assert(!property, label)
+      case sequence: Sequence => Cover(sequence, label)
+      case property: Property => Cover(property, label)
       case predicate: Referable[?] =>
-        Assert((!predicate.asInstanceOf[Referable[Bool]]).I, label)
+        Cover(predicate.asInstanceOf[Referable[Bool]].S, label)

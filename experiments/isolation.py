@@ -46,6 +46,28 @@ def toolchain(root):
     raise RuntimeError("trusted toolchain did not return its classpath configuration")
 
 
+def compiler_options(config, sources, work):
+    """Keep SemanticDB/plugin support, but scope its paths to this compilation.
+
+    Sources may live outside the Mill workspace (e.g. in tmpfs). Inheriting
+    Mill's sourceroot can produce an absolute SemanticDB source path, which
+    escapes the output directory and attempts to write beside readonly inputs.
+    """
+    path_options = ("-sourceroot", "-semanticdb-target")
+    options = []
+    inherited = iter(config["options"])
+    for option in inherited:
+        if option in path_options:
+            value = next(inherited, None)
+            if value is None or value.startswith("-"):
+                raise ValueError(f"missing value for compiler option {option}")
+        elif not any(option.startswith(flag + ":") or option.startswith(flag + "=")
+                     for flag in path_options):
+            options.append(option)
+    return options + ["-sourceroot", str(Path(sources).resolve()),
+                      "-semanticdb-target", str(Path(work).resolve() / "semanticdb")]
+
+
 def execute(argv, config, sources, work, *, timeout=600):
     readonly = [sources, *config["compiler"], *config["classpath"]]
     readonly += [arg.removeprefix("-Xplugin:") for arg in config["options"] if arg.startswith("-Xplugin:")]

@@ -83,7 +83,8 @@ def replace_once(source, old, new):
     return source.replace(old, new, 1)
 
 
-def repair_components(components, ports, *, owned_signals=(), clock_connections=None):
+def repair_components(components, ports, *, owned_signals=(), clock_connections=None,
+                      item_constraint_replacements=None, item_widths=None):
     """Ground field widths in IO; keep static/clock/BFM pins single-owner.
 
     clock_connections is an explicit signal -> top-level clock map. Never infer
@@ -95,6 +96,9 @@ def repair_components(components, ports, *, owned_signals=(), clock_connections=
     for name in known:
         identifier(name, "IO name")
     item = result["seq_item"]
+    for original, replacement in (item_constraint_replacements or {}).items():
+        item = replace_once(item, original, replacement)
+        changes.append(f"shared seq_item constraint repair: {original} -> {replacement}")
     references = set()
     for key, code in result.items():
         if key.endswith(("driver", "monitor")):
@@ -102,7 +106,7 @@ def repair_components(components, ports, *, owned_signals=(), clock_connections=
     additions = []
     for name in sorted(references & known.keys()):
         port = known[name]
-        width = int(port["width"])
+        width = int((item_widths or {}).get(name,port["width"]))
         declaration = re.search(rf"\b(?:rand\s+)?(?:bit|logic|reg|int)\s+(?:signed\s+)?(?:\[[^]]+\]\s*)?{name}\s*;", item)
         if declaration:
             old = declaration.group()
@@ -210,6 +214,45 @@ def install_cycle_transport(components, design, config, driver_key):
     return result
 
 
+def repair_axi_response_sampling(components, driver_key="driver"):
+    """Listen for responses concurrently with address/data handshakes.
+
+    Applies only to the recognized HAVEN AXI-Lite template. Preserve all bus
+    mappings, transaction values and ready policy; do not synthesize a DUT model.
+    """
+    result = deepcopy(components)
+    code = result[driver_key]
+    if "task axi_read(" not in code and "task axi_write(" not in code:
+        return result, []
+    for task_name, response_channel in (("axi_write", "B"), ("axi_read", "R")):
+        match = re.search(rf"  task {task_name}\(.*?  endtask", code, re.S)
+        if not match:
+            raise ValueError("unsupported AXI template: missing transaction task")
+        task = match.group()
+        marker = f"    // Phase 2: Wait for {response_channel} response\n"
+        if task.count(marker) != 1:
+            raise ValueError("unsupported AXI template: response wait marker")
+        setup, response = task.split(marker)
+        response = response.removesuffix("  endtask")
+        response = re.sub(r"\btimeout_cnt\b", "response_count", response)
+        listener = "      begin : response_handshake\n        int response_count;\n" + response + "      end\n"
+        if task_name == "axi_write":
+            if setup.count("    fork\n") != 1 or setup.count("    join\n") != 1:
+                raise ValueError("unsupported AXI template: write handshake fork")
+            task = replace_once(setup, "    join\n", listener + "    join\n") + "  endtask"
+        else:
+            marker = "    // Wait for AR handshake\n"
+            if setup.count(marker) != 1:
+                raise ValueError("unsupported AXI template: read handshake marker")
+            prefix, address = setup.split(marker)
+            task = prefix + "    fork\n      begin : ar_handshake\n" + address + "      end\n" + listener + "    join\n  endtask"
+        # An invalid transaction must stop both arms, not keep running bad traffic.
+        task = task.replace("`uvm_error(", "`uvm_fatal(")
+        code = code[:match.start()] + task + code[match.end():]
+    result[driver_key] = code
+    return result, ["shared AXI-Lite: concurrent B/R response capture from request launch; fatal handshake timeouts"]
+
+
 def repair_direct_handshake(components, design, config, driver_key="driver"):
     """Fix the known template race without inventing a DUT behavior model.
 
@@ -222,11 +265,17 @@ def repair_direct_handshake(components, design, config, driver_key="driver"):
     found = re.search(r"while \((vif\.\w+\s*!==\s*1'b[01]) && _hs_cnt < (\d+)\)", code)
     if not found:
         return result, []
-    if len(config["request"]) != 1:
-        raise ValueError("direct handshake repair needs one explicit request signal")
-    request, active = next(iter(config["request"].items()))
-    if config["idle"][request] == active:
+    if 'request' not in config:
+        # Event manifests describe physical IO, not a transaction request
+        # protocol. Keep the native driver unless such a protocol was supplied.
+        return result, []
+    requests = config["request"]
+    if not requests:
+        raise ValueError("direct handshake repair needs explicit request signals")
+    if any(config["idle"][request] == active for request, active in requests.items()):
         raise ValueError("request idle/active values must differ")
+    deassert = "\n".join(f"    vif.{request} = {config['idle'][request]};" for request in requests)
+    requested = " || ".join(f"(item.{request} == {active})" for request, active in requests.items())
     match = re.search(r"  task drive_item\([^)]*\);.*?  endtask", code, re.S)
     if not match:
         raise ValueError("unsupported direct handshake task")
@@ -241,8 +290,8 @@ def repair_direct_handshake(components, design, config, driver_key="driver"):
     #1; // inspect the response after this request's edge, not stale prior done
     completed = !({condition});
     @(negedge vif.{design.clock});
-    vif.{request} = {config['idle'][request]};
-    if (item.{request} == {active}) begin
+{deassert}
+    if ({requested}) begin
       count = 0;
       while (!completed && count < {limit}) begin
         @(posedge vif.{design.clock});
@@ -265,7 +314,14 @@ def render_witness_sequence(design, frames, label, ordinal=0):
         body += [f'    item = {design.top}_seq_item::type_id::create("beat_{index}");',
                  "    item.rvp_raw = 1;", f"    item.rvp_reset = {int(row['kind'] == 'reset')};",
                  f"    item.rvp_ordinal = {index};"]
+        if 'duration_ps' in row:
+            body.append(f"    item.rvp_ltl_active = {int(row['kind'] == 'witness')};")
+            body.append(f"    item.rvp_duration_ps = {row['duration_ps']};")
+            body.append(f"    item.rvp_formal_sample = {int(row.get('formal_sample', True))};")
+            body += [f"    item.rvp_clock_{name} = {value};" for name,value in row['clocks'].items()]
         for p in design.data_ports:
+            if p.kind == 'clock':
+                continue
             if p.direction == "input":
                 body.append(f"    item.rvp_drive_{p.name} = {p.width}'h{row['drive'][p.name]:x};")
             else:
@@ -288,6 +344,8 @@ endclass
 def check_sequence_set(sequences):
     names = []
     for code in sequences:
+        if 'bus-write fallback, not backdoor' in code or re.search(r"Skipped memory_write ['\"]", code):
+            raise ValueError('saved sequence contains an invalid memory_write fallback/skip; regenerate through the explicit shared memory API, not a register-bus substitute')
         found = re.findall(r"\bclass\s+(\w+)\s+extends\s+uvm_sequence\b", code)
         if len(found) != 1:
             raise ValueError("expected exactly one UVM sequence class per source")

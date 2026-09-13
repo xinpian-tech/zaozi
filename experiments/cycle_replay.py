@@ -38,12 +38,23 @@ def load_config(path: Path) -> tuple[Design, dict]:
     if raw.get("version") != 1 or raw.get("contract") != CONTRACT:
         raise ValueError("replay config must use version 1 and cycle-replay-v1")
     design = load_design((path.parent / raw["design"]).resolve())
+    if raw.get('environment'):
+        from environment_contract import validate_environment
+        validate_environment(design, raw['environment'])
+    elif any(p.kind == 'clock' for p in design.data_ports):
+        raise ValueError('multiple clocks require an explicit event environment')
+    if "formal_initial_state" in raw:
+        policy = raw["formal_initial_state"]
+        if not isinstance(policy, dict) or not (policy == {"mode": "rtl-reset-simulation"} or
+                (set(policy) == {"file", "sha256"} and isinstance(policy["file"], str) and
+                 isinstance(policy["sha256"], str) and re.fullmatch(r"[0-9a-f]{64}", policy["sha256"]))):
+            raise ValueError("invalid formal initial state policy")
     for key, maximum in (("reset_cycles", 100), ("drain_cycles", 10000)):
         if type(raw[key]) is not int or not 1 <= raw[key] <= maximum:
             raise ValueError(f"invalid {key}")
     check_drive(design, raw["idle"])
-    requests = raw["request"]
-    if not requests or not set(requests) <= set(design.drive_names):
+    requests = raw.get("request", {})
+    if (not requests and not raw.get('environment')) or not set(requests) <= set(design.drive_names):
         raise ValueError("request must identify declared input controls")
     check_drive(design, {**raw["idle"], **requests})
     baseline = raw["baseline"]
@@ -69,7 +80,7 @@ def check_drive(design: Design, values: dict) -> None:
     if set(values) != set(design.drive_names):
         raise ValueError("stimulus must contain exactly the manifest drive ports")
     for port in design.data_ports:
-        if port.direction == "input":
+        if port.direction == "input" and port.kind != 'clock':
             value = values[port.name]
             if type(value) is not int or not 0 <= value < (1 << port.width):
                 raise ValueError(f"out-of-width drive value for {port.name}")
@@ -147,6 +158,29 @@ def read_vcd(path: Path, clock="clock") -> list[dict[str, tuple[int, int]]]:
 
 
 def witness_frames(design: Design, config: dict, row: dict, segment: int) -> list[dict]:
+    if config.get('environment'):
+        from event_trace import CONTRACT as EVENT_CONTRACT, event_frames, idle_events, FORMAL_CLOCK
+        if row.get('witnessContract') != EVENT_CONTRACT:
+            raise ValueError('event environment requires an event-contract witness')
+        witness = Path(row['witnessFile'])
+        if digest(witness) != row['witnessSha256']:
+            raise ValueError('event witness SHA-256 changed')
+        beats = json.loads(Path(row['stimulusFile']).read_text())
+        samples = read_vcd(witness, FORMAL_CLOCK)
+        if len(beats) != len(samples) or len(beats) != row['cycles']:
+            raise ValueError('event stimulus / formal sample counts differ')
+        for beat,sample in zip(beats,samples):
+            check_drive(design, {k:int(v) for k,v in beat.items()})
+            for name,value in beat.items():
+                expected,mask = sample.get(name, sample.get('dut/'+name,(0,0)))
+                if int(value) & mask != expected & mask:
+                    raise ValueError('event stimulus differs from formal trace')
+        rows = idle_events(design,config,config['reset_cycles'],'reset')
+        rows += event_frames(witness,design,config['environment']['clocks'])
+        # No unproved drain after an event witness; all reported activity is
+        # reset or a preserved formal event, including its final sample edge.
+        for index,event in enumerate(rows): event.update(segment=segment,beat=index)
+        return rows
     if row.get("witnessContract") != WITNESS_CONTRACT:
         raise ValueError("replay requires a full-design witness; regenerate legacy/COI-only traces")
     stimulus = Path(row["stimulusFile"])
@@ -330,6 +364,8 @@ def preflight(design_path: Path, directory: Path) -> None:
 
 class Replay:
     def __init__(self, design: Design, config: dict, root: Path, eda_shell: Path, *, resume=False):
+        if config.get('environment'):
+            raise ValueError('event environments require the shared HAVEN event transport')
         self.design, self.config, self.root = design, config, root.resolve()
         self.eda_shell = eda_shell.resolve()
         self.build = self.root / "build"
@@ -455,7 +491,9 @@ def validate_schedule(design: Design, frames: list[dict], reset_cycles: int) -> 
         last_segment = row["segment"]
 
 
-def validate_samples(design: Design, frames: list[dict], log: str) -> dict:
+def validate_samples(design: Design, frames: list[dict], log: str, *, reset_environment_inputs=(), environment=None, goal_checked=False) -> dict:
+    if not set(reset_environment_inputs) <= set(design.drive_names):
+        raise ValueError('reset environment exemption names a non-input')
     if any(not re.search(rf"UVM_{kind}\s*:\s*0\b", log) for kind in ("ERROR", "FATAL")):
         raise ValueError("UVM did not finish without errors")
     if not re.search(rf"^RVPROBE_REPLAY_PASS {len(frames)}$", log, re.M):
@@ -464,6 +502,7 @@ def validate_samples(design: Design, frames: list[dict], log: str) -> dict:
     if len(samples) != len(frames):
         raise ValueError("sample count differs from schedule")
     prior = None
+    differences = []
     for index, (row, sample) in enumerate(zip(frames, samples)):
         ordinal, stamp, reset, *values = sample.split()
         active = row["kind"] == "reset"
@@ -471,26 +510,74 @@ def validate_samples(design: Design, frames: list[dict], log: str) -> dict:
         if int(ordinal) != index or reset != str(want_reset):
             raise ValueError("replay order/reset differs from schedule")
         # Bench time precision is 1 ps, clock period is 10 ns.
-        if prior is not None and int(stamp) - prior != 10000:
+        expected_step = frames[index-1].get('duration_ps',10000) if index else None
+        if prior is not None and int(stamp) - prior != expected_step:
             raise ValueError("driver inserted or dropped a clock cycle")
         prior = int(stamp)
-        if len(values) != len(design.data_ports):
+        if len(values) != len([p for p in design.data_ports if p.kind != 'clock']):
             raise ValueError("sample columns differ from manifest")
-        for port, value in zip(design.drive_names, values[:len(design.drive_names)]):
-            if not re.fullmatch(r"[0-9a-fA-F]+", value) or int(value, 16) != row["drive"][port]:
-                raise ValueError(f"sampled drive differs: row {index}, port {port}")
         outputs = [p for p in design.data_ports if p.direction == "output"]
+        sampled_outputs = {}
         for port, value in zip(outputs, values[len(design.drive_names):]):
             if not re.fullmatch(r"[01xXzZ]+", value):
                 raise ValueError("invalid sampled output")
             actual = int(re.sub("[xXzZ]", "0", value), 2)
             known = int("".join("0" if bit.lower() in "xz" else "1" for bit in value), 2)
+            sampled_outputs[port.name] = (actual, known)
+        resolved_drive = dict(row['drive'])
+        # Supplemental events hold external stimulus, not a new formal sample
+        # of the resolved pin. Model only trusted electrical feedback here;
+        # In native-goal mode the original Cover is the oracle; full-waveform
+        # comparisons are diagnostics while stimulus and timing stay strict.
+        if row.get('formal_sample') is False or goal_checked:
+            widths = {p.name:p.width for p in design.data_ports}
+            for connection in (environment or {}).get('open_drain', []):
+                pin = connection['input']
+                if pin not in (environment or {}).get('passive_open_drain', []):
+                    continue
+                output, output_known = sampled_outputs[connection['output']]
+                enable, enable_known = sampled_outputs[connection['enable_n']]
+                if not (output_known & enable_known or output & output_known or enable & enable_known):
+                    raise ValueError(f'unknown electrical feedback: row {index}, port {pin}')
+                resolved_drive[pin] = output | enable
+            for connection in (environment or {}).get('feedback', []):
+                pin = connection['input']
+                if pin in reset_environment_inputs:
+                    continue
+                mask = (1 << widths[pin]) - 1
+                output, output_known = sampled_outputs[connection['output']]
+                enable, enable_known = sampled_outputs[connection['enable']]
+                if enable_known & mask != mask or output_known & enable & mask != enable & mask:
+                    raise ValueError(f'unknown electrical feedback: row {index}, port {pin}')
+                resolved_drive[pin] = ((resolved_drive[pin] & ~enable) | (output & enable)) & mask
+        for port, value in zip(design.drive_names, values[:len(design.drive_names)]):
+            if goal_checked and port in reset_environment_inputs:
+                if not re.fullmatch(r'[0-9a-fA-F]+',value) or int(value,16)!=resolved_drive[port]:
+                    differences.append({'row':index,'port':port,'kind':'live_response','actual':value,'formal':resolved_drive[port]})
+                continue
+            if active and port in reset_environment_inputs:
+                # The live external device owns this pin during reset too;
+                # reset preamble metadata is not a requested stimulus value.
+                continue
+            if not re.fullmatch(r"[0-9a-fA-F]+", value) or int(value, 16) != resolved_drive[port]:
+                raise ValueError(f"sampled drive differs: row {index}, port {port}")
+        for port in outputs:
+            actual, known = sampled_outputs[port.name]
             expected, mask = row["expected"].get(port.name, [0, 0])
             if known & mask != mask or actual & mask != expected & mask:
+                if goal_checked:
+                    differences.append({'row':index,'port':port.name,'kind':'output','actual':actual,'known':known,'formal':expected,'mask':mask})
+                    continue
                 raise ValueError(f"sampled output disagrees: row {index}, port {port.name}")
-    return {"contract": CONTRACT, "passed": True, "sampled_cycles": len(frames),
+    event_mode = bool(frames and 'duration_ps' in frames[0])
+    if any(('duration_ps' in row) != event_mode for row in frames):
+        raise ValueError('mixed event and cycle replay schedule')
+    from event_trace import CONTRACT as EVENT_CONTRACT
+    return {"contract": EVENT_CONTRACT if event_mode else CONTRACT, "passed": True, "sampled_cycles": len(frames),
             "witness_cycles": sum(row["kind"] == "witness" for row in frames),
-            "output_checks": sum(len(row["expected"]) for row in frames),
-            "reset_per_witness": True, "sample_phase": "clocking input #1step before posedge",
-            "clock_period_ns": 10, "arithmetic_correctness_checked": False,
-            "limitation": "known formal output bits only; no whole-state equivalence or independent functional proof"}
+            "output_checks": 0 if goal_checked else sum(len(row["expected"]) for row in frames),
+            "waveform_output_comparisons": sum(len(row["expected"]) for row in frames),
+            "reset_per_witness": True, "sample_phase": "before declared clock event" if event_mode else "clocking input #1step before posedge",
+            "clock_period_ns": None if event_mode else 10, "arithmetic_correctness_checked": False,
+            "waveform_differences": differences,
+            "limitation": "native LTL goal checked on live IO; waveform differences are diagnostic" if goal_checked else "known formal output bits only; no whole-state equivalence or independent functional proof"}

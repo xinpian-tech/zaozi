@@ -8,7 +8,7 @@ import re
 
 def write_targets(code):
     """Find statement assignments, not comparisons inside Gen properties or RHS expressions."""
-    code = re.sub(r"\b\w+\s*:\s*assert\s+property\b[^;]*;", "", code)
+    code = re.sub(r"\b\w+\s*:\s*(?:assert|cover)\s+property\b[^;]*;", "", code)
     targets = []
     for statement in code.split(";"):
         depth = 0
@@ -60,7 +60,7 @@ def validate(text, design, top, labels):
         raise ValueError("UT boundary ports differ from the fixed design binding")
     # FIRRTL emits each external instance in named-port form; reject helpers/new instances.
     instances = list(re.finditer(r"\b(\w+)\s+(\w+)\s*\(([^;]*?)\)\s*;", code, re.S))
-    instances = [m for m in instances if m[1] not in {"module", "assert"}]
+    instances = [m for m in instances if m[1] not in {"module", "assert", "cover"}]
     if len(instances) != 1 or instances[0][1] != design.top:
         raise ValueError("UT must instantiate exactly one original DUT")
     pins = {}
@@ -110,10 +110,10 @@ def validate(text, design, top, labels):
             if net in inputs or net in driven_outputs or not re.fullmatch(r"\w+", net) or resolve(p.name) != net:
                 raise ValueError(f"DUT output {p.name} is not faithfully connected")
             driven_outputs.add(net)
-    actual_labels = re.findall(r"\b(\w+)\s*:\s*assert\s+property\b", code)
+    actual_labels = re.findall(r"\b(\w+)\s*:\s*cover\s+property\b", code)
     if len(actual_labels) != len(labels) or set(actual_labels) != set(labels):
         raise ValueError("compiled Gen labels differ from the response")
-    if len(re.findall(r"\bassert\b", code)) != len(labels) or re.search(r"\bcover\b", code):
+    if len(re.findall(r"\bcover\b", code)) != len(labels) or re.search(r"\bassert\b", code):
         raise ValueError("extra verification properties are not allowed")
     return {"policy": "faithful-single-dut-v1", "passed": True, "ports": len(expected),
             "dut_instances": 1, "assumptions": 0, "goals": len(labels)}

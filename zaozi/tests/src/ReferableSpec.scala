@@ -142,7 +142,7 @@ object ReferableSpec extends TestSuite:
           val io = summon[Interface[ReferableSpecIO]]
           compileError("""val c = 0.U(8); c := 0.U(8)""").check(
             "",
-            "Type parameter T must be a subtype of DynamicSubfield"
+            "Cannot resolve member ':=' on hardware type me.jiuyang.zaozi.valuetpe.UInt. Assignment requires a writable hardware reference"
           )
       ConstCannotBeAssigned.compileErrorTest(ReferableSpecParameter(8))
 
@@ -155,6 +155,6 @@ object ReferableSpec extends TestSuite:
           val io = summon[Interface[ReferableSpecIO]]
           compileError("""val n = io.passthrough.i + io.passthrough.i; n := io.passthrough.i""").check(
             "",
-            "Type parameter T must be a subtype of DynamicSubfield"
+            "Cannot resolve member ':=' on hardware type me.jiuyang.zaozi.valuetpe.UInt. Assignment requires a writable hardware reference"
           )
       NodeCannotBeAssigned.compileErrorTest(ReferableSpecParameter(8))

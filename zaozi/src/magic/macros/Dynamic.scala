@@ -74,16 +74,27 @@ private def resolveFieldShape[T: Type](
 ): FieldShape =
   import quotes.reflect.*
 
-  val shapeType           = TypeRepr.of[T]
+  val shapeType          = TypeRepr.of[T]
   val dynamicSubfieldType = TypeRepr.of[me.jiuyang.zaozi.magic.DynamicSubfield]
+  val fieldNameStr        = fieldName.valueOrAbort
 
   // Ensure the shape supports typed dynamic subfield navigation.
   if (!(shapeType <:< dynamicSubfieldType)) {
-    report.errorAndAbort(s"Type parameter T must be a subtype of DynamicSubfield, but got ${shapeType.show}.")
+    val hint =
+      if (shapeType =:= TypeRepr.of[me.jiuyang.zaozi.valuetpe.Bool])
+        fieldNameStr match
+          case "asUInt" => "Bool is already a hardware predicate; use it directly or use .S for a sequence."
+          case "&&"     => "Use & for hardware Bool conjunction; parenthesize comparisons."
+          case "||"     => "Use | for hardware Bool disjunction; parenthesize comparisons."
+          case _        => "Check the member name, API imports and required contextual parameters."
+      else if (fieldNameStr == ":=")
+        "Assignment requires a writable hardware reference, API imports and contextual parameters; constants and expression results are not writable."
+      else
+        "Check the member name, API imports and required contextual parameters."
+    report.errorAndAbort(s"Cannot resolve member '$fieldNameStr' on hardware type ${shapeType.show}. $hint", fieldName)
   }
 
   // Check if the field exists in the shape type
-  val fieldNameStr   = fieldName.valueOrAbort
   val fieldSymbolOpt = shapeType.classSymbol.flatMap(_.declaredFields.find(_.name == fieldNameStr))
   val fieldSymbol    = fieldSymbolOpt.getOrElse {
     report.errorAndAbort(s"Field '$fieldNameStr' does not exist in type ${shapeType.show}.")
@@ -115,9 +126,10 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
 ): Expr[Any] =
   import quotes.reflect.*
 
+  val shape                                            = resolveFieldShape[T](fieldName)
   val (arena, typeImpl, context, block, file, line, _, _) = summonContextualParameters
 
-  resolveFieldShape[T](fieldName) match
+  shape match
     case FieldShape.Aligned(elem)  =>
       elem.asInstanceOf[Type[?]] match
         case '[tpe] =>

@@ -5,8 +5,8 @@ package me.jiuyang.utlib
 import me.jiuyang.zaozi.*
 
 /** A UT lowered for a SystemVerilog formal engine: firtool's single-file SV of the linked design (zaozi's
-  * `assert property (not (…))` and `assume property` emitted as-is), the external RTL the wrapper's extern binds to,
-  * and the top's clock and reset port names. Generation assertions must be named explicitly; ordinary assertions
+  * native `cover property` emitted as-is), the external RTL the wrapper's extern binds to,
+  * and the top's clock and reset port names. Generation covers must be named explicitly; ordinary assertions
   * and external RTL covers are never interpreted as generation requests.
   */
 final case class JgModel(
@@ -14,19 +14,27 @@ final case class JgModel(
   top:     String,
   rtl:     Seq[os.Path],
   generationLabels: Set[String],
-  include: Option[os.Path] = None,
+  includeDirs: Seq[os.Path] = Seq.empty,
   clock:   String = "clock",
-  reset:   String = "reset"):
+  reset:   String = "reset",
+  resetSequence: Option[String] = None,
+  initialState: Option[String] = None,
+  clocks: Seq[(String, Int)] = Seq.empty,
+  environmentAssumptions: Seq[String] = Seq.empty):
   require(generationLabels.nonEmpty, "generation labels must not be empty")
   require(generationLabels.forall(_.matches("[A-Za-z_][A-Za-z0-9_]*")), "invalid generation label")
+  require(clocks.map(_._1).distinct.size == clocks.size &&
+    clocks.forall((name, factor) => name.matches("[A-Za-z_][A-Za-z0-9_]*") && factor > 0 && factor <= 10000),
+    "invalid clock schedule")
+  require(environmentAssumptions.forall(s => s.nonEmpty && !s.exists(c => "{}\n\r;$\\".contains(c))),
+    "invalid trusted environment expression")
+  def traceClock: String = if clocks.nonEmpty then ":jasper_formal_clock" else clock
+  def traceContract: String = if clocks.nonEmpty then "jg-multiclock-event-v1" else JasperGold.witnessContract
 
 /** The second formal backend: JasperGold, for the depth circt-bmc does not reach.
   *
-  * The same generation reading as [[FormalUT]] — the UT asserts `¬C`, a counterexample is a witness where `C`
-  * holds — but on the SystemVerilog firtool emits rather than on pruned HW IR: no register pinning, no layer
-  * stripping, no import surgery, and the property language is whatever SVA the engine accepts (bounded and
-  * unbounded delays, repetition, `throughout`, `until`). A `proven` verdict is unbounded, so `Infeasible` here means
-  * "no trace at any depth", not "none within the bound".
+  * Gen emits native covers; this backend selects and solves them without changing their expression or clock.
+  * An unreachable cover means no trace at any depth, unlike a bounded search.
   *
   * The engine runs through `ZAOZI_EDA_SHELL` when set (a wrapper invoked as `<shell> -c "<command>"` that provides the
   * license environment — see `experiments/eda-shell`), else `jg` from `PATH`. The counterexample is dumped
@@ -59,18 +67,18 @@ object JasperGold:
     outDir:    os.Path,
     rtl:       Seq[os.Path],
     generationLabels: Set[String],
-    include:   Option[os.Path] = None
+    includeDirs: Seq[os.Path] = Seq.empty
   ): JgModel =
     os.makeDir.all(outDir)
     val top       = dut.moduleName(parameter)
     val moduleDir = outDir / s"jg_mlir_${parameter.hashCode.toHexString}"
     val linked    = Lower.elaborateAndLink(dut, parameter, moduleDir, top)
     val sv        = outDir / s"$top.sv"
-    // Keep generation assertions even when their condition folds to true (an impossible goal).
-    // Dropping such an assertion loses the distinction between unreachable and a missing property.
+    // Keep generation covers even when their condition folds to false (an impossible goal).
+    // Dropping such a cover loses the distinction between unreachable and a missing property.
     // The external DUT RTL is unchanged, and JasperGold still optimizes the elaborated model.
     os.proc(CirctTools("firtool"), "--disable-opt", "--disable-all-randomization", linked.toString, "-o", sv.toString).call(check = true)
-    JgModel(sv, top, rtl, generationLabels, include)
+    JgModel(sv, top, rtl, generationLabels, includeDirs)
 
   /** Experiment policy: model code may describe goals, never invent environment restrictions.
     * Inspect emitted SV as well as source checks, so aliases/helpers cannot hide an assumption.
@@ -80,19 +88,19 @@ object JasperGold:
     val code = os.read(model.sv).replaceAll("(?s)/\\*.*?\\*/|//[^\\n]*", " ")
     require(!raw"\b(assume|restrict)\b".r.findFirstIn(code).isDefined,
       "model-authored assumptions/restrictions are forbidden; express scenario conditions inside Gen")
-    val assertions = generationAssertions.findAllMatchIn(code).map(_.group(1)).toSeq
+    val assertions = generationCovers.findAllMatchIn(code).map(_.group(1)).toSeq
     require(assertions.distinct.size == assertions.size && assertions.toSet == model.generationLabels,
-      "UT assertions must match generationLabels exactly; declare every Gen and no extra assertions")
-    require(!raw"\bcover\s+property\b".r.findFirstIn(code).isDefined, "use named Gen goals, not extra covers")
+      "UT covers must match generationLabels exactly; declare every Gen and no extra covers")
+    require(!raw"\bassert\s+property\b".r.findFirstIn(code).isDefined, "use named Gen goals, not extra assertions")
 
-  /** Select one goal from a single elaborated UT. Other Gen assertions are removed, not conjoined or proved.
+  /** Select one goal from a single elaborated UT. Other Gen covers are removed, not conjoined or proved.
     * Shared design, wiring, state and environment stay unchanged for every goal.
     */
   def selectGoal(model: JgModel, label: String, outDir: os.Path): JgModel =
     require(model.generationLabels.contains(label), s"unknown generation label: $label")
     val text = os.read(model.sv)
-    asCover(text, model.generationLabels) // Validate all labels before selecting any one of them.
-    val selected = generationAssertions.replaceAllIn(text, m =>
+    validateCovers(text, model.generationLabels)
+    val selected = generationCovers.replaceAllIn(text, m =>
       java.util.regex.Matcher.quoteReplacement(
         if model.generationLabels.contains(m.group(1)) && m.group(1) != label then "" else m.matched))
     os.makeDir.all(outDir)
@@ -100,23 +108,30 @@ object JasperGold:
     os.write.over(sv, selected)
     model.copy(sv = sv, generationLabels = Set(label))
 
-  /** Generate a witness for the UT's intent. `timeLimit` is JasperGold's per-run proof limit.
-    *
-    * The generation reading is stated to the engine as what it is — a **cover** of the scenario — rather than as
-    * the `assert ¬C` circt-bmc needs: firtool's `assert property (not (S))` is rewritten to `cover property ((S))`
-    * before analysis. Same semantics, different engines: a cover is a reachability search, and an unreachable
-    * scenario is *proven* so ([[GenerateOutcome.Infeasible]] here is unbounded), whereas the assertion form leaves a
-    * hard-to-refute `not` to the proof engines — on the i2c flow, `undetermined` after 600 s against `unreachable`
-    * in 2 s for the identical scenario.
-    */
+  /** Generate a witness by solving the selected native cover, without property rewriting. */
   def generate(model: JgModel, workDir: os.Path, timeLimit: String = "600s"): GenerateOutcome =
     require(model.generationLabels.size == 1, "selectGoal must select one goal before witness generation")
     os.makeDir.all(workDir)
     os.remove.all(workDir / "jgproj") // a project directory left by an interrupted run refuses a new session
     val vcd     = workDir / "witness.vcd"
     val sv      = workDir / model.sv.last
-    os.write.over(sv, asCover(os.read(model.sv), model.generationLabels))
-    val include = model.include.map(p => s"+incdir+$p ").getOrElse("")
+    val source = os.read(model.sv)
+    validateCovers(source, model.generationLabels)
+    os.write.over(sv, source)
+    require(model.initialState.isEmpty || model.resetSequence.isEmpty, "select one explicit initialization policy")
+    val resetCommand = model.initialState.map { state =>
+      val path = workDir / "initial.state"
+      os.write.over(path, state)
+      s"reset ${model.reset} -init_state {$path}"
+    }.orElse(model.resetSequence.map { sequence =>
+      val path = workDir / "reset.seq"
+      os.write.over(path, sequence)
+      s"reset -sequence {$path}"
+    }).getOrElse(s"reset ${model.reset}")
+    val include = model.includeDirs.map { p =>
+      require(!p.toString.exists(c => "{}\n\r\\".contains(c)), "invalid include path")
+      s"{+incdir+$p} "
+    }.mkString
     // Vendored `.v` files are read as Verilog-2001 and everything else as SystemVerilog: legacy RTL uses SV keywords
     // as identifiers (the CAN controller has a port named `do`), which is also why HAVEN's VCS line carries
     // `+verilog2001ext+.v`.
@@ -134,13 +149,18 @@ object JasperGold:
     // JG's default AR dump can encode out-of-cone vector bits as known 0/1 placeholders.
     // Reconstruct the full design before exporting expected outputs; proof search can still use COI reduction.
     val tcl     = workDir / "generate.tcl"
+    val clockCommands = if model.clocks.isEmpty then s"clock ${model.clock}" else
+      (model.clocks.map((name, factor) => s"clock $name -factor $factor") :+
+        s"clock -rate -default ${model.clock}").mkString("\n")
+    val environmentCommands = model.environmentAssumptions.map(s => s"assume -env {$s}").mkString("\n")
     os.write.over(
       tcl,
       s"""|clear -all
           |$analyze
-          |elaborate -top ${model.top}
-          |clock ${model.clock}
-          |reset ${model.reset}
+          |elaborate -disable_auto_bbox -top ${model.top}
+          |$clockCommands
+          |$resetCommand
+          |$environmentCommands
           |set_prove_time_limit $timeLimit
           |prove -all
           |set found ""
@@ -176,31 +196,19 @@ object JasperGold:
     else if os.exists(vcd) && statuses.exists(_._2 == "covered") then
       if !fullTraceExported(run.exitCode, log) then GenerateOutcome.Unknown("jg did not export a full-design trace")
       else
-        val trace = withAliases(parseVcd(vcd, model.clock), svAliases(model.sv, model.top))
+        val trace = withAliases(parseVcd(vcd, model.traceClock), svAliases(model.sv, model.top))
         GenerateOutcome.Generated(withFreeInputs(trace, svInputs(model.sv, model.top)))
     else if statuses.nonEmpty && statuses.forall(_._2 == "unreachable") then GenerateOutcome.Infeasible
     else GenerateOutcome.Unknown(s"cover statuses: ${statuses.map((n, s) => s"$n=$s").mkString(", ")}")
 
-  private val generationAssertions = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)assert property \((.*?)\);".r
+  private val generationCovers = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)cover property \((.*?)\);".r
 
-  /** Turn explicitly selected generation assertions into covers of their negation. */
-  private[utlib] def asCover(sv: String, labels: Set[String]): String =
-    // A runtime UT identifies its generation properties explicitly. Negate the emitted assertion,
-    // not its source spelling: firtool may fold !done to ~done, !(!done) to done, or a constant.
-    // Never reinterpret an unrelated assertion as a generation request.
+  /** Validate native generation covers without rewriting their clock or property expression. */
+  private[utlib] def validateCovers(sv: String, labels: Set[String]): Unit =
     require(labels.nonEmpty, "generation labels must not be empty")
-    val found = collection.mutable.Set.empty[String]
-    val result = generationAssertions.replaceAllIn(
-      sv,
-      m => java.util.regex.Matcher.quoteReplacement(
-        if labels.contains(m.group(1)) then
-          require(found.add(m.group(1)), s"ambiguous generation label: ${m.group(1)}")
-          s"${m.group(1)}:${m.group(2)}cover property (not (${m.group(3)}));"
-        else m.matched
-      )
-    )
-    require(found.toSet == labels, s"generation labels missing from emitted assertions: ${labels -- found}")
-    result
+    val found = generationCovers.findAllMatchIn(sv).map(_.group(1)).filter(labels.contains).toSeq
+    require(found.distinct.size == found.size, "ambiguous generation label")
+    require(found.toSet == labels, s"generation labels missing from emitted covers: ${labels -- found.toSet}")
 
   /** JasperGold may dump a forwarded top-level output under its instance pin's name. firtool's SV states every such
     * forwarding (`assign PORT = net;`, and `.pin(net)` on the instance), so read the top module's wiring once and

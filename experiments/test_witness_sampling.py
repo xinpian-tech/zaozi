@@ -22,8 +22,8 @@ class SamplingTests(unittest.TestCase):
     def test_prompt_describes_four_samples_not_four_gen_calls(self):
         design = load_design(ROOT / "experiments/tests/fixtures/tiny_design.json")
         prompt = build_prompt([], design.sources[0], "1s", design=design, sequences_per_intent=4)
-        self.assertIn("up to 4 distinct sequences per Gen", prompt)
-        self.assertIn("do not duplicate Gen calls", prompt)
+        self.assertIn("up to 4 distinct sequences per intent", prompt)
+        self.assertIn("do not duplicate goals", prompt)
 
     def test_default_budget_is_four_and_invalid_budgets_are_rejected(self):
         parser = argparse.ArgumentParser()
@@ -63,21 +63,22 @@ class SamplingTests(unittest.TestCase):
             self.assertEqual(len(rows[0]["sequences"]), 1)
 
     def test_preserves_selected_goal_and_removes_other_goals(self):
-        sv = "module m;\ng: assert property (not ((a) ##2 (done)));\nh:\n assert property (~start);\nendmodule"
+        sv = "module m;\ng: cover property (@(posedge clock) ((a) ##2 (done)));\nh:\n cover property (@(posedge clock) start);\nendmodule"
         selected = select_cover(sv, ["g", "h"], "g")
-        self.assertIn("g: cover property (not (not ((a) ##2 (done))));", selected)
+        self.assertIn("g: cover property (@(posedge clock) ((a) ##2 (done)));", selected)
         self.assertNotIn("h:", selected)
         self.assertNotIn("assume", selected)
         self.assertNotIn("assert property", selected)
 
     def test_missing_duplicate_or_extra_labels_fail_closed(self):
-        for sv in ("g: assert property (a);", "g: assert property (a);\ng: assert property (b);",
-                   "g: assert property (a);\nh: assert property (b);\nx: assert property (c);"):
+        for sv in ("g: cover property (a);", "g: cover property (a);\ng: cover property (b);",
+                   "g: cover property (a);\nh: cover property (b);\nx: cover property (c);",
+                   "g: assert property (a);\nh: assert property (b);"):
             with self.assertRaises(ValueError):
                 select_cover(sv, ["g", "h"], "g")
 
     def script(self, count=4, seed=11):
-        return render_sampling({"rtl": ["/tmp/d.v"], "include": None, "top": "m"}, "g",
+        return render_sampling({"rtl": ["/tmp/d.v"], "includeDirs": [], "top": "m"}, "g",
             Path("/tmp/m.sv"), Path("/tmp/samples"), [{"name": "a", "width": 8}], 3, count, seed, "2s")
 
     def test_deterministic_soft_preferences_and_nested_prefixes(self):
@@ -94,14 +95,58 @@ class SamplingTests(unittest.TestCase):
         self.assertIn('if {$status != "covered"}', large)
         self.assertIn("dict exists $seen $signature", large)
 
+    def test_multiple_include_roots_are_preserved_and_quoted(self):
+        script=render_sampling({'rtl':['/tmp/design.v'],'includeDirs':['/tmp/first root','/tmp/second'],
+                               'top':'m'},'g',Path('/tmp/m.sv'),Path('/tmp/samples'),
+                               [{'name':'a','width':8}],3,4,11,'2s')
+        self.assertIn('{+incdir+/tmp/first root}',script)
+        self.assertIn('{+incdir+/tmp/second}',script)
+
     def test_one_sample_needs_no_new_preferences(self):
         self.assertNotIn("visualize -force -soft", self.script(1))
+
+    def test_concretization_horizon_is_explicit_and_bounded(self):
+        from witness_sampling import sample_goal
+        for horizon in (0, 2, 13, True):
+            with self.assertRaisesRegex(ValueError, 'horizon'):
+                sample_goal({}, {'cycles':3}, None, {}, Path('/unused'), 4, 1, '1s',
+                            Path('/unused-shell'), horizon=horizon)
+
+    def test_long_trace_preferences_are_bounded_without_shortening_trace(self):
+        from witness_sampling import MAX_SOFT_PREFERENCES
+        script = render_sampling({'rtl': ['/tmp/d.v'], 'includeDirs': [], 'top': 'm'}, 'g',
+            Path('/tmp/m.sv'), Path('/tmp/samples'),
+            [{'name': 'a', 'width': 32}, {'name': 'b', 'width': 16}], 5000, 4, 11, '2s')
+        soft = [line for line in script.splitlines() if line.startswith('visualize -force -soft')]
+        self.assertEqual(len(soft), 6 * MAX_SOFT_PREFERENCES)
+        self.assertIn('visualize -min_length 5000', script)
+        self.assertIn('visualize -max_length 5000', script)
+        self.assertNotIn('assume', script)
 
     def test_reject_tcl_injection(self):
         for word in ("a}\nexit", "a\\b", "a\rb"):
             with self.assertRaises(ValueError):
                 tcl_word(word)
         self.assertEqual(tcl_word("/tmp/space path"), "{/tmp/space path}")
+
+    def test_sampling_uses_prepared_reset_sequence(self):
+        script = render_sampling({"rtl": ["/tmp/d.v"], "includeDirs": [], "top": "m",
+                                  "resetSequence": "reset 1'b1\n2\nreset 1'b0\n$\n"},
+                                 "g", Path("/tmp/model.sv"), Path("/tmp/sample"), [], 6, 4, 1, "30s")
+        self.assertIn("reset -sequence {/tmp/sample/reset.seq}", script)
+        self.assertNotIn("\nreset reset\n", script)
+
+    def test_sampling_uses_same_concrete_initial_state(self):
+        job = {"rtl": ["/tmp/d.v"], "includeDirs": [], "top": "m",
+               "initialState": "dut.mem[0]\n32'h0\n"}
+        script = render_sampling(job, "g", Path("/tmp/model.sv"),
+                                 Path("/tmp/sample"), [], 6, 4, 1, "30s")
+        self.assertIn("elaborate -disable_auto_bbox -top m", script)
+        self.assertIn("reset reset -init_state {/tmp/sample/initial.state}", script)
+        self.assertNotIn("reset -sequence", script)
+        with self.assertRaisesRegex(ValueError, "conflicting"):
+            render_sampling({**job, "resetSequence": "reset 1'b1\n2\n"}, "g",
+                            Path("/tmp/model.sv"), Path("/tmp/sample"), [], 6, 4, 1, "30s")
 
     def test_saved_configuration_keeps_cover_and_only_soft_preferences(self):
         valid = "\n".join(["proc visualize_save {} {", "visualize -new_window", "task -set <embedded>",

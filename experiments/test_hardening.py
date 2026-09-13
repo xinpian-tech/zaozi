@@ -32,7 +32,7 @@ tiny_external dut (.clk(clock), .rst(reset), .payload(payload), .valid(valid),
  .result(result_net), .done(done_net));
 assign result = result_net;
 assign done = done_net;
-target: assert property (~(valid & payload <= 8'h7));
+target: cover property (@(posedge clock) valid & payload <= 8'h7);
 endmodule
 '''
 
@@ -57,7 +57,7 @@ class WiringTest(unittest.TestCase):
             SV.replace("tiny_external dut", "Other dut"),
             SV.replace("wire done_net;", "wire done_net; Other helper (.x(payload));"),
             SV.replace("endmodule", "endmodule\nmodule tiny_external(); endmodule"),
-            SV.replace("target: assert", "target: assume"),
+            SV.replace("target: cover", "target: assume"),
             SV.replace("wire done_net;", "`define altered\nwire done_net;"),
             SV.replace("assign done = done_net;", "assign done = done_net;\nalways @(posedge clock) done_net <= valid;"),
             SV.replace("wire done_net;", "wire done_net = valid;"),
@@ -67,6 +67,31 @@ class WiringTest(unittest.TestCase):
         for text in variants:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 validate(text, self.design, "TestUT", ["target"])
+
+
+class CompilerPathTest(unittest.TestCase):
+    def test_external_sources_keep_semanticdb_and_plugin_inside_work(self):
+        original = ["-Xsemanticdb", "-sourceroot", "/workspace",
+                    "-semanticdb-target", "/workspace/out", "-Xplugin:/tool/plugin.jar",
+                    "-experimental"]
+        config = {"options": list(original)}
+        options = isolation.compiler_options(config, Path('/dev/shm/run/sources'), Path('/dev/shm/run/solve'))
+        self.assertEqual(options, ["-Xsemanticdb", "-Xplugin:/tool/plugin.jar", "-experimental",
+                                  "-sourceroot", "/dev/shm/run/sources",
+                                  "-semanticdb-target", "/dev/shm/run/solve/semanticdb"])
+        self.assertEqual(config['options'], original)
+
+    def test_inline_and_repeated_old_path_options_are_removed(self):
+        config = {'options':['-sourceroot:/old', '-semanticdb-target=/old/out',
+                             '-sourceroot','/another', '-Xsemanticdb']}
+        options = isolation.compiler_options(config, Path('/new/src'), Path('/new/work'))
+        self.assertEqual(options, ['-Xsemanticdb', '-sourceroot', '/new/src',
+                                   '-semanticdb-target', '/new/work/semanticdb'])
+
+    def test_incomplete_inherited_option_fails_closed(self):
+        for options in (['-sourceroot'], ['-semanticdb-target', '-Xsemanticdb']):
+            with self.assertRaisesRegex(ValueError, 'missing value'):
+                isolation.compiler_options({'options':options}, Path('/src'), Path('/work'))
 
 
 @unittest.skipUnless(shutil.which("bwrap") and Path("/nix/store").is_dir(), "Linux bubblewrap/Nix required")
@@ -108,6 +133,16 @@ Path("sandbox-output").write_text("allowed")
 
 
 class AccountingTest(unittest.TestCase):
+    def test_unknown_usage_is_not_reported_as_zero_cost(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(totals(directory)['usage_reported']['total_tokens'],0)
+            Records(directory).append({'id':'manual','phase':'model-request','status':'completed',
+                                       'usage':{'total_tokens':None}})
+            cost=totals(directory)
+            self.assertIsNone(cost['usage_reported']['total_tokens'])
+            self.assertFalse(cost['token_accounting_complete'])
+            self.assertEqual(cost['requests_without_usage'],1)
+
     def test_failed_requests_interrupted_events_and_nested_records_count_once(self):
         with tempfile.TemporaryDirectory() as directory:
             records = Records(directory)
@@ -196,7 +231,7 @@ class GoalFeedbackTest(unittest.TestCase):
 
     def test_stop_is_not_an_empty_ut_or_proof(self):
         data = {"stop": {"reason": "no useful target"}, "proofObligations": []}
-        self.assertEqual(parse_response(json.dumps(data)), data)
+        self.assertEqual(parse_response("STOP"), {"stop": True})
         for bad in ({"stop": {"reason": ""}, "proofObligations": []}, {**data, "ut": {}}):
             with self.assertRaises(ValueError):
                 parse_response(json.dumps(bad))
@@ -225,14 +260,15 @@ class GenerationRecoveryTest(unittest.TestCase):
                 "--out", str(root / "run"), "--attempts", "2"]
 
     def test_resume_reuses_response_after_infrastructure_failure_without_another_request(self):
-        response = (FIXTURES / "tiny_intents.json").read_text()
+        response = (FIXTURES / "tiny_intents.ltl").read_text()
         info = {"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}}
         ok = {"phase": "solve", "ok": True, "result": {"status": "partial", "utCount": 1,
               "goals": [{"label": "good", "status": "generated"}, {"label": "bad", "status": "unknown"}]}}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             args = self.arguments(root)
-            with patch.object(generation, "invoke", return_value=(response, info)) as invoke, \
+            replies = [{**info, "choices": [{"message": {"role": "assistant", "content": response}}]}]
+            with patch.object(generation, "send_completion", side_effect=replies) as invoke, \
                  patch.object(generation, "harness", side_effect=[({"phase": "toolchain", "ok": False, "detail": "transient infrastructure"}, ""), (ok, "")]) as harness, \
                  contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(generation.main(args), 1)
@@ -245,10 +281,31 @@ class GenerationRecoveryTest(unittest.TestCase):
             self.assertEqual(summary["costs"]["requests"], 1)
             self.assertEqual(summary["costs"]["phases"]["generation-session"]["count"], 2)
 
+    def test_empty_generation_never_enters_source_repair_or_compilation(self):
+        replies = [{"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+                    "choices": [{"message": message, "finish_reason": reason}]}
+                   for message, reason in (({"role": "assistant", "content": ""}, "length"),)]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.arguments(root)
+            with patch.object(generation, "send_completion", side_effect=replies) as send, \
+                 patch.object(generation, "harness") as harness, \
+                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main(args), 1)
+                self.assertEqual(generation.main([*args, "--resume"]), 1)
+            self.assertEqual(send.call_count, 1)
+            harness.assert_not_called()
+            self.assertFalse((root / "run/attempt-2").exists())
+            self.assertFalse((root / "run/attempt-1/harness.json").exists())
+            summary = json.loads((root / "run/summary.json").read_text())
+            self.assertEqual(summary["status"], "failed")
+            self.assertEqual(summary["tokens"], 30)
+            self.assertEqual(summary["costs"]["requests"], 1)
+
     def test_stop_never_calls_compiler_and_changed_resume_does_not_overwrite_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            args = [*self.arguments(root), "--response-file", str(FIXTURES / "stop_response.json")]
+            args = [*self.arguments(root), "--response-file", str(FIXTURES / "stop_response.ltl")]
             with patch.object(generation, "invoke", side_effect=AssertionError("no model")), \
                  patch.object(generation, "harness", side_effect=AssertionError("no UT")), \
                  contextlib.redirect_stdout(io.StringIO()):

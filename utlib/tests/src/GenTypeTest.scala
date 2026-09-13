@@ -22,8 +22,8 @@ object GenTypeTest extends TestSuite:
       """)
       assert(accepted)
 
-    test("native history rejects Bits"):
-      val errors = typeCheckErrors("""
+    test("native history preserves scalar types"):
+      val accepted = typeChecks("""
         import me.jiuyang.utlib.Gen
         import me.jiuyang.zaozi.*
         import me.jiuyang.zaozi.default.{*, given}
@@ -35,8 +35,11 @@ object GenTypeTest extends TestSuite:
         def build(signal: Referable[Bits])(using ClockEvent, ClockScope, ResetScope,
           Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
         ): Referable[Bits] = past(signal, 2)
+        def sample[D <: Bool | UInt | SInt | Bits](signal: Referable[D])(using ClockEvent,
+          Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
+        ): Node[D] = past(signal, 1)
       """)
-      assert(errors.nonEmpty)
+      assert(accepted)
 
     test("Expr accepts hardware Bool, Sequence and Property but not Bits"):
       assert(typeChecks("""

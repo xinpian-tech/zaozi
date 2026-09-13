@@ -1,0 +1,171 @@
+{
+  "contract": "axi4lite-transaction-v1",
+  "scope": "Shared transaction and environment contracts; generic BFM stimulus API and validation. Event response conformance is a replay acceptance policy, not full BFM formal equivalence.",
+  "files": {
+    "src/haven/dsl/codegen.py": {
+      "before": "3b0f6bd1cd8d2acfc697aad90ff3ee264b72941811b8ba290683bf804c6575f2",
+      "after": "b58c1c6c3fbd9d7b06ec2469a84e72ba2c84aac74f2531342cc3234de6f42941"
+    },
+    "src/haven/graph/rtl_utils.py": {
+      "before": "c31464b2b878b5445033fb5c40a70c6d7a45957cbf50df3d8bd9f0193c39bfc3",
+      "after": "5ad5935d42f8cb85fee2c903c22abfe430138025a03eeff1a56e7de61e6f4175"
+    },
+    "src/haven/graph/task_graph.py": {
+      "before": "152b0337234467f50feb162e83afd3a5ee8e7311ee6154101c06af68d03869d3",
+      "after": "36c1270853ccbb1242e308794f5dabb4cded74294ab3e376fd85ffce0ea4fdb9"
+    },
+    "src/haven/phases/arch_assist.py": {
+      "before": "312ca9fe917c0f066082083f2c1d3f7ed158a175fc3fd180deec0c9fb77f861a",
+      "after": "d00f29cc157d56b01f2393f241204f71468b176b76c422d56268bb4f3609ba3f"
+    },
+    "src/haven/phases/testbench_generator.py": {
+      "before": "e4f97efff450254e9e87fde8e9b8dc9ef6ef592ebbeeb04f8f2af3838b5220ca",
+      "after": "adfe5e51af32abf82e347fa7173439f3410ae1269529a443581b39c1e63d38d4"
+    },
+    "src/haven/prompts/gen_seq_item.md": {
+      "before": "4f0903f7103ffa45a3cb78c969de734043d0e5d5815f5b3a2cbf0abdfd0197e4",
+      "after": "0fc499b30cb2fb6826a810016b6014585227a8d98df3594f1e90342fa18a7078"
+    },
+    "src/haven/utils/sv_fixups.py": {
+      "before": "3ed64ee9428422524fd43aba79ae72a60ec099812be8700ebea0f1cff046a1a0",
+      "after": "f01a7ee0bf51a138848991d2efd738de13f6dbef0fb3e3fcb7be1dc51838787f"
+    },
+    "src/haven/utils/transaction_contract.py": {
+      "before": null,
+      "after": "6e5ec66d7311e2207d9c6060a663230da3234e70ea3d63a243a20768062f815b"
+    },
+    "tests/test_transaction_contract.py": {
+      "before": null,
+      "after": "337dce67a92a9eb7388977a321573fdb5880a21fe077e74efd9ddfb28c067f15"
+    },
+    "src/haven/main.py": {
+      "before": "d4e49592b4bd21a0c4474c6b4e744eb9b42531532128c6cd5d02876a2611ed90",
+      "after": "ec7c2564cb02af646dae7f2befde8d30c3077e6e5d5d54ba2c24b1da27e540e4"
+    },
+    "src/haven/eda/vcs_utils.py": {
+      "before": "40984f065d19bd13308d12146b4f5f2349bd361809421bd984f714b642051492",
+      "after": "7e08ceeb2120f24983ba5d077d0ac73b3fd40080c8939e0fa35e7fe29dce7f71"
+    },
+    "tests/test_runtime_acceptance.py": {
+      "before": null,
+      "after": "5394bcdb467c66885da0ed2157ee148c0a133e1f605713fb96f46c2cd03a1ec1"
+    },
+    "src/haven/utils/template_engine.py": {
+      "before": "fb4d1685ed066741b0f78b1bc99cc1b8e4afe831aec5555fc820397135fa5f20",
+      "after": "4aeb6a2f6ed094b9f3582c30f83fa096fe42bcceaa1c147a2b04e98c01a13197"
+    },
+    "src/haven/templates/core/top.sv.j2": {
+      "before": "de64d93a556a9bba0605242f0687de026b68b22b7aa77cad3658a0f899c15f26",
+      "after": "5d762b7d290abd4dc5c4ef8b80cfe4a5d4861d2c150b3a358798887b87817f30"
+    },
+    "src/haven/templates/bfm/bfm_i2c_slave.sv.j2": {
+      "before": "4bbaca80e3bafe6781f32d142ad538c91d0e05f9c8e61fdd0f381c0c2e8fd211",
+      "after": "45dd29f3d301e4926c4969042bc43a6f4a9e9929ce65cf565c7df387cd60ef1b"
+    },
+    "src/haven/utils/environment_contract.py": {
+      "before": null,
+      "after": "7ac4e761058b645854c97b13606578ae5f38f99f740b140b7b90eec0f7a01c39"
+    },
+    "src/haven/utils/agent_dispatch.py": {
+      "before": null,
+      "after": "4223523a352a66d6ee545cad48cc69d5ad7da7f0423737ff894bfed3a485e7f4"
+    },
+    "tests/test_environment_contract.py": {
+      "before": null,
+      "after": "9eb2dd005223791d12d367e1b8d67119f83d7318126eea859d98c591714aca6f"
+    },
+    "tests/test_agent_dispatch.py": {
+      "before": null,
+      "after": "71153e03c97189f04417f4966cbbc8f69cd94dd4ed0984331e5a165f85abeb3f"
+    },
+    "src/haven/phases/config_generator.py": {
+      "before": "efa502ab3b08159cd81397fae7037dc92dbf75ff51d5124c75e6d3e637964de2",
+      "after": "63c93def4acf0ed30a87342b29d62c7cdb06ad2ea6e1f84a2663e3b051c970db"
+    },
+    "src/haven/utils/llm_client.py": {
+      "before": "2f68cd9408a2804614bce6f31d3218af6aff74546f9738356b0d238ab874ad81",
+      "after": "7a5e307b1fd6b184de35ac8793b6007d224f6208d99f49eca117d3a22a757b18"
+    },
+    "src/haven/phases/dsl_generator.py": {
+      "before": "95fc2bcc6ec032e81f0bb1e9c9e4b4e33cee7ef228e0bffa1bafc0ae0f3c5e7b",
+      "after": "c41e8cf85285985d85117ed07e397d95a181dfce2aeb2cad1d558c5c8a5b6f79"
+    },
+    "src/haven/utils/json_output.py": {
+      "before": null,
+      "after": "48ff80a2dcc1db1f5793045e4b7e8ab8cb600980c3330814a9773f052f55bcdd"
+    },
+    "tests/test_json_output.py": {
+      "before": null,
+      "after": "486cf08b662cf37f3b2e928e79459ce1b0f83531b005bc27e1ec4ad1abe2312a"
+    },
+    "src/haven/utils/bfm_api.py": {
+      "before": null,
+      "after": "e34685d09265b4acd67f5141d197b379f5534e6350ef6120f58409921d06d694"
+    },
+    "tests/test_bfm_api.py": {
+      "before": null,
+      "after": "71da92667460b09ced04f7e1d7bd1f15d200fe5ebb635853b1a87cdcae195c7c"
+    },
+    "src/haven/templates/bfm/bfm_gpio.sv.j2": {
+      "before": "28bbbb5ced99c165b733dad53a6f3d721e51ab8b63c08da8b347e5808cb90ccc",
+      "after": "78e97173a0566518fa472bb97d0e2a55513fbb8713618c6ee4845d5c6341913e"
+    },
+    "src/haven/templates/bfm/bfm_mii_phy.sv.j2": {
+      "before": "1245f4d9f58567d72a4331758bb858b6f992c7cb0a54c81874a3c17af15066ce",
+      "after": "7ad0275b5f5ba1c8d0103443e9cb394275933d49280546cbdc2209c0a2247c8b"
+    },
+    "src/haven/templates/drivers/driver_wishbone_master.sv.j2": {
+      "before": "e9893e160fc28375312b04912a0ca85bf968e031ff3ebf8cee0a5f9b96b58b29",
+      "after": "1972b4177e4ccf80c42da2f2c6e1ce4b4b6b8d5ce3d25d9112d1fe7328ee954d"
+    },
+    "src/haven/utils/protocol_driver_renderer.py": {
+      "before": "624e2c3d66daafa66bad7599d58ff86bd7c331ffda2459f7cbc6ad996ed830ee",
+      "after": "a86066c0e34cfabf47ccdca71b548f648ec1de8c0872058aee658d678ddec30a"
+    },
+    "src/haven/dsl/schema.py": {
+      "before": "1826dd09b4f059ba8daffb5c0a44c5fdaeb1e7cdb2125466b4508af649332f87",
+      "after": "3b290df7377bd2f158089f2554aa3654a11f6487e769a846273daba7bf47b66d"
+    },
+    "src/haven/templates/monitors/monitor_wishbone.sv.j2": {
+      "before": "1ffd7f66ce73e65ccd876aa558874698bee81b8280319055779d757f4a571f38",
+      "after": "c82b2597339ec0d6fcaf74f2502a779ff608d2f1aaa3b74540609d342c5d161d"
+    },
+    "src/haven/templates/bfm/bfm_wishbone_slave.sv.j2": {
+      "before": "257585aa38af9af923594cab8bd84279c8f2e18ea54a10f7b9f0ed14bd8df7c3",
+      "after": "9162740b828a998c38045c3c499e56e8035db10ceee4e6bc46180f69194066fd"
+    },
+    "src/haven/prompts/gen_sequence_dsl.md": {
+      "before": "75ce69b4cab2a1c459feecbc6c87d0edbdb01e40c216e86a0400bd9d6da52780",
+      "after": "f62866769e169645b824b6e80bc5eeed10c748c1e29aca3b46a09314eca5379f"
+    },
+    "tests/test_dsl_codegen.py": {
+      "before": "065f9279f3d70b10a05ed076579f28eca0a1a54920a15fc1841307bcccc97d81",
+      "after": "08829800e06ef20f26c4d96ec8f65f744c05b81d49a61fe7da6502e4872aefa7"
+    },
+    "src/haven/templates/core/interface.sv.j2": {
+      "before": "d4dbfd2946bc5b3b4f58ab23291081cc8ee5be7499861da1b911218c47e7c67e",
+      "after": "adb99f6dc784ad5433f4f4c4e6b7cf3ec901de9611cb3ce30f39712dd102ded7"
+    },
+    "src/haven/templates/bfm/bfm_spi_slave.sv.j2": {
+      "before": "4ad7e27d161b4633c69faaeda3393898ccb687bc0f8b0a1fc122b82954f9f3ea",
+      "after": "23b3f21445dc7bc72029a62ced0e7ff418e24de536bc2c26c6d47789390845d1"
+    },
+    "src/haven/templates/bfm/bfm_sdram_model.sv.j2": {
+      "before": "3acb2b917d7abb41b78f40faa77bf41a7e478a29f00cab71bae551937938d5e0",
+      "after": "507bec5d2a23133f8b4fbb2393745457e350ec0af6469b41df440880c9c97779"
+    },
+    "src/haven/phases/arch_planner.py": {
+      "before": "3f1c5bcc4bccef8fb421cc1af19c5e37a399788c16a97a203303b3750ef39afd",
+      "after": "416ce962e75a905ca8e00c76e2cc1018d1f36087dd53b55c113d0726b5eb5847"
+    },
+    "hdl/sdram/haven.json": {
+      "before": "0dccfdb647f8d6d6154eb9c8406440d994acfe1b6751b6a6e4b6f7f81e7f161b",
+      "after": "7defccac0f872b20dbd4237f8a87d330faf573efeaf31052f668d0e989fb5ea4"
+    }
+  },
+  "contracts": [
+    "axi4lite-transaction-v1",
+    "pin-ownership-v1",
+    "broadcast-disjoint-pins-v1"
+  ]
+}

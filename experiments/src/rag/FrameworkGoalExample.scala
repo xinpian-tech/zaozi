@@ -41,14 +41,28 @@ object FrameworkGoalExample:
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
   ): Sequence = before.S.##(gap)(after.S)
 
-  // Native past samples Bool predicates, not Bits values; no automatic history guard.
+  // Endpoints only: these forms do not constrain the intervening cycles.
+  def bounded(before: Referable[Bool], after: Referable[Bool], lo: Int, hi: Int)(using ClockEvent)(using
+    Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
+  ): Sequence = before.S.##(lo, Some(hi))(after.S)
+
+  // Native past preserves Bool/UInt/SInt/Bits types and emits clocked SVA $past; delay > 0.
   def previously(predicate: Referable[Bool], cycles: Int)(using ClockEvent)(using
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
   ): Referable[Bool] = past(predicate, cycles)
 
+  def changed(signal: Referable[Bits], cycles: Int)(using ClockEvent)(using
+    Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
+  ): Referable[Bool] = !(past(signal, cycles) === signal)
+
+  // The past sample is at the witnessed starting event, not before available history.
+  def changedAfter(start: Referable[Bool], signal: Referable[Bits], cycles: Int)(using ClockEvent)(using
+    Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
+  ): Sequence = start.S.##(cycles)((!(past(signal, cycles) === signal)).S)
+
   // A bounded sequence describes an event to witness. Implication can be vacuously true
   // when its antecedent never occurs; it does not by itself request a transaction.
-  // The single model-authored UT calls Gen for each goal, listing all labels in generationLabels.
+  // The model supplies Gen expressions; the framework extracts labels and builds the fixed UT.
   // Its complete source owns imports, architecture and clock/reset context.
   def emit(expression: Gen.Expr, label: String)(using ClockEvent)(using
     Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext

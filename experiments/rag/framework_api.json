@@ -1,149 +1,7 @@
 {
-  "version": 12,
+  "version": 16,
   "scope": "framework-only",
   "documents": [
-    {
-      "id": "framework-data-example",
-      "title": "Few-shot intent response serialization",
-      "source": "experiments/src/rag/FrameworkDataExample.scala",
-      "kind": "example",
-      "whole_source": true,
-      "tags": [
-        "fewshot",
-        "data-example",
-        "response",
-        "envelope",
-        "caller-supplied"
-      ]
-    },
-    {
-      "id": "framework-goal-example",
-      "title": "Few-shot unified generation goal example",
-      "source": "experiments/src/rag/FrameworkGoalExample.scala",
-      "kind": "example",
-      "whole_source": true,
-      "tags": [
-        "fewshot",
-        "goal-example",
-        "Gen",
-        "expression",
-        "Sequence",
-        "Property",
-        "past",
-        "Bool",
-        "predicate",
-        "Bits",
-        "UInt",
-        "BigInt",
-        "constant",
-        "width",
-        "asUInt"
-      ]
-    },
-    {
-      "id": "framework-pipeline-example",
-      "title": "Few-shot solver outcome and UVM export example",
-      "source": "experiments/src/rag/FrameworkPipelineExample.scala",
-      "kind": "example",
-      "whole_source": true,
-      "tags": [
-        "fewshot",
-        "pipeline-example",
-        "exportSequence",
-        "interpret",
-        "GenerateOutcome",
-        "UTGenerator",
-        "JasperGold",
-        "UvmSequence"
-      ]
-    },
-    {
-      "id": "runtime-ut-contract",
-      "title": "Runtime-generated complete UT JSON source contract",
-      "source": "experiments/rag/framework_contract.md",
-      "tags": [
-        "runtime-generated",
-        "UT",
-        "JSON",
-        "ut",
-        "proofObligations",
-        "response",
-        "contract",
-        "source",
-        "module",
-        "generationLabels"
-      ],
-      "content": "The model returns one JSON object with exactly `ut` and `proofObligations`.\nThe `ut` object contains `module`, `generationLabels` and `source`: ONE complete Scala verification UT source.\n`generationLabels` lists all Gen labels exactly once (1..64 unique snake_case labels).\nEach proof obligation contains `label` and `reason`: metadata requiring a separate formal check.\nLabels are unique snake_case identifiers. JSON strings escape quotes and newlines. Multi-UT responses are rejected.\n\nThe experiment manifest defines the imported RTL, ports, clock/reset wiring and sequence item type.\nThe framework generates one shared `VerilogWrapper` binding and a fixed runner, NOT a UT body.\nThe model supplies imports and exactly one @generator object extending Generator with UT, implements architecture,\ninstantiates ImportedDut, faithfully wires every IO and clock/reset, declares clock/reset scopes and calls Gen for each goal.\nSource is compiled verbatim. The single UT is lowered once; each goal is solved separately against that same model.\nOther Gen assertions are removed from a selected goal's solver task, not conjoined or assumed.\nExpression-only responses are rejected; no source fragments are wrapped automatically.\nNo benchmark-specific UT, stdlib module, historical scenario or DUT implementation is available to the active runner.\n\nIf no useful generation target remains, return exactly `stop` and `proofObligations` instead:\n`{\"stop\":{\"reason\":\"explain the lack of a new goal\"},\"proofObligations\":[]}`.\nNo UT is generated in that case. Do not invent filler goals. A stop does not prove coverage closure."
-    },
-    {
-      "id": "utgenerator-abi",
-      "title": "UTGenerator typed ABI",
-      "source": "utlib/src/UTGenerator.scala",
-      "tags": [
-        "UTGenerator",
-        "abi",
-        "spec",
-        "drive",
-        "probe",
-        "typed"
-      ],
-      "content": "/** The ABI contract as a dependent type on this DUT's `(I, P)`: `abi.drive.<port>` and `abi.probe.<point>` are\n    * checked at compile time against the DUT's IO and Probe, and `abi.spec` is the serializable specification derived\n    * from those interfaces. Deterministic in the constructor state, so derived once.\n    */"
-    },
-    {
-      "id": "jaspergold-lower",
-      "title": "JasperGold lower signature",
-      "source": "utlib/src/JasperGold.scala",
-      "tags": [
-        "JasperGold",
-        "lower",
-        "JgModel",
-        "Generator",
-        "parameter",
-        "rtl"
-      ],
-      "content": "def lower[\n    PARAM <: Parameter,\n    L <: LayerInterface[PARAM],\n    I <: HWInterface[PARAM],\n    P <: DVInterface[PARAM, L]\n  ](dut:       Generator[PARAM, L, I, P],\n    parameter: PARAM,\n    outDir:    os.Path,\n    rtl:       Seq[os.Path],\n    generationLabels: Set[String],\n    include:   Option[os.Path] = None\n  ): JgModel ="
-    },
-    {
-      "id": "jaspergold-generate",
-      "title": "JasperGold witness generation signature",
-      "source": "utlib/src/JasperGold.scala",
-      "tags": [
-        "JasperGold",
-        "generate",
-        "GenerateOutcome",
-        "witness",
-        "timeLimit",
-        "workDir"
-      ],
-      "content": "def generate(model: JgModel, workDir: os.Path, timeLimit: String = \"600s\"): GenerateOutcome ="
-    },
-    {
-      "id": "abstract-stimulus-trace",
-      "title": "AbstractStimulus fromTrace interface",
-      "source": "utlib/src/Stimulus.scala",
-      "tags": [
-        "AbstractStimulus",
-        "fromTrace",
-        "TraceBinding",
-        "ABI",
-        "drive",
-        "ports"
-      ],
-      "content": "/** Cross the interface: extract the ABI drive columns from an ABI-named trace. The trace must already be rebound\n    * ([[TraceBinding.rebind]]) — lookup here is exact, and a miss names what the trace does hold.\n    */\n  def fromTrace(trace: Trace, spec: AbiSpec): AbstractStimulus ="
-    },
-    {
-      "id": "uvm-sequence-export",
-      "title": "UvmSequence per-witness export",
-      "source": "utlib/src/UvmSequence.scala",
-      "tags": [
-        "UvmSequence",
-        "write",
-        "stimulus",
-        "path",
-        "export"
-      ],
-      "content": "def write(stimulus: AbstractStimulus, path: os.Path): os.Path ="
-    },
     {
       "id": "generation-goal-types",
       "title": "Unified generation expression types",
@@ -158,36 +16,60 @@
       "content": "type Expr = Referable[Bool] | Sequence | Property"
     },
     {
-      "id": "runner-proof-metadata",
-      "title": "Proof metadata and witness interface boundary",
-      "source": "experiments/rag/framework_contract.md",
+      "id": "ltl-api-2",
+      "title": "2. 序列：连接、延迟与重复",
+      "source": "docs/zaozi-ltl-api.md",
       "tags": [
-        "proofObligations",
-        "metadata",
-        "witness",
-        "coverage",
-        "replay"
+        "LTL",
+        "Sequence",
+        "Property",
+        "past",
+        "delay",
+        "repeat"
       ],
-      "content": "`proofObligations` are pending metadata, not solver results. `Generated` supplies a witness only for the encoded intent.\nAn input-only constraint does not prove a coverage target was reached. Replay establishes coverage gain, and a dedicated\nreachability property is needed to prove dead code. `Unknown` must not be reported as `Infeasible` or coverage closure."
+      "content": "## 2. 序列：连接、延迟与重复\n\n`###` 和 `##` 的连接重载也接受硬件 Bool，不必显式写 `.S`：\n\n```scala\np ### q                        // p.S ### q.S\np.##(q)                        // p.S.##(q.S)，零拍间隔\np.##(gap)(q)                   // p.S.##(gap)(q.S)\np.##(lo, Some(hi))(q)          // p.S.##(lo, Some(hi))(q.S)\np ### q ### !p                // 支持返回的 Sequence 继续与 Bool 连接\n```\n\n左右两侧可混用 Bool 和 Sequence；只在连接操作处按当前 ClockEvent 提升 Bool，\n保留已有 Sequence 的时钟。Bool 参与的重载都需要 ClockEvent，包括零延迟连接。\n这不是全局隐式转换，不改变硬件 `& / | / !`、数值比较或 past 的类型；\nBits、UInt、SInt 和 Property 不能直接作为连接操作数。\n重复和其他 sequence 专用操作仍可显式使用 `.S`。\n\n以下 `s`、`a`、`b` 均为 `Sequence`，返回类型也均为 `Sequence`。除了 `a.##(b)`，本节表内操作都需要时钟。\n\n| zaozi 调用 | SVA 对应写法/含义 |\n| --- | --- |\n| `a.##(b)` | `a ##0 b`：a 的终点与 b 的起点重合 |\n| `a.###(b)` 或 `a ### b` | `a ##1 b`：b 从 a 结束后的下一拍开始 |\n| `a.##(n)(b)` | `a ##n b` |\n| `a.##(lo, Some(hi))(b)` | `a ##[lo:hi] b`，上下界均包含 |\n| `a.##(lo, None)(b)` | `a ##[lo:$] b`，没有有限上界 |\n| `a.##+(b)` | `a.##(1, None)(b)` |\n| `a.##*(b)` | `a.##(0, None)(b)` |\n| `s.*(n)` 或 `s * n` | `s[*n]`：连续重复 n 次 |\n| `s.*(lo, Some(hi))` | `s[*lo:hi]`：连续重复次数范围 |\n| `s.*(lo, None)` | `s[*lo:$]`；`lo=0/1` 分别可输出 `[*]` / `[+]` |\n| `s.*->(lo, hi)` | `s[->lo:hi]`：goto repetition，匹配结束在最后一次命中 |\n| `s.*=(lo, hi)` | `s[=lo:hi]`：nonconsecutive repetition，允许最后一次命中之后的未命中尾段 |\n| `a.within(b)` | 将 a 放在 b 的匹配区间内；当前展开式见下文 |\n\n参数检查：固定延迟/重复要求 `n >= 0`；范围要求 `lo >= 0` 且 `hi >= lo`。这些是 elaboration 时检查的常数。\n\n`*->` 和 `*=` 只有两个 `Int` 参数的重载：固定次数写成 `p.S.*->(n, n)` / `p.S.*=(n, n)`，没有单参数或 `None` 上界版本。虽然 Scala 接收 `Sequence`，对应 SVA 重复形式有操作数限制；这里应使用 `p.S` 这样的单拍布尔原子，不把类型签名视为任意复合序列都能在后端使用的保证。\n\n注意：\n\n- `p.S.##(n)(q.S)` 只指定两个端点，中间拍不隐含任何输入条件。\n- 重复的是整个 `s`，不是只保持最后一拍。`p.S.*(n)` 才表示 p 连续 n 个采样点为真。\n- `.*(0)` 涉及空序列；它不等于 `##0` 的同拍连接。\n- 明确写 `.##(n)(...)`，不要使用易产生 Scala 解析歧义的 `a ##(n)(b)`。\n- `None` 表示语义上的无界，不是 RVProbe 自动设置了某个求解深度。\n\n### throughout 与 within\n\n```scala\np.throughout(s)   // p 是 Bool，s 是 Sequence；返回 Sequence，需要时钟\na.within(b)      // a、b 都是 Sequence；返回 Sequence，需要时钟\n```\n\n`throughout` 要求 p 在 s 的整个匹配区间成立，默认实现为布尔原子的零到无穷次重复与 s 做 `intersect`。\n\n`within` 当前实现的准确展开为：\n\n```scala\ntrue.B.S.##*(a).##*(true.B.S).intersect(b)\n```\n\n两者已有 Verilog 生成测试；空序列、无界和多时钟的组合边界不能仅凭这些测试视为完成端到端验证。"
     },
     {
-      "id": "framework-ut-example",
-      "title": "Few-shot complete verification UT architecture and wrapper wiring",
-      "source": "experiments/src/rag/FrameworkUTExample.scala",
-      "kind": "example",
-      "whole_source": true,
+      "id": "ltl-api-3",
+      "title": "3. 逻辑组合与返回类型",
+      "source": "docs/zaozi-ltl-api.md",
       "tags": [
-        "fewshot",
-        "complete-ut-example",
-        "architecture",
-        "Imported",
-        "wrapper",
-        "wiring",
-        "ClockEvent",
-        "Gen",
-        "multiple",
-        "Gen"
-      ]
+        "LTL",
+        "Sequence",
+        "Property",
+        "past",
+        "delay",
+        "repeat"
+      ],
+      "content": "## 3. 逻辑组合与返回类型\n\n`&`、`|`、`intersect` 三个操作共享以下重载返回类型；它们自身不额外要求时钟。\n\n| 左操作数 ＼ 右操作数 | I | S | P |\n| --- | --- | --- | --- |\n| I | I | S | P |\n| S | S | S | P |\n| P | P | P | P |\n\n例如 `p.I & q.S` 返回 S，`p.S & !q.S` 返回 P。\n\n- `&` 输出 LTL/SVA 的 `and`；序列组合要求共同起点，但两侧可以在不同拍结束。\n- `intersect` 对序列还要求终点一致；不要把它与 `&` 视作时序上的同义词。\n- `|` 输出 `or`。\n- `!x`（方法名 `unary_!`）对 I、S、P 都返回 P（property negation）。\n\n硬件 Bool 层面的 `p & q` / `p | q` / `!p` 则仍是硬件布尔运算。不要用 Scala `&&` / `||`，比较式应先加括号，例如 `(bits === value.B(width)) & p`。"
+    },
+    {
+      "id": "ltl-api-4",
+      "title": "4. 蕴含、followed-by 与时序属性",
+      "source": "docs/zaozi-ltl-api.md",
+      "tags": [
+        "LTL",
+        "Sequence",
+        "Property",
+        "past",
+        "delay",
+        "repeat"
+      ],
+      "content": "## 4. 蕴含、followed-by 与时序属性\n\n下表中 `x`、`y` 表示 I/S/P；所有结果均为 P。\n\n| 调用 | 左操作数限制 | 需要时钟 | 当前语义/展开 |\n| --- | --- | --- | --- |\n| `a.\\|->(y)` | I 或 S | 否 | 重叠蕴含：后件从前件匹配结束处开始 |\n| `a.\\|=>(y)` | 仅 S | 是 | 非重叠蕴含：`a.##(1)(true.B.S).\\|->(y)` |\n| `a.#-#(y)` | I 或 S | 否 | 重叠 followed-by：`!(a.\\|->(!y))` |\n| `a.#=#(y)` | 仅 S | 是 | 非重叠 followed-by：`!(a.\\|=>(!y))` |\n| `x.implies(y)` | I/S/P | 否 | 逻辑蕴含，展开为 `(!x) \\| y` |\n| `x.iff(y)` | I/S/P | 否 | 展开为 `(!(x \\| y)) \\| (x & y)` |\n| `x.until(y)` | I/S/P | 是 | 输出 `x until y` |\n| `x.untilWith(y)` | I/S/P | 是 | 输出 `x until (x and y)`，结束拍也要求 x |\n| `always(x)` | 参数 I/S/P | 是 | 输出 `x until false` |\n| `eventually(x)` | 参数 I/S/P | 是 | 输出 `s_eventually x` |\n\n表中的 `\\|` 只是 Markdown 表格转义，实际 Scala 操作符是 `|`。可直接使用中缀形式，例如：\n\n```scala\nval overlapped = p.S |-> q.S\nval nextCycle = p.S |=> q.S\nval logical = p.I implies q.I\n```\n\n不要混淆 `implies` 与 `|->`：后者使用序列匹配终点；前者是逻辑组合展开。`Property` 没有 `|->`、`|=>`、`#-#`、`#=#` 扩展；`Immediate` 没有 `|=>`、`#=#`。\n\n`until` 使用弱直到，不要求右侧最终发生；`untilWith` 额外要求终止拍的左侧条件。`eventually` 则输出强最终发生 `s_eventually`。`always` 和无界 eventually 不等于一个默认有限长度的重复序列。\n\n蕴含有空真问题：前件不发生也可能满足属性。若验证意图是“实际产生 p，再产生 q”，应直接描述 `p.S.##(n)(q.S)`，而不是靠 `p.S |=> q.S` 强制 p 发生。`#-#` / `#=#` 是上述否定蕴含展开，不是蕴含的别名。"
+    },
+    {
+      "id": "ltl-api-5",
+      "title": "5. past：历史值，不是新的 Gen 分类",
+      "source": "docs/zaozi-ltl-api.md",
+      "tags": [
+        "LTL",
+        "Sequence",
+        "Property",
+        "past",
+        "delay",
+        "repeat"
+      ],
+      "content": "## 5. past：历史值，不是新的 Gen 分类\n\n```scala\ndef past[D <: Bool | UInt | SInt | Bits](\n  value: Referable[D],\n  delay: Int = 1\n)(using ClockEvent)(using\n  java.lang.foreign.Arena,\n  org.llvm.mlir.scalalib.capi.ir.Context,\n  org.llvm.mlir.scalalib.capi.ir.Block,\n  sourcecode.File,\n  sourcecode.Line,\n  sourcecode.Name.Machine,\n  InstanceContext\n): Node[D]\n```\n\n`past(value, n)` 返回当前采样事件之前 n 次采样的值，保留 Bool/UInt/SInt/Bits 类型及位宽。`n` 必须大于 0；不接受 Clock、Bundle、Sequence 或 Property。\n\n默认实现明确输出采样时钟，例如：\n\n```systemverilog\n$past(bits, 2, , @(posedge clock))\n```\n\n`past` 是采样值表达式，不是自动插入 n 级可复位寄存器。它没有 reset 参数、初值参数、采样 gate 参数，也没有自动历史有效性保护。\n\n```scala\nval changed = !(past(bits, gap) === bits) // gap > 0，结果是硬件 Bool\nval observedChange = p.S.##(gap)(changed.S)\n```\n\n第二式先匹配 p，再等待 gap 拍比较当前值与 p 所在拍的值，使该比较拥有所需的采样历史。它不要求中间值稳定，也不保证历史区间没有复位。如果意图有这些要求，应在表达式中明确写出；不能偷偷添加全局 Assume。\n\n单独写 `changed` 则没有建立有效历史起点。刚开始采样、复位前后以及嵌套 past 的有效历史长度必须另行分析，不能假定未知历史就是零。\n\n当前 SVAApi 没有独立的 `rose`、`fell`、`stable`、`changed` 方法。对于 Bool，在历史有效的前提下可写 `p & !past(p)` / `!p & past(p)` 表达相邻采样的上升/下降关系；这不是对所有四态 SVA 系统函数语义的完整替代声明。"
     }
   ]
 }

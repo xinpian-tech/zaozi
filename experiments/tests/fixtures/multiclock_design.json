@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "top": "clock_probe",
+  "sources": ["multiclock_probe.sv"],
+  "ports": [
+    {"name":"clock","direction":"input","width":1,"kind":"clock"},
+    {"name":"reset","direction":"input","width":1,"kind":"bool"},
+    {"name":"c2","direction":"input","width":1,"kind":"clock"},
+    {"name":"x","direction":"input","width":1},
+    {"name":"a","direction":"output","width":8},
+    {"name":"b","direction":"output","width":8}
+  ],
+  "clock":"clock",
+  "reset":{"port":"reset","active_low":false},
+  "sequence":{"name":"clock_seq","item_type":"clock_probe_seq_item"},
+  "context":"Synthetic two-clock transport regression, not a benchmark experiment."
+}

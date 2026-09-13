@@ -20,6 +20,7 @@ def compare_runs(paths):
             "requests_without_usage": costs["requests_without_usage"],
             "token_accounting_complete": costs["token_accounting_complete"],
             "reported_models": costs.get("reported_models", []), "phases": costs["phases"],
+            "usage_breakdown": costs.get("usage_breakdown", {}),
             "coverage": record.get("coverage"), "closed_lines": record.get("closed_lines"),
             "cells": record.get("cells"), "paired": record.get("paired"), "arms": record.get("arms"),
             "comparison_basis": fingerprint({key: record.get(key) for key in (
@@ -29,7 +30,8 @@ def compare_runs(paths):
                 "session_phase", "attempts", "jobs", "replay_contract", "offline", "saved_responses",
                 "saved_response_sha256", "response", "sampling", "sequences_per_intent",
                 "contract", "bundle", "haven_sha256", "eda_sha256", "eda_shell_sha256", "seed", "rounds", "min_gain", "target",
-                "scope", "metrics", "baseline_policy", "repair_policy", "bo_policy", "formal_exclusion_policy")})})
+                "scope", "metrics", "baseline_policy", "sequence_state_policy", "framework_context_policy", "skill_protocol",
+                "repair_policy", "runtime_repairs", "common_context_policy", "bo_policy", "formal_exclusion_policy")})})
     return {"runs": rows, "same_comparison_basis": len({row["comparison_basis"] for row in rows}) <= 1,
             "note": "Different basis means different RTL/task/framework/budgets; do not attribute the difference solely to RAG. "
                     "total_tokens sums reported usage only; unknown requests can still incur cost. "

@@ -123,9 +123,37 @@ object BundleSpec extends TestSuite:
           val io = summon[Interface[BundleSpecIO]]
           compileError("""io.a.a""").check(
             "",
-            "Type parameter T must be a subtype of DynamicSubfield, but got me.jiuyang.zaozi.valuetpe.UInt."
+            "Cannot resolve member 'a' on hardware type me.jiuyang.zaozi.valuetpe.UInt."
           )
       SubaccessOnNonBundleType.compileErrorTest(BundleSpecParameter(32))
+
+    test("Bool diagnostics identify the failing member"):
+      @generator
+      object BoolMemberDiagnostics
+          extends Generator[BundleSpecParameter, BundleSpecLayers, BundleSpecIO, BundleSpecProbe]
+          with HasCompileErrorTest:
+        def architecture(parameter: BundleSpecParameter) =
+          val io = summon[Interface[BundleSpecIO]]
+          val p  = io.b === io.b
+          compileError("""p.asUInt""").check(
+            "",
+            "Cannot resolve member 'asUInt' on hardware type me.jiuyang.zaozi.valuetpe.Bool. " +
+              "Bool is already a hardware predicate"
+          )
+          compileError("""p && p""").check(
+            "",
+            "Cannot resolve member '&&' on hardware type me.jiuyang.zaozi.valuetpe.Bool. Use &"
+          )
+          compileError("""p || p""").check(
+            "",
+            "Cannot resolve member '||' on hardware type me.jiuyang.zaozi.valuetpe.Bool. Use |"
+          )
+          compileError("""p.unknownMember""").check(
+            "",
+            "Cannot resolve member 'unknownMember' on hardware type me.jiuyang.zaozi.valuetpe.Bool. " +
+              "Check the member name"
+          )
+      BoolMemberDiagnostics.compileErrorTest(BundleSpecParameter(32))
 
     test("Symbol not found"):
       @generator

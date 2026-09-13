@@ -71,7 +71,7 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator z3 ] ++ lib.optionals stdenv.isLinux [
+          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator z3 yosys python3 uv ] ++ lib.optionals stdenv.isLinux [
             bubblewrap
             scala3BspSemanticLs
           ];
@@ -87,6 +87,10 @@
             SCALA_CLI_INSTALL_PATH = scala-cli;
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
             Z3_LIB = "${z3.lib}/lib/libz3.so";
+            # Binary Python wheels in HAVEN's own venv need these on NixOS.
+            # Scope them to haven-python, not the EDA tool environment.
+            RVPROBE_PYTHON_LIBRARY_PATH = lib.optionalString stdenv.isLinux
+              (lib.makeLibraryPath [ stdenv.cc.cc.lib zlib ]);
           };
           # -Djextract.decls.per.header=65535 is scoped to the jextract
           # subprocess via PanamaModule.jextractEnv in build.mill, so it no

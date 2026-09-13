@@ -21,20 +21,11 @@ from pathlib import Path
 
 TOKEN = re.compile(r"0x[0-9a-f]+|[a-z_][a-z0-9_]*|\d+", re.IGNORECASE)
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FRAMEWORK_EXAMPLE_SOURCES = frozenset({
-    "experiments/src/rag/FrameworkDataExample.scala",
-    "experiments/src/rag/FrameworkGoalExample.scala",
-    "experiments/src/rag/FrameworkPipelineExample.scala",
-    "experiments/src/rag/FrameworkUTExample.scala",
-})
+FRAMEWORK_EXAMPLE_SOURCES = frozenset()
 FRAMEWORK_SOURCES = frozenset({
-    "experiments/rag/framework_contract.md",
-    "utlib/src/UTGenerator.scala",
-    "utlib/src/JasperGold.scala",
-    "utlib/src/Stimulus.scala",
-    "utlib/src/UvmSequence.scala",
+    "docs/zaozi-ltl-api.md",
     "utlib/src/Gen.scala",
-}) | FRAMEWORK_EXAMPLE_SOURCES
+})
 STOP_WORDS = {
     "a",
     "an",

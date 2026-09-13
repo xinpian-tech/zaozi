@@ -1,0 +1,824 @@
+{
+  "updated_utc": "2026-09-10T05:21:58.914+00:00",
+  "scope": "specified-date attempts only; earlier setup/run costs are not included",
+  "successful_pairs": 1,
+  "terminal_pairs": 4,
+  "selected": [
+    {
+      "design": 6,
+      "run": "out/experiments/design6-uart-complete-pair-20260910-v1",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 96.42857142857143,
+        "cond": 84.61538461538461,
+        "toggle": 88.04878048780488,
+        "branch": 94.64285714285714
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 20,
+          "percent": {
+            "line": 97.61904761904762,
+            "cond": 88.46153846153847,
+            "toggle": 94.39024390243902,
+            "branch": 96.42857142857143
+          },
+          "score": 94.22485035289914,
+          "tokens": 153206,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 353.37296309135854,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design6-uart-complete-pair-20260910-v1/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": {
+            "line": 96.42857142857143,
+            "cond": 84.61538461538461,
+            "toggle": 88.04878048780488,
+            "branch": 94.64285714285714
+          },
+          "score": 90.93389841865451,
+          "tokens": 257987,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1592.5595337217674,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_FATAL uart_top_wb_agent__driver.sv(145) @ 325000: uvm_test_top.m_env.m_wb_agent.m_driver [WITNESS] wb_dat_o event mismatch; UVM_FATAL :    1; missing completion marker",
+          "source": "out/experiments/design6-uart-complete-pair-20260910-v1/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 2048.341,
+      "error": null
+    },
+    {
+      "design": 7,
+      "run": "out/experiments/design7-can-complete-pair-20260910-v2",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 100.0,
+        "cond": 91.66666666666667,
+        "toggle": 90.35326086956522,
+        "branch": 100.0
+      },
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "accepted_rounds": 1,
+          "sequence_count": null,
+          "percent": {
+            "line": 100.0,
+            "cond": 91.66666666666667,
+            "toggle": 93.88586956521739,
+            "branch": 100.0
+          },
+          "score": 96.38813405797102,
+          "tokens": 519072,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 675.0100104119629,
+          "stop_reason": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/coverage_flow.py', 'request', '--directory', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design7-can-complete-pair-20260910-v2/paired/haven/round-2-repair-1/attempt-1', '--options', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design7-can-complete-pair-20260910-v2/paired/haven/round-2-repair-1/request-options.json', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "source": "out/experiments/design7-can-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": {
+            "line": 100.0,
+            "cond": 91.66666666666667,
+            "toggle": 90.35326086956522,
+            "branch": 100.0
+          },
+          "score": 95.50498188405797,
+          "tokens": 327668,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1145.2073310473934,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_FATAL can_top_wb_agent__driver.sv(133) @ 315000: uvm_test_top.m_env.m_wb_agent.m_driver [WITNESS] wb_dat_o event mismatch; UVM_FATAL :    1; missing completion marker",
+          "source": "out/experiments/design7-can-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 1894.075,
+      "error": null
+    },
+    {
+      "design": 8,
+      "run": "out/experiments/design8-ethmac-complete-pair-20260910-v2",
+      "status": "failed",
+      "terminal_pair": false,
+      "successful_pair": false,
+      "baseline": null,
+      "arms": {
+        "haven": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design8-ethmac-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design8-ethmac-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 102.515,
+      "error": "shared simulation failed or timed out: UVM_ERROR sequence_1.sv(278) @ 5029115000: uvm_test_top.m_env.m_wb_master_agent.m_sequencer@@seq_1 [wait_rx_done] Poll timeout; UVM_ERROR :    1"
+    },
+    {
+      "design": 9,
+      "run": "out/experiments/design9-i2c-complete-pair-20260910-v2",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 81.81818181818181,
+        "cond": 94.44444444444444,
+        "toggle": 93.92523364485982,
+        "branch": 79.3103448275862
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 22,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 94.44444444444444,
+            "toggle": 93.92523364485982,
+            "branch": 82.75862068965517
+          },
+          "score": 88.69116560383077,
+          "tokens": 123398,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 298.13656219560653,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design9-i2c-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 1,
+          "sequence_count": null,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 100.0,
+            "toggle": 95.32710280373831,
+            "branch": 82.75862068965517
+          },
+          "score": 90.43052178243929,
+          "tokens": 275805,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1001.8294908134267,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_FATAL i2c_master_top_wb_agent__driver.sv(120) @ 305000: uvm_test_top.m_env.m_wb_agent.m_driver [ENVIRONMENT_WITNESS] sda_pad_i live response differs from symbolic response; UVM_FATAL :    1; missing completion marker",
+          "source": "out/experiments/design9-i2c-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 1386.452,
+      "error": null
+    },
+    {
+      "design": 10,
+      "run": "out/experiments/design10-gpio-complete-pair-20260910-v2",
+      "status": "completed",
+      "terminal_pair": true,
+      "successful_pair": true,
+      "baseline": {
+        "line": 100.0,
+        "cond": 60.89385474860335,
+        "toggle": 69.63677639046539,
+        "branch": 74.07407407407408
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 16,
+          "percent": {
+            "line": 100.0,
+            "cond": 69.83240223463687,
+            "toggle": 70.43132803632236,
+            "branch": 74.07407407407408
+          },
+          "score": 78.58445108625833,
+          "tokens": 109950,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 209.68869146332145,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design10-gpio-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "accepted_rounds": 3,
+          "sequence_count": 161,
+          "percent": {
+            "line": 100.0,
+            "cond": 100.0,
+            "toggle": 91.99772985244041,
+            "branch": 100.0
+          },
+          "score": 97.99943246311011,
+          "tokens": 183144,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1845.8868595007807,
+          "stop_reason": "round_budget",
+          "error": null,
+          "source": "out/experiments/design10-gpio-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 2120.05,
+      "error": null
+    }
+  ],
+  "all_attempts": [
+    {
+      "design": 6,
+      "run": "out/experiments/design6-uart-complete-pair-20260910-v1",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 96.42857142857143,
+        "cond": 84.61538461538461,
+        "toggle": 88.04878048780488,
+        "branch": 94.64285714285714
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 20,
+          "percent": {
+            "line": 97.61904761904762,
+            "cond": 88.46153846153847,
+            "toggle": 94.39024390243902,
+            "branch": 96.42857142857143
+          },
+          "score": 94.22485035289914,
+          "tokens": 153206,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 353.37296309135854,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design6-uart-complete-pair-20260910-v1/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": {
+            "line": 96.42857142857143,
+            "cond": 84.61538461538461,
+            "toggle": 88.04878048780488,
+            "branch": 94.64285714285714
+          },
+          "score": 90.93389841865451,
+          "tokens": 257987,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1592.5595337217674,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_FATAL uart_top_wb_agent__driver.sv(145) @ 325000: uvm_test_top.m_env.m_wb_agent.m_driver [WITNESS] wb_dat_o event mismatch; UVM_FATAL :    1; missing completion marker",
+          "source": "out/experiments/design6-uart-complete-pair-20260910-v1/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 2048.341,
+      "error": null
+    },
+    {
+      "design": 7,
+      "run": "out/experiments/design7-can-complete-pair-20260910-v1",
+      "status": "failed",
+      "terminal_pair": false,
+      "successful_pair": false,
+      "baseline": null,
+      "arms": {
+        "haven": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design7-can-complete-pair-20260910-v1/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design7-can-complete-pair-20260910-v1/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 24.186,
+      "error": "shared simulation failed or timed out: UVM_ERROR sequence_1.sv(260) @ 92515000: uvm_test_top.m_env.m_wb_agent.m_sequencer@@seq_1 [wait_rbs] Poll timeout; UVM_ERROR :    1"
+    },
+    {
+      "design": 7,
+      "run": "out/experiments/design7-can-complete-pair-20260910-v2",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 100.0,
+        "cond": 91.66666666666667,
+        "toggle": 90.35326086956522,
+        "branch": 100.0
+      },
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "accepted_rounds": 1,
+          "sequence_count": null,
+          "percent": {
+            "line": 100.0,
+            "cond": 91.66666666666667,
+            "toggle": 93.88586956521739,
+            "branch": 100.0
+          },
+          "score": 96.38813405797102,
+          "tokens": 519072,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 675.0100104119629,
+          "stop_reason": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/coverage_flow.py', 'request', '--directory', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design7-can-complete-pair-20260910-v2/paired/haven/round-2-repair-1/attempt-1', '--options', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design7-can-complete-pair-20260910-v2/paired/haven/round-2-repair-1/request-options.json', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "source": "out/experiments/design7-can-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": {
+            "line": 100.0,
+            "cond": 91.66666666666667,
+            "toggle": 90.35326086956522,
+            "branch": 100.0
+          },
+          "score": 95.50498188405797,
+          "tokens": 327668,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1145.2073310473934,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_FATAL can_top_wb_agent__driver.sv(133) @ 315000: uvm_test_top.m_env.m_wb_agent.m_driver [WITNESS] wb_dat_o event mismatch; UVM_FATAL :    1; missing completion marker",
+          "source": "out/experiments/design7-can-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 1894.075,
+      "error": null
+    },
+    {
+      "design": 8,
+      "run": "out/experiments/design8-ethmac-complete-pair-20260910-v1",
+      "status": "failed",
+      "terminal_pair": false,
+      "successful_pair": false,
+      "baseline": null,
+      "arms": {
+        "haven": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design8-ethmac-complete-pair-20260910-v1/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design8-ethmac-complete-pair-20260910-v1/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 43.638,
+      "error": "shared simulation failed or timed out: UVM_ERROR sequence_1.sv(239) @ 11927465000: uvm_test_top.m_env.m_wb_master_agent.m_sequencer@@seq_1 [wait_tx_done] Poll timeout; UVM_ERROR :    1"
+    },
+    {
+      "design": 8,
+      "run": "out/experiments/design8-ethmac-complete-pair-20260910-v2",
+      "status": "failed",
+      "terminal_pair": false,
+      "successful_pair": false,
+      "baseline": null,
+      "arms": {
+        "haven": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design8-ethmac-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "not_started",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": null,
+          "score": null,
+          "tokens": 0,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": null,
+          "stop_reason": null,
+          "error": null,
+          "source": "out/experiments/design8-ethmac-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 102.515,
+      "error": "shared simulation failed or timed out: UVM_ERROR sequence_1.sv(278) @ 5029115000: uvm_test_top.m_env.m_wb_master_agent.m_sequencer@@seq_1 [wait_rx_done] Poll timeout; UVM_ERROR :    1"
+    },
+    {
+      "design": 9,
+      "run": "out/experiments/design9-i2c-complete-pair-20260910-v1",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 81.81818181818181,
+        "cond": 94.44444444444444,
+        "toggle": 93.92523364485982,
+        "branch": 79.3103448275862
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 22,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 94.44444444444444,
+            "toggle": 93.92523364485982,
+            "branch": 82.75862068965517
+          },
+          "score": 88.69116560383077,
+          "tokens": 115423,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 248.5586416758597,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design9-i2c-complete-pair-20260910-v1/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": {
+            "line": 81.81818181818181,
+            "cond": 94.44444444444444,
+            "toggle": 93.92523364485982,
+            "branch": 79.3103448275862
+          },
+          "score": 87.37455118376806,
+          "tokens": 52438,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 129.6006630891934,
+          "stop_reason": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--design', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design9-i2c-complete-pair-20260910-v1/manifest/design.json', '--replay-config', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design9-i2c-complete-pair-20260910-v1/manifest/replay.json', '--modinfo', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design9-i2c-complete-pair-20260910-v1/paired/baseline/i2c_master_top_urgReport/modinfo.txt', '--feedback-file', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design9-i2c-complete-pair-20260910-v1/paired/rvprobe/round-1-repair-1/feedback.json', '--out', '/root/yjh-workspace/rvprobe-workspace/zaozi/out/experiments/design9-i2c-complete-pair-20260910-v1/paired/rvprobe/round-1-repair-1/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "source": "out/experiments/design9-i2c-complete-pair-20260910-v1/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 483.417,
+      "error": null
+    },
+    {
+      "design": 9,
+      "run": "out/experiments/design9-i2c-complete-pair-20260910-v2",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 81.81818181818181,
+        "cond": 94.44444444444444,
+        "toggle": 93.92523364485982,
+        "branch": 79.3103448275862
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 22,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 94.44444444444444,
+            "toggle": 93.92523364485982,
+            "branch": 82.75862068965517
+          },
+          "score": 88.69116560383077,
+          "tokens": 123398,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 298.13656219560653,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design9-i2c-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "accepted_rounds": 1,
+          "sequence_count": null,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 100.0,
+            "toggle": 95.32710280373831,
+            "branch": 82.75862068965517
+          },
+          "score": 90.43052178243929,
+          "tokens": 275805,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1001.8294908134267,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_FATAL i2c_master_top_wb_agent__driver.sv(120) @ 305000: uvm_test_top.m_env.m_wb_agent.m_driver [ENVIRONMENT_WITNESS] sda_pad_i live response differs from symbolic response; UVM_FATAL :    1; missing completion marker",
+          "source": "out/experiments/design9-i2c-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 1386.452,
+      "error": null
+    },
+    {
+      "design": 10,
+      "run": "out/experiments/design10-gpio-complete-pair-20260910-v1",
+      "status": "failed",
+      "terminal_pair": true,
+      "successful_pair": false,
+      "baseline": {
+        "line": 100.0,
+        "cond": 60.89385474860335,
+        "toggle": 69.63677639046539,
+        "branch": 74.07407407407408
+      },
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "accepted_rounds": 0,
+          "sequence_count": null,
+          "percent": {
+            "line": 100.0,
+            "cond": 60.89385474860335,
+            "toggle": 69.63677639046539,
+            "branch": 74.07407407407408
+          },
+          "score": 76.15117630328571,
+          "tokens": 179937,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 284.39265536610037,
+          "stop_reason": null,
+          "error": "shared simulation failed or timed out: UVM_ERROR gpio_top_driver.sv(70) @ 1235000: uvm_test_top.m_env.m_agent.m_driver [gpio_top_driver] WB write ACK timeout at addr 0x5; UVM_ERROR gpio_top_driver.sv(70) @ 2245000: uvm_test_top.m_env.m_agent.m_driver [gpio_top_driver] WB write ACK timeout at addr 0x5; UVM_ERROR gpio_top_driver.sv(70) @ 3345000: uvm_test_top.m_env.m_agent.m_driver [gpio_top_driver] WB write ACK timeout at addr 0x9",
+          "source": "out/experiments/design10-gpio-complete-pair-20260910-v1/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "accepted_rounds": 3,
+          "sequence_count": 237,
+          "percent": {
+            "line": 100.0,
+            "cond": 100.0,
+            "toggle": 90.97616345062428,
+            "branch": 100.0
+          },
+          "score": 97.74404086265608,
+          "tokens": 235855,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 2819.873188772239,
+          "stop_reason": "round_budget",
+          "error": null,
+          "source": "out/experiments/design10-gpio-complete-pair-20260910-v1/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 3186.389,
+      "error": null
+    },
+    {
+      "design": 10,
+      "run": "out/experiments/design10-gpio-complete-pair-20260910-v2",
+      "status": "completed",
+      "terminal_pair": true,
+      "successful_pair": true,
+      "baseline": {
+        "line": 100.0,
+        "cond": 60.89385474860335,
+        "toggle": 69.63677639046539,
+        "branch": 74.07407407407408
+      },
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "accepted_rounds": 2,
+          "sequence_count": 16,
+          "percent": {
+            "line": 100.0,
+            "cond": 69.83240223463687,
+            "toggle": 70.43132803632236,
+            "branch": 74.07407407407408
+          },
+          "score": 78.58445108625833,
+          "tokens": 109950,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 209.68869146332145,
+          "stop_reason": "coverage_stalled",
+          "error": null,
+          "source": "out/experiments/design10-gpio-complete-pair-20260910-v2/paired/summary.json"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "accepted_rounds": 3,
+          "sequence_count": 161,
+          "percent": {
+            "line": 100.0,
+            "cond": 100.0,
+            "toggle": 91.99772985244041,
+            "branch": 100.0
+          },
+          "score": 97.99943246311011,
+          "tokens": 183144,
+          "token_accounting_complete": true,
+          "requests_without_usage": 0,
+          "elapsed_seconds": 1845.8868595007807,
+          "stop_reason": "round_budget",
+          "error": null,
+          "source": "out/experiments/design10-gpio-complete-pair-20260910-v2/paired/summary.json"
+        }
+      },
+      "elapsed_seconds": 2120.05,
+      "error": null
+    }
+  ],
+  "shared_setup_attempts": [
+    {
+      "design": 7,
+      "source": "out/experiments/design7-can-joint-baseline-20260910-v1/stage1-costs.json",
+      "status": "failed",
+      "tokens": 182538,
+      "elapsed_seconds": 241.88077559601516,
+      "usage_correction": "out/experiments/design7-can-joint-baseline-20260910-v1/usage-correction.json",
+      "error": null
+    },
+    {
+      "design": 7,
+      "source": "out/experiments/design7-can-joint-baseline-20260910-v2/stage1-costs.json",
+      "status": "stage1_ready",
+      "tokens": 166195,
+      "elapsed_seconds": 257.40076231304556,
+      "usage_correction": null,
+      "error": null
+    },
+    {
+      "design": 7,
+      "source": "out/experiments/design7-can-dsl-baseline-20260910-v3/stage1-costs.json",
+      "status": "stage1_ready",
+      "tokens": 133867,
+      "elapsed_seconds": 116.38234348781407,
+      "usage_correction": null,
+      "error": null
+    },
+    {
+      "design": 8,
+      "source": "out/experiments/design8-ethmac-joint-baseline-20260910-v1/stage1-costs.json",
+      "status": "failed",
+      "tokens": 221666,
+      "elapsed_seconds": 284.4108391702175,
+      "usage_correction": null,
+      "error": "Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=65536, prompt_tokens=156130, total_tokens=221666, completion_tokens_details=CompletionTokensDetails(accepted_prediction_tokens=None, audio_tokens=None, reasoning_tokens=65536, rejected_prediction_tokens=None, text_tokens=None), prompt_tokens_details=PromptTokensDetails(audio_tokens=None, cache_write_tokens=None, cached_tokens=256, image_tokens=None, text_tokens=None), prompt_cache_hit_tokens=256, prompt_cache_miss_tokens=155874)"
+    },
+    {
+      "design": 8,
+      "source": "out/experiments/design8-ethmac-infrastructure-20260910-v1/stage1-costs.json",
+      "status": "failed",
+      "tokens": 0,
+      "elapsed_seconds": 5.79586501326412,
+      "usage_correction": null,
+      "error": "--reuse-dsl forbids new model calls, including automatic compile repair"
+    },
+    {
+      "design": 8,
+      "source": "out/experiments/design8-ethmac-joint-baseline-20260910-v2/stage1-costs.json",
+      "status": "failed",
+      "tokens": 356450,
+      "elapsed_seconds": 292.2594180824235,
+      "usage_correction": null,
+      "error": "Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=65536, prompt_tokens=290914, total_tokens=356450, completion_tokens_details=CompletionTokensDetails(accepted_prediction_tokens=None, audio_tokens=None, reasoning_tokens=65536, rejected_prediction_tokens=None, text_tokens=None), prompt_tokens_details=PromptTokensDetails(audio_tokens=None, cache_write_tokens=None, cached_tokens=256, image_tokens=None, text_tokens=None), prompt_cache_hit_tokens=256, prompt_cache_miss_tokens=290658)"
+    },
+    {
+      "design": 8,
+      "source": "out/experiments/design8-ethmac-infrastructure-20260910-v2/stage1-costs.json",
+      "status": "stage1_ready",
+      "tokens": 0,
+      "elapsed_seconds": 7.0772230895236135,
+      "usage_correction": null,
+      "error": null
+    },
+    {
+      "design": 8,
+      "source": "out/experiments/design8-ethmac-address-contract-20260910-v1/stage1-costs.json",
+      "status": "stage1_ready",
+      "tokens": 0,
+      "elapsed_seconds": 7.927049836143851,
+      "usage_correction": null,
+      "error": null
+    },
+    {
+      "design": 8,
+      "source": "out/experiments/design8-ethmac-memory-repair-20260910-v1/progress.json",
+      "status": "repair_budget_exhausted",
+      "tokens": 60565,
+      "elapsed_seconds": 158.5781916603446,
+      "token_accounting_complete": true,
+      "error": null
+    },
+    {
+      "design": 9,
+      "source": "out/experiments/design9-i2c-baseline-20260910-v1/stage1-costs.json",
+      "status": "stage1_ready",
+      "tokens": 62792,
+      "elapsed_seconds": 120.96866437420249,
+      "usage_correction": null,
+      "error": null
+    },
+    {
+      "design": 10,
+      "source": "out/experiments/design10-gpio-wb-contract-20260910-v1/stage1-costs.json",
+      "status": "stage1_ready",
+      "tokens": 0,
+      "elapsed_seconds": 12.097773135639727,
+      "usage_correction": null,
+      "error": null
+    }
+  ],
+  "known_tokens_all_attempts_and_setup": 3717956,
+  "note": "running requests may have unknown additional usage; failed-arm coverage is only its last accepted state, not a successful final result",
+  "timing_caveat": "designs ran concurrently on the shared host; wall times include contention and differing sequence counts, not a controlled isolated latency benchmark"
+}

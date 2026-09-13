@@ -27,12 +27,14 @@ from pathlib import Path
 import isolation
 from process_runner import run
 from run_records import Records, fingerprint, save
-from sequence_framework import Design, Port, parse_response, check_saved_sources
+from sequence_framework import Design, Port, MODEL_MODULE, parse_response, check_saved_sources
 from ut_validation import validate
 
 ZAOZI = Path(__file__).resolve().parent.parent
 ERROR_HEAD = re.compile(r"(\S+\.scala):(\d+):(\d+)")
 TASK_PREFIX = re.compile(r"^\d+\]\s?")
+COMPILER_CRASH_START = re.compile(
+    r"^\s*(?:exception occurred while |An unhandled exception was thrown in the compiler\.)")
 
 
 def strip_prefix(raw: str) -> str:
@@ -46,6 +48,13 @@ def parse_type_errors(output: str) -> list[dict]:
     current: dict | None = None
     for raw in output.splitlines():
         line = re.sub(r"\x1b\[[0-9;]*m", "", strip_prefix(raw))
+        # Crash metadata (classpath, compiler settings, stack trace) is not part
+        # of the preceding source diagnostic. Preserve the full raw output in
+        # compile.log, but do not append it to the model's source
+        # error. A later source diagnostic may still begin a new record.
+        if COMPILER_CRASH_START.match(line):
+            current = None
+            continue
         head = ERROR_HEAD.search(line)
         if head:
             current = {
@@ -54,12 +63,39 @@ def parse_type_errors(output: str) -> list[dict]:
                 "col": int(head.group(3)),
                 "message": "",
             }
+            category=re.search(r'--\s*(?:\[([^]]+)\]\s*)?((?:.+? )?Error):',line)
+            if category:
+                current.update(kind=category[2],code=category[1])
             errors.append(current)
+        elif re.fullmatch(r'\s*\d+ (?:warning|error)s? found\s*',line):
+            continue
         elif current is not None and "[error]" not in line and line.strip():
             current["message"] += ("\n" if current["message"] else "") + line.rstrip()
         elif "[error]" in line:
             current = None
     return errors
+
+
+def ltl_diagnostics(errors: list[dict], source: Path) -> list[dict]:
+    """Map generated-source locations back to the fragment the model actually authored.
+
+    Original compiler output stays in compile.log; no diagnostic meaning is guessed.
+    """
+    generated = (source / "ModelUT.scala").read_text().splitlines()
+    start = generated.index("    // BEGIN MODEL LTL") + 2  # one-based first body line
+    count = len((source / "model.ltl").read_text().split("\n"))
+    end = start + count
+    mapped = []
+    for original in errors:
+        row = dict(original)
+        if Path(row.get("file", "")).name == "ModelUT.scala" and start <= row.get("line", 0) < end:
+            row.update(file="model.ltl", line=row["line"] - start + 1, col=max(1, row["col"] - 4))
+            def line_number(match):
+                number = int(match[2])
+                return match[1] + str(number - start + 1 if start <= number < end else number) + match[3]
+            row["message"] = re.sub(r"(?m)^(\s*)(\d+)(\s*\|)", line_number, row["message"])
+        mapped.append(row)
+    return mapped
 
 
 def emit(payload: dict, code: int) -> "NoReturn":  # type: ignore[name-defined]
@@ -74,6 +110,7 @@ def main() -> None:
     parser.add_argument("--compile-only", action="store_true", help="typecheck without calling any solver")
     parser.add_argument("--resume", action="store_true", help="reuse verified lowering and successful goal checkpoints")
     parser.add_argument("--jg-time-limit", default="120s")
+    parser.add_argument("--replay-config", type=Path)
     args = parser.parse_args()
 
     source = args.generated.resolve()
@@ -103,7 +140,7 @@ def main() -> None:
     try:
         if not source.is_dir() or not (source / "response.json").is_file():
             raise ValueError("isolated execution requires a complete run-specific source directory")
-        response = parse_response((source / "response.json").read_text())
+        response = parse_response((source / "model.ltl").read_text())
         inputs = json.loads(record.read_text())
         design = Design(inputs["top"], tuple(Path(p["path"]) for p in inputs["sources"]),
             tuple(Path(p) for p in inputs["include_dirs"]), tuple(Port(**p) for p in inputs["ports"]),
@@ -111,10 +148,61 @@ def main() -> None:
             inputs["sequence"]["name"], inputs["sequence"]["item_type"], inputs["context"],
             tuple(inputs["parameters"].items()))
         check_saved_sources(source, design, response)
+        reset_sequence = None
+        initial_state = None
+        initial_state_record = None
+        clocks = []
+        environment_assumptions = []
+        if args.replay_config:
+            from cycle_replay import load_config
+            replay_design, replay = load_config(args.replay_config)
+            if replay_design.record() != design.record():
+                raise ValueError("reset protocol design differs from UT design")
+            if replay.get('environment'):
+                from event_trace import validate_clocks
+                schedule = replay['environment']['clocks']
+                quantum = validate_clocks(schedule)
+                clocks = [{'port': 'clock' if c['port'] == design.clock else c['port'],
+                           'factor': c['period_ps']//quantum} for c in schedule]
+            reset_sequence = "reset 1'b1\n" + "".join(
+                f"{p.name} {p.width}'h{replay['idle'][p.name]:x}\n"
+                for p in design.data_ports if p.direction == "input" and
+                p.name not in {c['port'] for c in clocks})
+            reset_sequence += f"{replay['reset_cycles']}\nreset 1'b0\n$\n"
+            if replay.get('environment'):
+                from environment_contract import reset_sequence as event_reset_sequence, formal_assumptions
+                reset_sequence = event_reset_sequence(design,replay)
+                environment_assumptions = formal_assumptions(design,replay['environment'])
+            if replay.get("formal_initial_state"):
+                policy = replay["formal_initial_state"]
+                prior_state = ""
+                if set(policy) == {"file", "sha256"}:
+                    state_path = (args.replay_config.parent / policy["file"]).resolve()
+                    if hashlib.sha256(state_path.read_bytes()).hexdigest() != policy["sha256"]:
+                        raise ValueError("formal initial state hash changed")
+                    prior_state = state_path.read_text()
+                elif policy != {"mode": "rtl-reset-simulation"}:
+                    raise ValueError("unsupported formal initial state policy")
+                if re.search(r"\bpast\s*\(", response["ltl"]):
+                    raise ValueError("snapshot initialization has no explicit past history; use a supported history policy")
+                from rtl_initial_state import POLICY, generate as generate_initial_state
+                # Never treat a partial memory-only file as a complete power-on
+                # state. Discover all clocked storage and simulate the original
+                # RTL reset prefix; existing entries must agree with that result.
+                phase = "initial-state"
+                initial_state = generate_initial_state(design, replay, out_dir / "initial-state",
+                    prior_state, Path(os.environ.get("ZAOZI_EDA_SHELL", ZAOZI / "experiments/eda-shell")))
+                snapshot_record = out_dir / "initial-state/snapshot.json"
+                initial_state_record = {"policy": POLICY, "file": str(snapshot_record),
+                    "sha256": hashlib.sha256(snapshot_record.read_bytes()).hexdigest()}
+                reset_sequence = None
         runtime = [ZAOZI / p for p in ("experiments/ut_harness.py", "experiments/isolation.py",
-            "experiments/ut_validation.py", "experiments/src/TrustedSolver.scala", "utlib/src/JasperGold.scala")]
+            "experiments/ut_validation.py", "experiments/rtl_initial_state.py",
+            "experiments/src/TrustedSolver.scala", "utlib/src/JasperGold.scala")]
         input_hash = fingerprint({"files": {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in [*source.glob("*.scala"), *runtime]}, "design": inputs, "timeLimit": args.jg_time_limit})
+            for p in [*source.glob("*.scala"), *runtime]}, "design": inputs, "timeLimit": args.jg_time_limit,
+            "resetSequence": reset_sequence, "initialState": initial_state, "clocks": clocks,
+            "environmentAssumptions": environment_assumptions})
         phase = "toolchain"
         with events.phase(phase):
             config = isolation.toolchain(ZAOZI)
@@ -131,15 +219,18 @@ def main() -> None:
             work.mkdir()
             classes = work / "classes"
             classes.mkdir()
+            (work / "semanticdb").mkdir()
+            compiler_options = isolation.compiler_options(config, source, work)
+            save(out_dir / "compile-options.json", compiler_options)
             cp = os.pathsep.join(config["classpath"])
             phase = "typecheck"
             with events.phase(phase):
                 compiled = isolation.execute([java, "-Xmx2g", *config["jvm"], "-cp", os.pathsep.join(config["compiler"]),
-                    "dotty.tools.dotc.Main", "-color:never", *config["options"], "-classpath", cp,
+                    "dotty.tools.dotc.Main", "-color:never", *compiler_options, "-classpath", cp,
                     "-d", str(classes), *map(str, sorted(source.glob("*.scala")))], config, source, work)
                 (out_dir / "compile.log").write_text(compiled.stdout)
                 if compiled.returncode:
-                    emit({"phase": phase, "ok": False, "errors": parse_type_errors(compiled.stdout),
+                    emit({"phase": phase, "ok": False, "errors": ltl_diagnostics(parse_type_errors(compiled.stdout), source),
                           "detail": compiled.stdout[-2500:]}, 2)
             if args.compile_only:
                 emit({"phase": phase, "ok": True, "isolation": "bubblewrap-compile-lower-v1"}, 0)
@@ -159,11 +250,11 @@ def main() -> None:
             phase = "wiring-check"
             with events.phase(phase):
                 sv = artifact("sv").read_text()
-                check = validate(sv, design, description["top"], response["ut"]["generationLabels"])
+                check = validate(sv, design, description["top"], response["labels"])
                 abi = json.loads(artifact("abiFile").read_text())
                 ports = [{"name": "clock", "role": "Clock", "width": 1, "signed": False},
                          {"name": "reset", "role": "Reset", "width": 1, "signed": False}]
-                ports += [{"name": p.name, "role": "Drive", "width": p.width, "signed": p.kind == "sint"}
+                ports += [{"name": p.name, "role": "Clock" if p.kind == 'clock' else "Drive", "width": p.width, "signed": p.kind == "sint"}
                           for p in design.data_ports if p.direction == "input"]
                 if abi["abiVersion"] != "1.0" or abi["ports"] != ports:
                     raise ValueError("model ABI differs from fixed binding")
@@ -174,11 +265,15 @@ def main() -> None:
                 path.write_text(sv)
                 job = {"sv": str(path), "svSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                     "inputsFingerprint": input_hash, "top": description["top"], "abi": abi,
-                    "rtl": [str(p) for p in design.sources], "include": str(design.include_dirs[0]) if design.include_dirs else None,
-                    "labels": response["ut"]["generationLabels"], "module": response["ut"]["module"],
-                    "sourceSha256": hashlib.sha256(response["ut"]["source"].encode()).hexdigest(),
+                    "rtl": [str(p) for p in design.sources], "includeDirs": [str(p) for p in design.include_dirs],
+                    "labels": response["labels"], "module": MODEL_MODULE,
+                    "sourceSha256": hashlib.sha256((source / "ModelUT.scala").read_bytes()).hexdigest(),
+                    "ltlSha256": hashlib.sha256(response["ltl"].encode()).hexdigest(),
                     "sequenceName": design.sequence_name, "itemType": design.item_type,
-                    "timeLimit": args.jg_time_limit, "proofObligations": response["proofObligations"]}
+                    "timeLimit": args.jg_time_limit, "proofObligations": [],
+                    "resetSequence": reset_sequence, "initialState": initial_state,
+                    "initialStateRecord": initial_state_record, "clocks": clocks,
+                    "environmentAssumptions": environment_assumptions}
                 job["fingerprint"] = fingerprint(job)
                 save(prepared, job)
         phase = "solve"

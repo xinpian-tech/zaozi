@@ -76,8 +76,15 @@ class CoveragePolicyTest(unittest.TestCase):
                      "--feedback-file", str(feedback), "--out", str(root / "prompt"), "--prompt-only", "--rag", "off"])
             self.assertEqual(rc, 0)
             prompt = (root / "prompt/attempt-1/prompt.txt").read_text()
-            self.assertIn("0->1", prompt)
+            self.assertNotIn("0->1", prompt)
+            self.assertIn("read_context", prompt)
             self.assertIn("Do not stop merely because all lines are covered", prompt)
+            from task_context import TaskContext
+            from sequence_framework import load_design
+            context = TaskContext(load_design(FIXTURES / 'tiny_design.json'), json.loads(feedback.read_text()))
+            self.assertIn('0->1', context.dispatch('read_context', {'topic': 'coverage'})['text'])
+            manifest = json.loads((root / 'prompt/manifest.json').read_text())
+            self.assertEqual(manifest['task_access']['topics'], context.record()['topics'])
 
     def test_toggle_progress_counts_with_all_lines_covered(self):
         first, second = coverage(line=100), coverage(line=100, toggle=64)
@@ -123,6 +130,102 @@ class CoveragePolicyTest(unittest.TestCase):
 
 
 class PairedLoopTest(unittest.TestCase):
+    def test_native_search_exhaustion_is_not_reported_as_shared_setup_failure(self):
+        from native_witness_selection import NativeWitnessExhaustion
+        calls=[]
+        def generate(arm, rd, *args):
+            calls.append(arm)
+            raise NativeWitnessExhaustion(0, 4, 16, rd/'native-witness-search/goal')
+        with tempfile.TemporaryDirectory() as directory:
+            result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory, lambda *args: coverage(), generate, runtime_repairs=3)
+        self.assertEqual(calls,['haven','rvprobe'])
+        for arm in result['arms'].values():
+            self.assertEqual(arm['stop_reason'],'native_witness_search_exhausted')
+            self.assertEqual(arm['diagnostics']['attempted'],16)
+            self.assertEqual(arm['rounds'],[])
+            self.assertEqual(arm['final'],result['baseline'])
+
+    def test_replay_setup_failure_never_requests_a_new_ut(self):
+        from replay_failures import ReplayInfrastructureFailure
+        calls=[]
+        def simulate(path,*args):
+            if path.name!='baseline': raise ReplayInfrastructureFailure('lowered top metadata mismatch')
+            return coverage()
+        def generate(arm,*args):
+            calls.append(arm)
+            return {'sequences':[sequence(arm)],'frames':[]}
+        with tempfile.TemporaryDirectory() as directory:
+            result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory,simulate,generate,runtime_repairs=3)
+        self.assertEqual(calls,['haven','rvprobe'])
+        for arm in result['arms'].values():
+            self.assertEqual(arm['rounds'],[])
+            self.assertEqual(arm['stop_reason'],'shared_contract_requires_validation')
+
+    def test_unreplayable_contract_failure_does_not_request_model_repair(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory)/'sim.log'
+            log.write_text('UVM_FATAL driver.sv(5) @ 12: driver [WITNESS_X] actual=xx expected=12 mask=ff')
+            def simulate(path, *args):
+                if path.name != 'baseline':
+                    raise paired.SimulationFailure('unknown output', log)
+                return coverage()
+            def generate(arm, *args):
+                calls.append(arm)
+                return {'sequences':[sequence(arm)],'frames':[]}
+            result = paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory, simulate, generate, runtime_repairs=3)
+        self.assertEqual(calls, ['haven','rvprobe'])
+        for arm in result['arms'].values():
+            self.assertEqual(arm['rounds'], [])
+            self.assertEqual(arm['final'], result['baseline'])
+            self.assertEqual(arm['stop_reason'], 'shared_contract_requires_validation')
+            self.assertEqual(len(arm['rejected_candidates']), 1)
+
+    def test_runtime_repair_keeps_failed_candidates_out_of_both_arms(self):
+        bundle = {'sequences':[sequence('base')], 'fingerprint':'x'}
+        calls = []
+        def simulate(path, sources, frames):
+            if any('bad' in s for s in sources):
+                raise ValueError('measured runtime failure')
+            return {**coverage(toggle=70 if len(sources)>1 else 60),'modinfo':str(path/'modinfo.txt')}
+        def generate(arm, rd, feedback, existing, ordinal):
+            repair = '-repair-' in rd.name
+            self.assertEqual(existing,bundle['sequences'])
+            self.assertEqual('runtime_failure' in feedback,repair)
+            self.assertTrue(feedback['modinfo'].endswith('baseline/modinfo.txt'))
+            calls.append((arm,repair))
+            return {'sequences':[sequence(arm+('_good' if repair else '_bad'))], 'frames':[]}
+        with tempfile.TemporaryDirectory() as directory:
+            result = paired.paired_loop(bundle,directory,simulate,generate,rounds=1)
+        self.assertEqual(result['status'],'completed')
+        self.assertEqual(calls,[('haven',False),('haven',True),('rvprobe',False),('rvprobe',True)])
+        for arm in result['arms'].values():
+            self.assertEqual(arm['sequence_count'],2)
+            self.assertEqual(len(arm['rejected_candidates']),1)
+            self.assertEqual(len(arm['rounds']),1)
+
+    def test_exhausted_runtime_repair_is_failure_not_a_coverage_result(self):
+        def simulate(path,*args):
+            if path.name != 'baseline': raise ValueError('bad witness')
+            return coverage()
+        with tempfile.TemporaryDirectory() as directory:
+            result = paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},directory,
+                simulate,lambda arm,*args:{'sequences':[sequence(arm)],'frames':[]})
+        self.assertEqual(result['status'],'failed')
+        for arm in result['arms'].values():
+            self.assertEqual(len(arm['rejected_candidates']),2)
+            self.assertEqual(arm['rounds'],[])
+
+    def test_failed_dsl_does_not_enter_accepted_history(self):
+        initial = {'sequences':[{'name':'baseline'}]}
+        attempts = [(['bad'],[{'name':'bad'}]),(['good'],[{'name':'good'}])]
+        result = paired.accepted_haven_dsl(initial,attempts,['baseline','good'])
+        self.assertEqual(result['sequences'],[{'name':'baseline'},{'name':'good'}])
+        self.assertEqual(initial['sequences'],[{'name':'baseline'}])
+
     def test_one_baseline_both_arms_same_prefix_isolated_additions(self):
         baseline = [sequence("initial_random"), sequence("initial_toggle")]
         bundle = {"sequences": baseline, "fingerprint": "shared"}
@@ -131,6 +234,10 @@ class PairedLoopTest(unittest.TestCase):
             simulations.append((str(path), list(sequences)))
             return coverage(line=100, toggle=60 + 4 * (len(sequences) - len(baseline)))
         def generate(arm, rd, feedback, existing, ordinal):
+            live = json.loads((rd.parents[1]/'progress.json').read_text())['arms'][arm]
+            self.assertEqual(live['status'],'running')
+            self.assertEqual(live['active_round'],int(rd.name.split('-')[1]))
+            self.assertIn('started_utc',live)
             feedbacks.append((arm, deepcopy(feedback)))
             return {"sequences": [sequence(f"{arm}_{rd.name.replace('-', '_')}")], "frames": []}
         with tempfile.TemporaryDirectory() as directory:
@@ -221,6 +328,32 @@ class SharedBenchTest(unittest.TestCase):
         self.assertIn('`uvm_fatal("HANDSHAKE_TIMEOUT"', driver)
         self.assertTrue(changes)
 
+    def test_shared_constraint_repairs_require_exact_original(self):
+        before = components()
+        before["seq_item"] += "\nconstraint c { valid == 1; }"
+        fixed, changes = repair_components(before, [], item_constraint_replacements={
+            "constraint c { valid == 1; }": "constraint c { valid inside {[0:1]}; }"})
+        self.assertIn("valid inside {[0:1]}", fixed["seq_item"])
+        self.assertIn("valid == 1", before["seq_item"])
+        self.assertTrue(changes)
+        with self.assertRaises(ValueError):
+            repair_components(before, [], item_constraint_replacements={"absent": "replacement"})
+
+    def test_handshake_deasserts_all_request_controls(self):
+        config = {**self.config, "request": {"valid": 1, "enable": 1},
+                  "idle": {**self.config["idle"], "enable": 0}}
+        fixed, _ = repair_direct_handshake(components(), self.design, config)
+        self.assertIn("vif.valid = 0;", fixed["driver"])
+        self.assertIn("vif.enable = 0;", fixed["driver"])
+        self.assertIn("(item.valid == 1) || (item.enable == 1)", fixed["driver"])
+
+    def test_event_metadata_does_not_invent_a_request_protocol(self):
+        before = components()
+        config = {k:v for k,v in self.config.items() if k != 'request'}
+        fixed, changes = repair_direct_handshake(before, self.design, config)
+        self.assertEqual(fixed,before)
+        self.assertEqual(changes,[])
+
     def test_raw_mode_uses_shared_driver_but_no_handshake_wait(self):
         original = components()
         fixed = install_cycle_transport(original, self.design, self.config, "driver")
@@ -295,6 +428,63 @@ class BundleTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Stage-2"):
                 paired.prepare(stage, haven, FIXTURES / "tiny_replay.json", root / "bundle")
 
+    def test_named_active_driver_with_passive_observer_is_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stage, haven = self.fixture(root)
+            bp_path = stage / 'ir/phase2b_blueprint.json'
+            bp = json.loads(bp_path.read_text())
+            bp['topology'] = {'agents': [{'name':'bus','mode':'active'}, {'name':'watch','mode':'passive'}]}
+            bp_path.write_text(json.dumps(bp))
+            old = stage/'final/tiny_external_driver.sv'
+            old.rename(stage/'final/tiny_external_bus__driver.sv')
+            monitor = 'class watch_monitor; task sample(); txn.done = vif.done; endtask endclass'
+            (stage/'final/tiny_external_watch__monitor.sv').write_text(monitor)
+            (stage/'final/tiny_external_watch__agent.sv').write_text('class watch_agent; endclass')
+            bundle = paired.prepare(stage,haven,FIXTURES/'tiny_replay.json',root/'bundle')
+            self.assertEqual(bundle['transport_driver'], 'bus__driver')
+            self.assertEqual(bundle['components']['watch__monitor'], monitor)
+            self.assertIn('rvp_drive_cycle', bundle['components']['bus__driver'])
+            self.assertEqual(bundle['blueprint']['topology'], bp['topology'])
+            for extra in ({'watch__driver':'class driver; endclass'},
+                          {'watch__sequencer':'class sequencer; endclass'},
+                          {'watch__monitor':'class monitor; task run(); vif.done <= 0; endtask endclass'}):
+                with self.assertRaises(ValueError):
+                    paired.transport_driver(bp, {**bundle['components'], **extra})
+
+    def test_unversioned_axi_item_cannot_enter_new_paired_experiment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stage, haven = self.fixture(root)
+            path = stage / "ir/phase2b_blueprint.json"
+            blueprint = json.loads(path.read_text())
+            blueprint['protocol_flows'] = {'bus_field_mapping': {
+                'awvalid': 'aw', 'wvalid': 'w', 'arvalid': 'ar'}}
+            path.write_text(json.dumps(blueprint))
+            with self.assertRaisesRegex(ValueError, 'no verified transaction-field ownership'):
+                paired.prepare(stage, haven, FIXTURES / "tiny_replay.json", root / "bundle")
+            self.assertFalse((root / 'bundle').exists())
+
+    def test_active_master_metadata_keeps_components_and_rejects_passive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            stage, haven = self.fixture(root)
+            path = stage / "ir/phase2b_blueprint.json"
+            blueprint = json.loads(path.read_text())
+            accepted = []
+            for mode in ("active", "active_master", "passive", "active_slave", "unknown"):
+                blueprint["topology"] = {"agents": [{"name": "bus_agent", "mode": mode}]}
+                path.write_text(json.dumps(blueprint))
+                if mode in ("active", "active_master"):
+                    result = paired.prepare(stage, haven, FIXTURES / "tiny_replay.json", root / mode)
+                    self.assertEqual(result["blueprint"]["topology"]["agents"][0]["mode"], mode)
+                    accepted.append(result)
+                else:
+                    with self.assertRaisesRegex(ValueError, "active primary agent"):
+                        paired.prepare(stage, haven, FIXTURES / "tiny_replay.json", root / mode)
+            self.assertEqual(accepted[0]["components"], accepted[1]["components"])
+            self.assertEqual(accepted[0]["sequences"], accepted[1]["sequences"])
+
     def test_reject_changed_ports_or_multiclock(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -354,7 +544,9 @@ class NativeHavenTest(unittest.TestCase):
                 (ad / "response.txt").write_text(json.dumps(reply))
             with patch.object(paired, "run_process", side_effect=fake_request), \
                  patch("subprocess.Popen", side_effect=AssertionError("no external process")):
-                result = backend.haven(root / "round", compact_feedback(coverage()), bundle["sequences"])
+                from prompt_context import MAX_INTENTS
+                feedback = {**compact_feedback(coverage()), 'intent_batch_limit':MAX_INTENTS}
+                result = backend.haven(root / "round", feedback, bundle["sequences"])
             self.assertEqual(len(result["sequences"]), 1)
             self.assertIn("codegen_filters", result["metadata"])
             self.assertEqual(json.loads((root / "round/attempt-1/response.txt").read_text()), reply)

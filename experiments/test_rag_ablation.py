@@ -97,7 +97,7 @@ class AblationTest(unittest.TestCase):
                  patch.object(ablation, "measure_goals", return_value=([{"status": "replayed"}], [{}])) as frames, \
                  contextlib.redirect_stdout(io.StringIO()):
                 code = ablation.main(["--replay-config", str(FIXTURES / "tiny_replay.json"), "--out", str(root),
-                    "--samples", "1", "--response-file", str(FIXTURES / "completion_intent.json")])
+                    "--samples", "1", "--response-file", str(FIXTURES / "completion_intent.ltl")])
             self.assertEqual(compile.call_count, 1)
             return code, json.loads((root / "summary.json").read_text()), simulate.call_count, frames.call_count
 

@@ -1,5 +1,23 @@
 # DATE / rvprobe 分支工作总览
 
+当前 prompt 更新：[Spec / IO 与按需 RTL](spec-io-on-demand-prompt.md)。仅 RVProbe 使用只读工具；HAVEN 保持原流程，未启动新的模型实验。
+
+最新：[剩余六个设计的人工 LTL 框架验收](remaining-six-native-flow-20260910.md)：
+simple_spi、spi、ue_gpio、ue_spi、ue_uart、sdram 均完成两轮，48 条新增 sequence 通过原始 LTL 四态回放。
+零远程 LLM 调用；修复共享组件、多目录/inout 导入与长 trace 采样，不属于正式模型配对结果。
+
+2026-09-10 后续：[设计 6–10 的零 LLM 离线修复与验证](design6-10-offline-fixes.md)。未重写旧实验成绩，未启动新的配对实验。
+
+随后按用户要求完成了[作者代替模型的实际流程验收](manual-flow-20260910.md)：GPIO 双侧两轮、UART/I2C 单轮通过；CAN/Ethernet 仍阻塞。不属于正式模型实验。
+
+前次：[第二轮人工 LTL 流程验收与子进程入口](manual-flow-followup-20260910.md)。
+本轮停止未完成的正式 DeepSeek 队列，单独验证真实收发、编译错误修复与 worker 边界；
+不把人工诊断成绩合入正式配对结果。
+
+前次：[原始 LTL 回放与原生外设修复验收](native-ltl-flow-20260910.md)：
+I2C、CAN、Ethernet 均跑通两轮完整人工闭环，合计 28 条新增 sequence；
+UART/GPIO 另完成新回放口径的保存样本复验。未调用 DeepSeek，不属于正式配对成绩。
+
 更新于 2026-09-07。本文汇总 `date` 分支相对 `ut` 基线 `7f1a276` 的工作；下列历史覆盖数据引用
 已有实验记录，不代表整理提交时重新执行了在线模型实验或完整商业 EDA 回放。
 
@@ -11,7 +29,7 @@
 
 | 层次 | 入口 | 已完成工作 |
 |---|---|---|
-| 框架与求解后端 | [`utlib/src/`](../../utlib/src/) | 单一 `Gen` 入口，接受 Bool / Sequence / Property；原生 Bool 条件 `past`；外部 SV 导入、circt-bmc / JasperGold、trace → ABI → stimulus / UVM |
+| 框架与求解后端 | [`utlib/src/`](../../utlib/src/) | 单一 `Gen` 入口，接受 Bool / Sequence / Property；原生同类型历史值 `past`；外部 SV 导入、circt-bmc / JasperGold、trace → ABI → stimulus / UVM |
 | 外部设计接口 | [`experiments/designs/`](../../experiments/designs/)、[`fixtures/`](../../experiments/fixtures/) | 原始 RTL 与 IO manifest；运行时生成共享 wrapper，不在 stdlib 复刻 DUT |
 | 实验流程 | [`experiments/`](../../experiments/) | 新 baseline → 编译 / 求解反馈 → 每条 witness 独立复位的逐周期回放 → URG 残余反馈；RAG 对照共用同一后端 |
 | 独立证明 | [`experiments/proofs/`](../../experiments/proofs/) | 人工可达性属性，独立于模型候选和 RAG |
@@ -115,6 +133,7 @@ Prompt-only 和本地检索不需要模型凭据，但仍需提供当前任务�
 
 ## 资料索引
 
+- [设计 6–10 配对结果与失败费用](design6-10-complete-pairs.md)、[共享环境与回放验收](shared-environment-conformance.md)
 - [HAVEN / DeepSeek 复现](haven-deepseek-reproduction.md)、[rvprobe 对比汇总](rvprobe-vs-haven.md)
 - [同 testbench 逐步实验记录](rvprobe-in-haven-testbench.md)、[2×2 消融](ablation-2x2.md)
 - [circt-bmc assumption 问题与复现](circt-bmc-assume.md)、[RAG 污染更正与审计](alu-rag-evaluation.md)

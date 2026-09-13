@@ -54,6 +54,87 @@ class MultiClockProbe(parameter: MultiClockParameter) extends DVBundle[MultiCloc
 
 object SVASpec extends TestSuite:
   val tests = Tests:
+    test("Bool sequence concatenation is identical to explicit lifting"):
+      @generator
+      object BoolConcat extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe] with HasVerilogTest:
+        def architecture(parameter: SVASpecParameter) =
+          val io = summon[Interface[SVASpecIO]]
+          given ClockEvent = posedge(io.clock)
+          val a = io.ib0
+          val b = io.ib1
+          // Keep Bool logic distinct from sequence logic and exercise computed predicates.
+          val predicate: Referable[Bool] = a & !b
+          val next: Sequence = a ### b
+          Cover(next, "next_short")
+          Cover(a.S ### b.S, "next_explicit")
+          Cover(a ### b.S, "right_sequence")
+          Cover(a.S ### b, "left_sequence")
+          Cover(a ### b ### !a, "chain_short")
+          Cover(a.S ### b.S ### (!a).S, "chain_explicit")
+          Cover(a.##(b), "zero_short")
+          Cover(a.S.##(b.S), "zero_explicit")
+          Cover(a.##(b.S), "zero_right_sequence")
+          Cover(a.S.##(b), "zero_left_sequence")
+          Cover(a.##(2)(b), "fixed_short")
+          Cover(a.S.##(2)(b.S), "fixed_explicit")
+          Cover(a.##(2)(b.S), "fixed_right_sequence")
+          Cover(a.S.##(2)(b), "fixed_left_sequence")
+          Cover(a.##(0, Some(3))(b), "bounded_short")
+          Cover(a.S.##(0, Some(3))(b.S), "bounded_explicit")
+          Cover(a.##(0, Some(3))(b.S), "bounded_right_sequence")
+          Cover(a.S.##(0, Some(3))(b), "bounded_left_sequence")
+          Cover(predicate ### past(a), "computed_short")
+          Cover(predicate.S ### past(a).S, "computed_explicit")
+
+      val sv = BoolConcat.verilogString(SVASpecParameter(8))
+      def property(label: String): String =
+        val pattern = ("""(?s)\b""" + label + """:\s*cover property ([^;]+);""").r
+        pattern.findFirstMatchIn(sv).getOrElse(sys.error(s"Missing cover $label in $sv"))
+          .group(1).replaceAll("""\s+""", "")
+      for prefix <- Seq("next", "chain", "zero", "fixed", "bounded", "computed") do
+        assert(property(prefix + "_short") == property(prefix + "_explicit"))
+      assert(property("right_sequence") == property("next_explicit"))
+      assert(property("left_sequence") == property("next_explicit"))
+      for prefix <- Seq("zero", "fixed", "bounded") do
+        assert(property(prefix + "_right_sequence") == property(prefix + "_explicit"))
+        assert(property(prefix + "_left_sequence") == property(prefix + "_explicit"))
+      assert(!sv.contains("assume property"))
+
+    test("Bool lifting uses the current clock without rebinding a sequence"):
+      @generator
+      object MixedBoolClock extends Generator[MultiClockParameter, MultiClockLayers, MultiClockIO, MultiClockProbe]
+          with HasVerilogTest:
+        def architecture(parameter: MultiClockParameter) =
+          val io = summon[Interface[MultiClockIO]]
+          val first = posedge(io.clock0)(io.ib0.S)
+          Cover(negedge(io.clock1)(first ### io.ib1), "mixed_short")
+          Cover(negedge(io.clock1)(first ### io.ib1.S), "mixed_explicit")
+          Cover(negedge(io.clock1)(io.ib1 ### first), "reverse_short")
+          Cover(negedge(io.clock1)(io.ib1.S ### first), "reverse_explicit")
+      val sv = MixedBoolClock.verilogString(MultiClockParameter(8))
+      def property(label: String): String =
+        val pattern = ("""(?s)\b""" + label + """:\s*cover property ([^;]+);""").r
+        pattern.findFirstMatchIn(sv).getOrElse(sys.error(s"Missing cover $label in $sv"))
+          .group(1).replaceAll("""\s+""", "")
+      assert(property("mixed_short") == property("mixed_explicit"))
+      assert(property("reverse_short") == property("reverse_explicit"))
+      assert(sv.contains("posedge clock0"))
+      assert(sv.contains("negedge clock1"))
+
+    test("Bool concatenation does not invent a clock"):
+      val errors = scala.compiletime.testing.typeCheckErrors("""
+        import me.jiuyang.zaozi.*
+        import me.jiuyang.zaozi.default.{*, given}
+        import me.jiuyang.zaozi.reftpe.*
+        import me.jiuyang.zaozi.valuetpe.*
+        import org.llvm.mlir.scalalib.capi.ir.{Context, Block}
+        import java.lang.foreign.Arena
+        def concat(a: Referable[Bool], b: Referable[Bool])(using
+          Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
+        ) = summon[SVAApi].###(a)(b)
+      """)
+      assert(errors.exists(_.message.contains("ClockEvent")))
+
     test("Simple SVA"):
       @generator
       object SimpleSVA extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe] with HasVerilogTest:
@@ -882,12 +963,29 @@ object SVASpec extends TestSuite:
 
             Assert(previous.S iff io.ib1.S, "past")
 
+        println(SimpleSVA.verilogString(SVASpecParameter(32)))
         SimpleSVA.verilogTest(SVASpecParameter(32))(
-          "reg _past_0;",
-          "reg _past_1;",
-          "assert property (not ((@(posedge clock) _past_1) or (@(posedge clock) ib1))",
-          "or (@(posedge clock) _past_1) and (@(posedge clock) ib1));"
+          "$past(ib0, 2, , @(posedge clock));"
         )
+
+      test("past rejects non-positive delays"):
+        @generator
+        object InvalidPast
+            extends Generator[SVASpecParameter, SVASpecLayers, SVASpecIO, SVASpecProbe]
+            with HasCompileErrorTest:
+          def architecture(parameter: SVASpecParameter) =
+            val io           = summon[Interface[SVASpecIO]]
+            given ClockEvent = posedge(io.clock)
+
+            val zeroDelay = intercept[IllegalArgumentException]:
+              past(io.ib0, 0)
+            assert(zeroDelay.getMessage.contains("past delay (0)"))
+
+            val negativeDelay = intercept[IllegalArgumentException]:
+              past(io.ib0, -1)
+            assert(negativeDelay.getMessage.contains("past delay (-1)"))
+
+        InvalidPast.compileErrorTest(SVASpecParameter(32))
 
     test("Clock"):
       test("Simple"):

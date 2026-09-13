@@ -22,9 +22,8 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_LTLIntersectIntrinsicApi,
   given_LTLNotIntrinsicApi,
   given_LTLOrIntrinsicApi,
-  given_ConnectApi,
   given_NodeApi,
-  given_RegApi,
+  given_VerbatimExprApi,
   given_VerifAssertApi,
   given_VerifAssumeApi,
   given_VerifCoverApi,
@@ -41,9 +40,8 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   LTLIntersectIntrinsicApi as IntersectApi,
   LTLNotIntrinsicApi as NotApi,
   LTLOrIntrinsicApi as OrApi,
-  ConnectApi,
   NodeApi,
-  RegApi,
+  VerbatimExprApi,
   VerifAssertApi as AssertApi,
   VerifAssumeApi as AssumeApi,
   VerifCoverApi as CoverApi
@@ -69,13 +67,22 @@ import java.lang.foreign.Arena
 export given_SVAApi.{always, eventually, negedge, past, posedge, Assert, Assume, Cover}
 
 given SVAApi with
+  private def clockedSequence(value: Referable[Bool] | Sequence)(
+    using ClockEvent
+  )(
+    using Arena, Context, Block, sourcecode.File, sourcecode.Line, sourcecode.Name.Machine, InstanceContext
+  ): Sequence =
+    value match
+      case sequence: Sequence => sequence
+      case predicate: Referable[?] => predicate.asInstanceOf[Referable[Bool]].S
+
   def posedge(clock: Referable[Clock]): ClockEvent =
     ClockEvent(FirrtlEventControl.AtPosEdge, clock)
   def negedge(clock: Referable[Clock]): ClockEvent =
     ClockEvent(FirrtlEventControl.AtNegEdge, clock)
 
-  def past[T <: Referable[Bool]](
-    value:       T,
+  def past[D <: Bool | UInt | SInt | Bits](
+    value:       Referable[D],
     delay:       Int = 1
   )(
     using clock: ClockEvent
@@ -87,28 +94,24 @@ given SVAApi with
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): Node[Bool] =
-    require(delay >= 0, s"past delay ($delay) must be greater than or equal to 0")
-    val result =
-      if delay == 0 then value.refer
-      else
-        (0 until delay).foldLeft(value.refer): (sample, _) =>
-          val reg = summon[RegApi].op(
-            name = s"_past_${summon[InstanceContext].anonSignalCounter.inc()}",
-            location = locate,
-            nameKind = FirrtlNameKind.Droppable,
-            tpe = sample.getType,
-            clock = clock.clock.refer,
-            clockEdge = clock.edge
-          )
-          reg.operation.appendToBlock()
-          val result = reg.operation.getResult(0)
-          summon[ConnectApi].op(sample, result, locate).operation.appendToBlock()
-          result
-    val nodeOp = summon[NodeApi].op(valName, locate, FirrtlNameKind.Interesting, result)
+  ): Node[D] =
+    require(delay > 0, s"past delay ($delay) must be greater than 0")
+    val input  = value.refer
+    val edge   = clock.edge match
+      case FirrtlEventControl.AtPosEdge => "posedge"
+      case FirrtlEventControl.AtNegEdge => "negedge"
+    // Keep the sampling clock in the call even when emission introduces a shared wire.
+    val pastOp = summon[VerbatimExprApi].op(
+      text = s"$$past({{0}}, $delay, , @($edge {{1}}))",
+      substitutions = Seq(input, clock.clock.refer),
+      resultType = input.getType,
+      location = locate
+    )
+    pastOp.operation.appendToBlock()
+    val nodeOp = summon[NodeApi].op(valName, locate, FirrtlNameKind.Interesting, pastOp.result)
     nodeOp.operation.appendToBlock()
-    new Node[Bool]:
-      val _tpe:   Bool  = new Object with Bool
+    new Node[D]:
+      val _tpe:   D     = value.getType
       val _refer: Value = nodeOp.operation.getResult(0)
 
   def always(
@@ -157,6 +160,58 @@ given SVAApi with
       private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   extension [T <: Referable[Bool]](ref: T)
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ###(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.S.###(clockedSequence(that))
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ##(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.S.##(clockedSequence(that))
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ##(n: Int)(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.S.##(n)(clockedSequence(that))
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ##(min: Int, max: Option[Int])(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.S.##(min, max)(clockedSequence(that))
+
     def S(
       using clock: ClockEvent
     )(
@@ -506,6 +561,58 @@ given SVAApi with
         private[zaozi] val _refer: Value = op.operation.getResult(0)
 
   extension (ref: Sequence)
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ###(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.###(that.S)
+
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ##(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.##(that.S)
+
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ##(n: Int)(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.##(n)(that.S)
+
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ##(min: Int, max: Option[Int])(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence = ref.##(min, max)(that.S)
+
     def unary_!(
       using Arena,
       Context,

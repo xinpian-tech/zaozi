@@ -8,7 +8,11 @@ import me.jiuyang.utlib.*
   val labels = job("labels").arr.map(_.str).toSeq
   val model = JgModel(os.Path(job("sv").str), job("top").str,
     job("rtl").arr.map(v => os.Path(v.str)).toSeq, labels.toSet,
-    job("include").strOpt.map(os.Path(_)))
+    job("includeDirs").arr.map(p => os.Path(p.str)).toSeq,
+    resetSequence = job.obj.get("resetSequence").flatMap(_.strOpt),
+    initialState = job.obj.get("initialState").flatMap(_.strOpt),
+    clocks = job.obj.get("clocks").toSeq.flatMap(_.arr).map(c => c("port").str -> c("factor").num.toInt),
+    environmentAssumptions = job.obj.get("environmentAssumptions").toSeq.flatMap(_.arr).map(_.str))
   val abi = AbiSpec.fromJson(ujson.write(job("abi")))
   JasperGold.requireUnconstrainedUT(model)
   val rows = labels.map { label =>
@@ -49,7 +53,7 @@ import me.jiuyang.utlib.*
             row("stimulusSha256") = sha(dir / "stimulus.json")
             row("sequenceFile") = sequence.toString
             row("witnessFile") = (dir / "jg" / "witness.vcd").toString
-            row("witnessContract") = JasperGold.witnessContract
+            row("witnessContract") = model.traceContract
             row("witnessSha256") = sha(dir / "jg" / "witness.vcd")
           case GenerateOutcome.Infeasible => row("status") = "infeasible"
           case GenerateOutcome.Unknown(detail) =>
@@ -74,8 +78,8 @@ import me.jiuyang.utlib.*
   val generated = rows.count(_("status").str == "generated")
   val status = if generated == rows.size then "generated" else if generated > 0 then "partial" else "no-witness"
   val report = ujson.Obj("status" -> status, "engine" -> "jaspergold", "utCount" -> 1,
-    "utModule" -> job("module"), "environmentPolicy" -> "fixed-reset-no-model-assumptions-v1",
-    "isolationPolicy" -> "bubblewrap-compile-lower-v1", "replayContract" -> "cycle-replay-v1",
+    "utModule" -> job("module"), "environmentPolicy" -> (if model.clocks.nonEmpty then "shared-event-environment-v1" else "fixed-reset-no-model-assumptions-v1"),
+    "isolationPolicy" -> "bubblewrap-compile-lower-v1", "replayContract" -> (if model.clocks.nonEmpty then model.traceContract else "cycle-replay-v1"),
     "beats" -> rows.filter(_("status").str == "generated").map(_("cycles").num.toInt).sum,
     "goals" -> ujson.Arr.from(rows), "proofObligations" -> job("proofObligations"))
   os.write.over(out / "report.json", ujson.write(report, indent = 2))

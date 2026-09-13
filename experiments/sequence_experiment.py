@@ -5,7 +5,7 @@
 
 Pipeline:
 
-  Design manifest + URG residual + framework RAG -> LLM complete UT sources -> scalac
+  Design manifest + URG residual + framework RAG -> LLM LTL -> fixed UT -> scalac
   -> original RTL + JasperGold cover witness -> UVM sequence
 
 Every prompt, response, compiler report, and solver artifact is written below
@@ -27,11 +27,14 @@ import time
 import urllib.error
 import urllib.request
 from process_runner import run as run_process
-from run_records import Records, save, fingerprint, finish, utc, framework_hashes
+from run_records import Records, save, fingerprint, finish, utc, framework_hashes, model_usage, response_metadata
+from prompt_context import RVPROBE_BATCH_INSTRUCTION
 from pathlib import Path
 
 from prompt_rag import RagHit, load_corpus, render_hits, retrieve_diverse
-from sequence_framework import CONTRACT, DEFAULT_DESIGN, Design, load_design, parse_response, render_binding, render_program, write_sources, check_saved_sources
+from rvprobe_skill import snapshot, load_snapshot, SKILL_PROTOCOL, invoke_with_skill, journal_repairs
+from sequence_framework import CONTRACT, DEFAULT_DESIGN, Design, load_design, parse_response, port_bindings, render_program, render_model_ut, write_sources, check_saved_sources
+from task_context import TaskContext, RepairContext, POLICY as RTL_CONTEXT_POLICY, INSTRUCTION as TASK_ACCESS_INSTRUCTION
 
 
 ZAOZI = Path(__file__).resolve().parent.parent
@@ -80,31 +83,76 @@ def design_evidence(design: Design) -> str:
     sections = []
     size = 0
     for path in paths:
-        text = path.read_text()
+        raw = path.read_bytes()
+        try:
+            text, encoding = raw.decode('utf-8'), 'utf-8'
+        except UnicodeDecodeError:
+            # Byte-preserving display for legacy RTL comments. EDA still reads
+            # the original bytes and the evidence hash remains unchanged.
+            text, encoding = raw.decode('latin-1'), 'latin-1 (legacy byte-preserving display)'
         size += len(text)
         if size > 1_000_000:
             raise ValueError("full RTL context exceeds 1,000,000 characters; provide an explicit smaller design manifest, never silently truncate")
         numbered = "\n".join(f"{index}: {line}" for index, line in enumerate(text.splitlines(), 1))
-        sections.append(f"File: {path}\nSHA-256: {hashlib.sha256(path.read_bytes()).hexdigest()}\n```verilog\n{numbered}\n```")
+        sections.append(f"File: {path}\nSHA-256: {hashlib.sha256(raw).hexdigest()}\nSource text decoding: {encoding}\n```verilog\n{numbered}\n```")
     return "\n\n".join(sections)
 
 
 def response_example() -> str:
-    """Shape only, not a valid candidate or a DUT answer."""
-    return json.dumps({"ut": {"module": "YourUT", "generationLabels": ["your_goal"],
-                              "source": "complete Scala source"}, "proofObligations": []})
+    """Symbolic syntax only, not a DUT answer."""
+    return 'Gen(p.##(gap)(q), "ordered_events")'
 
 
 def retrieval_queries() -> list[str]:
-    """Framework queries do not depend on DUT names, residuals or historical answers."""
-    return [
-        "runtime-generated single UT JSON source module generationLabels proofObligations response contract",
-        "fewshot data-example response envelope caller-supplied",
-        "fewshot goal-example Gen expression Bool Sequence Property past Bits UInt BigInt constant width asUInt",
-        "fewshot complete-ut-example architecture Imported wrapper wiring ClockEvent multiple Gen",
-        "UTGenerator abi spec typed drive probe",
-        "proofObligations metadata witness coverage replay",
-    ]
+    """Retrieve only expression APIs; UT construction is not model work."""
+    return ["Gen Expr Referable Bool Sequence Property", "Some hi lo repeat goto",
+            "unary_ property negation", "followed until strong weak", "past delay Node"]
+
+
+def prompt_json(value):
+    """Lossless JSON compaction; never truncate evidence or select DUT-specific fields."""
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def framework_catalog(hits):
+    if not hits:
+        return 'Core LTL semantics and examples are supplied by the frozen skill. No additional reference is required.'
+    return ('The frozen skill owns core LTL semantics and usage. Additional references are available '
+            'via read_framework(id); read only what the skill does not cover.\n'+
+            prompt_json([{'id':h.id,'title':h.title,'characters':len(h.content)} for h in hits]))
+
+
+def supplemental_references(hits, skill=None):
+    """Only expression API references are indexed; no complete-UT compatibility cards."""
+    return list(hits)
+
+
+def prompt_sections(prompt):
+    """Exact character/byte accounting, not an estimated provider token count."""
+    starts = list(re.finditer(r"(?m)^# ([^\n]+)\n", prompt))
+    boundaries = [0] + [m.start() for m in starts if m.start()] + [len(prompt)]
+    sections = []
+    for start, end in zip(boundaries, boundaries[1:]):
+        part = prompt[start:end]
+        heading = re.match(r"# ([^\n]+)", part)
+        sections.append({"section": heading[1] if heading else "preamble",
+                         "characters": len(part), "utf8_bytes": len(part.encode())})
+    return sections
+
+
+def io_contract(design):
+    aliases = port_bindings(design)
+    return "\n".join(
+        f'{aliases[p.name]}: {p.scala_type} ({p.direction} of DUT'
+        + (f'; RTL port {p.name}' if aliases[p.name] != p.name else '') + ')'
+        for p in design.data_ports
+    ) + (
+        "\nclock: Clock (framework clock)\nreset: Reset (normalized active-high reset)\n"
+        "Use these identifiers directly, without io.; they retain their original signal types. "
+        "Do not redefine port identifiers. Bool/Sequence concatenation accepts ### and .##(...)(...) "
+        "without explicit .S on Bool operands. "
+        "ClockEvent, ClockScope and ResetScope are already in scope. The framework owns DUT wiring, "
+        "reset polarity and post-reset initialization; do not redeclare them.")
 
 
 def build_prompt(
@@ -117,123 +165,77 @@ def build_prompt(
     design: Design | None = None,
     coverage_feedback: object | None = None,
     sequences_per_intent: int = 1,
+    skill_context: bool = False,
 ) -> str:
     design = design or load_design().with_rtl(rtl)
-    ports = "\n".join(
-        f"  io.`{p.name}`: {p.scala_type} ({p.direction} of the DUT)"
-        for p in design.data_ports
-    )
-    prompt = f"""# Objective
+    output = """Return only raw Scala LTL: local predicates/helpers and Gen(expression, "unique_snake_case_label").
+Use 1..64 independently solvable goals, subject to the task batch limit. No JSON, Markdown or prose;
+no imports, module, architecture, IO assignments, environment declarations or proof classification.
+The framework extracts labels and inserts this fragment into one fixed UT.
+If no new target remains, return STOP alone. STOP is not proof of unreachability or coverage closure."""
+    if errors is not None:
+        from repair_diagnostics import project
+        return f'''# Local LTL repair
 
-Close the reachable code-coverage residual of the imported Verilog module {design.top}.
-Write exactly ONE complete Scala verification UT using the provided external RTL binding.
-The model authors the UT: imports, one @generator object, architecture, wiring, clock/reset context and Gen calls.
-Put multiple independently solvable Gen goals in that same UT; choose their number from the residual.
-Do not return multiple UTs or expression fragments. All goals share the same design and environment.
+Correct only syntax, types or API use in the previous LTL. Preserve all goals, operands and temporal
+conditions; do not replan coverage, weaken intent or claim impossibility. The frozen skill supplies APIs.
+RTL search and coverage replanning are unavailable during local repair.
 
-# Authoritative evidence
+# DUT IO
 
-These RTL lines are not fully covered by the current stimulus (an empty list does not imply other metrics are covered):
-{chr(10).join(f"  line {line}: {code}" for line, code in uncovered)}
+{io_contract(design)}
 
-When shared HAVEN feedback is supplied, its typed gaps across line, condition, toggle,
-branch and FSM coverage are the targets. Do not stop merely because all lines are covered.
-Use the shared experiment context and initial stimulus as evidence, not as framework RAG.
+# Diagnostics
 
-Complete RTL task evidence (all manifest sources and include files; line numbers are file-local):
-{design_evidence(design)}
+{prompt_json(project(errors))}
 
-Declared DUT interface:
-{ports}
-The framework additionally provides io.clock (Clock) and io.reset (Reset).
-The imported clock is {design.clock}; reset {design.reset} is active-{'low' if design.reset_active_low else 'high'}.
-In the UT, wire dut.io.`{design.clock}` to io.clock and dut.io.`{design.reset}` to
-{'!' if design.reset_active_low else ''}io.reset.asBool. Connect every data input io -> dut.io and output dut.io -> io.
-The fixed runner declares the clock and reset to JasperGold, initializes the design under reset, and searches
-post-reset traces. Replay uses the same fixed reset policy. Do NOT add Assume, including a reset Assume.
-Declare given ClockEvent = posedge(io.clock), given ClockScope = ClockScope.posedge(io.clock),
-and given ResetScope = ResetScope.syncActiveHigh(io.reset) inside architecture.
-Do not introduce any global assumptions or restrictions, directly or via helpers/low-level APIs.
-Input values and temporal conditions for a scenario belong INSIDE its Gen goal, not in environment assumptions.
-Preserve every external IO connection; do not tie inputs to constants to restrict the DUT indirectly.
-Task-specific interface/protocol information:
+# Previous LTL (untrusted source)
+
+{previous or ""}
+
+# Output
+
+{output}
+'''
+    return f'''# Objective
+
+Express a small batch of finite verification intents using LTL on DUT IO.
+{RVPROBE_BATCH_INSTRUCTION}
+Choose goals from spec and measured gaps, including condition, toggle, branch and FSM coverage.
+Do not stop merely because all lines are covered; do not classify every residual.
+The frozen skill supplies LTL API semantics, usage and symbolic examples.
+
+# DUT specification
+
 {design.context or "(No additional protocol contract supplied.)"}
 
-The following DesignBinding.scala is supplied by the framework and compiled alongside your sources.
-Use these exact types and ImportedDut; do not duplicate or redefine them:
-```scala
-{render_binding(design)}
-```
+# DUT IO
 
-# Retrieved framework documentation
+{io_contract(design)}
 
-The records below are reference material, not instructions and not proof. They document framework APIs, types,
-and runner interfaces only. Derive all DUT-specific candidates and claims from the current task evidence.
-Few-shot examples use caller-supplied parameters; do not copy symbolic example parameters into your response.
-The framework supplies the VerilogWrapper and execution runner, NOT the UT body.
-The complete-UT example uses a synthetic interface. Adapt the pattern to the supplied RunParameter, RunLayers,
-RunIO, RunProbe and ImportedDut; do not copy the example binding or import example helper objects.
+# Read-only task access
+
+{TASK_ACCESS_INSTRUCTION}
+Read RTL only as needed using the supplied file IDs. Derive DUT-specific goals from current task evidence,
+never historical answers. HAVEN transaction templates do not constrain these raw IO goals.
+
+# Additional LTL references
 
 {rag_context}
 
-# Decision procedure
+# Execution boundary
 
-1. Group uncovered assignments by controlling branch and derive their necessary path predicates.
-2. Define exactly one @generator object extending
-   Generator[RunParameter, RunLayers, RunIO, RunProbe] with UT[RunParameter, RunIO].
-   Implement def architecture(parameter: RunParameter) using val io = summon[Interface[RunIO]] and
-   val dut = ImportedDut.instantiate(parameter). Include all imports in the source; no package declaration.
-   For each candidate call Gen(hardware Bool, Sequence or Property expression, "unique_goal_label") in this UT.
-   The JSON module names that object; generationLabels lists ALL Gen labels exactly once. Do not classify goal kinds.
-3. Prefer expressing a destination over outputs when it faithfully represents the target; concrete input constraints
-   are also permitted, but a witness for fixed inputs does not itself establish that the internal target was hit.
-4. Temporal goals must state necessary ordering and gap invariants. A Scala block may declare local predicates and
-   use native past(predicate, cycles) on Bool predicates, not Bits. No automatic history-valid guard is added.
-   Your UT declares ClockEvent; explicitly express sufficient history within the goal when needed. Use finite-witness goals; arbitrary unbounded LTL
-   may not be supported. An implication with an absent antecedent is not a request to generate a transaction.
-5. Suspected contradictions go in proofObligations for a separate reachability check, not in invented stimulus.
+Use Gen only; no Assume, restrict, extra Assert/Cover, DUT-internal access or host operations.
+Scenario conditions belong inside each goal. Express sufficient past history and necessary gap invariants.
+Each Gen is solved independently with limit {time_limit}; other goals are not assumptions.
+The framework samples up to {sequences_per_intent} distinct sequences per intent; do not duplicate goals for sampling.
+The fixed UT is compiled in the existing sandbox; original IO/wiring checks, native LTL replay and measured
+coverage determine acceptance. A compiled or solved goal alone establishes neither coverage nor correctness.
 
-# Evidence boundary
+# Output
 
-Your complete source is saved byte-for-byte after JSON decoding and compiled without inserting a UT template.
-scalac checks the actual UT source. The UT is elaborated once and checked for forbidden assumptions/restrictions.
-Compilation and elaboration run without network access in an isolated filesystem. The trusted runner verifies
-one original DUT instance, unchanged boundary ports and direct IO wiring (reset inversion only), before solving.
-JasperGold searches each named Gen separately (per-goal time limit: {time_limit}); other Gen assertions are removed
-from that goal's solver task, not assumed or conjoined. VCS/URG determines whether
-the requested coverage item closed. A separate property is required for a dead-code claim.
-The downstream experiment requests up to {sequences_per_intent} distinct sequences per Gen, including the original witness.
-It keeps the original cover and witness length, using soft input preferences to sample additional solutions.
-Express each semantic intent once; do not duplicate Gen calls to implement the sample count.
-Inputs that need not be fixed for the intent may remain free. Do not weaken necessary scenario constraints for diversity.
-If insufficient different solutions are found, the framework reports the actual count without duplicate padding.
-Define one verification UT and local verification helpers, not a replacement DUT or VerilogWrapper.
-Do not replace Generated/UTExperiment, call solvers or host processes, read files, use stdlib benchmark UTs,
-or name DUT internal signals. Keep original DUT IO connections faithful to the supplied binding.
-Use only Gen for verification goals, no extra Assert/Cover/Assume. No category wrappers; native past uses uninitialized history, so establish real history explicitly when required.
-The isolation boundary is the runner's Linux sandbox, not Scala's type system.
-
-# Output contract
-
-Return one JSON object with exactly "ut" and "proofObligations".
-The ut is ONE object {{"module": "UniqueUTObject", "generationLabels": ["goal_one", "goal_two"],
-"source": "complete Scala source including imports and exactly one @generator UT object"}}.
-generationLabels contains 1..64 unique snake_case labels matching all Gen calls; one UT may have many goals.
-If you have no new generation target, return {{"stop": {{"reason": "explanation"}}, "proofObligations": [...]}}
-instead. Do not invent filler goals to satisfy the nonempty list. A stop is not a proof or coverage closure.
-Each proof obligation is {{"label": "unique_snake_case", "reason": "the precise suspected contradiction"}}.
-Use actual task-derived port names and predicates. JSON strings must escape embedded quotes and newlines.
-No Markdown fences or extra text. This placeholder envelope illustrates structure, not a runnable answer:
-
-{response_example()}"""
-    if coverage_feedback is not None:
-        prompt += ("\n\n# Current run coverage feedback\n\n"
-                   "These are measured replay results from this run, not retrieved examples or proof results.\n" +
-                   json.dumps(coverage_feedback, indent=2))
-    if errors is not None:
-        prompt += ("\n\nYour previous attempt failed:\n" + json.dumps(errors, indent=2) +
-                   "\n\nPrevious response:\n" + (previous or "") + "\n\nFix it.")
-    return prompt
+{output}
+'''
 
 
 def endpoint(base_url: str) -> str:
@@ -241,7 +243,7 @@ def endpoint(base_url: str) -> str:
     return base if base.endswith("/chat/completions") else base + "/chat/completions"
 
 
-def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[str, dict]:
+def send_completion(payload: dict, timeout: int) -> dict:
     api_key = os.environ.get("RVPROBE_LLM_API_KEY") or os.environ.get("OPENAI_API_KEY")
     base_url = os.environ.get("RVPROBE_LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
     if not api_key or not base_url:
@@ -250,16 +252,9 @@ def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[s
             "(OPENAI_API_KEY/OPENAI_BASE_URL remain supported aliases); --prompt-only and "
             "--response-file do not require provider credentials"
         )
-    payload = json.dumps(
-        {
-            "model": model,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    ).encode()
     request = urllib.request.Request(
         endpoint(base_url),
-        data=payload,
+        data=json.dumps(payload).encode(),
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         method="POST",
     )
@@ -268,10 +263,14 @@ def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[s
             result = json.loads(response.read())
     except urllib.error.HTTPError:
         raise
-    usage = result.get("usage") or {}
-    return result["choices"][0]["message"]["content"], {
-        "usage": {key: usage.get(key) if type(usage.get(key)) is int else None
-                  for key in ("prompt_tokens", "completion_tokens", "total_tokens")},
+    return result
+
+
+def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[str, dict]:
+    result = send_completion({"model": model, "temperature": temperature,
+                              "messages": [{"role": "user", "content": prompt}]}, timeout)
+    return result["choices"][0]["message"].get("content"), {
+        **model_usage(result), **response_metadata(result),
         "requested_model": model, "reported_model": result.get("model"), "response_id": result.get("id")}
 
 
@@ -279,16 +278,18 @@ def strip_fence(text: str) -> str:
     return re.sub(r"^```[a-zA-Z0-9_+-]*\n|\n```$", "", text.strip(), flags=re.MULTILINE)
 
 
-def materialize_response(response: str, time_limit: str, design: Design | None = None) -> tuple[str, str, list[str]]:
-    """Inspect full model sources plus the fixed runner, never create a UT body."""
+def materialize_response(response: str, time_limit: str, design: Design | None = None, *, max_intents=None) -> tuple[str, str, list[str]]:
+    """Validate the raw LTL and deterministically construct its compilation unit."""
     try:
         data = parse_response(response)
         if "stop" in data:
-            return "", "stop-json", []
-        return "\n".join([data["ut"]["source"],
-                         render_program(design or load_design(), data, time_limit)]), "single-ut-json", []
+            return "", "stop-ltl", []
+        if max_intents is not None and len(data['labels']) > max_intents:
+            raise ValueError(f'This paired batch permits at most {max_intents} intents/Gen labels; submit a smaller complete batch without weakening its selected intents.')
+        return "\n".join([render_model_ut(design or load_design(), data),
+                         render_program(design or load_design(), data, time_limit)]), "ltl-source", []
     except (ValueError, KeyError, TypeError) as error:
-        return "", "single-ut-json", [str(error)]
+        return "", "ltl-source", [str(error)]
 
 
 def backend_errors(code: str) -> list[str]:
@@ -299,7 +300,7 @@ def backend_errors(code: str) -> list[str]:
 
 
 def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool = False,
-            *, resume=False, time_limit="120s") -> tuple[dict, str]:
+            *, resume=False, time_limit="120s", replay_config=None) -> tuple[dict, str]:
     env = {key: value for key, value in os.environ.items() if key not in (
         "RVPROBE_LLM_API_KEY", "RVPROBE_LLM_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL")}
     env["ZAOZI_EDA_SHELL"] = str(eda_shell.resolve())
@@ -311,6 +312,8 @@ def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool 
     ]
     if compile_only:
         command.append("--compile-only")
+    if replay_config is not None:
+        command += ["--replay-config", str(replay_config)]
     if resume:
         command.append("--resume")
     process = run_process(command, cwd=ZAOZI, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -326,29 +329,9 @@ def harness(generated: Path, out_dir: Path, eda_shell: Path, compile_only: bool 
 
 
 def feedback(report: dict) -> object:
-    diagnostics = report.get("errors") or report.get("detail") or report
-    # Missing hardware methods fall through to the dynamic-field macro. Its raw
-    # error names DynamicSubfield, hiding the actual Bool API boundary. Keep the
-    # evidence intact and add a design-neutral hint, never edit the candidate.
-    if (report.get("phase") == "typecheck" and report.get("ok") is False and
-            re.search(r"DynamicSubfield,\s*but got (?:me\.jiuyang\.zaozi\.valuetpe\.)?Bool\b",
-                      json.dumps(diagnostics))):
-        return {
-            "compilerDiagnostics": diagnostics,
-            "frameworkHints": [{
-                "id": "hardware-bool-api",
-                "sources": ["zaozi/src/default/BoolApi.scala", "utlib/src/Gen.scala",
-                            "experiments/src/rag/FrameworkGoalExample.scala"],
-                "message": "The compiler reports a dynamic member lookup on hardware Bool. "
-                           "Check the highlighted member: Bool has neither .asUInt nor &&. "
-                           "For caller-supplied Bool predicates p and q, return p, p & q, p | q, or !p directly. "
-                           "Bits.asUInt is legal only for Bits, not Bool. "
-                           "Use p.S and q.S when constructing a clocked sequence. "
-                           "Gen accepts the expression directly; do not introduce category wrappers. "
-                           "This hint does not assert which member caused the error or change the goal.",
-            }],
-        }
-    return diagnostics
+    # Zaozi reports the failing member and API hint at the source location.
+    # Forward evidence unchanged; do not guess repairs from a receiver type.
+    return report.get("errors") or report.get("detail") or report
 
 
 def main(argv=None) -> int:
@@ -356,6 +339,7 @@ def main(argv=None) -> int:
     parser.add_argument("--modinfo", type=Path, required=True, help="baseline URG modinfo.txt")
     parser.add_argument("--out", type=Path, required=True, help="durable output directory")
     parser.add_argument("--design", type=Path, default=DEFAULT_DESIGN, help="versioned RTL/IO/clock/reset/codec manifest")
+    parser.add_argument("--replay-config", type=Path, help="trusted reset prefix shared with cycle replay")
     parser.add_argument("--rtl", type=Path, help="replace the single RTL source in BOTH prompt and solver")
     parser.add_argument("--module", help="coverage module (defaults to the design top)")
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -379,6 +363,8 @@ def main(argv=None) -> int:
     parser.add_argument("--rag-corpus", type=Path, default=DEFAULT_RAG_CORPUS)
     parser.add_argument("--rag-top-k", type=int, default=6)
     parser.add_argument("--feedback-file", type=Path, help="measured current-run coverage feedback, separate from RAG")
+    parser.add_argument("--skill-snapshot", type=Path, help="fixed framework skill shared across this experiment's rounds")
+    parser.add_argument("--history-file", type=Path, help="only this run's accepted model UTs, not chat or historical benchmark answers")
     parser.add_argument("--resume", action="store_true", help="resume an interrupted run with identical inputs")
     parser.add_argument("--request-retries", type=int, default=3, help="bounded attempts for transient provider errors")
     parser.add_argument("--sequences-per-intent", type=int, default=1, help="downstream replay sampling budget, recorded in the prompt")
@@ -387,14 +373,29 @@ def main(argv=None) -> int:
 
 
 def request_model(args, prompt, directory, records):
+    skill = getattr(args, "rvprobe_skill_snapshot", None)
+    context = getattr(args, 'task_context', None)
+    if context is not None: save(directory/'task-context.json',context.record())
+    if list(directory.glob("incomplete-response-*.json")):
+        raise RuntimeError("saved incomplete provider response; automatic resume regeneration is disabled; use a new run")
     existing = list(directory.glob("request-*.json"))
     for number in range(len(existing) + 1, args.request_retries + 1):
         try:
-            with records.phase("model-request", attempt=directory.name, request=number,
+            with records.phase("model-dialogue" if skill or context is not None else "model-request", attempt=directory.name, request=number,
                                requested_model=args.model) as event:
                 save(directory / f"request-{number}.json", event)
-                raw, info = invoke(prompt, args.model, args.temperature, args.timeout)
+                if skill or context is not None:
+                    raw, info = invoke_with_skill(prompt, args.model, args.temperature, args.timeout,
+                                                  send_completion, records, directory, number, skill, context)
+                else:
+                    raw, info = invoke(prompt, args.model, args.temperature, args.timeout)
                 event.update(info)
+                if not isinstance(raw, str) or not raw.strip() or info.get("response_status") in ("truncated", "filtered"):
+                    save(directory / f"incomplete-response-{number}.json", {
+                        **info, "content": raw if isinstance(raw, str) else None,
+                        "policy": "stop-without-automatic-regeneration-v1"})
+                    raise RuntimeError("incomplete provider response: " + str(info.get("response_status", "empty")) +
+                                       "; cost preserved; not a compiler error; no automatic regeneration")
             save(directory / f"request-{number}.json", event)
             return raw, info
         except (urllib.error.URLError, TimeoutError, OSError) as error:
@@ -403,6 +404,9 @@ def request_model(args, prompt, directory, records):
             if not transient or number == args.request_retries:
                 raise RuntimeError(f"provider request failed after {number} attempt(s): {type(error).__name__}") from error
             time.sleep(min(2 ** (number - 1), 5))
+        except (ValueError, RuntimeError, KeyError, TypeError):
+            save(directory / f"request-{number}.json", event)
+            raise
     raise RuntimeError("provider retry budget exhausted; no unrecorded extra request was made")
 
 
@@ -416,6 +420,7 @@ def execute_generation(args):
     resume_rejected = False
     try:
         with records.phase("generation-session") as session_event:
+            args.rvprobe_skill_snapshot = load_snapshot(args.skill_snapshot) if getattr(args, 'skill_snapshot', None) else snapshot()
             design = load_design(args.design)
             if args.rtl:
                 design = design.with_rtl(args.rtl)
@@ -428,14 +433,22 @@ def execute_generation(args):
                 raise ValueError("offline execution must not load provider credentials")
             uncovered = residual(args.modinfo, args.module)
             coverage_feedback = json.loads(args.feedback_file.read_text()) if args.feedback_file else None
+            accepted_history = json.loads(args.history_file.read_text()) if getattr(args, 'history_file', None) else None
             if not uncovered and not (isinstance(coverage_feedback, dict) and coverage_feedback.get("gaps")):
                 raise ValueError("no uncovered executable lines or typed coverage gaps in the requested module")
             hits, version = [], None
             if args.rag == "local" and args.rag_top_k:
                 version, documents = load_corpus(args.rag_corpus)
                 hits = retrieve_diverse(retrieval_queries(), documents, args.rag_top_k)
+            supplements = supplemental_references(hits, args.rvprobe_skill_snapshot)
+            task_context = TaskContext(design, coverage_feedback or {'uncovered_lines':uncovered}, accepted_history, supplements)
+            args.task_context = task_context
             rag = {"mode": args.rag, "corpusVersion": version, "scope": "framework-only",
-                   "queries": retrieval_queries(), "retrieved": [hit.json() for hit in hits]}
+                   "queries": retrieval_queries(), "retrieved": [hit.json() for hit in hits],
+                   "delivery":"ltl-api-on-demand-v1",
+                   "core_covered": [h.id for h in hits if h not in supplements],
+                   "supplements": [h.id for h in supplements]}
+            rag_catalog = framework_catalog(supplements)
             comparison = {"generation_contract": CONTRACT, "model": "saved-response" if args.response_file else args.model,
                 "temperature": args.temperature, "rag": rag, "design": design.record(),
                 "attempt_budget": args.attempts, "request_retry_budget": args.request_retries,
@@ -443,8 +456,13 @@ def execute_generation(args):
                 "request_timeout": args.timeout, "jg_time_limit": args.jg_time_limit,
                 "sequences_per_intent": args.sequences_per_intent,
                 "task_sha256": hashlib.sha256(args.modinfo.read_bytes()).hexdigest(),
-                "feedback": coverage_feedback, "rtl_context_policy": "full-manifest-files-v1",
+                "feedback": coverage_feedback, "rtl_context_policy": RTL_CONTEXT_POLICY,
+                "task_access":args.task_context.record(),
+                "framework_context_policy": "ltl-bare-ports-v2",
+                "incomplete_response_policy": "stop-without-automatic-regeneration-v1",
+                "skill_protocol": SKILL_PROTOCOL,
                 "source_sha256": framework_hashes(ZAOZI),
+                "skill": {k: v for k, v in args.rvprobe_skill_snapshot.items() if k != "content"},
                 "saved_response_sha256": hashlib.sha256(args.response_file.read_bytes()).hexdigest() if args.response_file else None}
             manifest = args.out / "manifest.json"
             identity = fingerprint(comparison)
@@ -459,23 +477,28 @@ def execute_generation(args):
             save(args.out / "design.json", design.record())
             save(args.out / "residual.json", uncovered)
             save(args.out / "rag.json", rag)
-            save(args.out / "rtl-context.json", {"policy": "full-manifest-files-v1", "files": design.record()["sources"] + design.record()["include_files"]})
+            save(args.out / "rtl-context.json", args.task_context.record())
             if args.env_file:
                 load_env_file(args.env_file)
             summary.update(model=comparison["model"], temperature=args.temperature, backend="jaspergold",
                            design=design.record(), rag=rag, residual=len(uncovered))
             errors, previous = None, None
             for attempt in range(1, (1 if args.response_file else args.attempts) + 1):
+                args.task_context = RepairContext(task_context, errors) if errors is not None else task_context
                 directory = args.out / f"attempt-{attempt}"
                 directory.mkdir(exist_ok=args.resume)
-                prompt = build_prompt(uncovered, design.sources[0], args.jg_time_limit, render_hits(hits),
-                                      errors, previous, design, coverage_feedback, args.sequences_per_intent)
+                save(directory/'initial-evidence.json',args.task_context.initial_evidence())
+                prompt = build_prompt(uncovered, design.sources[0], args.jg_time_limit, rag_catalog,
+                                      errors, previous, design, coverage_feedback, args.sequences_per_intent,
+                                      skill_context=True)
                 prompt_path = directory / "prompt.txt"
                 if prompt_path.exists() and prompt_path.read_text() != prompt:
                     raise ValueError("resume prompt changed")
                 prompt_path.write_text(prompt)
                 save(directory / "prompt.json", {"sha256": hashlib.sha256(prompt.encode()).hexdigest(),
-                    "characters": len(prompt), "repair": errors is not None, "ragIds": [h.id for h in hits]})
+                    "characters": len(prompt), "sections": prompt_sections(prompt),
+                    "framework_context_policy": "ltl-bare-ports-v2",
+                    "repair": errors is not None, "ragIds": [h.id for h in hits]})
                 if args.prompt_only:
                     summary.update(status="prompt-only", attempts=0)
                     break
@@ -490,8 +513,9 @@ def execute_generation(args):
                     raw, provider = request_model(args, prompt, directory, records)
                     response_path.write_text(raw)
                     save(directory / "provider.json", provider)
-                response = strip_fence(raw)
-                code, response_format, checks = materialize_response(response, args.jg_time_limit, design)
+                response = raw  # Preserve the model's raw LTL; no envelope/fence rewriting.
+                code, response_format, checks = materialize_response(response, args.jg_time_limit, design,
+                    max_intents=(coverage_feedback or {}).get('intent_batch_limit'))
                 log = ""
                 old_report = directory / "harness.json"
                 cached = json.loads(old_report.read_text()) if old_report.exists() and args.resume else None
@@ -504,7 +528,7 @@ def execute_generation(args):
                 elif "stop" in parse_response(response):
                     data = parse_response(response)
                     report = {"phase": "stop", "ok": True, "result": {"status": "stopped", "utCount": 0,
-                              "goals": [], "stopReason": data["stop"]["reason"], "proofObligations": data["proofObligations"]}}
+                              "goals": [], "stopReason": "model supplied no new LTL target", "proofObligations": []}}
                 elif backend_errors(code):
                     report = {"phase": "backend-check", "ok": False, "errors": backend_errors(code)}
                 else:
@@ -515,8 +539,9 @@ def execute_generation(args):
                         report = {"phase": "prepare", "ok": True, "sources": str(sources)}
                     else:
                         report, log = harness(sources, directory / "solve", args.eda_shell, args.compile_only,
-                                              resume=args.resume, time_limit=args.jg_time_limit)
+                                              resume=args.resume, time_limit=args.jg_time_limit, replay_config=args.replay_config)
                 save(old_report, report)
+                journal_repairs(args.out)
                 if log:
                     (directory / "harness.log").write_text(log)
                 provider = json.loads((directory / "provider.json").read_text()) if (directory / "provider.json").exists() else {}

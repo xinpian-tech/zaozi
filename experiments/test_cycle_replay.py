@@ -19,7 +19,7 @@ from cycle_diagnostic import compare
 import cycle_diagnostic as coverage_flow
 import sequence_experiment as loop
 import sequence_framework as framework
-from test_support import full_ut, append_goals
+from test_support import goal_response, append_goals
 
 FIXTURES = Path(__file__).resolve().parent / "tests/fixtures"
 
@@ -185,6 +185,60 @@ b00101010 o
         with self.assertRaisesRegex(ValueError, "output disagrees"):
             validate_samples(self.design, frames, log.replace("xxxx0011", "xxxx00x1"))
 
+    def test_live_environment_reset_value_is_not_a_stimulus_but_witness_is_checked(self):
+        frames = baseline_frames(self.design, self.config)
+        reset_changed = self.sample_log(frames).replace('0 15000 1 0 0','0 15000 1 1 0')
+        self.assertTrue(validate_samples(self.design,frames,reset_changed,
+                                        reset_environment_inputs=['payload'])['passed'])
+        frames = [frame('baseline',{'payload':0,'valid':0})]
+        changed = self.sample_log(frames).replace('0 15000 0 0 0','0 15000 0 1 0')
+        with self.assertRaisesRegex(ValueError,'sampled drive differs'):
+            validate_samples(self.design,frames,changed,reset_environment_inputs=['payload'])
+        with self.assertRaisesRegex(ValueError,'non-input'):
+            validate_samples(self.design,frames,self.sample_log(frames),reset_environment_inputs=['result'])
+
+    def test_only_supplemental_events_resolve_trusted_electrical_feedback(self):
+        from dataclasses import replace
+        design = replace(self.design, ports=tuple(replace(p, width=8) if p.name == 'done' else p
+                                                 for p in self.design.ports))
+        frames = [dict(frame('witness', {'payload':255,'valid':0}), formal_sample=False)]
+        env = {'feedback':[{'input':'payload','output':'result','enable':'done'}]}
+        log = self.sample_log(frames).replace('15000 0 ff 0 0 0', '15000 0 f0 0 00000000 00001111')
+        self.assertTrue(validate_samples(design, frames, log, environment=env)['passed'])
+        for formal in (True, None):
+            frames[0]['formal_sample'] = formal
+            with self.assertRaisesRegex(ValueError, 'sampled drive differs'):
+                validate_samples(design, frames, log, environment=env)
+        frames[0]['formal_sample'] = False
+        with self.assertRaisesRegex(ValueError, 'sampled drive differs'):
+            validate_samples(design, frames, log.replace('f0 0', 'f0 1'), environment=env)
+        for changed in (log.replace('00001111','0000x111'), log.replace('00000000','0000000x')):
+            with self.assertRaisesRegex(ValueError, 'unknown electrical feedback'):
+                validate_samples(design, frames, changed, environment=env)
+        self.assertTrue(validate_samples(design, frames,
+            log.replace('00000000','xxxx0000'), environment=env)['passed'])
+        with self.assertRaisesRegex(ValueError, 'sampled drive differs'):
+            validate_samples(design, frames, log, environment=env, reset_environment_inputs=['payload'])
+
+    def test_passive_pad_supplemental_resolution_keeps_formal_and_reactive_checks(self):
+        from dataclasses import replace
+        design = replace(self.design, ports=tuple(replace(p,width=1) if p.name in ('payload','result') else p
+                                                 for p in self.design.ports))
+        rows = [dict(frame('witness',{'payload':0,'valid':0}), formal_sample=False)]
+        env = {'open_drain':[{'input':'payload','output':'result','enable_n':'done'}],
+               'passive_open_drain':['payload']}
+        log = self.sample_log(rows).replace('15000 0 0 0 0 0','15000 0 1 0 0 1')
+        self.assertTrue(validate_samples(design,rows,log,environment=env,
+                                        reset_environment_inputs=['payload'])['passed'])
+        rows[0]['formal_sample'] = True
+        with self.assertRaisesRegex(ValueError,'sampled drive differs'):
+            validate_samples(design,rows,log,environment=env)
+        rows[0]['formal_sample'] = False
+        with self.assertRaisesRegex(ValueError,'sampled drive differs'):
+            validate_samples(design,rows,log,environment={**env,'passive_open_drain':[]})
+        with self.assertRaisesRegex(ValueError,'unknown electrical feedback'):
+            validate_samples(design,rows,log.replace('1 0 0 1','1 0 0 x'),environment=env)
+
     def test_feedback_uses_measured_residual_and_rejects_regression(self):
         before = {"bins": {"line": [10, 8]}, "uncovered": [[3, "x"], [4, "y"]], "score": 80}
         after = {"bins": {"line": [10, 9]}, "uncovered": [[4, "y"]], "score": 90}
@@ -193,9 +247,12 @@ b00101010 o
             compare(after, before)
         prompt = loop.build_prompt([(4, "y")], self.design.sources[0], "5s", design=self.design,
                                    coverage_feedback={"closed_lines": [3], "remaining_lines": [4]})
-        self.assertIn("Current run coverage feedback", prompt)
-        self.assertIn('"closed_lines"', prompt)
-        self.assertIn("not retrieved examples or proof results", prompt)
+        self.assertIn("read_context", prompt)
+        self.assertNotIn('"closed_lines"', prompt)
+        from task_context import TaskContext
+        context = TaskContext(self.design, {"closed_lines": [3], "remaining_lines": [4]})
+        self.assertEqual(json.loads(context.dispatch('read_context', {'topic': 'coverage'})['text']),
+                         {"closed_lines": [3], "remaining_lines": [4]})
 
 
 class CoverageFlowTest(unittest.TestCase):
@@ -224,8 +281,8 @@ class CoverageFlowTest(unittest.TestCase):
              contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             code = coverage_flow.main(["--replay-config", str(FIXTURES / "tiny_replay.json"),
                 "--out", str(directory / "flow"), "--rounds", "3",
-                "--response-file", str(FIXTURES / "completion_intent.json"),
-                "--response-file", str(FIXTURES / "completion_intent.json")])
+                "--response-file", str(FIXTURES / "completion_intent.ltl"),
+                "--response-file", str(FIXTURES / "completion_intent.ltl")])
         return code, json.loads((directory / "flow/summary.json").read_text()), calls
 
     def test_next_round_uses_new_measurement_then_stops_without_progress(self):
@@ -270,9 +327,8 @@ class LicensedReplayTest(unittest.TestCase):
         design, config = load_config(FIXTURES / "tiny_replay.json")
         design = design.with_rtl(FIXTURES / "split_output.v")
         root = self.root / "split-output"
-        response = {"ut": full_ut("split_bits",
-                    "(io.valid & (io.payload === BigInt(1).B(8))).S ### (io.done & io.result(0)).S", design),
-                    "proofObligations": []}
+        response = goal_response("split_bits",
+                    "(io.valid & (io.payload === BigInt(1).B(8))).S ### (io.done & io.result(0)).S", design)
         sources = framework.write_sources(root / "sources", design, response)
         report, log = loop.harness(sources, root / "solve", loop.DEFAULT_EDA_SHELL)
         (root / "solve.log").write_text(log)
@@ -292,7 +348,7 @@ class LicensedReplayTest(unittest.TestCase):
 
     def test_unified_goals_and_independent_reset_replay_then_negative_output_check(self):
         design, config = load_config(FIXTURES / "tiny_replay.json")
-        response = framework.parse_response((FIXTURES / "tiny_intents.json").read_text())
+        response = framework.parse_response((FIXTURES / "tiny_intents.ltl").read_text())
         additional = [
             {"label": "property_goal", "expression": "!((!io.valid).S)"},
             {"label": "explicit_history", "expression":
@@ -311,7 +367,7 @@ class LicensedReplayTest(unittest.TestCase):
             {"label": "partial_output", "expression":
              "(io.valid & (io.payload === BigInt(165).B(8))).S ### (io.done & io.result(0)).S"},
         ]
-        append_goals(response["ut"], [(item["label"], item["expression"]) for item in additional])
+        append_goals(response, [(item["label"], item["expression"]) for item in additional])
         sources = framework.write_sources(self.root / "sources", design, response)
         report, log = loop.harness(sources, self.root / "solve", loop.DEFAULT_EDA_SHELL)
         (self.root / "solve.log").write_text(log)

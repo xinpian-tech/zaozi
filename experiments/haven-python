@@ -1,0 +1,18 @@
+#!/bin/sh
+# Run HAVEN's dependency-locked Python using libraries from this flake.
+set -eu
+if [ "$#" -lt 2 ]; then
+  echo "usage: nix develop -c experiments/haven-python HAVEN_ROOT SCRIPT [ARGS...]" >&2
+  exit 2
+fi
+rvprobe_haven_root=$(realpath "$1")
+shift
+if [ "${RVPROBE_PYTHON_LIBRARY_PATH+x}" != x ]; then
+  echo "Enter the zaozi flake dev shell before invoking haven-python." >&2
+  exit 2
+fi
+if [ -n "$RVPROBE_PYTHON_LIBRARY_PATH" ]; then
+  export LD_LIBRARY_PATH="$RVPROBE_PYTHON_LIBRARY_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+export PYTHONPATH="$rvprobe_haven_root/src${PYTHONPATH:+:$PYTHONPATH}"
+exec "$rvprobe_haven_root/.venv/bin/python" "$@"

@@ -1,0 +1,4 @@
+Gen(valid & (payload === BigInt(7).B(8)), "input_value")
+Gen(done & (result === BigInt(9).B(8)), "observed_result")
+Gen(valid ### !valid, "two_beats")
+Gen(valid ### (past(valid) & !valid), "history")

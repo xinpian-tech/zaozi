@@ -1240,8 +1240,8 @@ trait SVAApi:
   def posedge(clock: Referable[Clock]): ClockEvent
   def negedge(clock: Referable[Clock]): ClockEvent
 
-  def past[T <: Referable[Bool]](
-    value: T,
+  def past[D <: Bool | UInt | SInt | Bits](
+    value: Referable[D],
     delay: Int = 1
   )(
     using ClockEvent
@@ -1253,7 +1253,7 @@ trait SVAApi:
     sourcecode.Line,
     sourcecode.Name.Machine,
     InstanceContext
-  ): Node[Bool]
+  ): Node[D]
 
   /** SVA: always p
     */
@@ -1309,6 +1309,58 @@ trait SVAApi:
       sourcecode.Name.Machine,
       InstanceContext
     ): Immediate
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ###(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ##(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ##(n: Int)(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Bool operands are sampled at the current ClockEvent; identical to explicit .S. */
+    def ##(min: Int, max: Option[Int])(that: Referable[Bool] | Sequence)(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
 
     /** SVA: bool_expr throughout s
       */
@@ -1539,6 +1591,58 @@ trait SVAApi:
     ): Property
 
   extension (ref: Sequence)
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ###(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ##(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ##(n: Int)(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
+    /** Lift only the Bool operand; preserve the existing sequence and its clock. */
+    def ##(min: Int, max: Option[Int])(that: Referable[Bool])(
+      using ClockEvent
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line,
+      sourcecode.Name.Machine,
+      InstanceContext
+    ): Sequence
+
     /** SVA: not p
       *
       * This is property negation. CIRCT's `ltl.not` accepts any property-like operand and always produces

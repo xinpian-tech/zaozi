@@ -41,7 +41,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
   // Framework RAG examples are compiled with the runner; these tests use no solver or provider.
   object tests extends ScalaTests with Utest {
     def mvnDeps = Seq(v.utest)
-    override def moduleDeps: Seq[JavaModule] = Seq(m)
+    override def moduleDeps: Seq[JavaModule] = Seq(m, build.testlib)
     override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
     override def forkArgs: T[Seq[String]] = Task(super.forkArgs() ++ circtlib.forkArgs())
   }

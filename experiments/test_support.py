@@ -1,38 +1,21 @@
-"""Test-only construction of complete UT fixtures; never used by generation or RAG."""
-import sequence_framework as framework
+"""Test-only LTL fixtures; never used by generation or RAG."""
+from sequence_framework import parse_response
 
 
-def full_ut(label, expression, design=None, *, module=None):
-    return ut_with_goals([(label, expression)], design, module=module or "Test_" + label)
+def goal_response(label, expression, design=None):
+    return goals_response([(label, expression)])
 
 
-def append_goals(ut, goals):
+def append_goals(response, goals):
+    text = response["ltl"]
     for label, expression in goals:
-        ut["generationLabels"].append(label)
-        ut["source"] += f'''    Gen((
-{chr(10).join('      ' + line for line in expression.splitlines())}
-    ), "{label}")
-'''
-    return ut
+        text += f'\nGen((\n{expression}\n), "{label}")\n'
+    response.update(parse_response(text))
+    return response
 
 
-def ut_with_goals(goals, design=None, *, module="TestUT"):
-    design = design or framework.load_design(framework.ROOT / "experiments/tests/fixtures/tiny_design.json")
-    connections = [f"    dut.io.`{design.clock}` := io.clock",
-                   f"    dut.io.`{design.reset}` := {'!' if design.reset_active_low else ''}io.reset.asBool"]
-    for port in design.data_ports:
-        connections.append(f"    dut.io.`{port.name}` := io.`{port.name}`" if port.direction == "input" else
-                           f"    io.`{port.name}` := dut.io.`{port.name}`")
-    source = framework.IMPORTS + f'''
-@generator
-object {module} extends Generator[RunParameter, RunLayers, RunIO, RunProbe] with UT[RunParameter, RunIO]:
-  override def moduleName(parameter: RunParameter): String = "{module}"
-  def architecture(parameter: RunParameter) =
-    val io = summon[Interface[RunIO]]
-    val dut = ImportedDut.instantiate(parameter)
-{chr(10).join(connections)}
-    given ClockEvent = posedge(io.clock)
-    given ClockScope = ClockScope.posedge(io.clock)
-    given ResetScope = ResetScope.syncActiveHigh(io.reset)
-'''
-    return append_goals({"module": module, "generationLabels": [], "source": source}, goals)
+def goals_response(goals, design=None):
+    text = ""
+    for label, expression in goals:
+        text += f'Gen((\n{expression}\n), "{label}")\n'
+    return parse_response(text)
