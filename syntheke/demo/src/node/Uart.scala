@@ -88,7 +88,7 @@ object UartNodes:
     parameters { (view, domains) =>
       val freq = domains.value(clkClock).hz
       val s    = shapeOf(view.edgeOf(in))
-      Right(UartP(freq / baud, s.addrBits, s.dataBits, s.idBits))
+      Right(UartP(freq / baud, base, s.addrBits, s.dataBits, s.idBits))
     }
     (UartNodes(clk, serial, in), Vector.empty)
 

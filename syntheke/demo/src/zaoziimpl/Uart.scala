@@ -4,16 +4,28 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
+import me.jiuyang.stdlib.mmio.*
 import upickle.default.ReadWriter
 
 
-case class UartP(divisor: Int, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
+case class UartP(divisor: Int, base: Long, addrBits: Int, dataBits: Int, idBits: Int) extends Parameter derives ReadWriter:
   require(divisor >= 8, s"uart divisor $divisor: needs at least 8 clocks per bit")
   require(dataBits == 32, s"uart is a 32-bit single-beat slave, got dataBits $dataBits")
+  require(base >= 0 && base % 4 == 0 && BigInt(base) + 12 < (BigInt(1) << addrBits))
   def shape: AxiShape = AxiShape(addrBits, dataBits, idBits)
+  val transmit = RegField("transmit", 8).writeReadyValid
+  val receive = RegField("receive", 8).readReadyValid
+  val status = RegField("status", 2).readValue
+  val baudDivisor = RegField("baudDivisor", 32).readValue
+  val regMap = RegMapDefinition(addrBits - 2, 32, 1, true, Layer("Verification"), Seq(
+    RegMapRegister(BigInt(base), Seq(transmit)),
+    RegMapRegister(BigInt(base) + 4, Seq(receive)),
+    RegMapRegister(BigInt(base) + 8, Seq(status)),
+    RegMapRegister(BigInt(base) + 12, Seq(baudDivisor))
+  ))
 
 class UartPLayers(p: UartP) extends LayerInterface(p):
-  def layers = Seq.empty
+  def layers = Seq(p.regMap.assertionLayer)
 class UartPProbe(p: UartP)  extends DVBundle[UartP, UartPLayers](p)
 class UartPIO(p: UartP)     extends HWBundle(p):
   val clk    = Flipped(new ClockBundle)
@@ -54,53 +66,22 @@ object UartGen extends Generator[UartP, UartPLayers, UartPIO, UartPProbe]:
     val rxData  = RegInit(0.B(8))
     val rxValid = RegInit(false.B)
 
-    val bPending = RegInit(false.B)
-    val bId      = RegInit(0.B(p.idBits))
-    val rPending = RegInit(false.B)
-    val rId      = RegInit(0.B(p.idBits))
-    val rData    = RegInit(0.B(32))
-
-    io.in.aw.ready    := (!bPending) & io.in.w.valid
-    io.in.w.ready     := (!bPending) & io.in.aw.valid
-    io.in.b.valid     := bPending
-    io.in.b.bits.id   := bId
-    io.in.b.bits.resp := 0.B(2)
-    val doWrite = io.in.aw.valid & io.in.w.valid & (!bPending)
-    when(bPending & io.in.b.ready) { bPending := false.B }
-    when(doWrite) {
-      bPending := true.B
-      bId      := io.in.aw.bits.id
-      val wAddr = io.in.aw.bits.addr.bits(3, 2)
-      when((wAddr === 0.B(2)) & (!txBusy)) {
-        txShift := 1.B(1) ## io.in.w.bits.data.bits(7, 0) ## 0.B(1)
-        txCnt   := 10.U(4)
-        txBaud  := reload
-      }
+    val txStart = Wire(Bool())
+    val txData = Wire(Bits(8))
+    val rxRead = Wire(Bool())
+    when(txStart) {
+      txShift := 1.B(1) ## txData ## 0.B(1)
+      txCnt := 10.U(4)
+      txBaud := reload
     }
-
-    io.in.ar.ready    := !rPending
-    io.in.r.valid     := rPending
-    io.in.r.bits.id   := rId
-    io.in.r.bits.resp := 0.B(2)
-    io.in.r.bits.data := rData
-    io.in.r.bits.last := true.B
-    when(rPending & io.in.r.ready) { rPending := false.B }
-    when(io.in.ar.valid & (!rPending)) {
-      rPending := true.B
-      rId      := io.in.ar.bits.id
-      val rAddr = io.in.ar.bits.addr.bits(3, 2)
-      rData := 0.B(32)
-      when(rAddr === 1.B(2)) {
-        rData   := 0.B(24) ## rxData
-        rxValid := false.B
-      }
-      when(rAddr === 2.B(2)) {
-        rData := 0.B(30) ## rxValid.asBits ## txBusy.asBits
-      }
-      when(rAddr === 3.B(2)) {
-        rData := p.divisor.B(32)
-      }
-    }
+    when(rxRead) { rxValid := false.B }
+    val (req, rsp) = AxiRegMap(io.in, p.shape)
+    p.regMap(req, rsp)(
+      p.transmit.write(!txBusy, txStart, txData),
+      p.receive.read(rxRead, true.B, rxData),
+      p.status.read(rxValid.asBits ## txBusy.asBits),
+      p.baudDivisor.read(p.divisor.B(32))
+    )
 
     when(!rxBusy) {
       when(!rxSync) {

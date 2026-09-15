@@ -13,8 +13,7 @@ final case class WidthBridgeNodes(
 
 object WidthBridgeNodes:
   private[demo] def build(
-    wideBeatBytes:       Int,
-    maxUpstreamTransfer: Int
+    wideBeatBytes: Int
   )(
     using GeneratorScope[WidthBridgeP]
   ): (WidthBridgeNodes, Vector[Constraint]) =
@@ -41,23 +40,27 @@ object WidthBridgeNodes:
       )
     val (d, u)   = depend(inDraft, outDraft)
 
-
     val clk = clkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
     val out = outDraft.seal(ReadPlan(d))(ctx => Right((ctx(d), Vector.empty)))
     val in  = inDraft.seal(ReadPlan(u)) { ctx =>
       val narrow = ctx(u)
-      Right((
-        narrow.copy(
-          beatBytes = wideBeatBytes,
-          slaves = narrow.slaves.map(s =>
-            s.copy(
-              supportsRead = TransferSizes(s.supportsRead.min, maxUpstreamTransfer),
-              supportsWrite = TransferSizes(s.supportsWrite.min, maxUpstreamTransfer)
+      def singleBeat(sizes: TransferSizes): TransferSizes =
+        if sizes.min > narrow.beatBytes then TransferSizes(0, 0)
+        else TransferSizes(sizes.min, math.min(sizes.max, narrow.beatBytes))
+      Right(
+        (
+          narrow.copy(
+            beatBytes = wideBeatBytes,
+            slaves = narrow.slaves.map(s =>
+              s.copy(
+                supportsRead = singleBeat(s.supportsRead),
+                supportsWrite = singleBeat(s.supportsWrite)
+              )
             )
-          )
-        ),
-        Vector.empty
-      ))
+          ),
+          Vector.empty
+        )
+      )
     }
 
     parameters { (view, _) =>
@@ -66,13 +69,12 @@ object WidthBridgeNodes:
     (WidthBridgeNodes(clk, in, out), Vector.empty)
 
 def widthBridge(
-  wideBeatBytes:       Int,
-  maxUpstreamTransfer: Int
+  wideBeatBytes: Int
 )(
   using
-  ws:                  WrapperScope,
-  name:                sourcecode.Name,
-  file:                sourcecode.File,
-  line:                sourcecode.Line
+  ws:            WrapperScope,
+  name:          sourcecode.Name,
+  file:          sourcecode.File,
+  line:          sourcecode.Line
 ): WidthBridgeNodes =
-  generator[WidthBridgeP](WidthBridgeNodes.build(wideBeatBytes, maxUpstreamTransfer))
+  generator[WidthBridgeP](WidthBridgeNodes.build(wideBeatBytes))

@@ -3,7 +3,6 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import upickle.default.Writer
 
-
 def log2Up(x: Long): Int =
   require(x >= 1, s"log2Up($x)")
   if x <= 1 then 0 else 64 - java.lang.Long.numberOfLeadingZeros(x - 1)
@@ -12,10 +11,10 @@ final case class AddressSet(base: Long, mask: Long) derives Writer:
   require(base >= 0 && mask >= 0, s"illegal AddressSet($base, $mask)")
   require((base & mask) == 0L, f"AddressSet base 0x$base%x must be aligned to its mask 0x$mask%x")
 
-  def overlaps(that: AddressSet):    Boolean = ((that.base ^ base) & ~(mask | that.mask)) == 0L
+  def overlaps(that: AddressSet): Boolean = ((that.base ^ base) & ~(mask | that.mask)) == 0L
 
-  def max:        Long    = base | mask
-  def show:       String  = f"0x$base%x/0x$mask%x"
+  def max:  Long   = base | mask
+  def show: String = f"0x$base%x/0x$mask%x"
 
 object AddressSet:
   def misaligned(base: Long, size: Long): Vector[AddressSet] =
@@ -67,8 +66,8 @@ final case class AxiSlaveParams(
   interleavedId: Option[Int] = None)
     derives Writer:
   require(address.nonEmpty, s"slave '$name' needs at least one address set")
-  def maxTransfer:  Int  = math.max(supportsWrite.max, supportsRead.max)
-  def maxAddress:   Long = address.map(_.max).max
+  def maxTransfer: Int  = math.max(supportsWrite.max, supportsRead.max)
+  def maxAddress:  Long = address.map(_.max).max
 
 final case class AxiSlavePort(
   slaves:         Vector[AxiSlaveParams],
@@ -100,8 +99,8 @@ object Axi4 extends Protocol:
   val carries: Set[Domain] = Set.empty
 
   def negotiate(
-    m: AxiMasterPort,
-    s: AxiSlavePort,
+    m:       AxiMasterPort,
+    s:       AxiSlavePort,
     domains: EdgeDomains
   ): Either[Violation, (AxiEdgeParams, Vector[Constraint])] =
     def fail(msg: String) = Left(Violation(msg))
@@ -117,11 +116,9 @@ object Axi4 extends Protocol:
       return fail(
         s"masters need $idBits id bits (endId=${m.endId}) but the downstream absorbs at most ${s.idCapacityBits}"
       )
-    if s.maxTransfer < s.beatBytes then
-      return fail(s"maxTransfer ${s.maxTransfer} smaller than bus width ${s.beatBytes}: link pointlessly wide")
     if s.maxTransfer > s.beatBytes * 256 then
       return fail(s"maxTransfer ${s.maxTransfer} unencodable in AxLEN on a ${s.beatBytes}B bus")
-    val domainChecks = Vector(ClockDomain, ResetDomain).map { domain =>
+    val domainChecks      = Vector(ClockDomain, ResetDomain).map { domain =>
       val out = domains.outward(domain)
       val in  = domains.inward(domain)
       Seq(out, in).check { view =>
@@ -129,16 +126,18 @@ object Axi4 extends Protocol:
         else Left(Violation(s"${domain.key.show} differs between ${out.key.node.show} and ${in.key.node.show}"))
       }
     }
-    Right((
-      AxiEdgeParams(
-        master = m,
-        slave = s,
-        addrBits = math.max(1, log2Up(s.maxAddress + 1)),
-        dataBits = s.beatBytes * 8,
-        idBits = idBits
-      ),
-      domainChecks :+ PowerDomain.compatible(domains, allowModel = false)
-    ))
+    Right(
+      (
+        AxiEdgeParams(
+          master = m,
+          slave = s,
+          addrBits = math.max(1, log2Up(s.maxAddress + 1)),
+          dataBits = s.beatBytes * 8,
+          idBits = idBits
+        ),
+        domainChecks :+ PowerDomain.compatible(domains, allowModel = false)
+      )
+    )
 
   def interface(e: AxiEdgeParams): ProtocolInterface.Bundle =
     import ProtocolInterface.*

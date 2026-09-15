@@ -9,7 +9,6 @@ import upickle.default.ReadWriter
 
 import java.lang.foreign.Arena
 
-
 case class WidthBridgeP(wide: AxiShape, narrow: AxiShape) extends Parameter derives ReadWriter:
   require(wide.dataBits == 128 && narrow.dataBits == 32, s"bridge is 128→32, got ${wide.dataBits}→${narrow.dataBits}")
   require(wide.idBits == narrow.idBits, s"bridge passes ids through, got ${wide.idBits} vs ${narrow.idBits}")
@@ -93,8 +92,8 @@ object WidthBridgeGen extends Generator[WidthBridgeP, WidthBridgePLayers, WidthB
       wState  := 3.B(3)
     }
 
-    io.out.b.ready := wState === 3.B(3)
-    when((wState === 3.B(3)) & io.out.b.valid) { wState := 0.B(3) }
+    io.out.b.ready := (wState === 3.B(3)) & io.in.b.ready
+    when(io.out.b.ready & io.out.b.valid) { wState := 0.B(3) }
 
     when((wState === 4.B(3)) & io.in.w.valid & io.in.w.bits.last) { wState := 5.B(3) }
 
@@ -107,16 +106,18 @@ object WidthBridgeGen extends Generator[WidthBridgeP, WidthBridgePLayers, WidthB
 
     when(wState === 4.B(3)) { io.in.w.ready := true.B }
 
-    val rState = RegInit(0.B(2))
-    val rId    = RegInit(0.B(p.wide.idBits))
-    val rLane  = RegInit(0.B(2))
-    val rAddr  = RegInit(0.B(p.narrow.addrBits))
+    val rState     = RegInit(0.B(2))
+    val rId        = RegInit(0.B(p.wide.idBits))
+    val rLane      = RegInit(0.B(2))
+    val rAddr      = RegInit(0.B(p.narrow.addrBits))
+    val rRemaining = RegInit(0.U(8))
 
     io.in.ar.ready := rState === 0.B(2)
     when(io.in.ar.valid & io.in.ar.ready) {
-      rId   := io.in.ar.bits.id
-      rLane := io.in.ar.bits.addr.bits(3, 2)
-      rAddr := io.in.ar.bits.addr.bits(p.narrow.addrBits - 1, 0)
+      rId        := io.in.ar.bits.id
+      rLane      := io.in.ar.bits.addr.bits(3, 2)
+      rAddr      := io.in.ar.bits.addr.bits(p.narrow.addrBits - 1, 0)
+      rRemaining := io.in.ar.bits.len.asUInt
       when(narrowable(io.in.ar.bits.size, io.in.ar.bits.len)) {
         rState := 1.B(2)
       }.otherwise {
@@ -152,6 +153,12 @@ object WidthBridgeGen extends Generator[WidthBridgeP, WidthBridgePLayers, WidthB
       io.in.r.bits.resp := 2.B(2)
       io.in.r.bits.data := 0.B(128)
     }
-    io.in.r.bits.last := true.B
+    io.in.r.bits.last := (rState =/= 3.B(2)) | (rRemaining === 0.U(8))
     when((rState === 2.B(2)) & io.out.r.valid & io.in.r.ready) { rState := 0.B(2) }
-    when((rState === 3.B(2)) & io.in.r.ready) { rState := 0.B(2) }
+    when((rState === 3.B(2)) & io.in.r.ready) {
+      when(rRemaining === 0.U(8)) {
+        rState := 0.B(2)
+      }.otherwise {
+        rRemaining := (rRemaining - 1.U(8)).asBits.bits(7, 0).asUInt
+      }
+    }

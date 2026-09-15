@@ -69,7 +69,7 @@ object GpioNodes:
 
     parameters { (view, _) =>
       val s = shapeOf(view.edgeOf(in))
-      Right(GpioP(width, s.addrBits, s.dataBits, s.idBits))
+      Right(GpioP(width, base, s.addrBits, s.dataBits, s.idBits))
     }
     (GpioNodes(clk, pins, in), Vector.empty)
 
