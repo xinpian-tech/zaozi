@@ -36,11 +36,10 @@ object Probe:
 
 abstract class ProbeIO[FP <: Parameter, A](parameter: FP, observations: A)(using shape: ProbeShape[A])
   extends HWRecord(parameter):
-  private[zaozi] val handles: Vector[Probe[?]] = shape.handles(observations)
+  private[zaozi] val handles: Vector[Probe[?]] = shape.handles(observations).distinctBy(_.node)
   private[zaozi] val plan: ProbeBindings = ProbeBindings.from(handles.map(_.node))
 
-  private val sources = handles.distinctBy(_.node)
-  sources.zip(plan.ports).foreach { (handle, binding) =>
+  handles.zip(plan.ports).foreach { (handle, binding) =>
     Flipped(binding.portName, handle.dataType)
   }
 

@@ -217,19 +217,26 @@ object Elaborator:
             }
             .withDefaultValue(LayerTree.empty)
 
+        val wrapperPorts = resolved.portPlans
+          .groupBy(_.module)
+          .view.mapValues(_.sortBy(_.name.encoded)).toMap
+          .withDefaultValue(Vector.empty)
+        val wrapperLayers = spec.moduleOrder.flatMap(spec.wrapper).map { w =>
+          w.id -> leafPaths(resolved.layerDecls.getOrElse(w.id, LayerTree.empty).merge(generatorLayers(w.id)))
+        }.toMap
         val tbInputs = resolved.observations.ports
 
         spec.moduleOrder.foreach { id =>
           spec.wrapper(id).foreach { w =>
             val name       = moduleNames(id)
-            val ports      = resolved.portPlans.filter(_.module == id).sortBy(_.name.encoded)
+            val ports      = wrapperPorts(id)
             val portIndex  = ports.zipWithIndex.map((p, i) => p.name.encoded -> i).toMap
             val module     = summon[ModuleApi].op(
               name,
               unknownLoc,
               FirrtlConvention.Scalarized,
               ports.map(p => (portField(p), unknownLoc)),
-              leafPaths(resolved.layerDecls.getOrElse(id, LayerTree.empty).merge(generatorLayers(id)))
+              wrapperLayers(id)
             )
             given Block    = module.block
 
@@ -248,14 +255,14 @@ object Elaborator:
                   )
                   checkedPorts(instOp, expected, childId.show, gm.loc.show).toVector.map((n, v) => ((c, n), v))
                 case _:  WrapperModuleSpec   =>
-                  val childPorts = resolved.portPlans.filter(_.module == childId).sortBy(_.name.encoded)
+                  val childPorts = wrapperPorts(childId)
                   val instOp     = summon[InstanceApi].op(
                     moduleNames(childId),
                     c,
                     FirrtlNameKind.Interesting,
                     unknownLoc,
                     childPorts.map(portField),
-                    leafPaths(resolved.layerDecls.getOrElse(childId, LayerTree.empty).merge(generatorLayers(childId)))
+                    wrapperLayers(childId)
                   )
                   instOp.operation.appendToBlock()
                   childPorts.zipWithIndex.map((p, i) => ((c, p.name.encoded), instOp.operation.getResult(i)))

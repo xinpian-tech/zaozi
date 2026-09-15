@@ -35,9 +35,8 @@ object Negotiator:
     val settled                            = settle(domainReady, propagated)
     val constraints                        = domainReady.constraints ++ spec.constraints ++ propagated.constraints ++ settled.constraints
     val (domains, checks)                  = validateConstraints(domainReady, canonical, constraints)
-    val validated                          = domainReady.copy(domains = domains)
     val edges                              = interfaces(settled.edges)
-    val (generators, probes, observations) = assembleViews(validated, edges)
+    val (generators, probes, observations) = assembleViews(domainReady, edges)
     val (ports, wires, layers)             = Planner.plan(spec, edges, probes, observations)
     ResolvedDesign(
       spec = spec,
@@ -388,23 +387,6 @@ object Negotiator:
         key.node.name
       )
 
-    active.foreach { (bind, key) =>
-      val sourceUse      = useByKey.get(NodeDomainKey(bind.source, key))
-      val targetUse      = useByKey.get(NodeDomainKey(bind.target, key))
-      val carrierPresent = sourceUse.exists(_.selector.isInstanceOf[DomainSelectorSpec.CarrierOut]) ||
-        targetUse.exists(_.selector == DomainSelectorSpec.CarrierIn)
-      if carrierPresent then
-        (sourceUse.map(_.selector), targetUse.map(_.selector)) match
-          case (
-                Some(DomainSelectorSpec.CarrierOut(_)),
-                Some(DomainSelectorSpec.CarrierIn)
-              ) => ()
-          case _ =>
-            fail(
-              s"carrier on ${bind.bindId.show} for ${key.show} requires outward and inward carrier bindings, at ${at(bind.loc)}"
-            )
-    }
-
     val resolved = mutable.Map.empty[NodeDomainKey, ResolvedDomainAttachment]
     val visiting = mutable.ArrayBuffer.empty[NodeDomainKey]
 
@@ -477,28 +459,12 @@ object Negotiator:
   private def validateDomainEdges(
     spec:        DesignSpec,
     active:      Vector[(BindDecl, DomainKey)],
-    attachments: Map[NodeDomainKey, ResolvedDomainAttachment],
     constraints: Vector[ConstraintSpec]
   ): Vector[ResolvedDomainCheck] =
-    val checks    = Vector.newBuilder[ResolvedDomainCheck]
-
-    def attachment(node: ModuleNodeId, key: DomainKey): ResolvedDomainAttachment =
-      attachments.getOrElse(
-        NodeDomainKey(node, key),
-        fail(s"active node ${node.show} has no effective ${key.show} domain")
-      )
-
-    active.foreach { (bind, key) =>
-      val p      = spec.nodeSpec(bind.source).get.protocol
-      val source = attachment(bind.source, key)
-      val target = attachment(bind.target, key)
+    active.flatMap { (bind, key) =>
+      val p = spec.nodeSpec(bind.source).get.protocol
       if p.carries.exists(_.key == key) then
-        if source.declaration != target.declaration then
-          fail(
-            s"${bind.bindId.show} carries ${key.show} but resolves to different declarations " +
-              s"${source.declaration.show} and ${target.declaration.show}, at ${at(bind.loc)}"
-          )
-        checks += ResolvedDomainCheck(s"${bind.bindId.show}:carrier", Vector(key))
+        Vector(ResolvedDomainCheck(s"${bind.bindId.show}:carrier", Vector(key)))
       else
         val covered = constraints.exists { constraint =>
           constraint.source == DomainContributor.Bind(bind.bindId) && (constraint.constraint match
@@ -513,9 +479,8 @@ object Negotiator:
             s"active ${bind.bindId.show} has no protocol check covering both endpoints " +
               s"for ${key.show}, at ${at(bind.loc)}"
           )
+        Vector.empty
     }
-
-    checks.result()
 
 
   private def readableDeclaration(
@@ -774,7 +739,7 @@ object Negotiator:
     }
 
     val checks = Vector.newBuilder[ResolvedDomainCheck]
-    checks ++= validateDomainEdges(spec, ready.active, ready.attachmentByKey, constraints)
+    checks ++= validateDomainEdges(spec, ready.active, constraints)
     contributions.foreach { (contribution, module) =>
       contribution.constraint match
         case check: Constraint.Check =>

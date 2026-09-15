@@ -12,20 +12,17 @@ type WrapperScope       = BuildContext[WrapperMode]
 type GeneratorScope[FP] = BuildContext[GeneratorMode[FP]]
 type TestbenchScope[FP] = BuildContext[TestbenchMode[FP]]
 
-private[syntheke] final case class ProvidedDomain(
-  handle:     DomainHandle[?],
-  providedAt: ModuleId)
-
 private[syntheke] final class DomainEnv private (
-  private val bindings: Map[DomainKey, ProvidedDomain]):
+  private val bindings: Map[DomainKey, DomainSelectorSpec.Contextual]):
 
-  def updated(binding: ProvidedDomain): DomainEnv =
-    new DomainEnv(bindings.updated(binding.handle.domain.key, binding))
+  def updated(binding: DomainSelectorSpec.Contextual): DomainEnv =
+    val DomainSelectorSpec.Contextual(handle, _) = binding
+    new DomainEnv(bindings.updated(handle.domain.key, binding))
 
-  def binding(domain: Domain): Option[ProvidedDomain] =
-    bindings.get(domain.key).map { binding =>
+  def binding(domain: Domain): Option[DomainSelectorSpec.Contextual] =
+    bindings.get(domain.key).map { case binding @ DomainSelectorSpec.Contextual(handle, _) =>
       require(
-        binding.handle.domain eq domain,
+        handle.domain eq domain,
         s"domain key ${domain.key.show} is represented by two different definitions"
       )
       binding
@@ -46,13 +43,20 @@ private final class WrapperDraft(val moduleName: String) extends FrameDraft:
   val binds    = mutable.ArrayBuffer.empty[BindDecl]
   var testbench: Option[ModuleId] = None
 
+private final case class NodeEntry(
+  draft: NodeDraft[?],
+  domains: Vector[NodeDomainSpec],
+  loc: (sourcecode.File, sourcecode.Line),
+  computation: Option[NodeComputation])
+
 private final class GeneratorDraft(val definition: GeneratorDefinition[?]) extends FrameDraft:
-  val nodes  = mutable.ArrayBuffer.empty[(NodeDraft[?], (sourcecode.File, sourcecode.Line))]
+  var nodes  = Vector.empty[NodeEntry]
   val probes = mutable.ArrayBuffer.empty[ProbeSpec[?]]
-  val fns    = mutable.Map.empty[String, NodeComputation]
-  val uses   = mutable.ArrayBuffer.empty[NodeDomainSpec]
   val deps   = mutable.ArrayBuffer.empty[ParamDependencySpec]
   var params: Option[ParameterComputation] = None
+
+  def seal(index: Int, computation: NodeComputation): Unit =
+    nodes = nodes.updated(index, nodes(index).copy(computation = Some(computation)))
 
 private final class BuildFrame(
   val session: BuildSession,
@@ -140,7 +144,7 @@ private[syntheke] final class BuildSession:
 
   private def nodeDrafts(frame: BuildFrame): Iterator[NodeDraft[?]] =
     frame.draft match
-      case generator: GeneratorDraft => generator.nodes.iterator.map(_._1)
+      case generator: GeneratorDraft => generator.nodes.iterator.map(_.draft)
       case _:         WrapperDraft   => Iterator.empty
 
   def requireLiveNode(
@@ -177,7 +181,7 @@ private[syntheke] final class BuildSession:
     require(
       allFrames.exists { frame =>
         live(frame) && (frame.draft match
-          case generator: GeneratorDraft => generator.uses.exists(_.capability eq use)
+          case generator: GeneratorDraft => generator.nodes.exists(_.domains.exists(_.capability eq use))
           case _:         WrapperDraft   => false)
       },
       s"$role ${use.key.show} is not the live incarnation of a declared domain use in this Design build"
@@ -302,18 +306,17 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
       handle.domain.attachmentPolicy.permits(AttachmentMethod.Contextual),
       s"${handle.domain.key.show} does not permit Contextual attachments"
     )
-    val nextEnv = domainEnv.updated(ProvidedDomain(handle, id))
+    val nextEnv = domainEnv.updated(DomainSelectorSpec.Contextual(handle, id))
     body(
       using new BuildContext[R](frame, nextEnv)
     )
 
   private def domainBinding(domain: Domain): DomainSelectorSpec.Contextual =
-    val binding = domainEnv
+    domainEnv
       .binding(domain)
       .getOrElse(
         throw new IllegalArgumentException(s"${id.show}: no contextual domain for ${domain.key.show}")
       )
-    DomainSelectorSpec.Contextual(binding.handle, binding.providedAt)
 
   private[syntheke] def declareDomain[D <: Domain](
     domain: D,
@@ -418,7 +421,7 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
   private def reserveName(name: String, draft: GeneratorDraft): Unit =
     requireOpen(s"declaration '$name'")
     DeclaredName.require(name, s"declaration name in ${id.show}")
-    val taken = draft.nodes.exists(_._1.id.name == name) || draft.probes.exists(_.node.id.name == name)
+    val taken = draft.nodes.exists(_.draft.id.name == name) || draft.probes.exists(_.node.id.name == name)
     require(!taken, s"duplicate declaration name '$name' in ${id.show}")
 
   private[syntheke] def declareProbe[FP, P: TypeIdentity: Writer](
@@ -434,13 +437,15 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
     )
     node
 
-  private def requireDraft(node: NodeDraft[?], draft: GeneratorDraft): Unit =
+  private def requireDraft(node: NodeDraft[?], draft: GeneratorDraft): Int =
     requireOpen(s"node declaration ${node.id.show}")
+    val index = draft.nodes.indexWhere(_.draft eq node)
     require(
-      node.id.module == id && draft.nodes.exists(_._1 eq node),
+      node.id.module == id && index >= 0,
       s"node ${node.id.show} is not a draft of ${id.show}"
     )
-    require(!draft.fns.contains(node.id.name), s"node ${node.id.show} is already sealed")
+    require(draft.nodes(index).computation.isEmpty, s"node ${node.id.show} is already sealed")
+    index
 
   private[syntheke] def inward(
     p: Protocol
@@ -456,8 +461,7 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
     val nodeId = ModuleNodeId(id, name)
     val uses = nodeDomains(p, nodeId, NodeDirection.Inward, domains, (file, line))
     val b = new InwardNodeDraft[p.type](p, scope, nodeId, new NodeCapability, uses.map(_.capability))
-    draft.nodes += ((b, (file, line)))
-    draft.uses ++= uses
+    draft.nodes = draft.nodes :+ NodeEntry(b, uses, (file, line), None)
     b
 
   private[syntheke] def outward(
@@ -474,8 +478,7 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
     val nodeId = ModuleNodeId(id, name)
     val uses = nodeDomains(p, nodeId, NodeDirection.Outward, domains, (file, line))
     val b = new OutwardNodeDraft[p.type](p, scope, nodeId, new NodeCapability, uses.map(_.capability))
-    draft.nodes += ((b, (file, line)))
-    draft.uses ++= uses
+    draft.nodes = draft.nodes :+ NodeEntry(b, uses, (file, line), None)
     b
 
   private[syntheke] def depend(
@@ -520,6 +523,7 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
         s"node ${node.show} is missing carried domain ${domain.key.show}"
       )
     }
+    val firstOrder = frame.generator.nodes.iterator.map(_.domains.size).sum
     bindings.zipWithIndex.map { case (source, index) =>
       val domain = definition(source)
       val key = NodeDomainKey(node, domain.key)
@@ -537,7 +541,7 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
         case (false, _, use: NodeDomain[?]) => DomainSelectorSpec.Follow(use)
       validateDomainSelector(key, domain, selector)
       val token = new NodeDomain(domain, key, owner)
-      NodeDomainSpec(key, domain, selector, frame.generator.uses.size + index, loc, token)
+      NodeDomainSpec(key, domain, selector, firstOrder + index, loc, token)
     }
 
   private def validateDomainSelector(
@@ -571,7 +575,7 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
     f:    ReadValues => Either[Violation, (Any, Vector[Constraint])]
   ): Unit =
     val draft = frame.generator
-    requireDraft(node, draft)
+    val index = requireDraft(node, draft)
     plan.tokens.foreach { token =>
       require(token.tokenOwner eq owner, s"read-plan token of ${node.id.show} belongs to another Design build")
       token match
@@ -599,20 +603,20 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
           )
         case u: NodeDomain[?] =>
           require(u.key.node == node.id, s"${node.id.show}: domain token ${u.key.show} belongs to another node")
-          require(draft.uses.exists(_.capability eq u), s"${node.id.show}: unregistered domain token ${u.key.show}")
+          require(draft.nodes(index).domains.exists(_.capability eq u), s"${node.id.show}: unregistered domain token ${u.key.show}")
     }
-    draft.fns(node.id.name) = NodeComputation.Derived(plan, f)
+    draft.seal(index, NodeComputation.Derived(plan, f))
 
   private[syntheke] def fixed[P <: Protocol](node: InwardNodeDraft[P], value: Any): InwardPort[P] =
     val draft = frame.generator
-    requireDraft(node, draft)
-    draft.fns(node.id.name) = NodeComputation.Constant(value)
+    val index = requireDraft(node, draft)
+    draft.seal(index, NodeComputation.Constant(value))
     new InwardPort(node.protocol, node.id, owner, node.capability, node.nodeDomains)
 
   private[syntheke] def fixed[P <: Protocol](node: OutwardNodeDraft[P], value: Any): OutwardPort[P] =
     val draft = frame.generator
-    requireDraft(node, draft)
-    draft.fns(node.id.name) = NodeComputation.Constant(value)
+    val index = requireDraft(node, draft)
+    draft.seal(index, NodeComputation.Constant(value))
     new OutwardPort(node.protocol, node.id, owner, node.capability, node.nodeDomains)
 
   private[syntheke] def seal[P <: Protocol](
@@ -657,12 +661,12 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
   private[syntheke] def generatorSpec(loc: (sourcecode.File, sourcecode.Line)): GeneratorModuleSpec =
     requireOpen(s"close generator ${id.show}")
     val draft     = frame.generator
-    val nodeSpecs = draft.nodes.toVector.zipWithIndex.map { case ((builder, declLoc), order) =>
+    val nodeSpecs = draft.nodes.zipWithIndex.map { (entry, order) =>
+      val builder = entry.draft
       val direction = builder match
         case _: InwardNodeDraft[?] => NodeDirection.Inward
         case _: OutwardNodeDraft[?] => NodeDirection.Outward
-      val computation = draft.fns.getOrElse(
-        builder.id.name,
+      val computation = entry.computation.getOrElse(
         throw new IllegalStateException(s"node ${builder.id.show}: draft was never sealed")
       )
       NodeSpec(
@@ -670,9 +674,9 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
         direction = direction,
         protocol = builder.protocol,
         computation = computation,
-        nodeDomains = draft.uses.filter(_.key.node == builder.id).toVector,
+        nodeDomains = entry.domains,
         order = order,
-        loc = declLoc,
+        loc = entry.loc,
         capability = builder.capability
       )
     }
