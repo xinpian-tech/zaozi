@@ -79,6 +79,7 @@
             MLIR_INSTALL_PATH = mlir-install;
             JEXTRACT_INSTALL_PATH = jextract;
             LIBC_INCLUDE_PATH = "${stdenv.cc.libc.dev}/include";
+            LD_PRELOAD = lib.optionalString stdenv.isLinux "${jdk25.home}/lib/libjsig.so";
             LIT_INSTALL_PATH = lit;
             # Share regular Mill outputs with BSP so SemanticDB produced by
             # `mill __.compile` is immediately visible to the language server.
