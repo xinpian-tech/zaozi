@@ -1,0 +1,22 @@
+name: Syntheke Demo
+
+on:
+  push:
+    branches: [syntheke]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  elaborate:
+    runs-on: [self-hosted, linux, nixos]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Elaborate Demo
+        run: |
+          output=$(mktemp -d "$RUNNER_TEMP/syntheke-demo.XXXXXX")
+          mkdir "$output/mlirbc"
+          nix develop -c env ZAOZI_OUTDIR="$output/mlirbc" mill --no-server syntheke.demo.run "$output/rtl"
