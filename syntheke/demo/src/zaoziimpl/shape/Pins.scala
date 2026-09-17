@@ -12,10 +12,6 @@ class ClockBundle extends Bundle:
   val clock = Aligned(Clock())
   val reset = Aligned(Reset())
 
-class SerialRecord extends Record:
-  val tx = Aligned("tx", Bool())
-  val rx = Flipped("rx", Bool())
-
 class SerialBundle extends Bundle:
   val tx = Aligned(Bool())
   val rx = Flipped(Bool())
@@ -30,11 +26,17 @@ class GpioPinsBundle(width: Int) extends Bundle:
   val oe  = Aligned(Bits(width))
   val in  = Flipped(Bits(width))
 
-class JtagRecord extends Record:
-  val tms   = Flipped("tms", Bool())
-  val tdi   = Flipped("tdi", Bool())
-  val trstN = Flipped("trstN", Bool())
-  val tdo   = Aligned("tdo", Bool())
+class IORecord extends Record:
+  val inputEnable = Aligned("inputEnable", Bool())
+  val outputValue = Aligned("outputValue", Bool())
+  val outputEnable = Aligned("outputEnable", Bool())
+  val inputValue = Flipped("inputValue", Bool())
+
+class IOBundle extends Bundle:
+  val inputEnable = Aligned(Bool())
+  val outputValue = Aligned(Bool())
+  val outputEnable = Aligned(Bool())
+  val inputValue = Flipped(Bool())
 
 class JtagBundle extends Bundle:
   val tms   = Flipped(Bool())

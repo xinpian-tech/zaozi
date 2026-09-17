@@ -5,15 +5,13 @@ import me.jiuyang.syntheke.demo.{
   ClockDomain,
   ClockReset,
   ClockValue,
-  GpioPins,
-  Jtag,
+  IO,
   PowerDomain,
   PowerValue,
   ResetAssertion,
   ResetDomain,
   ResetRelease,
-  ResetValue,
-  Serial
+  ResetValue
 }
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.syntheke.zaozi.zaozi
@@ -35,15 +33,13 @@ final case class TestHarnessNodes(
   boardResetDomain:       DomainHandle[ResetDomain.type],
   private val outputs:    Vector[ClockReset.Outward],
   private val tckOutputs: Vector[ClockReset.Outward],
-  serialPins:             Serial.Inward,
-  gpioPins:               GpioPins.Inward,
-  jtagPins:               Jtag.Inward):
+  pins:                  Vector[IO.Inward]):
   def tap(n: String): ClockReset.Outward =
     outputs
       .find(_.id.name == n)
       .getOrElse(
         throw new IllegalArgumentException(
-          s"harness '${serialPins.id.module.show}' has no clock tap '$n' (taps: ${outputs.map(_.id.name).mkString(", ")})"
+          s"harness has no clock tap '$n' (taps: ${outputs.map(_.id.name).mkString(", ")})"
         )
       )
 
@@ -52,7 +48,7 @@ final case class TestHarnessNodes(
       .find(_.id.name == n)
       .getOrElse(
         throw new IllegalArgumentException(
-          s"harness '${serialPins.id.module.show}' has no tck tap '$n' (taps: ${tckOutputs.map(_.id.name).mkString(", ")})"
+          s"harness has no tck tap '$n' (taps: ${tckOutputs.map(_.id.name).mkString(", ")})"
         )
       )
 
@@ -60,6 +56,10 @@ private final class TestHarnessBuilder(
   freqHz:          Int,
   taps:            Vector[String],
   tckTaps:         Vector[String],
+  baud:            Int,
+  pinCount:        Int,
+  uartPins:        Vector[Int],
+  jtagPins:        Vector[Int],
   jtagPort:        Int,
   tckDiv:          Int
 )(
@@ -93,43 +93,24 @@ private final class TestHarnessBuilder(
     )
   }
 
-  private val serialPinsDraft =
-    given sourcecode.Name = sourcecode.Name("serialPins")
-    inward(Serial)(
-      crystalClockDomain,
-      boardResetDomain,
-      PowerDomain
-    )
-  private val gpioPinsDraft   =
-    given sourcecode.Name = sourcecode.Name("gpioPins")
-    inward(GpioPins)(
-      crystalClockDomain,
-      boardResetDomain,
-      PowerDomain
-    )
-  private val jtagPinsDraft   =
-    given sourcecode.Name = sourcecode.Name("jtagPins")
-    inward(Jtag)(
-      tckClockDomain,
-      boardResetDomain,
-      PowerDomain
-    )
-
   private val outputs    = outputDrafts.map(_.fixed(()))
   private val tckOutputs = tckOutputDrafts.map(_.fixed(()))
-  val serialPins         = serialPinsDraft.fixed(())
-  val gpioPins           = gpioPinsDraft.fixed(())
-  val jtagPins           = jtagPinsDraft.fixed(())
+  val pins = Vector.tabulate(pinCount) { i =>
+    given sourcecode.Name = sourcecode.Name(s"pin$i")
+    inward(IO)(PowerDomain).fixed(())
+  }
 
-  observedParameters { (probes, view, domains) =>
+  observedParameters { (probes, _, domains) =>
     val traces = TraceObservation.select(probes)
     Right(
       TestHarnessP(
           domains.value(crystalClockDomain).hz,
           taps,
           tckTaps,
-          view.edgeOf(serialPins),
-          view.edgeOf(gpioPins),
+          baud,
+          pinCount,
+          uartPins,
+          jtagPins,
           jtagPort,
           tckDiv,
           traces
@@ -143,15 +124,17 @@ private final class TestHarnessBuilder(
     boardResetDomain,
     outputs,
     tckOutputs,
-    serialPins,
-    gpioPins,
-    jtagPins
+    pins
   )
 
 def testHarness(
   freqHz:          Int,
   taps:            Vector[String],
   tckTaps:         Vector[String],
+  baud:            Int,
+  pinCount:        Int,
+  uartPins:        Vector[Int],
+  jtagPins:        Vector[Int],
   jtagPort:        Int,
   tckDiv:          Int
 )(
@@ -167,6 +150,10 @@ def testHarness(
         freqHz,
         taps,
         tckTaps,
+        baud,
+        pinCount,
+        uartPins,
+        jtagPins,
         jtagPort,
         tckDiv
       ).result

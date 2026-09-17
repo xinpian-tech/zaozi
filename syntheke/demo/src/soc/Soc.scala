@@ -3,6 +3,7 @@ package me.jiuyang.syntheke.demo
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.harness.testHarness
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
+import me.jiuyang.stdlib.iomux.IOMuxRoute
 
 object Soc:
 
@@ -23,6 +24,10 @@ object Soc:
         freqHz = refHz,
         taps = Vector("ref"),
         tckTaps = Vector("dtm", "dmiCross"),
+        baud = baud,
+        pinCount = pinCount,
+        uartPins = uartPins,
+        jtagPins = jtagPins,
         jtagPort = jtagPort,
         tckDiv = tckDiv
       )
@@ -54,6 +59,7 @@ object Soc:
             "uart",
             "gpio",
             "power",
+            "iomux",
             "dmiCross",
             "dm"
           )
@@ -85,12 +91,25 @@ object Soc:
 
         val bridge = widthBridge(wideBeatBytes = 16)
 
-        val periphXbar = axiXbar(Vector("bridge"), Vector("uart", "gpio", "power"), Arbitration.FixedPriority)
+        val periphXbar = axiXbar(Vector("bridge"), Vector("uart", "gpio", "power", "iomux"), Arbitration.FixedPriority)
         val power      = powerController(base = powerBase, size = periphSize, idCapacityBits = 8)
 
         val uart      = uartCtrl(base = uartBase, size = periphSize, idCapacityBits = 8, baud = baud)
         val uartClock = clockBuffer()
         val gpio      = gpioCtrl(base = gpioBase, size = periphSize, idCapacityBits = 8, width = gpioWidth)
+        val uartIO = serialIO(uart.serial)
+        val gpioIOs = gpioIO(gpio.pins, gpioWidth)
+        val alternatePins = (uartPins ++ jtagPins).toSet
+        val mux = ioMux(
+          base = iomuxBase,
+          size = periphSize,
+          idCapacityBits = 8,
+          pinCount = pinCount,
+          routes = Vector("uartTx", "uartRx").zip(uartPins).map((name, pin) => name -> IOMuxRoute(pin, 0)) ++
+            Vector("jtagTms", "jtagTdi", "jtagTrstN", "jtagTdo").zip(jtagPins)
+              .map((name, pin) => name -> IOMuxRoute(pin, 0)) ++
+            Vector.tabulate(gpioWidth)(pin => s"gpio$pin" -> IOMuxRoute(pin, if alternatePins(pin) then 1 else 0))
+        )
 
         val debug = wrapper("DebugIsland") {
           val dtm   = debugTransport(idcode = 0xdeadbeb1L, abits = 7)
@@ -103,6 +122,7 @@ object Soc:
             Vector.empty
           )
         }
+        val jtagPads = jtagIO(debug.jtag)
 
         cpu0Boundary.cpuMem <-- core0.mem
         cpu1Boundary.cpuMem <-- core1.mem
@@ -115,6 +135,7 @@ object Soc:
         uart.in <-- periphXbar.output("uart")
         gpio.in <-- periphXbar.output("gpio")
         power.in <-- periphXbar.output("power")
+        mux.in <-- periphXbar.output("iomux")
         cpu0Boundary.control <-- power.cpu0
         cpu1Boundary.control <-- power.cpu1
 
@@ -126,9 +147,14 @@ object Soc:
         memory.in <-- sysXbar.output("mem")
         memory.clk <-- sysPll.tap("mem")
 
-        harness.serialPins <-- uart.serial
-        harness.gpioPins <-- gpio.pins
-        harness.jtagPins <-- debug.jtag
+        mux.input("uartTx") <-- uartIO.tx
+        mux.input("uartRx") <-- uartIO.rx
+        mux.input("jtagTms") <-- jtagPads.tms
+        mux.input("jtagTdi") <-- jtagPads.tdi
+        mux.input("jtagTrstN") <-- jtagPads.trstN
+        mux.input("jtagTdo") <-- jtagPads.tdo
+        gpioIOs.zipWithIndex.foreach((pin, i) => mux.input(s"gpio$i") <-- pin)
+        harness.pins.zip(mux.pads).foreach((pin, pad) => pin <-- pad)
         debug.tckClk <-- harness.tckTap("dtm")
         debug.crossTck <-- harness.tckTap("dmiCross")
 
@@ -146,6 +172,7 @@ object Soc:
         uart.clk <-- uartClock.out
         gpio.clk <-- sysPll.tap("gpio")
         power.clk <-- sysPll.tap("power")
+        mux.clk <-- sysPll.tap("iomux")
         debug.crossSys <-- sysPll.tap("dmiCross")
         debug.dmClk <-- sysPll.tap("dm")
       ((), Vector.empty)
