@@ -27,8 +27,12 @@ class PromptEfficiencyTests(unittest.TestCase):
         self.assertNotIn(design_evidence(self.design), compact)
         self.assertNotIn('original evidence', compact)
         for rule in ['no Assume', 'raw Scala LTL',
-                     'up to 4 distinct sequences per intent', 'no imports', 'read_rtl', 'read_context']:
+                     'up to 4 distinct sequences per intent', 'no imports', 'read_rtl', 'read_context',
+                     'output LTL in the first response without a tool call']:
             self.assertIn(rule, compact)
+        contract=io_contract(self.design)
+        self.assertIn('scope handles, not hardware Bool predicates',contract)
+        self.assertIn('never use either as a Gen operand',contract)
         context = TaskContext(self.design, feedback)
         self.assertEqual(json.loads(context.topics['coverage'])['gaps'], feedback['gaps'])
         self.assertEqual(json.loads(context.topics['environment'])['shared_context'], feedback['shared_context'])
@@ -38,6 +42,18 @@ class PromptEfficiencyTests(unittest.TestCase):
     def test_json_compaction_never_changes_whitespace_inside_source(self):
         value = {'source': ' a  b\n  中文\t', 'data': [True, None, 2]}
         self.assertEqual(json.loads(prompt_json(value)), value)
+
+    def test_symbolic_task_keeps_checks_and_delegates_concrete_search(self):
+        from task_context import INSTRUCTION
+        prompt=build_prompt([],self.design.sources[0],'120s',design=self.design,sequences_per_intent=4)
+        self.assertIn('Leave witness search and input-value enumeration to the solver',prompt)
+        self.assertIn('history and output checks',prompt)
+        self.assertIn('native LTL replay',prompt)
+        self.assertIn('Do not replace a failing output-related intent',prompt)
+        self.assertIn('request only missing facts',INSTRUCTION)
+        self.assertNotIn('until complete',INSTRUCTION)
+        # Bound boilerplate only, never the DUT spec, evidence or API examples.
+        self.assertLess(len(INSTRUCTION),2500)
 
     def test_task_headings_are_not_mistaken_for_template_boundaries(self):
         context = '# Decision procedure\nretain this task evidence\n# Evidence boundary\n'

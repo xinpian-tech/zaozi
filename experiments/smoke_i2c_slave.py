@@ -1,11 +1,12 @@
 """Generic BFM-only protocol regression. No benchmark, model or coverage answers."""
+import backend_imports
 import argparse
 import json
 from pathlib import Path
 import shlex
 import time
 from jinja2 import Template
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc
 from cycle_replay import digest
 

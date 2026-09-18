@@ -83,6 +83,9 @@ class ParallelBatchTests(unittest.TestCase):
             temporaries = []
             def fake_run(argv, **kwargs):
                 flow = Path(argv[argv.index('--out')+1])
+                self.assertEqual(argv[argv.index('--rvprobe-max-tokens')+1],'393216')
+                self.assertEqual(argv[argv.index('--rvprobe-request-timeout')+1],'3600')
+                self.assertEqual(argv[argv.index('--rvprobe-reasoning-effort')+1],'max')
                 temporaries.append(kwargs['env']['TMPDIR'])
                 barrier.wait(timeout=10)
                 status = 'failed' if flow.parent.name == 'aes' else 'completed'
@@ -92,6 +95,7 @@ class ParallelBatchTests(unittest.TestCase):
                     'batch', '--haven-root', str(root/'haven'), '--env-file', str(root/'unused.env'),
                     '--out', str(root/'work'), '--archive-root', str(root/'archive'),
                     '--relocate-completed', '--jobs', '3', '--arm', 'both',
+                    '--rvprobe-max-tokens','393216','--rvprobe-request-timeout','3600',
                     '--stage1-map', str(mapping), '--designs', 'alu', 'aes', 'sha3']):
                 main()
             self.assertEqual(len(set(temporaries)), 3)

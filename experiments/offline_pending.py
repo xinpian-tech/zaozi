@@ -3,6 +3,7 @@
 No Stage-1 generation, new UT, candidate repairs or provider-response completion.
 Older complete candidates are explicitly distinguished from the failed round.
 """
+import backend_imports
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
@@ -14,7 +15,7 @@ import time
 
 from run_records import save, utc, framework_hashes
 from cycle_replay import digest
-from process_runner import run
+from rvprobe.backend.process import run
 
 
 def main():

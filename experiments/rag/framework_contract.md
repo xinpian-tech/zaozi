@@ -1,8 +1,10 @@
-# LTL-only contract (runtime-ltl-v2)
+# LTL-only contract (runtime-ltl-v4)
 
-The model returns raw Scala LTL: local predicates/pure helpers and
+The model returns raw Scala LTL: local vals, supplied helper calls and
 Gen(expression, "unique_snake_case_label"). No JSON, imports, module declaration,
 architecture, wiring, clock/reset declaration or proof classification.
+No helper definitions. Built-in Ltl.is/isZero/isOnes infer numeric type and width;
+their usage is in the skill, their implementation in utlib, never model-generated.
 Gen accepts Referable[Bool], Sequence or Property. Use native past with explicit
 history when required. No Assume, restrict, extra Assert/Cover or DUT internals.
 
@@ -12,7 +14,10 @@ names are explicitly mapped. Bool/Sequence concatenation accepts ### and fixed/b
 ## with contextual Bool lifting, not a global implicit conversion.
 The framework supplies the clock/reset context, extracts literal labels,
 and deterministically builds one fixed UT from the fragment. It saves model.ltl
-verbatim and independently hashes the generated ModelUT.scala. Each goal is solved
+verbatim and independently hashes the generated ModelUT.scala. One complete whole-response
+Scala code fence may be unwrapped without changing its body; raw response.txt and
+response-normalization.json preserve the original answer, hashes and source offsets.
+Ambiguous/multiple/truncated envelopes are rejected. Each goal is solved
 separately; other goals are neither conjoined nor assumed. Witnesses are checked
 by raw native replay before coverage credit.
 

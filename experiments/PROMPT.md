@@ -1,6 +1,6 @@
 # RVProbe LTL-only / LLM 输出契约
 
-当前契约：`runtime-ltl-v2`。单轮入口为 `sequence_experiment.py`，闭环入口为 `coverage_flow.py`。
+当前契约：`runtime-ltl-v4`。单轮入口为 `sequence_experiment.py`，闭环入口为 `coverage_flow.py`。
 HAVEN 侧 prompt、DSL 和执行方式不变。Stage-1 是固定实验环境，不由本轮模型生成。
 
 ## 分工与输入
@@ -8,7 +8,9 @@ HAVEN 侧 prompt、DSL 和执行方式不变。Stage-1 是固定实验环境，�
 模型只接收 DUT spec、规范化 IO 类型、LTL skill 和当前覆盖/物理环境证据；
 RTL 实现通过只读工具按需读取。初始 prompt 不包含完整 RTL、Scala binding、UT 接线骨架或 runner ABI。
 
-模型只负责在 IO 上表达验证意图：局部谓词、纯 helper、时序表达式和 `Gen` 调用。
+模型只负责在 IO 上表达验证意图：局部 `val`、已有 helper 调用、时序表达式和 `Gen` 调用，不生成函数定义。
+`utlib.Ltl` 提供按信号类型/位宽比较常量的 `is`、全零判断 `isZero` 和全一判断 `isOnes`。
+skill 只说明这些 API 的语义与调用方式；实现由框架编译提供，不含 DUT 地址或协议时序模板。
 IO 表直接列出可用的端口标识符，无需 `io.`。框架按 manifest 生成类型保留的局部别名；
 普通端口同名，Scala/API 名称冲突时使用明确列出的 `port_...` 别名，避免捕获 Gen、past 等符号。
 这是编译前的 codegen，不替换模型文本，也不通过 given/macro 猜测未定义标识符。
@@ -18,7 +20,9 @@ IO 表直接列出可用的端口标识符，无需 `io.`。框架按 manifest �
 
 ## 输出
 
-只返回原始 Scala LTL，不要 JSON、Markdown 围栏或解释。以下是符号语法示意：
+优先返回原始 Scala LTL，不要 JSON 或解释。整个回答恰好是一个完整的 Scala 代码围栏时，
+允许确定性解包：仅删除外层围栏与块外空白，块内源码逐字节不变。多块、夹带说明、
+未知语言标签或缺少闭合围栏均拒绝，不猜测应执行哪段源码。以下是符号语法示意：
 `p`、`q` 为 IO Bool 谓词，`gap` 是 Int 拍数，不是任何设计的答案。
 
 ```scala
@@ -40,7 +44,9 @@ Gen 接受硬件 Bool、Sequence、Property，不区分 value/state 等类别。
 
 ## 产物与验收
 
-`attempt-N/sources/model.ltl` 逐字节保存模型的原始 LTL；
+`attempt-N/response.txt` 逐字节保留完整回答，`response-normalization.json` 记录解包策略、
+原回答/块内源码哈希、字符起止偏移和起始行；resume 校验此记录。
+`attempt-N/sources/model.ltl` 逐字节保存块内 LTL（裸回答则完全相同）；
 `ModelUT.scala`、`DesignBinding.scala`、`Generated.scala` 由框架生成。
 `response.json` 是框架内部解析记录，不是模型输出格式。
 `model-sources.json` 分别记录 LTL 和生成 UT 的哈希；编译、续跑、采样均核验来源和确定性产物。
@@ -54,7 +60,7 @@ raw 输入回放、原始 LTL 验收和 VCS/URG 覆盖统计。语法检查不�
 ## Prompt 与 RAG
 
 RVProbe 在线生成及修复直接携带冻结的 [rvprobe-skill.md](../rvprobe-skill.md)，
-包含 LTL API 的语义、类型、时序用法和通用示例。策略为 `frozen-inline-ltl-skill-v2`。
+包含 LTL API 的语义、类型、时序用法和通用示例。策略为 `frozen-inline-ltl-skill-v4`。
 直接传 skill 原文，不将正文做第二层 JSON 转义；文件名、哈希等 provenance 保存在产物，不重复塞进模型上下文。
 同一次配对在 RVProbe 首轮保存 `frozen-skill.json`，后续各轮和修复复用同一内容并校验哈希，
 不再调用 `read_skill`，也不伪造 assistant/tool 历史。首个请求即包含 skill 和当前任务。
@@ -62,7 +68,7 @@ RVProbe 在线生成及修复直接携带冻结的 [rvprobe-skill.md](../rvprobe
 通过实际已接受 sequence 集合筛选，排除失败候选，不携带旧聊天/推理或其他实验的答案。
 真实任务工具交换仍保留协议所需消息字段，skill 文本仍计入输入 token，不声称免费继承。
 在线主提示词不再内联 RTL 全文、覆盖报告中的源码片段、完整反馈、基线 DSL 或组件声明。
-RVProbe 实现策略为 `complete-round-evidence-ltl-v1`。首个请求附带批准的 RTL 文件目录、
+RVProbe 实现策略为 `compact-evidence-first-ltl-v2`。首个请求附带批准的 RTL 文件目录、
 固定物理环境、基线标识及精确覆盖计数；不内联 RTL 正文，不选取设计答案。
 完整 coverage 仍按需读取，初始统计不冒充全部缺口信息。仅 RVProbe 使用以下只读工具：
 
@@ -77,7 +83,12 @@ RVProbe 实现策略为 `complete-round-evidence-ltl-v1`。首个请求附带批
 
 不提供任意路径、shell、文件写入或历史实验答案。include 扫描只允许 HDL 后缀，拒绝越界符号链接；
 每次读取 RTL 检查固定哈希，内容变化直接失败。提示模型在选择缺口前按需读取 coverage、编写刺激前遵守已提供的 environment，
-不要求默认遍历全部 RTL。RVProbe 每个对话最多 24 次模型请求、64 次任务工具调用，没有额外的 skill 引导请求。
+不要求默认遍历全部 RTL。先识别缺失实现事实并批量取证，再构造 LTL；证据已足够时直接回答，
+不强制增加一个取证请求。spec 原文和已读 RTL 保留，不以摘要替代事实，不删除协议历史推理字段。
+后续轮小型完整反馈采用同一无损列式 gaps 编码，保持全部行、顺序、重复项及元数据；
+内联大小按编码后的长度判断。bins/percent/score 已在 current_feedback 时不再在摘要中重复。
+原始完整 JSON 仍保存在 coverage topic；超限反馈和 RTL 仍可分页读取，不截断。
+RVProbe 每个对话最多 24 次模型请求、64 次任务工具调用，没有额外的 skill 引导请求。
 批量中的每个子查询/区间各计一次工具预算，不因为新增批量接口提高 64 次预算。
 `initial-evidence.json` 保存首轮附带证据；`task-context.json` 保存证据清单/哈希，
 `task-tool-N-M.json` 保存请求、读取范围、实际返回内容及 budget_cost。
@@ -113,6 +124,8 @@ skill 哈希进入运行恢复指纹。离线 response-file 不发请求。
 不重发完整 spec、覆盖报告或 RTL，不开放设计搜索/覆盖重新规划工具。
 保留源码错误类别、错误码、位置和消息；初始优先展示语法错误并去重，最多 8 项。
 完整诊断保持不变，随时可由修复专用 `read_diagnostics` 分页读取；框架 API 仍可按需读取。
+明确的响应包装错误使用 `format-only-repair-v1`：只开放完整诊断，不开放框架参考，
+提示模型仅修复包装。混合/未知诊断不降格成包装错误，仍保留正常语法/类型修复入口。
 修复必须保留原目标及必要时序条件，不删除目标来换取编译通过；框架生成的 UT 仍经过原编译、接线和回放检查。
 框架不猜测或自动改写不明确的 LTL 回答。
 这些完整修复记录不进入 skill/RAG；审查确认的框架通用规则才更新 skill，
@@ -130,7 +143,7 @@ skill 哈希进入运行恢复指纹。离线 response-file 不发请求。
 行覆盖已满不能单独作为停止理由，仍应处理 condition、toggle、branch、FSM 的剩余缺口。
 共享的设计相关初始序列不进入 framework-only RAG；HAVEN 可见原生基线 DSL，RVProbe 仅可见基线标识和统计。
 
-语料版本为 16；`ltl-bare-ports-v2` 内联核心 skill 和补充 LTL API 目录。
+语料版本为 16；`predefined-ltl-helpers-v4` 内联核心 skill 和补充 LTL API 目录。
 完整 UT、JSON 外壳、求解/导出流程和 runner ABI 示例不再进入模型参考白名单。
 补充参考只包含 Gen 接受类型及序列、逻辑组合、属性、past 的原文摘录，按需读取；
 白名单、原文匹配和源文件哈希由 prompt_rag.py 检查。rag.json 保存实际检索内容及来源。

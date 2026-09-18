@@ -1,0 +1,50 @@
+% Preliminary historical results. Two framework revisions; not a current frozen full16 benchmark.
+% S=completed, F=failed, F_0=failed with baseline-only coverage. Failed costs retained.
+\begin{table*}[t]
+\centering
+\small
+\caption{Preliminary historical paired results (HAVEN / RVProbe). Failed runs retain last accepted coverage; $F_0$ denotes baseline-only coverage. Time is Stage-2 wall time on a shared host.}
+\begin{tabular}{lrrrrrr}
+\hline
+Design & Status & Coverage (\%) & Tokens & Rounds & Requests & Time (min) \\
+\hline
+alu & S/F & 97.87/95.74 & 160029/391526 & 3/1 & 3/11 & 7.44/10.48 \\
+aes & S/S & 95.84/95.82 & 133805/283377 & 2/2 & 2/10 & 4.24/15.70 \\
+sha3 & S/S & 99.99/99.99 & 54712/315879 & 2/2 & 2/14 & 2.62/8.75 \\
+axil\_ram & F$_0$/S & 85.80/92.94 & 74242/568791 & 0/2 & 3/18 & 1.90/25.39 \\
+ue\_timer & F$_0$/S & 82.17/99.84 & 141969/700021 & 0/3 & 3/20 & 4.21/25.44 \\
+uart & S/F$_0$ & 95.25/90.93 & 177267/254827 & 3/0 & 3/7 & 7.30/14.98 \\
+can & F$_0$/F & 95.91/97.78 & 358602/3339410 & 0/1 & 2/48 & 9.30/26.32 \\
+ethmac & F/F & 91.93/92.94 & 1229855/5671472 & 2/1 & 5/73 & 14.81/34.08 \\
+i2c & S/S & 88.92/90.43 & 109207/884844 & 2/2 & 2/22 & 3.50/12.73 \\
+gpio & S/S & 93.08/97.90 & 182562/1169550 & 3/3 & 3/36 & 5.83/21.00 \\
+simple\_spi & S/S & 91.67/93.17 & 292914/785153 & 3/3 & 5/21 & 12.07/39.54 \\
+spi & S/F & 97.69/95.77 & 205266/763598 & 3/2 & 4/22 & 8.76/18.11 \\
+ue\_gpio & F$_0$/S & 54.26/97.62 & 175108/1736191 & 0/3 & 3/37 & 3.04/26.28 \\
+ue\_spi & F$_0$/F & 46.04/85.80 & 186838/776752 & 0/1 & 3/19 & 2.72/12.21 \\
+ue\_uart & F$_0$/F & 34.86/85.14 & 139003/529530 & 0/1 & 3/16 & 1.74/8.60 \\
+sdram & F$_0$/S & 72.27/85.82 & 198150/3474945 & 0/3 & 2/61 & 3.64/81.19 \\
+\hline
+\end{tabular}
+\end{table*}
+
+% Separate multi-version RVProbe-only runs; do not merge these into the paired table.
+\begin{table}[t]
+\centering
+\small
+\caption{Recent RVProbe-only reruns across three batches. ETHMAC failed in round 3; coverage reflects two accepted rounds, while cost includes the failure.}
+\begin{tabular}{lrrrrrr}
+\hline
+Design & Status & Coverage (\%) & Tokens & Rounds & Requests & Min \\
+\hline
+aes & S & 95.83 & 201294 & 2 & 8 & 9.59 \\
+sha3 & S & 99.99 & 128181 & 2 & 7 & 5.35 \\
+axil\_ram & S & 92.94 & 75219 & 2 & 4 & 8.34 \\
+ue\_timer & S & 99.84 & 155719 & 3 & 6 & 12.54 \\
+alu & S & 97.07 & 175194 & 3 & 6 & 14.70 \\
+uart & S & 97.30 & 251341 & 3 & 7 & 39.44 \\
+can & S & 97.64 & 1324149 & 3 & 20 & 38.90 \\
+ethmac & F & 94.65 & 3114764 & 2 & 34 & 34.45 \\
+\hline
+\end{tabular}
+\end{table}

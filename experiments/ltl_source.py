@@ -5,14 +5,85 @@ compiler, lowered-IO validation and native witness replay remain mandatory.
 """
 import json
 import re
+import hashlib
 
 LABEL = re.compile(r"[a-z][a-z0-9_]{0,79}\Z")
 FORBIDDEN = {
-    'import', 'package', 'class', 'object', 'trait', 'enum', 'given', 'summon',
+    'import', 'package', 'class', 'object', 'trait', 'enum', 'given', 'summon', 'def',
     'Assume', 'Assert', 'Cover', 'Contract', 'Require', 'Ensure',
     'ImportedDut', 'RunParameter', 'RunIO', 'RunProbe', 'ClockScope', 'ResetScope',
     'dut', 'Reg', 'Wire', 'Mem', 'Memory', 'JasperGold', 'UTGenerator', 'UTExperiment',
 }
+
+
+class OutputFormatError(ValueError):
+    """Ambiguous or unsupported envelope; never guess which code to execute."""
+
+
+def unwrap(source):
+    """Accept one whole-response fence, preserving its exact inner substring."""
+    if not isinstance(source, str) or not source.strip() or len(source) > 100000:
+        raise ValueError('return a nonempty LTL fragment of at most 100000 characters, or STOP')
+    start, end, kind = 0, len(source), 'raw'
+    # Fence lines must be standalone; do not search for a preferred code block.
+    fences = list(re.finditer(r'(?m)^[ \t]*```[^\r\n]*(?:\r?\n|$)', source))
+    if fences:
+        opening, closing = fences[0], fences[-1]
+        if (len(fences) != 2 or source[:opening.start()].strip() or source[closing.end():].strip()
+                or opening.group().rstrip('\r\n') not in ('```', '```scala')
+                or not opening.group().endswith('\n')
+                or closing.group().rstrip('\r\n') != '```'):
+            raise OutputFormatError('return raw LTL or exactly one complete scala code fence, with no surrounding prose or other blocks')
+        start, end, kind = opening.end(), closing.start(), 'single-scala-fence'
+    elif source.lstrip().startswith(('```', '{"', '{ "')):
+        raise OutputFormatError('return raw LTL, not an incomplete fence or UT JSON')
+    body = source[start:end]
+    return body, {'policy': 'exact-ltl-envelope-v1', 'kind': kind,
+        'raw_sha256': hashlib.sha256(source.encode()).hexdigest(),
+        'ltl_sha256': hashlib.sha256(body.encode()).hexdigest(),
+        'body_start_character': start, 'body_end_character': end,
+        'body_first_line': source.count('\n', 0, start) + 1}
+
+
+def normalize(source):
+    """Canonicalize one unambiguous Scala operator spelling.
+
+    Scala parses a curried symbolic call differently when whitespace replaces
+    the receiver dot (``p ##(1)(q)``).  It is nevertheless an unambiguous LTL
+    spelling: no operand, delay or goal changes.  Accept it at the LTL boundary
+    and record the exact source edits instead of spending another model call on
+    a mechanical compiler repair.  Raw provider output remains immutable in
+    response.txt; generated model.ltl contains this canonical form.
+    """
+    body, audit = unwrap(source)
+    stream = tokens(body)
+    edits = []
+    for index in range(1, len(stream) - 2):
+        kind, value, position = stream[index]
+        next_kind, next_value, next_position = stream[index + 1]
+        if (kind, value, next_kind, next_value) != ('symbol','#','symbol','#'):
+            continue
+        if next_position != position + 1 or stream[index + 2][1] != '(':
+            continue
+        previous = stream[index - 1]
+        if previous[1] == '.' or not (previous[0] in ('identifier','quoted') or
+                                      previous[0] == 'symbol' and previous[1] in (')',']')):
+            continue
+        previous_end = previous[2] + len(previous[1])
+        separator = body[previous_end:position]
+        # Comments and other tokens are never rewritten.  A real whitespace
+        # separator is required so canonical input remains byte-identical.
+        if not separator or not separator.isspace():
+            continue
+        edits.append({'kind':'bounded_delay_receiver_dot','start_character':previous_end,
+                      'end_character':position,'original':separator,'replacement':'.'})
+    normalized = body
+    for edit in reversed(edits):
+        normalized = normalized[:edit['start_character']] + edit['replacement'] + normalized[edit['end_character']:]
+    audit.update(canonicalization_policy='bounded-delay-receiver-dot-v1',
+                 canonical_edits=edits,
+                 normalized_ltl_sha256=hashlib.sha256(normalized.encode()).hexdigest())
+    return normalized, audit
 
 
 def tokens(source):
@@ -78,24 +149,26 @@ def tokens(source):
 
 
 def parse(source):
-    if not isinstance(source, str) or not source.strip() or len(source) > 100000:
-        raise ValueError('return a nonempty LTL fragment of at most 100000 characters, or STOP')
+    source, _ = normalize(source)
     if source.strip() == 'STOP':
         return {'stop': True}
-    if source.lstrip().startswith(('```', '{"', '{ "')):
-        raise ValueError('return raw LTL with Gen(expression, "label"), not Markdown or UT JSON')
     stream = tokens(source)
     stack = []
     pairs = {}
     opens = {'(': ')', '[': ']', '{': '}'}
     for index, (kind, value, position) in enumerate(stream):
         io_field = index >= 2 and stream[index - 1][1] == '.' and stream[index - 2][1] == 'io'
+        if kind == 'identifier' and value == 'def':
+            raise ValueError(f'helper definitions are framework-owned (character {position}); call supplied Ltl helpers or compose expressions with local val')
+        if (kind == 'symbol' and value == '=' and source[position:position + 2] == '=>'
+                and (position == 0 or source[position - 1] not in '!#%&*+-/:<=>?@\\^|~')):
+            raise ValueError(f'lambda helper definitions are framework-owned (character {position}); use supplied helpers or local val expressions')
         if ((kind in ('identifier', 'quoted') and value.strip('`') in FORBIDDEN and not io_field) or
                 (kind == 'symbol' and value in (':=', '@'))):
             raise ValueError(f'{value} is not part of the LTL output contract (character {position}); the framework owns the UT and wiring')
         if kind == 'identifier' and value in ('val', 'var', 'def') and index + 1 < len(stream):
-            if stream[index + 1][1].strip('`') in ('io', 'Gen'):
-                raise ValueError('do not redefine the supplied io or Gen')
+            if stream[index + 1][1].strip('`') in ('io', 'Gen', 'Ltl'):
+                raise ValueError('do not redefine the supplied io, Gen or Ltl')
         if kind != 'symbol':
             continue
         if value in opens:

@@ -1,9 +1,12 @@
-"""Generate a complete, known post-reset state from the original RTL, not LLM output.
+"""Generate native post-reset state from the original RTL, not LLM output.
 
 The pinned Verilator frontend discovers clocked storage; VCS evaluates RTL initial
 blocks and the manifest reset prefix. This intentionally fails closed outside the
-supported single-module, positive-edge, finite integral-storage subset.
+supported single-module, positive-edge, finite integral-storage subset. Legacy
+snapshot mode requires fully known state; native mode preserves unknown bits
+and combines a post-reset snapshot with the original JG reset sequence.
 """
+import backend_imports
 import itertools
 import hashlib
 import json
@@ -13,12 +16,17 @@ import re
 import shlex
 import subprocess
 
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import Records, fingerprint, save
 from cycle_replay import digest
 from sequence_framework import identifier
 
 POLICY = "rtl-simulated-reset-state-v1"
+NATIVE_RESET_POLICY = "rtl-simulated-native-reset-v1"
+
+
+class UnsupportedNativeReset(ValueError):
+    """No native snapshot claim outside the deliberately small supported subset."""
 
 
 def nodes(value):
@@ -101,7 +109,84 @@ def state_ports(tree, design):
     return sorted(result, key=lambda p: p["name"])
 
 
-def render_probe(design, replay, ports):
+def initialized_ports(tree, design, ports):
+    """Only deterministic, untimed initial assignments; no design-specific values.
+
+    VCS, not this code, evaluates constants and loops. AST inspection just rules
+    out external data, randomness, delays and cross-process initial races.
+    """
+    module = next(m for m in tree['modulesp'] if m.get('origName') == design.top)
+    variables = {n['addr']:n for n in module['stmtsp'] if n.get('type') == 'VAR'}
+    loops = {k for k,v in variables.items() if v.get('isUsedLoopIdx')}
+    allowed = {'INITIAL', 'INITIALSTATIC', 'BEGIN', 'ASSIGN', 'VARREF', 'CONST',
+               'ARRAYSEL', 'SEL', 'LOOP', 'LOOPTEST', 'ADD', 'SUB', 'MUL',
+               'GTS', 'LTS', 'GT', 'LT', 'GTES', 'LTES', 'GTE', 'LTE', 'EXTEND', 'EXTENDS'}
+    initialized, writers = set(), set()
+    for block in module['stmtsp']:
+        if block.get('type') not in ('INITIAL', 'INITIALSTATIC'): continue
+        writes = set()
+        for n in nodes(block):
+            if n.get('type') not in allowed or n.get('timingControlp'):
+                raise UnsupportedNativeReset('initial block has unsupported timing, operation or side effect')
+            if n.get('type') == 'VARREF':
+                key = n['varp']
+                if n.get('access') in ('RD', 'RW') and key not in loops:
+                    raise UnsupportedNativeReset('initial expression reads non-loop state or DUT IO')
+                if n.get('access') in ('WR', 'RW'): writes.add(key)
+        if writers & writes: raise UnsupportedNativeReset('multiple initial blocks write the same variable')
+        writers.update(writes)
+        initialized.update(writes-loops)
+    names = {'dut.'+variables[k]['verilogName'] for k in initialized if k in variables}
+    selected = [p for p in ports if p['name'].split('[')[0] in names]
+    if not selected: raise UnsupportedNativeReset('no supported explicitly initialized clocked storage')
+    return selected
+
+
+def native_reset_environment(design, replay):
+    env = replay.get('environment')
+    return not env or (env.get('boundary') == 'independent-dut-v1' and
+        len(env.get('clocks', [])) == 1 and env['clocks'][0]['port'] == design.clock and
+        not any(env.get(k) for k in ('extra_resets', 'open_drain', 'feedback', 'static')))
+
+
+def prepare_native_reset(design, replay, directory, eda_shell):
+    """Automatic best-effort discovery; infrastructure failures still propagate."""
+    directory = Path(directory)
+    identity = fingerprint({'design':design.record(), 'replay':replay, 'implementation':digest(Path(__file__))})
+    if (directory/'unsupported.json').exists():
+        saved = json.loads((directory/'unsupported.json').read_text())
+        if saved.get('fingerprint') != identity: raise ValueError('native initialization support inputs changed')
+        return None, None
+    try:
+        if not native_reset_environment(design, replay):
+            raise UnsupportedNativeReset('native reset snapshot requires an independent single-clock environment')
+        state = generate(design, {k:v for k,v in replay.items() if k != 'environment'},
+                         directory, '', eda_shell, native_reset=True)
+    except UnsupportedNativeReset as error:
+        directory.mkdir(parents=True, exist_ok=True)
+        save(directory/'unsupported.json', dict(policy=NATIVE_RESET_POLICY, reason=str(error), fingerprint=identity))
+        return None, None
+    path = directory/'snapshot.json'
+    return state, {'policy':NATIVE_RESET_POLICY, 'file':str(path.resolve()), 'sha256':digest(path)}
+
+
+def verify_native_reset(job, design, replay):
+    state, record = job.get('resetSnapshotState'), job.get('resetSnapshotRecord')
+    if not state and not record: return  # historical jobs retain their original semantics
+    if not state or not record or record.get('policy') != NATIVE_RESET_POLICY or not native_reset_environment(design, replay):
+        raise ValueError('invalid native reset state provenance')
+    path = Path(record['file'])
+    if digest(path) != record['sha256']: raise ValueError('native reset record changed')
+    saved = json.loads(path.read_text())
+    if (saved.get('policy') != NATIVE_RESET_POLICY or saved.get('design') != design.record() or
+            saved.get('idle') != replay['idle'] or saved.get('reset_cycles') != replay['reset_cycles'] or
+            saved.get('implementation') != digest(Path(__file__)) or
+            any(digest(Path(p)) != h for p,h in saved['artifact_sha256'].items()) or
+            (path.parent/'initial.state').read_text() != state or job.get('initialState')):
+        raise ValueError('native reset state or inputs changed')
+
+
+def render_probe(design, replay, ports, *, power_on=False):
     declarations, connections = [], []
     for p in design.ports:
         identifier(p.name, "probe IO")
@@ -118,21 +203,23 @@ def render_probe(design, replay, ports):
     displays = "\n".join(f'$display("RVPROBE_INIT {p["name"]} %b", {p["name"]});' for p in ports)
     return ("`timescale 1ns/1ps\nmodule rvprobe_initial_state_probe;\n"+"\n".join(declarations)+
         f"\n{design.top}{params} dut ("+", ".join(connections)+
-        f");\nalways #5 {design.clock} = ~{design.clock};\ninitial begin\n"
-        f"repeat ({replay['reset_cycles']}) @(posedge {design.clock});\n"
-        f"@(negedge {design.clock});\n{design.reset} = 1'b{int(design.reset_active_low)};\n#1;\n"+
+        f");\nalways #5 {design.clock} = ~{design.clock};\ninitial begin\n"+
+        ("#1;\n" if power_on else
+         f"repeat ({replay['reset_cycles']}) @(posedge {design.clock});\n"
+         f"@(negedge {design.clock});\n{design.reset} = 1'b{int(design.reset_active_low)};\n#1;\n")+
         displays+'\n$display("RVPROBE_INIT_DONE");\n$finish;\nend\nendmodule\n')
 
 
-def parse_state(log, ports):
+def parse_state(log, ports, *, allow_unknown=False):
     expected = {p["name"]: p["width"] for p in ports}
     values = {}
     for name, bits in re.findall(r"(?m)^RVPROBE_INIT (\S+) ([01xXzZ]+)\s*$", log):
         if name in values or name not in expected or len(bits) != expected[name]:
             raise ValueError("duplicate, unexpected or wrong-width snapshot state")
-        if re.search(r"[xXzZ]", bits):
+        if re.search(r"[xXzZ]", bits) and not allow_unknown:
             raise ValueError(f"unknown post-reset state: {name}; do not zero-fill missing initialization")
-        values[name] = f"{len(bits)}'h{int(bits, 2):x}"
+        values[name] = (f"{len(bits)}'b{bits.lower().replace('z', 'x')}" if re.search(r"[xXzZ]", bits)
+                        else f"{len(bits)}'h{int(bits, 2):x}")
     if set(values) != set(expected) or "RVPROBE_INIT_DONE" not in log.splitlines():
         raise ValueError("incomplete RTL snapshot simulation")
     return values
@@ -182,11 +269,13 @@ def verify_prepared(job, design, replay):
         raise ValueError("solver and sampler initial states differ")
 
 
-def generate(design, replay, directory, prior, eda_shell):
+def generate(design, replay, directory, prior, eda_shell, *, power_on=False, native_reset=False):
     if replay.get('environment'):
         raise ValueError('event environment requires native formal reset, not single-clock snapshot')
     directory = Path(directory).resolve()
-    inputs = {"policy": POLICY, "design": design.record(), "reset_cycles": replay["reset_cycles"],
+    if power_on and native_reset: raise ValueError('choose one snapshot sampling point')
+    inputs = {"policy": NATIVE_RESET_POLICY if native_reset else 'rtl-power-on-diagnostic-v1' if power_on else POLICY,
+              "design": design.record(), "reset_cycles": replay["reset_cycles"],
               "idle": replay["idle"], "prior": prior, "implementation": digest(Path(__file__))}
     key = fingerprint(inputs)
     if (directory / "snapshot.json").exists():
@@ -211,17 +300,37 @@ def generate(design, replay, directory, prior, eda_shell):
         *["-I"+str(p) for p in design.include_dirs], *[f"-G{k}={v}" for k,v in design.parameters],
         *map(str, design.sources)], "snapshot-discover")
     if re.search(r"%Warning-(?:LATCH|MULTIDRIVEN|UNSUPPORTED)", output):
+        if power_on or native_reset: raise UnsupportedNativeReset('snapshot discovery reported unsupported state semantics')
         raise ValueError("snapshot discovery reported unsupported state semantics")
-    ports = state_ports(json.loads(tree_path.read_text()), design)
+    tree = json.loads(tree_path.read_text())
+    try:
+        ports = state_ports(tree, design)
+    except ValueError as error:
+        if power_on or native_reset: raise UnsupportedNativeReset(str(error)) from error
+        raise
+    if power_on or native_reset:
+        initial = initialized_ports(tree, design, ports)
+        if power_on:
+            ports = initial
+        else:
+            # Capture the complete DUT post-reset state, not only initialized
+            # RAM. Cumulative JG reset overlays values; it does not simulate
+            # reset starting from the supplied power-on file.
+            loop_names = {'dut.'+n['verilogName'] for n in nodes(tree)
+                          if n.get('type') == 'VAR' and n.get('isUsedLoopIdx') and n.get('verilogName')}
+            ports = [p for p in ports if p['name'].split('[')[0] not in loop_names]
     save(directory / "storage.json", ports)
     probe = directory / "probe.sv"
-    probe.write_text(render_probe(design, replay, ports))
+    probe.write_text(render_probe(design, replay, ports, power_on=power_on))
     compile_args = ["vcs", "-full64", "-sverilog", "-timescale=1ns/1ps", "-top", "rvprobe_initial_state_probe", "-o", "simv",
         *["+incdir+"+str(p) for p in design.include_dirs], *map(str, design.sources), str(probe)]
     execute([str(eda_shell), "-c", shlex.join(compile_args)], "snapshot-compile")
     log = execute([str(eda_shell), "-c", "./simv"], "snapshot-simulate")
-    values = parse_state(log, ports)
+    values = parse_state(log, ports, allow_unknown=power_on or native_reset)
     validate_prior(prior, values)
+    if power_on or native_reset:
+        values = {n:v for n,v in values.items() if not re.fullmatch(r"\d+'bx+", v)}
+        if not values: raise UnsupportedNativeReset('explicit initial state contains no known bits')
     state = "".join(f"{name}\n{value}\n" for name,value in sorted(values.items()))
     (directory / "initial.state").write_text(state)
     save(directory / "snapshot.json", {"fingerprint": key, **inputs, "register_words": len(values),

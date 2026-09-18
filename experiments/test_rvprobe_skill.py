@@ -16,6 +16,19 @@ from task_context import TaskContext, TOOLS
 
 
 class SkillTests(unittest.TestCase):
+    def test_skill_helpers_are_calls_not_implementations(self):
+        content = snapshot()["content"]
+        for snippet in re.findall(r"```scala\n(.*?)\n```", content, re.S):
+            self.assertNotRegex(snippet, r"\bdef\s")
+        for name in ("Ltl.is(", "Ltl.isZero(", "Ltl.isOnes("):
+            self.assertIn(name, content)
+        self.assertIn('emit LTL immediately in that same response',content)
+        self.assertIn('not hardware\n`Bool` predicates',content)
+        self.assertIn('receiver dot (`.##`)',content)
+        self.assertIn('Do not write `predicate & sequence`',content)
+        self.assertIn('`predicate.throughout(sequence)`',content)
+        self.assertIn("utlib/src/Ltl.scala", framework_hashes(Path(__file__).resolve().parents[1]))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -44,7 +57,8 @@ class SkillTests(unittest.TestCase):
         self.assertEqual(text,"answer");self.assertEqual(len(payloads),1)
         messages=payloads[0]["messages"]
         self.assertEqual([m["role"] for m in messages],["user","user"])
-        self.assertEqual(messages[0]["content"].split("\n",1)[1],snapshot()["content"])
+        from rvprobe_skill import compact_skill_text
+        self.assertEqual(messages[0]["content"].split("\n",1)[1],compact_skill_text(snapshot()["content"]))
         self.assertNotIn(snapshot()["sha256"], messages[0]["content"])
         self.assertEqual(messages[-1]["content"],"test task")
         self.assertNotIn("tools",payloads[0])
@@ -65,7 +79,8 @@ class SkillTests(unittest.TestCase):
             payload=send.call_args.args[0]
             self.assertEqual(send.call_count,1);self.assertEqual(payload["tools"],TOOLS)
             self.assertNotIn("read_skill",[t["function"]["name"] for t in payload["tools"]])
-            self.assertEqual(payload["messages"][0]["content"].split("\n",1)[1],frozen["content"])
+        from rvprobe_skill import compact_skill_text
+        self.assertEqual(payload["messages"][0]["content"].split("\n",1)[1],compact_skill_text(frozen["content"]))
         changed=dict(frozen,content="tampered");save(path,changed)
         with self.assertRaisesRegex(ValueError,"invalid frozen skill"):load_snapshot(path)
 
@@ -137,25 +152,41 @@ class SkillTests(unittest.TestCase):
         self.assertEqual(record, journal_repairs(self.root))
         self.assertNotIn("private_fixed", snapshot()["content"])
 
+    def test_argument_repair_journal_requires_more_than_typechecking(self):
+        directory=self.root/'attempt-1'
+        (directory/'sources').mkdir(parents=True)
+        (directory/'sources/model.ltl').write_text('private_argument_error')
+        save(directory/'harness.json',{'phase':'elaboration-check','kind':'model_argument_error','ok':False,
+            'errors':[{'file':'model.ltl','code':'ltl_unsigned_range','message':'bad value'}]})
+        self.assertEqual(journal_repairs(self.root)['repairs'][0]['status'],'pending')
+        later=self.root/'attempt-2'
+        (later/'sources').mkdir(parents=True)
+        (later/'sources/model.ltl').write_text('private_proposed_repair')
+        save(later/'harness.json',{'phase':'typecheck','ok':True})
+        self.assertEqual(journal_repairs(self.root)['repairs'][0]['status'],'changed-unverified')
+        save(later/'harness.json',{'phase':'solve','ok':True})
+        self.assertEqual(journal_repairs(self.root)['repairs'][0]['status'],'compiled')
+        self.assertNotIn('private_proposed_repair',snapshot()['content'])
+
 
 @unittest.skipUnless(os.environ.get("RVPROBE_TEST_SKILL_COMPILE") == "1", "opt-in real Nix/compiler test")
 class SkillHelperCompileTests(unittest.TestCase):
     def test_actual_skill_helpers_accept_io_nodes_and_constants(self):
-        from sequence_framework import ROOT, write_sources
-        from test_support import goal_response
+        from sequence_framework import ROOT, write_sources, parse_response
         snippets = re.findall(r"```scala\n(.*?)\n```", snapshot()["content"], re.S)
-        helpers = [snippet for snippet in snippets if "def same(" in snippet]
+        helpers = [snippet for snippet in snippets if "Ltl.isZero(" in snippet]
         self.assertEqual(len(helpers), 1)
         # Compile the actual skill text, not a second hand-maintained example.
-        body = "{\n" + helpers[0] + "\ngated(same(payload, BigInt(0).B(8)), valid)\n}"
+        body = helpers[0].replace("bits", "payload")
         design = load_design(Path(__file__).parent / "tests/fixtures/tiny_design.json")
         with tempfile.TemporaryDirectory(prefix="rvprobe-skill-types-") as temporary:
             root = Path(temporary)
-            for name, expression, expected in (
-                ("valid", body, True),
-                ("datatype_not_reference", body.replace("Referable[Bits]", "Bits").replace("Referable[Bool]", "Bool"), False),
+            for name, source, expected in (
+                ("skill_example", body, True),
+                ("typed_values", 'Gen(Ltl.is(payload, BigInt(3)) & Ltl.isZero(payload ^ payload) & Ltl.isOnes(BigInt(255).U(8)) & Ltl.isOnes(BigInt(-1).S(8)) & Ltl.isZero(BigInt(0).S(1)), "typed_values")', True),
+                ("bool_not_numeric", body.replace("payload", "valid"), False),
             ):
-                response = goal_response("helper_types", expression, design)
+                response = parse_response(source)
                 sources = root / name / "sources"
                 write_sources(sources, design, response)
                 report, log = generation.harness(sources, root / name / "compile", ROOT / "experiments/eda-shell", compile_only=True)

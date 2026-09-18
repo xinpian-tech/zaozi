@@ -4,6 +4,7 @@
 Every design runs in a fresh process with its own native token tracker. Never
 discard BFMs, static pins or resets to bypass the paired adapter's scope checks.
 """
+import backend_imports
 import argparse
 import json
 import logging
@@ -12,7 +13,7 @@ import sys
 import time
 from types import SimpleNamespace
 
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc, framework_hashes, fresh_directory
 from haven_shared import checkout_hashes
 from design_inventory import DESIGNS

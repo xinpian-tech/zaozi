@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import time
 import uuid
+import backend_imports
+from rvprobe.backend.records import Records, save, utc, fingerprint
 
 
 def fresh_directory(path):
@@ -32,21 +34,6 @@ def fresh_directory(path):
                    'recovered_empty_create':recovered,'created_utc':utc()},stream)
     return path
 
-
-def utc():
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-
-
-def save(path, value):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
-    temporary.replace(path)
-
-
-def fingerprint(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 USAGE_DETAILS = {
@@ -78,7 +65,19 @@ def response_metadata(response):
     status = ("truncated" if reason == "length" else "filtered" if reason == "content_filter" else
               "tool_call" if message.get("tool_calls") else
               "complete" if isinstance(content, str) and content.strip() else "empty")
+    usage = model_usage(response)
+    completion = usage['usage']['completion_tokens']
+    reasoning = usage['usage_details']['reasoning_tokens']
+    failure = None
+    if status == 'truncated':
+        failure = ('provider_reasoning_budget_exhausted'
+                   if completion is not None and completion > 0 and reasoning == completion
+                   and not (isinstance(content, str) and content.strip()) and not message.get('tool_calls')
+                   else 'provider_output_truncated')
+    elif status in ('filtered', 'empty'):
+        failure = 'provider_' + status + '_response'
     return {"finish_reason": reason, "response_status": status,
+            "response_failure_kind": failure,
             "output_characters": len(content) if isinstance(content, str) else 0,
             "reasoning_characters": len(message.get("reasoning_content") or "")}
 
@@ -102,42 +101,13 @@ def framework_hashes(root):
     root = Path(root)
     paths = {p for p in (root / "experiments").glob("*.py") if not p.name.startswith("test_")}
     for directory, pattern in (("experiments/src", "*.scala"), ("experiments/rag", "*"),
-                               ("utlib/src", "*.scala"), ("zaozi/src", "*.scala"),
+                               ("utlib/src", "*.scala"), ("rvprobe/backend", "*.py"), ("zaozi/src", "*.scala"),
                                ("zaozi-compiler-plugin/src", "*.scala")):
         paths.update(p for p in (root / directory).rglob(pattern) if p.is_file())
     paths.add(root / "experiments/package.mill")
     paths.update(root / name for name in ("build.mill", "flake.nix", "flake.lock", "experiments/eda-shell", "rvprobe-skill.md") if (root / name).is_file())
     return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
-
-class Records:
-    def __init__(self, directory):
-        self.path = Path(directory) / "events.jsonl"
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-    def append(self, record):
-        with self.path.open("a") as stream:
-            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-
-    @contextmanager
-    def phase(self, phase, **fields):
-        event = {"id": uuid.uuid4().hex, "phase": phase, "started_utc": utc(), "status": "running", **fields}
-        began = time.monotonic()
-        self.append(event)
-        try:
-            yield event
-            if event["status"] == "running":
-                event["status"] = "ok"
-        except BaseException as error:
-            event.update(status="failed", error_type=type(error).__name__)
-            if getattr(error, "code", None) is not None:
-                event["error_code"] = error.code
-            raise
-        finally:
-            event.update(finished_utc=utc(), seconds=time.monotonic() - began)
-            self.append(event)
 
 
 def totals(directory):

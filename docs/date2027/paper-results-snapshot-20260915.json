@@ -1,0 +1,2884 @@
+{
+  "captured_utc": "2026-09-15T13:19:11.456246+00:00",
+  "reference": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/report-combined.json",
+  "reference_selection": "Latest completed pair if available, otherwise latest started attempt; all listed attempts retained",
+  "scope": "historical paired cohort retained including failures; later RVProbe-only runs shown separately, not substituted",
+  "paired": [
+    {
+      "design": "alu",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 97.86648472365445,
+          "percent": {
+            "line": 98.88268156424581,
+            "cond": 98.11320754716981,
+            "toggle": 97.54697286012527,
+            "branch": 96.92307692307692
+          },
+          "modules": [
+            "alu_top"
+          ],
+          "bins": {
+            "line": [
+              179,
+              177
+            ],
+            "cond": [
+              212,
+              208
+            ],
+            "toggle": [
+              1916,
+              1869
+            ],
+            "branch": [
+              65,
+              63
+            ]
+          },
+          "baseline_score": 91.91088983785829,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 12,
+          "tokens": 160029,
+          "usage": {
+            "prompt_tokens": 64567,
+            "completion_tokens": 95462,
+            "total_tokens": 160029
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 446.3072573589161,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/summary.json",
+          "source_sha256": "ef69eb960a113a212e3a63aa832a6a9aedf3f32cc7279cb61f5d189ccea8a72c"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 95.73673045763823,
+          "percent": {
+            "line": 97.76536312849161,
+            "cond": 93.86792452830188,
+            "toggle": 95.92901878914405,
+            "branch": 95.38461538461539
+          },
+          "modules": [
+            "alu_top"
+          ],
+          "bins": {
+            "line": [
+              179,
+              175
+            ],
+            "cond": [
+              212,
+              199
+            ],
+            "toggle": [
+              1916,
+              1838
+            ],
+            "branch": [
+              65,
+              62
+            ]
+          },
+          "baseline_score": 91.91088983785829,
+          "rounds": 1,
+          "rounds_with_new_sequences": 1,
+          "new_sequences": 16,
+          "tokens": 391526,
+          "usage": {
+            "prompt_tokens": 284689,
+            "completion_tokens": 106837,
+            "total_tokens": 391526
+          },
+          "requests": 11,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 628.8269211277366,
+          "active_round": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--skill-snapshot', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/rvprobe/frozen-skill.json', '--history-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/rvprobe/round-2/accepted-history.json', '--design', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/manifest/design.json', '--replay-config', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/manifest/replay.json', '--modinfo', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/rvprobe/round-1/simulation/alu_top_urgReport/modinfo.txt', '--feedback-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/rvprobe/round-2/feedback.json', '--out', '/dev/shm/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/rvprobe/round-2/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/summary.json",
+          "source_sha256": "ef69eb960a113a212e3a63aa832a6a9aedf3f32cc7279cb61f5d189ccea8a72c"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "alu_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/alu/flow/paired/manifest.json"
+    },
+    {
+      "design": "aes",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 95.83787469893502,
+          "percent": {
+            "line": 98.80952380952381,
+            "cond": 100,
+            "toggle": 99.26873857404021,
+            "branch": 97.77777777777777,
+            "fsm": 83.33333333333333
+          },
+          "modules": [
+            "aes_core"
+          ],
+          "bins": {
+            "line": [
+              84,
+              83
+            ],
+            "cond": [
+              55,
+              55
+            ],
+            "toggle": [
+              4376,
+              4344
+            ],
+            "branch": [
+              45,
+              44
+            ],
+            "fsm": [
+              6,
+              5
+            ]
+          },
+          "baseline_score": 95.04262789820376,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 7,
+          "tokens": 133805,
+          "usage": {
+            "prompt_tokens": 82616,
+            "completion_tokens": 51189,
+            "total_tokens": 133805
+          },
+          "requests": 2,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 254.43453611806035,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/aes/flow/paired/summary.json",
+          "source_sha256": "a2cf328faced5329a912a8c10e6bc881daaeff8be798282b7c407ffb12387736"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 95.82416354719828,
+          "percent": {
+            "line": 98.80952380952381,
+            "cond": 100,
+            "toggle": 99.20018281535648,
+            "branch": 97.77777777777777,
+            "fsm": 83.33333333333333
+          },
+          "modules": [
+            "aes_core"
+          ],
+          "bins": {
+            "line": [
+              84,
+              83
+            ],
+            "cond": [
+              55,
+              55
+            ],
+            "toggle": [
+              4376,
+              4341
+            ],
+            "branch": [
+              45,
+              44
+            ],
+            "fsm": [
+              6,
+              5
+            ]
+          },
+          "baseline_score": 95.04262789820376,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 24,
+          "tokens": 283377,
+          "usage": {
+            "prompt_tokens": 206383,
+            "completion_tokens": 76994,
+            "total_tokens": 283377
+          },
+          "requests": 10,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 941.7056755879894,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/aes/flow/paired/summary.json",
+          "source_sha256": "a2cf328faced5329a912a8c10e6bc881daaeff8be798282b7c407ffb12387736"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "aes_core"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/aes/flow/paired/manifest.json"
+    },
+    {
+      "design": "sha3",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 99.99024199843872,
+          "percent": {
+            "line": 100,
+            "cond": 100,
+            "toggle": 99.96096799375488,
+            "branch": 100
+          },
+          "modules": [
+            "keccak"
+          ],
+          "bins": {
+            "line": [
+              11,
+              11
+            ],
+            "cond": [
+              3,
+              3
+            ],
+            "toggle": [
+              7686,
+              7683
+            ],
+            "branch": [
+              8,
+              8
+            ]
+          },
+          "baseline_score": 72.34922409102737,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 8,
+          "tokens": 54712,
+          "usage": {
+            "prompt_tokens": 33419,
+            "completion_tokens": 21293,
+            "total_tokens": 54712
+          },
+          "requests": 2,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 156.97656328137964,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/sha3/flow/paired/summary.json",
+          "source_sha256": "597b49f6192f9a6da2fecead9af741e42423f6eeafb980bb88bac6e99e38d805"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 99.99349466562582,
+          "percent": {
+            "line": 100,
+            "cond": 100,
+            "toggle": 99.97397866250326,
+            "branch": 100
+          },
+          "modules": [
+            "keccak"
+          ],
+          "bins": {
+            "line": [
+              11,
+              11
+            ],
+            "cond": [
+              3,
+              3
+            ],
+            "toggle": [
+              7686,
+              7684
+            ],
+            "branch": [
+              8,
+              8
+            ]
+          },
+          "baseline_score": 72.34922409102737,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 20,
+          "tokens": 315879,
+          "usage": {
+            "prompt_tokens": 266072,
+            "completion_tokens": 49807,
+            "total_tokens": 315879
+          },
+          "requests": 14,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 524.9236821802333,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/sha3/flow/paired/summary.json",
+          "source_sha256": "597b49f6192f9a6da2fecead9af741e42423f6eeafb980bb88bac6e99e38d805"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "keccak"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/sha3/flow/paired/manifest.json"
+    },
+    {
+      "design": "axil_ram",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 85.80130404941661,
+          "percent": {
+            "line": 100,
+            "cond": 61.29032258064516,
+            "toggle": 81.91489361702128,
+            "branch": 100
+          },
+          "modules": [
+            "axil_ram"
+          ],
+          "bins": {
+            "line": [
+              40,
+              40
+            ],
+            "cond": [
+              31,
+              19
+            ],
+            "toggle": [
+              470,
+              385
+            ],
+            "branch": [
+              12,
+              12
+            ]
+          },
+          "baseline_score": 85.80130404941661,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 74242,
+          "usage": {
+            "prompt_tokens": 45609,
+            "completion_tokens": 28633,
+            "total_tokens": 74242
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 114.02100735902786,
+          "active_round": null,
+          "error": "HAVEN DSL generation exhausted schema repair budget",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/axil_ram/flow/paired/summary.json",
+          "source_sha256": "57d28a235f560c7be2dd4f0e94f32ed310f1f95566305e5bcf80e44436b60ee0"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 92.94440631434455,
+          "percent": {
+            "line": 100,
+            "cond": 87.09677419354838,
+            "toggle": 84.68085106382979,
+            "branch": 100
+          },
+          "modules": [
+            "axil_ram"
+          ],
+          "bins": {
+            "line": [
+              40,
+              40
+            ],
+            "cond": [
+              31,
+              27
+            ],
+            "toggle": [
+              470,
+              398
+            ],
+            "branch": [
+              12,
+              12
+            ]
+          },
+          "baseline_score": 85.80130404941661,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 32,
+          "tokens": 568791,
+          "usage": {
+            "prompt_tokens": 436515,
+            "completion_tokens": 132276,
+            "total_tokens": 568791
+          },
+          "requests": 18,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 1523.2841906910762,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/axil_ram/flow/paired/summary.json",
+          "source_sha256": "57d28a235f560c7be2dd4f0e94f32ed310f1f95566305e5bcf80e44436b60ee0"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "axil_ram"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v2/axil_ram/flow/paired/manifest.json"
+    },
+    {
+      "design": "ue_timer",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 82.16630753653594,
+          "percent": {
+            "line": 93.22033898305085,
+            "cond": 75.83333333333333,
+            "toggle": 71.95723684210526,
+            "branch": 87.65432098765432
+          },
+          "modules": [
+            "timer"
+          ],
+          "bins": {
+            "line": [
+              118,
+              110
+            ],
+            "cond": [
+              120,
+              91
+            ],
+            "toggle": [
+              1216,
+              875
+            ],
+            "branch": [
+              81,
+              71
+            ]
+          },
+          "baseline_score": 82.16630753653594,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 141969,
+          "usage": {
+            "prompt_tokens": 75396,
+            "completion_tokens": 66573,
+            "total_tokens": 141969
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 252.5574508626014,
+          "active_round": null,
+          "error": "HAVEN DSL generation exhausted schema repair budget",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_timer/flow/paired/summary.json",
+          "source_sha256": "a40e2c81c994d8c933f427d8189587ea63d9837ba2bb470daf72e23a35e4988d"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 99.83552631578948,
+          "percent": {
+            "line": 100,
+            "cond": 100,
+            "toggle": 99.34210526315789,
+            "branch": 100
+          },
+          "modules": [
+            "timer"
+          ],
+          "bins": {
+            "line": [
+              118,
+              118
+            ],
+            "cond": [
+              120,
+              120
+            ],
+            "toggle": [
+              1216,
+              1208
+            ],
+            "branch": [
+              81,
+              81
+            ]
+          },
+          "baseline_score": 82.16630753653594,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 48,
+          "tokens": 700021,
+          "usage": {
+            "prompt_tokens": 594385,
+            "completion_tokens": 105636,
+            "total_tokens": 700021
+          },
+          "requests": 20,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 1526.3706906381994,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_timer/flow/paired/summary.json",
+          "source_sha256": "a40e2c81c994d8c933f427d8189587ea63d9837ba2bb470daf72e23a35e4988d"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "timer"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "665721f0a795e8670bd7cd90d30d6fcf6cf88d140c7feb3e82cd0863c2ec5294",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_timer/flow/paired/manifest.json"
+    },
+    {
+      "design": "uart",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 95.24736442419369,
+          "percent": {
+            "line": 97.61904761904762,
+            "cond": 92.3076923076923,
+            "toggle": 94.63414634146342,
+            "branch": 96.42857142857143
+          },
+          "modules": [
+            "uart_top"
+          ],
+          "bins": {
+            "line": [
+              84,
+              82
+            ],
+            "cond": [
+              78,
+              72
+            ],
+            "toggle": [
+              410,
+              388
+            ],
+            "branch": [
+              56,
+              54
+            ]
+          },
+          "baseline_score": 90.93389841865451,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 12,
+          "tokens": 177267,
+          "usage": {
+            "prompt_tokens": 97707,
+            "completion_tokens": 79560,
+            "total_tokens": 177267
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 437.73082657158375,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/uart/flow/paired/summary.json",
+          "source_sha256": "2d796797c3cdba1836c2391f6206280ed8bb31765aa74885d4446c6d176ade49"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 90.93389841865451,
+          "percent": {
+            "line": 96.42857142857143,
+            "cond": 84.61538461538461,
+            "toggle": 88.04878048780488,
+            "branch": 94.64285714285714
+          },
+          "modules": [
+            "uart_top"
+          ],
+          "bins": {
+            "line": [
+              84,
+              81
+            ],
+            "cond": [
+              78,
+              66
+            ],
+            "toggle": [
+              410,
+              361
+            ],
+            "branch": [
+              56,
+              53
+            ]
+          },
+          "baseline_score": 90.93389841865451,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 254827,
+          "usage": {
+            "prompt_tokens": 206635,
+            "completion_tokens": 48192,
+            "total_tokens": 254827
+          },
+          "requests": 7,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 898.665161547251,
+          "active_round": null,
+          "error": "Command '['/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '-c', 'jg -batch -tcl /dev/shm/rvprobe-paired16-parallel-20260912-v1/uart/flow/paired/rvprobe/round-1/native-witness-search/loopback_rbr_reads_return_written_bytes/sampling/sample.tcl -proj /dev/shm/rvprobe-paired16-parallel-20260912-v1/uart/flow/paired/rvprobe/round-1/native-witness-search/loopback_rbr_reads_return_written_bytes/sampling/jgproj']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/uart/flow/paired/summary.json",
+          "source_sha256": "2d796797c3cdba1836c2391f6206280ed8bb31765aa74885d4446c6d176ade49"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "uart_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "665721f0a795e8670bd7cd90d30d6fcf6cf88d140c7feb3e82cd0863c2ec5294",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/uart/flow/paired/manifest.json"
+    },
+    {
+      "design": "can",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 95.91259057971014,
+          "percent": {
+            "line": 100,
+            "cond": 91.66666666666667,
+            "toggle": 91.9836956521739,
+            "branch": 100
+          },
+          "modules": [
+            "can_top"
+          ],
+          "bins": {
+            "line": [
+              27,
+              27
+            ],
+            "cond": [
+              36,
+              33
+            ],
+            "toggle": [
+              736,
+              677
+            ],
+            "branch": [
+              9,
+              9
+            ]
+          },
+          "baseline_score": 95.91259057971014,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 358602,
+          "usage": {
+            "prompt_tokens": 239061,
+            "completion_tokens": 119541,
+            "total_tokens": 358602
+          },
+          "requests": 2,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 558.1498422510922,
+          "active_round": null,
+          "error": "1 candidate sequences failed: can_top_gap_hard_sync_overload_error_seq: shared simulation failed or timed out: UVM_ERROR sequence_1.sv(259) @ 1831615000: uvm_test_top.m_env.m_wb_agent.m_sequencer@@seq_1 [wait_rx_error_counter_nonzero] Poll timeout; UVM_ERROR :    1",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/summary.json",
+          "source_sha256": "92f1c88d280ccc21875f3ab16cb2d3e3e1856e9fe87f9b6a8dc4bb8ba2c317fc"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 97.7770229468599,
+          "percent": {
+            "line": 100,
+            "cond": 97.22222222222223,
+            "toggle": 93.88586956521739,
+            "branch": 100
+          },
+          "modules": [
+            "can_top"
+          ],
+          "bins": {
+            "line": [
+              27,
+              27
+            ],
+            "cond": [
+              36,
+              35
+            ],
+            "toggle": [
+              736,
+              691
+            ],
+            "branch": [
+              9,
+              9
+            ]
+          },
+          "baseline_score": 95.91259057971014,
+          "rounds": 1,
+          "rounds_with_new_sequences": 1,
+          "new_sequences": 16,
+          "tokens": 3339410,
+          "usage": {
+            "prompt_tokens": 3124524,
+            "completion_tokens": 214886,
+            "total_tokens": 3339410
+          },
+          "requests": 48,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 1579.298857438378,
+          "active_round": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--skill-snapshot', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/rvprobe/frozen-skill.json', '--history-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/rvprobe/round-2/accepted-history.json', '--design', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/manifest/design.json', '--replay-config', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/manifest/replay.json', '--modinfo', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/rvprobe/round-1/simulation/can_top_urgReport/modinfo.txt', '--feedback-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/rvprobe/round-2/feedback.json', '--out', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/rvprobe/round-2/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/summary.json",
+          "source_sha256": "92f1c88d280ccc21875f3ab16cb2d3e3e1856e9fe87f9b6a8dc4bb8ba2c317fc"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "can_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "665721f0a795e8670bd7cd90d30d6fcf6cf88d140c7feb3e82cd0863c2ec5294",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/can/flow/paired/manifest.json"
+    },
+    {
+      "design": "ethmac",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 91.93020058233581,
+          "percent": {
+            "line": 100,
+            "cond": 84.0909090909091,
+            "toggle": 83.62989323843416,
+            "branch": 100
+          },
+          "modules": [
+            "ethmac"
+          ],
+          "bins": {
+            "line": [
+              65,
+              65
+            ],
+            "cond": [
+              132,
+              111
+            ],
+            "toggle": [
+              1686,
+              1410
+            ],
+            "branch": [
+              39,
+              39
+            ]
+          },
+          "baseline_score": 84.20751105359646,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 8,
+          "tokens": 1229855,
+          "usage": {
+            "prompt_tokens": 1097117,
+            "completion_tokens": 132738,
+            "total_tokens": 1229855
+          },
+          "requests": 5,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 888.5448563704267,
+          "active_round": null,
+          "error": "1 candidate sequences failed: ethmac_gap_master_dma_unaligned_rx_bd_seq: shared simulation failed or timed out: UVM_ERROR sequence_1.sv(223) @ 8070115000: uvm_test_top.m_env.m_wb_master_agent.m_sequencer@@seq_1 [wait_rx_done_unaligned_1] Poll timeout; UVM_ERROR sequence_1.sv(274) @ 16281115000: uvm_test_top.m_env.m_wb_master_agent.m_sequencer@@seq_1 [wait_rx_done_unaligned_3] Poll timeout; UVM_ERROR :    2",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/summary.json",
+          "source_sha256": "22b3e6a96287750b0e7f8bc4bd7544e55049149aa5ead04834a6a3877f91f5cc"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 92.93648226032568,
+          "percent": {
+            "line": 100,
+            "cond": 87.87878787878788,
+            "toggle": 83.86714116251483,
+            "branch": 100
+          },
+          "modules": [
+            "ethmac"
+          ],
+          "bins": {
+            "line": [
+              65,
+              65
+            ],
+            "cond": [
+              132,
+              116
+            ],
+            "toggle": [
+              1686,
+              1414
+            ],
+            "branch": [
+              39,
+              39
+            ]
+          },
+          "baseline_score": 84.20751105359646,
+          "rounds": 1,
+          "rounds_with_new_sequences": 1,
+          "new_sequences": 16,
+          "tokens": 5671472,
+          "usage": {
+            "prompt_tokens": 5381086,
+            "completion_tokens": 290386,
+            "total_tokens": 5671472
+          },
+          "requests": 73,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 2044.993653154932,
+          "active_round": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--skill-snapshot', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/rvprobe/frozen-skill.json', '--history-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/rvprobe/round-2/accepted-history.json', '--design', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/manifest/design.json', '--replay-config', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/manifest/replay.json', '--modinfo', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/rvprobe/round-1/simulation/ethmac_urgReport/modinfo.txt', '--feedback-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/rvprobe/round-2/feedback.json', '--out', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/rvprobe/round-2/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/summary.json",
+          "source_sha256": "22b3e6a96287750b0e7f8bc4bd7544e55049149aa5ead04834a6a3877f91f5cc"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "ethmac"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ethmac/flow/paired/manifest.json"
+    },
+    {
+      "design": "i2c",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 88.92481046364385,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 94.44444444444444,
+            "toggle": 94.85981308411215,
+            "branch": 82.75862068965517
+          },
+          "modules": [
+            "i2c_master_top"
+          ],
+          "bins": {
+            "line": [
+              55,
+              46
+            ],
+            "cond": [
+              36,
+              34
+            ],
+            "toggle": [
+              214,
+              203
+            ],
+            "branch": [
+              29,
+              24
+            ]
+          },
+          "baseline_score": 87.37455118376806,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 8,
+          "tokens": 109207,
+          "usage": {
+            "prompt_tokens": 72735,
+            "completion_tokens": 36472,
+            "total_tokens": 109207
+          },
+          "requests": 2,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 209.85331934131682,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/i2c/flow/paired/summary.json",
+          "source_sha256": "f80c5786f9c29625d485b95d4d7c0908ddfd13ec5875e11ab830b5d92187ad0e"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 90.43052178243929,
+          "percent": {
+            "line": 83.63636363636364,
+            "cond": 100,
+            "toggle": 95.32710280373831,
+            "branch": 82.75862068965517
+          },
+          "modules": [
+            "i2c_master_top"
+          ],
+          "bins": {
+            "line": [
+              55,
+              46
+            ],
+            "cond": [
+              36,
+              36
+            ],
+            "toggle": [
+              214,
+              204
+            ],
+            "branch": [
+              29,
+              24
+            ]
+          },
+          "baseline_score": 87.37455118376806,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 32,
+          "tokens": 884844,
+          "usage": {
+            "prompt_tokens": 800773,
+            "completion_tokens": 84071,
+            "total_tokens": 884844
+          },
+          "requests": 22,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 763.8704707156867,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "coverage_stalled",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/i2c/flow/paired/summary.json",
+          "source_sha256": "f80c5786f9c29625d485b95d4d7c0908ddfd13ec5875e11ab830b5d92187ad0e"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "i2c_master_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/i2c/flow/paired/manifest.json"
+    },
+    {
+      "design": "gpio",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 93.08492761526706,
+          "percent": {
+            "line": 100,
+            "cond": 97.76536312849161,
+            "toggle": 74.57434733257662,
+            "branch": 100
+          },
+          "modules": [
+            "gpio_top"
+          ],
+          "bins": {
+            "line": [
+              134,
+              134
+            ],
+            "cond": [
+              179,
+              175
+            ],
+            "toggle": [
+              1762,
+              1314
+            ],
+            "branch": [
+              108,
+              108
+            ]
+          },
+          "baseline_score": 78.46032220782536,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 12,
+          "tokens": 182562,
+          "usage": {
+            "prompt_tokens": 115504,
+            "completion_tokens": 67058,
+            "total_tokens": 182562
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 349.6544821774587,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/gpio/flow/paired/summary.json",
+          "source_sha256": "b34e50dacbf7a66ce02afd8c6e96a7c3b19cb30eb11eb74a22c409ed606ac8dd"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 97.90455234338836,
+          "percent": {
+            "line": 100,
+            "cond": 98.88268156424581,
+            "toggle": 92.7355278093076,
+            "branch": 100
+          },
+          "modules": [
+            "gpio_top"
+          ],
+          "bins": {
+            "line": [
+              134,
+              134
+            ],
+            "cond": [
+              179,
+              177
+            ],
+            "toggle": [
+              1762,
+              1634
+            ],
+            "branch": [
+              108,
+              108
+            ]
+          },
+          "baseline_score": 78.46032220782536,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 48,
+          "tokens": 1169550,
+          "usage": {
+            "prompt_tokens": 993984,
+            "completion_tokens": 175566,
+            "total_tokens": 1169550
+          },
+          "requests": 36,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 1260.0059871850535,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/gpio/flow/paired/summary.json",
+          "source_sha256": "b34e50dacbf7a66ce02afd8c6e96a7c3b19cb30eb11eb74a22c409ed606ac8dd"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "gpio_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/gpio/flow/paired/manifest.json"
+    },
+    {
+      "design": "simple_spi",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 91.66708074534162,
+          "percent": {
+            "line": 98.66666666666667,
+            "cond": 98.41269841269842,
+            "toggle": 84.44444444444444,
+            "branch": 93.47826086956522,
+            "fsm": 83.33333333333333
+          },
+          "modules": [
+            "simple_spi_top"
+          ],
+          "bins": {
+            "line": [
+              75,
+              74
+            ],
+            "cond": [
+              63,
+              62
+            ],
+            "toggle": [
+              270,
+              228
+            ],
+            "branch": [
+              46,
+              43
+            ],
+            "fsm": [
+              6,
+              5
+            ]
+          },
+          "baseline_score": 21.26367609845871,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 11,
+          "tokens": 292914,
+          "usage": {
+            "prompt_tokens": 143732,
+            "completion_tokens": 149182,
+            "total_tokens": 292914
+          },
+          "requests": 5,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 724.0840483885258,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/simple_spi/flow/paired/summary.json",
+          "source_sha256": "c347c126b9168871e1dadca5d6292c92d913ab75ea86b18b1ea40e9288b595d7"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 93.16972624798711,
+          "percent": {
+            "line": 98.66666666666667,
+            "cond": 100,
+            "toggle": 90.37037037037037,
+            "branch": 93.47826086956522,
+            "fsm": 83.33333333333333
+          },
+          "modules": [
+            "simple_spi_top"
+          ],
+          "bins": {
+            "line": [
+              75,
+              74
+            ],
+            "cond": [
+              63,
+              63
+            ],
+            "toggle": [
+              270,
+              244
+            ],
+            "branch": [
+              46,
+              43
+            ],
+            "fsm": [
+              6,
+              5
+            ]
+          },
+          "baseline_score": 21.26367609845871,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 48,
+          "tokens": 785153,
+          "usage": {
+            "prompt_tokens": 601072,
+            "completion_tokens": 184081,
+            "total_tokens": 785153
+          },
+          "requests": 21,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 2372.306574070826,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/simple_spi/flow/paired/summary.json",
+          "source_sha256": "c347c126b9168871e1dadca5d6292c92d913ab75ea86b18b1ea40e9288b595d7"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "simple_spi_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/simple_spi/flow/paired/manifest.json"
+    },
+    {
+      "design": "spi",
+      "arms": {
+        "haven": {
+          "status": "completed",
+          "score": 97.68530901722391,
+          "percent": {
+            "line": 98.80952380952381,
+            "cond": 100,
+            "toggle": 93.61702127659575,
+            "branch": 96,
+            "fsm": 100
+          },
+          "modules": [
+            "spi_top"
+          ],
+          "bins": {
+            "line": [
+              84,
+              83
+            ],
+            "cond": [
+              59,
+              59
+            ],
+            "toggle": [
+              282,
+              264
+            ],
+            "branch": [
+              50,
+              48
+            ],
+            "fsm": [
+              5,
+              5
+            ]
+          },
+          "baseline_score": 23.295949032335617,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 12,
+          "tokens": 205266,
+          "usage": {
+            "prompt_tokens": 110170,
+            "completion_tokens": 95096,
+            "total_tokens": 205266
+          },
+          "requests": 4,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 525.5949133364484,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/summary.json",
+          "source_sha256": "bf0041634790044962a29cb29778555b6f85534fcf0b4568c68818a133ebd4dc"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 95.77041540020264,
+          "percent": {
+            "line": 98.80952380952381,
+            "cond": 100,
+            "toggle": 84.04255319148936,
+            "branch": 96,
+            "fsm": 100
+          },
+          "modules": [
+            "spi_top"
+          ],
+          "bins": {
+            "line": [
+              84,
+              83
+            ],
+            "cond": [
+              59,
+              59
+            ],
+            "toggle": [
+              282,
+              237
+            ],
+            "branch": [
+              50,
+              48
+            ],
+            "fsm": [
+              5,
+              5
+            ]
+          },
+          "baseline_score": 23.295949032335617,
+          "rounds": 2,
+          "rounds_with_new_sequences": 2,
+          "new_sequences": 32,
+          "tokens": 763598,
+          "usage": {
+            "prompt_tokens": 607283,
+            "completion_tokens": 156315,
+            "total_tokens": 763598
+          },
+          "requests": 22,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 1086.6370894014835,
+          "active_round": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--skill-snapshot', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/rvprobe/frozen-skill.json', '--history-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/rvprobe/round-3/accepted-history.json', '--design', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/manifest/design.json', '--replay-config', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/manifest/replay.json', '--modinfo', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/rvprobe/round-2/simulation/spi_top_urgReport/modinfo.txt', '--feedback-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/rvprobe/round-3/feedback.json', '--out', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/rvprobe/round-3/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/summary.json",
+          "source_sha256": "bf0041634790044962a29cb29778555b6f85534fcf0b4568c68818a133ebd4dc"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "spi_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/spi/flow/paired/manifest.json"
+    },
+    {
+      "design": "ue_gpio",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 54.26065535491905,
+          "percent": {
+            "line": 82.87671232876713,
+            "cond": 54.4,
+            "toggle": 7.890909090909091,
+            "branch": 71.875
+          },
+          "modules": [
+            "gpio"
+          ],
+          "bins": {
+            "line": [
+              146,
+              121
+            ],
+            "cond": [
+              125,
+              68
+            ],
+            "toggle": [
+              2750,
+              217
+            ],
+            "branch": [
+              96,
+              69
+            ]
+          },
+          "baseline_score": 54.26065535491905,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 175108,
+          "usage": {
+            "prompt_tokens": 124308,
+            "completion_tokens": 50800,
+            "total_tokens": 175108
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 182.68722734693438,
+          "active_round": null,
+          "error": "HAVEN DSL generation exhausted schema repair budget",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_gpio/flow/paired/summary.json",
+          "source_sha256": "083d421c610ee56df5f652b6e17b454e8cce167b2a39b6bc27205902d21bc1f4"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 97.6185190950602,
+          "percent": {
+            "line": 98.63013698630137,
+            "cond": 96.8,
+            "toggle": 97.12727272727273,
+            "branch": 97.91666666666667
+          },
+          "modules": [
+            "gpio"
+          ],
+          "bins": {
+            "line": [
+              146,
+              144
+            ],
+            "cond": [
+              125,
+              121
+            ],
+            "toggle": [
+              2750,
+              2671
+            ],
+            "branch": [
+              96,
+              94
+            ]
+          },
+          "baseline_score": 54.26065535491905,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 48,
+          "tokens": 1736191,
+          "usage": {
+            "prompt_tokens": 1494812,
+            "completion_tokens": 241379,
+            "total_tokens": 1736191
+          },
+          "requests": 37,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 1577.036043313332,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_gpio/flow/paired/summary.json",
+          "source_sha256": "083d421c610ee56df5f652b6e17b454e8cce167b2a39b6bc27205902d21bc1f4"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "gpio"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_gpio/flow/paired/manifest.json"
+    },
+    {
+      "design": "ue_spi",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 46.04098353646065,
+          "percent": {
+            "line": 68.16143497757848,
+            "cond": 42.19409282700422,
+            "toggle": 11.397058823529411,
+            "branch": 62.4113475177305
+          },
+          "modules": [
+            "spi_lite"
+          ],
+          "bins": {
+            "line": [
+              223,
+              152
+            ],
+            "cond": [
+              237,
+              100
+            ],
+            "toggle": [
+              1088,
+              124
+            ],
+            "branch": [
+              141,
+              88
+            ]
+          },
+          "baseline_score": 46.04098353646065,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 186838,
+          "usage": {
+            "prompt_tokens": 141369,
+            "completion_tokens": 45469,
+            "total_tokens": 186838
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 163.33890134003013,
+          "active_round": null,
+          "error": "HAVEN DSL generation exhausted schema repair budget",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/summary.json",
+          "source_sha256": "21a012b085e490e5cae4eedb3ae9984f790462d145e5081f2a8111eff121e9b9"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 85.79707927303372,
+          "percent": {
+            "line": 96.41255605381166,
+            "cond": 92.40506329113924,
+            "toggle": 60.75367647058823,
+            "branch": 93.61702127659575
+          },
+          "modules": [
+            "spi_lite"
+          ],
+          "bins": {
+            "line": [
+              223,
+              215
+            ],
+            "cond": [
+              237,
+              219
+            ],
+            "toggle": [
+              1088,
+              661
+            ],
+            "branch": [
+              141,
+              132
+            ]
+          },
+          "baseline_score": 46.04098353646065,
+          "rounds": 1,
+          "rounds_with_new_sequences": 1,
+          "new_sequences": 16,
+          "tokens": 776752,
+          "usage": {
+            "prompt_tokens": 677517,
+            "completion_tokens": 99235,
+            "total_tokens": 776752
+          },
+          "requests": 19,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 732.3995415531099,
+          "active_round": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--skill-snapshot', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/rvprobe/frozen-skill.json', '--history-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/rvprobe/round-2/accepted-history.json', '--design', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/manifest/design.json', '--replay-config', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/manifest/replay.json', '--modinfo', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/rvprobe/round-1/simulation/spi_lite_urgReport/modinfo.txt', '--feedback-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/rvprobe/round-2/feedback.json', '--out', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/rvprobe/round-2/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/summary.json",
+          "source_sha256": "21a012b085e490e5cae4eedb3ae9984f790462d145e5081f2a8111eff121e9b9"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "spi_lite"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_spi/flow/paired/manifest.json"
+    },
+    {
+      "design": "ue_uart",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 34.862028185901906,
+          "percent": {
+            "line": 61.29032258064516,
+            "cond": 23.391812865497077,
+            "toggle": 3.389830508474576,
+            "branch": 51.37614678899082
+          },
+          "modules": [
+            "uart_lite"
+          ],
+          "bins": {
+            "line": [
+              186,
+              114
+            ],
+            "cond": [
+              171,
+              40
+            ],
+            "toggle": [
+              826,
+              28
+            ],
+            "branch": [
+              109,
+              56
+            ]
+          },
+          "baseline_score": 34.862028185901906,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 139003,
+          "usage": {
+            "prompt_tokens": 111657,
+            "completion_tokens": 27346,
+            "total_tokens": 139003
+          },
+          "requests": 3,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 104.57700907159597,
+          "active_round": null,
+          "error": "HAVEN DSL generation exhausted schema repair budget",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/summary.json",
+          "source_sha256": "39a05603816fd5cfa0a70124bcb8da8121be5cdccca9d98dbdf945ba14853742"
+        },
+        "rvprobe": {
+          "status": "failed",
+          "score": 85.13759403021979,
+          "percent": {
+            "line": 93.01075268817205,
+            "cond": 92.98245614035088,
+            "toggle": 64.64891041162228,
+            "branch": 89.90825688073394
+          },
+          "modules": [
+            "uart_lite"
+          ],
+          "bins": {
+            "line": [
+              186,
+              173
+            ],
+            "cond": [
+              171,
+              159
+            ],
+            "toggle": [
+              826,
+              534
+            ],
+            "branch": [
+              109,
+              98
+            ]
+          },
+          "baseline_score": 34.862028185901906,
+          "rounds": 1,
+          "rounds_with_new_sequences": 1,
+          "new_sequences": 12,
+          "tokens": 529530,
+          "usage": {
+            "prompt_tokens": 458402,
+            "completion_tokens": 71128,
+            "total_tokens": 529530
+          },
+          "requests": 16,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 515.7064774865285,
+          "active_round": null,
+          "error": "Command '['/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.venv/bin/python', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/sequence_experiment.py', '--skill-snapshot', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/rvprobe/frozen-skill.json', '--history-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/rvprobe/round-2/accepted-history.json', '--design', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/manifest/design.json', '--replay-config', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/manifest/replay.json', '--modinfo', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/rvprobe/round-1/simulation/uart_lite_urgReport/modinfo.txt', '--feedback-file', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/rvprobe/round-2/feedback.json', '--out', '/dev/shm/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/rvprobe/round-2/generation', '--model', 'deepseek-v4-flash-vision-exp', '--temperature', '0.3', '--attempts', '3', '--timeout', '600', '--request-retries', '3', '--jg-time-limit', '120s', '--eda-shell', '/root/yjh-workspace/rvprobe-workspace/zaozi/experiments/eda-shell', '--sequences-per-intent', '4', '--env-file', '/tmp/claude-0/-root-yjh-workspace/491fc915-de96-4db8-85de-375362ef0be6/scratchpad/haven/.env']' returned non-zero exit status 1.",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/summary.json",
+          "source_sha256": "39a05603816fd5cfa0a70124bcb8da8121be5cdccca9d98dbdf945ba14853742"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "uart_lite"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/ue_uart/flow/paired/manifest.json"
+    },
+    {
+      "design": "sdram",
+      "arms": {
+        "haven": {
+          "status": "failed",
+          "score": 72.27011494252874,
+          "percent": {
+            "cond": 100,
+            "toggle": 16.810344827586206,
+            "branch": 100
+          },
+          "modules": [
+            "sdrc_top"
+          ],
+          "bins": {
+            "cond": [
+              4,
+              4
+            ],
+            "toggle": [
+              696,
+              117
+            ],
+            "branch": [
+              2,
+              2
+            ]
+          },
+          "baseline_score": 72.27011494252874,
+          "rounds": 0,
+          "rounds_with_new_sequences": 0,
+          "new_sequences": 0,
+          "tokens": 198150,
+          "usage": {
+            "prompt_tokens": 160062,
+            "completion_tokens": 38088,
+            "total_tokens": 198150
+          },
+          "requests": 2,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 218.30912795476615,
+          "active_round": null,
+          "error": "1 candidate sequences failed: sdrc_resolved_gap_cti_burst_toggle_seq: shared simulation failed or timed out: UVM_ERROR sequence_1.sv(73) @ 244685000: uvm_test_top.m_env.m_agent.m_sequencer@@seq_1 [rd_seed_600] Poll timeout; UVM_ERROR :    1",
+          "stop_reason": null,
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/sdram/flow/paired/summary.json",
+          "source_sha256": "b4b7ae95b46438fa89e90297926ae673c0c1e928cd1dacd2b6a42956df3e941a"
+        },
+        "rvprobe": {
+          "status": "completed",
+          "score": 85.82375478927203,
+          "percent": {
+            "cond": 100,
+            "toggle": 57.47126436781609,
+            "branch": 100
+          },
+          "modules": [
+            "sdrc_top"
+          ],
+          "bins": {
+            "cond": [
+              4,
+              4
+            ],
+            "toggle": [
+              696,
+              400
+            ],
+            "branch": [
+              2,
+              2
+            ]
+          },
+          "baseline_score": 72.27011494252874,
+          "rounds": 3,
+          "rounds_with_new_sequences": 3,
+          "new_sequences": 36,
+          "tokens": 3474945,
+          "usage": {
+            "prompt_tokens": 3314834,
+            "completion_tokens": 160111,
+            "total_tokens": 3474945
+          },
+          "requests": 61,
+          "unknown_requests": 0,
+          "accounting_complete": true,
+          "seconds": 4871.149412995204,
+          "active_round": null,
+          "error": null,
+          "stop_reason": "round_budget",
+          "reported_models": [
+            "deepseek-flash"
+          ],
+          "source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/sdram/flow/paired/summary.json",
+          "source_sha256": "b4b7ae95b46438fa89e90297926ae673c0c1e928cd1dacd2b6a42956df3e941a"
+        }
+      },
+      "audit": {
+        "same_modules": true,
+        "same_metrics": true,
+        "same_bin_denominators": true,
+        "report_values_match": true
+      },
+      "configuration": {
+        "model": "deepseek-v4-flash-vision-exp",
+        "rounds": 3,
+        "attempts": 3,
+        "timeout": 600,
+        "seed": 20260906,
+        "temperature": 0.3,
+        "sampling": {
+          "method": "soft-input-resample-v2",
+          "max_soft_preferences": 64,
+          "sequences_per_intent": 4,
+          "seed": 20260906,
+          "time_limit": "30s"
+        },
+        "metrics": [
+          "line",
+          "cond",
+          "toggle",
+          "branch",
+          "fsm"
+        ],
+        "scope": [
+          "sdrc_top"
+        ],
+        "generation_task_policy": "finite-intent-batch-v1",
+        "sequence_state_policy": "fresh-process-per-sequence-v2"
+      },
+      "framework_fingerprint": "1af1f68c0d5c991d3a25794743e9f593d898b8ec7d2ecde3bc9cd3e4a8e09f31",
+      "manifest_source": "/var/storage/workspaces/clo91eaf/rvprobe-paired16-parallel-20260912-v1/sdram/flow/paired/manifest.json"
+    }
+  ],
+  "latest_rvprobe": [
+    {
+      "design": "aes",
+      "batch": "rvprobe-full16-stable-20260914-v1",
+      "rvprobe": {
+        "status": "completed",
+        "score": 95.83330431502279,
+        "percent": {
+          "line": 98.80952380952381,
+          "cond": 100,
+          "toggle": 99.24588665447898,
+          "branch": 97.77777777777777,
+          "fsm": 83.33333333333333
+        },
+        "modules": [
+          "aes_core"
+        ],
+        "bins": {
+          "line": [
+            84,
+            83
+          ],
+          "cond": [
+            55,
+            55
+          ],
+          "toggle": [
+            4376,
+            4343
+          ],
+          "branch": [
+            45,
+            44
+          ],
+          "fsm": [
+            6,
+            5
+          ]
+        },
+        "baseline_score": 95.06547981776501,
+        "rounds": 2,
+        "rounds_with_new_sequences": 2,
+        "new_sequences": 32,
+        "tokens": 201294,
+        "usage": {
+          "prompt_tokens": 157926,
+          "completion_tokens": 43368,
+          "total_tokens": 201294
+        },
+        "requests": 8,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 575.4947310741991,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "coverage_stalled",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-full16-stable-20260914-v1/aes/flow/paired/summary.json",
+        "source_sha256": "7f222ad9e5ce49a77df1be5a40941ae333b76129a6f23a932696d744fe7af94f"
+      },
+      "framework_fingerprint": "e933be539da31ca4ea070e8a8599f1e611838c788ff61e138cd9c5600de9614f"
+    },
+    {
+      "design": "sha3",
+      "batch": "rvprobe-full16-stable-20260914-v1",
+      "rvprobe": {
+        "status": "completed",
+        "score": 99.99349466562582,
+        "percent": {
+          "line": 100,
+          "cond": 100,
+          "toggle": 99.97397866250326,
+          "branch": 100
+        },
+        "modules": [
+          "keccak"
+        ],
+        "bins": {
+          "line": [
+            11,
+            11
+          ],
+          "cond": [
+            3,
+            3
+          ],
+          "toggle": [
+            7686,
+            7684
+          ],
+          "branch": [
+            8,
+            8
+          ]
+        },
+        "baseline_score": 72.34922409102737,
+        "rounds": 2,
+        "rounds_with_new_sequences": 1,
+        "new_sequences": 12,
+        "tokens": 128181,
+        "usage": {
+          "prompt_tokens": 94318,
+          "completion_tokens": 33863,
+          "total_tokens": 128181
+        },
+        "requests": 7,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 320.9576054662466,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "no_generated_sequences",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-full16-stable-20260914-v1/sha3/flow/paired/summary.json",
+        "source_sha256": "88c9f9ee85439722f2911bd5a08e99a72fcd88b4db529fe8d4d3c5a949f1bbb2"
+      },
+      "framework_fingerprint": "e933be539da31ca4ea070e8a8599f1e611838c788ff61e138cd9c5600de9614f"
+    },
+    {
+      "design": "axil_ram",
+      "batch": "rvprobe-full16-stable-20260914-v1",
+      "rvprobe": {
+        "status": "completed",
+        "score": 92.94440631434455,
+        "percent": {
+          "line": 100,
+          "cond": 87.09677419354838,
+          "toggle": 84.68085106382979,
+          "branch": 100
+        },
+        "modules": [
+          "axil_ram"
+        ],
+        "bins": {
+          "line": [
+            40,
+            40
+          ],
+          "cond": [
+            31,
+            27
+          ],
+          "toggle": [
+            470,
+            398
+          ],
+          "branch": [
+            12,
+            12
+          ]
+        },
+        "baseline_score": 85.80130404941661,
+        "rounds": 2,
+        "rounds_with_new_sequences": 2,
+        "new_sequences": 32,
+        "tokens": 75219,
+        "usage": {
+          "prompt_tokens": 40290,
+          "completion_tokens": 34929,
+          "total_tokens": 75219
+        },
+        "requests": 4,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 500.1428438797593,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "coverage_stalled",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-full16-stable-20260914-v1/axil_ram/flow/paired/summary.json",
+        "source_sha256": "c914cf900164fac6d786abe795b23d05b2d466d8481745564a37ba24ce20ecb4"
+      },
+      "framework_fingerprint": "e933be539da31ca4ea070e8a8599f1e611838c788ff61e138cd9c5600de9614f"
+    },
+    {
+      "design": "ue_timer",
+      "batch": "rvprobe-full16-stable-20260914-v1",
+      "rvprobe": {
+        "status": "completed",
+        "score": 99.83552631578948,
+        "percent": {
+          "line": 100,
+          "cond": 100,
+          "toggle": 99.34210526315789,
+          "branch": 100
+        },
+        "modules": [
+          "timer"
+        ],
+        "bins": {
+          "line": [
+            118,
+            118
+          ],
+          "cond": [
+            120,
+            120
+          ],
+          "toggle": [
+            1216,
+            1208
+          ],
+          "branch": [
+            81,
+            81
+          ]
+        },
+        "baseline_score": 82.12518911548331,
+        "rounds": 3,
+        "rounds_with_new_sequences": 3,
+        "new_sequences": 48,
+        "tokens": 155719,
+        "usage": {
+          "prompt_tokens": 108192,
+          "completion_tokens": 47527,
+          "total_tokens": 155719
+        },
+        "requests": 6,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 752.36630026903,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "round_budget",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-full16-stable-20260914-v1/ue_timer/flow/paired/summary.json",
+        "source_sha256": "0ec73af10b35b91b82cb9eff16a52e042c0fdda63843877998b0bcde8e055e8b"
+      },
+      "framework_fingerprint": "e933be539da31ca4ea070e8a8599f1e611838c788ff61e138cd9c5600de9614f"
+    },
+    {
+      "design": "alu",
+      "batch": "rvprobe-retry4-20260915-v1",
+      "rvprobe": {
+        "status": "completed",
+        "score": 97.06907857089911,
+        "percent": {
+          "line": 98.88268156424581,
+          "cond": 96.69811320754717,
+          "toggle": 95.77244258872652,
+          "branch": 96.92307692307692
+        },
+        "modules": [
+          "alu_top"
+        ],
+        "bins": {
+          "line": [
+            179,
+            177
+          ],
+          "cond": [
+            212,
+            205
+          ],
+          "toggle": [
+            1916,
+            1835
+          ],
+          "branch": [
+            65,
+            63
+          ]
+        },
+        "baseline_score": 91.91088983785829,
+        "rounds": 3,
+        "rounds_with_new_sequences": 3,
+        "new_sequences": 48,
+        "tokens": 175194,
+        "usage": {
+          "prompt_tokens": 94115,
+          "completion_tokens": 81079,
+          "total_tokens": 175194
+        },
+        "requests": 6,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 881.8077624300495,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "round_budget",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-retry4-20260915-v1/alu/flow/paired/summary.json",
+        "source_sha256": "81422c03819fdefbd6f7c60ee1fcab4cbcc1b4e1bb2cc72cfb30ad1b3964527e"
+      },
+      "framework_fingerprint": "de6954b6e36cbba76e4eee5bc4b77f6aeaa7352fa74963252e08070965aea602"
+    },
+    {
+      "design": "uart",
+      "batch": "rvprobe-retry4-20260915-v1",
+      "rvprobe": {
+        "status": "completed",
+        "score": 97.30473286875726,
+        "percent": {
+          "line": 98.80952380952381,
+          "cond": 100,
+          "toggle": 92.1951219512195,
+          "branch": 98.21428571428571
+        },
+        "modules": [
+          "uart_top"
+        ],
+        "bins": {
+          "line": [
+            84,
+            83
+          ],
+          "cond": [
+            78,
+            78
+          ],
+          "toggle": [
+            410,
+            378
+          ],
+          "branch": [
+            56,
+            55
+          ]
+        },
+        "baseline_score": 90.93389841865451,
+        "rounds": 3,
+        "rounds_with_new_sequences": 3,
+        "new_sequences": 25,
+        "tokens": 251341,
+        "usage": {
+          "prompt_tokens": 149836,
+          "completion_tokens": 101505,
+          "total_tokens": 251341
+        },
+        "requests": 7,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 2366.5921935141087,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "round_budget",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-retry4-20260915-v1/uart/flow/paired/summary.json",
+        "source_sha256": "64f801aef09dc52403c40a1548bc3202034089b592323b89461214f3067a9499"
+      },
+      "framework_fingerprint": "de6954b6e36cbba76e4eee5bc4b77f6aeaa7352fa74963252e08070965aea602"
+    },
+    {
+      "design": "can",
+      "batch": "rvprobe-retry2-20260915-v2",
+      "rvprobe": {
+        "status": "completed",
+        "score": 97.64115338164251,
+        "percent": {
+          "line": 100,
+          "cond": 97.22222222222223,
+          "toggle": 93.34239130434783,
+          "branch": 100
+        },
+        "modules": [
+          "can_top"
+        ],
+        "bins": {
+          "line": [
+            27,
+            27
+          ],
+          "cond": [
+            36,
+            35
+          ],
+          "toggle": [
+            736,
+            687
+          ],
+          "branch": [
+            9,
+            9
+          ]
+        },
+        "baseline_score": 95.33514492753623,
+        "rounds": 3,
+        "rounds_with_new_sequences": 3,
+        "new_sequences": 48,
+        "tokens": 1324149,
+        "usage": {
+          "prompt_tokens": 1191368,
+          "completion_tokens": 132781,
+          "total_tokens": 1324149
+        },
+        "requests": 20,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 2333.8879954740405,
+        "active_round": null,
+        "error": null,
+        "stop_reason": "round_budget",
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-retry2-20260915-v2/can/flow/paired/summary.json",
+        "source_sha256": "8ab978258a3e8b643234e0d20991c248720384ac7c04f5b079f898327ef33fab"
+      },
+      "framework_fingerprint": "3948409708c892430bb8e56afe71f56c71acc96a5517453ccfd8470555fe845f"
+    },
+    {
+      "design": "ethmac",
+      "batch": "rvprobe-retry2-20260915-v2",
+      "rvprobe": {
+        "status": "failed",
+        "score": 94.64776771271434,
+        "percent": {
+          "line": 100,
+          "cond": 93.18181818181819,
+          "toggle": 85.40925266903915,
+          "branch": 100
+        },
+        "modules": [
+          "ethmac"
+        ],
+        "bins": {
+          "line": [
+            65,
+            65
+          ],
+          "cond": [
+            132,
+            123
+          ],
+          "toggle": [
+            1686,
+            1440
+          ],
+          "branch": [
+            39,
+            39
+          ]
+        },
+        "baseline_score": 84.17785506308638,
+        "rounds": 2,
+        "rounds_with_new_sequences": 2,
+        "new_sequences": 31,
+        "tokens": 3114764,
+        "usage": {
+          "prompt_tokens": 2849177,
+          "completion_tokens": 265587,
+          "total_tokens": 3114764
+        },
+        "requests": 34,
+        "unknown_requests": 0,
+        "accounting_complete": true,
+        "seconds": 2067.2270625019446,
+        "active_round": null,
+        "error": "encoded goal rail reintroduces an unencoded X/Z value",
+        "stop_reason": null,
+        "reported_models": [
+          "deepseek-flash"
+        ],
+        "source": "/var/storage/workspaces/clo91eaf/rvprobe-retry2-20260915-v2/ethmac/flow/paired/summary.json",
+        "source_sha256": "ad918e93748f0c3661196e780c2fe6cddd83a1fda083758fca8b3484c3e06479"
+      },
+      "framework_fingerprint": "3948409708c892430bb8e56afe71f56c71acc96a5517453ccfd8470555fe845f"
+    }
+  ],
+  "statistics": {
+    "haven": {
+      "completed": 8,
+      "mean_last_accepted_score": 82.7217674034067,
+      "tokens": 3819529,
+      "requests": 48,
+      "sum_seconds": 5586.821369130164,
+      "accounting_complete": true
+    },
+    "rvprobe": {
+      "completed": 9,
+      "mean_last_accepted_score": 93.60211799300248,
+      "tokens": 21645866,
+      "requests": 435,
+      "sum_seconds": 22847.18042908702,
+      "accounting_complete": true
+    }
+  },
+  "both_completed_designs": [
+    "aes",
+    "sha3",
+    "i2c",
+    "gpio",
+    "simple_spi"
+  ],
+  "both_completed_statistics": {
+    "haven": {
+      "mean_score": 93.90098710432525,
+      "tokens": 773200,
+      "sum_seconds": 1695.0029493067414
+    },
+    "rvprobe": {
+      "mean_score": 95.46449171732777,
+      "tokens": 3438803,
+      "sum_seconds": 5862.812389739789
+    }
+  },
+  "distinct_historical_frameworks": 2,
+  "all_paired_audits_pass": true,
+  "notes": [
+    "Historical paired cohort is preliminary, contains two framework fingerprints; not a final single-version 16-design benchmark.",
+    "Each pair's module scope, effective coverage metrics, bin denominators and original report values verified. Cross-design metrics vary with effective FSM availability.",
+    "Failed-arm coverage is last accepted coverage; zero-round failure is baseline only. Failure costs retained for selected attempts.",
+    "Token totals are provider-reported prompt+completion tokens including cache-hit tokens, not monetary charges. Stage 1 and unselected development/retry attempts excluded.",
+    "Time is per-arm Stage-2 wall time including inference/compilation/solving/replay, excluding shared baseline/setup and archival; shared-host contention prevents isolated speed claims.",
+    "Round count is recorded coverage-loop iterations, distinct from model HTTP requests and attempts.",
+    "Later RVProbe-only results span multiple framework versions and are not substituted into historical pairs. No repeated-seed confidence interval or causally attributed optimization gain.",
+    "Requested model deepseek-v4-flash-vision-exp; provider reports deepseek-flash. Internal served variant is not independently verified."
+  ]
+}

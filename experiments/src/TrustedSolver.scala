@@ -11,6 +11,7 @@ import me.jiuyang.utlib.*
     job("includeDirs").arr.map(p => os.Path(p.str)).toSeq,
     resetSequence = job.obj.get("resetSequence").flatMap(_.strOpt),
     initialState = job.obj.get("initialState").flatMap(_.strOpt),
+    resetSnapshotState = job.obj.get("resetSnapshotState").flatMap(_.strOpt),
     clocks = job.obj.get("clocks").toSeq.flatMap(_.arr).map(c => c("port").str -> c("factor").num.toInt),
     environmentAssumptions = job.obj.get("environmentAssumptions").toSeq.flatMap(_.arr).map(_.str))
   val abi = AbiSpec.fromJson(ujson.write(job("abi")))
@@ -37,6 +38,7 @@ import me.jiuyang.utlib.*
       val row = ujson.Obj("label" -> label, "generationLabel" -> label,
         "utModule" -> job("module"), "utSourceSha256" -> job("sourceSha256"),
         "fingerprint" -> job("fingerprint"), "startedUtc" -> java.time.Instant.now().toString,
+        "propertyCompileTimeLimit" -> job("timeLimit"), "solveTimeLimit" -> job("timeLimit"),
         "engine" -> "jaspergold")
       try
         val selected = JasperGold.selectGoal(model, label, dir / "selected")
@@ -59,7 +61,12 @@ import me.jiuyang.utlib.*
           case GenerateOutcome.Unknown(detail) =>
             row("status") = "unknown"
             row("detail") = detail
+            row("unknownReason") = if detail.startsWith("solver_time_limit:") then "solver_time_limit" else "undetermined"
       catch
+        case error: JasperGold.GenerationFailure =>
+          row("status") = "error"
+          row("failureKind") = error.kind
+          row("detail") = error.detail
         case error: Exception =>
           row("status") = "error"
           row("detail") = error.toString

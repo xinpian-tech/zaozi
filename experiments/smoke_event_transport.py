@@ -1,4 +1,5 @@
 """Synthetic shared-UVM event regression. No model calls or benchmark answers."""
+import backend_imports
 import argparse
 import json
 import os
@@ -54,7 +55,7 @@ def main():
     if args.solve:
         from sequence_framework import write_sources, parse_response
         from cycle_replay import witness_frames
-        from process_runner import run
+        from rvprobe.backend.process import run
         replay = {**config,'version':1,'contract':'cycle-replay-v1',
                   'design':str(fixture/'multiclock_design.json'),'drain_cycles':1,
                   'request':{'x':1},'baseline':{'mode':'reset-only','idle_cycles':1}}

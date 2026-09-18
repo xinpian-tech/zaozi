@@ -19,6 +19,7 @@ final case class JgModel(
   reset:   String = "reset",
   resetSequence: Option[String] = None,
   initialState: Option[String] = None,
+  resetSnapshotState: Option[String] = None,
   clocks: Seq[(String, Int)] = Seq.empty,
   environmentAssumptions: Seq[String] = Seq.empty):
   require(generationLabels.nonEmpty, "generation labels must not be empty")
@@ -42,6 +43,25 @@ final case class JgModel(
   * ports by name, internal signals by `scope/…/name` below the top.
   */
 object JasperGold:
+
+  final case class GenerationFailure(kind: String, detail: String) extends RuntimeException(s"$kind: $detail")
+
+  private[utlib] def executionFailure(exitCode: Int, log: String, generatedSource: Option[String] = None): Option[GenerationFailure] =
+    val errorLines = log.linesIterator.map(_.trim).filter(_.startsWith("ERROR")).toSeq
+    val errors = errorLines.take(4).mkString(" | ")
+    def modelLiveness(line: String): Boolean = generatedSource.exists { path =>
+      line.startsWith(s"ERROR (EOBS012): $path(") && line.endsWith(": Not supported: Liveness cover.")
+    }
+    val onlyLiveness = errorLines.exists(modelLiveness) && errorLines.forall { line =>
+      modelLiveness(line) || line.startsWith("ERROR (ENL008):") || line.startsWith("ERROR: problem encountered at line ")
+    }
+    if log.contains("EOBS002") || log.contains("Property compilation time limit exceeded") then
+      Some(GenerationFailure("property_compile_timeout", errors))
+    else if onlyLiveness then
+      Some(GenerationFailure("unsupported_liveness_cover", errors))
+    else if exitCode != 0 || !log.linesIterator.exists(_.trim == "JGDONE") then
+      Some(GenerationFailure("jg_execution_failure", if errors.nonEmpty then errors else log.takeRight(1500)))
+    else None
 
   /** Only full-design traces may supply expected outputs to checked replay. */
   val witnessContract = "jg-full-design-v1"
@@ -108,8 +128,12 @@ object JasperGold:
     os.write.over(sv, selected)
     model.copy(sv = sv, generationLabels = Set(label))
 
-  /** Generate a witness by solving the selected native cover, without property rewriting. */
+  /** Generate a formal candidate by solving the selected native cover, without property rewriting.
+    * Two-state reachability alone is not native-simulation validity. The RVProbe witness backend
+    * owns initialization-aware concretization and native replay before a candidate becomes stimulus.
+    */
   def generate(model: JgModel, workDir: os.Path, timeLimit: String = "600s"): GenerateOutcome =
+    require(timeLimit.matches("[1-9][0-9]*[smh]"), "invalid JG time limit")
     require(model.generationLabels.size == 1, "selectGoal must select one goal before witness generation")
     os.makeDir.all(workDir)
     os.remove.all(workDir / "jgproj") // a project directory left by an interrupted run refuses a new session
@@ -119,7 +143,7 @@ object JasperGold:
     validateCovers(source, model.generationLabels)
     os.write.over(sv, source)
     require(model.initialState.isEmpty || model.resetSequence.isEmpty, "select one explicit initialization policy")
-    val resetCommand = model.initialState.map { state =>
+    val resetBase = model.initialState.map { state =>
       val path = workDir / "initial.state"
       os.write.over(path, state)
       s"reset ${model.reset} -init_state {$path}"
@@ -128,6 +152,13 @@ object JasperGold:
       os.write.over(path, sequence)
       s"reset -sequence {$path}"
     }).getOrElse(s"reset ${model.reset}")
+    val resetCommand = model.resetSnapshotState.map { state =>
+      require(model.initialState.isEmpty && model.resetSequence.nonEmpty,
+        "native reset snapshot requires the original reset sequence")
+      val path = workDir / "reset-snapshot.state"
+      os.write.over(path, state)
+      s"set_cumulative_reset on\nreset -init_state {$path}\n$resetBase"
+    }.getOrElse(resetBase)
     val include = model.includeDirs.map { p =>
       require(!p.toString.exists(c => "{}\n\r\\".contains(c)), "invalid include path")
       s"{+incdir+$p} "
@@ -156,6 +187,8 @@ object JasperGold:
     os.write.over(
       tcl,
       s"""|clear -all
+          |set_property_compile_time_limit $timeLimit
+          |set_task_compile_time_limit $timeLimit
           |$analyze
           |elaborate -disable_auto_bbox -top ${model.top}
           |$clockCommands
@@ -191,15 +224,18 @@ object JasperGold:
     os.write.over(workDir / "jg.log", log)
 
     val statuses = log.linesIterator.collect { case s"JGSTATUS $name $status" => name.trim -> status.trim }.toSeq
-    if run.exitCode != 0 || !log.linesIterator.exists(_.trim == "JGDONE") then
-      GenerateOutcome.Unknown(s"jg did not finish: ${log.linesIterator.toSeq.takeRight(5).mkString(" | ")}")
-    else if os.exists(vcd) && statuses.exists(_._2 == "covered") then
-      if !fullTraceExported(run.exitCode, log) then GenerateOutcome.Unknown("jg did not export a full-design trace")
+    executionFailure(run.exitCode, log, Some(sv.toString)).foreach(error => throw error)
+    if statuses.isEmpty then throw GenerationFailure("missing_goal_status", "JG finished without a selected goal status")
+    else if statuses.exists(_._2 == "covered") then
+      if !os.exists(vcd) || !fullTraceExported(run.exitCode, log) then
+        throw GenerationFailure("trace_export_failure", "jg did not export a full-design trace")
       else
         val trace = withAliases(parseVcd(vcd, model.traceClock), svAliases(model.sv, model.top))
         GenerateOutcome.Generated(withFreeInputs(trace, svInputs(model.sv, model.top)))
     else if statuses.nonEmpty && statuses.forall(_._2 == "unreachable") then GenerateOutcome.Infeasible
-    else GenerateOutcome.Unknown(s"cover statuses: ${statuses.map((n, s) => s"$n=$s").mkString(", ")}")
+    else
+      val reason = if log.contains("time_limit expiration") then "solver_time_limit" else "undetermined"
+      GenerateOutcome.Unknown(s"$reason: cover statuses: ${statuses.map((n, s) => s"$n=$s").mkString(", ")}")
 
   private val generationCovers = raw"(?s)(\w+):((?:[^\n]*\n)?\s*)cover property \((.*?)\);".r
 

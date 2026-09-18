@@ -1,5 +1,6 @@
+import backend_imports
 import unittest
-from encoded_past import lower_past
+from rvprobe.backend.past import lower_past
 
 
 class PastLoweringTest(unittest.TestCase):

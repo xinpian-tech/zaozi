@@ -15,6 +15,7 @@ Run inside the zaozi dev shell (`nix develop . -c experiments/ut_harness.py …`
 from there. Diagnostics go to stderr; stdout carries exactly the one JSON line.
 """
 
+import backend_imports
 import argparse
 import hashlib
 import json
@@ -25,10 +26,12 @@ import subprocess
 import sys
 from pathlib import Path
 import isolation
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import Records, fingerprint, save
 from sequence_framework import Design, Port, MODEL_MODULE, parse_response, check_saved_sources
-from ut_validation import validate
+from rvprobe.backend.validation import validate
+from framework_runtime import runtime_hashes
+from repair_policy import model_repair_allowed
 
 ZAOZI = Path(__file__).resolve().parent.parent
 ERROR_HEAD = re.compile(r"(\S+\.scala):(\d+):(\d+)")
@@ -99,8 +102,61 @@ def ltl_diagnostics(errors: list[dict], source: Path) -> list[dict]:
 
 
 def emit(payload: dict, code: int) -> "NoReturn":  # type: ignore[name-defined]
+    if payload.get('ok') is False:
+        payload['model_repair_allowed'] = model_repair_allowed(payload)
+        if not payload['model_repair_allowed']:
+            payload.setdefault('kind', 'framework_infrastructure_failure')
     print(json.dumps(payload))
     sys.exit(code)
+
+
+NON_REPAIRABLE_GOAL_SHORTFALLS = frozenset({'property_compile_timeout'})
+
+
+def solver_diagnostic(report, labels):
+    """Separate local resource shortfalls from source repairs and infrastructure failures."""
+    failed=[goal for goal in report['goals'] if goal['status']=='error']
+    hard=[goal for goal in failed if goal.get('failureKind') not in NON_REPAIRABLE_GOAL_SHORTFALLS]
+    if not hard:return None
+    detail='; '.join(f"{g['label']}: {g.get('failureKind','solver_error')}: {g.get('detail','')}" for g in hard)
+    if not all(g.get('failureKind')=='unsupported_liveness_cover' and g.get('label') in labels for g in hard):
+        return dict(phase='solve',ok=False,result=report,model_repair_allowed=False,detail=detail)
+    message=('The current JasperGold Cover backend rejects this generated liveness property (EOBS012). '
+        'This is an unsupported goal form, not proof of unreachability or a solver timeout. '
+        'Preserve the original intent and every Gen label; repair the affected expression, not the DUT or environment. '
+        'Express the actual finite event sequence when that matches the intent. '
+        'Use a finite delay bound only when justified by the supplied spec, configuration or observed RTL evidence; '
+        'do not invent a bound, weaken the output condition, delete the goal, return STOP, or add assumptions. '
+        'The framework has not rewritten the original property or certified a replacement equivalent.')
+    return dict(phase='solve',ok=False,kind='model_goal_unsupported',result=report,
+        errors=[dict(file='model.ltl',goal=g['label'],code='jg_unsupported_liveness_cover',
+            message=message,backend_detail=g.get('detail','')) for g in hard])
+
+
+def elaboration_diagnostic(work: Path, source: Path) -> dict | None:
+    """Only typed, source-mapped helper errors permit LTL repair; logs are not parsed."""
+    path = work / 'artifacts/ltl-error.json'
+    if not path.exists():
+        return None
+    if not path.resolve().is_relative_to(work.resolve()) or path.stat().st_size > 16384:
+        return None
+    try:
+        error = json.loads(path.read_text())
+        if not isinstance(error, dict) or set(error) != {'schema','code','file','line','col','message'}:
+            return None
+        if (error['schema'] != 'ltl-argument-v1' or error['code'] not in
+                {'ltl_unsigned_range','ltl_signed_range'} or
+                not isinstance(error['file'], str) or
+                Path(error['file']).resolve() != (source/'ModelUT.scala').resolve() or
+                type(error['line']) is not int or error['line'] < 1 or type(error['col']) is not int or error['col'] != 1 or
+                not isinstance(error['message'],str) or not error['message'].strip()):
+            return None
+        row = ltl_diagnostics([{k:error[k] for k in ('code','file','line','col','message')}],source)[0]
+        if row['file'] != 'model.ltl':
+            return None
+        return {'phase':'elaboration-check','ok':False,'kind':'model_argument_error','errors':[row]}
+    except (ValueError, TypeError, KeyError, OSError):
+        return None
 
 
 def main() -> None:
@@ -138,9 +194,12 @@ def main() -> None:
     events = Records(out_dir)
     phase = "input-check"
     try:
+        phase = 'framework-preflight'
+        trusted_hashes = runtime_hashes(ZAOZI)
+        phase = 'input-check'
         if not source.is_dir() or not (source / "response.json").is_file():
             raise ValueError("isolated execution requires a complete run-specific source directory")
-        response = parse_response((source / "model.ltl").read_text())
+        response = parse_response((source / "model.ltl").read_bytes().decode('utf-8'))
         inputs = json.loads(record.read_text())
         design = Design(inputs["top"], tuple(Path(p["path"]) for p in inputs["sources"]),
             tuple(Path(p) for p in inputs["include_dirs"]), tuple(Port(**p) for p in inputs["ports"]),
@@ -151,6 +210,7 @@ def main() -> None:
         reset_sequence = None
         initial_state = None
         initial_state_record = None
+        reset_snapshot_state, reset_snapshot_record = None, None
         clocks = []
         environment_assumptions = []
         if args.replay_config:
@@ -196,12 +256,16 @@ def main() -> None:
                 initial_state_record = {"policy": POLICY, "file": str(snapshot_record),
                     "sha256": hashlib.sha256(snapshot_record.read_bytes()).hexdigest()}
                 reset_sequence = None
-        runtime = [ZAOZI / p for p in ("experiments/ut_harness.py", "experiments/isolation.py",
-            "experiments/ut_validation.py", "experiments/rtl_initial_state.py",
-            "experiments/src/TrustedSolver.scala", "utlib/src/JasperGold.scala")]
-        input_hash = fingerprint({"files": {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in [*source.glob("*.scala"), *runtime]}, "design": inputs, "timeLimit": args.jg_time_limit,
-            "resetSequence": reset_sequence, "initialState": initial_state, "clocks": clocks,
+            elif not args.compile_only:
+                from rtl_initial_state import prepare_native_reset
+                phase = 'initial-state'
+                reset_snapshot_state, reset_snapshot_record = prepare_native_reset(design, replay, out_dir/'reset-snapshot',
+                    Path(os.environ.get('ZAOZI_EDA_SHELL', ZAOZI/'experiments/eda-shell')))
+        input_hash = fingerprint({"files": {**trusted_hashes,
+            **{str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in source.glob('*.scala')}},
+            "design": inputs, "timeLimit": args.jg_time_limit,
+            "resetSequence": reset_sequence, "initialState": initial_state, "resetSnapshotState": reset_snapshot_state,
+            "resetSnapshotRecord": reset_snapshot_record, "clocks": clocks,
             "environmentAssumptions": environment_assumptions})
         phase = "toolchain"
         with events.phase(phase):
@@ -240,6 +304,9 @@ def main() -> None:
                     "utRun", str(work / "artifacts")], config, source, work)
                 (out_dir / "lower.log").write_text(lowered.stdout)
                 if lowered.returncode:
+                    diagnostic = elaboration_diagnostic(work, source) if lowered.returncode == 2 else None
+                    if diagnostic is not None:
+                        emit(diagnostic, 2)
                     raise ValueError(lowered.stdout[-2500:])
             description = json.loads((work / "artifacts/report.json").read_text())
             def artifact(name):
@@ -273,6 +340,7 @@ def main() -> None:
                     "timeLimit": args.jg_time_limit, "proofObligations": [],
                     "resetSequence": reset_sequence, "initialState": initial_state,
                     "initialStateRecord": initial_state_record, "clocks": clocks,
+                    "resetSnapshotState": reset_snapshot_state, "resetSnapshotRecord": reset_snapshot_record,
                     "environmentAssumptions": environment_assumptions}
                 job["fingerprint"] = fingerprint(job)
                 save(prepared, job)
@@ -290,9 +358,14 @@ def main() -> None:
             (out_dir / "solve.log").write_text(solved.stdout)
             if solved.returncode:
                 raise ValueError(solved.stdout[-2500:])
-        emit({"phase": phase, "ok": True, "result": json.loads((out_dir / "report.json").read_text())}, 0)
+        report = json.loads((out_dir / "report.json").read_text())
+        diagnostic=solver_diagnostic(report,job['labels'])
+        if diagnostic:
+            emit(diagnostic,2 if model_repair_allowed(diagnostic) else 3)
+        emit({"phase": phase, "ok": True, "result": report}, 0)
     except (ValueError, RuntimeError, OSError, subprocess.SubprocessError, KeyError) as error:
-        emit({"phase": phase, "ok": False, "detail": str(error)}, 3)
+        emit({"phase": phase, "ok": False, "detail": str(error),
+              "error_type": type(error).__name__, "model_repair_allowed": False}, 3)
 
 
 if __name__ == "__main__":

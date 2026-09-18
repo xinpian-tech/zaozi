@@ -6,6 +6,16 @@ from prune_archived_caches import validate, relocate
 
 
 class ArchiveValidationTest(unittest.TestCase):
+    def test_resolved_archive_alias_cannot_be_validated_as_a_scratch_copy(self):
+        with tempfile.TemporaryDirectory() as root:
+            work, archive = self.roots(root)
+            link = Path(root)/'retired-scratch'
+            link.symlink_to(archive, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'independent'):
+                validate(link, archive)
+            with self.assertRaisesRegex(ValueError, 'independent'):
+                validate(archive, archive)
+
     def test_offline_summary_still_requires_identical_archived_material(self):
         with tempfile.TemporaryDirectory() as root:
             work=Path(root)/'work'; archive=Path(root)/'archive'

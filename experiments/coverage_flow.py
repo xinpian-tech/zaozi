@@ -4,6 +4,7 @@
 prepare is read/transform only; run explicitly invokes models/EDA. Unit tests use
 injected generators/simulators. Never run an experiment just by preparing a bundle.
 """
+import backend_imports
 import argparse
 from copy import deepcopy
 import importlib
@@ -15,18 +16,19 @@ import time
 from types import SimpleNamespace
 
 import sequence_experiment as generation
-from cycle_replay import digest, load_config, validate_samples, witness_frames
+import rvprobe_model_options
+from cycle_replay import digest, load_config, validate_samples
 from haven_shared import (CONTRACT, METRICS, checkout_hashes, check_sequence_set,
                           compact_feedback, coverage_progress, coverage_score,
                           install_cycle_transport, repair_components, replace_once,
-                          render_witness_sequence, stop_reason, repair_direct_handshake, repair_axi_response_sampling)
-from process_runner import run as run_process
-from prompt_context import paired_feedback, POLICY as CONTEXT_POLICY
+                          stop_reason, repair_direct_handshake, repair_axi_response_sampling)
+from rvprobe.backend.process import run as run_process
+from prompt_context import paired_feedback, rvprobe_batch_instruction, POLICY as CONTEXT_POLICY
 from task_context import POLICY as RTL_CONTEXT_POLICY, MAX_MODEL_CALLS
 from run_records import Records, begin, finish, fingerprint, framework_hashes, save, totals, utc
 from sequence_framework import ROOT, identifier
 from urg_score import parse, score, _MODULE_SPLIT
-from witness_sampling import expand_goals, sampling_options, sampling_policy
+from witness_sampling import sampling_options, sampling_policy
 from isolated_replay import POLICY as ISOLATION_POLICY
 
 
@@ -263,32 +265,71 @@ def load_bundle(path, haven_root):
     return bundle, design, config
 
 
-def paired_loop(bundle, directory, simulate, generate, *, rounds=3, min_gain=0.1, target=100, arms=("haven", "rvprobe"), runtime_repairs=1):
+def paired_loop(bundle, directory, simulate, generate, *, rounds=3, min_gain=0.1, target=100, arms=("haven", "rvprobe"), runtime_repairs=1, fixed_rounds=False, quality_floor=None, restored=None):
     """One shared baseline; isolated cumulative arms, common post-simulation policy."""
     if not arms or len(set(arms)) != len(arms) or set(arms) - {"haven", "rvprobe"}:
         raise ValueError("select distinct haven/rvprobe arms")
     if type(runtime_repairs) is not int or runtime_repairs < 0:
         raise ValueError('runtime repair budget must be nonnegative')
+    if quality_floor is not None and not 0 < quality_floor <= 100:
+        raise ValueError('quality floor must be in (0, 100]')
     directory = Path(directory)
     summary = {"status": "running", "contract": CONTRACT, "bundle": bundle["fingerprint"], "arms": {}}
-    from replay_failures import POLICY as FAILURE_POLICY
+    from rvprobe.backend.failures import POLICY as FAILURE_POLICY
     summary['runtime_failure_policy'] = FAILURE_POLICY
     baseline_sequences = list(bundle["sequences"])
     check_sequence_set(baseline_sequences)
-    baseline = simulate(directory / "baseline", baseline_sequences, [])
+    if restored is not None:
+        if tuple(arms) != ('rvprobe',):
+            raise ValueError('a restored paired checkpoint is RVProbe-only')
+        required = {'baseline','current','previous','best','rounds','sequences','frames'}
+        if not isinstance(restored,dict) or required-set(restored):
+            raise ValueError('incomplete restored paired checkpoint')
+        old_rounds = restored['rounds']
+        if (not isinstance(old_rounds,list) or
+                [row.get('round') for row in old_rounds] != list(range(1,len(old_rounds)+1))):
+            raise ValueError('restored rounds are not contiguous')
+        if rounds < len(old_rounds):
+            raise ValueError('round budget is smaller than the restored checkpoint')
+        baseline = deepcopy(restored['baseline'])
+        summary['continuation'] = {'restored_rounds':len(old_rounds),
+                                   'baseline_replayed':False,
+                                   'accepted_sequences_replayed':False}
+    else:
+        baseline = simulate(directory / "baseline", baseline_sequences, [])
     summary["baseline"] = baseline
     save(directory / "progress.json", summary)
     for arm in arms:
         arm_began, arm_started = time.monotonic(), utc()
-        current, previous, best = deepcopy(baseline), None, deepcopy(baseline)
-        sequences, frames = list(baseline_sequences), []
-        result = {"status": "running", "rounds": [], "baseline": deepcopy(baseline), "started_utc": arm_started}
+        if restored is None:
+            current, previous, best = deepcopy(baseline), None, deepcopy(baseline)
+            sequences, frames = list(baseline_sequences), []
+            prior_rounds = []
+            carried = {}
+        else:
+            current, previous, best = (deepcopy(restored[key]) for key in ('current','previous','best'))
+            sequences, frames = list(restored['sequences']), deepcopy(restored['frames'])
+            prior_rounds = deepcopy(restored['rounds'])
+            if sequences[:len(baseline_sequences)] != baseline_sequences:
+                raise ValueError('restored sequence history changed the shared baseline')
+            check_sequence_set(sequences)
+            expected_current = prior_rounds[-1]['coverage'] if prior_rounds else baseline
+            expected_previous = (prior_rounds[-2]['coverage'] if len(prior_rounds)>1 else
+                                 baseline if prior_rounds else None)
+            if current != expected_current or previous != expected_previous:
+                raise ValueError('restored coverage cursor disagrees with accepted rounds')
+            carried = {key:deepcopy(restored[key]) for key in
+                       ('intent_outcomes','all_intents_satisfied','rejected_candidates') if key in restored}
+        result = {"status": "running", "rounds": prior_rounds, "baseline": deepcopy(baseline),
+                  "started_utc": arm_started, **carried}
         summary["arms"][arm] = result
         save(directory / "progress.json", summary)
-        reason = stop_reason(None, current, 0, rounds, min_gain, target)
+        constrained = arm == 'rvprobe' and quality_floor is not None
+        reason = ('coverage_floor' if current['score'] >= quality_floor else None) if constrained else (
+                 None if fixed_rounds else stop_reason(None, current, 0, rounds, min_gain, target))
         try:
             if not reason:
-                for number in range(1, rounds + 1):
+                for number in range(len(prior_rounds)+1, rounds + 1):
                     rd = directory / arm / f"round-{number}"
                     result['active_round'] = number
                     save(directory / 'progress.json', summary)
@@ -326,11 +367,25 @@ def paired_loop(bundle, directory, simulate, generate, *, rounds=3, min_gain=0.1
                                 'repair_instruction':'Replace your failed candidate using measured diagnostics. Keep the verification intent; do not suppress or delete checks, fabricate outputs, modify shared components, or claim success without execution.'}
                         else:
                             break
-                    if candidate.get("stop"):
+                    if candidate.get("stop") and not fixed_rounds:
                         reason = "model_stop"
                         break
+                    if arm == 'rvprobe' and 'unresolved_intents' in candidate.get('metadata', {}):
+                        meta = candidate['metadata']
+                        result.setdefault('intent_outcomes', []).append(dict(round=number,
+                            unresolved=meta['unresolved_intents'], partial=meta.get('partial_intents', [])))
+                        result['all_intents_satisfied'] = not any(
+                            item['unresolved'] for item in result['intent_outcomes'])
+                    if fixed_rounds and (candidate.get('stop') or not candidate.get('sequences')):
+                        result['rounds'].append(dict(round=number,status='no_validated_sequences',
+                            coverage=deepcopy(current),added_sequences=0,metadata=candidate.get('metadata',{})))
+                        reason='round_budget'
+                        continue
                     additions = candidate["sequences"]
                     if not additions:
+                        if arm == 'rvprobe' and 'unresolved_intents' in candidate.get('metadata', {}):
+                            result['rounds'].append(dict(round=number, status='no_validated_sequences',
+                                coverage=deepcopy(current), added_sequences=0, metadata=candidate['metadata']))
                         reason = "no_generated_sequences"
                         break
                     delta = coverage_progress(current, measured)
@@ -339,12 +394,22 @@ def paired_loop(bundle, directory, simulate, generate, *, rounds=3, min_gain=0.1
                     previous, current, sequences, frames = current, measured, proposed, new_frames
                     if current["score"] > best["score"]:
                         best = deepcopy(current)
-                    reason = stop_reason(previous, current, number, rounds, min_gain, target)
+                    if constrained:
+                        reason = ('coverage_floor' if current['score'] >= quality_floor else
+                                  'round_budget' if number >= rounds else None)
+                    else:
+                        reason = ('round_budget' if number>=rounds else None) if fixed_rounds else stop_reason(previous, current, number, rounds, min_gain, target)
                     save(directory / "progress.json", summary)
                     if reason:
                         break
             result.update(status="completed", stop_reason=reason or "round_budget", final=current, best=best,
                           sequence_count=len(sequences), witness_frames=len(frames))
+            if constrained:
+                result.update(coverage_floor=quality_floor,
+                              coverage_floor_met=best['score'] >= quality_floor)
+                if not result['coverage_floor_met']:
+                    result.update(status='failed',failure_kind='coverage_floor_unmet',
+                                  error=f'best composite coverage {best["score"]:.6f}% is below required floor {quality_floor:.6f}%')
         except Exception as error:
             result.update(status="failed", error=str(error), final=current, best=best)
             result['failed_round'] = result.get('active_round')
@@ -352,9 +417,7 @@ def paired_loop(bundle, directory, simulate, generate, *, rounds=3, min_gain=0.1
             if details:
                 result['diagnostics'] = details
             if details.get('model_repair_allowed') is False:
-                result['stop_reason'] = ('native_witness_search_exhausted'
-                    if details.get('kind') == 'native_witness_search_exhausted'
-                    else 'shared_contract_requires_validation')
+                result['stop_reason'] = 'shared_contract_requires_validation'
         result.pop('active_round', None)
         result.update(started_utc=arm_started, finished_utc=utc(), elapsed_seconds=time.monotonic()-arm_began,
                       costs=totals(directory / arm))
@@ -367,7 +430,7 @@ def paired_loop(bundle, directory, simulate, generate, *, rounds=3, min_gain=0.1
 class SimulationFailure(ValueError):
     def __init__(self, message, log_path):
         super().__init__(message)
-        from replay_failures import classify
+        from rvprobe.backend.failures import classify
         log = log_path.read_text()
         self.diagnostics = {'log':str(log_path),'tail':log[-24000:], **classify(log+'\n'+message)}
 
@@ -408,11 +471,12 @@ class HavenSimulation:
         for key, original in self.bundle["components"].items():
             if key not in ("test", "pkg", "filelist") and components[key] != original:
                 raise ValueError("shared testbench component changed")
-        from ltl_replay import install as install_ltl, check_hit
+        from ltl_replay import install as install_ltl
+        from rvprobe.backend.replay import check_hit
         try:
             ltl = install_ltl(components,frames,self.design)
         except ValueError as error:
-            from replay_failures import ReplayInfrastructureFailure
+            from rvprobe.backend.failures import ReplayInfrastructureFailure
             raise ReplayInfrastructureFailure(str(error)) from error
         for key, code in components.items():
             suffix = "f" if key == "filelist" else "sv"
@@ -554,8 +618,20 @@ def saved_generation(directory, bundle, design, model):
 
 def accepted_rvprobe_history(candidates, existing):
     """Keep only this run's LTL fragments whose sequences were actually accepted."""
-    return {'ltls': [deepcopy(c['ltl']) for c in candidates
-                    if c['sequences'] and all(s in existing for s in c['sequences'])]}
+    accepted = [c for c in candidates
+                if c['sequences'] and all(s in existing for s in c['sequences'])]
+    outcomes = []
+    for candidate in accepted:
+        for row in candidate.get('metadata', {}).get('sampling', []):
+            outcomes.append({key: deepcopy(row[key]) for key in
+                ('label', 'status', 'actual', 'requested_cap', 'sampling_shortfall') if key in row})
+    return {'ltls': [deepcopy(c['ltl']) for c in accepted],
+            **({'native_replay_outcomes': outcomes,
+                'native_replay_instruction':
+                    'native-validated goals were accepted; partial/unresolved goals were not. '
+                    'Do not repeat an unresolved expression unchanged. Add legal initialization, '
+                    'handshake or history when repairing the same intent, or select another measured gap.'}
+               if outcomes else {})}
 
 
 class Backends:
@@ -575,6 +651,17 @@ class Backends:
         # Common source evidence; TaskContext further removes native transaction
         # abstractions for the RVProbe arm before any model/tool response.
         feedback = paired_feedback(feedback, self.bundle)
+        if arm=='rvprobe':
+            from feedback_ablation import redact_feedback
+            # RVProbe may use a separately recorded quality-mode batch size;
+            # HAVEN's shared DSL prompt remains fixed at four intents.
+            rv_options = rvprobe_model_options.record(args)
+            feedback['intent_batch_limit'] = rv_options['intent_batch_limit']
+            feedback['batch_instruction'] = rvprobe_batch_instruction(rv_options['intent_batch_limit'])
+            # The modinfo path stays orchestration-only; the no-coverage author never reads it.
+            modinfo=feedback.get('modinfo')
+            feedback=redact_feedback(feedback,rv_options['feedback_mode'])
+            if modinfo is not None:feedback['modinfo']=modinfo
         if self.replay.get("formal_initial_state"):
             feedback["formal_environment"] = {
                 "initialization": "trusted RTL-derived initial-state snapshot",
@@ -583,6 +670,9 @@ class Backends:
         save(rd / "feedback.json", feedback)
         if arm == "haven":
             return self.haven(rd, feedback, existing)
+        if self.native_witness_simulator is None:
+            from rvprobe.backend.failures import ReplayInfrastructureFailure
+            raise ReplayInfrastructureFailure('RVProbe requires isolated native replay before model generation')
         skill_path = rd.parent / 'frozen-skill.json'
         if skill_path.exists():
             if generation.load_snapshot(skill_path) != self.rvprobe_skill:
@@ -591,18 +681,36 @@ class Backends:
             save(skill_path, self.rvprobe_skill)
         from rtl_evidence import collect
         history = accepted_rvprobe_history(self.rvprobe_candidates, existing)
-        history['coverage_round'] = int(rd.name.removeprefix('round-'))
-        history['rtl_evidence'] = collect(rd.parent, int(rd.name.removeprefix('round-')))
+        history['coverage_round'] = int(rd.name.split('-')[1])
+        history['rtl_evidence'] = collect(rd.parent, history['coverage_round'])
         save(rd / 'accepted-history.json', history)
+        round_number=history['coverage_round']
+        options=rvprobe_model_options.effective(args,feedback,round_number)
+        save(rd/'generation-options.json',options)
+        request_timeout=options['request_timeout_seconds']
         command = [sys.executable, str(ROOT / "experiments/sequence_experiment.py"),
                    '--skill-snapshot', str(skill_path), '--history-file', str(rd / 'accepted-history.json'),
                    "--design", str((Path(self.bundle["replay_config"]).parent / self.replay["design"]).resolve()),
                    "--replay-config", str(self.bundle["replay_config"]),
                    "--modinfo", feedback["modinfo"], "--feedback-file", str(rd / "feedback.json"),
                    "--out", str(rd / "generation"), "--model", args.model, "--temperature", str(args.temperature),
-                   "--attempts", str(args.attempts), "--timeout", str(args.timeout),
+                   "--attempts", str(args.attempts), "--timeout", str(request_timeout),
                    "--request-retries", str(args.request_retries), "--jg-time-limit", args.jg_time_limit,
                    "--eda-shell", str(args.eda_shell), "--sequences-per-intent", str(args.sequences_per_intent)]
+        if options['max_tokens'] is not None:
+            command += ['--max-tokens',str(options['max_tokens'])]
+        command += ['--reasoning-effort',options['reasoning_effort']]
+        command += ['--dialogue-policy',options['dialogue_policy']]
+        if options['evidence_steps'] is not None:
+            command += ['--evidence-steps',str(options['evidence_steps'])]
+        if options['evidence_tools'] is not None:
+            command += ['--evidence-tools',str(options['evidence_tools'])]
+        if options['retrieval_max_tokens'] is not None:
+            command += ['--retrieval-max-tokens',str(options['retrieval_max_tokens'])]
+        if options['retrieval_reasoning_effort'] is not None:
+            command += ['--retrieval-reasoning-effort',options['retrieval_reasoning_effort']]
+        command += ['--feedback-mode',rvprobe_model_options.record(args)['feedback_mode']]
+        if getattr(args,'rvprobe_fixed_rounds',False):command.append('--fixed-opportunities')
         if self.bundle.get('coverage_module'):
             command += ['--module',self.bundle['coverage_module']]
         continuation = getattr(args,'continued_generation',None)
@@ -613,72 +721,49 @@ class Backends:
             save(rd/'continued-generation.json',continuation)
         elif args.env_file:
             command += ["--env-file", str(args.env_file)]
-        with (rd / "generation.log").open("w") as log:
-            run_process(command, stdout=log, stderr=-2, check=True,
-                        timeout=args.attempts * (MAX_MODEL_CALLS * args.timeout * args.request_retries + 21600))
-        result = json.loads((rd / "generation/summary.json").read_text())
+        # An infrastructure-only retry may reuse an already paid, complete
+        # model response.  The generation summary remains immutable in its
+        # original run; only native witness selection is repeated.
+        reuse = getattr(args, 'reuse_generations', {}).get(round_number)
+        ltl_source_path = None
+        if reuse is not None:
+            reuse = Path(reuse).resolve()
+            summary_path = reuse / 'summary.json'
+            if not summary_path.is_file():
+                raise ValueError(f'reused generation summary is missing: {summary_path}')
+            result = json.loads(summary_path.read_text())
+            if result.get('model') != args.model or result.get('status') not in ('completed', 'generated'):
+                raise ValueError('reused generation is not a complete response from the requested model')
+            if result.get('result', {}).get('status') not in ('generated', 'partial'):
+                raise ValueError('reused generation has no usable LTL result')
+            ltl_source_path = Path(result['sources']) / 'model.ltl'
+            if not ltl_source_path.is_file():
+                raise ValueError(f'reused generation source is missing: {ltl_source_path}')
+            save(rd / 'reused-generation.json', {
+                'source': str(reuse), 'summary_sha256': digest(summary_path),
+                'response_sha256': digest(Path(result['sources']).parent.parent / 'response.txt')
+                    if (Path(result['sources']).parent.parent / 'response.txt').is_file() else None,
+                'remote_llm_requests': 0,
+                'policy': 'reuse-complete-model-response-after-infrastructure-failure-v1'})
+        else:
+            with (rd / "generation.log").open("w") as log:
+                run_process(command, stdout=log, stderr=-2, check=True,
+                            timeout=args.attempts * (MAX_MODEL_CALLS * request_timeout * args.request_retries + 21600))
+            result = json.loads((rd / "generation/summary.json").read_text())
         if result["result"]["status"] == "stopped":
             return {"stop": result["result"]["stopReason"]}
-        goals = expand_goals(result, Path(self.bundle["replay_config"]), rd / "sampling", args)
-        sequences, frames, sampling = [], [], []
-        for goal in goals:
-            rows = goal.get("sequences", [goal] if goal["status"] == "generated" else [])
-            selection = None
-            if self.native_witness_simulator is not None and rows:
-                from native_witness_selection import pool_target, select_witnesses
-                from witness_sampling import frozen_inputs, sample_goal
-                search = rd/'native-witness-search'/goal['label']
-                selected_frame_count = 0
-                def evaluate(row, index):
-                    nonlocal selected_frame_count
-                    # Cache exactly the same independently rendered sequence
-                    # that the final cumulative coverage merge will consume.
-                    new = witness_frames(self.design, self.replay, row, ordinal + len(frames) + selected_frame_count)
-                    from ltl_replay import attach
-                    attach(new, goal)
-                    name = f"rvp_{rd.name.replace('-', '_')}_{goal['label']}_{index}"
-                    source = render_witness_sequence(self.design, new, name, 0)
-                    self.native_witness_simulator.measure_one([source], new)
-                    selected_frame_count += len(new)
-                    return (row, index)
-                def replenish(budget):
-                    _, _, job, original_goals = frozen_inputs(
-                        Path(result['sources']).parent/'solve', Path(self.bundle['replay_config']))
-                    original = next(g for g in original_goals if g['label'] == goal['label'])
-                    return sample_goal(job, original, self.design, self.replay, search/'sampling',
-                                       budget, args.sampling_seed, args.sampling_time_limit, args.eda_shell)
-                auxiliary = None
-                if getattr(args, 'encoded_witness_yosys', None):
-                    from encoded_candidate_search import candidates
-                    def auxiliary(budget):
-                        return candidates(Path(result['sources']).parent/'solve',
-                            Path(self.bundle['replay_config']), goal['label'], search/'encoded',
-                            args.encoded_witness_yosys, args.eda_shell, budget, args.sampling_seed)
-                selected, selection = select_witnesses(rows, pool_target(args.sequences_per_intent, len(rows)),
-                                                       evaluate, replenish, search, auxiliary=auxiliary)
-            else:
-                selected = [(row, index) for index, row in enumerate(rows)]
-            sampling.append({"label": goal["label"], "actual": len(selected),
-                             "requested_cap": args.sequences_per_intent,
-                             "available_pool": len(rows),
-                             "sampling_shortfall": max(0, args.sequences_per_intent - len(selected)),
-                             "pool_policy": 'up-to-cap-all-offered-native-validated-v1',
-                             "status": 'native-validated' if selection else goal.get("sampling_status", goal["status"]),
-                             **({'native_selection':selection} if selection else {})})
-            for row, index in selected:
-                new = witness_frames(self.design, self.replay, row, ordinal + len(frames))
-                if self.replay.get('environment'):
-                    from ltl_replay import attach
-                    attach(new,goal)
-                label = f"rvp_{rd.name.replace('-', '_')}_{goal['label']}_{index}"
-                sequences.append(render_witness_sequence(self.design, new, label, ordinal + len(frames)))
-                frames += new
+        from witness_backend_adapter import generate as generate_sequences
+        produced = generate_sequences(result, Path(self.bundle["replay_config"]), self.design,
+            self.replay, self.native_witness_simulator, rd, args, ordinal)
+        sequences, frames = produced['sequences'], produced['frames']
         ut_files = sorted((rd/'generation').glob('attempt-*/sources/model.ltl'))
+        if ltl_source_path is not None:
+            ut_files = [ltl_source_path]
         if ut_files:
-            self.rvprobe_candidates.append({'sequences': list(sequences), 'ltl': {
-                'round': rd.name, 'source': ut_files[-1].read_text(), 'sha256': digest(ut_files[-1])}})
-        return {"sequences": sequences, "frames": frames, "metadata": {"sampling": sampling},
-                "repair_context": {"ltl":ut_files[-1].read_text() if ut_files else None}}
+            self.rvprobe_candidates.append({'sequences': list(sequences), 'metadata':deepcopy(produced['metadata']), 'ltl': {
+                'round': rd.name, 'source': ut_files[-1].read_bytes().decode('utf-8'), 'sha256': digest(ut_files[-1])}})
+        return {"sequences": sequences, "frames": frames, "metadata": produced["metadata"],
+                "repair_context": {"ltl":ut_files[-1].read_bytes().decode('utf-8') if ut_files else None}}
 
     def haven(self, rd, feedback, existing):
         from haven.dsl.schema import DSLSequenceSet, BusFieldMapping, BFMConfig
@@ -774,6 +859,7 @@ def main(argv=None):
     run.add_argument("--model", default=generation.DEFAULT_MODEL)
     run.add_argument("--temperature", type=float, default=0.3)
     run.add_argument("--timeout", type=int, default=600)
+    rvprobe_model_options.add_options(run)
     run.add_argument("--attempts", type=int, default=3)
     run.add_argument("--request-retries", type=int, default=3)
     run.add_argument('--runtime-repairs',type=int,default=1)
@@ -782,6 +868,8 @@ def main(argv=None):
     run.add_argument("--env-file", type=Path)
     run.add_argument('--encoded-witness-yosys', type=Path,
                      help='opt-in auxiliary candidate search; unchanged original native Cover required')
+    run.add_argument('--encoded-witness-time-limit', default='120s',
+                     help='per auxiliary solve budget; does not change the LTL or native acceptance')
     run.add_argument('--continue-generation',type=Path,help='reuse latest first-round remote-model response in a new run')
     run.add_argument('--fixed-stage1-identity',type=Path,
                      help='explicit frozen shared-environment admission; preserves original setup provenance')
@@ -791,6 +879,8 @@ def main(argv=None):
     req.add_argument("--options", type=Path, required=True)
     req.add_argument("--env-file", type=Path)
     args = parser.parse_args(argv)
+    if args.command == 'run' and not re.fullmatch(r'[1-9][0-9]*s', args.encoded_witness_time_limit):
+        parser.error('invalid encoded witness time limit')
     if args.command == "prepare":
         bundle = prepare(args.stage1_run, args.haven_root, args.replay_config, args.out)
         print(json.dumps({"bundle": str(args.out / "bundle.json"), "fingerprint": bundle["fingerprint"], "experiments_run": False}))
@@ -810,11 +900,21 @@ def main(argv=None):
         if not shutil.which("bwrap"):
             parser.error("bubblewrap is required; start inside nix develop before requesting models")
     policy = sampling_policy(args)
+    if getattr(args,'rvprobe_fixed_rounds',False) and args.arm!='rvprobe':
+        parser.error('fixed-round ablation is RVProbe-only; HAVEN unchanged')
+    if (getattr(args,'rvprobe_fixed_rounds',False) and
+            getattr(args,'rvprobe_adaptive_quality_floor',None) is not None):
+        parser.error('adaptive quality floor already controls stopping; do not combine it with fixed rounds')
+    if getattr(args,'rvprobe_feedback_mode',None)=='no_coverage' and not getattr(args,'rvprobe_fixed_rounds',False):
+        parser.error('no-coverage ablation requires fixed-round opportunities')
     stop_reason(None, {"score": 0}, 0, args.rounds, args.min_gain, args.target)
     if min(args.attempts, args.timeout, args.request_retries) < 1 or args.runtime_repairs < 0:
         parser.error("budgets must be positive")
     if not 0 <= args.seed < 2**31:
         parser.error("seed must be a nonnegative 31-bit integer")
+    # Reject a wrong/empty provider env before running the potentially expensive
+    # shared baseline. The request worker remains the only process that loads values.
+    generation.require_provider_credentials(args.env_file)
     bundle, design, replay = load_bundle(args.bundle, args.haven_root)
     admission = None
     if args.fixed_stage1_identity:
@@ -844,6 +944,7 @@ def main(argv=None):
                 "rounds": args.rounds, "min_gain": args.min_gain, "target": args.target,
                 "attempts": args.attempts, "request_retries": args.request_retries,
                 "temperature": args.temperature, "timeout": args.timeout, "jg_time_limit": args.jg_time_limit,
+                "rvprobe_generation_options": rvprobe_model_options.record(args),
                 "scope": [bundle.get('coverage_module',design.top)], "metrics": list(METRICS),
                 "baseline_policy": "shared Stage-1 sequences, fresh process per sequence, coverage union" if isolate_sequences else "one shared HAVEN Stage-1 simulation; exact same sequence prefix",
                 "common_context_policy": CONTEXT_POLICY,
@@ -864,12 +965,13 @@ def main(argv=None):
         from isolated_replay import DIAGNOSTIC_POLICY
         manifest['candidate_diagnostic_policy'] = DIAGNOSTIC_POLICY
         if replay.get('environment', {}).get('boundary') == 'independent-dut-v1':
-            from native_witness_selection import POLICY as NATIVE_SELECTION_POLICY, search_budget
+            from rvprobe.backend.selection import POLICY as NATIVE_SELECTION_POLICY, search_budget
             manifest['native_witness_selection'] = dict(policy=NATIVE_SELECTION_POLICY,
                 target_per_intent=args.sequences_per_intent,
                 candidate_budget_per_intent=search_budget(args.sequences_per_intent) * (2 if args.encoded_witness_yosys else 1),
                 auxiliary_candidate_policy='encoded-native-checked-v1' if args.encoded_witness_yosys else None,
                 auxiliary_yosys=str(args.encoded_witness_yosys) if args.encoded_witness_yosys else None,
+                auxiliary_time_limit=args.encoded_witness_time_limit,
                 all_attempt_costs_retained=True, model_calls=0)
     from prompt_context import MAX_INTENTS
     manifest['intent_batch_limit'] = MAX_INTENTS
@@ -890,7 +992,9 @@ def main(argv=None):
                     backends.native_witness_simulator = simulate
             summary = paired_loop(bundle, root, simulate, generate,
                                   rounds=args.rounds, min_gain=args.min_gain, target=args.target, arms=arms,
-                                  runtime_repairs=args.runtime_repairs)
+                                  runtime_repairs=args.runtime_repairs,
+                                  fixed_rounds=getattr(args,'rvprobe_fixed_rounds',False),
+                                  quality_floor=getattr(args,'rvprobe_adaptive_quality_floor',None))
     except Exception as error:
         summary.update(status="failed", error=str(error))
     finally:

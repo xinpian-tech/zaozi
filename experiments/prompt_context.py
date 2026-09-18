@@ -35,6 +35,14 @@ RVPROBE_BATCH_INSTRUCTION = (BATCH_INSTRUCTION
              "do not emit proof classifications. "))
 
 
+def rvprobe_batch_instruction(limit=MAX_INTENTS):
+    """Render the RVProbe-only batch contract without changing HAVEN's text."""
+    if type(limit) is not int or not 1 <= limit <= 8:
+        raise ValueError('invalid RVProbe intent batch limit')
+    return RVPROBE_BATCH_INSTRUCTION.replace('at most 4 new finite',
+                                             f'at most {limit} new finite')
+
+
 def public_bfm_parameters(sources):
     """Expose actual interface parameters, never model bodies or test scenarios."""
     result={}

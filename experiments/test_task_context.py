@@ -42,6 +42,20 @@ class TaskAccessTest(unittest.TestCase):
         self.assertEqual(self.context.dispatch('search_rtl',{'query':'.*'})['total_matches'],0)
         self.assertNotIn(str(self.root),json.dumps(listing))
 
+    def test_inspect_batch_combines_literal_search_and_bounded_context(self):
+        result=self.context.dispatch('inspect_rtl_batch',{
+            'queries':[{'query':'module'},{'query':'wire example'}], 'context_lines':1})
+        self.assertEqual([r['total_matches'] for r in result['queries']],[2,1])
+        self.assertEqual(len(result['ranges']),1)
+        self.assertIn('1: module DUT_SENTINEL;',result['ranges'][0]['text'])
+        self.assertIn('2: wire example;',result['ranges'][0]['text'])
+        self.assertIn('Exact source contexts',result['note'])
+
+    def test_inspect_batch_rejects_unbounded_or_extra_arguments(self):
+        for args in ({'queries':[]},{'queries':[{'query':'wire'}],'context_lines':101},
+                     {'queries':[{'query':'wire','offset':1}]}):
+            with self.assertRaises(ValueError):self.context.dispatch('inspect_rtl_batch',args)
+
     def test_pagination_does_not_lose_long_lines_or_unicode(self):
         self.source.write_text('wire '+('中文'*PAGE_CHARS)+';\n')
         context=TaskContext(self.design)
@@ -121,7 +135,8 @@ class TaskAccessTest(unittest.TestCase):
                     task_context=self.context,rvprobe_skill_snapshot=snapshot() if with_skill else None)
                 replies=[
                     self.call('list_rtl',{},1),self.call('read_rtl',{'file_id':'rtl_0001'},2),
-                    self.call('read_context',{'topic':'environment'},3),self.reply({'role':'assistant','content':'FINAL_JSON'})]
+                    self.call('read_context',{'topic':'environment'},3),
+                    self.reply({'role':'assistant','content':'FINAL_JSON'})]
                 payloads=[]
                 def send(payload,timeout):
                     payloads.append(json.loads(json.dumps(payload)));return replies.pop(0)
@@ -147,14 +162,15 @@ class TaskAccessTest(unittest.TestCase):
     def test_bad_tool_arguments_return_error_then_can_be_corrected(self):
         args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,task_context=self.context)
         replies=[self.call('read_rtl',{'file_id':'/etc/passwd'},1),
-                 self.call('read_rtl',{'file_id':'rtl_0001'},2),self.reply({'content':'FINAL_JSON'})]
+                 self.call('read_rtl',{'file_id':'rtl_0001'},2),self.reply({'content':'READY'}),
+                 self.reply({'content':'FINAL_JSON'})]
         with patch('sequence_experiment.send_completion',side_effect=replies):
             raw,_=request_model(args,'task',self.root,Records(self.root))
         self.assertEqual(raw,'FINAL_JSON')
         error=json.loads((self.root/'task-tool-1-1.json').read_text())['result']
         self.assertEqual(set(error),{'error'})
         self.assertIn('unknown RTL file ID',error['error'])
-        self.assertEqual(totals(self.root)['requests'],3)
+        self.assertEqual(totals(self.root)['requests'],4)
 
     def test_last_budget_slot_returns_answer_with_tools_disabled(self):
         args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,task_context=self.context)

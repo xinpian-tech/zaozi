@@ -97,6 +97,19 @@ class SequenceFrameworkTest(unittest.TestCase):
             design=self.changed_manifest(lambda raw: raw.update(include_dirs=[str(first),str(second)]))
             self.assertEqual(design.include_dirs,(first,second))
 
+    def test_helper_api_name_collision_and_definition_rejection(self):
+        from dataclasses import replace
+        design = replace(self.design, ports=tuple(replace(p, name="Ltl") if p.name == "payload" else p
+                                                  for p in self.design.ports))
+        self.assertEqual(framework.port_bindings(design)["Ltl"], "port_Ltl")
+        for prefix, error in (("def eq32(x: Referable[Bits]) = x", "framework-owned"),
+                              ("val eq32 = (x: Referable[Bits]) => x", "framework-owned"),
+                              ("val Ltl = null", "do not redefine")):
+            with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, error):
+                framework.parse_response(prefix + '\nGen(valid, "target")')
+        self.assertEqual(framework.parse_response('Gen(Ltl.isZero(payload), "zero")')["labels"], ["zero"])
+        self.assertEqual(framework.parse_response('Gen(valid.S |=> done.S, "later")')["labels"], ["later"])
+
     def test_no_legacy_cli_or_build_module(self):
         for path in ("utlib/src/Sem.scala", "utlib/src/Txn.scala", "experiments/alu_residual_loop.py",
                      "experiments/alu_rag_ablation.py"):
@@ -239,7 +252,7 @@ class SequenceFrameworkTest(unittest.TestCase):
                 framework.check_saved_sources(target, self.design, self.response)
 
     def test_ltl_helpers_whitespace_and_generated_source_are_integrity_checked(self):
-        response = framework.parse_response(self.response["ltl"] + "\n// local helper\ndef identity(p: Referable[Bool]) = p\n\n")
+        response = framework.parse_response(self.response["ltl"] + "\n// supplied helper\nval zero = Ltl.isZero(payload)\n\n")
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
             sources = framework.write_sources(directory / "sources", self.design, response)
@@ -295,11 +308,11 @@ class SequenceFrameworkTest(unittest.TestCase):
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             summary = json.loads(result.stdout)
-            self.assertEqual(summary["contract"], "runtime-ltl-v2")
+            self.assertEqual(summary["contract"], "runtime-ltl-v4")
             manifest = json.loads((directory / "run/manifest.json").read_text())
-            self.assertEqual(manifest["framework_context_policy"], "ltl-bare-ports-v2")
+            self.assertEqual(manifest["framework_context_policy"], "predefined-ltl-helpers-v4")
             prompt_record = json.loads((directory / "run/attempt-1/prompt.json").read_text())
-            self.assertEqual(prompt_record["framework_context_policy"], "ltl-bare-ports-v2")
+            self.assertEqual(prompt_record["framework_context_policy"], "predefined-ltl-helpers-v4")
             self.assertEqual(summary["status"], "prepare")
             self.assertTrue((Path(summary["sources"]) / "DesignBinding.scala").is_file())
 
@@ -342,6 +355,14 @@ bounded
                 self.assertFalse(report["ok"], report)
                 self.assertEqual(report["phase"], "typecheck")
                 self.assertTrue(any(e["file"] == "model.ltl" for e in report["errors"]))
+
+    def test_single_fenced_ltl_compiles_without_body_rewriting(self):
+        body = 'Gen(valid ### (past(valid) & !valid), "history")\r\n'
+        response = framework.parse_response('```scala\n' + body + '```\n')
+        sources = framework.write_sources(self.artifacts / 'fenced' / 'sources', self.design, response)
+        self.assertEqual((sources / 'model.ltl').read_bytes(), body.encode())
+        report, _ = loop.harness(sources, self.artifacts / 'fenced' / 'compile', loop.DEFAULT_EDA_SHELL, compile_only=True)
+        self.assertTrue(report['ok'], report)
 
     def test_escaped_port_aliases_compile_without_capturing_gen_or_past(self):
         from dataclasses import replace

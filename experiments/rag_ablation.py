@@ -3,6 +3,7 @@
 """Paired framework-RAG experiment on one fresh, fixed residual task and checked cycle replay."""
 from __future__ import annotations
 
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -16,7 +17,7 @@ from cycle_diagnostic import compare
 from cycle_replay import CONTRACT as REPLAY_CONTRACT, Replay, baseline_frames, digest, load_config, preflight, save, witness_frames
 from sequence_framework import CONTRACT as GENERATION_CONTRACT, ROOT
 from goal_coverage import measure_goals
-from process_runner import run as run_process
+from rvprobe.backend.process import run as run_process
 from run_records import Records, begin, finish, framework_hashes
 from witness_sampling import sampling_options, sampling_policy, expand_goals
 

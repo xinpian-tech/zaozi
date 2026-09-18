@@ -3,6 +3,7 @@
 """Standalone cycle-replay diagnostic. NOT the paired HAVEN experiment entrypoint."""
 from __future__ import annotations
 
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -14,7 +15,7 @@ import sequence_experiment as generation
 from cycle_replay import CONTRACT, Replay, baseline_frames, digest, load_config, preflight, save, witness_frames
 from sequence_framework import ROOT
 from goal_coverage import measure_goals
-from process_runner import run as run_process
+from rvprobe.backend.process import run as run_process
 from run_records import Records, begin, finish, framework_hashes
 from witness_sampling import sampling_options, sampling_policy, expand_goals
 

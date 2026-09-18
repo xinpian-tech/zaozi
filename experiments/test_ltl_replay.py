@@ -1,11 +1,13 @@
 """Observer extraction and fail-closed replay provenance (no EDA/provider needed)."""
+import backend_imports
 import hashlib
 import unittest
 import json
 import tempfile
 from pathlib import Path
 from copy import deepcopy
-from ltl_replay import POLICY, attach, monitor, install, check_hit
+from ltl_replay import install
+from rvprobe.backend.replay import POLICY, attach, monitor, check_hit
 from test_hardening import SV, FIXTURES
 from sequence_framework import load_design
 

@@ -5,6 +5,7 @@ the operator supplies an OpenAI-style message with a matching request hash.
 All parsing, skill dispatch, compilation, solving, sampling and replay remain real.
 No provider credentials are loaded; other model entry points fail closed.
 """
+import backend_imports
 import argparse
 import json
 import os
@@ -16,7 +17,7 @@ from unittest.mock import patch
 import coverage_flow as paired
 import sequence_experiment as generation
 from run_records import fingerprint, save, utc
-from process_runner import run as run_worker
+from rvprobe.backend.process import run as run_worker
 
 
 class ManualCompletion:

@@ -1,3 +1,4 @@
+import backend_imports
 import unittest
 from sequence_framework import ROOT, load_design
 from cycle_replay import frame
@@ -5,7 +6,7 @@ from haven_shared import render_witness_sequence
 from isolated_replay import independent_batches, IsolatedSimulation, CandidateBatchFailure, diagnostic_excerpt
 from pathlib import Path
 from types import SimpleNamespace
-from replay_failures import ReplayInfrastructureFailure
+from rvprobe.backend.failures import ReplayInfrastructureFailure
 
 
 class IsolationTests(unittest.TestCase):

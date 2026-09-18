@@ -1,4 +1,5 @@
 """Policy and recovery regressions; no provider credentials or paid requests."""
+import backend_imports
 import contextlib
 import io
 import json
@@ -18,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import isolation
 import sequence_experiment as generation
 from sequence_framework import load_design, parse_response
-from ut_validation import validate
+from rvprobe.backend.validation import validate
 from goal_coverage import measure_goals
 from run_records import Records, begin, finish, totals, utc
 from compare_runs import compare_runs
@@ -179,7 +180,7 @@ class AccountingTest(unittest.TestCase):
         info = {"usage": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with patch.object(generation, "invoke", side_effect=[TimeoutError(), ("response", info)]) as invoke, \
+            with patch.object(generation, "invoke", side_effect=[urllib.error.HTTPError('local', 429, 'busy', {}, None), ("response", info)]) as invoke, \
                  patch.object(generation.time, "sleep"):
                 self.assertEqual(generation.request_model(args, "prompt", root, Records(root))[0], "response")
                 self.assertEqual([call.args[1] for call in invoke.call_args_list], ["fixed-model", "fixed-model"])
@@ -252,6 +253,35 @@ class GoalFeedbackTest(unittest.TestCase):
 
 
 class GenerationRecoveryTest(unittest.TestCase):
+    def test_missing_runtime_is_detected_before_any_provider_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(generation,'runtime_hashes',side_effect=FileNotFoundError('missing trusted file')), \
+                    patch.object(generation,'send_completion') as send, \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main(self.arguments(root)),1)
+                send.assert_not_called()
+            summary = json.loads((root/'run/summary.json').read_text())
+            self.assertEqual(summary['costs']['requests'],0)
+            self.assertIn('missing trusted file',summary['error'])
+
+    def test_input_check_and_unknown_failures_never_request_model_repair(self):
+        response = (FIXTURES/'tiny_intents.ltl').read_text()
+        for phase in ('input-check','initial-state','wiring-check','lower','unknown-phase'):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                reply = {'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30},
+                         'choices':[{'message':{'role':'assistant','content':response}}]}
+                report = {'phase':phase,'ok':False,'detail':'trusted input missing'}
+                with patch.object(generation,'send_completion',return_value=reply) as send, \
+                        patch.object(generation,'harness',return_value=(report,'')), \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(generation.main(self.arguments(root)),1)
+                    self.assertEqual(send.call_count,1)
+                self.assertFalse((root/'run/attempt-2').exists())
+                summary = json.loads((root/'run/summary.json').read_text())
+                self.assertFalse(summary['model_repair_allowed'])
+
     def arguments(self, root):
         divider = "=" * 72
         modinfo = root / "modinfo.txt"
@@ -259,11 +289,32 @@ class GenerationRecoveryTest(unittest.TestCase):
         return ["--design", str(FIXTURES / "tiny_design.json"), "--modinfo", str(modinfo),
                 "--out", str(root / "run"), "--attempts", "2"]
 
+    def test_typed_model_argument_error_uses_existing_repair_budget(self):
+        response = (FIXTURES/'tiny_intents.ltl').read_text()
+        reply = {'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30},
+                 'choices':[{'message':{'role':'assistant','content':response}}]}
+        bad = {'phase':'elaboration-check','ok':False,'kind':'model_argument_error',
+               'errors':[{'file':'model.ltl','line':1,'col':1,'code':'ltl_unsigned_range',
+                          'message':'constant does not fit unsigned width'}]}
+        ok = {'phase':'solve','ok':True,'result':{'status':'generated','goals':[]}}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            with patch.object(generation,'send_completion',return_value=reply) as send, \
+                    patch.object(generation,'harness',side_effect=[(bad,''),(ok,'')]), \
+                    contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main(self.arguments(root)),0)
+            self.assertEqual(send.call_count,2)
+            self.assertIn('constant does not fit unsigned width',(root/'run/attempt-2/prompt.txt').read_text())
+            summary=json.loads((root/'run/summary.json').read_text())
+            self.assertEqual(summary['attempts'],2)
+            self.assertEqual(summary['costs']['usage_reported']['total_tokens'],60)
+
     def test_resume_reuses_response_after_infrastructure_failure_without_another_request(self):
         response = (FIXTURES / "tiny_intents.ltl").read_text()
         info = {"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}}
-        ok = {"phase": "solve", "ok": True, "result": {"status": "partial", "utCount": 1,
-              "goals": [{"label": "good", "status": "generated"}, {"label": "bad", "status": "unknown"}]}}
+        ok = {"phase": "solve", "ok": True, "result": {"status": "generated", "utCount": 1,
+              "goals": [{"label": label, "status": "generated"}
+                        for label in parse_response(response)['labels']]}}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             args = self.arguments(root)
@@ -276,10 +327,87 @@ class GenerationRecoveryTest(unittest.TestCase):
                 self.assertEqual(invoke.call_count, 1)
                 self.assertEqual(harness.call_count, 2)
             summary = json.loads((root / "run/summary.json").read_text())
-            self.assertEqual(summary["status"], "partial")
+            self.assertEqual(summary["status"], "generated")
             self.assertEqual(summary["tokens"], 30)
             self.assertEqual(summary["costs"]["requests"], 1)
             self.assertEqual(summary["costs"]["phases"]["generation-session"]["count"], 2)
+
+    def test_partial_solve_gets_goal_local_feedback_and_can_be_repaired(self):
+        response = (FIXTURES / 'tiny_intents.ltl').read_text()
+        labels = parse_response(response)['labels']
+        info = {'usage': {'prompt_tokens': 10, 'completion_tokens': 20, 'total_tokens': 30}}
+        reply = {**info, 'choices': [{'message': {'role': 'assistant', 'content': response}}]}
+        partial = {'phase':'solve','ok':True,'result':{'status':'partial','utCount':1,
+            'goals':[{'label':labels[0],'status':'generated'},
+                     *[{'label':label,'status':'infeasible'} for label in labels[1:]]]}}
+        complete = {'phase':'solve','ok':True,'result':{'status':'generated','utCount':1,
+            'goals':[{'label':label,'status':'generated'} for label in labels]}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(generation,'send_completion',return_value=reply) as send, \
+                    patch.object(generation,'harness',side_effect=[(partial,''),(complete,'')]) as harness, \
+                    contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main(self.arguments(root)),0)
+            self.assertEqual(send.call_count,2)
+            self.assertEqual(harness.call_count,2)
+            prompt=(root/'run/attempt-2/prompt.txt').read_text()
+            self.assertIn('jg_goal_infeasible',prompt)
+            self.assertIn('Keep every already-generated goal expression',prompt)
+            saved=json.loads((root/'run/attempt-1/goal-shortfall-feedback.json').read_text())
+            self.assertEqual([row['goal'] for row in saved['errors']],labels[1:])
+            summary=json.loads((root/'run/summary.json').read_text())
+            self.assertEqual(summary['status'],'generated')
+            self.assertEqual(summary['costs']['usage_reported']['total_tokens'],60)
+
+    def test_failed_partial_repair_falls_back_to_best_verified_partial(self):
+        response = (FIXTURES / 'tiny_intents.ltl').read_text()
+        labels = parse_response(response)['labels']
+        info = {'usage': {'prompt_tokens': 10, 'completion_tokens': 20, 'total_tokens': 30}}
+        replies = [{**info,'choices':[{'message':{'role':'assistant','content':text}}]}
+                   for text in (response,'STOP')]
+        partial = {'phase':'solve','ok':True,'result':{'status':'partial','utCount':1,
+            'goals':[{'label':labels[0],'status':'generated'},
+                     *[{'label':label,'status':'unknown'} for label in labels[1:]]]}}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            with patch.object(generation,'send_completion',side_effect=replies) as send, \
+                    patch.object(generation,'harness',return_value=(partial,'')) as harness, \
+                    contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main(self.arguments(root)),0)
+            self.assertEqual(send.call_count,2)
+            self.assertEqual(harness.call_count,1)
+            summary=json.loads((root/'run/summary.json').read_text())
+            self.assertEqual(summary['status'],'partial')
+            self.assertEqual(summary['partial_fallback']['selected_attempt'],1)
+            self.assertEqual(summary['result'],partial['result'])
+            self.assertEqual(summary['costs']['usage_reported']['total_tokens'],60)
+
+    def test_liveness_capability_feedback_uses_budget_and_preserves_labels(self):
+        from ut_harness import solver_diagnostic
+        from rvprobe_skill import journal_repairs
+        response = (FIXTURES / 'tiny_intents.ltl').read_text()
+        bad = solver_diagnostic({'goals': [dict(label='input_value', status='error',
+            failureKind='unsupported_liveness_cover', detail='Not supported: Liveness cover.')]},
+            parse_response(response)['labels'])
+        ok = {'phase': 'solve', 'ok': True, 'result': {'status': 'generated', 'goals': []}}
+        for repaired in (response, 'STOP', response.replace('input_value', 'different_goal')):
+            with self.subTest(repaired=repaired), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                replies = [{'usage': {'prompt_tokens': 10, 'completion_tokens': 20, 'total_tokens': 30},
+                    'choices': [{'message': {'role': 'assistant', 'content': text}}]} for text in (response, repaired)]
+                with patch.object(generation, 'send_completion', side_effect=replies) as send, \
+                        patch.object(generation, 'harness', side_effect=[(bad, ''), (ok, '')]) as harness, \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(generation.main(self.arguments(root)), 0 if repaired == response else 1)
+                self.assertEqual(send.call_count, 2)
+                self.assertEqual(harness.call_count, 2 if repaired == response else 1)
+                prompt = (root / 'run/attempt-2/prompt.txt').read_text()
+                self.assertIn('jg_unsupported_liveness_cover', prompt)
+                self.assertIn('# DUT specification', prompt)
+                summary = json.loads((root / 'run/summary.json').read_text())
+                self.assertEqual(summary['costs']['usage_reported']['total_tokens'], 60)
+                repair = journal_repairs(root / 'run')['repairs'][0]
+                self.assertEqual(repair['status'], 'backend-accepted' if repaired == response else 'changed-unverified')
 
     def test_empty_generation_never_enters_source_repair_or_compilation(self):
         replies = [{"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
@@ -321,7 +449,7 @@ class GenerationRecoveryTest(unittest.TestCase):
 
 class ProcessCleanupTest(unittest.TestCase):
     def test_timeout_also_kills_descendant_in_a_separate_session(self):
-        from process_runner import run
+        from rvprobe.backend.process import run
         import time
         with tempfile.TemporaryDirectory() as directory:
             pid_file = Path(directory) / "child.pid"

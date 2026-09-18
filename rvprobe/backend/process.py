@@ -1,4 +1,4 @@
-"""Bounded subprocesses: kill the complete process group on timeout/interruption."""
+"""Bounded backend subprocesses: stop the complete group on timeout/interruption."""
 import os
 import signal
 import subprocess

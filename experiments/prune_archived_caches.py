@@ -16,6 +16,9 @@ def digest(path):
 
 
 def validate(work,archive,summary=Path('flow/paired/summary.json')):
+    work, archive = Path(work).resolve(), Path(archive).resolve()
+    if work == archive or work in archive.parents or archive in work.parents:
+        raise ValueError('independent work and archive directories required, including resolved aliases')
     if summary.is_absolute() or '..' in summary.parts:
         raise ValueError('summary must be a relative path inside the experiment')
     if not (work/summary).is_file() or not (archive/summary).is_file():

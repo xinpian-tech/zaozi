@@ -4,6 +4,57 @@ import json
 from pathlib import Path
 
 INLINE_LIMIT = 48000
+PACKET_INLINE_LIMIT = 32768
+
+
+def index(ranges):
+    """Expose only verified range metadata; bodies remain available on demand.
+
+    Compact dialogues should not resend old RTL bodies on every new coverage
+    round.  The exact ranges are retained in the run artifact and can be
+    fetched with read_context(topic=rtl_history) or read_rtl at their offsets.
+    """
+    return {'policy':'same-run-verified-rtl-index-v1', 'inline':False,
+            'ranges':[{k:v for k,v in row.items() if k!='text'} for row in ranges],
+            'characters':sum(len(row.get('text','')) for row in ranges),
+            'details':'Bodies remain available through read_context(topic=rtl_history) or read_rtl; request only missing ranges.'}
+
+
+def project_inline(ranges, limit=PACKET_INLINE_LIMIT):
+    """Return a deterministic recent source window for a stateless request.
+
+    ``ranges`` has already been validated against the frozen RTL.  The complete
+    merged ranges remain in the run artifact and in ``read_context``; this
+    projection only bounds repeated prompt size.  The newest observed ranges are
+    preferred because they correspond to the current model lookup.  A partial
+    range retains its source offset/hash so the model can request the omitted
+    prefix or suffix explicitly.
+    """
+    if type(limit) is not int or limit < 1:
+        raise ValueError('inline RTL limit must be positive')
+    total = sum(len(row.get('text', '')) for row in ranges)
+    if total <= limit:
+        return ranges
+    remaining = limit
+    selected = []
+    for row in reversed(ranges):
+        if remaining <= 0:
+            break
+        text = row.get('text', '')
+        if not text:
+            continue
+        if len(text) <= remaining:
+            selected.append(dict(row))
+            remaining -= len(text)
+        else:
+            # Keep the tail of the newest range.  Line numbers in the source
+            # text remain intact; ``omitted_prefix`` is explicit metadata.
+            start = row['offset'] + len(text) - remaining
+            selected.append({**row, 'offset': start, 'text': text[-remaining:],
+                             'omitted_prefix': len(text) - remaining})
+            remaining = 0
+    selected.sort(key=lambda row: (row['file_id'], row['offset']))
+    return selected
 
 
 def collect(run, before_round):
@@ -60,6 +111,19 @@ def initial(ranges):
     if size<=INLINE_LIMIT:
         return {'policy':'same-run-verified-rtl-v1','inline':True,'ranges':ranges,
             'instruction':'These exact RTL ranges were already requested by you in earlier coverage rounds. Reuse them; read only missing or additional ranges as needed.'}
-    return {'policy':'same-run-verified-rtl-v1','inline':False,
+    # Keep an exact prefix instead of dropping all bodies at the size boundary.
+    # Full indices and continuation offsets preserve access to the omitted tail.
+    remaining = INLINE_LIMIT
+    visible = []
+    for row in ranges:
+        if remaining <= 0:
+            break
+        text = row['text'][:remaining]
+        end = row['offset'] + len(text)
+        visible.append({**row, 'text':text, 'end_offset':end,
+                        'next_offset':end if end < row['end_offset'] else None})
+        remaining -= len(text)
+    return {'policy':'same-run-verified-rtl-v2','inline':False,
         'ranges':[{k:v for k,v in row.items() if k!='text'} for row in ranges],
-        'characters':size,'details':'read_context(topic=rtl_history) for all prior read text, or read_rtl for a needed range; no evidence is silently removed'}
+        'inline_ranges':visible, 'inline_text_characters':INLINE_LIMIT-remaining,
+        'characters':size,'details':'Reuse inline_ranges; read_rtl at next_offset for a needed continuation, or read_context(topic=rtl_history) for all prior text. The full range index is retained.'}

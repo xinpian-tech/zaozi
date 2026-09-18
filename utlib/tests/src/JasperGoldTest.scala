@@ -6,6 +6,20 @@ import utest.*
 
 object JasperGoldTest extends TestSuite:
   val tests: Tests = Tests:
+    test("only generated liveness cover errors permit source repair"):
+      val source = "/run/goal/jg/ModelUT.sv"
+      val error = s"ERROR (EOBS012): $source(64): Not supported: Liveness cover.\n"
+      val cascade = "ERROR (ENL008): Elaborate did not conclude successfully\nERROR: problem encountered at line 6 in file run.tcl\n"
+      assert(JasperGold.executionFailure(1, error + cascade, Some(source)).get.kind == "unsupported_liveness_cover")
+      assert(JasperGold.executionFailure(1, error).get.kind == "jg_execution_failure")
+      assert(JasperGold.executionFailure(1, error.replace(source, "/rtl/dut.sv"), Some(source)).get.kind == "jg_execution_failure")
+      assert(JasperGold.executionFailure(1, error + "ERROR: license failure\n", Some(source)).get.kind == "jg_execution_failure")
+      assert(JasperGold.executionFailure(1, error + "ERROR (EOBS002): Property compilation time limit exceeded\n", Some(source)).get.kind == "property_compile_timeout")
+    test("property compilation failure is not an unknown solve"):
+      val failed = JasperGold.executionFailure(1, "ERROR (EOBS002): Property compilation time limit exceeded after 5000ms")
+      assert(failed.get.kind == "property_compile_timeout")
+      assert(JasperGold.executionFailure(1, "ERROR: syntax error").get.kind == "jg_execution_failure")
+      assert(JasperGold.executionFailure(0, "JGSTATUS top.goal undetermined\nJGDONE\n").isEmpty)
     test("one lowered UT selects independent goals and rejects hidden restrictions"):
       val dir = os.temp.dir(prefix = "single-ut-policy-")
       val sv = dir / "top.sv"

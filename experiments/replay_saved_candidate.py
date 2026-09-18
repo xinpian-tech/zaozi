@@ -2,6 +2,7 @@
 
 Diagnostic only: this is not a fresh paired closed-loop experiment.
 """
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -77,7 +78,7 @@ def normalize_saved_ordinals(candidate, design, *, already_isolated=False):
 def refresh_ltl_provenance(candidate, generation):
     """Rebind only the known class/emitted-top metadata bug, never LTL or IO."""
     from copy import deepcopy
-    from ltl_replay import attach
+    from rvprobe.backend.replay import attach
     summary=json.loads((generation/'summary.json').read_text())
     goals={g['generationLabel']:g for g in summary['result']['goals']}
     fixed=deepcopy(candidate)
@@ -105,10 +106,18 @@ def main():
                          help='replay recorded source sequences and schedule after an adapter repair')
     parser.add_argument('--sequence', type=int, help='one-based candidate index; omit to replay baseline plus all candidates')
     parser.add_argument('--seed', type=int, default=20260906)
+    parser.add_argument('--dump-waveform', action='store_true',
+                        help='diagnostic only: observe the live DUT without changing its inputs or RTL')
     parser.add_argument('--generation',type=Path,
                         help='verify original solver artifacts and repair only stale lowered-module metadata')
     args = parser.parse_args()
     bundle, design, _ = load_bundle(args.bundle, args.haven_root)
+    if args.dump_waveform:
+        top = bundle['components']['top']
+        if top.count('endmodule') != 1:
+            raise ValueError('waveform diagnostic requires one testbench top')
+        bundle['components']['top'] = top.replace('endmodule',
+            'initial begin $dumpfile("dut.vcd"); $dumpvars(0, u_dut); end\nendmodule')
     source = args.candidate or args.simulation_directory/'inputs.json'
     candidate = (json.loads(args.candidate.read_text()) if args.candidate else
                  load_saved_simulation(args.simulation_directory))
@@ -130,7 +139,7 @@ def main():
         source_kind='candidate' if args.candidate else 'saved-simulation',
         source_sha256=framework_hashes(ROOT), isolation=POLICY, sequence=args.sequence, seed=args.seed,
         generation=str(args.generation) if args.generation else None, rebound_module_metadata=rebound,
-        rebased_initial_ordinal=initial_ordinal))
+        rebased_initial_ordinal=initial_ordinal, waveform_diagnostic=args.dump_waveform))
     if args.generation or initial_ordinal: save(out/'candidate.json',candidate)
     config = json.loads(args.eda_config.read_text())
     config['eda_env'] = {'shell': str(args.eda_shell.resolve())}

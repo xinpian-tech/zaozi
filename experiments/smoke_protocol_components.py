@@ -1,4 +1,5 @@
 """Generic MII and Wishbone component regressions, not benchmark experiments."""
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -6,7 +7,7 @@ import shlex
 import sys
 import time
 from jinja2 import Template
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc
 from cycle_replay import digest
 

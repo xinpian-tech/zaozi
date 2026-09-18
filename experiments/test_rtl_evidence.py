@@ -7,7 +7,7 @@ from unittest.mock import patch
 from run_records import save
 from sequence_framework import load_design
 from task_context import TaskContext
-from rtl_evidence import collect,validate_and_merge
+from rtl_evidence import collect,validate_and_merge,index,project_inline
 
 
 class RtlEvidenceTests(unittest.TestCase):
@@ -73,12 +73,25 @@ class RtlEvidenceTests(unittest.TestCase):
         self.assertEqual(result['ranges'][0]['text'],context.files['rtl_0001']['text'])
         self.assertIsNone(result['ranges'][0]['next_offset'])
 
+    def test_compact_index_and_recent_projection_preserve_access_metadata(self):
+        rows=validate_and_merge(self.context.files,[self.read(1),self.read(2),self.read(3)])
+        compact=index(rows)
+        self.assertFalse(compact['inline'])
+        self.assertNotIn('text',compact['ranges'][0])
+        projected=project_inline(rows,limit=10)
+        self.assertLessEqual(sum(len(r['text']) for r in projected),10)
+        self.assertTrue(any(r.get('omitted_prefix',0)>0 for r in projected))
+
     def test_later_round_packet_is_complete_and_duplicate_tools_are_not_exposed(self):
         feedback={'gaps':[{'type':'toggle','signal':'signal','direction':'0->1'}],'score':12}
         history={'coverage_round':2,'ltls':[{'source':'own accepted UT'}],'rtl_evidence':[self.read(1)]}
         context=TaskContext(self.design,feedback,history)
         packet=context.initial_evidence()
-        self.assertEqual(packet['current_feedback'],{'complete':True,'coverage':feedback})
+        from coverage_table import unpack
+        self.assertTrue(packet['current_feedback']['complete'])
+        compact=packet['current_feedback']['coverage']
+        self.assertEqual({**compact,'gaps':unpack(compact['gaps'])},feedback)
+        self.assertNotIn('score',packet['coverage'])  # Present exactly once in current_feedback.
         self.assertEqual(packet['accepted_ltl']['ltls'],history['ltls'])
         names={t['function']['name'] for t in context.tools}
         self.assertNotIn('read_coverage',names);self.assertNotIn('list_rtl',names)

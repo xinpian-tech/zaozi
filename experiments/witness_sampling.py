@@ -7,6 +7,7 @@ heuristic sampling, not uniform sampling or exhaustive solution enumeration.
 """
 from __future__ import annotations
 
+import backend_imports
 import argparse
 import json
 import os
@@ -19,30 +20,14 @@ import time
 
 from cycle_replay import (Replay, WITNESS_CONTRACT, baseline_frames, digest,
                           load_config, read_vcd, witness_frames)
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import Records, begin, fingerprint, finish, framework_hashes, save
 from sequence_framework import ROOT, check_saved_sources, parse_response
-from ut_validation import validate
+from rvprobe.backend.validation import validate
 
-COVER = re.compile(r"(\w+):((?:[^\n]*\n)?\s*)cover property \((.*?)\);", re.S)
+from rvprobe.backend.cover import COVER, select_cover, tcl_word
 SAMPLING_METHOD = "soft-input-resample-v2"
 MAX_SOFT_PREFERENCES = 64
-
-
-def select_cover(sv, labels, label):
-    matches = list(COVER.finditer(sv))
-    found = [m[1] for m in matches]
-    if len(set(found)) != len(found) or set(found) != set(labels) or label not in found:
-        raise ValueError("UT cover labels differ from prepared job")
-    return COVER.sub(lambda m: m[0]
-                         if m[1] == label else "", sv)
-
-
-def tcl_word(value):
-    value = str(value)
-    if any(c in value for c in "{}\n\r\\"):
-        raise ValueError("unsupported Tcl path or identifier")
-    return "{" + value + "}"
 
 
 def render_sampling(job, label, sv, out, drives, cycles, count, seed, limit):
@@ -76,10 +61,18 @@ def render_sampling(job, label, sv, out, drives, cycles, count, seed, limit):
         if job.get('resetSequence'):
             raise ValueError("conflicting formal initialization policies")
         reset = f"reset reset -init_state {tcl_word(out / 'initial.state')}"
+    if job.get('resetSnapshotState'):
+        if job.get('initialState') or not job.get('resetSequence'):
+            raise ValueError('native reset snapshot requires the original reset sequence')
+        reset = ('set_cumulative_reset on\nreset -init_state '+tcl_word(out/'reset-snapshot.state')+'\n'+reset)
     clock_setup = ([f"clock {c['port']} -factor {c['factor']}" for c in job['clocks']] +
                    ['clock -rate -default clock']) if job.get('clocks') else ['clock clock']
     environment_setup = [f"assume -env {{{term}}}" for term in job.get('environmentAssumptions', [])]
-    script = ["clear -all", *analyze, f"elaborate -disable_auto_bbox -top {job['top']}", *clock_setup, reset, *environment_setup,
+    compile_limit=job.get('timeLimit',limit)
+    if not re.fullmatch(r'[1-9][0-9]*[smh]',compile_limit):
+        raise ValueError('invalid property compilation budget')
+    script = ["clear -all", f"set_property_compile_time_limit {compile_limit}",
+              f"set_task_compile_time_limit {compile_limit}", *analyze, f"elaborate -disable_auto_bbox -top {job['top']}", *clock_setup, reset, *environment_setup,
               f"set_prove_time_limit {limit}", "prove -all", 'set target ""',
               "foreach p [get_property_list -include {type cover}] {",
               f"  if {{[string match {{*::{job['top']}.{label}}} $p] || [string equal {{{job['top']}.{label}}} $p]}} {{ set target $p }}",
@@ -175,8 +168,9 @@ def frozen_inputs(source, config_path):
         raise ValueError("frozen design inputs changed")
     if job["rtl"] != [str(p) for p in design.sources] or job["labels"] != response["labels"]:
         raise ValueError("prepared job differs from frozen source")
-    from rtl_initial_state import verify_prepared
+    from rtl_initial_state import verify_prepared, verify_native_reset
     verify_prepared(job, design, config)
+    verify_native_reset(job, design, config)
     from environment_contract import verify_solver_environment
     verify_solver_environment(job, design, config)
     validate(sv.read_text(), design, job["top"], job["labels"])
@@ -253,6 +247,8 @@ def sample_goal(job, goal, design, config, directory, count, seed, limit, eda_sh
             (directory / "reset.seq").write_text(job["resetSequence"])
         if job.get("initialState"):
             (directory / "initial.state").write_text(job["initialState"])
+        if job.get('resetSnapshotState'):
+            (directory/'reset-snapshot.state').write_text(job['resetSnapshotState'])
         sv = directory / Path(job["sv"]).name
         sv.write_text(select_cover(Path(job["sv"]).read_text(), job["labels"], label))
         clock_names = {c['port'] for c in job.get('clocks', [])}

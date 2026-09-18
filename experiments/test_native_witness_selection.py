@@ -1,11 +1,12 @@
+import backend_imports
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from native_witness_selection import select_witnesses, NativeWitnessExhaustion, pool_target
-from replay_failures import ReplayInfrastructureFailure
+from rvprobe.backend.selection import select_witnesses, exhaustion_details, pool_target
+from rvprobe.backend.failures import ReplayInfrastructureFailure
 
 
 class CoverMiss(ValueError):
@@ -15,6 +16,17 @@ class CoverMiss(ValueError):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_exhaustion_exposes_auxiliary_termination_and_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/'encoded').mkdir()
+            (root/'encoded/search.json').write_text(json.dumps(dict(status='stopped',
+                stop_reason='undetermined',solve_time_limit='120s',attempts=[{'status':'undetermined'}])))
+            details=exhaustion_details(0,1,1,root)['auxiliary_search']
+            self.assertEqual(details['stop_reason'],'undetermined')
+            self.assertEqual(details['solve_time_limit'],'120s')
+            self.assertEqual(details['attempts'],1)
+
     def test_opt_in_auxiliary_still_requires_original_native_cover(self):
         def evaluate(row,index):
             if row['inputFingerprint'] != '4': raise CoverMiss('original cover missed')
@@ -27,6 +39,25 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(report['budget'],8)
         self.assertEqual(report['auxiliary_candidate_policy'],'encoded-native-checked-v1')
         self.assertEqual([x['status'] for x in report['attempts']],['rejected']*4+['passed'])
+
+    def test_observed_unknowns_escalate_without_guessing_more_initial_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checks = root/'checks.json'
+            checks.write_text(json.dumps({'waveform_differences':[
+                {'kind':'output','mask':255,'known':15}]}))
+            error = CoverMiss('miss')
+            error.diagnostics = {**CoverMiss.diagnostics, 'replay_checks':str(checks)}
+            extra = Mock(side_effect=AssertionError('must not resample arbitrary initial values'))
+            def evaluate(row, index):
+                if row['inputFingerprint']=='0': raise error
+                return row
+            selected, report = select_witnesses([self.row(0),self.row(1)],1,evaluate,extra,root,
+                                                auxiliary=lambda budget:[self.row(2)])
+            self.assertEqual(selected,[self.row(1)])
+            self.assertEqual(report['attempts'][0]['unknown_output_bits'],4)
+            self.assertTrue(report['known_state_escalation']['skipped_two_state_replenishment'])
+            extra.assert_not_called()
 
     def test_auxiliary_is_lazy_and_never_handles_transport_defects(self):
         extra=Mock(side_effect=AssertionError('unexpected auxiliary solver'))
@@ -49,14 +80,16 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(report['status'],'passed')
         extra.assert_not_called()
 
-    def test_short_pool_still_requires_every_offered_candidate_to_be_valid(self):
+    def test_short_pool_never_emits_a_rejected_candidate(self):
         def evaluate(row,index):
             if index: raise CoverMiss('original cover missed')
             return row
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(NativeWitnessExhaustion):
-                select_witnesses([self.row(0),self.row(1)],pool_target(4,2),evaluate,
-                    lambda budget: [],Path(directory))
+            selected,report=select_witnesses([self.row(0),self.row(1)],pool_target(4,2),evaluate,
+                lambda budget: [],Path(directory))
+        self.assertEqual(selected,[self.row(0)])
+        self.assertEqual(report['status'],'exhausted')
+        self.assertEqual(report['accepted'],1)
 
     def row(self, index):
         return dict(inputFingerprint=str(index), witnessFile=f'witness-{index}.vcd')
@@ -84,17 +117,17 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(saved['attempts'][0]['log'],'retained.log')
         self.assertEqual(saved['attempts'][0]['replay_checks'],'replay-checks.json')
 
-    def test_never_accepts_partial_success(self):
+    def test_preserves_validated_subset_without_claiming_full_target(self):
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(NativeWitnessExhaustion,'1/2 validated') as raised:
-                select_witnesses([self.row(0)],2,lambda row,index:row,
-                                 lambda budget:[],Path(directory))
+            selected,report=select_witnesses([self.row(0)],2,lambda row,index:row,
+                                           lambda budget:[],Path(directory))
             report=json.loads((Path(directory)/'selection.json').read_text())
-        self.assertEqual(report['status'],'failed')
+        self.assertEqual(selected,[self.row(0)])
+        self.assertEqual(report['status'],'exhausted')
         self.assertEqual(report['accepted'],1)
-        self.assertEqual(raised.exception.diagnostics['kind'],'native_witness_search_exhausted')
-        self.assertFalse(raised.exception.diagnostics['model_repair_allowed'])
-        self.assertEqual(raised.exception.diagnostics['attempted'],1)
+        self.assertEqual(report['diagnostics']['kind'],'native_witness_search_exhausted')
+        self.assertFalse(report['diagnostics']['model_repair_allowed'])
+        self.assertEqual(report['diagnostics']['attempted'],1)
 
     def test_transport_and_unknown_errors_are_not_resampled(self):
         for error in (ReplayInfrastructureFailure('bad pins'),ValueError('unknown defect')):
@@ -110,7 +143,8 @@ class SelectionTests(unittest.TestCase):
             calls.append(index)
             raise CoverMiss('miss')
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(ReplayInfrastructureFailure,'4 distinct candidates'):
-                select_witnesses([self.row(0)],1,evaluate,
-                    lambda budget:[self.row(i) for i in range(100)],Path(directory))
+            selected,report=select_witnesses([self.row(0)],1,evaluate,
+                lambda budget:[self.row(i) for i in range(100)],Path(directory))
+        self.assertEqual(selected,[])
+        self.assertEqual(report['status'],'exhausted')
         self.assertEqual(calls,list(range(4)))

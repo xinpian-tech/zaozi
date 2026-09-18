@@ -1,4 +1,5 @@
 """Native acceptance check for an isolated alternative-encoding diagnostic."""
+import backend_imports
 import argparse
 import json
 import time
@@ -6,7 +7,8 @@ from pathlib import Path
 from coverage_flow import load_haven, prepare, HavenSimulation
 from cycle_replay import witness_frames
 from haven_shared import render_witness_sequence
-from ltl_replay import attach
+from rvprobe.backend.replay import attach
+from rvprobe.backend.runtime import ReplayTransport, WitnessBackend
 from offline_validation import no_model_calls
 from run_records import save, utc
 from witness_sampling import frozen_inputs, import_sample
@@ -63,7 +65,25 @@ def main():
             eda['eda_env'] = {'shell':str(Path(__file__).resolve().parent/'eda-shell')}
             if args.zero_delays:
                 eda['eda_tools']['vcs']['flags'].append('+delay_mode_zero')
-            result = HavenSimulation(bundle, design, eda, 20260906)(out/'sequence-0', [sequence], rows)
+            simulator = HavenSimulation(bundle, design, eda, 20260906)
+            if args.negative_drive:
+                result = simulator(out/'sequence-0', [sequence], rows)
+            else:
+                measured = []
+                def measure(source, frames):
+                    value = simulator(out/f'sequence-{len(measured)}', [source], frames)
+                    measured.append(value)
+                    return value['replay']
+                backend = WitnessBackend(ReplayTransport(
+                    frames=lambda row, segment: witness_frames(design, config, row, segment),
+                    render=lambda frames, name, ordinal: render_witness_sequence(design, frames, name, ordinal),
+                    measure=measure), replenish=lambda *args: [])
+                produced = backend.generate([{**original, 'sequences':[candidate]}],
+                    out/'backend', 'rvp_encoded_probe', 1)
+                record['backend'] = produced['metadata']
+                if not produced['sequences']:
+                    raise ValueError('encoded diagnostic candidate did not satisfy the original native LTL')
+                result = measured[0]
             record.update(status='passed', coverage=result)
             if args.negative_drive:
                 record.update(status='failed', error='negative stimulus was incorrectly accepted')

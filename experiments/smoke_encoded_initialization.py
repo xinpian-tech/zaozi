@@ -1,4 +1,5 @@
 """JG integration regression: declaration init alone must not be trusted."""
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -6,8 +7,8 @@ import re
 import shlex
 import subprocess
 
-from encoded_initialization import BOOT, materialize_initializers
-from process_runner import run
+from rvprobe.backend.initialization import BOOT, materialize_initializers
+from rvprobe.backend.process import run
 from run_records import save
 
 CODE = """module init_probe(clock, reset, we, data);

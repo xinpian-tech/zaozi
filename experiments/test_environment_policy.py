@@ -1,3 +1,4 @@
+import backend_imports
 import unittest
 from types import SimpleNamespace
 from environment_policy import derive_policy, require_supported
@@ -40,7 +41,7 @@ class EnvironmentPolicyTests(unittest.TestCase):
 
     def test_independent_static_inputs_are_declared_and_checked_before_driving(self):
         from environment_contract import INDEPENDENT, independent_environment, formal_assumptions
-        from replay_failures import classify
+        from rvprobe.backend.failures import classify
         ports=[Port('clock','input',1,'clock'),Port('reset','input',1),Port('cfg','input',4)]
         design=SimpleNamespace(top='probe',clock='clock',reset='reset',reset_active_low=False,
                                ports=ports,data_ports=ports[2:],parameters={})
@@ -122,7 +123,7 @@ class EnvironmentPolicyTests(unittest.TestCase):
         self.assertIn('INPUT_WITNESS',fixed['driver'])
         self.assertIn('spi_slave_bfm u_spi_slave_bfm',fixed['top'])
         self.assertNotIn('rvp_raw_mode',components['top'])
-        from replay_failures import classify
+        from rvprobe.backend.failures import classify
         self.assertFalse(classify('UVM_FATAL driver.sv(1) @ 0: [INPUT_WITNESS] mismatch')['model_repair_allowed'])
         with self.assertRaisesRegex(ValueError,'boundary differ'):
             install_event_transport(components,design,{'environment':env},'driver',derive_policy(bp))
@@ -134,7 +135,7 @@ class EnvironmentPolicyTests(unittest.TestCase):
                 'boundary':INDEPENDENT,'open_drain':[{}]})
 
     def test_adapter_input_failures_do_not_request_model_repairs(self):
-        from replay_failures import classify
+        from rvprobe.backend.failures import classify
         self.assertFalse(classify('sampled drive differs: row 24, port input')['model_repair_allowed'])
         self.assertFalse(classify('original LTL goal did not hold on live IO: goal')['model_repair_allowed'])
     def test_roles_do_not_depend_on_design_names(self):

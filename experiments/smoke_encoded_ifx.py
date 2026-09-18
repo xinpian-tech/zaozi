@@ -1,4 +1,5 @@
 """VCS regression for procedural-if versus ternary X semantics in encoding."""
+import backend_imports
 import argparse
 from pathlib import Path
 import re
@@ -6,7 +7,7 @@ import shlex
 import subprocess
 import time
 
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc
 
 RTL = """module branch_probe(input clock, reset, we, input [1:0] cfg,

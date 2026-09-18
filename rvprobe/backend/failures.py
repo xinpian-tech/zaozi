@@ -1,4 +1,4 @@
-"""Measured transport failures, not guesses about a DUT's initialization logic."""
+"""Backend failures based on measured transport, never guessed DUT initialization."""
 import re
 
 POLICY = 'explicit-transport-failure-no-model-repair-v2'

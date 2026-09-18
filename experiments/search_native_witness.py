@@ -4,6 +4,7 @@ Never calls a model, edits the UT/RTL, or accepts partial goal success. Formal
 covers with unconstrained initial state or floating buses need not be replayable.
 Keep every rejected attempt and validate the exact original Cover on live IO.
 """
+import backend_imports
 import argparse
 import time
 from pathlib import Path
@@ -30,7 +31,7 @@ def main():
     from witness_sampling import frozen_inputs, sample_goal
     from cycle_replay import witness_frames
     from haven_shared import render_witness_sequence
-    from ltl_replay import attach
+    from rvprobe.backend.replay import attach
     import json
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)

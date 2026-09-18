@@ -1,11 +1,12 @@
 """Real four-state simulation of native generated poll termination, no model."""
+import backend_imports
 import argparse
 from pathlib import Path
 import shlex
 import sys
 import time
 
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc
 from cycle_replay import digest
 

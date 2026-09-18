@@ -1,12 +1,12 @@
 # zaozi LTL API 参考
 
-按 2026-09-13 当前工作树的实际声明、实现和测试整理。这里的 LTL API 包含 SVA 的时序序列与属性，不只是布尔公式。本文不新增 API，也不包含任何实验设计的历史答案。
+按 2026-09-14 当前工作树的实际声明、实现和测试整理。这里的 LTL API 包含 SVA 的时序序列与属性，不只是布尔公式。本文记录已有实现，也不包含任何实验设计的历史答案。
 
 源码入口：[API 声明](../zaozi/src/Api.scala)、[默认实现](../zaozi/src/default/SVAApi.scala)、[LTL 类型](../zaozi/src/ltltpe/)、[SVASpec](../zaozi/tests/src/SVASpec.scala)、[PastSpec](../zaozi/tests/src/PastSpec.scala)。
 
 ## 1. 上下文与类型
 
-底层 API 在已有 generator 的 `architecture` 中使用。RVProbe 的 `runtime-ltl-v2` 接口由框架预先提供以下上下文及端口局部别名，模型不要输出这些声明，只返回 LTL 片段：
+底层 API 在已有 generator 的 `architecture` 中使用。RVProbe 的 `runtime-ltl-v4` 接口由框架预先提供以下上下文及端口局部别名，模型不要输出这些声明，只返回 LTL 片段：
 
 ```scala
 import me.jiuyang.zaozi.*
@@ -20,6 +20,10 @@ given ClockEvent = posedge(io.clock)
 ```
 
 下文示例都是该上下文中的表达式片段，不是独立 UT。`p`、`q`、`r` 是 `Referable[Bool]`，`bits` 是 `Referable[Bits]`；拍数是 Scala `Int`，不是硬件信号。所有名字均为符号占位，不是 DUT 场景。
+
+RVProbe 额外预导入框架的 [Ltl helper](../utlib/src/Ltl.scala)：`Ltl.is(signal, value: BigInt)` 按信号类型与位宽构造常量比较；`Ltl.isZero(signal)` / `Ltl.isOnes(signal)` 判断全零/全一，返回硬件 Bool。支持 Bits/UInt/SInt，越界常量报错而不截断；SInt 全一是 -1。它们不引入时序或约束。模型只调用这些 API，不输出 helper 定义；[skill](../rvprobe-skill.md) 提供调用示例。
+
+大常量使用 `BigInt("89abcdef", 16)`，不要用 `BigInt(0x89abcdef)`：后者在 Scala 中先成为负数 Int，BigInt 无法恢复溢出前的值。全零/全一直接用现有 helper。越界会抛出带源码位置及错误码的 `LtlArgumentException`；RVProbe 仅将可映射到模型源码的有符号/无符号范围错误作为可修正的 `elaboration-check`，其他 lower 错误不自动交给模型。
 
 省略签名中重复的 elaboration 上下文：`Arena`、MLIR `Context/Block`、`sourcecode` 信息和 `InstanceContext`。标注“需要时钟”特指额外的 `using ClockEvent`，不是要求调用者手工创建这些编译上下文。
 

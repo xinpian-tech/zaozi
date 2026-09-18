@@ -1,10 +1,11 @@
+import backend_imports
 import sys
 import unittest
 from types import ModuleType
 from unittest.mock import patch
 
 from offline_validation import no_model_calls, ModelCallsForbidden
-from replay_failures import classify
+from rvprobe.backend.failures import classify
 
 
 class OfflineTests(unittest.TestCase):

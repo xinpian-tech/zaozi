@@ -47,7 +47,7 @@ Stage-1 不要求由 DeepSeek 或与 LTL 相同的模型创建；来源和历史
 
 以下 UT/求解/逐周期工具仍可独立使用；旧独立闭环已移到 `cycle_diagnostic.py`，不是 HAVEN 对照入口。
 
-当前框架契约为 `runtime-ltl-v2`（模型仅输出 LTL，框架组装 UT）。此前 v4 的单 UT / 无模型 Assume 在线 ALU 测量见[历史报告](../docs/date2027/single-ut-alu.md)，不重新标记为 v5 结果。
+当前框架契约为 `runtime-ltl-v4`（模型仅输出 LTL，框架组装 UT）。此前 v4 的单 UT / 无模型 Assume 在线 ALU 测量见[历史报告](../docs/date2027/single-ut-alu.md)，不重新标记为 v5 结果。
 历史 v5 在线结果及耗时/token 对比见[ALU v5 实验报告](../docs/date2027/alu-v5-online.md)。
 
 ```text
@@ -67,16 +67,18 @@ Stage-1 不要求由 DeepSeek 或与 LTL 相同的模型创建；来源和历史
 
 ## 代码归属
 
+- `../rvprobe/backend/`：不依赖实验/模型/HAVEN 的 Python witness 运行库；负责未知状态编码、初始化与 past 辅助模型、原始 Cover 监视器、有界候选选择及原生验收。`Gen → Cover → JG` 的 Scala 前端不变。
+- `witness_backend_adapter.py`：向核心绑定冻结文件、逐拍序列格式和仿真器；`coverage_flow.py` 只调用该入口并统计结果。缺少原生回放器时在模型调用前拒绝运行，不再直接使用未验收候选。
 - `stdlib/`：恢复为 `ut` 基线内容，不新增实验模块或测试。
 - `sequence_framework.py`：设计无关的 IO binding 和 runner 生成器；原样保存模型 LTL，确定性组装固定 UT、IO binding 和 runner。
 - `utlib/src/Gen.scala`：唯一的目标生成入口；直接接受 Bool / Sequence / Property。`past` 的有效历史需在时序意图中明确表达。
 - `coverage_flow.py` / `haven_shared.py`：共享 HAVEN 组件、初始序列、覆盖策略与两个激励后端。
 - `environment_preflight.py` / `rtl_environment.py`：原 RTL 的 CIRCT IO、JG 时钟/复位预检及共享元数据，不生成验证意图。
 - `event_trace.py` / `event_transport.py` / `environment_contract.py` / `environment_policy.py`：多时钟事件、电气约束、激励与外部响应分离。外部模型继续驱动响应；形式端使用过近似，不声称完整形式化 BFM。
-- `ltl_replay.py`：有原始 UT 来源证明的事件序列，在真实四态 IO 上重新检查原始 Cover；波形差异留作诊断。没有该来源证明的旧序列仍严格逐位回放。新旧验收口径不得混入同一比较。
+- `ltl_replay.py`：仅把核心产生的原始 Cover 监视器接到实验 testbench 的真实 IO。监视器提取、来源校验和命中判断位于 `../rvprobe/backend/replay.py`；新旧验收口径不得混入同一比较。
 - `cycle_diagnostic.py` / `cycle_replay.py`：独立逐周期诊断，不包含 DUT 实现，不作为配对比较入口。
 - `sequence_experiment.py`：单轮 prompt、模型调用、编译 / 求解反馈；不是兼容转发入口。
-- `isolation.py` / `ut_validation.py`：断网编译/lower 与保守的 DUT 接线检查；缺少 bubblewrap 时拒绝执行。
+- `isolation.py` / `../rvprobe/backend/validation.py`：断网编译/lower 与保守的 DUT 接线检查；缺少 bubblewrap 时拒绝执行。
 - `src/TrustedSolver.scala`：只消费已检查的数据，不加载模型 class；逐目标求解和 checkpoint。
 - `goal_coverage.py`：逐目标独立统计 witness 与固定 drain 覆盖。
 - `run_records.py` / `compare_runs.py`：统一耗时、请求/token 账本和跨实验对比。
@@ -89,6 +91,9 @@ Stage-1 不要求由 DeepSeek 或与 LTL 相同的模型创建；来源和历史
 - `<run>/sources/` 或 `<run>/attempt-N/sources/`：框架的 `DesignBinding.scala`、`Generated.scala`，以及原始 `model.ltl` 和框架组装的 `ModelUT.scala`。
 
 一个设计只维护一份接口定义，每轮模型只输出 LTL，框架组装恰好一个 UT，共用固定 wrapper。
+
+后端归属、接口与离线回归见 [RVProbe witness 后端](../rvprobe/backend/README.md)。
+`encoded_witness_probe.py` 现在只是离线命令行适配器，不再实现编码；旧实现文件已迁移，未保留兼容副本。
 
 多时钟/BFM 修复的验收范围、限制和无模型复现命令见 [环境修复记录](../docs/date2027/design6-10-environment-repair.md)。
 
@@ -226,7 +231,9 @@ RVProbe 初始 prompt 不包含 RTL 实现；模型可分页读取 manifest 批�
 ## 模型与回放
 
 `sequence_experiment.py` 接收 `--design`、`--modinfo`、`--out`，实现单轮生成和反馈修正。
-当前生成契约为 `runtime-ltl-v2`。LLM 只返回原始 LTL：局部谓词/helper 和 Gen 调用。
+当前生成契约为 `runtime-ltl-v4`。LLM 只返回原始 LTL：局部 val、已有 `Ltl` helper 调用和 Gen 调用，不生成 helper 定义。helper 的实现属于 utlib，调用语义在 rvprobe-skill.md 中说明。
+单个完整的全回答 Scala 代码围栏可确定性解包，保留块内源码、原始回答及哈希/偏移审计；
+不猜测多块或不完整回答。后续轮覆盖表无损压缩，包装错误修复不开放框架 API 工具。
 不返回 JSON、imports、模块名、接线、时钟声明或 proof 分类；无新目标时只返回 `STOP`。
 框架自动生成固定 UT、wrapper 与 runner；旧完整 UT JSON 不再接受。详见 [PROMPT.md](PROMPT.md)。
 跨拍条件用原生 `past(predicate, cycles)`，支持 Bool、UInt、SInt、Bits，保留输入类型且 cycles > 0；不自动保护历史有效性。
@@ -261,7 +268,7 @@ JG 在生成轨迹前设置 `set_trace_optimization standard`，重建并导出�
 只允许相同 RTL、配置、源码版本、保存回答和预算；失败产物保留，不覆盖或混合不同条件。
 已有原始回答不会重新请求模型；成功 goal checkpoint 验证 witness/stimulus 哈希后复用，未完成目标可继续求解。
 已完成的回放检查 schedule 与产物哈希后复用；未完成目录保留为 `*.interrupted-N`。
-`--request-retries` 默认 3，限定同一源码尝试的传输重试总次数；只重试超时/临时 HTTP 错误，不更换模型。
+`--request-retries` 默认 3，只允许在尚未完成任何对话步骤时，对明确返回的临时 HTTP 错误进行有限重试；超时、断连或已完成检索后的失败不自动重发，不更换模型。`--timeout` 限定整个 HTTP 请求的墙钟时间，而不仅是 socket 空闲时间。
 源码修正预算与请求重试预算分开；基础设施失败不通过让模型另写 UT 来掩盖。
 
 每次实验保留 `events.jsonl`、`summary.json` 和 `comparison.json`：
@@ -348,13 +355,107 @@ utlib 的类型测试验证 Gen 外没有历史上下文。这些测试输入不
 `out/experiments/runtime-ut-regression-*/`。没有任何测试向模型服务发请求。
 
 旧结果和污染审计保持原样，参见 [DATE 总览](../docs/date2027/README.md)；
-它们不代表当前 `runtime-ltl-v2` 的在线模型或 RAG 效果。
+它们不代表当前 `runtime-ltl-v4` 的在线模型或 RAG 效果。
 
 回放工具测试对 synthetic 外部 RTL 的不同目标表达式实际求解并回放，
 检查历史深度、历史采样值、时序 / Property 下的有效性保护、区间延迟、重复序列和不同目标间的隔离。
 另有只引用一个输出位的目标，以及 `split_output.v` 中独立按位赋值的回归，
 要求导出并验证整个输出值；随后故意改错目标未引用的输出位，
 要求仿真失败。它们是框架回归，不进入 RAG，也不计作在线样本。
+# Long-run ownership and offline source-entry checks
+
+Launch long batches with `batch_service.py --unit rvprobe-UNIQUE-NAME --log
+/absolute/new-log -- COMMAND...`. This creates a one-shot systemd service, not
+a scheduled task. Pass the normal `nix develop -c experiments/haven-python ...`
+batch command after `--`; model credentials remain in the existing env file.
+
+Use `python experiments/batch_status.py --batch /absolute/batch` for a read-only
+status that checks the owner process instead of trusting a stale `running` JSON.
+Add `--reconcile` only to persist interrupted state after the owner has stopped;
+the original progress record is preserved and child metrics remain unchanged.
+
+Runtime-file preflight now runs before any model request. Infrastructure errors
+are not eligible for model repair. To test this entry without model calls, use
+`smoke_witness_backend.py --rebuild-saved-response` with its required saved-batch,
+design, round, tool and output paths. Omit `--label` to exercise all saved intents;
+`--sequences-per-intent 4` exercises production sampling. These are diagnostic
+runs, never replacements for fresh online comparison results.
+See [the repair and verification record](../docs/date2027/runtime-path-repair-20260914.md).
+
+The auxiliary known-state solver budget is independently configurable with
+`--encoded-witness-time-limit 120s` in `haven_design_batch.py`,
+`haven_event_paired.py`, `coverage_flow.py run` and `smoke_witness_backend.py`.
+The default remains 120 seconds per solve. The selected limit is recorded in
+the experiment manifest and auxiliary search records; changing it defines a
+different resource configuration, not a comparable rerun under the old budget.
+`undetermined` with a JG time-limit message is reported as `solver_time_limit`,
+not unreachability. Exhaustion reports include the auxiliary termination record.
+Increasing the budget never permits an unvalidated sequence or changes its LTL.
+
+Native selection v2 treats the sequence count as a cap, not a requirement that
+every offered candidate succeed. It returns only candidates that individually
+pass the original native Cover and transport checks. Budget exhaustion is an
+explicit per-intent `exhausted` outcome; other independent intents continue.
+An available native pool is checked before resorting to auxiliary solving.
+Infrastructure/process/unsupported-encoding errors still stop execution.
+
+RVProbe evidence dialogue uses `independent-evidence-requests-v1`: after a
+read-only tool batch, the next model call is a new inference request containing
+the unchanged skill/task and exact observed evidence. It does not continue the
+prior assistant/tool conversation or send accumulated `reasoning_content`.
+RTL reads are hash-validated and overlapping ranges merged; other identical
+observations are deduplicated. Errors, range indices, and continuation offsets
+remain available. No model-written summaries or design answers are inserted.
+The model can emit LTL immediately if no additional evidence is needed, so the
+direct-output path still takes one call. The final budget slot disables tools.
+
+Large cross-round RTL history retains up to 48,000 characters of exact prior
+text plus its complete index, rather than dropping all bodies at the threshold.
+The remaining text is still available through the existing read tools. The
+24-request/64-tool-entry budgets, original LTL acceptance, and HAVEN path are
+unchanged. This changes the model conversation structure, so token savings,
+cache behavior, and coverage require an online comparison; character reductions
+alone do not establish lower billed cost or preserved coverage.
+
+The subsequent `independent-evidence-requests-v2-staged` policy keeps the
+direct-answer fast path, but after any tool request explicitly separates
+retrieval from authoring. Retrieval asks only for missing facts and returns
+`READY`; a separate tools-disabled request then authors LTL from the original
+skill/task and actual tool evidence. A premature draft is not forwarded as an
+answer or summary. All calls, including handoff, count against the unchanged
+24-request budget; truncated handoffs stop without automatic regeneration.
+
+`stability_campaign.py` runs two fixed-version UART/ETHMAC pilots before a
+three-concurrent-design full RVProbe batch. Its recorded engineering gate is
+not a statistical claim. A failing completed pilot writes a campaign-local
+stop flag: peers finish any in-flight response, preserve its usage, and stop
+before their next paid model request. Ordinary batches and HAVEN do not use
+this gate. A gate failure requires diagnosis/new-version validation; no hidden
+retry, relaxed threshold, or automatic full-batch launch follows it.
+
+`profile_evidence_dialogue.py --generation ... --out NEW_JSON` measures message
+character volume at saved tool boundaries with zero model calls and unchanged
+historical artifacts. It holds the historical tool schedule constant and does
+not predict how a fresh model would choose tools or author intents.
+
+Backend records distinguish `passed`, `completed_with_shortfalls`, and `failed`.
+They include unresolved/partial intent labels and `all_intents_satisfied`.
+`accepted.json` preserves validated source/schedules even if a later intent
+encounters an infrastructure error. No rejected candidate enters the coverage
+union. An experiment's `completed` status means the loop finished, **not** that
+every generated intent was satisfied; retain its `intent_outcomes` when exporting
+results. An all-empty RVProbe round records zero additions and unchanged coverage,
+then stops under the existing no-sequences policy. HAVEN's generation/acceptance
+path is unchanged.
+
+`smoke_witness_backend.py --measure-coverage` also measures the fixed baseline and
+the native-accepted sequence union, without calling a model. Shortfall diagnostics
+must not be relabeled full intent success or merged into historical paid results.
+
+For a saved failed simulation, `replay_saved_candidate.py --dump-waveform`
+observes the live DUT hierarchy while replaying the unchanged inputs. It is
+diagnostic-only and never calls a model or supplies DUT initialization values.
+
 # Stateful RTL: initialization and independent replay
 
 JG must not silently black-box large arrays when exporting values to check in
@@ -393,8 +494,77 @@ Snapshot mode still rejects `past(...)`: the snapshot does not carry reset histo
 Ordinary reset-sequence mode keeps native past support. Both arms use independent
 replay, with unchanged RTL and output checks. No snapshot contents enter skill/RAG.
 
+JG property and task compilation limits are set explicitly before elaboration,
+using the requested solve time limit. Compilation and proof are separate phases.
+`property_compile_timeout` and `solver_time_limit` are recorded as unresolved
+intent shortfalls, never as evidence of unreachability and never as reasons for
+a paid model repair. Independent goals that produced valid witnesses remain usable.
+Missing goal status, incomplete witness export, license/path errors and other JG
+execution failures still fail the run closed.
+
+The known-state fallback supports Boolean goto repetition (`[->N]` and bounded
+`[->M:N]`). It counts only known-true observations and preserves native goto
+skipping semantics, including skipped X observations. Run
+`experiments/smoke_encoded_goto.py --help` for the original-versus-encoded VCS
+regression. All auxiliary witnesses still require the original native Cover.
+The offline encoder CLI exposes `--engine-mode` for solver diagnostics; the
+production default remains `auto`. Engine experiments do not change the LTL,
+DUT, native acceptance criteria, or historical paid-run results.
+
 Regression (no model calls):
 
 ```bash
 nix develop -c env RVPROBE_RUN_SNAPSHOT_TESTS=1 python3 -m unittest discover -s experiments -p 'test_rtl_initial_state.py' -v
 ```
+
+## Fixed-stimulus reproducibility check
+
+`replay_completed_experiment.py --pair PAIRED_DIR --bundle BUNDLE_JSON
+--haven-root FROZEN_HAVEN --out NEW_DIRECTORY` reruns all accepted RVProbe
+sequences plus the fixed baseline in fresh simulation processes, with model
+calls forbidden. It verifies the original per-sequence artifacts and requires
+identical coverage bin counts and native-LTL acceptance counts. It is a
+zero-model diagnostic, not a fresh benchmark or a claim about model-output
+variance. Failed rounds, ambiguous accepted candidates and baseline-only runs
+cannot be substituted for a completed reference.
+
+`smoke_trace_resampling.py --out NEW_DIRECTORY` exercises JG's successful and
+exhausted trace outcomes on a synthetic module. A covered auxiliary goal does
+not imply that every requested trace preference can be solved. Missing traces
+are recorded as sampling exhaustion; no witness is exported or accepted, and
+previous native-valid candidates are preserved. Actual process errors still fail.
+
+## Provider failures and safe restart
+
+RVProbe's `--timeout` bounds the whole HTTP request (including response reading),
+not just socket inactivity. The Linux model-worker main thread enforces it;
+trickling responses cannot extend the deadline. This does not guarantee remote
+cancellation or that the provider charges nothing.
+
+Transport timeouts/disconnects and total-deadline expiry stop without automatic
+resubmission. Explicit transient HTTP errors can use `--request-retries` only
+before a completed dialogue step; a failed follow-up must not restart paid
+evidence retrieval. On resume, an attempt with saved requests but no reusable
+response stops closed, even if its last request appears successful: submission
+or billing may have happened before the process died. Saved complete responses
+remain reusable for offline framework repair. Unknown usage is never zero.
+
+Length-truncated, filtered and empty answers are provider outcomes, not LTL
+compiler repair tasks. Numeric usage can identify reasoning-budget exhaustion
+when all completion tokens are reasoning and no answer/tool call was returned.
+Missing token details do not justify this inference. No private reasoning text
+is persisted. Partial answers are not compiled or silently completed, budgets
+and model settings are not automatically changed, and historical failed runs
+are never relabelled successful. These policies apply to RVProbe, not HAVEN.
+
+## Source-local elaboration errors
+
+`Ltl.is` keeps strict signed/unsigned range checking. Its typed argument errors
+carry a source location and stable code; the fixed runner writes a bounded
+`ltl-error.json`. Only known range codes mapped into the actual `model.ltl` body
+are exposed as repairable `elaboration-check` diagnostics, using the existing
+attempt budget. Unknown width, malformed diagnostics, generated-binding errors,
+CIRCT failures and other lower errors remain infrastructure failures. No broad
+stack-trace matching or automatic constant wrapping is used. Full logs and raw
+model answers are preserved, and the private repair journal includes these
+argument failures without promoting DUT content into the skill.

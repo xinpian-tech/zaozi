@@ -1,4 +1,4 @@
-"""Explicitly load the diagnostic encoder's initial state before DUT reset.
+"""Explicitly load the witness encoder's initial state before DUT reset.
 
 JG 2021 ignores the generated SV declaration initializers. This adapter accepts
 only Yosys's flattened, single-assignment FF form. It adds a solver-only boot
@@ -16,6 +16,130 @@ INITIAL = re.compile(r'(?m)^\s*reg\s+(?:\[\d+:\d+\]\s+)?('
                      + NAME + r')\s*=\s*(\d+\x27(?:h[0-9a-fA-F]+|b[01]+|d[0-9]+))\s*;')
 FF = re.compile(r'(always\s*@\((?:posedge|negedge)\s+[^)]+\)\s*)('
                 + NAME + r')\s*<=\s*([^;]+);')
+
+
+def canonicalize_output_aliases(model, top):
+    """Split each identical output SigSpec only once before xprop.
+
+    Yosys 0.67 can export a duplicate as d=(canonical_x ? X : canonical_d),
+    x=0. In 2-state FPV that is a fresh arbitrary value marked as known.
+    Canonicalize structural aliases, including syntactically different atoms.
+    This changes naming only, never DUT state, reset, or predicate truth.
+    """
+    mapped = deepcopy(model)
+    module = mapped['modules'][top]
+    canonical, aliases = {}, {}
+    outputs = [(name, port) for name, port in module['ports'].items() if port['direction'] == 'output']
+    # Prefer the trusted, simple atom identifiers for goal/environment references.
+    for name, port in sorted(outputs, key=lambda row: (not row[0].startswith('rvp_encoded_atom_'), row[0])):
+        bits = tuple(port['bits'])
+        if bits not in canonical:
+            canonical[bits] = name
+            continue
+        aliases[name] = canonical[bits]
+        # init is stored on netnames, not cells. Removing an alias must never
+        # erase a real RTL initializer (or turn a known bit into arbitrary state).
+        nets = module.setdefault('netnames', {})
+        initial = nets.get(name, {}).get('attributes', {}).get('init')
+        if initial is not None:
+            target = nets.setdefault(canonical[bits], {'bits':list(bits),'attributes':{}})
+            attributes = target.setdefault('attributes', {})
+            previous = attributes.get('init', 'x' * len(bits))
+            if len(initial) != len(bits) or len(previous) != len(bits):
+                raise ValueError('output alias initializer width mismatch')
+            if any(a in '01' and b in '01' and a != b for a,b in zip(previous,initial)):
+                raise ValueError('conflicting output alias initializers')
+            attributes['init'] = ''.join(b if a == 'x' else a for a,b in zip(previous,initial))
+        del module['ports'][name]
+        module.get('netnames', {}).pop(name, None)
+    return mapped, aliases
+
+
+def remap_encoded_expression(expression, aliases):
+    return re.sub(r'\b([A-Za-z_]\w*)_([dx])\b',
+                  lambda m: aliases.get(m[1], m[1]) + '_' + m[2], expression)
+
+
+def pack_output_bits(model, top):
+    """Export each distinct output bit once, including overlapping slices.
+
+    Whole-port deduplication cannot handle an atom aliasing bus[0]. Give xprop
+    a single non-overlapping output SigSpec and bind predicates to its rails.
+    Keep all original netnames/initializers and cells: this is wiring only.
+    """
+    mapped = deepcopy(model)
+    module = mapped['modules'][top]
+    name = 'rvp_encoded_outputs'
+    if name in module['ports'] or name in module.get('netnames', {}):
+        raise ValueError('packed output name collision')
+    bits, indices, bindings = [], {}, {}
+    for port_name, port in list(module['ports'].items()):
+        if port['direction'] != 'output':
+            continue
+        bindings[port_name] = []
+        for bit in port['bits']:
+            if bit not in indices:
+                indices[bit] = len(bits)
+                bits.append(bit)
+            bindings[port_name].append(indices[bit])
+        del module['ports'][port_name]
+    if not bits:
+        raise ValueError('no output bits to encode')
+    module['ports'][name] = {'direction': 'output', 'bits': bits}
+    module.setdefault('netnames', {})[name] = {
+        'hide_name': 0, 'bits': bits, 'attributes': {}}
+    return mapped, bindings
+
+
+def bind_packed_expression(expression, bindings):
+    """Preserve LSB-first JSON bit ordering in SV scalar/vector expressions."""
+    def replace(match):
+        if match[1] not in bindings:
+            raise ValueError('encoded expression references an unmapped output')
+        bits = [f'rvp_encoded_outputs_{match[2]}[{i}]'
+                for i in reversed(bindings[match[1]])]
+        return bits[0] if len(bits) == 1 else '{' + ', '.join(bits) + '}'
+    return re.sub(r'\b([A-Za-z_]\w*)_([dx])\b', replace, expression)
+
+
+def audit_encoded_goal_rails(model, top, expressions):
+    """Reject combinational X decoders/undriven bits feeding claimed-known rails.
+
+    FF state is checked by the explicit value/mask initialization contract;
+    this audit catches X reintroduction at the exported combinational boundary.
+    It is deliberately conservative, not an equivalence proof for arbitrary RTL.
+    """
+    module = model['modules'][top]
+    predicates = re.sub(r'@\([^)]*\)', '', ' '.join(expressions))
+    names = sorted(set(re.findall(r'\b[A-Za-z_]\w*_[dx]\b', predicates)))
+    ports = module['ports']
+    if any(name not in ports or ports[name]['direction'] != 'output' for name in names):
+        raise ValueError('encoded goal rail missing from outputs')
+    inputs = {b for p in ports.values() if p['direction'] == 'input' for b in p['bits']}
+    drivers = {}
+    state = {'$dff','$dffe','$sdff','$sdffe','$sdffce','$adff','$adffe','$aldff','$aldffe','$ff'}
+    for cell in module.get('cells', {}).values():
+        fanin = [b for name,direction in cell['port_directions'].items() if direction == 'input'
+                 for b in cell['connections'][name]]
+        for name,direction in cell['port_directions'].items():
+            if direction == 'output':
+                for bit in cell['connections'][name]:
+                    drivers.setdefault(bit, []).append([] if cell['type'] in state else fanin)
+    pending = [b for name in names for b in ports[name]['bits']]
+    seen = set()
+    while pending:
+        bit = pending.pop()
+        if bit in seen:
+            continue
+        seen.add(bit)
+        if bit in ('x','z'):
+            raise ValueError('encoded goal rail reintroduces an unencoded X/Z value')
+        if bit in ('0','1') or bit in inputs:
+            continue
+        if bit not in drivers or len(drivers[bit]) != 1:
+            raise ValueError('encoded goal rail has an undriven or multiply driven bit')
+        pending.extend(drivers[bit][0])
+    return dict(policy='no-combinational-x-reentry-v1', rails=names, checked_bits=len(seen))
 
 
 def preserve_single_driver_masks(model, top):

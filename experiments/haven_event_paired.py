@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Run sequences against one shared environment with concrete response checking."""
+import backend_imports
 import argparse
 import json
+import re
 from pathlib import Path
 import sys
 import time
+import rvprobe_model_options
 
 from environment_preflight import write_replay_manifest
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc
 from haven_snapshot import snapshot
 from environment_policy import derive_policy, require_supported
@@ -30,9 +33,17 @@ def main():
     parser.add_argument('--arm', choices=('both','haven','rvprobe'), default='both')
     parser.add_argument('--continue-generation',type=Path)
     parser.add_argument('--encoded-witness-yosys',type=Path)
+    parser.add_argument('--encoded-witness-time-limit',default='120s')
     parser.add_argument('--shared-stage1-environment',action='store_true')
     parser.add_argument('--boundary',choices=['independent-dut-v1'],default='independent-dut-v1')
+    parser.add_argument('--rounds',type=int,default=3,
+                        help='number of RVProbe coverage rounds (HAVEN remains unchanged unless selected)')
+    rvprobe_model_options.add_options(parser)
     args = parser.parse_args()
+    if args.rounds < 1:
+        parser.error('rounds must be positive')
+    if not re.fullmatch(r'[1-9][0-9]*s', args.encoded_witness_time_limit):
+        parser.error('invalid encoded witness time limit')
     stage = args.stage1_run.resolve()
     fixed = stage1_identity(stage,args.shared_stage1_environment)
     ir = stage/'ir'
@@ -44,7 +55,8 @@ def main():
     args.out.mkdir(parents=True,exist_ok=False)
     record = {'status':'preparing','started_utc':utc(),'scope':'shared-environment-conformance-v1','arm':args.arm,
               'stage1_run':str(stage),'shared_setup_cost_record':str(stage.parents[1]/'stage1-costs.json'),
-              'model':'deepseek-v4-flash-vision-exp','rounds':3,'sequences_per_intent':4}
+              'model':'deepseek-v4-flash-vision-exp','rounds':args.rounds,'sequences_per_intent':4,
+              'rvprobe_intent_batch_limit':args.rvprobe_intent_batch_limit}
     record.update(shared_setup_mode='frozen',stage1_model_calls=0,fixed_stage1=fixed)
     if args.arm == 'haven':
         record['paired_status'] = 'incomplete_haven_arm_only'
@@ -73,14 +85,16 @@ def main():
         record['status'] = 'running_'+args.arm
         save(args.out/'progress.json',record)
         extra = ['--continue-generation',args.continue_generation] if args.continue_generation else []
+        extra += rvprobe_model_options.cli(args)
         if args.encoded_witness_yosys:
-            extra += ['--encoded-witness-yosys',args.encoded_witness_yosys]
+            extra += ['--encoded-witness-yosys',args.encoded_witness_yosys,
+                      '--encoded-witness-time-limit',args.encoded_witness_time_limit]
         if args.shared_stage1_environment:
             extra += ['--fixed-stage1-identity',args.out/'fixed-stage1.json']
         command(['run','--bundle',args.out/'shared/bundle.json','--haven-root',args.haven_root,
                  '--env-file',args.env_file,'--eda-shell',args.eda_shell,
                  '--eda-config',ROOT/'experiments/designs/haven_eda.json','--arm',args.arm,
-                 '--model',record['model'],'--rounds','3','--seed','20260906',
+                 '--model',record['model'],'--rounds',str(args.rounds),'--seed','20260906',
                  '--sequences-per-intent','4','--isolate-sequences','--out',args.out/'paired',*extra],'paired.log')
         result = json.loads((args.out/'paired/summary.json').read_text())
         record.update(status=result['status'],summary=str(args.out/'paired/summary.json'))

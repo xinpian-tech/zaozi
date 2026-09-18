@@ -1,4 +1,5 @@
 """Exercise the real MII boundary mux with synthetic pins; zero model calls."""
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -9,7 +10,7 @@ from jinja2 import Template
 from event_transport import install_event_transport
 from environment_policy import derive_policy
 from sequence_framework import Port
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save, utc
 from cycle_replay import digest
 

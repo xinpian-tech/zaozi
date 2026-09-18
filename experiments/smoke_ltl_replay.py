@@ -1,13 +1,14 @@
 """Native VCS observer semantics: success, miss, X, gating, and native past."""
+import backend_imports
 import argparse
 import json
 from pathlib import Path
 import shlex
 import time
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save,utc
 from test_ltl_replay import metadata,SV,FIXTURES
-from ltl_replay import monitor,check_hit
+from rvprobe.backend.replay import monitor, check_hit
 from sequence_framework import load_design
 
 

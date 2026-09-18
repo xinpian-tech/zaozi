@@ -148,6 +148,15 @@ class SamplingTests(unittest.TestCase):
             render_sampling({**job, "resetSequence": "reset 1'b1\n2\n"}, "g",
                             Path("/tmp/model.sv"), Path("/tmp/sample"), [], 6, 4, 1, "30s")
 
+    def test_sampling_preserves_native_power_on_and_original_reset(self):
+        job={'rtl':['/tmp/d.v'], 'includeDirs':[], 'top':'m',
+             'resetSnapshotState':"dut.mem[0] 8'h5\n", 'resetSequence':"reset 1'b1\n2\nreset 1'b0\n$\n"}
+        script=render_sampling(job, 'g', Path('/tmp/model.sv'), Path('/tmp/sample'), [], 6, 4, 1, '30s')
+        self.assertIn('set_cumulative_reset on\nreset -init_state {/tmp/sample/reset-snapshot.state}\nreset -sequence {/tmp/sample/reset.seq}', script)
+        for changed in ({'resetSequence':None}, {'initialState':"dut.mem[0] 8'h0"}):
+            with self.assertRaises(ValueError):
+                render_sampling({**job,**changed}, 'g', Path('/tmp/model.sv'), Path('/tmp/sample'), [], 6, 4, 1, '30s')
+
     def test_saved_configuration_keeps_cover_and_only_soft_preferences(self):
         valid = "\n".join(["proc visualize_save {} {", "visualize -new_window", "task -set <embedded>",
             "visualize -set_target -cover -property {<embedded>::m.g}",

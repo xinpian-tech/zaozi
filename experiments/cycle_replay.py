@@ -7,6 +7,7 @@ here. The input schedule is data, and the same compiled bench measures every arm
 """
 from __future__ import annotations
 
+import backend_imports
 import hashlib
 import json
 import os
@@ -358,7 +359,7 @@ def preflight(design_path: Path, directory: Path) -> None:
                "check_interface(load_design(Path(sys.argv[1])), Path(sys.argv[2]))",
                str(design_path), str(directory / "interface")]
     with (directory / "interface.log").open("w") as log:
-        from process_runner import run
+        from rvprobe.backend.process import run
         run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
 
 
@@ -373,7 +374,7 @@ class Replay:
 
     def command(self, cwd, command, log, timeout=900):
         from run_records import Records
-        from process_runner import run
+        from rvprobe.backend.process import run
         with (self.root / "commands.jsonl").open("a") as stream:
             stream.write(json.dumps({"cwd": str(cwd), "command": command, "log": str(log)}) + "\n")
         with log.open("w") as stream:

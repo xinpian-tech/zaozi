@@ -1,6 +1,7 @@
 """No-model regressions for batched evidence, local repairs and source fidelity."""
 import hashlib
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,11 +37,28 @@ class TokenFlowTests(unittest.TestCase):
         value=self.context.initial_evidence()
         self.assertEqual(value['coverage']['bins'],self.feedback['bins'])
         self.assertEqual(value['coverage']['gaps_by_type'],{'toggle':1})
-        self.assertEqual(value['rtl'],self.context.dispatch('list_rtl',{}))
+        full=self.context.dispatch('list_rtl',{})
+        self.assertEqual(value['rtl']['files'],[
+            {k:row[k] for k in ('file_id','name','lines','characters')}
+            for row in full['files']])
+        self.assertNotIn('sha256',value['rtl']['files'][0])
+        self.assertNotIn('encoding',value['rtl']['files'][0])
         text=json.dumps(value)
         self.assertIn('PHYSICAL_CONDITION',text)
         for sentinel in ('RTL_SNIPPET','module target','HAVEN_NATIVE_DSL'):self.assertNotIn(sentinel,text)
         self.assertIn('RTL_SNIPPET',self.context.topics['coverage'])
+        from task_context import INSTRUCTION
+        self.assertIn('output LTL immediately without an RTL tool call',INSTRUCTION)
+        self.assertIn('Do not read RTL merely to confirm',INSTRUCTION)
+
+    def test_model_projection_omits_repeated_batch_rule_but_audit_retains_it(self):
+        feedback={**self.feedback,'batch_instruction':'EXACT_FIXED_BATCH_RULE'}
+        context=TaskContext(self.design,feedback)
+        self.assertNotIn('batch_instruction',context.initial_evidence()['environment'])
+        self.assertEqual(json.loads(context.topics['environment'])['batch_instruction'],
+                         'EXACT_FIXED_BATCH_RULE')
+        self.assertEqual(context.record()['model_projection']['omitted_environment_fields'],
+                         ['batch_instruction'])
 
     def test_batched_ranges_merge_overlap_without_repeating_or_losing_text(self):
         ranges=[{'file_id':'rtl_0001','start_line':2,'line_count':2},
@@ -134,6 +152,67 @@ class TokenFlowTests(unittest.TestCase):
         self.assertNotIn('RTL_SNIPPET',prompt)
         self.assertIn('do not replan coverage',prompt)
 
+    def test_long_diagnostic_projection_keeps_exact_report_readable(self):
+        from repair_diagnostics import MAX_PROJECTED_MESSAGE_CHARS
+        message='TYPE_ERROR '+('x'*10000)+' ORIGINAL_TAIL'
+        errors=[{'kind':'Type Mismatch Error','line':8,'message':message}]
+        result=project(errors)
+        row=result['diagnostics'][0]
+        self.assertEqual(row['line'],8)
+        self.assertTrue(row['message'].startswith(message[:MAX_PROJECTED_MESSAGE_CHARS]))
+        self.assertIn('tail omitted',row['message'])
+        self.assertLess(len(row['message']),MAX_PROJECTED_MESSAGE_CHARS+100)
+        repair=RepairContext(self.context,errors)
+        self.assertEqual(json.loads(repair.dispatch('read_diagnostics',{})['text']),errors)
+        self.assertEqual(errors[0]['message'],message)
+
+    def test_direct_ltl_after_evidence_needs_no_handoff(self):
+        args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,
+            task_context=self.context,rvprobe_skill_snapshot=snapshot())
+        call={'id':'read-1','type':'function','function':{'name':'list_rtl','arguments':'{}'}}
+        ltl='Gen(valid, "valid_seen")'
+        with patch.object(generation,'send_completion',side_effect=[self.reply(None,[call]),self.reply(ltl)]) as send:
+            raw,info=generation.request_model(args,'SPEC_IO',self.root,Records(self.root))
+        self.assertEqual(raw,ltl)
+        self.assertEqual(send.call_count,2)
+        self.assertEqual(info['http_requests'],2)
+        self.assertFalse(list(self.root.glob('evidence-handoff-*.json')))
+
+    def test_retrieval_requests_can_use_separate_budget_from_final_authoring(self):
+        args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,
+            task_context=self.context,rvprobe_skill_snapshot=snapshot(),
+            evidence_steps=2,evidence_tools=16,retrieval_max_tokens=32768,
+            retrieval_reasoning_effort='low',max_tokens=393216,reasoning_effort='max')
+        call={'id':'read-1','type':'function','function':{'name':'list_rtl','arguments':'{}'}}
+        ltl='Gen(valid, "valid_seen")'
+        call2={'id':'read-2','type':'function','function':{'name':'read_context','arguments':json.dumps({'topic':'environment'})}}
+        with patch.object(generation,'send_completion',side_effect=[self.reply(None,[call]),self.reply(None,[call2]),self.reply(ltl)]) as send:
+            raw,_=generation.request_model(args,'SPEC_IO',self.root,Records(self.root))
+        self.assertEqual(raw,ltl)
+        first,last=send.call_args_list[0].args[0],send.call_args_list[-1].args[0]
+        self.assertEqual((first['max_tokens'],first['reasoning_effort']),(32768,'low'))
+        self.assertEqual((last['max_tokens'],last['reasoning_effort']),(393216,'max'))
+
+    def test_tool_budget_overflow_retains_final_authoring_opportunity(self):
+        args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,
+            task_context=self.context,rvprobe_skill_snapshot=snapshot())
+        def call(name,args,ident):
+            return {'id':ident,'type':'function','function':{'name':name,'arguments':json.dumps(args)}}
+        first=call('list_rtl',{},'one')
+        overflow=call('search_rtl_batch',{'queries':[{'query':'wire'}]*2},'two')
+        ltl='Gen(valid, "valid_seen")'
+        replies=[self.reply(None,[first]),self.reply(None,[overflow]),self.reply(ltl)]
+        with patch('rvprobe_skill.MAX_TOOL_CALLS',2), patch.object(self.context,'dispatch',wraps=self.context.dispatch) as dispatch, \
+                patch.object(generation,'send_completion',side_effect=replies) as send:
+            raw,info=generation.request_model(args,'SPEC_IO',self.root,Records(self.root))
+        self.assertEqual(raw,ltl)
+        self.assertEqual(info['task_tool_calls'],1)
+        self.assertEqual(send.call_count,3)
+        self.assertEqual(send.call_args.args[0]['tool_choice'],'none')
+        self.assertFalse(any(c.args[0]=='search_rtl_batch' for c in dispatch.call_args_list))
+        self.assertIn('NOT executed',json.dumps(send.call_args.args[0]))
+        self.assertEqual(len(list(self.root.glob('tool-budget-refusal-*.json'))),1)
+
     @staticmethod
     def reply(content='FINAL',calls=None):
         return {'model':'test','choices':[{'message':{'role':'assistant','content':content,
@@ -141,7 +220,7 @@ class TokenFlowTests(unittest.TestCase):
             'finish_reason':'tool_calls' if calls else 'stop'}],
             'usage':{'prompt_tokens':10,'completion_tokens':2,'total_tokens':12}}
 
-    def test_batches_charge_underlying_queries_and_preserve_provider_protocol(self):
+    def test_batches_charge_queries_and_start_clean_independent_requests(self):
         args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,
             task_context=self.context,rvprobe_skill_snapshot=snapshot())
         payloads=[]
@@ -155,7 +234,12 @@ class TokenFlowTests(unittest.TestCase):
         self.assertEqual(len(payloads),9)
         self.assertEqual(info['task_tool_calls'],64)
         self.assertEqual(totals(self.root)['usage_reported']['total_tokens'],108)
-        self.assertIn('PRIVATE_PROTOCOL_FIELD',json.dumps(payloads[-1]))
+        self.assertNotIn('PRIVATE_PROTOCOL_FIELD',json.dumps(payloads))
+        self.assertTrue(all(m['role']=='user' for p in payloads for m in p['messages']))
+        # Repeated queries are retained in the audit, but only one copy of
+        # identical observed results is sent to the final authoring request.
+        packet=json.loads((self.root/'evidence-1-8.json').read_text())
+        self.assertEqual(len(packet['observations']),1)
         saved=''.join(f.read_text() for f in self.root.glob('*.json*'))
         self.assertNotIn('PRIVATE_PROTOCOL_FIELD',saved)
 
@@ -167,7 +251,7 @@ class TokenFlowTests(unittest.TestCase):
         payloads=[]
         def send(payload,timeout):
             payloads.append(json.loads(json.dumps(payload)));return self.reply(response)
-        reports=[({'phase':'typecheck','ok':False,'errors':[{'kind':'Syntax Error','message':'synthetic compiler diagnostic'}]},''),
+        reports=[({'phase':'typecheck','ok':False,'errors':[{'file':'model.ltl','kind':'Syntax Error','message':'synthetic compiler diagnostic'}]},''),
                  ({'phase':'solve','ok':True,'result':{'status':'generated','goals':[]}},'')]
         with patch.object(generation,'send_completion',side_effect=send),patch.object(generation,'harness',side_effect=reports), \
                 redirect_stdout(io.StringIO()),redirect_stderr(io.StringIO()):
@@ -181,6 +265,53 @@ class TokenFlowTests(unittest.TestCase):
         self.assertNotIn('object FrameworkUTExample extends',first)
         raw=json.loads((self.root/'run/attempt-2/task-context.json').read_text())
         self.assertEqual(raw['request_mode'],'local-source-repair-v1')
+
+    def test_retrieval_handoff_starts_one_clean_tools_disabled_author(self):
+        args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=1,
+            task_context=self.context,rvprobe_skill_snapshot=snapshot())
+        call={'id':'read-1','type':'function','function':{'name':'read_rtl',
+              'arguments':json.dumps({'file_id':'rtl_0001','start_line':1,'line_count':1})}}
+        # Backwards-compatible READY is the only explicit handoff. Other text
+        # goes to the normal LTL source validator, not a silent extra request.
+        replies=[self.reply(None,[call]),self.reply('READY'),self.reply('FINAL_LTL')]
+        payloads=[]
+        def send(payload,timeout):
+            payloads.append(json.loads(json.dumps(payload)));return replies.pop(0)
+        with patch.object(generation,'send_completion',side_effect=send):
+            raw,info=generation.request_model(args,'SPEC_IO',self.root,Records(self.root))
+        self.assertEqual(raw,'FINAL_LTL');self.assertEqual(info['http_requests'],3)
+        self.assertIn('output the requested LTL now',payloads[1]['messages'][-1]['content'])
+        self.assertEqual(payloads[-1]['tool_choice'],'none')
+        self.assertFalse(any(m['role']=='assistant' for m in payloads[-1]['messages']))
+        self.assertIn('module target',json.dumps(payloads[-1]))
+        self.assertEqual(totals(self.root)['usage_reported']['total_tokens'],36)
+
+    def test_incomplete_retrieval_handoff_does_not_start_authoring(self):
+        args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=3,
+            task_context=self.context,rvprobe_skill_snapshot=snapshot())
+        call={'id':'read-1','type':'function','function':{'name':'list_rtl','arguments':'{}'}}
+        replies=[self.reply(None,[call]),self.reply(None)]
+        with patch.object(generation,'send_completion',side_effect=replies) as send:
+            with self.assertRaisesRegex(RuntimeError,'incomplete evidence handoff'):
+                generation.request_model(args,'SPEC_IO',self.root,Records(self.root))
+        self.assertEqual(send.call_count,2)
+        self.assertEqual(totals(self.root)['usage_reported']['total_tokens'],24)
+
+    def test_campaign_gate_waits_for_response_then_prevents_the_next_paid_call(self):
+        args=SimpleNamespace(model='test',temperature=0,timeout=1,request_retries=3,
+            task_context=self.context,rvprobe_skill_snapshot=snapshot())
+        flag=self.root/'stop.json'
+        call={'id':'read-1','type':'function','function':{'name':'list_rtl','arguments':'{}'}}
+        def send(payload,timeout):
+            flag.write_text('{"reason":"peer pilot failed"}')
+            return self.reply(None,[call])
+        with patch.dict(os.environ,{'RVPROBE_STOP_NEW_MODEL_REQUESTS':str(flag)}), \
+                patch.object(generation,'send_completion',side_effect=send) as model:
+            with self.assertRaisesRegex(RuntimeError,'campaign_gate_stop'):
+                generation.request_model(args,'SPEC_IO',self.root,Records(self.root))
+        self.assertEqual(model.call_count,1)
+        self.assertEqual(totals(self.root)['usage_reported']['total_tokens'],12)
+        self.assertTrue(totals(self.root)['token_accounting_complete'])
 
 
 if __name__=='__main__':unittest.main()

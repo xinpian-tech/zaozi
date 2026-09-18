@@ -1,4 +1,4 @@
-"""Fail-closed structural checks for the firtool-emitted, single-DUT verification wrapper.
+"""Backend structural checks for the firtool-emitted, single-DUT verification wrapper.
 
 Only direct/alias wiring is accepted (plus reset inversion). This is deliberately
 stricter than arbitrary semantic equivalence and is not a general SV parser.

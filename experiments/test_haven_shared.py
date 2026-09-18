@@ -1,4 +1,5 @@
 """Offline contract regressions: no model, subprocess, solver or simulation calls."""
+import backend_imports
 from copy import deepcopy
 import contextlib
 import io
@@ -130,24 +131,103 @@ class CoveragePolicyTest(unittest.TestCase):
 
 
 class PairedLoopTest(unittest.TestCase):
-    def test_native_search_exhaustion_is_not_reported_as_shared_setup_failure(self):
-        from native_witness_selection import NativeWitnessExhaustion
+    def test_restored_checkpoint_skips_baseline_and_prior_rounds(self):
+        base=coverage(line=80,toggle=60,cond=70,branch=70)
+        first=coverage(line=85,toggle=70,cond=75,branch=75)
+        second=coverage(line=90,toggle=80,cond=85,branch=85)
+        prior=[{'round':1,'coverage':first,'added_sequences':1},
+               {'round':2,'coverage':second,'added_sequences':1}]
+        restored=dict(baseline=base,current=second,previous=first,best=second,
+            rounds=prior,sequences=[sequence('base'),sequence('old_1'),sequence('old_2')],frames=[])
+        calls=[]
+        def simulate(path,sources,frames):
+            calls.append(('simulate',path.name,list(sources)))
+            if path.name!='simulation':
+                raise AssertionError('restored baseline or prior round was replayed')
+            return coverage(line=96,toggle=96,cond=96,branch=96)
+        def generate(arm,rd,feedback,existing,ordinal):
+            calls.append(('generate',rd.name,list(existing)))
+            return {'sequences':[sequence('new_3')],'frames':[]}
+        with tempfile.TemporaryDirectory() as directory:
+            result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory,simulate,generate,arms=('rvprobe',),rounds=4,
+                quality_floor=95,restored=restored)
+        arm=result['arms']['rvprobe']
+        self.assertEqual(calls[0][0:2],('generate','round-3'))
+        self.assertEqual(calls[1][0:2],('simulate','simulation'))
+        self.assertEqual([row['round'] for row in arm['rounds']],[1,2,3])
+        self.assertEqual(arm['sequence_count'],4)
+        self.assertEqual(arm['stop_reason'],'coverage_floor')
+        self.assertTrue(arm['coverage_floor_met'])
+        self.assertFalse(result['continuation']['baseline_replayed'])
+
+    def test_quality_floor_ignores_plateau_but_rejects_below_floor_after_budget(self):
+        calls=[]
+        def generate(arm,*args):
+            calls.append(arm)
+            return {'sequences':[sequence(f'candidate_{len(calls)}')],'frames':[]}
+        with tempfile.TemporaryDirectory() as directory:
+            result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory,lambda *args:coverage(line=94,toggle=94,cond=94,branch=94),generate,
+                arms=['rvprobe'],rounds=3,quality_floor=95)
+        arm=result['arms']['rvprobe']
+        self.assertEqual(len(calls),3)
+        self.assertEqual(arm['failure_kind'],'coverage_floor_unmet')
+        self.assertFalse(arm['coverage_floor_met'])
+        self.assertEqual(result['status'],'failed')
+
+    def test_quality_floor_stops_as_soon_as_measured_coverage_reaches_floor(self):
+        calls=[]
+        def simulate(path,*args):
+            return coverage(line=96,toggle=96,cond=96,branch=96) if path.name=='simulation' else coverage()
+        def generate(arm,*args):
+            calls.append(arm)
+            return {'sequences':[sequence('candidate')],'frames':[]}
+        with tempfile.TemporaryDirectory() as directory:
+            result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory,simulate,generate,arms=['rvprobe'],rounds=3,quality_floor=95)
+        arm=result['arms']['rvprobe']
+        self.assertEqual(calls,['rvprobe'])
+        self.assertTrue(arm['coverage_floor_met'])
+        self.assertEqual(arm['stop_reason'],'coverage_floor')
+
+    def test_valid_subset_is_measured_without_claiming_unresolved_intent_success(self):
+        calls=[]
+        def generate(arm,*args):
+            calls.append(arm)
+            return dict(sequences=[sequence('validated')],frames=[],metadata=dict(
+                unresolved_intents=['unresolved'],partial_intents=[],all_intents_satisfied=False))
+        def simulate(path,sources,frames):
+            return coverage(line=90 if path.name=='baseline' else 95)
+        with tempfile.TemporaryDirectory() as directory:
+            result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
+                directory,simulate,generate,arms=['rvprobe'],rounds=1,runtime_repairs=3)
+        arm=result['arms']['rvprobe']
+        self.assertEqual(calls,['rvprobe'])
+        self.assertEqual(arm['status'],'completed')
+        self.assertFalse(arm['all_intents_satisfied'])
+        self.assertGreater(arm['final']['score'],arm['baseline']['score'])
+        self.assertEqual(arm['rounds'][0]['added_sequences'],1)
+        self.assertEqual(arm['intent_outcomes'][0]['unresolved'],['unresolved'])
+
+    def test_no_validated_intents_is_recorded_without_fake_coverage_or_model_repair(self):
         calls=[]
         def generate(arm, rd, *args):
             calls.append(arm)
-            raise NativeWitnessExhaustion(0, 4, 16, rd/'native-witness-search/goal')
+            return dict(sequences=[],frames=[],metadata=dict(unresolved_intents=['goal'],partial_intents=[]))
         with tempfile.TemporaryDirectory() as directory:
             result=paired.paired_loop({'sequences':[sequence('base')],'fingerprint':'x'},
-                directory, lambda *args: coverage(), generate, runtime_repairs=3)
-        self.assertEqual(calls,['haven','rvprobe'])
+                directory, lambda *args: coverage(), generate, arms=['rvprobe'],runtime_repairs=3)
+        self.assertEqual(calls,['rvprobe'])
         for arm in result['arms'].values():
-            self.assertEqual(arm['stop_reason'],'native_witness_search_exhausted')
-            self.assertEqual(arm['diagnostics']['attempted'],16)
-            self.assertEqual(arm['rounds'],[])
+            self.assertEqual(arm['stop_reason'],'no_generated_sequences')
+            self.assertFalse(arm['all_intents_satisfied'])
+            self.assertEqual(arm['rounds'][0]['added_sequences'],0)
+            self.assertEqual(arm['intent_outcomes'][0]['unresolved'],['goal'])
             self.assertEqual(arm['final'],result['baseline'])
 
     def test_replay_setup_failure_never_requests_a_new_ut(self):
-        from replay_failures import ReplayInfrastructureFailure
+        from rvprobe.backend.failures import ReplayInfrastructureFailure
         calls=[]
         def simulate(path,*args):
             if path.name!='baseline': raise ReplayInfrastructureFailure('lowered top metadata mismatch')

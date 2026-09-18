@@ -1,4 +1,4 @@
-"""Lower sampled history in the auxiliary model only; native SVA is untouched."""
+"""Lower sampled history in the backend's candidate model; native SVA is untouched."""
 import re
 
 

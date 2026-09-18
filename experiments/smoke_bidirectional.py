@@ -1,9 +1,10 @@
 """Four-state electrical regression of the generic resolved-wire wrapper."""
+import backend_imports
 import argparse
 from pathlib import Path
 import shlex
 from bidirectional_wrapper import render
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import save
 
 

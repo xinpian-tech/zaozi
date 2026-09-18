@@ -1,9 +1,10 @@
 """VCS concurrency regression for shared item dispatch (synthetic, no model)."""
+import backend_imports
 import argparse
 from pathlib import Path
 import shlex
 import sys
-from process_runner import run
+from rvprobe.backend.process import run
 
 
 def main():

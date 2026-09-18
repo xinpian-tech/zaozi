@@ -3,6 +3,7 @@
 Never edits its UT, stimulus, or original artifacts; never calls a model.
 Used to regression-test transport fixes before another full manual closed loop.
 """
+import backend_imports
 import argparse
 import hashlib
 import json
@@ -15,7 +16,7 @@ from coverage_flow import prepare, HavenSimulation, load_haven
 from environment_preflight import write_replay_manifest
 from cycle_replay import load_config
 from haven_shared import render_witness_sequence
-from ltl_replay import attach
+from rvprobe.backend.replay import attach
 from run_records import save,utc
 
 

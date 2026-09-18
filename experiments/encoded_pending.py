@@ -3,6 +3,7 @@
 No provider requests, Stage-1 mutation, or completed-pair relabeling. Every
 encoding, timeout and native rejection is independently recorded.
 """
+import backend_imports
 import argparse
 import json
 from pathlib import Path
@@ -11,7 +12,7 @@ import sys
 import time
 
 from frozen_stage1 import verify_stage1
-from process_runner import run
+from rvprobe.backend.process import run
 from run_records import framework_hashes, save, utc
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +59,8 @@ def main():
                 for key in ('trace_cycles', 'trace_preference'):
                     if key in group:
                         sampling += ['--'+key.replace('_', '-'), group[key]]
+                if 'jg_time_limit' in group:
+                    sampling += ['--jg-time-limit', group['jg_time_limit']]
                 if group.get('noncontending_tristates'):
                     sampling += ['--noncontending-tristates']
                 command('encoded_witness_probe.py', [*common, '--out', directory/'encoded',

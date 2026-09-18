@@ -1,11 +1,12 @@
 """Fail-closed Linux isolation for compilation and model elaboration, never EDA/license access."""
+import backend_imports
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 
-from process_runner import run
+from rvprobe.backend.process import run
 
 
 def command(argv, *, readonly, writable, env):

@@ -3,6 +3,7 @@
 Exhaust all defined data and noncontending enable combinations, including an
 undriven bus. Z is compared as unknown: this is not general four-state equality.
 """
+import backend_imports
 import argparse
 import re
 import shlex
@@ -10,9 +11,9 @@ import subprocess
 import time
 from pathlib import Path
 
-from encoded_initialization import expose_collision_guards, preserve_single_driver_masks
+from rvprobe.backend.initialization import expose_collision_guards, preserve_single_driver_masks
 from run_records import save, utc
-from process_runner import run
+from rvprobe.backend.process import run
 import json
 
 RTL = """module tri_probe(input [1:0] a,b,input ena,input [1:0] enb,output [1:0] sense,lone);

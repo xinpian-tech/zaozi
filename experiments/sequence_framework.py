@@ -21,7 +21,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DESIGN = ROOT / "experiments/designs/alu.json"
-CONTRACT = "runtime-ltl-v2"
+CONTRACT = "runtime-ltl-v4"
 MODEL_MODULE = "ModelUT"
 from ltl_source import parse as parse_response, FORBIDDEN
 
@@ -32,7 +32,7 @@ abstract case catch do else extends final finally for forSome if implicit lazy
 match new override private protected return sealed super this throw try type val
 var while with yield true false null end export extension inline opaque open
 transparent using derives then infix erased into
-io dut parameter Gen past BigInt Some None Seq Option List Map Set Array
+io dut parameter Gen Ltl past BigInt Some None Seq Option List Map Set Array
 Bool Bits UInt SInt Clock Reset Referable Sequence Property Immediate
 posedge negedge always eventually ClockEvent ClockScope ResetScope
 RunLayers ModelUT Generated IMPORTS _ given_ClockEvent given_ClockScope given_ResetScope
@@ -330,8 +330,13 @@ def main() -> None:
     parser.add_argument("--jg-time-limit", default="120s")
     args = parser.parse_args()
     design = load_design(args.design)
-    response = parse_response(args.response_file.read_text())
+    from ltl_source import normalize
+    raw = args.response_file.read_bytes().decode('utf-8')
+    response = parse_response(raw)
+    _, normalization = normalize(raw)
     args.out.mkdir(parents=True, exist_ok=False)
+    (args.out / 'response.txt').write_bytes(raw.encode())
+    (args.out / 'response-normalization.json').write_text(json.dumps(normalization, indent=2) + '\n')
     if "stop" in response:
         (args.out / "response.json").write_text(json.dumps(response, indent=2) + "\n")
         print(json.dumps({"status": "stopped", "top": design.top, "utCount": 0,

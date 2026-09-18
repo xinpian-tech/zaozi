@@ -66,7 +66,7 @@ def profile(directory, design, bundle=None):
             'common_context_policy': POLICY if bundle is not None else 'unchanged',
             'feedback_sha256': hashlib.sha256(json.dumps(feedback, sort_keys=True).encode()).hexdigest(),
             'old_sections': prompt_sections(old), 'new_sections': prompt_sections(new),
-            'io_preserved': True, 'new_output_contract':'runtime-ltl-v2', 'framework_access':'on-demand', 'rtl_access': 'on-demand',
+            'io_preserved': True, 'new_output_contract':'runtime-ltl-v3', 'framework_access':'on-demand', 'rtl_access': 'on-demand',
             'excluded_costs': ['bootstrap', 'skill', 'task tool exchanges', 'retries', 'model output']}
 
 

@@ -1,11 +1,12 @@
 """Compare valid sampled history; verify conservative unknown auxiliary prehistory."""
+import backend_imports
 import argparse
 from pathlib import Path
 import shlex
 import subprocess
 import time
-from encoded_past import lower_past
-from process_runner import run
+from rvprobe.backend.past import lower_past
+from rvprobe.backend.process import run
 from run_records import save, utc
 
 RTL = '''module history_probe(input clock, slow, input [7:0] a,
