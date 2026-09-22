@@ -20,7 +20,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation}
 import java.lang.foreign.Arena
 import upickle.default.Writer
 
-object zaozi:
+private[zaozi] object ZaoziDefinitions:
   def apply[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: Generator[PARAM, L, I, P]
   )(
@@ -28,18 +28,10 @@ object zaozi:
   ): GeneratorDefinition[PARAM] =
     val name = generator.getClass.getSimpleName.stripSuffix("$").stripSuffix("Gen")
     GeneratorBackend.define[PARAM](name)(
-      fullParam => describePublicProbes(name, generator, fullParam)
-    )(definition => new ZaoziBackend(definition, generator))
-
-  def testbench[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: ProbeIO[PARAM, ?], P <: DVInterface[PARAM, L]](
-    generator: Generator[PARAM, L, I, P]
-  )(
-    using Writer[PARAM]
-  ): TestbenchDefinition[PARAM] =
-    val name = generator.getClass.getSimpleName.stripSuffix("$").stripSuffix("Gen")
-    GeneratorBackend.defineTestbench[PARAM](name)(
-      probeFn = fullParam => describePublicProbes(name, generator, fullParam),
-      observationFn = fullParam => generator.interface(fullParam).plan
+      fullParam => describePublicProbes(name, generator, fullParam),
+      fullParam => generator.interface(fullParam) match
+        case observed: ProbeIO[?, ?] => observed.plan
+        case _ => ProbeBindings.empty
     )(definition => new ZaoziBackend(definition, generator))
 
   private def describePublicProbes[
@@ -74,9 +66,8 @@ private final class ZaoziBackend[
 
   def moduleName(fullParam: Any): String =
     val fp = param(fullParam)
-    val abi = definition match
-      case testbench: TestbenchDefinition[PARAM] => Some(upickle.default.writeJs(testbench.observations(fp)))
-      case _ => None
+    val observations = definition.observations(fp)
+    val abi = Option.when(observations.ports.nonEmpty)(upickle.default.writeJs(observations))
     GeneratorBackend.canonicalModuleName(definition, fp, abi)
 
   override def layers(fullParam: Any): Seq[Vector[String]] =

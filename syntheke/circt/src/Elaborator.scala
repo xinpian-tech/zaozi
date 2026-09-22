@@ -35,6 +35,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   Circuit,
   CircuitApi,
   ConnectApi,
+  ExtModuleApi,
   InstanceApi,
   Layer as CirctLayer,
   LayerApi,
@@ -74,33 +75,63 @@ final class ElaborationException(message: String) extends RuntimeException(messa
 
 final case class ElaboratedDesign(
   circuitName: String,
+  directory:   os.RelPath,
   mlirbc:      Array[Byte],
   verilog:     Map[String, String],
-  moduleNames: Map[ModuleId, String])
+  moduleNames: Map[ModuleId, String],
+  resolved: ResolvedDesign,
+  private[circt] val layers: LayerTree,
+  private[circt] val definedModules: Set[String])
 
 object Elaborator:
 
   private def fail(message: String): Nothing = throw ElaborationException(message)
 
-  def elaborate(resolved: ResolvedDesign): ElaboratedDesign =
+  def elaborate(roots: Seq[ResolvedDesign]): Vector[ElaboratedDesign] =
+    val ordered = Compilation.order(roots)
+    val directories = Compilation.directories(ordered, roots)
+    val compiled = ordered.foldLeft(Vector.empty[ElaboratedDesign]) { (done, resolved) =>
+      val dependencies = resolved.dependencies.map { (id, definition) =>
+        id -> done.find(_.resolved eq definition).get
+      }.toMap
+      val directory = directories(resolved.spec.wrapper(ModuleId.root).get.moduleName)
+      val unit = elaborateUnit(resolved, dependencies, directory)
+      done.foreach { previous =>
+        val overlap = previous.definedModules.intersect(unit.definedModules)
+        if overlap.nonEmpty then fail(
+          s"duplicate modules in boundaries ${previous.circuitName} and ${unit.circuitName}: ${overlap.toVector.sorted.mkString(", ")}")
+      }
+      done :+ unit
+    }
+    Compilation.filelists(compiled)
+
+  private def elaborateUnit(
+    resolved: ResolvedDesign,
+    dependencies: Map[ModuleId, ElaboratedDesign],
+    directory: os.RelPath
+  ): ElaboratedDesign =
     val spec = resolved.spec
+    def owned(id: ModuleId): Boolean = !dependencies.keys.exists(_.isAncestorOf(id))
+    val localModules = spec.moduleOrder.filter(owned)
+    val generators = localModules.flatMap(spec.generatorModule)
     val mlirbcDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
-    val backendOf: Map[GeneratorDefinition[?], GeneratorBackend] = spec.generators.map { definition =>
+    val backendOf: Map[GeneratorDefinition[?], GeneratorBackend] = generators.map(_.definition).distinct.map { definition =>
       val backend = definition match
         case provider: GeneratorBackendProvider => provider.createBackend()
         case _ => fail(s"missing backend for generator ${definition.name}")
       definition -> backend
     }.toMap
 
-    val moduleNames: Map[ModuleId, String] = spec.moduleOrder.map { id =>
+    val moduleNames: Map[ModuleId, String] = spec.moduleOrder.filter(id => owned(id) || dependencies.contains(id)).map { id =>
       id -> (spec.modules(id) match
         case g: GeneratorModuleSpec =>
           backendOf(g.definition).moduleName(resolved.generatorModule(id).get.fullParam)
-        case w: WrapperModuleSpec   => w.moduleName)
+        case w: WrapperModuleSpec   => w.moduleName
+        case b: BoundaryModuleSpec => spec.wrapper(b.target).get.moduleName)
     }.toMap
 
-    val generatorNames = spec.generatorModules.map(g => moduleNames(g.id)).toSet
-    spec.moduleOrder.flatMap(spec.wrapper).foreach { w =>
+    val generatorNames = generators.map(g => moduleNames(g.id)).toSet
+    (localModules ++ dependencies.keys).flatMap(spec.wrapper).foreach { w =>
       if generatorNames(w.moduleName) then
         fail(s"wrapper ${w.id.show} is named '${w.moduleName}', which a generator module of this design also takes")
     }
@@ -206,7 +237,7 @@ object Elaborator:
           }
 
         val generatorLayers: Map[ModuleId, LayerTree] =
-          spec.generatorModules
+          generators
             .flatMap(g =>
               backendOf(g.definition)
                 .layers(resolved.generatorModule(g.id).get.fullParam)
@@ -221,12 +252,27 @@ object Elaborator:
           .groupBy(_.module)
           .view.mapValues(_.sortBy(_.name.encoded)).toMap
           .withDefaultValue(Vector.empty)
-        val wrapperLayers = spec.moduleOrder.flatMap(spec.wrapper).map { w =>
-          w.id -> leafPaths(resolved.layerDecls.getOrElse(w.id, LayerTree.empty).merge(generatorLayers(w.id)))
+        val dependencyLayers = dependencies.toVector.flatMap { (id, compiled) =>
+          (0 to id.path.size).map(n => ModuleId(id.path.take(n)) -> compiled.layers)
+        }.foldLeft(Map.empty[ModuleId, LayerTree]) { case (acc, (id, tree)) =>
+          acc.updated(id, acc.getOrElse(id, LayerTree.empty).merge(tree))
+        }
+        val wrapperLayers = (localModules ++ dependencies.keys).flatMap(spec.wrapper).map { w =>
+          w.id -> leafPaths(resolved.layerDecls.getOrElse(w.id, LayerTree.empty)
+            .merge(generatorLayers(w.id)).merge(dependencyLayers.getOrElse(w.id, LayerTree.empty)))
         }.toMap
-        val tbInputs = resolved.observations.ports
 
-        spec.moduleOrder.foreach { id =>
+        dependencies.toVector.sortBy(_._1.show).distinctBy(_._2.circuitName).foreach { (id, compiled) =>
+          val expected = compiled.resolved.portPlans.filter(_.module == ModuleId.root).sortBy(_.name.encoded)
+          val actual = wrapperPorts(id)
+          if actual.map(p => (p.name, p.direction, p.interface)) != expected.map(p => (p.name, p.direction, p.interface)) then
+            fail(s"boundary interface differs from compiled definition at ${id.show}")
+          summon[ExtModuleApi].op(compiled.circuitName, compiled.circuitName, unknownLoc,
+            FirrtlConvention.Scalarized, actual.map(p => (portField(p), unknownLoc)),
+            leafPaths(compiled.layers), Map.empty).appendToCircuit()
+        }
+
+        localModules.filter(id => spec.wrapper(id).isDefined).distinctBy(moduleNames).foreach { id =>
           spec.wrapper(id).foreach { w =>
             val name       = moduleNames(id)
             val ports      = wrapperPorts(id)
@@ -243,15 +289,14 @@ object Elaborator:
             def emitChild(c: String): Vector[((String, String), Value)] =
               val childId = id / c
               spec.modules(childId) match
+                case _: BoundaryModuleSpec => fail(s"boundary contract ${childId.show} cannot be instantiated as hardware")
                 case gm: GeneratorModuleSpec =>
                   val rgm      = resolved.generatorModule(childId).get
                   val instOp   = backendOf(gm.definition).instantiate(rgm.fullParam, c, gm.loc)
                   val expected = rgm.view.nodes.map { nv =>
                     (nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
                   } ++ rgm.probeDeclaration.ports.map(p => (p.name, true, p.tpe)) ++ (
-                    if spec.testbench.contains(childId) then
-                      tbInputs.map(p => (p.portName, false, p.reference.inner))
-                    else Vector.empty
+                    resolved.observations.get(childId).toVector.flatMap(_.ports).map(p => (p.portName, false, p.reference.inner))
                   )
                   checkedPorts(instOp, expected, childId.show, gm.loc.show).toVector.map((n, v) => ((c, n), v))
                 case _:  WrapperModuleSpec   =>
@@ -282,17 +327,14 @@ object Elaborator:
 
             resolved.wirePlans.filter(_.module == id).foreach { wp =>
               wp.origin match
-                case PlanOrigin.Design(_)            =>
+                case PlanOrigin.Design(_) | PlanOrigin.Observation(_) =>
                   summon[ConnectApi].op(baseOf(wp.from), baseOf(wp.to), unknownLoc).operation.appendToBlock()
                 case PlanOrigin.Verification(_) =>
-                  wp.to match
-                    case LocalEndpoint.ChildPort(_, _) =>
-                      val reference = baseOf(wp.from)
-                      val read      = summon[RefResolveApi].op(reference, unknownLoc)
-                      read.operation.appendToBlock()
-                      summon[ConnectApi].op(read.result, baseOf(wp.to), unknownLoc).operation.appendToBlock()
-                    case LocalEndpoint.ThisPort(_)            =>
-                      summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
+                  summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
+                case PlanOrigin.ProbeRead(_) =>
+                  val read = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
+                  read.operation.appendToBlock()
+                  summon[ConnectApi].op(read.result, baseOf(wp.to), unknownLoc).operation.appendToBlock()
             }
 
             module.appendToCircuit()
@@ -360,7 +402,8 @@ object Elaborator:
 
         val (defined0, referenced0) = moduleSymbols(summon[Circuit].operation)
         val linkedLayers = link((referenced0 -- defined0).toList, defined0, LayerTree.empty)
-        emitLayers(resolved.layerDecls.values.foldLeft(linkedLayers)(_.merge(_)), None)
+        val layers = (resolved.layerDecls.values ++ dependencyLayers.values).foldLeft(linkedLayers)(_.merge(_))
+        emitLayers(layers, None)
 
         if !summon[MlirModule].getOperation.verify then fail("MLIR verification of the linked circuit failed")
 
@@ -368,9 +411,9 @@ object Elaborator:
         summon[MlirModule].getOperation.writeBytecode(bc => bytecode.write(bc))
 
         given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
-        given PassManager    = summon[PassManagerApi].passManagerCreate
         val firtoolOptions   = summon[FirtoolOptions]
         val verilogDir       = os.temp.dir(prefix = s"syntheke-$circuitName-verilog", deleteOnExit = false)
+        given PassManager = summon[PassManagerApi].passManagerCreate
         summon[PassManager].preprocessTransforms(firtoolOptions)
         summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
         summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
@@ -380,10 +423,13 @@ object Elaborator:
           summon[MlirModule].getOperation,
           s"firtool lowering pipeline for circuit '$circuitName'"
         )
+        val definedModules = opsIn(summon[MlirModule].getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
+          .filter(_.getName.str == "hw.module")
+          .map(_.getInherentAttributeByName("sym_name").stringAttrGetValue).toSet
         val verilog          =
           try os.walk(verilogDir).filter(os.isFile).map(p => p.relativeTo(verilogDir).toString -> os.read(p)).toMap
           finally os.remove.all(verilogDir)
 
-        ElaboratedDesign(circuitName, bytecode.toByteArray, verilog, moduleNames)
+        ElaboratedDesign(circuitName, directory, bytecode.toByteArray, verilog, moduleNames, resolved, layers, definedModules)
       finally summon[Context].destroy()
     finally arena.close()

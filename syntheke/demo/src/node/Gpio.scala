@@ -44,27 +44,24 @@ object GpioNodes:
       )
 
 
-    val clk  = clkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val pins = pinsDraft.seal(ReadPlan())(_ => Right((width, Vector.empty)))
-    val in   = inDraft.seal(ReadPlan())(_ =>
-      Right((
-        AxiSlavePort(
-          slaves = Vector(
-            AxiSlaveParams(
-              name,
-              AddressSet.misaligned(base, size),
-              RegionType.PutEffects,
-              executable = false,
-              supportsWrite = TransferSizes(1, 4),
-              supportsRead = TransferSizes(1, 4)
-            )
-          ),
-          beatBytes = 4,
-          idCapacityBits = idCapacityBits,
-          minLatency = 1
+    val clk  = clkDraft.fixed(())
+    val pins = pinsDraft.fixed(width)
+    val in   = inDraft.fixed(
+      AxiSlavePort(
+        slaves = Vector(
+          AxiSlaveParams(
+            name,
+            AddressSet.misaligned(base, size),
+            RegionType.PutEffects,
+            executable = false,
+            supportsWrite = TransferSizes(1, 4),
+            supportsRead = TransferSizes(1, 4)
+          )
         ),
-        Vector.empty
-      ))
+        beatBytes = 4,
+        idCapacityBits = idCapacityBits,
+        minLatency = 1
+      )
     )
 
     parameters { (view, _) =>

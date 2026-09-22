@@ -78,18 +78,12 @@ trait Domain:
 
 private[syntheke] final class DesignOwner
 
-trait ReadToken:
+private[syntheke] trait ReadToken:
   type Value
   private[syntheke] def tokenOwner: DesignOwner
 
-final class ReadPlan private[syntheke] (private[syntheke] val tokens: Vector[ReadToken])
-
-object ReadPlan:
-  def apply(tokens: ReadToken*): ReadPlan =
-    new ReadPlan(tokens.toVector.distinct)
-
-final class ReadValues private[syntheke] (values: Map[ReadToken, Any]):
-  def apply[T <: ReadToken](token: T): token.Value =
+private[syntheke] final class ReadValues(values: Map[ReadToken, Any]):
+  private[syntheke] def lookup[T <: ReadToken](token: T): token.Value =
     values
       .getOrElse(token, throw new IllegalArgumentException("token is not present in this sealed read plan"))
       .asInstanceOf[token.Value]
@@ -115,7 +109,7 @@ final class NodeDomain[D <: Domain] private[syntheke] (
   val domain:                  D,
   val key:                     NodeDomainKey,
   private[syntheke] val owner: DesignOwner)
-    extends DomainReadable[D],
+    extends DomainReadable[D], ParameterValue,
       ReadToken:
   private[syntheke] def module:      ModuleId    = key.node.module
   private[syntheke] def tokenOwner:  DesignOwner = owner

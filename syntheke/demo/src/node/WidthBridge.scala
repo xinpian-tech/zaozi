@@ -38,12 +38,10 @@ object WidthBridgeNodes:
         clkDraft.domain(ResetDomain),
         PowerDomain
       )
-    val (d, u)   = depend(inDraft, outDraft)
 
-    val clk = clkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val out = outDraft.seal(ReadPlan(d))(ctx => Right((ctx(d), Vector.empty)))
-    val in  = inDraft.seal(ReadPlan(u)) { ctx =>
-      val narrow = ctx(u)
+    val clk = clkDraft.fixed(())
+    val out = outDraft.derive(inDraft)(master => Right((master, Vector.empty)))
+    val in  = inDraft.derive(out) { narrow =>
       def singleBeat(sizes: TransferSizes): TransferSizes =
         if sizes.min > narrow.beatBytes then TransferSizes(0, 0)
         else TransferSizes(sizes.min, math.min(sizes.max, narrow.beatBytes))

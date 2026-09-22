@@ -1,7 +1,6 @@
 package me.jiuyang.syntheke.demo
 
 import me.jiuyang.syntheke.*
-import me.jiuyang.syntheke.demo.harness.testHarness
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.stdlib.iomux.IOMuxRoute
 
@@ -17,20 +16,20 @@ object Soc:
     hart0:    DebugInterrupt.Outward,
     hart1:    DebugInterrupt.Outward)
 
-  def build(config: SocConfig): DesignSpec =
+  final case class Ports(
+    ref: InwardBoundary[ClockReset.type],
+    dtmClock: InwardBoundary[ClockReset.type],
+    crossingClock: InwardBoundary[ClockReset.type],
+    memory: OutwardBoundary[Axi4.type],
+    memoryClock: OutwardBoundary[ClockReset.type],
+    pins: Vector[OutwardBoundary[IO.type]])
+
+  def build(config: SocConfig): Design[Ports] =
     import config.*
-    Design {
-      val harness = testHarness(
-        freqHz = refHz,
-        taps = Vector("ref"),
-        tckTaps = Vector("dtm", "dmiCross"),
-        baud = baud,
-        pinCount = pinCount,
-        uartPins = uartPins,
-        jtagPins = jtagPins,
-        jtagPort = jtagPort,
-        tckDiv = tckDiv
-      )
+    Design("Soc") {
+      val refClock = ClockDomain.declare(ClockValue(refHz), None)
+      val tckClock = ClockDomain.declare(ClockValue(refHz / (2 * tckDiv)), None)
+      val boardReset = ResetDomain.declare(ResetValue(true, ResetAssertion.Asynchronous, ResetRelease.Synchronous), None)
 
       val alwaysOnPowerDomain = PowerDomain.declare(
         PowerValue.Supply(millivolts = 900, alwaysOn = true),
@@ -64,14 +63,7 @@ object Soc:
             "dm"
           )
         )
-        sysPll.ref <-- harness.tap("ref")
-
-        val memory = memorySubsystem(
-          base = loadBase,
-          size = dramBytes,
-          idCapacityBits = 6,
-          configFile = dramConfigFile
-        )
+        val ref = sysPll.ref.boundary(())(refClock, boardReset, PowerDomain)
 
         val core0        = cpu0PowerDomain.provide {
           core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = true, enableTrace = true)
@@ -144,8 +136,12 @@ object Soc:
         core0.debug <-- cpu0Boundary.cpuDebug
         core1.debug <-- cpu1Boundary.cpuDebug
 
-        memory.in <-- sysXbar.output("mem")
-        memory.clk <-- sysPll.tap("mem")
+        val memory = sysXbar.output("mem").boundary(AxiSlavePort(
+          slaves = Vector(AxiSlaveParams("dram", AddressSet.misaligned(loadBase, dramBytes),
+            RegionType.Uncached, executable = true, supportsWrite = TransferSizes(1, 64), supportsRead = TransferSizes(1, 64))),
+          beatBytes = 16, idCapacityBits = 6, minLatency = 8
+        ))(sysPll.systemClockDomain, sysPll.systemResetDomain, PowerDomain)
+        val memoryClock = sysPll.tap("mem").boundary(())(ClockDomain, ResetDomain, PowerDomain)
 
         mux.input("uartTx") <-- uartIO.tx
         mux.input("uartRx") <-- uartIO.rx
@@ -154,9 +150,12 @@ object Soc:
         mux.input("jtagTrstN") <-- jtagPads.trstN
         mux.input("jtagTdo") <-- jtagPads.tdo
         gpioIOs.zipWithIndex.foreach((pin, i) => mux.input(s"gpio$i") <-- pin)
-        harness.pins.zip(mux.pads).foreach((pin, pad) => pin <-- pad)
-        debug.tckClk <-- harness.tckTap("dtm")
-        debug.crossTck <-- harness.tckTap("dmiCross")
+        val pins = mux.pads.zipWithIndex.map { (pad, i) =>
+          given sourcecode.Name = sourcecode.Name(s"pin$i")
+          pad.boundary(())(PowerDomain)
+        }
+        val dtmClock = debug.tckClk.boundary(())(tckClock, boardReset, PowerDomain)
+        val crossingClock = debug.crossTck.boundary(())(tckClock, boardReset, PowerDomain)
 
         cpu0Boundary.clk <-- sysPll.tap("core0")
         cpu1Boundary.clk <-- sysPll.tap("core1")
@@ -175,5 +174,5 @@ object Soc:
         mux.clk <-- sysPll.tap("iomux")
         debug.crossSys <-- sysPll.tap("dmiCross")
         debug.dmClk <-- sysPll.tap("dm")
-      ((), Vector.empty)
+        (Ports(ref, dtmClock, crossingClock, memory, memoryClock, pins), Vector.empty)
     }

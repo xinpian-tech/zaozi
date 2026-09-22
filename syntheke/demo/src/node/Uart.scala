@@ -45,44 +45,24 @@ object UartNodes:
 
     val clkClock = clkDraft.domain(ClockDomain)
 
-    val clk    = clkDraft.seal(ReadPlan())(_ =>
-      Right((
-        (),
-        Vector(
-          clkDraft.domain(ClockDomain).requirement(ClockRequirement(minHz = Some(baud * 8))),
-          clkDraft.domain(ResetDomain).requirement(
-            ResetRequirement(
-              requireAsynchronousAssertion = true,
-              requireSynchronousRelease = true,
-              requiredActiveHigh = Some(true)
-            )
-          ),
-          clkDraft.domain(PowerDomain).requirement(
-            PowerRequirement(minMillivolts = Some(850), maxMillivolts = Some(950), requiresAlwaysOn = true)
+    val clk    = clkDraft.fixed(())
+    val serial = serialDraft.fixed(baud)
+    val in     = inDraft.fixed(
+      AxiSlavePort(
+        slaves = Vector(
+          AxiSlaveParams(
+            name,
+            AddressSet.misaligned(base, size),
+            RegionType.PutEffects,
+            executable = false,
+            supportsWrite = TransferSizes(1, 4),
+            supportsRead = TransferSizes(1, 4)
           )
-        )
-      ))
-    )
-    val serial = serialDraft.seal(ReadPlan())(_ => Right((baud, Vector.empty)))
-    val in     = inDraft.seal(ReadPlan())(_ =>
-      Right((
-        AxiSlavePort(
-          slaves = Vector(
-            AxiSlaveParams(
-              name,
-              AddressSet.misaligned(base, size),
-              RegionType.PutEffects,
-              executable = false,
-              supportsWrite = TransferSizes(1, 4),
-              supportsRead = TransferSizes(1, 4)
-            )
-          ),
-          beatBytes = 4,
-          idCapacityBits = idCapacityBits,
-          minLatency = 1
         ),
-        Vector.empty
-      ))
+        beatBytes = 4,
+        idCapacityBits = idCapacityBits,
+        minLatency = 1
+      )
     )
 
     parameters { (view, domains) =>
@@ -90,7 +70,17 @@ object UartNodes:
       val s    = shapeOf(view.edgeOf(in))
       Right(UartP(freq / baud, base, s.addrBits, s.dataBits, s.idBits))
     }
-    (UartNodes(clk, serial, in), Vector.empty)
+    (UartNodes(clk, serial, in), Vector(
+      clk.domain(ClockDomain).requirement(ClockRequirement(minHz = Some(baud * 8))),
+      clk.domain(ResetDomain).requirement(ResetRequirement(
+        requireAsynchronousAssertion = true,
+        requireSynchronousRelease = true,
+        requiredActiveHigh = Some(true)
+      )),
+      clk.domain(PowerDomain).requirement(
+        PowerRequirement(minMillivolts = Some(850), maxMillivolts = Some(950), requiresAlwaysOn = true)
+      )
+    ))
 
 def uartCtrl(
   base:           Long,

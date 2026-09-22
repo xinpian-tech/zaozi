@@ -45,10 +45,10 @@ object DtmNodes:
       )
 
 
-    val tck  = tckDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
+    val tck  = tckDraft.fixed(())
     val jtag =
-      jtagDraft.seal(ReadPlan())(_ => Right((JtagTap(idcode, DtmNodes.irLength, abits, 32, JtagInstruction.DMI), Vector.empty)))
-    val dmi  = dmiDraft.seal(ReadPlan())(_ => Right((DmiMaster(abits, 32), Vector.empty)))
+      jtagDraft.fixed(JtagTap(idcode, DtmNodes.irLength, abits, 32, JtagInstruction.DMI))
+    val dmi  = dmiDraft.fixed(DmiMaster(abits, 32))
 
     parameters { (view, _) =>
       val e = view.edgeOf(dmi)

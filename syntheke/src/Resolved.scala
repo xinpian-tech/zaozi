@@ -23,7 +23,7 @@ final case class EdgeView private[syntheke] (
   private[syntheke] val owner: DesignOwner,
   nodes: Vector[NodeView]):
 
-  def edgeOf(n: Port[?]): n.protocol.Edge =
+  private[syntheke] def lookupEdge(n: Port[?]): n.protocol.Edge =
     require(n.owner eq owner, s"node ${n.id.show} belongs to another Design build")
     val view = nodes.find(_.node == n.id)
     require(view.isDefined, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")
@@ -35,8 +35,8 @@ final case class EdgeView private[syntheke] (
 
 final class DomainView private[syntheke] (
   val module: ModuleId,
-  owner:      DesignOwner,
-  entries: Vector[(DomainReadable[?], ResolvedDomain)]):
+  private[syntheke] val owner: DesignOwner,
+  private[syntheke] val entries: Vector[(DomainReadable[?], ResolvedDomain)]):
   private val byKey: Map[DomainReadable[?], ResolvedDomain] = entries.toMap
 
   private def entry[D <: Domain](token: DomainReadable[D]): ResolvedDomain =
@@ -46,10 +46,10 @@ final class DomainView private[syntheke] (
     require(found.get.domain eq token.domain, s"domain token ${token.domain.key.show} does not match its resolved entry")
     found.get
 
-  def value[D <: Domain](token: DomainReadable[D]): token.domain.Value =
+  private[syntheke] def lookupValue[D <: Domain](token: DomainReadable[D]): token.domain.Value =
     entry(token).value.asInstanceOf[token.domain.Value]
 
-  def sameIdentity[D <: Domain](a: DomainReadable[D], b: DomainReadable[D]): Boolean =
+  private[syntheke] def compareIdentity[D <: Domain](a: DomainReadable[D], b: DomainReadable[D]): Boolean =
     require(a.domain eq b.domain, s"sameIdentity operands use different domain objects for ${a.domain.key.show}")
     entry(a).id == entry(b).id
 
@@ -63,9 +63,9 @@ final class EdgeDomains private[syntheke] (
       .getOrElse(throw IllegalArgumentException(s"edge endpoint has no ${domain.key.show} domain"))
       .asInstanceOf[NodeDomain[D]]
 
-  def outward[D <: Domain](domain: D): NodeDomain[D] = token(outwardTokens, domain)
-  def inward[D <: Domain](domain: D): NodeDomain[D] = token(inwardTokens, domain)
-  def value[D <: Domain](source: NodeDomain[D]): source.domain.Value = values.value(source)
+  private[syntheke] def outwardToken[D <: Domain](domain: D): NodeDomain[D] = token(outwardTokens, domain)
+  private[syntheke] def inwardToken[D <: Domain](domain: D): NodeDomain[D] = token(inwardTokens, domain)
+  private[syntheke] def lookupValue[D <: Domain](source: NodeDomain[D]): source.domain.Value = values.value(source)
 
 enum DomainContributor:
   case Node(node: ModuleNodeId)
@@ -92,9 +92,21 @@ final case class ResolvedDomainAttachment(
   declaration: DomainDeclId,
   provenance:  AttachmentProvenance)
 
-final case class ResolvedDomainCheck(
-  subject:    String,
-  domainKeys: Vector[DomainKey])
+private[syntheke] enum DomainCheckSubject:
+  case Carrier(bind: BindId)
+  case Constraint(source: DomainContributor, loc: (sourcecode.File, sourcecode.Line))
+
+final case class ResolvedDomainCheck private[syntheke] (
+  private[syntheke] val origin: DomainCheckSubject,
+  domainKeys: Vector[DomainKey]):
+  def subject: String = origin match
+    case DomainCheckSubject.Carrier(bind) => s"${bind.show}:carrier"
+    case DomainCheckSubject.Constraint(source, loc) => s"constraint from $source, at ${loc.show}"
+
+  private[syntheke] def map(contributor: DomainContributor => DomainContributor, bind: BindId => BindId): ResolvedDomainCheck =
+    copy(origin = origin match
+      case DomainCheckSubject.Carrier(id) => DomainCheckSubject.Carrier(bind(id))
+      case DomainCheckSubject.Constraint(source, loc) => DomainCheckSubject.Constraint(contributor(source), loc))
 
 final case class ResolvedGeneratorModule(
   module:           ModuleId,
@@ -126,6 +138,8 @@ enum PortDirection derives CanEqual:
 enum PlanOrigin derives CanEqual:
   case Design(bind: BindId)
   case Verification(source: ModuleNodeId)
+  case ProbeRead(source: ModuleNodeId)
+  case Observation(source: ModuleNodeId)
 
 final case class PortPlan(
   module:    ModuleId,
@@ -179,7 +193,18 @@ final case class ResolvedDesign(
   wirePlans:         Vector[WirePlan],
   layerDecls:        Map[ModuleId, LayerTree],
   probes:            ProbeCatalog,
-  observations: ProbeBindings):
+  observations: Map[ModuleId, ProbeBindings],
+  private[syntheke] val dependencies: Vector[(ModuleId, ResolvedDesign)]):
+  private[syntheke] def boundaryEdge(boundary: Boundary[?]): ResolvedEdge =
+    require(spec.boundaries.exists(_.terminal eq boundary.terminal), "boundary is not public in this design")
+    edgeAt(boundary.terminal.id)
+
+  private[syntheke] def boundaryDomain[D <: Domain](boundary: Boundary[?], domain: D): ResolvedDomain =
+    boundaryEdge(boundary)
+    val use = boundary.terminal.nodeDomains.find(_.domain eq domain).getOrElse(
+      throw IllegalArgumentException(s"boundary ${boundary.id.show} has no ${domain.key.show} domain"))
+    val declaration = domainAttachments.find(_.key == use.key).get.declaration
+    domains.find(_.id == declaration).get
   def edgeAt(node: ModuleNodeId): ResolvedEdge =
     val found = edges.find(e => e.bind.source == node || e.bind.target == node)
     require(found.isDefined, s"${node.show} has no settled edge")

@@ -22,7 +22,7 @@ object Retention extends Protocol:
     Bundle(Vector(
       Field("save", Bool),
       Field("restore", Bool),
-      Field("reset", Reset),
+      Field("reset", UInt(1)),
       Field("saved", Flipped(Bool)),
       Field("restored", Flipped(Bool))
     ))

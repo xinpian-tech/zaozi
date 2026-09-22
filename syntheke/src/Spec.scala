@@ -6,6 +6,7 @@ enum NodeDirection derives CanEqual:
 
 sealed trait DomainSelectorSpec
 object DomainSelectorSpec:
+  private[syntheke] final case class Frozen(source: DomainReadable[?], provenance: AttachmentProvenance) extends DomainSelectorSpec
   final case class Direct(private[syntheke] val domain: DomainHandle[?]) extends DomainSelectorSpec
   final case class Contextual(
     private[syntheke] val domain: DomainHandle[?],
@@ -58,10 +59,6 @@ final case class ParamDependencySpec(
   order: Int,
   loc:   (sourcecode.File, sourcecode.Line))
 
-private[syntheke] enum ParameterComputation:
-  case Ordinary(compute: (EdgeView, DomainView) => Either[Violation, Any])
-  case Observed(compute: (ProbeCatalog, EdgeView, DomainView) => Either[Violation, Any])
-
 final class ProbeSpec[P] private[syntheke] (
   val node: ProbeNode[P],
   private[syntheke] val resolve: (Any, ProbeDeclaration) => Either[Violation, Option[ProbeResolution[P]]],
@@ -71,11 +68,25 @@ sealed trait ModuleSpec:
   def id:  ModuleId
   def loc: (sourcecode.File, sourcecode.Line)
 
+private[syntheke] sealed trait NodeModuleSpec extends ModuleSpec:
+  def nodes: Vector[NodeSpec]
+  def dependencies: Vector[ParamDependencySpec]
+  def node(name: String): Option[NodeSpec] = nodes.find(_.name == name)
+
+private[syntheke] final case class BoundaryModuleSpec(
+  id: ModuleId,
+  target: ModuleId,
+  external: Boolean,
+  nodes: Vector[NodeSpec],
+  loc: (sourcecode.File, sourcecode.Line)) extends NodeModuleSpec:
+  val dependencies: Vector[ParamDependencySpec] = Vector.empty
+
 final case class WrapperModuleSpec(
   id:         ModuleId,
   moduleName: String,
   children:   Vector[String],
-  loc:        (sourcecode.File, sourcecode.Line))
+  loc:        (sourcecode.File, sourcecode.Line),
+  private[syntheke] val definition: AnyRef)
     extends ModuleSpec
 
 final case class GeneratorModuleSpec(
@@ -83,11 +94,10 @@ final case class GeneratorModuleSpec(
   definition:                       GeneratorDefinition[?],
   nodes:                            Vector[NodeSpec],
   dependencies:                     Vector[ParamDependencySpec],
-  private[syntheke] val parameters: ParameterComputation,
+  private[syntheke] val parameters: (EdgeView, DomainView) => Either[Violation, Any],
   loc:                              (sourcecode.File, sourcecode.Line),
   probes: Vector[ProbeSpec[?]])
-    extends ModuleSpec:
-  def node(name: String): Option[NodeSpec] = nodes.find(_.name == name)
+    extends NodeModuleSpec
 
 final case class BindDecl(
   order:      Int,
@@ -104,17 +114,19 @@ final case class DesignSpec(
   binds:                       Vector[BindDecl],
   domainDecls:                 Vector[DomainHandle[?]],
   constraints:                 Vector[ConstraintSpec],
-  testbench: Option[ModuleId]):
+  root: ModuleId,
+  private[syntheke] val boundaries: Vector[Boundary[?]]):
 
   def wrapper(id:    ModuleId):         Option[WrapperModuleSpec]   = modules.get(id).collect { case w: WrapperModuleSpec => w }
   def generatorModule(id: ModuleId):    Option[GeneratorModuleSpec] =
     modules.get(id).collect { case g: GeneratorModuleSpec => g }
   def generatorModules:                 Vector[GeneratorModuleSpec] =
     moduleOrder.flatMap(generatorModule)
+  private[syntheke] def nodeModules: Vector[NodeModuleSpec] = moduleOrder.flatMap(id => modules.get(id).collect { case n: NodeModuleSpec => n })
   def nodeSpec(id: ModuleNodeId):       Option[NodeSpec]            =
-    generatorModule(id.module).flatMap(_.node(id.name))
+    modules.get(id.module).collect { case n: NodeModuleSpec => n }.flatMap(_.node(id.name))
   def domainDecl(id: DomainDeclId):     Option[DomainHandle[?]]     = domainDecls.find(_.id == id)
-  def nodeDomains:                       Vector[NodeDomainSpec]   = generatorModules.flatMap(_.nodes.flatMap(_.nodeDomains))
+  def nodeDomains:                       Vector[NodeDomainSpec]   = nodeModules.flatMap(_.nodes.flatMap(_.nodeDomains))
 
   def generators: Vector[GeneratorDefinition[?]] =
     generatorModules.map(_.definition).foldLeft(Vector.empty[GeneratorDefinition[?]]) { (acc, e) =>

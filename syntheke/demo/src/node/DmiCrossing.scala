@@ -47,7 +47,6 @@ object DmiCrossingNodes:
         deqClkDraft.domain(ResetDomain),
         PowerDomain
       )
-    val (d, u)      = depend(inDraft, outDraft)
 
     val enqClock = enqClkDraft.domain(ClockDomain)
     val deqClock = deqClkDraft.domain(ClockDomain)
@@ -58,10 +57,10 @@ object DmiCrossingNodes:
       else Right(())
     }
 
-    val enqClk = enqClkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val deqClk = deqClkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val out    = outDraft.seal(ReadPlan(d))(ctx => Right((ctx(d), Vector.empty)))
-    val in     = inDraft.seal(ReadPlan(u))(ctx => Right((ctx(u), Vector.empty)))
+    val enqClk = enqClkDraft.fixed(())
+    val deqClk = deqClkDraft.fixed(())
+    val out    = outDraft.derive(inDraft)(master => Right((master, Vector.empty)))
+    val in     = inDraft.derive(out)(slave => Right((slave, Vector.empty)))
 
     parameters { (view, _) =>
       val e = view.edgeOf(out)

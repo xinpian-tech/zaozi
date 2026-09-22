@@ -25,17 +25,10 @@ trait GeneratorBackend:
 
 object GeneratorBackend:
   def define[FP: upickle.default.Writer](name: String)(
-    probeFn: FP => ProbeDeclaration
-  )(backend: GeneratorDefinition[FP] => GeneratorBackend): GeneratorDefinition[FP] =
-    new GeneratorDefinition[FP](name) with GeneratorBackendProvider:
-      def probes(fullParam: FP): ProbeDeclaration = probeFn(fullParam)
-      def createBackend(): GeneratorBackend = backend(this)
-
-  def defineTestbench[FP: upickle.default.Writer](name: String)(
     probeFn: FP => ProbeDeclaration,
     observationFn: FP => ProbeBindings
-  )(backend: TestbenchDefinition[FP] => GeneratorBackend): TestbenchDefinition[FP] =
-    new TestbenchDefinition[FP](name) with GeneratorBackendProvider:
+  )(backend: GeneratorDefinition[FP] => GeneratorBackend): GeneratorDefinition[FP] =
+    new GeneratorDefinition[FP](name) with GeneratorBackendProvider:
       def probes(fullParam: FP): ProbeDeclaration = probeFn(fullParam)
       def observations(fullParam: FP): ProbeBindings = observationFn(fullParam)
       def createBackend(): GeneratorBackend = backend(this)

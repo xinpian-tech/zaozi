@@ -20,7 +20,7 @@ object ClockReset extends Protocol:
     ProtocolInterface.Bundle(
       Vector(
         ProtocolInterface.Field("clock", ProtocolInterface.Clock),
-        ProtocolInterface.Field("reset", ProtocolInterface.Reset)
+        ProtocolInterface.Field("reset", ProtocolInterface.UInt(1))
       )
     )
 

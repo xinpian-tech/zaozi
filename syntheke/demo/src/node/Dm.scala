@@ -61,16 +61,13 @@ object DmNodes:
         PowerDomain
       )
 
-    val clk       = clkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val dmi       = dmiDraft.seal(ReadPlan())(_ => Right((DmiSlave(DmNodes.addrBits, 32), Vector.empty)))
+    val clk       = clkDraft.fixed(())
+    val dmi       = dmiDraft.fixed(DmiSlave(DmNodes.addrBits, 32))
     val hartPorts = hartDrafts.zipWithIndex.map { (port, i) =>
-      port.seal(ReadPlan())(_ => Right((DebugRequest(i), Vector.empty)))
+      port.fixed(DebugRequest(i))
     }
-    val sb        = sbDraft.seal(ReadPlan())(_ =>
-      Right((
-        AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << sbIdBits), maxFlight = Some(1)))),
-        Vector.empty
-      ))
+    val sb        = sbDraft.fixed(
+      AxiMasterPort(Vector(AxiMasterParams(name, IdRange(0, 1 << sbIdBits), maxFlight = Some(1))))
     )
 
     parameters { (view, _) =>

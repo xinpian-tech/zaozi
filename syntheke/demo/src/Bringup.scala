@@ -17,10 +17,10 @@ object Bringup:
        |""".stripMargin
 
   def probeRsTarget(resolved: ResolvedDesign): String =
-    val root  = ModuleId.root
+    val root  = ModuleId.root / "dut" / "soc"
     val tap   = resolved.edgeAt(ModuleNodeId(root / "jtagPads", "in")).edgeAs(Jtag)
     val harts = resolved.generatorModule(root / "debug" / "dm").get.fullParam.asInstanceOf[DmP].harts
-    val ram   = resolved.edgeAt(ModuleNodeId(root / "memory", "in")).edgeAs(Axi4).slave.slaves.head.address.head
+    val ram   = resolved.edgeAt(ModuleNodeId(ModuleId.root / "dut" / "memory", "in")).edgeAs(Axi4).slave.slaves.head.address.head
     val cores = (0 until harts)
       .map(i => s"""      - name: hart$i
                    |        type: riscv

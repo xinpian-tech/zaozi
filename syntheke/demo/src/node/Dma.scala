@@ -36,14 +36,11 @@ object DmaNodes:
       )
 
 
-    val clk = clkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val mem = memDraft.seal(ReadPlan())(_ =>
-      Right((
-        AxiMasterPort(
-          Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight = Some(maxFlight)))
-        ),
-        Vector.empty
-      ))
+    val clk = clkDraft.fixed(())
+    val mem = memDraft.fixed(
+      AxiMasterPort(
+        Vector(AxiMasterParams(name, IdRange(0, 1 << idBits), maxFlight = Some(maxFlight)))
+      )
     )
 
     parameters { (view, _) =>

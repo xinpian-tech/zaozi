@@ -44,11 +44,10 @@ abstract class ProbeIO[FP <: Parameter, A](parameter: FP, observations: A)(using
   }
 
 final class BoundProbe[T <: Data & CanProbe] private[zaozi] (
-  private val value: Node[T]):
-  def read(): Node[T] = value
+  private[zaozi] val value: Node[T])
 
-extension [T <: Data & CanProbe](handle: Probe[T])
-  def bind[I <: ProbeIO[?, ?]](io: Interface[I])(
+private[zaozi] object ProbeAccess:
+  def bind[T <: Data & CanProbe, I <: ProbeIO[?, ?]](handle: Probe[T], io: Interface[I])(
     using Arena, Context, Block, sourcecode.File, sourcecode.Line
   ): BoundProbe[T] =
     require(io.getType.handles.exists(_.node eq handle.node), s"${handle.id.show}: source is not observed by this interface")

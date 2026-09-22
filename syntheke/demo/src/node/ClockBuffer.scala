@@ -19,8 +19,8 @@ object ClockBufferNodes:
       given sourcecode.Name = sourcecode.Name("out")
       outward(ClockReset)(inDraft.domain(ClockDomain), inDraft.domain(ResetDomain), PowerDomain)
 
-    val in = inDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val out = outDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
+    val in = inDraft.fixed(())
+    val out = outDraft.fixed(())
     parameters((_, _) => Right(ClockBufferP()))
     (ClockBufferNodes(in, out), Vector.empty)
 

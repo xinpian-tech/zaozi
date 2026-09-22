@@ -58,23 +58,23 @@ object CpuPowerBoundaryNodes:
       given sourcecode.Name = sourcecode.Name("retention")
       outward(Retention)(cpuClock, retentionReset, aonPower)
 
-    val (masters, slaves) = depend(cpuMemDraft, busDraft)
-    val (request, hart) = depend(debugDraft, cpuDebugDraft)
     val clk = clkDraft.fixed(())
     val cpuClk = cpuClkDraft.fixed(())
     val control = controlDraft.fixed(())
     val retention = retentionDraft.fixed(())
-    val cpuMem = cpuMemDraft.seal(ReadPlan(slaves))(values => Right((values(slaves), Vector.empty)))
-    val bus = busDraft.seal(ReadPlan(masters)) { values =>
-      val port = values(masters)
-      if port.masters.exists(_.maxFlight.forall(_ <= 0)) then
+    val cpuMem = cpuMemDraft.derive(busDraft)(slave => Right((slave, Vector.empty)))
+    val busPower = busDraft.domain(PowerDomain)
+    val bus = busDraft.derive((cpuMem, busPower)) { (port, supply) =>
+      if !supply.isInstanceOf[PowerValue.Supply] then
+        Left(Violation("CPU power boundary requires physical supply declarations"))
+      else if port.masters.exists(_.maxFlight.forall(_ <= 0)) then
         Left(Violation("CPU power shutdown requires a finite positive AXI maxFlight for every master"))
       else if port.masters.map(m => BigInt(m.maxFlight.get) * (m.id.end - m.id.start)).sum > Int.MaxValue then
         Left(Violation("CPU power shutdown AXI outstanding bound exceeds the counter capacity"))
-      else Right((port, Vector.empty))
+      else Right((port, Vector(busPower.requirement(PowerRequirement(requiresAlwaysOn = true)))))
     }
-    val debug = debugDraft.seal(ReadPlan(hart))(values => Right((values(hart), Vector.empty)))
-    val cpuDebug = cpuDebugDraft.seal(ReadPlan(request))(values => Right((values(request), Vector.empty)))
+    val debug = debugDraft.derive(cpuDebugDraft)(hart => Right((hart, Vector.empty)))
+    val cpuDebug = cpuDebugDraft.derive(debug)(request => Right((request, Vector.empty)))
 
     val isolation = Seq(aonPower, cpuPower).check { view =>
       (view.value(aonPower), view.value(cpuPower)) match
@@ -96,7 +96,6 @@ object CpuPowerBoundaryNodes:
     (
       CpuPowerBoundaryNodes(clk, cpuClk, cpuMem, bus, debug, cpuDebug, retention, control),
       Vector(
-        aonPower.requirement(PowerRequirement(requiresAlwaysOn = true)),
         reset.requirement(ResetRequirement(
           requireAsynchronousAssertion = true,
           requireSynchronousRelease = true,

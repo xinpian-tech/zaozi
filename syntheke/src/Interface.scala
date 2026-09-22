@@ -33,7 +33,6 @@ object ProtocolInterface:
     require(width >= 0, "Analog width must be nonnegative")
   case object Bool                    extends ProtocolInterface
   case object Clock                   extends ProtocolInterface
-  case object Reset                   extends ProtocolInterface
   case object AsyncReset              extends ProtocolInterface
 
   final case class Probe(inner: ProtocolInterface, layer: Option[LayerPath])
@@ -78,7 +77,6 @@ object ProtocolInterface:
     case Analog(w)              => ujson.Obj("type" -> ujson.Str("analog"), "width" -> ujson.Num(w))
     case Bool                   => ujson.Obj("type" -> ujson.Str("bool"))
     case Clock                  => ujson.Obj("type" -> ujson.Str("clock"))
-    case Reset                  => ujson.Obj("type" -> ujson.Str("reset"))
     case AsyncReset             => ujson.Obj("type" -> ujson.Str("asyncReset"))
     case Probe(i, l)            =>
       ujson.Obj(
@@ -97,7 +95,6 @@ object ProtocolInterface:
     case "analog"     => Analog(v("width").num.toInt)
     case "bool"       => Bool
     case "clock"      => Clock
-    case "reset"      => Reset
     case "asyncReset" => AsyncReset
     case "probe"      =>
       Probe(

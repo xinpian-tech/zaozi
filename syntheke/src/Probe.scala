@@ -73,7 +73,14 @@ final class ProbeCatalog private[syntheke] (
   private[syntheke] val ports: Vector[ResolvedPublicPort],
   private[syntheke] val nodes: Vector[ResolvedProbe[?]]):
 
-  def query[P](using parameterType: TypeIdentity[P]): Vector[ResolvedProbe[P]] =
+  private[syntheke] def combined(that: ProbeCatalog): ProbeCatalog =
+    new ProbeCatalog((ports ++ that.ports).distinct, (nodes ++ that.nodes).distinct)
+
+  private[syntheke] def published(owner: DesignOwner, forwarded: Vector[ResolvedProbe[?]]): ProbeCatalog =
+    val selected = (nodes.filter(_.node.owner eq owner) ++ forwarded).distinct
+    new ProbeCatalog(selected.map(_.port).distinct, selected)
+
+  private[syntheke] def matching[P](using parameterType: TypeIdentity[P]): Vector[ResolvedProbe[P]] =
     nodes.collect {
       case resolved if resolved.node.parameterType == parameterType =>
         resolved.asInstanceOf[ResolvedProbe[P]]

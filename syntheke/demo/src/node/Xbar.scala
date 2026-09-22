@@ -59,18 +59,15 @@ object AxiXbarNodes:
       )
     }
 
-    val grid    = outputDrafts.map(out => inputDrafts.map(in => depend(in, out)))
-    val outputs = outputDrafts.zipWithIndex.map { (out, oi) =>
-      val readers = grid(oi).map(_._1)
-      out.seal(ReadPlan(readers*))(ctx => Right((Axi4Xbar.mapInputs(readers.map(ctx(_))), Vector.empty)))
+    val outputs = outputDrafts.map { out =>
+      out.derive(inputDrafts)(masters => Right((Axi4Xbar.mapInputs(masters), Vector.empty)))
     }
-    val inputs  = inputDrafts.zipWithIndex.map { (in, ii) =>
-      val readers = grid.map(_(ii)._2)
-      in.seal(ReadPlan(readers*))(ctx =>
-        Axi4Xbar.aggregate(readers.map(ctx(_)), inputDrafts.size).map(value => (value, Vector.empty))
+    val inputs  = inputDrafts.map { in =>
+      in.derive(outputs)(slaves =>
+        Axi4Xbar.aggregate(slaves, inputDrafts.size).map(value => (value, Vector.empty))
       )
     }
-    val clk     = clkDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
+    val clk     = clkDraft.fixed(())
 
     parameters { (view, _) =>
       val inShapes = ins.zip(inputs).map((n, b) => n -> shapeOf(view.edgeOf(b)))

@@ -25,7 +25,15 @@ object Negotiator:
 
   private final case class Settled(edges: Vector[SettledEdge], constraints: Vector[ConstraintSpec])
 
-  def negotiate(spec: DesignSpec): ResolvedDesign =
+  def negotiate[A](design: Design[A]): ResolvedDesign =
+    design.frozen._1
+
+  private[syntheke] def build[A](design: Design[A]): (ResolvedDesign, A) =
+    val session = new BuildSession(ModuleId.root)
+    val (spec, ports) = session.build(design.moduleName, design.loc)(design.body)
+    (session.resolve(spec), ports)
+
+  private[syntheke] def resolve(spec: DesignSpec, imported: Option[ProbeCatalog]): ResolvedDesign =
     val canonical                          = beforeDomainReady("Freeze/canonical domains")(canonicalDomains(spec))
     beforeDomainReady("Freeze/structure")(structuralCheck(spec))
     beforeDomainReady("Freeze/domain declarations")(frozenDomainCheck(spec, canonical))
@@ -36,8 +44,7 @@ object Negotiator:
     val constraints                        = domainReady.constraints ++ spec.constraints ++ propagated.constraints ++ settled.constraints
     val (domains, checks)                  = validateConstraints(domainReady, canonical, constraints)
     val edges                              = interfaces(settled.edges)
-    val (generators, probes, observations) = assembleViews(domainReady, edges)
-    val (ports, wires, layers)             = Planner.plan(spec, edges, probes, observations)
+    val (generators, probes, observations) = assembleViews(domainReady, edges, imported)
     ResolvedDesign(
       spec = spec,
       domains = domains,
@@ -46,11 +53,12 @@ object Negotiator:
       constraints = constraints,
       edges = edges,
       generatorModules = generators,
-      portPlans = ports,
-      wirePlans = wires,
-      layerDecls = layers,
+      portPlans = Vector.empty,
+      wirePlans = Vector.empty,
+      layerDecls = Map.empty,
       probes = probes,
-      observations = observations
+      observations = observations,
+      dependencies = Vector.empty
     )
 
   private def fail(message: String): Nothing = throw NegotiationException(message)
@@ -91,7 +99,7 @@ object Negotiator:
     spec.constraints.foreach { c =>
       c.reads.foreach(readable(_, s"constraint from ${c.source}, at ${at(c.loc)}"))
     }
-    spec.generatorModules.foreach { g =>
+    spec.nodeModules.foreach { g =>
       g.nodes.foreach { n =>
         val nodeId = ModuleNodeId(g.id, n.name)
         n.nodeDomains.foreach { u =>
@@ -120,33 +128,6 @@ object Negotiator:
       generator.probes.foreach { declared =>
         if !(declared.node.owner eq spec.owner) || declared.node.id.module != generator.id then
           fail(s"local Probe ${declared.node.id.show} does not belong to generator ${generator.id.show}, at ${at(declared.loc)}")
-      }
-    }
-    spec.generatorModules.filterNot(g => spec.testbench.contains(g.id)).foreach { generator =>
-      generator.definition match
-        case _: TestbenchDefinition[?] =>
-          fail(s"${generator.id.show} uses a TestbenchDefinition and must be declared with testbench")
-        case _ => ()
-      generator.parameters match
-        case ParameterComputation.Ordinary(_) => ()
-        case ParameterComputation.Observed(_) =>
-          fail(s"observedParameters is only available to the testbench, not ${generator.id.show}")
-    }
-    spec.testbench.flatMap(spec.generatorModule).foreach { testbench =>
-      testbench.definition match
-        case _: TestbenchDefinition[?] => ()
-        case _ => fail(s"testbench ${testbench.id.show} requires a TestbenchDefinition")
-      if testbench.probes.nonEmpty then
-        fail(s"testbench ${testbench.id.show} consumes the DUT Probe catalog and cannot declare local Probe sources")
-      if testbench.dependencies.nonEmpty then
-        fail(
-          s"testbench ${testbench.id.show} has fixed boundaries and cannot declare functional parameter dependencies"
-        )
-      testbench.nodes.foreach { node =>
-        node.computation match
-          case NodeComputation.Constant(_)   => ()
-          case NodeComputation.Derived(_, _) =>
-            fail(s"testbench boundary ${testbench.id.show}#${node.name} must use fixed(value), at ${at(node.loc)}")
       }
     }
     spec.generators.foldLeft(Set.empty[String]) { (seen, e) =>
@@ -186,7 +167,7 @@ object Negotiator:
         )
     }
 
-    val allNodes = spec.generatorModules.flatMap(g => g.nodes.map(n => ModuleNodeId(g.id, n.name) -> n))
+    val allNodes = spec.nodeModules.flatMap(g => g.nodes.map(n => ModuleNodeId(g.id, n.name) -> n))
     val asSource = spec.binds.groupBy(_.source)
     val asTarget = spec.binds.groupBy(_.target)
     allNodes.foreach { (id, n) =>
@@ -200,7 +181,7 @@ object Negotiator:
         )
     }
 
-    spec.generatorModules.foreach { g =>
+    spec.nodeModules.foreach { g =>
       g.dependencies
         .groupBy(d => d.from -> d.to)
         .collectFirst { case (pair, ds) if ds.sizeIs > 1 => pair -> ds }
@@ -263,7 +244,7 @@ object Negotiator:
       d.reads.foreach(requireReadable(_, d.id.module, s"source of domain ${d.id.show}"))
     }
 
-    val allUses = spec.generatorModules.flatMap { g =>
+    val allUses = spec.nodeModules.flatMap { g =>
       g.nodes.flatMap { n =>
         val id = ModuleNodeId(g.id, n.name)
         n.nodeDomains.foreach { u =>
@@ -285,11 +266,18 @@ object Negotiator:
         fail(s"domain use ${u.key.show} has a mismatched declaration capability, at ${at(u.loc)}")
       val carried = node.protocol.carries.exists(_ eq u.domain)
       val carrierSelector = u.selector match
+        case _: DomainSelectorSpec.Frozen => carried
         case _: DomainSelectorSpec.CarrierOut | DomainSelectorSpec.CarrierIn => true
         case _                                                               => false
       if carried != carrierSelector then
         fail(s"domain use ${u.key.show} has a carrier role inconsistent with its protocol declaration, at ${at(u.loc)}")
       u.selector match
+        case DomainSelectorSpec.Frozen(source, _) =>
+          spec.modules(u.key.node.module) match
+            case _: BoundaryModuleSpec => source match
+              case domain: DomainHandle[?] => requireDomain(domain, u.domain, s"frozen domain use ${u.key.show}")
+              case target: NodeDomain[?] => requireFollow(u, target)
+            case _ => fail(s"${u.key.show}: frozen domains require a design boundary")
         case DomainSelectorSpec.Direct(domain) =>
           requireDomain(domain, u.domain, s"domain use ${u.key.show}")
         case DomainSelectorSpec.Contextual(domain, providedAt) =>
@@ -375,7 +363,7 @@ object Negotiator:
     active:    Vector[(BindDecl, DomainKey)]
   ): Vector[ResolvedDomainAttachment] =
     val preorder   = spec.moduleOrder.zipWithIndex.toMap
-    val nodeOrder  = spec.generatorModules.flatMap(g => g.nodes.map(n => ModuleNodeId(g.id, n.name) -> n.order)).toMap
+    val nodeOrder  = spec.nodeModules.flatMap(g => g.nodes.map(n => ModuleNodeId(g.id, n.name) -> n.order)).toMap
     val useByKey   = spec.nodeDomains.map(u => u.key -> u).toMap
     val bindByNode = spec.binds.flatMap(b => Vector(b.source -> b, b.target -> b)).toMap
 
@@ -428,6 +416,11 @@ object Negotiator:
           val use                       = useByKey.getOrElse(key, fail(s"active node ${key.node.show} has no ${key.domain.show} NodeDomain"))
           visiting += key
           val (declaration, provenance) = use.selector match
+            case DomainSelectorSpec.Frozen(source, provenance) =>
+              val declaration = source match
+                case domain: DomainHandle[?] => domain.id
+                case target: NodeDomain[?] => resolve(target.key).declaration
+              declaration -> provenance
             case DomainSelectorSpec.Direct(domain) =>
               domain.id -> AttachmentProvenance.Direct(domain.id)
             case DomainSelectorSpec.Contextual(domain, providedAt) =>
@@ -446,7 +439,8 @@ object Negotiator:
                 bind.bindId, bind.source, source.declaration, source.provenance
               )
           visiting.dropRightInPlace(1)
-          validatePolicy(use.domain, use.key.show, use.loc, provenance)
+          if !use.selector.isInstanceOf[DomainSelectorSpec.Frozen] then
+            validatePolicy(use.domain, use.key.show, use.loc, provenance)
           ResolvedDomainAttachment(key, declaration, provenance)
         }
       )
@@ -464,7 +458,7 @@ object Negotiator:
     active.flatMap { (bind, key) =>
       val p = spec.nodeSpec(bind.source).get.protocol
       if p.carries.exists(_.key == key) then
-        Vector(ResolvedDomainCheck(s"${bind.bindId.show}:carrier", Vector(key)))
+        Vector(ResolvedDomainCheck(DomainCheckSubject.Carrier(bind.bindId), Vector(key)))
       else
         val covered = constraints.exists { constraint =>
           constraint.source == DomainContributor.Bind(bind.bindId) && (constraint.constraint match
@@ -754,7 +748,8 @@ object Negotiator:
           )
           check.run(view) match
             case Left(v) => fail(s"$where failed: ${v.message}")
-            case Right(_) => checks += ResolvedDomainCheck(where, check.reads.map(_.domain.key).distinct)
+            case Right(_) => checks += ResolvedDomainCheck(
+              DomainCheckSubject.Constraint(contribution.source, contribution.loc), check.reads.map(_.domain.key).distinct)
         case _: Constraint.Required[?] => ()
     }
     domains -> checks.result()
@@ -775,12 +770,12 @@ object Negotiator:
 
 
   private def parameterTopology(spec: DesignSpec): Vector[ModuleNodeId] =
-    val allNodes                 = spec.generatorModules.flatMap(g => g.nodes.map(g.id -> _))
+    val allNodes                 = spec.nodeModules.flatMap(g => g.nodes.map(g.id -> _))
     val preorder                 = spec.moduleOrder.zipWithIndex.toMap
     val nodeKey                  = allNodes.map((m, n) => ModuleNodeId(m, n.name) -> (preorder(m), n.order)).toMap
     val nodeIds                  = nodeKey.keys.toVector
     val edges                    = spec.binds.map(b => b.source -> b.target) ++ (
-      for g <- spec.generatorModules; d <- g.dependencies
+      for g <- spec.nodeModules; d <- g.dependencies
       yield ModuleNodeId(g.id, d.from) -> ModuleNodeId(g.id, d.to)
     )
     val successors               = edges.groupMap(_._1)(_._2).withDefaultValue(Vector.empty)
@@ -794,7 +789,7 @@ object Negotiator:
         val onCycle = members.toSet
         val locs    = members.flatMap(id => spec.nodeSpec(id).map(_.loc)) ++
           spec.binds.filter(b => onCycle(b.source) && onCycle(b.target)).map(_.loc) ++
-          spec.generatorModules.flatMap(g =>
+          spec.nodeModules.flatMap(g =>
             g.dependencies
               .filter(d => onCycle(ModuleNodeId(g.id, d.from)) && onCycle(ModuleNodeId(g.id, d.to)))
               .map(_.loc)
@@ -921,8 +916,9 @@ object Negotiator:
 
   private def assembleViews(
     ready: DomainReadyDesign,
-    edges: Vector[ResolvedEdge]
-  ): (Vector[ResolvedGeneratorModule], ProbeCatalog, ProbeBindings) =
+    edges: Vector[ResolvedEdge],
+    imported: Option[ProbeCatalog]
+  ): (Vector[ResolvedGeneratorModule], ProbeCatalog, Map[ModuleId, ProbeBindings]) =
     val spec         = ready.spec
     val edgeOfSource = edges.map(e => e.bind.source -> e).toMap
     val edgeOfTarget = edges.map(e => e.bind.target -> e).toMap
@@ -959,16 +955,13 @@ object Negotiator:
       }
       ResolvedGeneratorModule(g.id, definition, edgeView, domainView, fullParam, encoded, declaration)
 
-    val dutParameters             = spec.generatorModules.filterNot(g => spec.testbench.contains(g.id)).map { g =>
+    val parameters = spec.generatorModules.map { g =>
       val (edgeView, domainView) = views(g)
-      val result                 = g.parameters match
-        case ParameterComputation.Ordinary(compute) => compute(edgeView, domainView)
-        case ParameterComputation.Observed(_)       => fail(s"${g.id.show} is not the testbench")
-      (g, edgeView, domainView, parameter(g, result))
+      (g, edgeView, domainView, parameter(g, g.parameters(edgeView, domainView)))
     }
-    val dut                       = dutParameters.map { (g, edgeView, domainView, fullParam) => resolved(g, edgeView, domainView, fullParam) }
-    val catalog                   = ProbeCatalog.resolve(dut.map(g => g.module -> g.probeDeclaration)) { ports =>
-      dut.flatMap { generator =>
+    val generators = parameters.map { (g, edgeView, domainView, fullParam) => resolved(g, edgeView, domainView, fullParam) }
+    val localCatalog = ProbeCatalog.resolve(generators.map(g => g.module -> g.probeDeclaration)) { ports =>
+      generators.flatMap { generator =>
         spec.generatorModule(generator.module).get.probes.flatMap { declared =>
           declared.resolve(generator.fullParam, generator.probeDeclaration) match
             case Left(violation) =>
@@ -987,27 +980,14 @@ object Negotiator:
         }
       }
     }
-    val (testbench, observations) = spec.testbench.flatMap(spec.generatorModule) match
-      case None    => (Vector.empty[ResolvedGeneratorModule], ProbeBindings.empty)
-      case Some(g) =>
-        val (edgeView, domainView) = views(g)
-        val result                 = g.parameters match
-          case ParameterComputation.Ordinary(compute) => compute(edgeView, domainView)
-          case ParameterComputation.Observed(compute) => compute(catalog, edgeView, domainView)
-        val fullParam              = parameter(g, result)
-        val observations           = g.definition.asInstanceOf[TestbenchDefinition[Any]].observations(fullParam)
-        catalog.validate(observations)
-        val targetNames            = observations.ports.map(_.portName)
-        val functionalNames        = g.nodes.map(_.name).toSet
-        targetNames.foreach { name =>
-          if functionalNames(name) then
-            fail(s"testbench Probe port '$name' conflicts with a functional node in ${g.id.show}")
-        }
-        val module                 = resolved(g, edgeView, domainView, fullParam)
-        val publicNames            = module.probeDeclaration.ports.map(_.name).toSet
-        targetNames.foreach { name =>
-          if publicNames(name) then fail(s"testbench Probe port '$name' conflicts with a public Probe in ${g.id.show}")
-        }
-        (Vector(module), observations)
-    val byId                      = (dut ++ testbench).map(g => g.module -> g).toMap
-    (spec.generatorModules.map(g => byId(g.id)), catalog, observations)
+    val catalog = imported.fold(localCatalog)(_.combined(localCatalog))
+    val observations = generators.flatMap { module =>
+      val inputs = module.definition.asInstanceOf[GeneratorDefinition[Any]].observations(module.fullParam)
+      catalog.validate(inputs)
+      val names = spec.generatorModule(module.module).get.nodes.map(_.name).toSet ++ module.probeDeclaration.ports.map(_.name)
+      inputs.ports.foreach { input =>
+        if names(input.portName) then fail(s"Probe input '${input.portName}' conflicts with a declared port in ${module.module.show}")
+      }
+      Option.when(inputs.ports.nonEmpty)(module.module -> inputs)
+    }.toMap
+    (generators, catalog, observations)

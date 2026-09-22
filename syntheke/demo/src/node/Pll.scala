@@ -92,8 +92,8 @@ object PllNodes:
       else Right(())
     }
 
-    val ref     = refDraft.seal(ReadPlan())(_ => Right(((), Vector.empty)))
-    val outputs = outputDrafts.map(_.seal(ReadPlan())(_ => Right(((), Vector.empty))))
+    val ref     = refDraft.fixed(())
+    val outputs = outputDrafts.map(_.fixed(()))
 
     parameters { (_, domains) =>
       val refHz       = domains.value(refClock).hz

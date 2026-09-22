@@ -1,6 +1,6 @@
 package me.jiuyang.syntheke
 
-sealed abstract class Reader[T] private[syntheke] (
+private[syntheke] sealed abstract class Reader[T](
   private[syntheke] val node:           ModuleNodeId,
   private[syntheke] val nodeCapability: NodeCapability,
   private[syntheke] val owner0:         DesignOwner)
@@ -8,9 +8,9 @@ sealed abstract class Reader[T] private[syntheke] (
   type Value = T
   private[syntheke] def tokenOwner: DesignOwner = owner0
 
-final class DownReader[T] private[syntheke] (node: ModuleNodeId, capability: NodeCapability, owner: DesignOwner)
+private[syntheke] final class DownReader[T](node: ModuleNodeId, capability: NodeCapability, owner: DesignOwner)
     extends Reader[T](node, capability, owner)
-final class UpReader[T] private[syntheke] (node: ModuleNodeId, capability: NodeCapability, owner: DesignOwner)
+private[syntheke] final class UpReader[T](node: ModuleNodeId, capability: NodeCapability, owner: DesignOwner)
     extends Reader[T](node, capability, owner)
 
 private[syntheke] final class NodeCapability
@@ -22,7 +22,7 @@ sealed abstract class NodeHandle[P <: Protocol] private[syntheke] (
   private[syntheke] val capability: NodeCapability,
   private[syntheke] val nodeDomains: Vector[NodeDomain[?]]):
 
-  def domain[D <: Domain](domain: D): NodeDomain[D] =
+  private[syntheke] def lookupDomain[D <: Domain](domain: D): NodeDomain[D] =
     nodeDomains
       .find(_.domain eq domain)
       .getOrElse(throw new IllegalArgumentException(s"node ${id.show} has no ${domain.key.show} domain"))
@@ -42,15 +42,8 @@ final class InwardNodeDraft[P <: Protocol] private[syntheke] (
   id0:       ModuleNodeId,
   capability0: NodeCapability,
   nodeDomains0: Vector[NodeDomain[?]])
-    extends NodeDraft[P](protocol0, id0, scope0, capability0, nodeDomains0):
-
-  def seal(
-    reads: ReadPlan
-  )(f:     ReadValues => Either[Violation, (protocol.Up, Vector[Constraint])]
-  ): InwardPort[P] =
-    scope.seal(this, reads, f)
-
-  def fixed(value: protocol.Up): InwardPort[P] = scope.fixed(this, value)
+    extends NodeDraft[P](protocol0, id0, scope0, capability0, nodeDomains0), ParameterValue:
+  type Value = protocol.Down
 
 final class OutwardNodeDraft[P <: Protocol] private[syntheke] (
   protocol0: P,
@@ -58,15 +51,8 @@ final class OutwardNodeDraft[P <: Protocol] private[syntheke] (
   id0:       ModuleNodeId,
   capability0: NodeCapability,
   nodeDomains0: Vector[NodeDomain[?]])
-    extends NodeDraft[P](protocol0, id0, scope0, capability0, nodeDomains0):
-
-  def seal(
-    reads: ReadPlan
-  )(f:     ReadValues => Either[Violation, (protocol.Down, Vector[Constraint])]
-  ): OutwardPort[P] =
-    scope.seal(this, reads, f)
-
-  def fixed(value: protocol.Down): OutwardPort[P] = scope.fixed(this, value)
+    extends NodeDraft[P](protocol0, id0, scope0, capability0, nodeDomains0), ParameterValue:
+  type Value = protocol.Up
 
 sealed abstract class Port[P <: Protocol] private[syntheke] (
   protocol0:   P,
@@ -82,7 +68,8 @@ final class InwardPort[P <: Protocol] private[syntheke] (
   owner0:      DesignOwner,
   capability0: NodeCapability,
   nodeDomains0: Vector[NodeDomain[?]])
-    extends Port[P](protocol0, id0, owner0, capability0, nodeDomains0)
+    extends Port[P](protocol0, id0, owner0, capability0, nodeDomains0), ParameterValue:
+  type Value = protocol.Down
 
 final class OutwardPort[P <: Protocol] private[syntheke] (
   protocol0:   P,
@@ -90,4 +77,5 @@ final class OutwardPort[P <: Protocol] private[syntheke] (
   owner0:      DesignOwner,
   capability0: NodeCapability,
   nodeDomains0: Vector[NodeDomain[?]])
-    extends Port[P](protocol0, id0, owner0, capability0, nodeDomains0)
+    extends Port[P](protocol0, id0, owner0, capability0, nodeDomains0), ParameterValue:
+  type Value = protocol.Up

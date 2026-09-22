@@ -1,102 +1,95 @@
 package me.jiuyang.syntheke
 
 private[syntheke] object Planner:
-
   def plan(
-    spec:         DesignSpec,
-    edges:        Vector[ResolvedEdge],
-    probes:       ProbeCatalog,
-    observations: ProbeBindings
+    spec: DesignSpec,
+    edges: Vector[ResolvedEdge],
+    probes: ProbeCatalog,
+    observations: Map[ModuleId, ProbeBindings]
   ): (Vector[PortPlan], Vector[WirePlan], Map[ModuleId, LayerTree]) =
-
     def ancestors(endpoint: ModuleId): Vector[ModuleId] =
       Iterator.iterate(endpoint.parent)(_.flatMap(_.parent)).takeWhile(_.isDefined).flatten.toVector
 
-    import PortName.dangle as dangleName
-
-    def planChain(
-      endpoint:  ModuleId,
-      portName:  PortName,
-      base:      PortName,
-      ms:        Vector[ModuleId],
-      direction: PortDirection,
-      interface: ProtocolInterface,
-      origin:    PlanOrigin,
-      loc:       (sourcecode.File, sourcecode.Line)
-    ): (Vector[PortPlan], Vector[WirePlan]) =
-      val ports = ms.map(m => PortPlan(m, direction, dangleName(m, endpoint, base), interface, origin, loc))
-      val wires = ms.zipWithIndex.map { (m, i) =>
-        val name       = dangleName(m, endpoint, base)
-        val childRef   =
-          if i == 0 then LocalEndpoint.ChildPort(endpoint.path.last, portName)
-          else LocalEndpoint.ChildPort(ms(i - 1).path.last, dangleName(ms(i - 1), endpoint, base))
-        val thisRef    = LocalEndpoint.ThisPort(name)
-        val (from, to) = direction match
-          case PortDirection.Output => (childRef, thisRef)
-          case PortDirection.Input  => (thisRef, childRef)
+    def chain(endpoint: ModuleId, port: PortName, base: PortName, stop: Option[ModuleId],
+      direction: PortDirection, interface: ProtocolInterface, origin: PlanOrigin,
+      loc: (sourcecode.File, sourcecode.Line)): (Vector[PortPlan], Vector[WirePlan], LocalEndpoint) =
+      val modules = ancestors(endpoint).takeWhile(m => !stop.contains(m) && spec.root.isAncestorOf(m))
+      val ports = modules.map(m => PortPlan(m, direction, PortName.dangle(m, endpoint, base), interface, origin, loc))
+      val wires = modules.zipWithIndex.map { (m, i) =>
+        val child =
+          if i == 0 then LocalEndpoint.ChildPort(endpoint.path.last, port)
+          else LocalEndpoint.ChildPort(modules(i - 1).path.last, ports(i - 1).name)
+        val here = LocalEndpoint.ThisPort(ports(i).name)
+        val (from, to) = if direction == PortDirection.Output then (child, here) else (here, child)
         WirePlan(m, from, to, origin, loc)
       }
-      (ports, wires)
+      val end =
+        if stop.isEmpty && modules.nonEmpty then LocalEndpoint.ThisPort(ports.last.name)
+        else if modules.isEmpty then LocalEndpoint.ChildPort(endpoint.path.last, port)
+        else LocalEndpoint.ChildPort(modules.last.path.last, ports.last.name)
+      (ports, wires, end)
 
-    def chainEnd(endpoint: ModuleId, portName: PortName, base: PortName, ms: Vector[ModuleId]): LocalEndpoint =
-      if ms.isEmpty then LocalEndpoint.ChildPort(endpoint.path.last, portName)
-      else LocalEndpoint.ChildPort(ms.last.path.last, dangleName(ms.last, endpoint, base))
+    def endpoint(node: ModuleNodeId): ModuleNodeId = spec.modules(node.module) match
+      case boundary: BoundaryModuleSpec => ModuleNodeId(boundary.target, node.name)
+      case _ => node
 
-    val designParts = edges.map { e =>
-      val decl                 = spec.binds(e.bind.order)
-      val a                    = e.bind.source.module
-      val b                    = e.bind.target.module
-      val w                    = if a == b then a.parent.get else ModuleId.lca(a, b)
-      val origin               = PlanOrigin.Design(e.bind)
-      val srcName              = PortName(Vector(e.bind.source.name))
-      val srcBase              = PortName(Vector("node", e.bind.source.name, "out"))
-      val srcMs                = ancestors(a).takeWhile(_ != w)
-      val tgtName              = PortName(Vector(e.bind.target.name))
-      val tgtBase              = PortName(Vector("node", e.bind.target.name, "in"))
-      val tgtMs                = ancestors(b).takeWhile(_ != w)
-      val (srcPorts, srcWires) =
-        planChain(a, srcName, srcBase, srcMs, PortDirection.Output, e.interface, origin, decl.loc)
-      val (tgtPorts, tgtWires) =
-        planChain(b, tgtName, tgtBase, tgtMs, PortDirection.Input, e.interface, origin, decl.loc)
-      val lcaWire              =
-        WirePlan(w, chainEnd(a, srcName, srcBase, srcMs), chainEnd(b, tgtName, tgtBase, tgtMs), origin, decl.loc)
-      (srcPorts ++ tgtPorts, srcWires ++ tgtWires :+ lcaWire)
+    val functional = edges.map { edge =>
+      val decl = spec.binds(edge.bind.order)
+      val origin = PlanOrigin.Design(edge.bind)
+      val source = endpoint(edge.bind.source)
+      val target = endpoint(edge.bind.target)
+      val terminal = Vector(edge.bind.source, edge.bind.target).flatMap { node =>
+        spec.modules(node.module) match
+          case b: BoundaryModuleSpec if !b.external => Some(node -> b)
+          case _ => None
+      }.headOption
+      terminal match
+        case Some((node, boundary)) =>
+          val output = node == edge.bind.target
+          val inner = if output then source else target
+          val direction = if output then PortDirection.Output else PortDirection.Input
+          val (ports, wires, end) = chain(inner.module, PortName.literal(inner.name),
+            PortName(Vector("node", inner.name, if output then "out" else "in")), Some(boundary.target),
+            direction, edge.interface, origin, decl.loc)
+          val name = PortName.literal(node.name)
+          val here = LocalEndpoint.ThisPort(name)
+          val wire = if output then WirePlan(boundary.target, end, here, origin, decl.loc)
+            else WirePlan(boundary.target, here, end, origin, decl.loc)
+          (ports :+ PortPlan(boundary.target, direction, name, edge.interface, origin, decl.loc), wires :+ wire)
+        case None =>
+          val common = if source.module == target.module then source.module.parent.get else ModuleId.lca(source.module, target.module)
+          val (sp, sw, se) = chain(source.module, PortName.literal(source.name), PortName(Vector("node", source.name, "out")),
+            Some(common), PortDirection.Output, edge.interface, origin, decl.loc)
+          val (tp, tw, te) = chain(target.module, PortName.literal(target.name), PortName(Vector("node", target.name, "in")),
+            Some(common), PortDirection.Input, edge.interface, origin, decl.loc)
+          (sp ++ tp, sw ++ tw :+ WirePlan(common, se, te, origin, decl.loc))
     }
 
-    val routed  = if spec.testbench.nonEmpty then observations.nodes else probes.mappedPorts
-    val inputOf = observations.ports.map(input => input.source -> input.portName).toMap
-    val dvParts = routed.map { source =>
-      val g        = spec.generatorModule(source.id.module).get
-      val origin   = PlanOrigin.Verification(source.id)
-      val portName = PortName.literal(source.id.name)
-      val base     = PortName.probeBase(source.id.name)
-      val leaf     = source.reference
-      spec.testbench match
-        case Some(tb) =>
-          val ms             = ancestors(g.id).takeWhile(_ != ModuleId.root)
-          val (ports, wires) = planChain(g.id, portName, base, ms, PortDirection.Output, leaf, origin, g.loc)
-          val tbWire         = WirePlan(
-            ModuleId.root,
-            chainEnd(g.id, portName, base, ms),
-            LocalEndpoint.ChildPort(tb.path.last, PortName.literal(inputOf(source.id))),
-            origin,
-            g.loc
-          )
-          (ports, wires :+ tbWire, (ms :+ ModuleId.root).flatMap(m => source.reference.layer.map(m -> _)))
-        case None     =>
-          val ms             = ancestors(g.id)
-          val (ports, wires) = planChain(g.id, portName, base, ms, PortDirection.Output, leaf, origin, g.loc)
-          (ports, wires, ms.flatMap(m => source.reference.layer.map(m -> _)))
+    val uses = observations.toVector.sortBy(_._1.show).flatMap { (consumer, bindings) =>
+      bindings.nodes.zip(bindings.ports).map { (source, binding) => (source, Some(consumer -> binding.portName)) }
     }
-
-    val layers = dvParts
-      .flatMap(_._3)
-      .foldLeft(Map.empty[ModuleId, LayerTree]) { case (acc, (m, lp)) =>
-        acc.updated(m, acc.getOrElse(m, LayerTree.empty).add(lp))
+    val routed: Vector[(ResolvedPublicPort, Option[(ModuleId, String)])] =
+      uses ++ probes.mappedPorts.map(_ -> None)
+    val verification = routed.map { (source, consumer) =>
+      val loc = spec.modules(source.id.module).loc
+      val origin = PlanOrigin.Verification(source.id)
+      val common = consumer.map { (target, _) =>
+        if source.id.module == target then target.parent.get else ModuleId.lca(source.id.module, target)
       }
-
-    (
-      designParts.flatMap(_._1) ++ dvParts.flatMap(_._1),
-      designParts.flatMap(_._2) ++ dvParts.flatMap(_._2),
-      layers
-    )
+      val (sp, sw, se) = chain(source.id.module, PortName.literal(source.id.name), PortName.probeBase(source.id.name),
+        common, PortDirection.Output, source.reference, origin, loc)
+      consumer match
+        case Some((target, name)) =>
+          val (tp, tw, te) = chain(target, PortName.literal(name), PortName(Vector("observation", name)),
+            common, PortDirection.Input, source.reference.inner, PlanOrigin.Observation(source.id), loc)
+          val read = WirePlan(common.get, se, te, PlanOrigin.ProbeRead(source.id), loc)
+          (sp ++ tp, sw ++ tw :+ read, (sp.map(_.module) :+ common.get).flatMap(m => source.reference.layer.map(m -> _)))
+        case None =>
+          (sp, sw, sp.flatMap(p => source.reference.layer.map(p.module -> _)))
+    }
+    val ports = (functional.flatMap(_._1) ++ verification.flatMap(_._1)).distinct
+    val wires = (functional.flatMap(_._2) ++ verification.flatMap(_._2)).distinct
+    val layers = verification.flatMap(_._3).foldLeft(Map.empty[ModuleId, LayerTree]) { case (acc, (module, path)) =>
+      acc.updated(module, acc.getOrElse(module, LayerTree.empty).add(path))
+    }
+    (ports, wires, layers)

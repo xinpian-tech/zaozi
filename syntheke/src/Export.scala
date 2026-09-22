@@ -61,6 +61,8 @@ object Export:
               "children"   -> ujson.Arr.from(w.children.map(ujson.Str(_))),
               "loc"        -> loc(w.loc)
             )
+          case b: BoundaryModuleSpec =>
+            ujson.Obj("id" -> moduleId(b.id), "kind" -> ujson.Str("boundary"), "target" -> moduleId(b.target))
           case g: GeneratorModuleSpec =>
             ujson.Obj(
               "id"           -> moduleId(id),
@@ -72,6 +74,7 @@ object Export:
                   "direction"  -> ujson.Str(n.direction.toString.toLowerCase),
                   "nodeDomains" -> ujson.Arr.from(n.nodeDomains.map { u =>
                     val selector            = u.selector match
+                      case DomainSelectorSpec.Frozen(source, _) => ujson.Obj("frozen" -> domainReadable(source))
                       case DomainSelectorSpec.Direct(domain)                 => ujson.Obj("direct" -> domainDeclId(domain.id))
                       case DomainSelectorSpec.Contextual(domain, providedAt) =>
                         ujson.Obj(
@@ -114,7 +117,7 @@ object Export:
           "loc"               -> loc(d.loc)
         )
       }),
-      "testbench"          -> spec.testbench.fold[ujson.Value](ujson.Null)(moduleId)
+      "root"               -> moduleId(spec.root)
     )
 
   private def write(writer: upickle.default.Writer[?], value: Any): ujson.Value =
@@ -154,7 +157,7 @@ object Export:
   def domains(resolved: ResolvedDesign): ujson.Value =
     val spec       = resolved.spec
     val moduleRank = spec.moduleOrder.zipWithIndex.toMap
-    val nodes      = spec.generatorModules.flatMap { module =>
+    val nodes      = spec.nodeModules.flatMap { module =>
       module.nodes.map(node => ModuleNodeId(module.id, node.name) -> node)
     }
     val nodeById   = nodes.toMap
@@ -197,6 +200,7 @@ object Export:
       case nodeDomain: NodeDomain[?] => attachmentByKey(nodeDomain.key).declaration
 
     def selectorJson(nodeDomain: NodeDomainSpec): ujson.Value = nodeDomain.selector match
+      case DomainSelectorSpec.Frozen(source, _) => ujson.Obj("frozen" -> domainReadable(source))
       case DomainSelectorSpec.Direct(domain)                 =>
         ujson.Obj("direct" -> domainDeclId(domain.id))
       case DomainSelectorSpec.Contextual(domain, providedAt) =>
@@ -273,6 +277,8 @@ object Export:
 
     val constraintNodes = constraints.flatMap(_.reads.collect { case token: NodeDomain[?] => token.key }).toSet
     val followTargets = nodeDomains.collect {
+      case NodeDomainSpec(_, _, DomainSelectorSpec.Frozen(target: NodeDomain[?], _), _, _, _) =>
+        target.key
       case NodeDomainSpec(_, _, DomainSelectorSpec.Follow(target), _, _, _) =>
         target.key
       case NodeDomainSpec(_, _, DomainSelectorSpec.CarrierOut(target: NodeDomain[?]), _, _, _) =>
@@ -396,7 +402,7 @@ object Export:
           .map { (bind, source) =>
             val key = source.key.domain
             val target = attachmentByKey(NodeDomainKey(bind.target, key))
-            val carried = source.provenance.method == AttachmentMethod.CarrierOut
+            val carried = nodeById(bind.source).protocol.carries.exists(_.key == key)
             val checks = checksByBindDomain(bind.bindId -> key)
             val reasons = Vector(
               Some("endpointNodeDomain"),
@@ -478,6 +484,8 @@ object Export:
     def origin(o: PlanOrigin):             ujson.Value = o match
       case PlanOrigin.Design(b)       => ujson.Obj("design" -> bindId(b))
       case PlanOrigin.Verification(s) => ujson.Obj("verification" -> nodeId(s))
+      case PlanOrigin.ProbeRead(s) => ujson.Obj("probeRead" -> nodeId(s))
+      case PlanOrigin.Observation(s) => ujson.Obj("observation" -> nodeId(s))
     def endpoint(e: LocalEndpoint):        ujson.Value = e match
       case LocalEndpoint.ThisPort(name)        => ujson.Obj("port" -> ujson.Str(name.encoded))
       case LocalEndpoint.ChildPort(inst, port) =>
@@ -487,7 +495,7 @@ object Export:
       "probes"        -> ujson.Arr.from(resolved.probes.ports.map { probe =>
         ujson.Obj("source" -> nodeId(probe.id), "interface" -> interface(probe.reference))
       }),
-      "probeBindings" -> upickle.default.writeJs(resolved.observations),
+      "probeBindings" -> ujson.Obj.from(resolved.observations.toVector.sortBy(_._1.show).map((module, bindings) => module.show -> upickle.default.writeJs(bindings))),
       "ports"         -> ujson.Arr.from(resolved.portPlans.map { p =>
         ujson.Obj(
           "module"    -> moduleId(p.module),
