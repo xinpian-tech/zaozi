@@ -2,14 +2,34 @@ import json
 import io
 from pathlib import Path
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from contextlib import redirect_stdout
-from framework_runtime import runtime_files, runtime_hashes
+from framework_runtime import runtime_files, runtime_hashes, runtime_commands
 from repair_policy import model_repair_allowed
 from sequence_framework import ROOT
 from ut_harness import emit
 
 
 class FrameworkRuntimeTest(unittest.TestCase):
+    def test_missing_nix_is_an_environment_failure_without_execution(self):
+        with patch('framework_runtime.shutil.which', return_value=None), \
+                patch('framework_runtime.subprocess.run') as run:
+            with self.assertRaisesRegex(RuntimeError, "nix.*missing from PATH"):
+                runtime_commands()
+            run.assert_not_called()
+
+    def test_nix_entry_is_executable_not_just_a_present_path(self):
+        with patch('framework_runtime.shutil.which', return_value='/fake/nix'), \
+                patch('framework_runtime.subprocess.run', return_value=SimpleNamespace(stdout='nix (Nix) test\n')) as run:
+            result = runtime_commands()
+            self.assertEqual(result['nix']['version'], 'nix (Nix) test')
+            self.assertEqual(run.call_args.args[0], ['/fake/nix', '--version'])
+        with patch('framework_runtime.shutil.which', return_value='/fake/nix'), \
+                patch('framework_runtime.subprocess.run', side_effect=OSError('loader unavailable')):
+            with self.assertRaisesRegex(RuntimeError, 'repair the execution environment'):
+                runtime_commands()
+
     def test_every_trusted_runtime_file_exists_and_core_is_hashed(self):
         paths=runtime_files(ROOT)
         self.assertTrue(all(p.is_file() for p in paths))

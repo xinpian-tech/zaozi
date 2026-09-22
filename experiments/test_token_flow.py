@@ -104,6 +104,43 @@ class TokenFlowTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'frozen RTL changed'):
             self.context.dispatch('read_rtl_batch',{'ranges':[{'file_id':'rtl_0001','start_line':1,'line_count':1}]})
 
+    def test_solver_repair_reuses_exact_reads_and_exposes_no_coverage_replanning(self):
+        read=self.context.dispatch('read_rtl',{'file_id':'rtl_0001','start_line':2,'line_count':1})
+        for code in RepairContext.SEMANTIC_CODES:
+            with self.subTest(code=code):
+                errors=[{'file':'model.ltl','goal':'observe_response','code':code}]
+                repair=RepairContext(self.context,errors,[read])
+                names={t['function']['name'] for t in repair.tools}
+                self.assertEqual(names,{'read_framework','read_diagnostics','read_rtl',
+                                       'read_rtl_batch','inspect_rtl_batch','read_context'})
+                initial=repair.initial_evidence()
+                self.assertEqual(initial['previously_read_rtl']['ranges'][0]['text'],read['text'])
+                self.assertIn('PHYSICAL_CONDITION',json.dumps(initial))
+                self.assertNotIn('RTL_SNIPPET',json.dumps(initial))
+                self.assertNotIn('current_feedback',initial)
+                self.assertNotIn('accepted_ltl',initial)
+                self.assertNotIn('HAVEN_NATIVE_DSL',json.dumps(initial))
+                self.assertEqual(json.loads(repair.dispatch('read_context',{'topic':'rtl_history'})['text'])[0]['text'],read['text'])
+                self.assertEqual(repair.dispatch('read_rtl',{'file_id':'rtl_0001','start_line':2,'line_count':1}),read)
+                for topic in ('coverage','history','environment'):
+                    with self.assertRaises(ValueError):repair.dispatch('read_context',{'topic':topic})
+                with self.assertRaises(ValueError):repair.dispatch('read_coverage',{})
+                self.assertEqual(repair.call_cost('read_rtl_batch',{'ranges':[{},{}]}),2)
+                prompt=generation.build_prompt([],self.design.sources[0],'120s',
+                    errors=errors,previous='PRIOR',design=self.design)
+                self.assertIn('read only missing implementation facts',prompt)
+                self.assertNotIn('RTL search and coverage replanning are unavailable',prompt)
+
+    def test_only_recognized_goal_diagnostics_enable_semantic_evidence(self):
+        good={'file':'model.ltl','goal':'observe_response','code':'jg_goal_infeasible'}
+        for errors in ([{**good,'file':'framework.scala'}],[{**good,'goal':''}],
+                       [{**good,'code':'unknown_infrastructure_failure'}],[good,'unknown failure']):
+            with self.subTest(errors=errors):
+                context=RepairContext(self.context,errors)
+                self.assertFalse(context.semantic)
+                self.assertEqual({t['function']['name'] for t in context.tools},
+                                 {'read_framework','read_diagnostics'})
+
     def test_framework_content_is_on_demand_and_hash_checked(self):
         source=self.root/'framework.scala';source.write_text('FRAMEWORK_ONLY_BODY')
         doc=SimpleNamespace(id='api',source='framework.scala',content=source.read_text(),

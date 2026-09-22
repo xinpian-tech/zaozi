@@ -1,7 +1,11 @@
 import backend_imports
+import json
+import tempfile
 import unittest
+from unittest.mock import patch
 from encoded_witness_probe import diagnostic_config
 from rvprobe.backend.encoding import leaves, terminal_result, trace_result, resampling_commands, preference_ports, distinct_input_constraint
+from rvprobe.backend.encoding import EncodingOptions, InputDiversityExhausted, solve
 from types import SimpleNamespace
 from pathlib import Path
 from rvprobe.backend.initialization import materialize_initializers, global_ff_commands, expose_collision_guards, preserve_single_driver_masks, canonicalize_output_aliases, remap_encoded_expression, audit_encoded_goal_rails, BOOT, GLOBAL_CLOCK
@@ -179,6 +183,72 @@ class SequenceAtoms(unittest.TestCase):
         self.assertEqual([p.name for p in preference_ports(design,config)],['data'])
         self.assertEqual(config,{'environment':{'static':{'cfg':1}}})
 
+    def test_secondary_resets_are_not_variable_for_either_polarity(self):
+        port=lambda n,d='input',k='data':SimpleNamespace(name=n,direction=d,kind=k,width=1)
+        design=SimpleNamespace(data_ports=[port('cfg'),port('rst_hi'),port('rst_lo'),
+            port('data'),port('out','output'),port('clk',k='clock')])
+        config={'environment':{'static':{'cfg':1},'extra_resets':[
+            {'port':'rst_hi','active_low':False},{'port':'rst_lo','active_low':True}]}}
+        frozen=json.dumps(config,sort_keys=True)
+        ports=preference_ports(design,config)
+        self.assertEqual([p.name for p in ports],['data'])
+        for seed in range(20):
+            subset=distinct_input_constraint(
+                [[{'cfg':'1','rst_hi':'0','rst_lo':'1','data':'0'}]],ports,1,seed)
+            self.assertEqual(subset['port'],'data')
+            self.assertEqual(subset['expression'],"data != 1'h0")
+        self.assertEqual(json.dumps(config,sort_keys=True),frozen)
+
+    def test_sampler_exhaustion_is_distinct_from_invalid_input(self):
+        ports=[SimpleNamespace(name='data',width=1)]
+        with self.assertRaises(InputDiversityExhausted):
+            distinct_input_constraint([[{'data':'0'}],[{'data':'1'}]],ports,1,0)
+        with self.assertRaises(InputDiversityExhausted):
+            distinct_input_constraint([[{}]],[],1,0)
+        for traces in ([],[[{'data':'0'},{'data':'1'}]],[[{'data':'2'}]]):
+            with self.assertRaises(ValueError) as error:
+                distinct_input_constraint(traces,ports,1,0)
+            self.assertNotIsInstance(error.exception,InputDiversityExhausted)
+
+    def test_no_variable_subset_stops_before_synthesis_without_claiming_unsat(self):
+        design=SimpleNamespace(data_ports=[SimpleNamespace(name='arst',direction='input',
+                                                          kind='data',width=1)])
+        config={'environment':{'extra_resets':[{'port':'arst','active_low':True}]}}
+        job={'fingerprint':'unchanged-job','labels':['intent']}
+        with tempfile.TemporaryDirectory() as temporary, patch('rvprobe.backend.encoding.run') as run:
+            root=Path(temporary)
+            prior=root/'prior.json'
+            prior.write_text('[{"arst":"1"}]')
+            options=EncodingOptions(out=root/'candidate',yosys=Path('yosys'),
+                eda_shell=Path('eda'),label='intent',trace_cycles=1,trace_seed=0,
+                avoid_stimulus=(prior,))
+            summary=solve(design,config,job,{'label':'intent'},[],options)
+            self.assertEqual(summary['status'],'resampling_exhausted')
+            self.assertEqual(summary['termination_reason'],'no_single_cell_candidate')
+            self.assertFalse(summary['solver_invoked'])
+            self.assertFalse(summary['original_goal_proven'])
+            self.assertFalse(summary['unreachability_proven'])
+            self.assertEqual(summary['source_job'],'unchanged-job')
+            self.assertEqual(prior.read_text(),'[{"arst":"1"}]')
+            self.assertEqual(json.loads((options.out/'summary.json').read_text()),summary)
+            run.assert_not_called()
+            self.assertFalse((options.out/'witness.vcd').exists())
+
+    def test_invalid_saved_trace_is_not_reported_as_normal_exhaustion(self):
+        design=SimpleNamespace(data_ports=[SimpleNamespace(name='data',direction='input',
+                                                          kind='data',width=1)])
+        with tempfile.TemporaryDirectory() as temporary, patch('rvprobe.backend.encoding.run') as run:
+            root=Path(temporary)
+            prior=root/'prior.json';prior.write_text('[{"data":"2"}]')
+            options=EncodingOptions(out=root/'candidate',yosys=Path('yosys'),
+                eda_shell=Path('eda'),label='intent',trace_cycles=1,trace_seed=0,
+                avoid_stimulus=(prior,))
+            with self.assertRaisesRegex(ValueError,'outside IO width'):
+                solve(design,{'environment':{}},{'labels':['intent'],'fingerprint':'j'},
+                      {'label':'intent'},[],options)
+            run.assert_not_called()
+            self.assertFalse((options.out/'summary.json').exists())
+
     def test_inconsistent_environment_is_not_unreachable_intent(self):
         result = terminal_result('WARNING (WAS006): The task is inconsistent at cycle 1.\nENCODED_GOAL unreachable\n')
         self.assertEqual(result['status'], 'inconsistent_environment')
@@ -233,11 +303,49 @@ class SequenceAtoms(unittest.TestCase):
         self.assertEqual(env, '(rvp_encoded_atom_2_d && !rvp_encoded_atom_2_x)')
 
     def test_unsupported_temporal_forms_fail_closed(self):
-        for expression in ('$past(a)', 'a |-> b', 'a intersect b', 'a[*n]',
+        for expression in ('$past(a)', 'a |-> b', 'a within b', 'a[*n]',
                            'a ##[1:$] b', '@(negedge clock) a', '(a ##1 b) && c'):
             with self.subTest(expression=expression):
                 with self.assertRaises(ValueError):
                     leaves(expression, [])
+
+    def test_sequence_composition_preserves_operators_and_matching_endpoints(self):
+        for operator in ('and','or','intersect'):
+            atoms=[]
+            result=leaves(f'(p ##1 q) {operator} (r ##2 s)',atoms)
+            self.assertEqual(atoms,['p','q','r','s'])
+            self.assertIn(f' {operator} ',result)
+            self.assertIn('##1',result)
+            self.assertIn('##2',result)
+        atoms=[]
+        result=leaves('p or q and r intersect s ##1 t',atoms)
+        self.assertEqual(atoms,['p','q','r','s','t'])
+        self.assertEqual(result.count(' or '),1)
+        self.assertEqual(result.count(' and '),1)
+        self.assertEqual(result.count(' intersect '),1)
+        self.assertIn('##1',result)
+
+    def test_canonical_throughout_keeps_empty_capable_repeat_and_all_events(self):
+        atoms=[]
+        expression='(@(posedge clock) p[*]) intersect (@(posedge clock) a) ##0 (@(posedge clock) ##1 b)'
+        result=leaves(expression,atoms)
+        self.assertEqual(atoms,['p','a','b'])
+        self.assertIn('[*]',result)
+        self.assertNotIn('[*1:',result)
+        self.assertIn(' intersect ',result)
+        self.assertEqual(result.count('@(posedge clock)'),3)
+        self.assertIn('##0',result)
+        self.assertIn('##1',result)
+        self.assertEqual(result.count('&& !rvp_encoded_atom_'),3)
+
+    def test_clock_prefix_still_scopes_the_whole_composite_sequence(self):
+        atoms=[]
+        result=leaves('@(posedge clock) p and q ##1 r',atoms)
+        self.assertTrue(result.startswith('@(posedge clock) ('))
+        self.assertEqual(result.count('@(posedge clock)'),1)
+        self.assertEqual(atoms,['p','q','r'])
+        for invalid in ('a intersect', 'or a', 'a and  or b'):
+            with self.assertRaises(ValueError):leaves(invalid,[])
 
     def test_repetition_keeps_native_empty_bounded_and_unbounded_semantics(self):
         for suffix in ('[*0]', '[*4]', '[*2:7]', '[*0:$]', '[*]', '[+]'):

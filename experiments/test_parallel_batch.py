@@ -86,6 +86,8 @@ class ParallelBatchTests(unittest.TestCase):
                 self.assertEqual(argv[argv.index('--rvprobe-max-tokens')+1],'393216')
                 self.assertEqual(argv[argv.index('--rvprobe-request-timeout')+1],'3600')
                 self.assertEqual(argv[argv.index('--rvprobe-reasoning-effort')+1],'max')
+                self.assertEqual(argv[argv.index('--rvprobe-model')+1],'deepseek-v4-flash')
+                self.assertEqual(argv[argv.index('--sequences-per-intent')+1],'8')
                 temporaries.append(kwargs['env']['TMPDIR'])
                 barrier.wait(timeout=10)
                 status = 'failed' if flow.parent.name == 'aes' else 'completed'
@@ -96,11 +98,15 @@ class ParallelBatchTests(unittest.TestCase):
                     '--out', str(root/'work'), '--archive-root', str(root/'archive'),
                     '--relocate-completed', '--jobs', '3', '--arm', 'both',
                     '--rvprobe-max-tokens','393216','--rvprobe-request-timeout','3600',
+                    '--rvprobe-model','deepseek-v4-flash','--sequences-per-intent','8',
                     '--stage1-map', str(mapping), '--designs', 'alu', 'aes', 'sha3']):
                 main()
             self.assertEqual(len(set(temporaries)), 3)
             result = json.loads((root/'archive/summary.json').read_text())
             self.assertEqual(result['status'], 'finished_with_failures')
+            self.assertEqual(result['models'],{'rvprobe':'deepseek-v4-flash',
+                                               'haven':'deepseek-v4-flash-vision-exp'})
+            self.assertEqual(result['sequences_per_intent'],8)
             for name, item in result['designs'].items():
                 self.assertEqual(item['storage_status'], 'relocated')
                 self.assertTrue((root/'work'/name).is_symlink())

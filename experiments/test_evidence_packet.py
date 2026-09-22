@@ -67,6 +67,19 @@ class EvidencePacketTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'does not match frozen source'):
             packet(self.context, self.context.initial_evidence(), [read])
 
+    def test_inspect_context_and_explicit_read_share_one_verified_body(self):
+        args={'queries':[{'query':'third'}],'context_lines':0}
+        observation={'name':'inspect_rtl_batch','arguments':args,
+                     'result':self.context.dispatch('inspect_rtl_batch',args)}
+        before=deepcopy(observation)
+        result=packet(self.context,self.context.initial_evidence(),[observation,self.read(3)])
+        self.assertEqual(observation,before)
+        self.assertEqual([r['text'] for r in result['rtl_ranges']],['3: third;\n'])
+        self.assertNotIn('text',result['observations'][0]['result']['ranges'][0])
+        observation['result']['ranges'][0]['text']='FORGED'
+        with self.assertRaises(ValueError):
+            packet(self.context,self.context.initial_evidence(),[observation])
+
     def test_errors_and_coverage_are_retained_and_repair_has_no_rtl(self):
         observations = [{'name':'read_coverage','arguments':{},'result':{'text':'ALL_GAPS','next_offset':200}},
                         {'name':'read_rtl','arguments':{},'result':{'error':'missing file'}}]

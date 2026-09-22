@@ -24,6 +24,13 @@ retain their declared Bool/Bits/UInt/SInt types. `clock` and `reset` are framewo
 scope handles, not hardware
 `Bool` predicates; never place them in an expression or pass them to `Gen`.
 
+Respect the modeled DUT boundary. Unless the fixed environment explicitly
+provides an external responder, its response/data pins are ordinary DUT inputs,
+not an implicit memory or peripheral model. A finite transaction may need legal
+response activity on those inputs before the selected output check. Use the IO
+directions and environment contract; do not reconstruct an external module or
+assume it supplied data that the scenario never establishes.
+
 ## Goals and temporal operators
 
 Use `Gen(expression, "unique_snake_case_label")` once per intent. `Gen` accepts a
@@ -71,6 +78,12 @@ its intended response/history inside the Gen scenario. Never add Assume, restric
 global constraints or unrelated input-only replacements for a failed output goal.
 JG searches concrete inputs and cycles; do not enumerate candidate assignments.
 
+A Gen is an existential scenario, not a universal assertion or a replacement
+reference model. Express the minimum legal setup and the selected observable
+check, then let the solver find a witness. Do not prove every residual unreachable
+or derive every possible data value before emitting this batch. When the API and
+chosen IO relation are already known, additional confirmation reads add no evidence.
+
 For a symbolic event order:
 
 ```scala
@@ -82,6 +95,29 @@ Gen(ordered, "symbolic_event_order")
 
 Use local vals to keep long chains shallow. Local vals may hold predicates or
 sequences; they do not add state or cycles.
+
+Concatenation does not share endpoints: `(p ### q) ### (q.##(gap)(r))`
+requires `q` on two consecutive samples. To continue from the already matched
+`q`, write `(p ### q).##(gap)(r)`. Both forms are legal and have different event
+counts; choose the one that expresses the intended protocol. A source note about
+a repeated boundary is a timing fact, not proof of the reason for UNSAT.
+
+Bind an observed response to the request that produces it. A registered output
+at the current sample can belong to an earlier request: checking the current
+selector/address alongside that output does not establish their relationship.
+For this example only, suppose the supplied contract says an accepted request
+echoes its tag exactly one sampled cycle later:
+
+```scala
+val response = valid_out & (tag_out === past(tag_in, 1))
+Gen(accepted_request ### response, "one_cycle_tag_echo")
+```
+
+The preceding request establishes the required history; the `1` follows the
+example contract, not a default bus latency. For the real DUT use its supplied
+latency/handshake, retain pins through a handshake only when its protocol requires
+that, and observe the result of that transaction. Keep these conditions inside
+Gen; do not impose a new global environment assumption.
 
 ## Backend boundary
 
@@ -117,6 +153,11 @@ an assumption, or inventing a timeout. `infeasible` describes the expression
 under the fixed DUT/reset/environment; it does not prove that the intended DUT
 behavior is impossible. For `unknown` or compile timeout, remove unnecessary
 temporal complexity while preserving the same finite setup and observation.
+For these solver diagnostics (and unsupported finite Cover expressions), the
+repair tools can read the frozen RTL. Reuse the returned source ranges first;
+look up only the missing fact for the named failed goal. Syntax/type repair does
+not need RTL reads. Neither kind of repair may replan coverage, alter successful
+goals, or remove an output check. No solver status is itself an UNSAT core.
 
 ## Output contract
 
@@ -150,12 +191,15 @@ Gen(zero ### ones, "symbolic_bit_pattern_order")
 
 For a nontrivial wide constant use `BigInt("89abcdef", 16)`, not
 `BigInt(0x89abcdef)`: Scala may overflow the inner Int/Long before BigInt sees it.
+In `BigInt(text, radix)`, the second argument is the numeral's base, never the
+signal width: hexadecimal uses 16, binary uses 2, decimal uses 10. All digits
+must be legal in that base. `Ltl.is` already infers the signal width.
 Use `Ltl.isOnes(signal)` for an all-one pattern. For signal-to-signal equality use
 `===`; for Bits literal equality use `value.B(width)` or the typed helper.
 
-## Local repair checklist
+## Local syntax/type repair checklist
 
-Repair only syntax, types or API use in the previous fragment. Preserve labels,
+For syntax/type diagnostics, repair only syntax, types or API use in the previous fragment. Preserve labels,
 operands, temporal conditions and intended checks; do not replan coverage.
 
 - Replace Scala `&&`/`||` with hardware `&`/`|` and parenthesize comparisons.

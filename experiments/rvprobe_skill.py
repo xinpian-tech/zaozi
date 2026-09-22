@@ -13,7 +13,7 @@ from provider_failure import incomplete_response
 from repair_policy import model_repair_allowed
 
 SKILL = Path(__file__).resolve().parent.parent / "rvprobe-skill.md"
-SKILL_PROTOCOL = "frozen-inline-ltl-skill-v8"
+SKILL_PROTOCOL = "frozen-inline-ltl-skill-v10"
 
 
 def compact_skill_text(content):

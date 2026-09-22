@@ -10,6 +10,51 @@ import rvprobe.backend.candidates as search
 
 
 class CandidateSearchTests(unittest.TestCase):
+    def test_auxiliary_capability_shortfall_does_not_discard_native_valid_subset(self):
+        from rvprobe.backend.selection import select_witnesses
+        replies=[{'status':'covered'},search.UnsupportedTemporalForm('auxiliary limit')]
+        with tempfile.TemporaryDirectory() as temp, patch.object(search,'solve',side_effect=replies) as solver:
+            root=Path(temp);design,config,job,goals=self.frozen()
+            importer=Mock(return_value={'inputFingerprint':'valid','cycles':12})
+            auxiliary=lambda count: search.candidates(design,config,job,goals[0],[],root/'encoded',
+                Path('yosys'),Path('eda'),count,23,importer)
+            selected,report=select_witnesses([],2,lambda row,index:row,
+                lambda count:[],root,auxiliary=auxiliary)
+            self.assertEqual(len(selected),1)
+            self.assertEqual(report['status'],'exhausted')
+            self.assertEqual(report['diagnostics']['auxiliary_search']['termination_reason'],
+                             'unsupported_temporal_form')
+            self.assertEqual(solver.call_count,2)
+            importer.assert_called_once()
+            audit=json.loads((root/'encoded/search.json').read_text())
+            self.assertFalse(audit['unreachability_proven'])
+            self.assertEqual(audit['attempts'][-1]['kind'],'auxiliary_temporal_unsupported')
+
+    def test_unclassified_value_error_is_not_a_capability_shortfall(self):
+        with tempfile.TemporaryDirectory() as temp, patch.object(search,'solve',
+                side_effect=ValueError('bad trace width')):
+            with self.assertRaisesRegex(ValueError,'bad trace width'):
+                self.generate(Path(temp)/'search',4,Mock())
+
+    def test_no_free_input_shortfall_keeps_valid_subset_and_does_not_retry(self):
+        from rvprobe.backend.selection import select_witnesses
+        replies=[{'status':'covered'},{'status':'resampling_exhausted',
+                  'termination_reason':'no_single_cell_candidate','solver_invoked':False}]
+        with tempfile.TemporaryDirectory() as temp, patch.object(search,'solve',side_effect=replies) as solver:
+            root=Path(temp);design,config,job,goals=self.frozen()
+            importer=Mock(return_value={'inputFingerprint':'valid','cycles':12})
+            auxiliary=lambda count: search.candidates(design,config,job,goals[0],[],root/'encoded',
+                Path('yosys'),Path('eda'),count,23,importer)
+            selected,report=select_witnesses([],2,lambda row,index:row,
+                lambda count:[],root,auxiliary=auxiliary)
+            self.assertEqual(len(selected),1)
+            self.assertEqual(report['status'],'exhausted')
+            self.assertEqual(report['diagnostics']['auxiliary_search']['termination_reason'],
+                             'no_single_cell_candidate')
+            self.assertEqual(solver.call_count,2)
+            importer.assert_called_once()
+            self.assertFalse(selected[0]['original_goal_proven'])
+
     def test_resampling_exhaustion_preserves_native_validated_subset(self):
         from rvprobe.backend.selection import select_witnesses
         replies = [{'status':'covered'}, {'status':'resampling_exhausted',

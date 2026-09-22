@@ -76,6 +76,35 @@ class ModelOutputError(ValueError):
     """Only observable model-source defects enter the bounded repair budget."""
 
 
+def check_sva_repair(intents, previous, solved):
+    """Reject dropped intents and edits to already generated properties."""
+    before = {item['label']: item for item in previous}
+    after = {item['label']: item for item in intents}
+    if before.keys() != after.keys():
+        raise ModelOutputError('SVA repair must preserve every original intent label')
+    for label, old in before.items():
+        if after[label]['intent'] != old['intent']:
+            raise ModelOutputError('SVA repair changed the original intent description: '+label)
+        if label in solved and after[label]['property'] != old['property']:
+            raise ModelOutputError('SVA repair changed an already generated property: '+label)
+
+
+def sva_shortfall(goals):
+    errors = []
+    for goal in goals:
+        status = goal['status']
+        if status == 'generated':
+            continue
+        if status not in ('unreachable', 'infeasible', 'undetermined', 'unknown'):
+            raise RuntimeError('Unclassified direct SVA solver outcome: '+str(status))
+        errors.append(dict(label=goal['label'], status=status,
+            termination_reason=goal.get('detail', {}).get('termination_reason'),
+            unreachability_proven=status in ('unreachable', 'infeasible'),
+            message=('No witness exists under the fixed DUT/reset/environment.' if status in
+                     ('unreachable','infeasible') else 'No result within the solver budget; this is not UNSAT.')))
+    return errors
+
+
 def parse_response(raw, method):
     text = strip_fence(raw).strip()
     if text == 'STOP':
@@ -323,10 +352,14 @@ class DirectedBackend:
         self.history=[]
 
     def generate(self, directory, feedback, existing, ordinal):
-        from rvprobe.backend.runtime import ReplayTransport, WitnessBackend
-        from rvprobe.backend.candidates import candidates
         from rtl_evidence import collect
         errors=[]
+        previous_intents=(deepcopy(feedback.get('rejected_model_candidate',{}).get('intents'))
+                          if self.method=='directed_sva' else None)
+        solved=set()
+        best=None
+        previous_resource_state=None
+        repair_log=[]
         design,config,args=self.design,self.config,self.args
         accepted={fingerprint(s) for s in existing}
         self.history=[h for h in self.history if h['sequence_hashes'] and set(h['sequence_hashes']) <= accepted]
@@ -353,6 +386,14 @@ class DirectedBackend:
                 'Do not weaken an intent or remove checks to silence a failure.\n'+
                 'Current-run accepted outputs:\n'+json.dumps(self.history,ensure_ascii=False)+
                 '\nMeasured candidate errors:\n'+json.dumps(errors,ensure_ascii=False))
+            if previous_intents is not None:
+                prompt += ('\nRepair the SAME SVA intents, not a new coverage round. Return all labels and '
+                    'intent descriptions unchanged. Keep already generated properties byte-for-byte unchanged. '
+                    'For unresolved properties, correct legal setup, handshake, readback or temporal ordering; '
+                    'retain output checks and the verification objective. A timeout is not proof of UNSAT. '
+                    'Do not remove checks, replace with input-only activity, change the environment, or return STOP. '
+                    'No UNSAT core is available unless explicitly supplied.\nPrevious candidate:\n'+
+                    json.dumps(previous_intents,ensure_ascii=False)+'\nGenerated labels: '+json.dumps(sorted(solved)))
             if getattr(args,'response_file',None):
                 ad.mkdir(parents=True,exist_ok=False)
                 raw=args.response_file.read_text()
@@ -363,7 +404,12 @@ class DirectedBackend:
                 raw=direct_dialogue(prompt,context,args,ad)
             try:
                 intents=parse_response(raw,self.method)
-                if intents is None:return {'stop':'model_stop'}
+                if intents is None:
+                    if previous_intents is not None:
+                        raise ModelOutputError('STOP cannot replace an unresolved SVA repair')
+                    return {'stop':'model_stop'}
+                if previous_intents is not None:
+                    check_sva_repair(intents,previous_intents,solved)
                 save(ad/'intents.json',intents)
                 if self.method in ('directed_stimulus','directed_sv_constraint'):
                     sequences,frames=[],[]
@@ -382,27 +428,74 @@ class DirectedBackend:
                     produced=dict(sequences=sequences,frames=frames,metadata={'method':self.method,'intent_satisfaction_checked':False})
                 else:
                     job,goals=solve_sva(design,config,intents,ad/'solve',args)
-                    for goal in goals:
-                        if goal['status']=='generated':
-                            try: goal['sequences']=sample_goal(job,goal,design,config,ad/'sampling'/goal['label'],4,args.sampling_seed,args.sampling_time_limit,args.eda_shell)
-                            except (ValueError,OSError,subprocess.SubprocessError) as error:
-                                save(ad/'sampling'/goal['label']/'error.json',{'error':str(error)})
-                    def replenish(goal,out,budget):
-                        return sample_goal(job,goal,design,config,out,budget,args.sampling_seed,args.sampling_time_limit,args.eda_shell)
-                    def known(goal,out,budget):
-                        return candidates(design,config,job,goal,job['environmentAssumptions'],out,
-                            args.encoded_witness_yosys,args.eda_shell,budget,args.sampling_seed,
-                            lambda path,label:import_sample(path,label,design,event_mode=True),time_limit=args.jg_time_limit)
-                    transport=ReplayTransport(frames=lambda row,segment:witness_frames(design,config,row,segment),
-                        render=lambda rows,name,offset:render_witness_sequence(design,rows,name,offset),
-                        measure=lambda source,rows:self.simulator.measure_one([source],rows)[1]['replay'])
-                    produced=WitnessBackend(transport,replenish,known).generate(goals,directory/'native-witness-search',
-                        'sva_'+directory.name.replace('-','_'),4,ordinal)
-                    produced['metadata']['method']=self.method
+                    missing=sva_shortfall(goals)
+                    generated={g['label'] for g in goals if g['status']=='generated'}
+                    repair_log.append(dict(attempt=attempt,phase='solve',generated=sorted(generated),errors=missing))
+                    save(directory/'sva-repairs.json',repair_log)
+                    if best is None or len(generated)>len(best[1]):
+                        best=((job,goals,intents,ad),generated)
+                    if missing:
+                        resource_only=bool(generated) and all(not e['unreachability_proven'] for e in missing)
+                        resource_state=(frozenset(generated),tuple((e['label'],e['status']) for e in missing))
+                        stalled=resource_only and resource_state==previous_resource_state
+                        report=dict(kind='sva_goal_shortfall',attempt=attempt,errors=missing,
+                            retry=attempt<args.attempts and not stalled,
+                            stop_reason='resource_repair_no_progress' if stalled else None)
+                        save(ad/'goal-shortfall-feedback.json',report)
+                        errors.append(report)
+                        if attempt<args.attempts and not stalled:
+                            previous_intents,solved=intents,solved | generated
+                            previous_resource_state=resource_state if resource_only else None
+                            continue
+                        (job,goals,intents,ad),_=best
+                    return self.materialize_sva(directory,job,goals,intents,ad,ordinal)
             except ModelOutputError as error:
-                errors.append(str(error));save(ad/'error.json',{'error':str(error),'model_repair_allowed':True})
+                report={'error':str(error),'model_repair_allowed':True,'attempt':attempt}
+                errors.append(report);save(ad/'error.json',report)
+                repair_log.append(dict(report,phase='model_source'))
+                save(directory/('sva-repairs.json' if self.method=='directed_sva' else 'source-repairs.json'),repair_log)
+                if self.method=='directed_sva' and previous_intents is None:
+                    errors[-1]['rejected_response']=raw
+                    try:previous_intents=parse_response(raw,self.method)
+                    except ModelOutputError:pass
                 continue
             self.history.append({'round':directory.name,'intents':intents,'sequence_hashes':[fingerprint(s) for s in produced['sequences']]})
             produced['repair_context']={'intents':intents}
             return produced
-        raise ValueError('direct baseline exhausted the 3-attempt model-source repair budget')
+        if best is not None:
+            (job,goals,intents,ad),_=best
+            save(directory/'repair-budget.json',dict(exhausted=True,attempts=args.attempts,
+                retained_generated_labels=sorted(best[1]),policy='retain-valid-partial-not-cross-run'))
+            return self.materialize_sva(directory,job,goals,intents,ad,ordinal)
+        raise ValueError(f'direct baseline exhausted the {args.attempts}-attempt model-source repair budget')
+
+    def materialize_sva(self,directory,job,goals,intents,ad,ordinal):
+        from rvprobe.backend.runtime import ReplayTransport, WitnessBackend
+        from rvprobe.backend.candidates import candidates
+        design,config,args=self.design,self.config,self.args
+        for goal in goals:
+            if goal['status']=='generated':
+                try: goal['sequences']=sample_goal(job,goal,design,config,ad/'sampling'/goal['label'],4,args.sampling_seed,args.sampling_time_limit,args.eda_shell)
+                except (ValueError,OSError,subprocess.SubprocessError) as error:
+                    save(ad/'sampling'/goal['label']/'error.json',{'error':str(error)})
+        def replenish(goal,out,budget):
+            return sample_goal(job,goal,design,config,out,budget,args.sampling_seed,args.sampling_time_limit,args.eda_shell)
+        def known(goal,out,budget):
+            return candidates(design,config,job,goal,job['environmentAssumptions'],out,
+                args.encoded_witness_yosys,args.eda_shell,budget,args.sampling_seed,
+                lambda path,label:import_sample(path,label,design,event_mode=True),time_limit=args.jg_time_limit)
+        transport=ReplayTransport(frames=lambda row,segment:witness_frames(design,config,row,segment),
+            render=lambda rows,name,offset:render_witness_sequence(design,rows,name,offset),
+            measure=lambda source,rows:self.simulator.measure_one([source],rows)[1]['replay'])
+        try:
+            produced=WitnessBackend(transport,replenish,known).generate(goals,directory/'native-witness-search',
+                'sva_'+directory.name.replace('-','_'),4,ordinal)
+        except ValueError as error:
+            error.repair_context={'intents':deepcopy(intents)}
+            raise
+        produced['metadata']['method']=self.method
+        produced['metadata']['sva_repair_policy']='bounded-same-intent-last-valid-v1'
+        self.history.append({'round':directory.name,'intents':intents,
+                             'sequence_hashes':[fingerprint(s) for s in produced['sequences']]})
+        produced['repair_context']={'intents':intents}
+        return produced

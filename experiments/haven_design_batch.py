@@ -20,7 +20,7 @@ from frozen_stage1 import load_fixed_setup, verify_fixed_setup
 from rvprobe.backend.process import run
 from run_records import framework_hashes, fresh_directory, save, utc
 from batch_lifecycle import current_owner
-from framework_runtime import runtime_hashes
+from framework_runtime import runtime_hashes, runtime_commands
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -108,6 +108,8 @@ def main():
     parser.add_argument('--jobs',type=int,default=1,help='concurrent designs, including their archival')
     parser.add_argument('--rounds',type=int,default=3,
                         help='coverage rounds forwarded to the selected arm')
+    parser.add_argument('--sequences-per-intent',type=int,choices=range(1,9),default=4,
+                        help='RVProbe witness target per Gen; HAVEN generation is unchanged')
     parser.add_argument('--relocate-completed',action='store_true',
                         help='verify archive, then replace finished scratch design with durable symlink')
     parser.add_argument('--generation-map',type=Path,help='design to failed first-round generation to continue')
@@ -128,10 +130,14 @@ def main():
     if not re.fullmatch(r'[1-9][0-9]*s', args.encoded_witness_time_limit):
         parser.error('invalid encoded witness time limit')
     runtime_hashes(ROOT)
+    if args.arm in ('rvprobe', 'both'):
+        runtime_commands()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
     if args.rounds < 1:
         parser.error('--rounds must be positive')
+    if args.arm=='haven' and args.sequences_per_intent!=4:
+        parser.error('witness-count experiments are RVProbe-only; HAVEN remains unchanged')
     if len(args.designs) != len(set(args.designs)):
         parser.error('duplicate designs are not allowed')
     if args.relocate_completed and not args.archive_root:
@@ -155,7 +161,9 @@ def main():
         require_space(args.out, minimum=1024 * 1024 * 1024)
     began = time.monotonic()
     progress = dict(status='running', started_utc=utc(), pid=os.getpid(), owner=current_owner(), arm=args.arm,
-                    model='deepseek-v4-flash-vision-exp', sequences_per_intent=4,
+                    model=rvprobe_model_options.model_for(args, args.arm), sequences_per_intent=args.sequences_per_intent,
+                    models={arm:rvprobe_model_options.model_for(args,arm) for arm in
+                            (('haven','rvprobe') if args.arm=='both' else (args.arm,))},
                     rvprobe_generation_options=rvprobe_model_options.record(args),
                     diagnostic_only=False, framework=framework_hashes(ROOT),
                     rounds=args.rounds,
@@ -225,7 +233,7 @@ def main():
                           '--encoded-witness-time-limit', args.encoded_witness_time_limit]
             if args.boundary:
                 extra += ['--boundary',args.boundary]
-            extra += ['--rounds',str(args.rounds)]
+            extra += ['--rounds',str(args.rounds),'--sequences-per-intent',str(args.sequences_per_intent)]
             if identity.get('shared_environment'):
                 extra += ['--shared-stage1-environment']
             command('haven_event_paired.py', [

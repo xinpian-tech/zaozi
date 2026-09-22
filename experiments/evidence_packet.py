@@ -47,7 +47,7 @@ def packet(context, initial, observations):
         item = deepcopy(observation)
         name, value = item['name'], item['result']
         pieces = ([value] if name == 'read_rtl' and 'error' not in value else
-                  value.get('ranges', []) if name == 'read_rtl_batch' else [])
+                  value.get('ranges', []) if name in ('read_rtl_batch', 'inspect_rtl_batch') else [])
         for piece in pieces:
             if piece.get('text'):
                 rows.append(dict(piece))

@@ -7,12 +7,24 @@ import unittest
 from unittest.mock import patch
 
 import sequence_experiment as generation
-from rvprobe_model_options import add_options,cli,effective,record,token_limit
+from rvprobe_model_options import add_options,cli,effective,record,token_limit,model_for
 from rvprobe_skill import snapshot
 from run_records import Records,totals
 
 
 class GenerationBudget(unittest.TestCase):
+    def test_regular_deepseek_override_never_changes_haven_model_or_budget(self):
+        parser=argparse.ArgumentParser();add_options(parser)
+        args=parser.parse_args(['--rvprobe-model','deepseek-v4-flash',
+            '--rvprobe-reasoning-effort','high','--rvprobe-max-tokens','65536'])
+        for _ in range(3):args=parser.parse_args(cli(args))
+        args.model='deepseek-v4-flash-vision-exp'
+        self.assertEqual(model_for(args),'deepseek-v4-flash')
+        self.assertEqual(model_for(args,'haven'),'deepseek-v4-flash-vision-exp')
+        self.assertEqual(record(args)['model'],'deepseek-v4-flash')
+        self.assertEqual(record(args)['max_tokens'],65536)
+        self.assertEqual(record(args)['reasoning_effort'],'high')
+
     def test_incremental_policy_forwarded_and_recorded(self):
         parser=argparse.ArgumentParser();add_options(parser)
         args=parser.parse_args(['--rvprobe-dialogue-policy','incremental'])

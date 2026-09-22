@@ -53,8 +53,25 @@ class TaskAccessTest(unittest.TestCase):
 
     def test_inspect_batch_rejects_unbounded_or_extra_arguments(self):
         for args in ({'queries':[]},{'queries':[{'query':'wire'}],'context_lines':101},
-                     {'queries':[{'query':'wire','offset':1}]}):
+                     {'queries':[{'query':'wire','offset':1}]},
+                     {'queries':[{'query':'wire','context_lines':101}]},
+                     {'queries':[{'query':'wire','context_lines':True}]},
+                     {'queries':[{'query':'wire','match_offset':-1}]},
+                     {'queries':[{'query':'wire','match_offset':True}]}):
             with self.assertRaises(ValueError):self.context.dispatch('inspect_rtl_batch',args)
+
+    def test_inspect_per_query_radius_and_occurrence_use_exact_source(self):
+        self.source.write_text('input value;\nwire unseen;\nassign out = value;\nnext;\n')
+        context=TaskContext(self.design)
+        first=context.dispatch('inspect_rtl_batch',{'queries':[{'query':'value','context_lines':0}]})
+        self.assertEqual([r['line'] for r in first['queries'][0]['matching_locations']],[1,3])
+        self.assertEqual(first['ranges'][0]['text'],'1: input value;\n')
+        self.assertNotIn('unseen',json.dumps(first))
+        later=context.dispatch('inspect_rtl_batch',{'context_lines':5,
+            'queries':[{'query':'value','context_lines':0,'match_offset':1}]})
+        self.assertEqual(later['queries'][0]['selected_match']['line'],3)
+        self.assertEqual(later['ranges'][0]['text'],'3: assign out = value;\n')
+        self.assertNotIn('unseen',json.dumps(later))
 
     def test_pagination_does_not_lose_long_lines_or_unicode(self):
         self.source.write_text('wire '+('中文'*PAGE_CHARS)+';\n')

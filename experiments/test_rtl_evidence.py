@@ -7,7 +7,7 @@ from unittest.mock import patch
 from run_records import save
 from sequence_framework import load_design
 from task_context import TaskContext
-from rtl_evidence import collect,validate_and_merge,index,project_inline
+from rtl_evidence import collect,collect_generation,validate_and_merge,index,project_inline
 
 
 class RtlEvidenceTests(unittest.TestCase):
@@ -72,6 +72,21 @@ class RtlEvidenceTests(unittest.TestCase):
         result=context.dispatch('read_rtl_batch',{'ranges':[{'file_id':'rtl_0001','start_line':1,'line_count':600}]})
         self.assertEqual(result['ranges'][0]['text'],context.files['rtl_0001']['text'])
         self.assertIsNone(result['ranges'][0]['next_offset'])
+
+    def test_inspect_source_is_reused_but_search_previews_are_not(self):
+        generation=self.root/'round-1/generation'
+        result=self.context.dispatch('inspect_rtl_batch',{
+            'queries':[{'query':'third'}],'context_lines':0})
+        save(generation/'attempt-1/task-tool-1-1.json',
+             {'tool_call':{'function':{'name':'inspect_rtl_batch'}},'result':result})
+        save(generation/'attempt-1/task-tool-1-2.json',
+             {'tool_call':{'function':{'name':'search_rtl'}},
+              'result':{'matches':[{'preview':'NOT_READ'}]}})
+        rows=collect_generation(generation)
+        self.assertEqual([r['text'] for r in rows],['3: third;\n'])
+        self.assertEqual(collect(self.root,2),[{**r,'source_round':1} for r in rows])
+        self.assertEqual(len(validate_and_merge(self.context.files,rows)),1)
+        self.assertNotIn('NOT_READ',json.dumps(rows))
 
     def test_compact_index_and_recent_projection_preserve_access_metadata(self):
         rows=validate_and_merge(self.context.files,[self.read(1),self.read(2),self.read(3)])

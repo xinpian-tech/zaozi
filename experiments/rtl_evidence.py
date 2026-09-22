@@ -57,25 +57,37 @@ def project_inline(ranges, limit=PACKET_INLINE_LIMIT):
     return selected
 
 
+def collect_generation(generation):
+    """Collect exact returned reads from this generation, including repair attempts.
+
+    A search-with-context is a source read too.  Never recover text from model
+    responses, search previews, or neighboring unread lines.
+    """
+    rows = []
+    for path in sorted(Path(generation).glob('attempt-*/task-tool-*.json')):
+        record = json.loads(path.read_text())
+        name = record['tool_call']['function']['name']
+        result = record['result']
+        if not isinstance(result, dict) or 'error' in result:
+            continue
+        if name == 'read_rtl':
+            pieces = [result]
+        elif name in ('read_rtl_batch', 'inspect_rtl_batch'):
+            pieces = result.get('ranges', [])
+        else:
+            continue
+        for piece in pieces:
+            if piece.get('text'):
+                rows.append({key: piece[key] for key in ('file_id', 'sha256', 'offset', 'text')} |
+                    {'tool_sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+    return rows
+
+
 def collect(run, before_round):
     rows = []
     for number in range(1, before_round):
-        for path in sorted((Path(run)/f'round-{number}'/'generation').glob('attempt-*/task-tool-*.json')):
-            record = json.loads(path.read_text())
-            name = record['tool_call']['function']['name']
-            result = record['result']
-            if not isinstance(result, dict) or 'error' in result:
-                continue
-            if name == 'read_rtl':
-                pieces = [result]
-            elif name == 'read_rtl_batch':
-                pieces = result['ranges']
-            else:
-                continue
-            for piece in pieces:
-                if piece.get('text'):
-                    rows.append({key: piece[key] for key in ('file_id','sha256','offset','text')} |
-                        {'source_round': number, 'tool_sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+        rows.extend({**row, 'source_round': number} for row in
+                    collect_generation(Path(run)/f'round-{number}'/'generation'))
     return rows
 
 

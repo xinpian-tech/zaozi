@@ -50,22 +50,29 @@ def coverage_loop(bundle, directory, simulate, backend, *, rounds=3, runtime_rep
                 for repair in range(runtime_repairs+1):
                     rd=directory/(f'round-{number}'+(f'-repair-{repair}' if repair else ''))
                     save(rd/'feedback.json',feedback)
-                    candidate=backend.generate(rd,feedback,sequences,len(frames))
-                    save(rd/'candidate.json',candidate)
-                    if candidate.get('stop') or not candidate.get('sequences'):
-                        if repair:raise ValueError('runtime repair produced no replacement candidate')
-                        break
-                    proposed=sequences+candidate['sequences'];new_frames=frames+candidate.get('frames',[])
-                    check_sequence_set(proposed)
+                    candidate = None
                     try:
+                        candidate=backend.generate(rd,feedback,sequences,len(frames))
+                        save(rd/'candidate.json',candidate)
+                        if candidate.get('stop') or not candidate.get('sequences'):
+                            if repair:raise ValueError('runtime repair produced no replacement candidate')
+                            break
+                        proposed=sequences+candidate['sequences'];new_frames=frames+candidate.get('frames',[])
+                        check_sequence_set(proposed)
                         measured=simulate(rd/'simulation',proposed,new_frames)
                     except ValueError as error:
                         detail=getattr(error,'diagnostics',{})
-                        failure={'error':str(error),'diagnostics':detail,'round':number,'repair':repair}
+                        failure={'error':str(error),'diagnostics':detail,'round':number,'repair':repair,
+                                 'phase':'candidate_generation' if candidate is None else 'simulation'}
                         result.setdefault('rejected_candidates',[]).append(failure)
                         save(rd/'runtime-failure.json',failure)
-                        if not detail.get('model_repair_allowed',True) or repair==runtime_repairs:raise
-                        feedback={**feedback,'runtime_failure':failure,'rejected_model_candidate':candidate.get('repair_context',{}),
+                        # Only explicit, classified candidate defects are repairable.
+                        # Provider, provenance, adapter and unclassified failures stop.
+                        if detail.get('model_repair_allowed') is not True or detail.get('kind') not in (
+                                'candidate_environment_violation','model_candidate_error') or repair==runtime_repairs:raise
+                        context=(candidate or {}).get('repair_context',getattr(error,'repair_context',{}))
+                        if not context:raise
+                        feedback={**feedback,'runtime_failure':failure,'rejected_model_candidate':context,
                             'repair_instruction':'Repair the same intent using the measured failure, without changing shared infrastructure or deleting checks.'}
                     else:break
                 if fixed_rounds and (candidate.get('stop') or not candidate.get('sequences')):
@@ -123,7 +130,8 @@ def main():
     parser.add_argument('--sampling-seed',type=int,default=20260906)
     parser.add_argument('--sampling-time-limit',default='30s')
     args=parser.parse_args()
-    if args.model!='deepseek-v4-flash-vision-exp':parser.error('four-way cohort model is fixed')
+    if args.model not in ('deepseek-v4-flash-vision-exp','deepseek-v4-flash'):
+        parser.error('unsupported controlled-cohort model')
     import re
     if not re.fullmatch(r'[1-9][0-9]*s',args.jg_time_limit):parser.error('invalid JG time limit')
     out=fresh_directory(args.out.resolve());started=utc();began=time.monotonic()

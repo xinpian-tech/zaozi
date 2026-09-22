@@ -36,9 +36,9 @@ from prompt_rag import RagHit, load_corpus, render_hits, retrieve_diverse
 from rvprobe_skill import snapshot, load_snapshot, SKILL_PROTOCOL, invoke_with_skill, journal_repairs
 from sequence_framework import CONTRACT, DEFAULT_DESIGN, Design, load_design, parse_response, port_bindings, render_program, render_model_ut, write_sources, check_saved_sources
 from task_context import TaskContext, RepairContext, POLICY as RTL_CONTEXT_POLICY, INSTRUCTION as TASK_ACCESS_INSTRUCTION
-from ltl_source import normalize, OutputFormatError
-from framework_runtime import runtime_hashes
-from repair_policy import model_repair_allowed
+from ltl_source import normalize, OutputFormatError, LiteralArgumentError
+from framework_runtime import runtime_hashes, runtime_commands
+from repair_policy import model_repair_allowed, resource_repair_stalled, RESOURCE_REPAIR_POLICY
 from provider_failure import ProviderFailure, incomplete_response
 from rvprobe_model_options import DEFAULT_REASONING_EFFORT, REASONING_EFFORTS
 
@@ -229,10 +229,14 @@ If no new target remains, return STOP alone. STOP is not proof of unreachability
                 'activity, or invent a timing bound. Solver infeasible/unknown is feedback about the expression as '
                 'written, not proof that the verification intent is impossible.\n\n# DUT specification\n\n'
                 + (design.context or '(No additional protocol contract supplied.)'))
+        evidence_boundary = ('Use already-returned RTL first; read only missing implementation facts for the named '
+            'failed goals. Coverage replanning and changes to successful goals remain unavailable.'
+            if RepairContext.is_semantic(errors) else
+            'RTL search and coverage replanning are unavailable during local repair.')
         return f'''# Local LTL repair
 
 {instruction}
-RTL search and coverage replanning are unavailable during local repair.
+{evidence_boundary}
 
 # DUT IO
 
@@ -314,6 +318,9 @@ def endpoint(base_url: str) -> str:
 
 
 def send_completion(payload: dict, timeout: int) -> dict:
+    stop = os.environ.get('RVPROBE_STOP_NEW_MODEL_REQUESTS')
+    if stop and Path(stop).exists():
+        raise RuntimeError('campaign_gate_stop: no new model requests; prior usage retained')
     from request_deadline import request_deadline
     api_key = os.environ.get("RVPROBE_LLM_API_KEY") or os.environ.get("OPENAI_API_KEY")
     base_url = os.environ.get("RVPROBE_LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
@@ -335,9 +342,13 @@ def send_completion(payload: dict, timeout: int) -> dict:
     return result
 
 
-def invoke(prompt: str, model: str, temperature: float, timeout: int) -> tuple[str, dict]:
-    result = send_completion({"model": model, "temperature": temperature,
-                              "messages": [{"role": "user", "content": prompt}]}, timeout)
+def invoke(prompt: str, model: str, temperature: float, timeout: int, *,
+           max_tokens=None, reasoning_effort=None) -> tuple[str, dict]:
+    payload = {"model": model, "temperature": temperature,
+               "messages": [{"role": "user", "content": prompt}]}
+    if max_tokens is not None: payload['max_tokens'] = max_tokens
+    if reasoning_effort is not None: payload['reasoning_effort'] = reasoning_effort
+    result = send_completion(payload, timeout)
     return result["choices"][0]["message"].get("content"), {
         **model_usage(result), **response_metadata(result),
         "requested_model": model, "reported_model": result.get("model"), "response_id": result.get("id")}
@@ -359,6 +370,8 @@ def materialize_response(response: str, time_limit: str, design: Design | None =
                          render_program(design or load_design(), data, time_limit)]), "ltl-source", []
     except OutputFormatError as error:
         return "", "ltl-source", [{'kind': 'response-envelope', 'message': str(error)}]
+    except LiteralArgumentError as error:
+        return "", "ltl-source", error.diagnostics
     except (ValueError, KeyError, TypeError) as error:
         return "", "ltl-source", [str(error)]
 
@@ -405,7 +418,7 @@ def feedback(report: dict) -> object:
     return report.get("errors") or report.get("detail") or report
 
 
-def goal_shortfall_feedback(report: dict, labels: list[str]) -> dict | None:
+def goal_shortfall_feedback(report: dict, labels: list[str], source: str | None = None) -> dict | None:
     """Turn a valid partial solve into bounded, goal-local model feedback.
 
     The trusted solver report remains the authority.  This function neither
@@ -456,6 +469,9 @@ def goal_shortfall_feedback(report: dict, labels: list[str]) -> dict | None:
             'code':'jg_goal_' + ('compile_timeout' if status == 'error' else status),
             'status':status,'failureKind':failure_kind,'message':message,
             **({'backend_detail':goal['detail']} if isinstance(goal.get('detail'), str) and goal['detail'] else {})})
+    if source:
+        from ltl_diagnostics import solver_source_notes
+        errors = solver_source_notes(errors, source)
     return {'phase':'solve','ok':False,'kind':'model_goal_shortfall','result':result,'errors':errors}
 
 
@@ -542,7 +558,9 @@ def request_model(args, prompt, directory, records):
                                                   retrieval_max_tokens=getattr(args,'retrieval_max_tokens',None),
                                                   retrieval_reasoning_effort=getattr(args,'retrieval_reasoning_effort',None))
                 else:
-                    raw, info = invoke(prompt, args.model, args.temperature, args.timeout)
+                    options={key:getattr(args,'provider_'+key) for key in ('max_tokens','reasoning_effort')
+                             if getattr(args,'provider_'+key,None) is not None}
+                    raw, info = invoke(prompt, args.model, args.temperature, args.timeout, **options)
                 event.update(info)
                 if not isinstance(raw, str) or not raw.strip() or info.get("response_status") in ("truncated", "filtered"):
                     save(directory / f"incomplete-response-{number}.json", {
@@ -581,6 +599,7 @@ def execute_generation(args):
     comparison = {}
     resume_rejected = False
     best_partial = None
+    previous_shortfall = None
     try:
         with records.phase("generation-session") as session_event:
             args.rvprobe_skill_snapshot = load_snapshot(args.skill_snapshot) if getattr(args, 'skill_snapshot', None) else snapshot()
@@ -637,6 +656,7 @@ def execute_generation(args):
                 "task_access":args.task_context.record(),
                 "framework_context_policy": "predefined-ltl-helpers-v4",
                 "incomplete_response_policy": "stop-without-automatic-regeneration-v1",
+                "resource_repair_policy": RESOURCE_REPAIR_POLICY,
                 "skill_protocol": SKILL_PROTOCOL,
                 "source_sha256": framework_hashes(ZAOZI),
                 "skill": {k: v for k, v in args.rvprobe_skill_snapshot.items() if k != "content"},
@@ -658,6 +678,8 @@ def execute_generation(args):
             with records.phase('framework-preflight'):
                 try:
                     save(args.out/'runtime-inputs.json', runtime_hashes(ZAOZI))
+                    if not (args.prompt_only or args.prepare_only):
+                        save(args.out/'runtime-commands.json', runtime_commands())
                 except (OSError, RuntimeError):
                     summary.update(failure_kind='framework_infrastructure_failure',
                                    model_repair_allowed=False)
@@ -671,7 +693,12 @@ def execute_generation(args):
             attempt_budget = 1 if args.response_file else args.attempts
             for attempt in range(1, attempt_budget + 1):
                 if errors is not None and feedback_mode=='no_diagnostics':errors=GENERIC_ERROR
-                args.task_context = RepairContext(task_context, errors) if errors is not None else task_context
+                if errors is not None:
+                    from rtl_evidence import collect_generation
+                    args.task_context = RepairContext(task_context, errors,
+                        collect_generation(args.out) if RepairContext.is_semantic(errors) else ())
+                else:
+                    args.task_context = task_context
                 directory = args.out / f"attempt-{attempt}"
                 directory.mkdir(exist_ok=args.resume)
                 save(directory/'initial-evidence.json',args.task_context.initial_evidence())
@@ -752,18 +779,33 @@ def execute_generation(args):
                 summary["attempts"] = attempt
                 if report["ok"]:
                     result = report.get("result", {})
-                    shortfall = goal_shortfall_feedback(report, parse_response(response).get('labels', []))
+                    parsed_response = parse_response(response)
+                    shortfall = goal_shortfall_feedback(report, parsed_response.get('labels', []),
+                                                       parsed_response.get('ltl'))
                     if shortfall is not None:
                         generated = sum(goal.get('status') == 'generated' for goal in result.get('goals', []))
                         if best_partial is None or generated > best_partial['generated_goals']:
                             best_partial = {'result':result, 'sources':str(directory / 'sources'),
                                 'attempt':attempt, 'generated_goals':generated}
-                        if attempt < attempt_budget:
-                            save(directory / 'goal-shortfall-feedback.json', shortfall)
-                            summary['history'][-1].update(repairScheduled=True,
-                                unresolvedGoals=[error['goal'] for error in shortfall['errors']])
+                        stalled = resource_repair_stalled(previous_shortfall, shortfall)
+                        save(directory / 'goal-shortfall-feedback.json', shortfall)
+                        summary['history'][-1].update(repairScheduled=attempt < attempt_budget and not stalled,
+                            unresolvedGoals=[error['goal'] for error in shortfall['errors']])
+                        if stalled:
+                            stop = {'policy':RESOURCE_REPAIR_POLICY, 'attempt':attempt,
+                                'previous_attempt':attempt - 1, 'reason':'resource-repair-stalled',
+                                'generated_goals':sorted(goal['label'] for goal in result['goals']
+                                                         if goal.get('status') == 'generated'),
+                                'unresolved_goals':[{key:error[key] for key in ('goal','code')}
+                                                    for error in shortfall['errors']],
+                                'action':'retain best partial; unresolved goals remain in round feedback'}
+                            summary['resource_repair_stop'] = stop
+                            summary['history'][-1]['repairStopReason'] = stop['reason']
+                            save(directory / 'resource-repair-stop.json', stop)
+                        if attempt < attempt_budget and not stalled:
                             required_repair_labels = set(parse_response(response)['labels'])
                             errors, previous = shortfall['errors'], response
+                            previous_shortfall = shortfall
                             continue
                         chosen = best_partial
                         summary.update(status=chosen['result'].get('status', report['phase']),
@@ -771,11 +813,13 @@ def execute_generation(args):
                         if chosen['attempt'] != attempt:
                             summary['partial_fallback'] = {'selected_attempt':chosen['attempt'],
                                 'failed_repair_attempt':attempt,
-                                'reason':'earlier partial generated more goals'}
+                                'reason':('repeated resource shortfall without new generated goals; retained best partial'
+                                    if stalled else 'earlier partial retained with maximal generated-goal count')}
                         break
                     summary.update(status=result.get("status", report["phase"]), result=result, sources=str(directory / "sources"))
                     break
                 summary['last_error'] = feedback(report)
+                previous_shortfall = None
                 if not model_repair_allowed(report):
                     if best_partial is not None:
                         summary.update(status=best_partial['result'].get('status', 'partial'),

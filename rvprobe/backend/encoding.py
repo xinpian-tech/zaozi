@@ -60,9 +60,22 @@ def trace_result(log, *, resampling=False, diversity=False):
 
 def preference_ports(design, config):
     """Only vary IO that the frozen environment does not fix to a constant."""
-    fixed = set(config.get('environment', {}).get('static', {}))
+    environment = config.get('environment', {})
+    fixed = set(environment.get('static', {}))
+    # Secondary resets are held inactive for the entire post-reset witness.
+    # A hard diversity constraint on these pins would contradict the existing
+    # environment; soft preferences on them cannot add input diversity either.
+    fixed.update(reset['port'] for reset in environment.get('extra_resets', []))
     return [p for p in design.data_ports
             if p.direction == 'input' and p.kind != 'clock' and p.name not in fixed]
+
+
+class InputDiversityExhausted(ValueError):
+    """No subset remains for this sampler; not proof the goal is unreachable."""
+
+
+class UnsupportedTemporalForm(ValueError):
+    """An auxiliary-encoder limitation, not invalid original LTL or UNSAT."""
 
 
 def distinct_input_constraint(traces, ports, cycles, seed):
@@ -82,7 +95,7 @@ def distinct_input_constraint(traces, ports, cycles, seed):
         expression = ' && '.join(f"{port.name} != {port.width}'h{v:x}" for v in values)
         return dict(expression=expression, cycle=cycle+1, port=port.name,
                     excluded_values=values, policy='single-cell-candidate-subset-v1')
-    raise ValueError('no single sampled input can distinguish all prior traces')
+    raise InputDiversityExhausted('no single sampled input can distinguish all prior traces')
 
 
 def leaves(expression, atoms):
@@ -94,8 +107,31 @@ def leaves(expression, atoms):
     # Only the Boolean leaves are encoded, never approximate n repeats by a delay.
     repetition = r'\[\*(?:\d+(?::(?:\d+|\$))?)?\]|\[\+\]|\[->\d+(?::\d+)?\]'
     checked = re.sub(repetition, '', s)
-    if re.search(r'\$|\b(?:and|or|not|intersect|throughout|within|until|s_until|eventually|s_eventually|always|s_always|nexttime|s_nexttime|first_match|disable|iff)\b|\|[-=]>|\[\*|\[->|\[=', checked):
-        raise ValueError('diagnostic encoder does not support this temporal form')
+    if re.search(r'\$|\b(?:not|throughout|within|until|s_until|eventually|s_eventually|always|s_always|nexttime|s_nexttime|first_match|disable|iff)\b|\|[-=]>|\[\*|\[->|\[=', checked):
+        raise UnsupportedTemporalForm('auxiliary encoder does not support this temporal form')
+    # Keep native sequence topology and Boolean-leaf knownness separate. In
+    # particular, zaozi emits throughout as P[*0:$] intersect S; its empty
+    # repetition must remain empty-capable. and/or permit unequal endpoints,
+    # while intersect requires a common endpoint. Do not replace any of them
+    # with a Boolean operator or change a repetition/delay bound.
+    from .portability import top_words
+    words = top_words(s)
+    if words:
+        clock = re.match(r'@\(posedge (\w+)\)\s*', s)
+        if clock:
+            return clock[0] + '(' + leaves(s[clock.end():], atoms) + ')'
+        for operator in ('or', 'and', 'intersect'):
+            cuts = [word for word in words if word[0] == operator]
+            if not cuts:
+                continue
+            parts, offset = [], 0
+            for word in cuts:
+                parts.append(s[offset:word.start()])
+                offset = word.end()
+            parts.append(s[offset:])
+            if any(not part.strip() for part in parts):
+                raise ValueError('sequence composition requires both operands')
+            return (' ' + operator + ' ').join('(' + leaves(part, atoms) + ')' for part in parts)
     depth = 0
     cuts = []
     i = 0
@@ -209,6 +245,34 @@ def solve(design, config, job, goal, environment_terms, args: EncodingOptions):
     began = time.monotonic()
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)
+    distinct = None
+    prior_inputs = []
+    if args.avoid_stimulus:
+        # Plan only against free inputs, before running expensive synthesis or
+        # proof. Bad trace files/widths remain fatal; only exhausted sampler
+        # space is a normal shortfall. Do not claim UNSAT or fabricate a trace.
+        traces = []
+        for path in args.avoid_stimulus:
+            raw = path.read_bytes()
+            traces.append(json.loads(raw))
+            prior_inputs.append({'path': str(path.resolve()),
+                                 'sha256': hashlib.sha256(raw).hexdigest()})
+        try:
+            distinct = distinct_input_constraint(traces, preference_ports(design, config),
+                                                 args.trace_cycles, args.trace_seed)
+        except InputDiversityExhausted:
+            summary = dict(diagnostic_only=True, remote_llm_requests=0,
+                status='resampling_exhausted', termination_reason='no_single_cell_candidate',
+                solver_invoked=False, solve_time_limit=args.jg_time_limit,
+                engine_mode=args.engine_mode, source_job=job['fingerprint'], label=args.label,
+                elapsed_seconds=time.monotonic()-began, finished_utc=utc(),
+                original_goal_proven=False, unreachability_proven=False,
+                native_replay_required=True)
+            save(out/'input-distinct.json', dict(status='exhausted', prior_inputs=prior_inputs,
+                policy='single-cell-candidate-subset-v1', original_goal_proven=False,
+                preference_inputs=[p.name for p in preference_ports(design, config)]))
+            save(out/'summary.json', summary)
+            return summary
     source_boundary = config['environment'].get('boundary', 'shared-environment-conformance-v1')
     code = re.sub(r'/\*.*?\*/|//[^\n]*', '', select_cover(Path(job['sv']).read_text(), job['labels'], args.label), flags=re.S)
     code, past_lowering = lower_past(code, {c['port'] for c in job['clocks']})
@@ -235,7 +299,7 @@ def solve(design, config, job, goal, environment_terms, args: EncodingOptions):
         trace_cycles=args.trace_cycles, trace_preference=args.trace_preference,
         trace_seed=args.trace_seed,
         engine_mode=args.engine_mode, solve_time_limit=args.jg_time_limit,
-        preference_policy='variable-input-soft-preferences-v2',
+        preference_policy='environment-free-input-soft-preferences-v3',
         preference_inputs=[p.name for p in preference_ports(design, config)],
         noncontending_tristates=args.noncontending_tristates,
         boundary=config['environment'].get('boundary', source_boundary), source_boundary=source_boundary,
@@ -358,12 +422,9 @@ def solve(design, config, job, goal, environment_terms, args: EncodingOptions):
             cycle, port = divmod(cell, len(drives))
             p = drives[port]
             commands += [f"visualize -force -soft {{{p.name} == {p.width}'h{rng.getrandbits(p.width):x}}} {cycle+1}"]
-    if args.avoid_stimulus:
-        distinct = distinct_input_constraint([json.loads(p.read_text()) for p in args.avoid_stimulus],
-            preference_ports(design, config), args.trace_cycles, args.trace_seed)
-        save(out/'input-distinct.json', {**distinct, 'prior_inputs':[
-            {'path':str(p.resolve()),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()}
-            for p in args.avoid_stimulus], 'original_goal_proven':False})
+    if distinct is not None:
+        save(out/'input-distinct.json', {**distinct, 'prior_inputs':prior_inputs,
+            'original_goal_proven':False})
         commands += [f"visualize -force {{{distinct['expression']}}} {distinct['cycle']} -name rvp_distinct_input"]
     resampling = bool(args.trace_cycles or args.trace_preference or args.trace_seed is not None)
     if resampling:

@@ -23,7 +23,11 @@ def main():
            ('miss','valid & done_net','0',1,False),
            ('unknown','valid & done_net',"1'bx",1,False),
            ('inactive','valid & done_net','1',0,False),
-           ('past','valid & $past(payload, 2) == payload','1',1,True)]
+           ('past','valid & $past(payload, 2) == payload','1',1,True),
+           ('explicit_disable_hit','disable iff (!valid) valid & done_net','1',1,True),
+           ('explicit_disable_abort','disable iff (valid) valid & done_net','1',1,False),
+           ('explicit_disable_inactive','disable iff (!valid) valid & done_net','1',0,False),
+           ('explicit_disable_unknown','disable iff (!valid) valid & done_net',"1'bx",1,False)]
     shell=str(Path(__file__).resolve().parent/'eda-shell')
     for label,expression,value,active,expected in cases:
         folder=out/label;folder.mkdir()

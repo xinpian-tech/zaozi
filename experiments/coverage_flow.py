@@ -473,11 +473,14 @@ class HavenSimulation:
                 raise ValueError("shared testbench component changed")
         from ltl_replay import install as install_ltl
         from rvprobe.backend.replay import check_hit
+        ltl_monitor_audit = []
         try:
-            ltl = install_ltl(components,frames,self.design)
+            ltl = install_ltl(components,frames,self.design,audit=ltl_monitor_audit)
         except ValueError as error:
             from rvprobe.backend.failures import ReplayInfrastructureFailure
             raise ReplayInfrastructureFailure(str(error)) from error
+        if ltl_monitor_audit:
+            save(directory/'native-ltl-normalization.json', ltl_monitor_audit)
         for key, code in components.items():
             suffix = "f" if key == "filelist" else "sv"
             (directory / f"{self.design.top}_{key}.{suffix}").write_text(code)
@@ -618,19 +621,23 @@ def saved_generation(directory, bundle, design, model):
 
 def accepted_rvprobe_history(candidates, existing):
     """Keep only this run's LTL fragments whose sequences were actually accepted."""
+    from native_replay_feedback import outcome
     accepted = [c for c in candidates
                 if c['sequences'] and all(s in existing for s in c['sequences'])]
     outcomes = []
     for candidate in accepted:
         for row in candidate.get('metadata', {}).get('sampling', []):
-            outcomes.append({key: deepcopy(row[key]) for key in
-                ('label', 'status', 'actual', 'requested_cap', 'sampling_shortfall') if key in row})
+            outcomes.append(outcome(row))
     return {'ltls': [deepcopy(c['ltl']) for c in accepted],
             **({'native_replay_outcomes': outcomes,
                 'native_replay_instruction':
-                    'native-validated goals were accepted; partial/unresolved goals were not. '
-                    'Do not repeat an unresolved expression unchanged. Add legal initialization, '
-                    'handshake or history when repairing the same intent, or select another measured gap.'}
+                    'native-validated goals have accepted witnesses; partial goals have only the '
+                    'reported subset; unresolved goals have none. Native observations describe a '
+                    'bounded search outcome, not proof of UNSAT, unreachable behavior, bad LTL or '
+                    'broken transport. In the next normal coverage round, use these observations '
+                    'and RTL evidence to correct any demonstrated setup/history omission, preserving '
+                    'the intended output check and fixed environment, or select another measured gap. '
+                    'Do not repeat an unresolved expression unchanged.'}
                if outcomes else {})}
 
 
@@ -693,7 +700,7 @@ class Backends:
                    "--design", str((Path(self.bundle["replay_config"]).parent / self.replay["design"]).resolve()),
                    "--replay-config", str(self.bundle["replay_config"]),
                    "--modinfo", feedback["modinfo"], "--feedback-file", str(rd / "feedback.json"),
-                   "--out", str(rd / "generation"), "--model", args.model, "--temperature", str(args.temperature),
+                   "--out", str(rd / "generation"), "--model", options['model'], "--temperature", str(args.temperature),
                    "--attempts", str(args.attempts), "--timeout", str(request_timeout),
                    "--request-retries", str(args.request_retries), "--jg-time-limit", args.jg_time_limit,
                    "--eda-shell", str(args.eda_shell), "--sequences-per-intent", str(args.sequences_per_intent)]
@@ -732,7 +739,7 @@ class Backends:
             if not summary_path.is_file():
                 raise ValueError(f'reused generation summary is missing: {summary_path}')
             result = json.loads(summary_path.read_text())
-            if result.get('model') != args.model or result.get('status') not in ('completed', 'generated'):
+            if result.get('model') != options['model'] or result.get('status') not in ('completed', 'generated'):
                 raise ValueError('reused generation is not a complete response from the requested model')
             if result.get('result', {}).get('status') not in ('generated', 'partial'):
                 raise ValueError('reused generation has no usable LTL result')
@@ -779,7 +786,9 @@ class Backends:
         prompt = build_haven_prompt(prompt_template, self.design, feedback, self.haven_dsl,
                                     self.bundle["initial_dsl"], DSLSequenceSet.model_json_schema())
         save(rd / "request-options.json", {"model": self.args.model, "temperature": self.args.temperature,
-              "timeout": self.args.timeout, "request_retries": self.args.request_retries})
+              "timeout": self.args.timeout, "request_retries": self.args.request_retries,
+              "provider_max_tokens":getattr(self.args,'haven_max_tokens',None),
+              "provider_reasoning_effort":getattr(self.args,'haven_reasoning_effort',None)})
         errors = []
         for attempt in range(1, self.args.attempts + 1):
             ad = rd / f"attempt-{attempt}"
@@ -857,6 +866,8 @@ def main(argv=None):
     run.add_argument("--isolate-sequences", action="store_true",
                      help="fresh simulation per added sequence in BOTH arms; union coverage databases")
     run.add_argument("--model", default=generation.DEFAULT_MODEL)
+    run.add_argument('--haven-max-tokens',type=rvprobe_model_options.token_limit)
+    run.add_argument('--haven-reasoning-effort',choices=('low','high','max'))
     run.add_argument("--temperature", type=float, default=0.3)
     run.add_argument("--timeout", type=int, default=600)
     rvprobe_model_options.add_options(run)
@@ -920,7 +931,8 @@ def main(argv=None):
     if args.fixed_stage1_identity:
         from frozen_stage1 import admit_shared_environment
         admission = admit_shared_environment(bundle,json.loads(args.fixed_stage1_identity.read_text()))
-    if bundle.get('diagnostic_only') and args.model != 'manual-author-debug' and admission is None:
+    if (bundle.get('diagnostic_only') and admission is None and
+            any(rvprobe_model_options.model_for(args,arm)!='manual-author-debug' for arm in arms)):
         raise ValueError('manually authored diagnostic baseline cannot be used as a provider-model benchmark')
     if 'rvprobe' in arms and replay.get('environment'):
         from environment_policy import derive_policy, require_supported
@@ -934,9 +946,11 @@ def main(argv=None):
         parser.error("EDA config accepts only eda_tools, eda_env, simulation; model credentials belong in env-file")
     config.setdefault("eda_env", {})["shell"] = str(args.eda_shell.resolve())
     root = args.out.resolve()
-    args.continued_generation = (saved_generation(args.continue_generation,bundle,design,args.model)
+    args.continued_generation = (saved_generation(args.continue_generation,bundle,design,
+                                                 rvprobe_model_options.model_for(args))
                                  if args.continue_generation else None)
     manifest = {"contract": CONTRACT, "bundle": bundle["fingerprint"], "model": args.model, "arms": list(arms),
+                "models": {arm:rvprobe_model_options.model_for(args,arm) for arm in arms},
                 "source_sha256": framework_hashes(ROOT), "haven_sha256": bundle["haven_sha256"],
                 "stimulus_interface_policy": bundle.get('stimulus_interface_policy'),
                 "eda_sha256": digest(args.eda_config), "seed": args.seed, "sampling": policy,
@@ -945,6 +959,8 @@ def main(argv=None):
                 "attempts": args.attempts, "request_retries": args.request_retries,
                 "temperature": args.temperature, "timeout": args.timeout, "jg_time_limit": args.jg_time_limit,
                 "rvprobe_generation_options": rvprobe_model_options.record(args),
+                "haven_generation_options": {'max_tokens':args.haven_max_tokens,
+                                             'reasoning_effort':args.haven_reasoning_effort},
                 "scope": [bundle.get('coverage_module',design.top)], "metrics": list(METRICS),
                 "baseline_policy": "shared Stage-1 sequences, fresh process per sequence, coverage union" if isolate_sequences else "one shared HAVEN Stage-1 simulation; exact same sequence prefix",
                 "common_context_policy": CONTEXT_POLICY,

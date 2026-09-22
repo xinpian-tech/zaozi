@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from copy import deepcopy
 from ltl_replay import install
-from rvprobe.backend.replay import POLICY, attach, monitor, check_hit
+from rvprobe.backend.replay import POLICY, attach, monitor, check_hit, guarded_property
 from test_hardening import SV, FIXTURES
 from sequence_framework import load_design
 
@@ -29,6 +29,27 @@ class NativeReplayTest(unittest.TestCase):
         self.assertIn('valid & done & result == payload', code)
         self.assertIn('disable iff (reset || !rvp_active)', code)
         self.assertNotIn('assign result = result;', code)
+
+    def test_explicit_clock_precedes_a_single_merged_disable(self):
+        expr = '@(posedge clock) disable iff (reset || (payload == 0)) valid ##1 done'
+        got = guarded_property(expr)
+        self.assertEqual(got, '@(posedge clock) disable iff (reset || !rvp_active || '
+                         '(reset || (payload == 0))) valid ##1 done')
+        self.assertEqual(got.count('disable iff'), 1)
+        source=SV.replace("@(posedge clock) valid & payload <= 8'h7",expr)
+        _,code=monitor(metadata(source),self.design)
+        self.assertIn('cover property ('+got+')',code)
+        self.assertEqual(code.count('disable iff'),1)
+
+    def test_disable_order_default_clock_and_nested_sequence_events(self):
+        self.assertEqual(guarded_property('disable iff (valid) @(posedge clock) done'),
+            '@(posedge clock) disable iff (reset || !rvp_active || (valid)) done')
+        self.assertEqual(guarded_property('valid ##1 done'),
+            'disable iff (reset || !rvp_active) valid ##1 done')
+        got=guarded_property('@(posedge clock) (valid ##1 @(posedge clock) done)')
+        self.assertTrue(got.endswith('(valid ##1 @(posedge clock) done)'))
+        with self.assertRaisesRegex(ValueError,'repeated'):
+            guarded_property('disable iff (valid) disable iff (done) valid')
 
     def test_modified_source_and_forged_wrappers_rejected(self):
         meta = metadata(); meta['source'] += '\n'

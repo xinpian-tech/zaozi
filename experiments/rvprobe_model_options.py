@@ -52,6 +52,8 @@ def coverage_floor(value):
 
 
 def add_options(parser):
+    parser.add_argument('--rvprobe-model',
+        help='RVProbe-only provider model ID; omitted inherits --model, never changes HAVEN')
     parser.add_argument('--rvprobe-feedback-mode',choices=('full','no_diagnostics','no_coverage'))
     parser.add_argument('--rvprobe-fixed-rounds',action='store_true',
         help='Controlled ablation: do not stop on coverage gain, target, or an empty round')
@@ -79,7 +81,7 @@ def add_options(parser):
 
 def cli(args):
     result=[]
-    for name in ('rvprobe_max_tokens','rvprobe_request_timeout','rvprobe_reasoning_effort','rvprobe_dialogue_policy','rvprobe_feedback_mode','rvprobe_evidence_steps','rvprobe_evidence_tools','rvprobe_retrieval_max_tokens','rvprobe_retrieval_reasoning_effort','rvprobe_adaptive_quality_floor'):
+    for name in ('rvprobe_model','rvprobe_max_tokens','rvprobe_request_timeout','rvprobe_reasoning_effort','rvprobe_dialogue_policy','rvprobe_feedback_mode','rvprobe_evidence_steps','rvprobe_evidence_tools','rvprobe_retrieval_max_tokens','rvprobe_retrieval_reasoning_effort','rvprobe_adaptive_quality_floor'):
         value=getattr(args,name,None)
         if value is not None:result+=['--'+name.replace('_','-'),str(value)]
     if getattr(args,'rvprobe_intent_batch_limit',4) != 4:
@@ -88,8 +90,14 @@ def cli(args):
     return result
 
 
+def model_for(args, arm='rvprobe'):
+    shared=getattr(args,'model',None) or 'deepseek-v4-flash-vision-exp'
+    return (getattr(args,'rvprobe_model',None) or shared) if arm=='rvprobe' else shared
+
+
 def record(args):
-    return dict(feedback_mode=getattr(args,'rvprobe_feedback_mode',None) or 'full',
+    return dict(model=model_for(args),
+        feedback_mode=getattr(args,'rvprobe_feedback_mode',None) or 'full',
         fixed_rounds=getattr(args,'rvprobe_fixed_rounds',False),
         dialogue_policy=getattr(args,'rvprobe_dialogue_policy',None) or 'staged',
         max_tokens=getattr(args,'rvprobe_max_tokens',None),

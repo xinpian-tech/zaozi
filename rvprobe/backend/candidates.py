@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from .records import save, utc
-from .encoding import solve, EncodingOptions
+from .encoding import solve, EncodingOptions, UnsupportedTemporalForm
 
 def candidates(design, config, job, goal, environment_terms, directory, yosys, eda_shell,
                count, seed, import_trace, time_limit='120s'):
@@ -70,6 +70,16 @@ def candidates(design, config, job, goal, environment_terms, directory, yosys, e
             else:
                 prior_inputs[row['inputFingerprint']] = str(out/'witness.json')
             yield row
+        except UnsupportedTemporalForm as error:
+            # A missing optional concretization form must not discard other
+            # native-valid goals or masquerade as an invalid model expression.
+            # Keep this intent unresolved and return the already-valid subset.
+            item.update(status='unsupported', kind='auxiliary_temporal_unsupported',
+                        error=str(error), termination_reason='unsupported_temporal_form')
+            record.update(status='stopped', stop_reason='unsupported_temporal_form',
+                          termination_reason='unsupported_temporal_form',
+                          unreachability_proven=False)
+            return
         except GeneratorExit:
             record.update(status='stopped', stop_reason='consumer_closed')
             raise

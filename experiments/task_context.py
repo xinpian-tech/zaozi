@@ -73,10 +73,12 @@ TOOLS = [
              'type':'object','properties':{'query':{'type':'string','minLength':1,'maxLength':200},
                  'file_id':{'type':'string'},'offset':{'type':'integer','minimum':0}},
              'required':['query'],'additionalProperties':False}}},['queries']),
-    tool('inspect_rtl_batch','Search up to 8 exact literals and return one bounded, line-numbered RTL context per query in the same call. Use this instead of a search-then-read loop.',
+    tool('inspect_rtl_batch','Search up to 8 exact literals, return one bounded source context and other matching line locations per query. context_lines may be shared or overridden per query. match_offset selects a zero-based occurrence; use it to skip declarations and inspect a later use.',
          {'queries':{'type':'array','minItems':1,'maxItems':BATCH_SIZE,'items':{
              'type':'object','properties':{'query':{'type':'string','minLength':1,'maxLength':200},
-                 'file_id':{'type':'string'}},'required':['query'],'additionalProperties':False}},
+                 'file_id':{'type':'string'},
+                 'context_lines':{'type':'integer','minimum':0,'maximum':100},
+                 'match_offset':{'type':'integer','minimum':0}},'required':['query'],'additionalProperties':False}},
           'context_lines':{'type':'integer','minimum':0,'maximum':100}},['queries']),
     tool('read_framework','Read a frozen framework-only reference from the supplied catalog; no DUT examples or historical answers.',
          {'id':{'type':'string'},'offset':{'type':'integer','minimum':0},
@@ -277,15 +279,25 @@ class TaskContext:
             raise ValueError('inspect_rtl_batch requires 1..8 queries and context_lines 0..100')
         ranges=[];results=[]
         for index,query in enumerate(queries):
-            if not isinstance(query,dict) or set(query)-{'query','file_id'}:
-                raise ValueError('invalid inspect query')
-            found=self.dispatch('search_rtl',query)
+            if not isinstance(query,dict) or set(query)-{'query','file_id','context_lines','match_offset'}:
+                raise ValueError('inspect query permits query, file_id, context_lines (0..100), and match_offset (zero-based occurrence) only')
+            radius=query.get('context_lines',context)
+            occurrence=query.get('match_offset',0)
+            if type(radius) is not int or not 0<=radius<=100:
+                raise ValueError('inspect query context_lines must be an integer from 0 to 100')
+            if type(occurrence) is not int or occurrence<0:
+                raise ValueError('inspect query match_offset must be a nonnegative integer')
+            found=self.dispatch('search_rtl',{k:v for k,v in query.items() if k in ('query','file_id')} |
+                                {'offset':occurrence})
             match=found['matches'][0] if found['matches'] else None
             results.append({'query':query,'total_matches':found['total_matches'],
-                            'selected_match':match,'selection':'first literal match in frozen catalog'})
+                            'selected_match':match,'selection':'literal match at requested occurrence in frozen catalog',
+                            'match_offset':occurrence,'next_match_offset':found['next_offset'],
+                            'matching_locations':[{k:v for k,v in m.items() if k in ('file_id','line','offset')}
+                                                  for m in found['matches']]})
             if match:
                 entry=self.files[match['file_id']]
-                start=max(1,match['line']-context);end=min(len(entry['lines']),match['line']+context)
+                start=max(1,match['line']-radius);end=min(len(entry['lines']),match['line']+radius)
                 ranges.append({'file_id':match['file_id'],'start_line':start,
                                'line_count':end-start+1,'query_index':index})
         # read_rtl_batch validates and merges; keep query_index only in the audit above.
@@ -384,19 +396,40 @@ class TaskContext:
 
 
 class RepairContext:
-    """A syntax/format repair can consult APIs and full errors, not replan a DUT."""
+    """Type repairs stay local; solver repairs may inspect missing DUT facts."""
+    SEMANTIC_CODES = frozenset(('jg_goal_infeasible', 'jg_goal_unknown',
+        'jg_goal_compile_timeout', 'jg_unsupported_liveness_cover'))
     tools=[t for t in TOOLS if t['function']['name']=='read_framework']+[
         tool('read_diagnostics','Read the full saved diagnostics, including errors omitted from the initial syntax-first projection.',
              {'offset':{'type':'integer','minimum':0},
               'limit':{'type':'integer','minimum':1,'maximum':PAGE_CHARS}})]
 
-    def __init__(self, task, errors):
+    def __init__(self, task, errors, rtl_evidence=()):
         self.task=task
+        self.files=task.files
         self.diagnostics=json.dumps(errors,ensure_ascii=False,separators=(',',':'))
         self.format_only=self.is_format_only(errors)
+        self.semantic=self.is_semantic(errors)
+        self.rtl_history=[]
         self.tools=deepcopy(type(self).tools)
         if self.format_only:
             self.tools=[t for t in self.tools if t['function']['name']=='read_diagnostics']
+        elif self.semantic:
+            from rtl_evidence import validate_and_merge
+            self.rtl_history=validate_and_merge(self.files,[*task.rtl_history,*rtl_evidence])
+            names={'read_rtl','read_rtl_batch','inspect_rtl_batch'}
+            self.tools.extend(deepcopy(t) for t in task.tools if t['function']['name'] in names)
+            self.tools.append(tool('read_context','Read only verified RTL already returned in this run.',
+                {'topic':{'type':'string','enum':['rtl_history']},
+                 'offset':{'type':'integer','minimum':0},
+                 'limit':{'type':'integer','minimum':1,'maximum':PAGE_CHARS}},['topic']))
+
+    @classmethod
+    def is_semantic(cls, errors):
+        return (isinstance(errors,list) and bool(errors) and all(
+            isinstance(error,dict) and error.get('file')=='model.ltl'
+            and error.get('code') in cls.SEMANTIC_CODES
+            and isinstance(error.get('goal'),str) and bool(error['goal']) for error in errors))
 
     @staticmethod
     def is_format_only(errors):
@@ -407,19 +440,36 @@ class RepairContext:
         # A local source repair cannot change the environment or replan the
         # DUT scenario.  IO, diagnostics and previous LTL are in the repair
         # prompt, so repeating the full physical environment only wastes input.
-        return {'policy':self.record()['request_mode'],
+        result={'policy':self.record()['request_mode'],
             **({} if self.format_only else {'framework':[
                 {'id':d.id,'title':d.title,'characters':len(d.content)} for d in self.task.framework.values()]})}
+        if self.semantic:
+            from rtl_evidence import initial
+            task_evidence=self.task.initial_evidence()
+            result.update(rtl=task_evidence['rtl'],environment=task_evidence['environment'])
+            if self.rtl_history:
+                result['previously_read_rtl']=initial(self.rtl_history)
+        return result
 
     def record(self):
-        return {**self.task.record(),'request_mode':('format-only-repair-v1' if self.format_only else 'local-source-repair-v1'),
+        return {**self.task.record(),'request_mode':('format-only-repair-v1' if self.format_only else
+            'goal-local-evidence-repair-v1' if self.semantic else 'local-source-repair-v1'),
             'diagnostics_sha256':hashlib.sha256(self.diagnostics.encode()).hexdigest()}
 
     @staticmethod
-    def call_cost(name,args):return 1
+    def call_cost(name,args):return TaskContext.call_cost(name,args)
 
     def dispatch(self,name,args):
         if name=='read_framework' and not self.format_only:return self.task.dispatch(name,args)
+        if self.semantic:
+            if name in ('read_rtl','read_rtl_batch','inspect_rtl_batch'):
+                return self.task.dispatch(name,args)
+            if name=='read_context':
+                if (not isinstance(args,dict) or set(args)-{'topic','offset','limit'}
+                        or args.get('topic')!='rtl_history'):
+                    raise ValueError('goal-local repair permits RTL history, not coverage replanning')
+                return {'topic':'rtl_history',**TaskContext.page(
+                    json.dumps(self.rtl_history,ensure_ascii=False,separators=(',',':')),args)}
         if name!='read_diagnostics':raise ValueError('local repair permits only framework references and saved diagnostics')
         if not isinstance(args,dict) or set(args)-{'offset','limit'}:raise ValueError('unexpected diagnostic arguments')
         return TaskContext.page(self.diagnostics,args)

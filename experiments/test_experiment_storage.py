@@ -55,7 +55,21 @@ class StorageTest(unittest.TestCase):
 
     def test_outside_root_rejected(self):
         with self.assertRaisesRegex(ValueError,'outside'):
-            archive_closed_simulation(self.root)
+                archive_closed_simulation(self.root)
+
+    def test_parent_archive_preserves_already_relocated_closed_child(self):
+        from prune_archived_caches import relocate, validate
+        (self.sim/'summary.json').write_text('{"status":"completed"}')
+        dest = self.archive/'design'/'simulation'
+        archive_tree(self.sim,dest)
+        relocate(self.sim,dest,Path('summary.json'))
+        (self.work/'summary.json').write_text('{"status":"completed"}')
+        archive_tree(self.work,self.archive)
+        validate(self.work,self.archive,Path('summary.json'))
+        self.assertFalse(dest.is_symlink())
+        self.assertEqual((dest/'simv.vdb/coverage').read_text(),'keep')
+        relocate(self.work,self.archive,Path('summary.json'))
+        self.assertEqual((self.sim/'simv.vdb/coverage').read_text(),'keep')
 
     def test_low_space_checked_before_simulation(self):
         with patch('experiment_storage.shutil.disk_usage') as usage:

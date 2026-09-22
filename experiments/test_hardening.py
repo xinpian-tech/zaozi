@@ -253,6 +253,30 @@ class GoalFeedbackTest(unittest.TestCase):
 
 
 class GenerationRecoveryTest(unittest.TestCase):
+    def test_missing_nix_stops_before_paid_generation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch('framework_runtime.shutil.which', return_value=None), \
+                    patch.object(generation, 'send_completion') as send, \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main(self.arguments(root)), 1)
+                send.assert_not_called()
+            summary = json.loads((root/'run/summary.json').read_text())
+            self.assertEqual(summary['failure_kind'], 'framework_infrastructure_failure')
+            self.assertFalse(summary['model_repair_allowed'])
+            self.assertEqual(summary['costs']['requests'], 0)
+            self.assertIn('missing from PATH', summary['error'])
+
+    def test_prompt_only_does_not_require_nix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(generation, 'runtime_commands', side_effect=RuntimeError('unavailable')) as check, \
+                    patch.object(generation, 'send_completion') as send, \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main([*self.arguments(root), '--prompt-only']), 0)
+                check.assert_not_called()
+                send.assert_not_called()
+
     def test_missing_runtime_is_detected_before_any_provider_request(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -381,6 +405,97 @@ class GenerationRecoveryTest(unittest.TestCase):
             self.assertEqual(summary['partial_fallback']['selected_attempt'],1)
             self.assertEqual(summary['result'],partial['result'])
             self.assertEqual(summary['costs']['usage_reported']['total_tokens'],60)
+
+    def partial_report(self, statuses):
+        labels = parse_response((FIXTURES / 'tiny_intents.ltl').read_text())['labels']
+        self.assertEqual(len(statuses), len(labels))
+        goals = [{'label':label, 'status':'error' if status == 'compile_timeout' else status,
+                  **({'failureKind':'property_compile_timeout'} if status == 'compile_timeout' else {})}
+                 for label, status in zip(labels, statuses)]
+        status = ('generated' if all(s == 'generated' for s in statuses) else
+                  'partial' if 'generated' in statuses else 'no-witness')
+        return {'phase':'solve', 'ok':True, 'result':{'status':status, 'utCount':1, 'goals':goals}}
+
+    def test_resource_only_partial_stops_after_one_no_progress_repair(self):
+        response = (FIXTURES / 'tiny_intents.ltl').read_text()
+        reply = {'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30},
+                 'choices':[{'message':{'role':'assistant','content':response}}]}
+        for resource in ('unknown', 'compile_timeout'):
+            with self.subTest(resource=resource), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                partial = self.partial_report(['generated', resource, resource, resource])
+                with patch.object(generation, 'send_completion', return_value=reply) as send, \
+                        patch.object(generation, 'harness', return_value=(partial, '')) as harness, \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(generation.main([*self.arguments(root), '--attempts', '3']), 0)
+                self.assertEqual(send.call_count, 2)
+                self.assertEqual(harness.call_count, 2)
+                self.assertFalse((root / 'run/attempt-3').exists())
+                summary = json.loads((root / 'run/summary.json').read_text())
+                self.assertEqual(summary['status'], 'partial')
+                self.assertEqual(summary['result'], partial['result'])
+                self.assertEqual(summary['partial_fallback']['selected_attempt'], 1)
+                stop = summary['resource_repair_stop']
+                self.assertEqual(stop['reason'], 'resource-repair-stalled')
+                self.assertEqual(len(stop['unresolved_goals']), 3)
+                self.assertFalse(summary['history'][-1]['repairScheduled'])
+                self.assertEqual(summary['costs']['usage_reported']['total_tokens'], 60)
+                self.assertEqual(summary['costs']['requests'], 2)
+                manifest = json.loads((root / 'run/manifest.json').read_text())
+                self.assertEqual(manifest['resource_repair_policy'], stop['policy'])
+                self.assertEqual(json.loads((root / 'run/attempt-2/resource-repair-stop.json').read_text()), stop)
+                self.assertTrue((root / 'run/attempt-2/goal-shortfall-feedback.json').is_file())
+
+    def test_nonresource_no_witness_progress_and_changed_failures_keep_repair_budget(self):
+        response = (FIXTURES / 'tiny_intents.ltl').read_text()
+        reply = {'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30},
+                 'choices':[{'message':{'role':'assistant','content':response}}]}
+        initial = ['generated', 'unknown', 'unknown', 'unknown']
+        scenarios = {
+            'infeasible': (['generated', 'infeasible', 'infeasible', 'infeasible'],) * 2,
+            'no-witness': (['unknown'] * 4,) * 2,
+            'mixed-failure': (['generated', 'unknown', 'unknown', 'infeasible'],) * 2,
+            'new-generated-goal': (initial, ['generated', 'generated', 'unknown', 'unknown']),
+            'different-generated-goal': (initial, ['unknown', 'generated', 'unknown', 'unknown']),
+            'changed-to-infeasible': (initial, ['generated', 'unknown', 'unknown', 'infeasible']),
+            'changed-resource-class': (initial, ['generated', 'unknown', 'unknown', 'compile_timeout']),
+        }
+        for name, (first, second) in scenarios.items():
+            with self.subTest(scenario=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                reports = [(self.partial_report(states), '') for states in (first, second, ['generated'] * 4)]
+                with patch.object(generation, 'send_completion', return_value=reply) as send, \
+                        patch.object(generation, 'harness', side_effect=reports) as harness, \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(generation.main([*self.arguments(root), '--attempts', '3']), 0)
+                self.assertEqual(send.call_count, 3)
+                self.assertEqual(harness.call_count, 3)
+                summary = json.loads((root / 'run/summary.json').read_text())
+                self.assertEqual(summary['status'], 'generated')
+                self.assertNotIn('resource_repair_stop', summary)
+                self.assertEqual(summary['costs']['usage_reported']['total_tokens'], 90)
+
+    def test_source_error_breaks_consecutive_resource_stall_detection(self):
+        response = (FIXTURES / 'tiny_intents.ltl').read_text()
+        reply = {'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30},
+                 'choices':[{'message':{'role':'assistant','content':response}}]}
+        partial = self.partial_report(['generated', 'unknown', 'unknown', 'unknown'])
+        typed = {'phase':'typecheck', 'ok':False,
+                 'errors':[{'file':'model.ltl', 'line':1, 'col':1, 'message':'type mismatch'}]}
+        reports = [(report, '') for report in
+                   (partial, typed, partial, self.partial_report(['generated'] * 4))]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(generation, 'send_completion', return_value=reply) as send, \
+                    patch.object(generation, 'harness', side_effect=reports) as harness, \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(generation.main([*self.arguments(root), '--attempts', '4']), 0)
+            self.assertEqual(send.call_count, 4)
+            self.assertEqual(harness.call_count, 4)
+            summary = json.loads((root / 'run/summary.json').read_text())
+            self.assertEqual(summary['status'], 'generated')
+            self.assertNotIn('resource_repair_stop', summary)
+            self.assertEqual(summary['costs']['usage_reported']['total_tokens'], 120)
 
     def test_liveness_capability_feedback_uses_budget_and_preserves_labels(self):
         from ut_harness import solver_diagnostic

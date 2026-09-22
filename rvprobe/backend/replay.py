@@ -6,8 +6,48 @@ from pathlib import Path
 
 from .validation import validate
 from .cover import select_cover, COVER
+from .portability import restore_throughout, pairs
+from .failures import ReplayInfrastructureFailure
 
 POLICY = 'native-io-ltl-replay-v1'
+
+
+def guarded_property(expression):
+    """Add replay gating to the property specification, not its sequence body.
+
+    Preserve an explicit clock and the original asynchronous disable condition.
+    A second disable iff is illegal SV. Do not remove it or turn it into a
+    sampled Boolean operand, which would change four-state/abort semantics.
+    """
+    rest = expression.strip()
+    clock, disabled = '', None
+    for _ in range(2):
+        if rest.startswith('@') and not clock:
+            event = re.match(r'@\s*\(', rest)
+            if not event:
+                raise ReplayInfrastructureFailure('unsupported native property clock specification')
+            opening = event.end()-1
+            end = pairs(rest).get(opening)
+            if end is None:
+                raise ReplayInfrastructureFailure('unbalanced native property clock')
+            clock, rest = rest[:end+1], rest[end+1:].strip()
+        elif re.match(r'disable\s+iff\b', rest) and disabled is None:
+            prefix = re.match(r'disable\s+iff\s*\(', rest)
+            if not prefix:
+                raise ReplayInfrastructureFailure('invalid native property disable condition')
+            opening = prefix.end()-1
+            end = pairs(rest).get(opening)
+            if end is None:
+                raise ReplayInfrastructureFailure('unbalanced native property disable condition')
+            disabled, rest = rest[opening+1:end], rest[end+1:].strip()
+        else:
+            break
+    if not rest or re.match(r'disable\s+iff\b', rest):
+        raise ReplayInfrastructureFailure('invalid repeated native property disable condition')
+    gate = 'reset || !rvp_active'
+    if disabled is not None:
+        gate += ' || (' + disabled + ')'
+    return (clock+' ' if clock else '') + f'disable iff ({gate}) ' + rest
 
 
 def attach(rows, goal):
@@ -36,7 +76,7 @@ def attach(rows, goal):
     rows[0]['ltl'] = meta
 
 
-def monitor(meta, design):
+def monitor(meta, design, *, audit=None):
     if set(meta) != {'policy','source','top','label','sha256'} or meta['policy'] != POLICY:
         raise ValueError('invalid native LTL provenance')
     source, top, label = meta['source'], meta['top'], meta['label']
@@ -61,9 +101,20 @@ def monitor(meta, design):
     name = 'rvp_ltl_'+meta['sha256'][:16]
     ports = ['input clock, reset, rvp_active']
     ports += [f'input [{p.width-1}:0] {p.name}' for p in design.data_ports]
-    body = COVER.sub(lambda m: f'{label}: cover property (disable iff (reset || !rvp_active) {m[3]}) '
-                     f'begin $display("RVPROBE_LTL_HIT {meta["sha256"]} {label}"); end',body)
-    return name, f'module {name}('+', '.join(ports)+');\n'+body
+    transformations = []
+    def native_cover(match):
+        expression, edits = restore_throughout(match[3])
+        transformations.extend(edits)
+        return (f'{label}: cover property ({guarded_property(expression)}) '
+                f'begin $display("RVPROBE_LTL_HIT {meta["sha256"]} {label}"); end')
+    body = COVER.sub(native_cover, body)
+    code = f'module {name}('+', '.join(ports)+');\n'+body
+    if audit is not None:
+        audit.append(dict(policy='native-throughout-portability-v1',
+            source_sha256=meta['sha256'], label=label,
+            monitor_sha256=hashlib.sha256(code.encode()).hexdigest(),
+            transformations=transformations))
+    return name, code
 
 
 def check_hit(meta, log):

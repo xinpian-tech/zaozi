@@ -2,14 +2,14 @@
 import backend_imports
 from rvprobe.backend.replay import monitor
 
-def install(components, frames, design):
+def install(components, frames, design, *, audit=None):
     metas = [row['ltl'] for row in frames if 'ltl' in row]
     if not metas:
         return None
     if len(metas)!=1 or len({r['segment'] for r in frames})!=1:
         raise ValueError('native LTL replay requires one independently isolated sequence')
     meta = metas[0]
-    name, code = monitor(meta,design)
+    name, code = monitor(meta,design,audit=audit)
     components['rvp_ltl_monitor'] = code
     components['filelist'] += f'\n{design.top}_rvp_ltl_monitor.sv\n'
     connections = ['.clock(rvp_pin_'+design.clock+')', '.reset(vif.rvp_reset_request)',

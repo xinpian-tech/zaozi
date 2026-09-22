@@ -71,8 +71,13 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator z3 yosys python3 uv ] ++ lib.optionals stdenv.isLinux [
+          # RVProbe's production harness enters a nested `nix develop` after
+          # generation. Include the executable even in a clean service PATH.
+          nativeBuildInputs = with pkgs; [ mtf nix nixd jdk25 verilator z3 yosys python3 uv ] ++ lib.optionals stdenv.isLinux [
             bubblewrap
+            # VCS's launcher uses Perl to locate/load UVM. A systemd-launched
+            # experiment must not depend on the interactive user's PATH.
+            perl
             scala3BspSemanticLs
           ];
           env = with pkgs; {

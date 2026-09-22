@@ -43,6 +43,11 @@ def archive_tree(source, destination):
         for name in set(names) - skip:
             item = Path(directory)/name
             other = destination/item.relative_to(source)
+            # A closed child may already have been verified and relocated to
+            # this exact archive location while its parent is still running.
+            if item.is_symlink() and other.is_dir() and not other.is_symlink() and item.resolve() == other.resolve():
+                skip.add(name)
+                continue
             if other.is_symlink():
                 if not item.is_symlink() or os.readlink(item) != os.readlink(other):
                     raise ValueError(f'archive link conflicts: {other}')

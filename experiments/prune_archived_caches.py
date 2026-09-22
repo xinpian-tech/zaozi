@@ -37,6 +37,9 @@ def validate(work,archive,summary=Path('flow/paired/summary.json')):
             path=directory/name
             other=archive/path.relative_to(work)
             if path.is_symlink():
+                if other.is_dir() and not other.is_symlink() and path.resolve() == other.resolve():
+                    dirs.remove(name)
+                    continue
                 if not other.is_symlink() or os.readlink(path)!=os.readlink(other):
                     raise ValueError('archived directory link differs: '+str(path))
                 dirs.remove(name)

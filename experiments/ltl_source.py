@@ -20,6 +20,58 @@ class OutputFormatError(ValueError):
     """Ambiguous or unsupported envelope; never guess which code to execute."""
 
 
+class LiteralArgumentError(ValueError):
+    """A definitely invalid literal constructor in model source, not an EDA failure."""
+    def __init__(self, source, position, message):
+        super().__init__(message)
+        self.diagnostic = {'file':'model.ltl','kind':'literal-argument',
+            'code':'ltl_bigint_radix','line':source.count('\n',0,position)+1,
+            'col':position-source.rfind('\n',0,position),'message':message}
+        self.diagnostics = [self.diagnostic]
+
+
+def check_bigint_literals(source, stream, pairs):
+    """Check only plain ASCII BigInt(text, literalRadix), never evaluate Scala.
+
+    Escaped/interpolated strings, computed arguments and qualified/shadowed
+    identifiers stay with the compiler/runtime. No value or radix is repaired.
+    """
+    if any(value in ('val','var') and index+1<len(stream) and stream[index+1][1]=='BigInt'
+           for index,(_,value,_) in enumerate(stream)):
+        return
+    errors=[]
+    for index,(kind,value,position) in enumerate(stream):
+        if (kind!='identifier' or value!='BigInt' or
+                index and stream[index-1][1]=='.'):
+            continue
+        opening=index+1
+        if opening not in pairs or stream[opening][1]!='(':
+            continue
+        args=stream[opening+1:pairs[opening]]
+        if (len(args)<3 or args[0][0]!='string' or args[1][1]!=',' or
+                not re.fullmatch(r'"[+\-0-9A-Za-z]*"',args[0][1])):
+            continue
+        radix_text=''.join(part[1] for part in args[2:])
+        if not re.fullmatch(r'[+-]?[0-9]{1,3}',radix_text):
+            continue
+        radix=int(radix_text)
+        digits=args[0][1][1:-1]
+        magnitude=digits[1:] if digits.startswith(('+','-')) else digits
+        alphabet='0123456789abcdefghijklmnopqrstuvwxyz'
+        valid=(2<=radix<=36 and bool(magnitude) and
+               all(char.lower() in alphabet[:radix] for char in magnitude))
+        if not valid:
+            errors.append(LiteralArgumentError(source,position,
+                f'BigInt({args[0][1]}, {radix_text}) is not a valid integer literal. '
+                'The second argument is radix (2..36), not signal width; every digit must fit that radix. '
+                'Use radix 16 for hexadecimal text, 2 for binary, or 10 for decimal. '
+                'Ltl.is infers the signal width. Correct the representation while preserving the intended '
+                'numeric value, all goal labels and output checks; the framework has not changed the value.'))
+    if errors:
+        errors[0].diagnostics=[error.diagnostic for error in errors]
+        raise errors[0]
+
+
 def unwrap(source):
     """Accept one whole-response fence, preserving its exact inner substring."""
     if not isinstance(source, str) or not source.strip() or len(source) > 100000:
@@ -179,6 +231,7 @@ def parse(source):
             pairs[stack.pop()] = index
     if stack:
         raise ValueError(f'unclosed {stream[stack[-1]][1]} in LTL at character {stream[stack[-1]][2]}')
+    check_bigint_literals(source,stream,pairs)
     labels = []
     for index, (kind, value, position) in enumerate(stream):
         if kind != 'identifier' or value != 'Gen':
