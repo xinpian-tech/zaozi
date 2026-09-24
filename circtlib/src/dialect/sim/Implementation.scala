@@ -2,7 +2,12 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.sim.operation
 
-import org.llvm.circt.scalalib.capi.dialect.sim.{TypeApi as SimTypeApi, given}
+import org.llvm.circt.scalalib.capi.dialect.sim.{
+  DPIArgument as CApiDPIArgument,
+  DPIDirection as CApiDPIDirection,
+  TypeApi as SimTypeApi,
+  given
+}
 import org.llvm.mlir.scalalib.capi.ir.{
   Attribute,
   AttributeApi,
@@ -14,7 +19,6 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Operation,
   OperationApi,
   Type,
-  TypeApi,
   Value,
   given
 }
@@ -45,28 +49,55 @@ given DPIFuncApi with
     using Arena,
     Context
   ): DPIFunc =
-    def checked(name: String): String =
-      require(name.matches("[A-Za-z_][A-Za-z_0-9]*"), s"invalid DPI identifier: $name")
-      name
-    val signature = arguments.map { arg =>
-      val printed = new StringBuilder
-      arg.tpe.print(printed ++= _)
-      s"${arg.direction.keyword} \"${checked(arg.name)}\" : $printed"
-    }.mkString(", ")
-    val dpiType   = summon[TypeApi].typeParseGet(s"!sim.dpi_functy<$signature>")
+    val dpiType = summon[SimTypeApi].dpiFunctionTypeGet(arguments.map { arg =>
+      val direction = arg.direction match
+        case DPIDirection.In     => CApiDPIDirection.In
+        case DPIDirection.Out    => CApiDPIDirection.Out
+        case DPIDirection.InOut  => CApiDPIDirection.InOut
+        case DPIDirection.Return => CApiDPIDirection.Return
+        case DPIDirection.Ref    => CApiDPIDirection.Ref
+      CApiDPIArgument(arg.name, arg.tpe, direction)
+    })
     DPIFunc(
       summon[OperationApi].operationCreate(
         name = "sim.func.dpi",
         location = location,
         regionBlockTypeLocations = Seq(Seq.empty),
         namedAttributes = Seq(
-          named("sym_name", checked(symbol).stringAttrGet),
+          named("sym_name", symbol.stringAttrGet),
           named("dpi_function_type", dpiType.typeAttrGet)
-        ) ++ verilogName.toSeq.map(name => named("verilogName", checked(name).stringAttrGet)),
+        ) ++ verilogName.toSeq.map(name => named("verilogName", name.stringAttrGet)),
         resultsTypes = Some(Seq.empty)
       )
     )
   extension (ref: DPIFunc) def operation: Operation = ref._operation
+end given
+
+given DPICallApi with
+  def op(
+    callee:      String,
+    clock:       Value,
+    enable:      Value,
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): DPICall =
+    DPICall(
+      summon[OperationApi].operationCreate(
+        name = "sim.func.dpi.call",
+        location = location,
+        namedAttributes = Seq(
+          named("callee", callee.flatSymbolRefAttrGet),
+          named("operandSegmentSizes", Seq(1, 1, inputs.size).denseI32ArrayGet)
+        ),
+        operands = Seq(clock, enable) ++ inputs,
+        resultsTypes = Some(resultTypes)
+      )
+    )
+  extension (ref: DPICall) def operation: Operation = ref._operation
 end given
 
 given FormatLiteralApi with

@@ -15,7 +15,7 @@ import java.lang.foreign.Arena
   * registerSimPasses
   * }}}
   *
-  * Sim.h has no type or attribute constructors, so [[TypeApi]] builds sim types by textual parsing.
+  * Sim.h provides constructors for all sim dialect types.
   */
 trait DialectApi:
   inline def loadDialect(
@@ -33,10 +33,42 @@ trait DialectApi:
     ): LogicalResult
 end DialectApi
 
-/** Constructors for the sim dialect types this binding covers. */
+enum DPIDirection(val cValue: Int):
+  case In     extends DPIDirection(0)
+  case Out    extends DPIDirection(1)
+  case InOut  extends DPIDirection(2)
+  case Return extends DPIDirection(3)
+  case Ref    extends DPIDirection(4)
+
+final case class DPIArgument(name: String, tpe: Type, direction: DPIDirection)
+
+/** Constructors for the sim dialect types. */
 trait TypeApi:
   /** `!sim.fstring` — a format string fragment or concatenation thereof. */
   def formatStringTypeGet(
+    using Arena,
+    Context
+  ): Type
+
+  def dynamicStringTypeGet(
+    using Arena,
+    Context
+  ): Type
+  def queueTypeGet(
+    element: Type,
+    bound:   Int
+  )(
+    using Arena
+  ): Type
+  def assocArrayTypeGet(
+    element: Type,
+    index:   Type
+  )(
+    using Arena
+  ): Type
+  def dpiFunctionTypeGet(
+    arguments: Seq[DPIArgument]
+  )(
     using Arena,
     Context
   ): Type

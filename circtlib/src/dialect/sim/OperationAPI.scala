@@ -30,6 +30,22 @@ trait DPIFuncApi extends HasOperation[DPIFunc]:
   ): DPIFunc
 end DPIFuncApi
 
+class DPICall(val _operation: Operation)
+trait DPICallApi extends HasOperation[DPICall]:
+  /** `sim.func.dpi.call` — call a declared DPI-C function. */
+  def op(
+    callee:      String,
+    clock:       Value,
+    enable:      Value,
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): DPICall
+end DPICallApi
+
 class FormatLiteral(val _operation: Operation)
 trait FormatLiteralApi extends HasOperation[FormatLiteral]:
   /** `sim.fmt.literal` — a constant ASCII fragment. */

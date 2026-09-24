@@ -1021,7 +1021,6 @@ mlirTypeEqual                                 # header: $MLIR_INSTALL_PATH/inclu
 mlirTypeGetContext                            # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 mlirTypeGetDialect                            # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 mlirTypeGetTypeID                             # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
-mlirTypeParseGet                              # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 mlirTypePrint                                 # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 mlirValueDump                                 # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h
 mlirValueEqual                                # header: $MLIR_INSTALL_PATH/include/mlir-c/IR.h

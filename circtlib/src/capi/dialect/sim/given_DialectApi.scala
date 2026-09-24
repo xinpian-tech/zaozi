@@ -2,7 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.sim
 
-import org.llvm.circt.CAPI.{mlirExportDPIInterface, mlirGetDialectHandle__sim__ as mlirGetDialectHandle, registerSimPasses as r}
+import org.llvm.circt.CAPI.{
+  mlirExportDPIInterface,
+  mlirGetDialectHandle__sim__ as mlirGetDialectHandle,
+  registerSimPasses as r
+}
 import org.llvm.mlir.scalalib.capi.ir.{Context, DialectHandle, Module, given}
 import org.llvm.mlir.scalalib.capi.support.{LogicalResult, given}
 
@@ -21,8 +25,8 @@ given DialectApi with
 
   extension (module: Module)
     def exportDPIInterface(
-      dutModule: String,
-      callback:  String => Unit
+      dutModule:   String,
+      callback:    String => Unit
     )(
       using arena: Arena
     ): LogicalResult =

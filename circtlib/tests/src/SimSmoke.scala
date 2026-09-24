@@ -51,7 +51,7 @@ object SimSmoke extends TestSuite:
 
       summon[SimDialect].loadDialect
 
-      // After loading, they are, and the dialect's types parse.
+      // After loading, the operations and type constructors are available.
       assert(context.isRegisteredOperation("sim.print"))
       assert(context.isRegisteredOperation("sim.triggered"))
 

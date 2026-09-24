@@ -34,6 +34,11 @@ trait ContextApi extends HasSegment[Context] with HasSizeOf[Context]:
     inline def appendDialectRegistry(registry:  DialectRegistry): Unit
     inline def enableMultithreading(enable:     Boolean):         Unit
     inline def loadAllAvailableDialects():                        Unit
+    inline def isRegisteredOperation(
+      name:        String
+    )(
+      using arena: Arena
+    ):                                                            Boolean
     inline def setThreadPool(threadPool:        LlvmThreadPool):  Unit
     def attachDiagnosticHandler(
       handler:     Diagnostic => Boolean
