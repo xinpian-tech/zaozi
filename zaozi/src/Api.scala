@@ -13,6 +13,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
+import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena
@@ -271,6 +272,41 @@ trait VerilogWrapperApi:
       sourcecode.Name.Machine,
       InstanceContext
     ): Instance[I, P]
+
+/** Constructs a testbench module and an LLHD-driven clock. */
+trait TBApi:
+  def module(name: String)(body: (Arena, Context, Block) ?=> Unit)(using Arena, Context, Block): Unit
+
+  /** Produces a clock with a period in nanoseconds, e.g. period 10 toggles every 5 ns. */
+  def clock(name: String, period: Long)(using Arena, Context, Block): Value
+
+final case class DpiArg(
+  name:      String,
+  direction: DPIDirection,
+  width:     Int,
+  signed:    Boolean = false):
+  require(width > 0 && width <= 64, s"invalid DPI width: $width")
+
+final case class DpiFunction(symbol: String, arguments: Seq[DpiArg])
+
+final case class DpiCallResult(values: Map[String, Value]):
+  def apply(name: String): Value = values(name)
+
+/** Declares and calls sim dialect DPI-C functions. */
+trait SimApi:
+  def dpiFunction(symbol: String, cName: Option[String], arguments: Seq[DpiArg])(
+    using Arena,
+    Context,
+    Block
+  ): DpiFunction
+
+  def dpiCall(function: DpiFunction, clock: Value, enabled: Value, inputs: Seq[Value])(
+    using Arena,
+    Context,
+    Block
+  ): DpiCallResult
+
+  def clockedTerminate(clock: Value, condition: Value, success: Boolean)(using Arena, Context, Block): Unit
 
 trait ConstructorApi:
   def Clock(): Clock
