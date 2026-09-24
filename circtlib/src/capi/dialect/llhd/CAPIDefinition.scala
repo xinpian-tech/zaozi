@@ -57,8 +57,26 @@ end AttributeApi
   *
   * {{{
   * llhdTypeIsATimeType
+  * llhdTypeIsARefType
+  * llhdTimeTypeGet
+  * llhdRefTypeGet
+  * llhdRefTypeGetNestedType
   * }}}
   */
 trait TypeApi:
+  def timeTypeGet(
+    using Arena,
+    Context
+  ):                                           Type
+  def refTypeGet(
+    element: Type
+  )(
+    using Arena
+  ):                                           Type
   extension (tpe: Type) inline def isTimeType: Boolean
+  extension (tpe: Type) inline def isRefType:  Boolean
+  extension (tpe: Type)
+    def refTypeGetNestedType(
+      using Arena
+    ):                                         Type
 end TypeApi

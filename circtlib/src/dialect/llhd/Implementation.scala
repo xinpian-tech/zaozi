@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.llhd.operation
 
-import org.llvm.circt.scalalib.capi.dialect.llhd.{AttributeApi as LLHDAttributeApi, given}
+import org.llvm.circt.scalalib.capi.dialect.llhd.{AttributeApi as LLHDAttributeApi, TypeApi as LLHDTypeApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{
   AttributeApi,
   Block,
@@ -12,7 +12,6 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Operation,
   OperationApi,
   OperationStateApi,
-  TypeApi,
   Value,
   given
 }
@@ -35,7 +34,7 @@ given ConstantTimeApi with
         name = "llhd.constant_time",
         location = location,
         namedAttributes = Seq(summon[NamedAttributeApi].namedAttributeGet("value".identifierGet, value)),
-        resultsTypes = Some(Seq(summon[TypeApi].typeParseGet("!llhd.time")))
+        resultsTypes = Some(Seq(summon[LLHDTypeApi].timeTypeGet))
       )
     )
   extension (ref: ConstantTime)
@@ -54,16 +53,14 @@ given SignalApi with
     using Arena,
     Context
   ): Signal =
-    val typeString = new StringBuilder
-    initial.getType.print(typeString ++= _)
-    val attrs      = name.toSeq.map(n => summon[NamedAttributeApi].namedAttributeGet("name".identifierGet, n.stringAttrGet))
+    val attrs = name.toSeq.map(n => summon[NamedAttributeApi].namedAttributeGet("name".identifierGet, n.stringAttrGet))
     Signal(
       summon[OperationApi].operationCreate(
         name = "llhd.sig",
         location = location,
         namedAttributes = attrs,
         operands = Seq(initial),
-        resultsTypes = Some(Seq(summon[TypeApi].typeParseGet(s"!llhd.ref<${typeString.toString}>")))
+        resultsTypes = Some(Seq(summon[LLHDTypeApi].refTypeGet(initial.getType)))
       )
     )
   extension (ref: Signal)
