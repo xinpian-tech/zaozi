@@ -8,6 +8,10 @@
 // RUN: firld %t.dir/SynchronizedReset_stages2_activeHigh.mlirbc --base-circuit SynchronizedReset_stages2_activeHigh --no-mangle | firtool --format=mlir | FileCheck %s
 // RUN: rm -rf %t.dir
 
+// CHECK: reset_released_after_stages:
+// CHECK: assert property (disable iff (SynchronizedReset_stages2_activeHigh.reset)
+// CHECK: reset_stays_released_until_reasserted:
+// CHECK: assert property (disable iff (SynchronizedReset_stages2_activeHigh.reset)
 // CHECK-LABEL: module SynchronizedReset_stages2_activeHigh(
 // CHECK: input  clock,
 // CHECK: reset,
