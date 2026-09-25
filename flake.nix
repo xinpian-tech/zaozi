@@ -6,6 +6,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
     circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
+    circt-nix.inputs.circt-src.url = "github:xinpian-tech/circt/feat/export-dpi-interface";
     flake-utils.url = "github:numtide/flake-utils";
     mvn-trace-forge.url = "github:Avimitin/mvn-trace-forge";
     scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
@@ -71,7 +72,7 @@
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
+          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 verilator ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
           ];
           env = with pkgs; {

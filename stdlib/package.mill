@@ -8,18 +8,23 @@ import mill.scalalib._
 import mill.scalalib.scalafmt._
 import os.Path
 
-import build.{circtlib, decoder, v, zaozi, LitModule, ZaoziPublishModule, ZaoziScalaModule}
+import build.{circtlib, decoder, utlib, v, zaozi, LitModule, ZaoziPublishModule, ZaoziScalaModule}
 import build.testlib
 
 object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(zaozi, decoder)
+  def moduleDeps = Seq(zaozi, decoder)
 
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
   override def forkArgs: T[Seq[String]] = Task(
     super.forkArgs() ++ circtlib.forkArgs()
   )
+
+  object ut extends ScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps = Seq(m, utlib)
+  }
 
   object lit extends ZaoziScalaModule with ScalafmtModule {
     def scalaVersion = Task(v.scala)
@@ -29,7 +34,7 @@ object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishM
     )
     object tests extends LitModule {
       def scalaVersion:    T[String]       = Task(m.scalaVersion())
-      def runClasspath:    T[Seq[os.Path]] = Task(lit.runClasspath().map(_.path))
+      def runClasspath:    T[Seq[os.Path]] = Task((lit.runClasspath() ++ ut.runClasspath()).map(_.path).distinct)
       def javaLibraryPath: T[Seq[os.Path]] = Task(
         (circtlib.libraryPaths()).map(_.path)
       )
