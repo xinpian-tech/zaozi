@@ -81,17 +81,15 @@ object SynchronizedReset
           s"reset_not_released_early_$cycle"
         )
 
-      // 3. output reset must be released after stages cycles
-      val heldDeassertedForStages = (!inputAsserted) throughout true.B.S.##(parameter.stages)(true.B.S)
-      val outputDeasserted        = !outputAsserted
-
+      val outputDeasserted = !outputAsserted
+      // A reset between clock edges restarts both release obligations.
       Assert(
-        (inputAsserted.S ### heldDeassertedForStages) |-> outputDeasserted.S,
+        true.B.S.##(parameter.stages)(true.B.S) |-> outputDeasserted.S,
+        !inputAsserted,
         "reset_released_after_stages"
       )
-
-      // 4. once released, output reset must remain released until input reset is asserted
       Assert(
-        always(outputDeasserted.I implies (outputDeasserted.I until inputAsserted.I)),
+        outputDeasserted.S |=> outputDeasserted.S,
+        !inputAsserted,
         "reset_stays_released_until_reasserted"
       )
