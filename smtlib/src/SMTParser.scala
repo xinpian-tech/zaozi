@@ -99,7 +99,7 @@ enum Z3Status:
 // This case class represents the result of a Z3 solver invocation.
 // status indicates whether the problem was satisfiable, unsatisfiable, or unknown.
 // model contains the variable assignments if the status is Sat, Or empty if Unsat or Unknown.
-final case class Z3Result(status: Z3Status, model: Seq[(String, Boolean | BigInt)])
+final case class Z3Result(status: Z3Status, model: Seq[(String, Boolean | BigInt)], conflict: Seq[String] = Seq.empty)
 
 // This function parses the output from Z3 and returns a Z3Result.
 def parseZ3Output(input: String): Z3Result =
@@ -122,6 +122,28 @@ def parseZ3Output(input: String): Z3Result =
     else Seq.empty
 
   Z3Result(status, model)
+
+/** Models found by successive checks, then the status of the check that ended the run. */
+final case class Z3Enumeration(status: Z3Status, models: Seq[Seq[(String, Boolean | BigInt)]])
+
+def parseZ3Models(input: String): Z3Enumeration =
+  def value(expr: SExpr):                                                       Boolean | BigInt = convert(expr) match
+    case SMTCommand.BoolConstant(value) => value
+    case SMTCommand.IntConstant(value)  => value
+    case other                          => throw new IllegalArgumentException(s"unexpected model value: $other")
+  @scala.annotation.tailrec
+  def models(rest: Seq[SExpr], found: Vector[Seq[(String, Boolean | BigInt)]]): Z3Enumeration    = rest match
+    case SExpr.Symbol("model") +: SExpr.List(pairs) +: tail =>
+      models(
+        tail,
+        found :+ pairs.map:
+          case SExpr.List(Seq(SExpr.Symbol(name), assigned)) => name -> value(assigned)
+          case other                                         => throw new IllegalArgumentException(s"unexpected model entry: $other")
+      )
+    case SExpr.Symbol("unsat") +: _                         => Z3Enumeration(Z3Status.Unsat, found)
+    case Seq(SExpr.Symbol("unknown"))                       => Z3Enumeration(Z3Status.Unknown, found)
+    case other                                              => throw new IllegalArgumentException(s"unexpected enumeration result: $other")
+  models(parseSExpr(input).get.value, Vector.empty)
 
 enum SExpr:
   case Symbol(value: String)
