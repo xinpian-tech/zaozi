@@ -8,12 +8,12 @@ import mill.scalalib._
 import mill.scalalib.scalafmt._
 import os.Path
 
-import build.{circtlib, decoder, v, zaozi, LitModule, ZaoziPublishModule, ZaoziScalaModule}
+import build.{circtlib, decoder, smtlib, v, zaozi, LitModule, ZaoziPublishModule, ZaoziScalaModule}
 import build.testlib
 
 object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
   def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(zaozi, decoder)
+  def moduleDeps   = Seq(zaozi, decoder, smtlib)
 
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
