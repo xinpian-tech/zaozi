@@ -51,6 +51,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   WalkResultEnum
 }
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
+import org.llvm.mlir.scalalib.capi.support.given
 
 import java.lang.foreign.Arena
 
@@ -69,6 +70,8 @@ def validateCircuit(
           // Find all instance and create an extmodule for it, which is a placeholder for linking at circt time.
           case i if i == "firrtl.instance" =>
             val moduleName: String = op.getInherentAttributeByName("moduleName").flatSymbolRefAttrGetValue
+            val verilogName = op.getAttributeByName("zaozi.verilog_defname")
+            val isVerilog   = org.llvm.mlir.MlirAttribute.ptr(verilogName.segment).address() != 0
             if (declaredModules.add(moduleName))
               val portTypes: Seq[Type] = Seq.tabulate(op.getNumResults.toInt)(i => op.getResult(i).getType)
               val extmoduleOp = ExtModule(
@@ -86,12 +89,12 @@ def validateCircuit(
                       // ::mlir::StringAttr
                       namedAttributeApi.namedAttributeGet(
                         "defname".identifierGet,
-                        moduleName.stringAttrGet
+                        if isVerilog then verilogName else moduleName.stringAttrGet
                       ),
                       // ::mlir::StringAttr
                       namedAttributeApi.namedAttributeGet(
                         "parameters".identifierGet,
-                        Seq.empty.arrayAttrGet
+                        if isVerilog then op.getAttributeByName("zaozi.verilog_parameters") else Seq.empty.arrayAttrGet
                       ),
                       // ::circt::firrtl::ConventionAttr
                       namedAttributeApi.namedAttributeGet(
@@ -153,6 +156,11 @@ def validateCircuit(
                 )
               )
               summon[Circuit].block.appendOwnedOperation(extmoduleOp.operation)
+            if isVerilog then
+              org.llvm.mlir.CAPI
+                .mlirOperationRemoveAttributeByName(op.segment, "zaozi.verilog_defname".toStringRef.segment)
+              org.llvm.mlir.CAPI
+                .mlirOperationRemoveAttributeByName(op.segment, "zaozi.verilog_parameters".toStringRef.segment)
           // get layers from module, append it to circuit to create symbol table.
           case i if i == "firrtl.module"   =>
             val layersAttrs = op.getInherentAttributeByName("layers")
