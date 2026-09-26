@@ -3,184 +3,108 @@
 package me.jiuyang.smtlib.tests
 
 import me.jiuyang.smtlib.default.{*, given}
-import me.jiuyang.smtlib.*
+import me.jiuyang.smtlib.parser.Z3Status
 import utest.*
-
-import java.lang.foreign.Arena
 
 object CoreSpec extends TestSuite:
   val tests = Tests:
     test("assert"):
-      test("Const[Bool]"):
-        smtTest("assert true"):
-          solver {
-            smtAssert(true.B)
-          }
-        smtTest("assert false"):
-          solver {
-            smtAssert(false.B)
-          }
-      test("Ref[Bool]"):
-        smtTest("declare-const a Bool"):
-          solver {
-            val a = smtValue(Bool)
-            smtAssert(a)
-          }
-    test("declare"):
-      test("const"):
-        smtTest("declare-const a Bool"):
-          solver {
-            val a = smtValue(Bool)
-            smtAssert(a)
-          }
-      test("named const"):
-        smtTest("declare-const domain_core Bool"):
-          solver {
-            given sourcecode.Name.Machine = sourcecode.Name.Machine("domain_core")
-            val a                         = smtValue(Bool)
-            smtAssert(a)
-          }
-      test("fun"):
-        smtTest("declare-fun a (Int Bool) Bool"):
-          solver {
-            val a = smtFunc(Seq(SInt, Bool), Bool)
-            smtAssert(a(1.S, true.B))
-          }
-    test("distinct"):
-      test("Const[Bool]"):
-        smtTest("distinct"):
-          solver {
-            smtAssert(smtDistinct())
-          }
-        smtTest("distinct true"):
-          solver {
-            smtAssert(smtDistinct(true.B))
-          }
-        smtTest("distinct true true"):
-          solver {
-            smtAssert(smtDistinct(true.B, true.B))
-          }
-        smtTest("distinct true false"):
-          solver {
-            smtAssert(smtDistinct(true.B, false.B))
-          }
-        smtTest("distinct true true false false"):
-          solver {
-            smtAssert(smtDistinct(true.B, true.B, false.B, false.B))
-          }
-      test("Ref[Bool]"):
-        smtTest(
-          "(declare-const a Bool)",
-          "(declare-const b Bool)",
-          "(assert (let ((tmp (distinct a b)))",
-          "        tmp))"
-        ):
-          solver {
-            val a = smtValue(Bool)
-            val b = smtValue(Bool)
-            smtAssert(smtDistinct(a, b))
-          }
-    test("reset"):
-      smtTest("(reset)\n(reset)"):
+      withSMTContext:
+        solver { smtAssert(true.B); smtCheck } ==> Seq(Z3Status.Sat)
+        solver { smtAssert(false.B); smtCheck } ==> Seq(Z3Status.Unsat)
         solver {
+          val a = smtValue(Bool)
+          smtAssert(a)
+          smtCheck
+          smtAssert(!a)
+          smtCheck
+        } ==> Seq(Z3Status.Sat, Z3Status.Unsat)
+    test("function application"):
+      withSMTContext:
+        solver {
+          val f = smtFunc(Seq(SInt, Bool), Bool)
+          smtAssert(f(1.S, true.B))
+          smtCheck
+          smtAssert(!f(1.S, true.B))
+          smtCheck
+        } ==> Seq(Z3Status.Sat, Z3Status.Unsat)
+    test("distinct"):
+      withSMTContext:
+        solver { smtAssert(smtDistinct(true.B, true.B)); smtCheck } ==> Seq(Z3Status.Unsat)
+        solver { smtAssert(smtDistinct(true.B, false.B)); smtCheck } ==> Seq(Z3Status.Sat)
+        solver { smtAssert(smtDistinct(true.B, true.B, false.B, false.B)); smtCheck } ==> Seq(Z3Status.Unsat)
+        solver {
+          val a = smtValue(Bool)
+          val b = smtValue(Bool)
+          smtAssert(smtDistinct(a, b))
+          smtCheck
+          smtAssert(a === b)
+          smtCheck
+        } ==> Seq(Z3Status.Sat, Z3Status.Unsat)
+    test("reset"):
+      withSMTContext:
+        solver {
+          smtAssert(false.B)
+          smtCheck
           smtReset
-        }
+          smtCheck
+        } ==> Seq(Z3Status.Unsat, Z3Status.Sat)
     test("set-logic"):
-      smtTest("(set-logic QF_LIA)"):
+      withSMTContext:
         solver {
           smtSetLogic("QF_LIA")
-        }
-      smtTest("(set-logic XXX)"):
-        solver {
-          smtSetLogic("XXX")
-        }
+          val a = smtValue(SInt)
+          smtAssert(a > 0.S)
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
     test("eq"):
-      smtTest("="):
+      withSMTContext:
+        solver { smtAssert(smtEq(true.B, true.B)); smtCheck } ==> Seq(Z3Status.Sat)
+        solver { smtAssert(smtEq(true.B, false.B)); smtCheck } ==> Seq(Z3Status.Unsat)
         solver {
-          smtAssert(smtEq())
-        }
-      smtTest("= true"):
-        solver {
-          smtAssert(smtEq(true.B))
-        }
-      smtTest("= true true"):
-        solver {
-          smtAssert(smtEq(true.B, true.B))
-        }
-      smtTest("= true false"):
-        solver {
-          smtAssert(smtEq(true.B, false.B))
-        }
-      smtTest(
-        "(declare-const a Bool)",
-        "(declare-const b Int)",
-        "(assert (let ((tmp (= a b)))",
-        "        tmp))"
-      ):
-        solver {
-          val a = smtValue(Bool)
+          val a = smtValue(SInt)
           val b = smtValue(SInt)
-          smtAssert(smtEq(a, b))
-        }
-      smtTest("= true 1"):
-        solver {
-          smtAssert(smtEq(true.B, 1.S))
-        }
-      smtTest(
-        "(declare-sort e 1)",
-        "(declare-const a Bool)",
-        "(declare-const b Int)",
-        "(declare-const c (_ BitVec 32))",
-        "(declare-fun d (Int Bool) Bool)",
-        "(declare-const e (e Int))",
-        "(assert (let ((tmp (= true 1 #x00000001 a b c d e)))",
-        "        tmp))"
-      ):
-        solver {
-          val a = smtValue(Bool)
-          val b = smtValue(SInt)
-          val c = smtValue(BitVector(true, 32))
-          val d = smtValue(SMTFunc(Seq(SInt, Bool), Bool))
-          val e = smtValue(Sort("e", Seq(SInt)))
-          smtAssert(smtEq(true.B, 1.S, 1.B(true, 32), a, b, c, d, e))
-        }
+          smtAssert(smtEq(a, b, 1.S))
+          smtCheck
+          smtAssert(a =/= 1.S)
+          smtCheck
+        } ==> Seq(Z3Status.Sat, Z3Status.Unsat)
+    test("invalid equality and distinct operands are rejected"):
+      withSMTContext:
+        intercept[IllegalArgumentException]:
+          solver { smtAssert(smtEq()); smtCheck }
+        intercept[IllegalArgumentException]:
+          solver { smtAssert(smtEq(true.B)); smtCheck }
+        intercept[IllegalArgumentException]:
+          solver { smtAssert(smtEq(true.B, 1.S)); smtCheck }
+        intercept[IllegalArgumentException]:
+          solver { smtAssert(smtDistinct()); smtCheck }
+        intercept[IllegalArgumentException]:
+          solver { smtAssert(smtDistinct(true.B)); smtCheck }
     test("ite"):
-      smtTest("ite true true false"):
-        solver {
-          val cond = true.B
-          smtAssert(smtIte(true.B) { true.B } { false.B })
-        }
-      smtTest(
-        "(declare-const a Bool)",
-        "(declare-const b Int)",
-        "(declare-const c Int)",
-        "(assert (let ((tmp (ite a b c)))",
-        "        (let ((tmp_0 (= tmp 0)))",
-        "        tmp_0)))"
-      ):
+      withSMTContext:
+        solver { smtAssert(smtIte(true.B) { true.B } { false.B }); smtCheck } ==> Seq(Z3Status.Sat)
         solver {
           val a = smtValue(Bool)
           val b = smtValue(SInt)
           val c = smtValue(SInt)
+          smtAssert(b === 1.S)
+          smtAssert(c === 2.S)
           smtAssert(smtIte(a) { b } { c } === 0.S)
-        }
-    test("push"):
-      smtTest("push 1"):
-        solver {
-          smtPush(1)
-        }
-    test("pop"):
-      smtTest("pop 1"):
-        solver {
-          smtPop(1)
-        }
-    test("check"):
-      smtTest("(check-sat)"):
-        solver {
           smtCheck
-        }
-    test("yield"):
-      smtTest(""):
+        } ==> Seq(Z3Status.Unsat)
+    test("push and pop"):
+      withSMTContext:
         solver {
-          smtYield()
-        }
+          val a = smtValue(Bool)
+          smtAssert(a)
+          smtCheck
+          smtPush(1)
+          smtAssert(!a)
+          smtCheck
+          smtPop(1)
+          smtCheck
+        } ==> Seq(Z3Status.Sat, Z3Status.Unsat, Z3Status.Sat)
+    test("check"):
+      withSMTContext:
+        solver { smtCheck; smtCheck } ==> Seq(Z3Status.Sat, Z3Status.Sat)

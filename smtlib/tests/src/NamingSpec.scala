@@ -1,98 +1,80 @@
 // SPDX-License-Identifier: Apache-2.0
 package me.jiuyang.smtlib.tests
 
-import me.jiuyang.smtlib.*
 import me.jiuyang.smtlib.default.{*, given}
 import me.jiuyang.smtlib.parser.Z3Status
+import org.llvm.mlir.scalalib.capi.ir.given
 import utest.*
 
 object NamingSpec extends TestSuite:
   val tests = Tests:
     test("value declarations use Scala val names"):
-      val result = smtZ3Test(
-        "(declare-const a Bool)",
-        "(declare-const b Bool)",
-        "(assert a)",
-        "(not b)"
-      ) {
-        val a = smtValue(Bool)
-        val b = smtValue(Bool)
-        smtAssert(a)
-        smtAssert(!b)
-      }
-      result.status ==> Z3Status.Sat
-      result.model.toMap ==> Map("a" -> true, "b" -> false)
-    test("function declarations and applications use Scala val names"):
-      smtTest(
-        "(declare-const a Bool)",
-        "(declare-const count Int)",
-        "(declare-fun f (Int Bool) Bool)",
-        "(declare-fun g (Int Bool) Bool)",
-        "(f count a)",
-        "(g count a)"
-      ):
+      withSMTContext:
         solver {
-          val a     = smtValue(Bool)
+          val a = smtValue(Bool)
+          val b = smtValue(Bool)
+          assert(a.operation.getAttributeByName("namePrefix").stringAttrGetValue == "a")
+          assert(b.operation.getAttributeByName("namePrefix").stringAttrGetValue == "b")
+          smtAssert(a)
+          smtAssert(!b)
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
+    test("function declarations use Scala val names"):
+      withSMTContext:
+        solver {
           val count = smtValue(SInt)
           val f     = smtFunc(Seq(SInt, Bool), Bool)
           val g     = smtValue(SMTFunc(Seq(SInt, Bool), Bool))
-          smtAssert(f(count, a))
-          smtAssert(g(count, a))
-        }
+          assert(f.operation.getAttributeByName("namePrefix").stringAttrGetValue == "f")
+          assert(g.operation.getAttributeByName("namePrefix").stringAttrGetValue == "g")
+          smtAssert(f(count, true.B))
+          smtAssert(!g(count, true.B))
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
     test("declarations in an anonymous function"):
-      smtTest("(declare-const _GEN_0 Bool)", "(declare-const _GEN_1 Bool)"):
+      withSMTContext:
         solver {
-          (0 until 2).foreach { _ => smtAssert(smtValue(Bool)) }
-        }
+          (0 until 2).foreach { index =>
+            val value = { given sourcecode.Name.Machine = sourcecode.Name.Machine("$anonfun"); smtValue(Bool) }
+            assert(value.operation.getAttributeByName("namePrefix").stringAttrGetValue == s"_GEN_$index")
+            smtAssert(value)
+          }
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
     test("contextual names"):
-      smtTest("(declare-const domain_core Bool)", "(declare-fun domain_enable (Int Bool) Bool)"):
+      withSMTContext:
         solver {
-          val core   = {
-            given sourcecode.Name.Machine = sourcecode.Name.Machine("domain_core")
-            smtValue(Bool)
-          }
+          val core   = { given sourcecode.Name.Machine = sourcecode.Name.Machine("domain_core"); smtValue(Bool) }
           val enable = {
-            given sourcecode.Name.Machine = sourcecode.Name.Machine("domain_enable")
-            smtFunc(Seq(SInt, Bool), Bool)
+            given sourcecode.Name.Machine = sourcecode.Name.Machine("domain_enable"); smtFunc(Seq(SInt, Bool), Bool)
           }
+          assert(core.operation.getAttributeByName("namePrefix").stringAttrGetValue == "domain_core")
+          assert(enable.operation.getAttributeByName("namePrefix").stringAttrGetValue == "domain_enable")
           smtAssert(core)
           smtAssert(enable(1.S, core))
-        }
-    test("anonymous declarations share a counter"):
-      smtTest(
-        "(declare-const _GEN_0 Bool)",
-        "(declare-fun _GEN_1 (Int Bool) Bool)",
-        "(declare-const _GEN_2 Int)"
-      ):
-        solver {
-          given sourcecode.Name.Machine = sourcecode.Name.Machine("$anonfun")
-          val a                         = smtValue(Bool)
-          val b                         = smtFunc(Seq(SInt, Bool), Bool)
-          val c                         = smtValue(SInt)
-          smtAssert(a)
-          smtAssert(b(c, a))
-        }
-    test("each solver starts a fresh counter"):
-      smtTest(
-        "; solver scope 0\n(declare-const _GEN_0 Bool)",
-        "; solver scope 1\n(declare-const _GEN_0 Bool)"
-      ):
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
+    test("each solver starts a fresh shared anonymous counter"):
+      withSMTContext:
         for _ <- 0 until 2 do
           solver {
             given sourcecode.Name.Machine = sourcecode.Name.Machine("$anonfun")
-            smtAssert(smtValue(Bool))
-          }
-    test("export disambiguates explicit and generated names"):
-      smtTest("(declare-const _GEN_0 Bool)", "(declare-const _GEN_0_0 Bool)"):
+            val a                         = smtValue(Bool)
+            val b                         = smtFunc(Seq(SInt, Bool), Bool)
+            val c                         = smtValue(SInt)
+            assert(a.operation.getAttributeByName("namePrefix").stringAttrGetValue == "_GEN_0")
+            assert(b.operation.getAttributeByName("namePrefix").stringAttrGetValue == "_GEN_1")
+            assert(c.operation.getAttributeByName("namePrefix").stringAttrGetValue == "_GEN_2")
+            smtAssert(a)
+            smtAssert(b(c, a))
+            smtCheck
+          } ==> Seq(Z3Status.Sat)
+    test("colliding explicit and generated prefixes denote distinct values"):
+      withSMTContext:
         solver {
-          val named     = {
-            given sourcecode.Name.Machine = sourcecode.Name.Machine("_GEN_0")
-            smtValue(Bool)
-          }
-          val anonymous = {
-            given sourcecode.Name.Machine = sourcecode.Name.Machine("$anonfun")
-            smtValue(Bool)
-          }
+          val named     = { given sourcecode.Name.Machine = sourcecode.Name.Machine("_GEN_0"); smtValue(Bool) }
+          val anonymous = { given sourcecode.Name.Machine = sourcecode.Name.Machine("$anonfun"); smtValue(Bool) }
           smtAssert(named)
-          smtAssert(anonymous)
-        }
+          smtAssert(!anonymous)
+          smtCheck
+        } ==> Seq(Z3Status.Sat)

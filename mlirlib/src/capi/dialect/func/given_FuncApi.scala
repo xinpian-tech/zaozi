@@ -3,6 +3,7 @@
 package org.llvm.mlir.scalalib.capi.dialect.func
 
 import org.llvm.mlir.scalalib.capi.ir.{
+  AttributeApi,
   Block,
   Context,
   LocationApi,
@@ -10,10 +11,12 @@ import org.llvm.mlir.scalalib.capi.ir.{
   NamedAttributeApi,
   Operation,
   OperationApi,
+  Type,
   given
 }
 
 import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.support.given
 
 // Structure
 given FuncApi with
@@ -60,6 +63,36 @@ given FuncApi with
         // ++ noInlineAttr
     )
   )
+  def op(
+    symName:        String,
+    inputs:         Seq[Type],
+    results:        Seq[Type],
+    emitCInterface: Boolean
+  )(
+    using arena:    Arena,
+    context:        Context
+  ): Func =
+    val location     = summon[LocationApi].locationUnknownGet
+    val functionType = Type(
+      org.llvm.mlir.CAPI
+        .mlirFunctionTypeGet(arena, context.segment, inputs.size, inputs.toMlirArray, results.size, results.toMlirArray)
+    )
+    val named        = summon[NamedAttributeApi]
+    Func(
+      summon[OperationApi].operationCreate(
+        name = "func.func",
+        location = location,
+        regionBlockTypeLocations = Seq(Seq((inputs, inputs.map(_ => location)))),
+        resultsTypes = Some(Seq.empty),
+        namedAttributes = Seq(
+          named.namedAttributeGet("sym_name".identifierGet, symName.stringAttrGet),
+          named.namedAttributeGet("function_type".identifierGet, functionType.typeAttrGet)
+        ) ++ Option.when(emitCInterface)(
+          named.namedAttributeGet("llvm.emit_c_interface".identifierGet, summon[AttributeApi].unitAttrGet)
+        )
+      )
+    )
+
   extension (c:   Func)
     inline def block(
       using Arena

@@ -20,3 +20,4 @@ CIRCTVerif
 CIRCTExportFIRRTL
 CIRCTExportVerilog
 MLIRCAPIRegisterEverything
+CIRCTCAPIConversion

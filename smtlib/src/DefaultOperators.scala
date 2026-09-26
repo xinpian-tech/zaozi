@@ -14,6 +14,38 @@ import java.lang.foreign.Arena
 val constructorApi = summon[ConstructorApi]
 export constructorApi.*
 
+// Local declarations in a quantifier body denote bound variables, represented
+// by MLIR block arguments. Captures from the enclosing solver remain free.
+private def bindQuantifier(
+  op:          Operation,
+  block:       Block,
+  names:       Seq[String]
+)(
+  using arena: Arena,
+  context:     Context
+): Unit =
+  val declarations = Iterator
+    .iterate(block.getFirstOperation)(_.getNextInBlock)
+    .takeWhile(value => org.llvm.mlir.MlirOperation.ptr(value.segment).address() != 0)
+    .filter(_.getName.str == "smt.declare_fun")
+    .toVector
+  require(declarations.nonEmpty, "a quantifier must declare at least one bound variable")
+  require(names.isEmpty || names.size == declarations.size, "quantifier names must match bound variables")
+  val boundNames   =
+    if names.nonEmpty then names else declarations.map(_.getAttributeByName("namePrefix").stringAttrGetValue)
+  op.setAttributeByName("boundVarNames", boundNames.map(_.stringAttrGet).arrayAttrGet)
+  declarations.foreach: declaration =>
+    val value    = declaration.getResult(0)
+    val argument = org.llvm.mlir.CAPI.mlirBlockAddArgument(
+      arena,
+      block.segment,
+      value.getType.segment,
+      declaration.getLocation.segment
+    )
+    org.llvm.mlir.CAPI.mlirValueReplaceAllUsesOfWith(value.segment, argument)
+    declaration.removeFromParent()
+    declaration.destroy()
+
 given ConstructorApi with
   // types
   extension (value: Int)
@@ -219,12 +251,13 @@ given ConstructorApi with
     sourcecode.Name.Machine
   ): Ref[Bool] =
     val op = summon[ExistsApi].op(weight, noPattern, boundVarNames, locate)
+    op.operation.appendToBlock()
     body(
       using summon[Arena],
       summon[Context],
       op.bodyBlock
     )
-    op.operation.appendToBlock()
+    bindQuantifier(op.operation, op.bodyBlock, boundVarNames)
     new Ref[Bool]:
       val _tpe: Bool = new Object with Bool
       val _operation = op.operation
@@ -243,12 +276,13 @@ given ConstructorApi with
     sourcecode.Name.Machine
   ): Ref[Bool] =
     val op = summon[ForallApi].op(weight, noPattern, boundVarNames, locate)
+    op.operation.appendToBlock()
     body(
       using summon[Arena],
       summon[Context],
       op.bodyBlock
     )
-    op.operation.appendToBlock()
+    bindQuantifier(op.operation, op.bodyBlock, boundVarNames)
     new Ref[Bool]:
       val _tpe: Bool = new Object with Bool
       val _operation = op.operation
@@ -341,19 +375,12 @@ given ConstructorApi with
   )(
     using Arena,
     Context,
-    Block,
+    SolverContext,
     sourcecode.File,
     sourcecode.Line,
     sourcecode.Name.Machine
-  ): Unit =
-    val op = summon[SolverApi].op(locate)
-    body(
-      using summon[Arena],
-      summon[Context],
-      op.bodyBlock,
-      new SolverContext
-    )
-    op.operation.appendToBlock()
+  ): Seq[me.jiuyang.smtlib.parser.Z3Status] =
+    executeSolver(body, summon[SolverContext], locate)
 
 end given
 

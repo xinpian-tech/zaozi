@@ -117,6 +117,7 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Ref[Bool]
 
+  /** Declarations made directly in the body become bound variables. Names default to their DSL names. */
   def smtExists(
     weight:        BigInt,
     noPattern:     Boolean,
@@ -131,6 +132,7 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Ref[Bool]
 
+  /** Declarations made directly in the body become bound variables. Names default to their DSL names. */
   def smtForall(
     weight:        BigInt,
     noPattern:     Boolean,
@@ -200,17 +202,36 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Unit
 
-  /** Builds a solver body with fresh naming state for anonymous declarations. */
+  /** Executes the checks in the body and returns their statuses in order. No check is added implicitly. When
+    * configured, SolverContext.debug receives replayable SMT-LIB before execution. Native storage is owned by the
+    * caller's arena. The body is built once before execution; statuses are available only after it completes.
+    * SolverContext resolves Z3_LIB once on the first native execution and shares that library configuration across
+    * solver invocations.
+    *
+    * {{{
+    * given SolverContext = new SolverContext(debug = Some(text => println(text)))
+    * solver {
+    *   val a = smtValue(Bool)
+    *   smtAssert(a)
+    *   smtCheck
+    *   smtPush(1)
+    *   smtAssert(!a)
+    *   smtCheck
+    *   smtPop(1)
+    *   smtCheck
+    * } // Seq(Sat, Unsat, Sat)
+    * }}}
+    */
   def solver(
     body: (Arena, Context, Block, SolverContext) ?=> Unit
   )(
     using Arena,
     Context,
-    Block,
+    SolverContext,
     sourcecode.File,
     sourcecode.Line,
     sourcecode.Name.Machine
-  ): Unit
+  ): Seq[me.jiuyang.smtlib.parser.Z3Status]
 
 end ConstructorApi
 

@@ -645,7 +645,8 @@ end given
 
 given CheckApi with
   def op(
-    location:    Location
+    location:    Location,
+    resultTypes: Seq[Type] = Seq.empty
   )(
     using arena: Arena,
     context:     Context
@@ -662,7 +663,7 @@ given CheckApi with
           // unsat
           Seq((Seq.empty, Seq.empty))
         ),
-        resultsTypes = Some(Seq.empty)
+        resultsTypes = Some(resultTypes)
       )
     )
   extension (ref: Check)
@@ -1361,7 +1362,8 @@ end given
 
 given SolverApi with
   def op(
-    location:    Location
+    location:    Location,
+    inputs:      Seq[Value] = Seq.empty
   )(
     using arena: Arena,
     context:     Context
@@ -1370,8 +1372,9 @@ given SolverApi with
       summon[OperationApi].operationCreate(
         name = "smt.solver",
         location = location,
+        operands = inputs,
         regionBlockTypeLocations = Seq(
-          Seq((Seq.empty, Seq.empty))
+          Seq((inputs.map(_.getType), inputs.map(_ => location)))
         ),
         resultsTypes = Some(Seq.empty)
       )
