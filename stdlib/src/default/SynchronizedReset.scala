@@ -93,3 +93,6 @@ object SynchronizedReset
         !inputAsserted,
         "reset_stays_released_until_reasserted"
       )
+
+      Cover(inputAsserted.S ### (!inputAsserted).S.##*(outputDeasserted.S), true.B, "reset_release_sequence")
+      Cover(outputDeasserted.S.##*(inputAsserted.S).##*(outputAsserted.S), true.B, "reset_reassertion_sequence")
