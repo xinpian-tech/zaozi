@@ -22,10 +22,10 @@ import scala.util.control.NonFatal
   * carries only the framework method symbol, so the compiler resolves `io.a` to `selectDynamic` rather than `val a`.
   * This phase runs after `typer` (the inline expansion already happened there) and replaces the whole `Inlined` node of
   * the access with a typed `Select` on the resolved field symbol, positioned at the access span. Rewriting only
-  * `Inlined.call` is not enough for span-based navigation: the expansion's synthetic receiver val spans the whole access
-  * and wins symbol-at-cursor, while the retained `call` is not walked at all. Nested accesses (`io.a.b`) are rebuilt
-  * level by level so the inner level keeps its own node, and the inliner's receiver proxies (`val Referable_this = io`),
-  * which live on in the enclosing `Block`, are collapsed to point spans for the same reason.
+  * `Inlined.call` is not enough for span-based navigation: the expansion's synthetic receiver val spans the whole
+  * access and wins symbol-at-cursor, while the retained `call` is not walked at all. Nested accesses (`io.a.b`) are
+  * rebuilt level by level so the inner level keeps its own node, and the inliner's receiver proxies (`val
+  * Referable_this = io`), which live on in the enclosing `Block`, are collapsed to point spans for the same reason.
   *
   * It is contributed by [[ZaoziSemanticDBPlugin.initialize]] ONLY to interactive presentation-compiler pipelines
   * (parser/typer/SetRootTree/cookComments): the rewrite mutates the typed tree, so in the batch pipeline it would be
@@ -90,7 +90,7 @@ class ZaoziPcNavPhase extends PluginPhase:
   ): Tree =
     t match
       case vd: ValDef if isInlineProxy(vd) => vd.withSpan(Span(vd.span.start))
-      case _                               => t
+      case _ => t
 
   private def isInlineProxy(
     vd: ValDef
@@ -152,7 +152,7 @@ class ZaoziPcNavPhase extends PluginPhase:
             dynamicSelect(inl.call).getOrElse(
               cpy.Inlined(inl)(transform(inl.call), transformSub(inl.bindings), transform(inl.expansion))
             )
-          case _            => super.transform(t)
+          case _ => super.transform(t)
       mapper.transform(tree)
 
   /** `(receiver, bundleType, fieldName)` of a zaozi dynamic field access, from the retained pre-inlining call. Two

@@ -208,24 +208,28 @@ object PluginSpec extends TestSuite:
       def fieldRefs(withPlugin: Boolean): (List[String], Int) =
         import dotty.tools.dotc.ast.tpd
         import dotty.tools.dotc.core.Contexts.Context as DottyContext
-        val out           = scratchRoot / (if withPlugin then "nav-on" else "nav-off")
+        val out            = scratchRoot / (if withPlugin then "nav-on" else "nav-off")
         os.makeDir.all(out)
-        val options       = List("-classpath", fixtureCp, "-d", out.toString, "-experimental")
+        val options        = List("-classpath", fixtureCp, "-d", out.toString, "-experimental")
           ++ (if withPlugin then List(s"-Xplugin:$pluginJar") else Nil)
-        val driver        = new dotty.tools.dotc.interactive.InteractiveDriver(options)
-        val uri           = java.net.URI.create(s"file:///NavProbe${if withPlugin then "On" else "Off"}.scala")
-        val diags         = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+        val driver         = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val uri            = java.net.URI.create(s"file:///NavProbe${if withPlugin then "On" else "Off"}.scala")
+        val diags          = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
         assert(diags.isEmpty)
         given DottyContext = driver.currentCtx
-        val fieldAccesses = List.newBuilder[String]
-        var dynCalls      = 0
-        def record(t: tpd.Tree)(using DottyContext): Unit =
+        val fieldAccesses  = List.newBuilder[String]
+        var dynCalls       = 0
+        def record(
+          t: tpd.Tree
+        )(
+          using DottyContext
+        ): Unit =
           val sym = t.symbol
           if sym.exists && sym.isTerm && sym.owner.isClass && sym.owner.name.toString == "NavBundle"
             && (t.isInstanceOf[tpd.Select] || t.isInstanceOf[tpd.Ident])
           then fieldAccesses += buffer.substring(t.span.start, t.span.end)
           if sym.exists && sym.name.toString == "selectDynamic" then dynCalls += 1
-        val traverser     = new tpd.TreeTraverser:
+        val traverser      = new tpd.TreeTraverser:
           override def traverse(
             tree: tpd.Tree
           )(
@@ -237,7 +241,7 @@ object PluginSpec extends TestSuite:
                 traverse(inlined.call)
                 inlined.bindings.foreach(traverse)
                 traverse(inlined.expansion)
-              case _                    => traverseChildren(tree)
+              case _ => traverseChildren(tree)
         traverser.traverse(driver.compilationUnits(uri).tpdTree)
         (fieldAccesses.result(), dynCalls)
 
@@ -296,9 +300,9 @@ object PluginSpec extends TestSuite:
         import dotty.tools.dotc.ast.tpd
         import dotty.tools.dotc.core.Contexts.Context as DottyContext
         import dotty.tools.dotc.core.Flags
-        val out           = scratchRoot / (if withPlugin then "navnested-on" else "navnested-off")
+        val out            = scratchRoot / (if withPlugin then "navnested-on" else "navnested-off")
         os.makeDir.all(out)
-        val options       = List(
+        val options        = List(
           "-classpath",
           fixtureCp,
           "-d",
@@ -309,21 +313,25 @@ object PluginSpec extends TestSuite:
           fixtureSrc.toString
         )
           ++ (if withPlugin then List(s"-Xplugin:$pluginJar", s"-Xplugin:$pluginJar") else Nil)
-        val driver        = new dotty.tools.dotc.interactive.InteractiveDriver(options)
-        val uri           = java.net.URI.create(s"file:///NavNestedProbe${if withPlugin then "On" else "Off"}.scala")
-        val diags         = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+        val driver         = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val uri            = java.net.URI.create(s"file:///NavNestedProbe${if withPlugin then "On" else "Off"}.scala")
+        val diags          = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
         assert(diags.isEmpty)
         given DottyContext = driver.currentCtx
-        val fieldAccesses = List.newBuilder[String]
-        var dynCalls      = 0
-        def record(t: tpd.Tree)(using DottyContext): Unit =
+        val fieldAccesses  = List.newBuilder[String]
+        var dynCalls       = 0
+        def record(
+          t: tpd.Tree
+        )(
+          using DottyContext
+        ): Unit =
           val sym = t.symbol
           if sym.exists && sym.isTerm && !sym.is(Flags.Method)
             && (sym.owner.name.toString == "NavNestedOuter" || sym.owner.name.toString == "NavNestedInner")
             && (t.isInstanceOf[tpd.Select] || t.isInstanceOf[tpd.Ident])
           then fieldAccesses += buffer.substring(t.span.start, t.span.end)
           if sym.exists && sym.name.toString == "selectDynamic" then dynCalls += 1
-        val traverser     = new tpd.TreeTraverser:
+        val traverser      = new tpd.TreeTraverser:
           override def traverse(
             tree: tpd.Tree
           )(
@@ -335,7 +343,7 @@ object PluginSpec extends TestSuite:
                 traverse(inlined.call)
                 inlined.bindings.foreach(traverse)
                 traverse(inlined.expansion)
-              case _                    => traverseChildren(tree)
+              case _ => traverseChildren(tree)
         traverser.traverse(driver.compilationUnits(uri).tpdTree)
         (fieldAccesses.result(), dynCalls)
 
@@ -391,9 +399,9 @@ object PluginSpec extends TestSuite:
       def symbolAt(cursor: Int): List[String] =
         import dotty.tools.dotc.ast.tpd
         import dotty.tools.dotc.core.Contexts.Context as DottyContext
-        val out        = scratchRoot / "navprobe2"
+        val out            = scratchRoot / "navprobe2"
         os.makeDir.all(out)
-        val options    = List(
+        val options        = List(
           "-classpath",
           fixtureCp,
           "-d",
@@ -404,15 +412,15 @@ object PluginSpec extends TestSuite:
           fixtureSrc.toString,
           s"-Xplugin:$pluginJar"
         )
-        val driver     = new dotty.tools.dotc.interactive.InteractiveDriver(options)
-        val uri        = java.net.URI.create("file:///NavProbe2.scala")
-        val diags      = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+        val driver         = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val uri            = java.net.URI.create("file:///NavProbe2.scala")
+        val diags          = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
         assert(diags.isEmpty)
         given DottyContext = driver.currentCtx
         // Every symbol-bearing node whose span contains the cursor, innermost first; this is the
         // candidate list a client's symbol-at-cursor walks.
-        val found      = List.newBuilder[(Int, Int, String)]
-        val traverser  = new tpd.TreeTraverser:
+        val found          = List.newBuilder[(Int, Int, String)]
+        val traverser      = new tpd.TreeTraverser:
           override def traverse(
             t: tpd.Tree
           )(
