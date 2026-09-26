@@ -12,6 +12,7 @@ import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.plugins.PluginPhase
 import dotty.tools.dotc.util.Spans.*
 
+import scala.collection.mutable
 import scala.util.control.NonFatal
 
 /** Presentation-compiler phase that makes go-to-definition and hover on a zaozi dynamic bundle-field access resolve to
@@ -20,12 +21,16 @@ import scala.util.control.NonFatal
   * A `Referable[T]` or `Interface[T]` (`scala.Dynamic`) access `io.a` is a `transparent inline selectDynamic("a")`
   * whose expansion drops the field name to a runtime string; the retained pre-inlining call `io.selectDynamic("a")`
   * carries only the framework method symbol, so the compiler resolves `io.a` to `selectDynamic` rather than `val a`.
-  * This phase runs after `typer` (the inline expansion already happened there) and replaces the whole `Inlined` node of
-  * the access with a typed `Select` on the resolved field symbol, positioned at the access span. Rewriting only
-  * `Inlined.call` is not enough for span-based navigation: the expansion's synthetic receiver val spans the whole
-  * access and wins symbol-at-cursor, while the retained `call` is not walked at all. Nested accesses (`io.a.b`) are
-  * rebuilt level by level so the inner level keeps its own node, and the inliner's receiver proxies (`val
-  * Referable_this = io`), which live on in the enclosing `Block`, are collapsed to point spans for the same reason.
+  * This phase runs after `typer` (the inline expansion already happened there) and replaces the `Inlined` node of the
+  * access with an ascription around a `Select` on the resolved field symbol, positioned at the access span. The
+  * navigation target (the select, whose symbol is the field) is deliberately separate from the expression's semantic
+  * type: the ascription keeps the access's own type (`Ref[T]`, or `Option[Ref[T]]`), so type-driven operations such as
+  * completion on `io.a.getType` keep seeing the dynamic access's result instead of the field's `BundleField[T]`.
+  * Rewriting only `Inlined.call` is not enough for span-based navigation: the expansion's synthetic receiver val spans
+  * the whole access and wins symbol-at-cursor, while the retained `call` is not walked at all. Nested accesses
+  * (`io.a.b`) are rebuilt level by level so the inner level keeps its own node, and the inliner's receiver proxies
+  * (`val Referable_this = io`), which live on in the enclosing `Block`, are collapsed to point spans for the same
+  * reason.
   *
   * It is contributed by [[ZaoziSemanticDBPlugin.initialize]] ONLY to interactive presentation-compiler pipelines
   * (parser/typer/SetRootTree/cookComments): the rewrite mutates the typed tree, so in the batch pipeline it would be
@@ -45,18 +50,23 @@ class ZaoziPcNavPhase extends PluginPhase:
   override val runsAfter:  Set[String] = Set("typer")
   override val runsBefore: Set[String] = Set("SetRootTree")
 
+  /** Spans (start, end) of the dynamic accesses this run rewrote. A receiver proxy is only neutralized when its span is
+    * one of them, so the rewrite never touches anything unrelated to a rewritten access.
+    */
+  private val rewrittenAccessSpans = mutable.Set.empty[(Int, Int)]
+
   override def transformInlined(
     tree: Inlined
   )(
     using Context
   ): Tree =
     try
-      dynamicSelect(tree.call) match
-        case Some(fieldSelect) =>
+      dynamicSelect(tree.call, tree.tpe) match
+        case Some(nav) =>
           // The primary path: this Inlined IS the dynamic access `io.a`. Drop the whole node — the
           // expansion's synthetic vals must not remain as competing symbol-at-cursor candidates.
-          fieldSelect
-        case None              =>
+          nav
+        case None      =>
           // Not itself a dynamic access, but its retained `call` (e.g. the whole `Tests { ... }`
           // argument of an enclosing utest/macro `Inlined`) may hold typed COPIES of dynamic
           // accesses that navigation reaches; an un-rewritten copy there makes go-to land on the
@@ -92,15 +102,25 @@ class ZaoziPcNavPhase extends PluginPhase:
       case vd: ValDef if isInlineProxy(vd) => vd.withSpan(Span(vd.span.start))
       case _ => t
 
+  /** A compiler-generated inline receiver proxy, i.e. the `val Referable_this = io` the inliner binds around a dynamic
+    * access. The checks are deliberately strict: only synthetic vals (never a user-written `_this` val, whose span and
+    * children must stay navigable), and only when the span is one of the accesses this run actually rewrote.
+    */
+  /** A compiler-generated inline receiver proxy, i.e. the `val Referable_this = io` the inliner binds around a dynamic
+    * access. On this compiler those vals carry no `Synthetic` flag, so the identity is pinned down structurally: the
+    * exact generated name, a span that is one of the accesses this run rewrote, and the receiver/field-select shape. A
+    * user-written `_this` val keeps the span of its own declaration, never that of a rewritten access.
+    */
   private def isInlineProxy(
     vd: ValDef
   )(
     using Context
   ): Boolean =
-    vd.symbol.name.toString.endsWith("_this") && (
-      isFieldSelect(vd.rhs) || vd.rhs.isInstanceOf[Inlined] ||
-        (vd.tpt.tpe.exists && bundleOf(vd.tpt.tpe.widen).isDefined)
-    )
+    ProxyNames.contains(vd.symbol.name.toString) &&
+      rewrittenAccessSpans.contains((vd.span.start, vd.span.end)) && (
+        isFieldSelect(vd.rhs) || vd.rhs.isInstanceOf[Inlined] ||
+          (vd.tpt.tpe.exists && bundleOf(vd.tpt.tpe.widen).isDefined)
+      )
 
   /** `Select` on a bundle-field symbol, i.e. the node this phase builds for an access. */
   private def isFieldSelect(
@@ -119,17 +139,24 @@ class ZaoziPcNavPhase extends PluginPhase:
   ): Boolean =
     sym.exists && sym.isTerm && sym.owner.isClass && isDynamicSubfield(sym.owner.typeRef)
 
-  /** A typed `Select(prefix, field)` of the resolved bundle field if `call` is a zaozi dynamic field access, positioned
-    * at the access span; else None. The receiver chain is rewritten the same way, so `io.a.b` gets one select per level
-    * (the inner level must not lose its node to the outer one).
+  /** The navigation node for the dynamic field access in `call`: the innermost `Select` carries the field symbol as the
+    * navigation target, while the `Typed` wrapper keeps the access's semantic type (`accessTpe`), so the two concerns
+    * stay separate. The receiver chain is rewritten the same way, so `io.a.b` gets one node per level (the inner level
+    * must not lose its node to the outer one).
     */
   private def dynamicSelect(
-    call: Tree
+    call:      Tree,
+    accessTpe: Type
   )(
     using Context
   ): Option[Tree] =
     bundleFieldAccess(call).flatMap { (qual, bundleType, fieldName) =>
-      resolveField(bundleType, fieldName).map(sym => Select(rewriteDynamics(qual), sym.termRef).withSpan(call.span))
+      resolveField(bundleType, fieldName).map { sym =>
+        if call.span.exists then rewrittenAccessSpans += ((call.span.start, call.span.end))
+        val target = Select(rewriteDynamics(qual), sym.termRef).withSpan(call.span)
+        val nav    = Typed(target, TypeTree(accessTpe)).withSpan(call.span)
+        if accessTpe.exists then nav.withType(accessTpe) else nav
+      }
     }
 
   /** Rewrite dynamic-access `Inlined` copies nested anywhere inside `tree`, including retained inline/macro calls and
@@ -149,7 +176,7 @@ class ZaoziPcNavPhase extends PluginPhase:
           using Context
         ): Tree = t match
           case inl: Inlined =>
-            dynamicSelect(inl.call).getOrElse(
+            dynamicSelect(inl.call, inl.tpe).getOrElse(
               cpy.Inlined(inl)(transform(inl.call), transformSub(inl.bindings), transform(inl.expansion))
             )
           case _ => super.transform(t)
@@ -216,3 +243,6 @@ object ZaoziPcNavPhase:
   private val ReferableName       = "me.jiuyang.zaozi.reftpe.Referable"
   private val InterfaceName       = "me.jiuyang.zaozi.reftpe.Interface"
   private val DynamicSubfieldName = "me.jiuyang.zaozi.magic.DynamicSubfield"
+
+  /** Compiler-generated receiver-proxy names, one per zaozi receiver base. */
+  private val ProxyNames = Set("Referable_this", "Interface_this")

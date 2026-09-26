@@ -445,6 +445,225 @@ object PluginSpec extends TestSuite:
       assert(heads == List(Some("field1@io.field1"), Some("field1@io.field1"), Some("field2@io.field1.field2")))
     }
 
+    test("interactive: cursor navigation targets the field at both levels") {
+      // Drive the navigation algorithm itself: `Interactive.pathTo` gives the innermost node at the
+      // cursor, and a client's definition provider then takes that node's symbol (for an `Inlined`
+      // node, its `call` symbol, as the island's provider does). Both levels must resolve to their
+      // own field - the structural probe above alone cannot catch parent-span pruning.
+      val buffer =
+        """package navpath
+          |
+          |import me.jiuyang.zaozi.*
+          |import me.jiuyang.zaozi.default.{*, given}
+          |import me.jiuyang.zaozi.reftpe.Referable
+          |import me.jiuyang.zaozi.valuetpe.*
+          |import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+          |
+          |import java.lang.foreign.Arena
+          |
+          |class NavPathInner extends Bundle:
+          |  val field2 = Aligned(UInt(8))
+          |
+          |class NavPathOuter extends Bundle:
+          |  val field1 = Aligned(new NavPathInner)
+          |
+          |object NavPathUse:
+          |  def use(
+          |    io: Referable[NavPathOuter]
+          |  )(
+          |    using Arena,
+          |    Block,
+          |    Context,
+          |    TypeImpl,
+          |    InstanceContext
+          |  ): Unit =
+          |    val single = io.field1
+          |    val nested = io.field1.field2
+          |    ()
+          |""".stripMargin
+
+      import dotty.tools.dotc.ast.tpd
+      import dotty.tools.dotc.core.Contexts.Context as DottyContext
+      import dotty.tools.dotc.interactive.Interactive
+      import dotty.tools.dotc.util.Spans
+      val out     = scratchRoot / "navpath"
+      os.makeDir.all(out)
+      val options = List(
+        "-classpath",
+        fixtureCp,
+        "-d",
+        out.toString,
+        "-experimental",
+        s"-Xplugin:$pluginJar"
+      )
+      val driver  = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+      val uri     = java.net.URI.create("file:///NavPathProbe.scala")
+      val diags   = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+      assert(diags.isEmpty)
+
+      given DottyContext = driver.currentCtx
+      val unit           = driver.compilationUnits(uri)
+
+      def target(cursor: Int): String =
+        val node = Interactive.enclosingTree(Interactive.pathTo(unit.tpdTree, Spans.Span(cursor)))
+        if node.symbol.exists then node.symbol.name.toString else "<none>"
+
+      val single       = buffer.indexOf("val single = io.field1") + "val single = io.".length
+      val nestedField1 = buffer.indexOf("val nested = io.field1.field2") + "val nested = io.".length
+      val nestedField2 = nestedField1 + "field1.".length
+      val targets      = List(target(single), target(nestedField1), target(nestedField2))
+      assert(targets == List("field1", "field1", "field2"))
+    }
+
+    test("interactive: the rewritten access keeps its semantic type and its completions") {
+      // A dynamic access must stay typed by the access itself (`Ref[...]`), not by the field
+      // declaration (`BundleField[...]`): type-driven operations, e.g. completion on
+      // `io.field1.getType`, read the qualifier's type. Differential: plugin on vs plugin off.
+      val buffer =
+        """package navtype
+          |
+          |import me.jiuyang.zaozi.*
+          |import me.jiuyang.zaozi.default.{*, given}
+          |import me.jiuyang.zaozi.reftpe.Referable
+          |import me.jiuyang.zaozi.valuetpe.*
+          |import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+          |
+          |import java.lang.foreign.Arena
+          |
+          |class NavTypeBundle extends Bundle:
+          |  val field1 = Aligned(UInt(8))
+          |
+          |object NavTypeUse:
+          |  def use(
+          |    io: Referable[NavTypeBundle]
+          |  )(
+          |    using Arena,
+          |    Block,
+          |    Context,
+          |    TypeImpl,
+          |    InstanceContext
+          |  ): Unit =
+          |    val x = io.field1.getType
+          |    ()
+          |""".stripMargin
+
+      def probe(withPlugin: Boolean): (String, Set[String]) =
+        import dotty.tools.dotc.ast.tpd
+        import dotty.tools.dotc.core.Contexts.Context as DottyContext
+        import dotty.tools.dotc.interactive.{Completion, Interactive}
+        import dotty.tools.dotc.util.{SourcePosition, Spans}
+        val out              = scratchRoot / (if withPlugin then "navtype-on" else "navtype-off")
+        os.makeDir.all(out)
+        val options          = List("-classpath", fixtureCp, "-d", out.toString, "-experimental")
+          ++ (if withPlugin then List(s"-Xplugin:$pluginJar") else Nil)
+        val driver           = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val uri              = java.net.URI.create(s"file:///NavTypeProbe${if withPlugin then "On" else "Off"}.scala")
+        val diags            = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+        assert(diags.isEmpty)
+        val unit             = driver.compilationUnits(uri)
+        // `Completion.completions` reads the tree from the context's compilation unit; the driver's
+        // context carries no unit after `run`, so put ours in explicitly.
+        given DottyContext   = driver.currentCtx.fresh.setCompilationUnit(unit)
+        val cursor           = buffer.indexOf(".getType") + 4
+        var qualTpe          = ""
+        val typeFinder       = new tpd.TreeTraverser:
+          override def traverse(
+            t: tpd.Tree
+          )(
+            using DottyContext
+          ): Unit = t match
+            case sel: tpd.Select if sel.symbol.exists && sel.symbol.name.toString == "getType" =>
+              qualTpe = sel.qualifier.tpe.show
+            case _ => traverseChildren(t)
+        typeFinder.traverse(unit.tpdTree)
+        val (_, completions) = Completion.completions(SourcePosition(unit.source, Spans.Span(cursor)))
+        (qualTpe, completions.map(_.label).toSet)
+
+      val (onTpe, onCompletions)   = probe(withPlugin = true)
+      val (offTpe, offCompletions) = probe(withPlugin = false)
+      // The access keeps the dynamic access's type, so both runs see the same `Referable` members.
+      assert(offTpe.nonEmpty)
+      assert(offCompletions.contains("getType"))
+      assert((onTpe, onCompletions) == (offTpe, offCompletions))
+    }
+
+    test("interactive: user vals named `_this` are left untouched") {
+      // `val saved_this: Referable[NavBundle] = io` is ordinary user code. The receiver-proxy
+      // neutralization must only touch synthetic inliner proxies whose span is one of the rewritten
+      // accesses; a user val keeps its span, and position-based navigation must still reach its
+      // name, its type annotation and its initializer.
+      val buffer =
+        """package navuser
+          |
+          |import me.jiuyang.zaozi.*
+          |import me.jiuyang.zaozi.default.{*, given}
+          |import me.jiuyang.zaozi.reftpe.Referable
+          |import me.jiuyang.zaozi.valuetpe.*
+          |import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+          |
+          |import java.lang.foreign.Arena
+          |
+          |class NavUserBundle extends Bundle:
+          |  val field1 = Aligned(UInt(8))
+          |
+          |object NavUserUse:
+          |  def use(
+          |    io: Referable[NavUserBundle]
+          |  )(
+          |    using Arena,
+          |    Block,
+          |    Context,
+          |    TypeImpl,
+          |    InstanceContext
+          |  ): Unit =
+          |    val saved_this: Referable[NavUserBundle] = io
+          |    val x = saved_this.field1
+          |    ()
+          |""".stripMargin
+
+      def probe(withPlugin: Boolean): (Option[(Int, Int)], List[Option[(Int, Int)]]) =
+        import dotty.tools.dotc.ast.tpd
+        import dotty.tools.dotc.core.Contexts.Context as DottyContext
+        import dotty.tools.dotc.interactive.Interactive
+        import dotty.tools.dotc.util.Spans
+        val out            = scratchRoot / (if withPlugin then "navuser-on" else "navuser-off")
+        os.makeDir.all(out)
+        val options        = List("-classpath", fixtureCp, "-d", out.toString, "-experimental")
+          ++ (if withPlugin then List(s"-Xplugin:$pluginJar") else Nil)
+        val driver         = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val uri            = java.net.URI.create(s"file:///NavUserProbe${if withPlugin then "On" else "Off"}.scala")
+        val diags          = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
+        assert(diags.isEmpty)
+        given DottyContext = driver.currentCtx
+        val unit           = driver.compilationUnits(uri)
+        val valStart       = buffer.indexOf("val saved_this")
+        var savedSpan: Option[(Int, Int)] = None
+        val finder     = new tpd.TreeTraverser:
+          override def traverse(
+            t: tpd.Tree
+          )(
+            using DottyContext
+          ): Unit = t match
+            case vd: tpd.ValDef if vd.symbol.exists && vd.symbol.name.toString == "saved_this" =>
+              savedSpan = Some((vd.span.start, vd.span.end))
+            case _ => traverseChildren(t)
+        finder.traverse(unit.tpdTree)
+        def innermost(offset: Int): Option[(Int, Int)] =
+          Interactive.pathTo(unit.tpdTree, Spans.Span(offset)).lastOption.map(t => (t.span.start, t.span.end))
+        val nameOffset = valStart + "val saved_".length
+        val typeOffset = buffer.indexOf("Referable[", valStart) + "Referable".length
+        val initOffset = buffer.indexOf(" = io", valStart) + " = ".length
+        (savedSpan, List(innermost(nameOffset), innermost(typeOffset), innermost(initOffset)))
+
+      val (spanOn, pathsOn)   = probe(withPlugin = true)
+      val (spanOff, pathsOff) = probe(withPlugin = false)
+      assert(spanOn.nonEmpty)
+      assert(spanOn == spanOff)
+      assert(spanOn.exists((start, end) => end > start))
+      assert(pathsOn == pathsOff)
+      assert(pathsOn.forall(_.nonEmpty))
+    }
+
     test("batch: tasty and bytecode are byte-identical with and without the plugin") {
       // The nav phase must never even schedule in the batch pipeline (a batch rewrite of
       // Inlined.call would be pickled into published TASTy), and the SemanticDB enhancer must
