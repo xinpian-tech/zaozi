@@ -20,7 +20,7 @@ given ExportSmtlibApi with
       emitReset:   Boolean
     )(
       using arena: Arena
-    ): Unit =
+    ): LogicalResult =
       LogicalResult(
         mlirTranslateModuleToSMTLIB(
           arena,
@@ -44,7 +44,7 @@ given ExportSmtlibApi with
       emitReset:   Boolean
     )(
       using arena: Arena
-    ): Unit =
+    ): LogicalResult =
       LogicalResult(
         mlirTranslateOperationToSMTLIB(
           arena,

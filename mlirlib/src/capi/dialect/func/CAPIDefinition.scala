@@ -3,7 +3,7 @@
 package org.llvm.mlir.scalalib.capi.dialect.func
 
 import org.llvm.mlir.scalalib.capi.support.{*, given}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Operation, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Operation, Type, given}
 
 import java.lang.foreign.Arena
 
@@ -27,6 +27,16 @@ trait FuncApi extends HasOperation[Func]:
   )(
     using arena: Arena,
     context:     Context
+  ): Func
+
+  def op(
+    symName:        String,
+    inputs:         Seq[Type],
+    results:        Seq[Type],
+    emitCInterface: Boolean
+  )(
+    using Arena,
+    Context
   ): Func
 
   extension (c: Func)

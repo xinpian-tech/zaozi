@@ -3,38 +3,42 @@
 package me.jiuyang.smtlib.tests
 
 import me.jiuyang.smtlib.default.{*, given}
-import me.jiuyang.smtlib.*
+import me.jiuyang.smtlib.parser.Z3Status
 import utest.*
-
-import java.lang.foreign.Arena
 
 object QuantifierSpec extends TestSuite:
   val tests = Tests:
     test("Exist"):
-      smtTest(
-        "(declare-const x Int)",
-        "(assert (let ((tmp (exists ()",
-        "                           ( ! (let ((tmp_0 (= x 1)))",
-        "                           tmp_0) :weight 1))))",
-        "        tmp))"
-      ):
+      withSMTContext:
         solver {
           smtAssert(smtExists(1, false, Seq.empty) {
             val x = smtValue(SInt)
             smtYield(x === 1.S)
           })
-        }
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
     test("Forall"):
-      smtTest(
-        "(declare-const x Int)",
-        "(assert (let ((tmp (forall ()",
-        "                           ( ! (let ((tmp_0 (= x 1)))",
-        "                           tmp_0) :weight 1))))",
-        "        tmp))"
-      ):
+      withSMTContext:
         solver {
           smtAssert(smtForall(1, false, Seq.empty) {
             val x = smtValue(SInt)
             smtYield(x === 1.S)
           })
-        }
+          smtCheck
+        } ==> Seq(Z3Status.Unsat)
+    test("Forall identity"):
+      withSMTContext:
+        solver {
+          smtAssert(smtForall(1, false, Seq("bound")) {
+            val x = smtValue(SInt)
+            smtYield(x === x)
+          })
+          smtCheck
+        } ==> Seq(Z3Status.Sat)
+    test("empty binders are rejected before native execution"):
+      withSMTContext:
+        intercept[IllegalArgumentException]:
+          solver {
+            smtAssert(smtExists(1, false, Seq.empty) { smtYield(true.B) })
+            smtCheck
+          }
