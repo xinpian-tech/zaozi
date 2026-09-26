@@ -99,7 +99,7 @@ enum Z3Status:
 // This case class represents the result of a Z3 solver invocation.
 // status indicates whether the problem was satisfiable, unsatisfiable, or unknown.
 // model contains the variable assignments if the status is Sat, Or empty if Unsat or Unknown.
-final case class Z3Result(status: Z3Status, model: Seq[(String, Boolean | BigInt)])
+final case class Z3Result(status: Z3Status, model: Seq[(String, Boolean | BigInt)], conflict: Seq[String] = Seq.empty)
 
 // This function parses the output from Z3 and returns a Z3Result.
 def parseZ3Output(input: String): Z3Result =
