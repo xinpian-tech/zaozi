@@ -4,14 +4,8 @@
 final: prev:
 
 let
-  libllvm = prev.llvmPackages_circt.libllvm.override {
-    buildSharedLibs = true;
-  };
-  mlir = prev.llvmPackages_circt.mlir.override {
-    buildSharedLibs = true;
-  };
+  inherit (prev.llvmPackages_circt) libllvm mlir;
   circt = prev.circt.override {
-    inherit libllvm mlir;
     buildSharedLibs = true;
   };
 in

@@ -2,23 +2,30 @@
   "nodes": {
     "circt-nix": {
       "inputs": {
-        "circt-src": "circt-src",
+        "circt-src": [
+          "circt-src"
+        ],
+        "cli11-src": "cli11-src",
         "flake-compat": "flake-compat",
+        "fmt-src": "fmt-src",
+        "googletest-src": "googletest-src",
+        "ixwebsocket-src": "ixwebsocket-src",
         "llvm-src": "llvm-src",
         "nixpkgs": "nixpkgs",
-        "slang-src": "slang-src"
+        "nlohmann-json-src": "nlohmann-json-src",
+        "slang-src": "slang-src",
+        "zlib-src": "zlib-src"
       },
       "locked": {
-        "lastModified": 1786705190,
-        "narHash": "sha256-RTa5b+sgY0UFjQyRnV14wOgh6Oz445NHa5LLsp1/3o0=",
+        "lastModified": 1790483207,
+        "narHash": "sha256-LGa56FF8ZTSstrT81LhdmaGDaAZ84z2bpvTJTWkjOU0=",
         "owner": "xinpian-tech",
         "repo": "circt-nix",
-        "rev": "7640149ba35aef83cbe21386eea883d3434b8ed2",
+        "rev": "e919a6efa65774fcc9fefec5d255bc929d73963e",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
-        "ref": "xinpian-main",
         "repo": "circt-nix",
         "type": "github"
       }
@@ -26,17 +33,34 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1786604801,
-        "narHash": "sha256-af08Ik/BMzyG1WTG2Rh006ze2D7fWZkvESZ2Bx0bpNk=",
+        "lastModified": 1790491876,
+        "narHash": "sha256-crQccThpaobulNa/VrF95qD+/SlxD53gRyjJYvwU5kI=",
         "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "306d4f5c0f1b03575a17665d8f2592c33feb8be0",
+        "rev": "fb8ebceb892382e2f9d468063855a428e8cb6b9b",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
         "ref": "master",
         "repo": "circt",
+        "type": "github"
+      }
+    },
+    "cli11-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1740659131,
+        "narHash": "sha256-73dfpZDnKl0cADM4LTP3/eDFhwCdiHbEaGRF7ZyWsdQ=",
+        "owner": "CLIUtils",
+        "repo": "CLI11",
+        "rev": "4160d259d961cd393fd8d67590a8c7d210207348",
+        "type": "github"
+      },
+      "original": {
+        "owner": "CLIUtils",
+        "ref": "v2.5.0",
+        "repo": "CLI11",
         "type": "github"
       }
     },
@@ -150,20 +174,71 @@
         "type": "github"
       }
     },
+    "fmt-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1740593668,
+        "narHash": "sha256-sUbxlYi/Aupaox3JjWFqXIjcaQa0LFjclQAOleT+FRA=",
+        "owner": "fmtlib",
+        "repo": "fmt",
+        "rev": "123913715afeb8a437e6388b4473fcc4753e1c9a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fmtlib",
+        "ref": "11.1.4",
+        "repo": "fmt",
+        "type": "github"
+      }
+    },
+    "googletest-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1722432886,
+        "narHash": "sha256-1OJ2SeSscRBNr7zZ/a8bJGIqAnhkg45re0j3DtPfcXM=",
+        "owner": "google",
+        "repo": "googletest",
+        "rev": "b514bdc898e2951020cbdca1304b75f5950d1f59",
+        "type": "github"
+      },
+      "original": {
+        "owner": "google",
+        "ref": "v1.15.2",
+        "repo": "googletest",
+        "type": "github"
+      }
+    },
+    "ixwebsocket-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1778618314,
+        "narHash": "sha256-nzkz/18q2h+/CcjMYVo2XmkUp5/50oakdGsWxp4KKHM=",
+        "owner": "machinezone",
+        "repo": "IXWebSocket",
+        "rev": "173f442474c4d9db16184c5e15cc96e07605e0e0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "machinezone",
+        "repo": "IXWebSocket",
+        "rev": "173f442474c4d9db16184c5e15cc96e07605e0e0",
+        "type": "github"
+      }
+    },
     "llvm-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1783919289,
-        "narHash": "sha256-epMcDIyD3zwgH4r4DqvXW0pUHTanXhm+CPaGE53WD7s=",
+        "lastModified": 1788198821,
+        "narHash": "sha256-1qERhNh9h0fbF4e3IRpAPqnWQXGow5l39z1sda6Lxl8=",
         "owner": "llvm",
         "repo": "llvm-project",
-        "rev": "b1c56fb53a9c76d6b045ede49083b647ae049ffe",
+        "rev": "e297b52ec9d8b5c38042e53ae5650922717970cd",
         "type": "github"
       },
       "original": {
         "owner": "llvm",
         "repo": "llvm-project",
-        "rev": "b1c56fb53a9c76d6b045ede49083b647ae049ffe",
+        "rev": "e297b52ec9d8b5c38042e53ae5650922717970cd",
         "type": "github"
       }
     },
@@ -209,11 +284,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1785090369,
-        "narHash": "sha256-m0pDuRJG7EDo9ri+4Ksu83VsI+PlxNC9lNBfydejce4=",
+        "lastModified": 1790185690,
+        "narHash": "sha256-xJ+X4hBtOcAFGBOe5nAMyMUeF9foJBmIOu3NjBqBycU=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "624af665418d3c65d544145b4d34ad696439570e",
+        "rev": "4975466d324710c576dc11ad614684e6bd8cad8e",
         "type": "github"
       },
       "original": {
@@ -287,9 +362,27 @@
         "type": "github"
       }
     },
+    "nlohmann-json-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1701207391,
+        "narHash": "sha256-7F0Jon+1oWL7uqet5i1IgHX0fUw/+z0QwEcA3zs5xHg=",
+        "owner": "nlohmann",
+        "repo": "json",
+        "rev": "9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nlohmann",
+        "ref": "v3.11.3",
+        "repo": "json",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "circt-nix": "circt-nix",
+        "circt-src": "circt-src",
         "flake-utils": "flake-utils",
         "mvn-trace-forge": "mvn-trace-forge",
         "nixpkgs": "nixpkgs_3",
@@ -421,6 +514,23 @@
       "original": {
         "owner": "xinpian-tech",
         "repo": "zaozi",
+        "type": "github"
+      }
+    },
+    "zlib-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1739919615,
+        "narHash": "sha256-L/gubPuMLJ1nq+AVZdwhcv6mkgBYzKJ6ncoYM93LvJ0=",
+        "owner": "madler",
+        "repo": "zlib",
+        "rev": "5a82f71ed1dfc0bec044d9702463dbdf84ea3b71",
+        "type": "github"
+      },
+      "original": {
+        "owner": "madler",
+        "repo": "zlib",
+        "rev": "5a82f71ed1dfc0bec044d9702463dbdf84ea3b71",
         "type": "github"
       }
     }
