@@ -85,14 +85,12 @@ trait Testbench[I <: HWInterface[?]]:
 /** Simulation behavior attached to a FIRRTL testbench generator. */
 trait UT[PARAM <: Parameter, I <: HWInterface[PARAM]]:
   def clockPeriodNs(parameter: PARAM): Long
-  def simulation(
-    parameter: PARAM,
-    testbench: Testbench[I]
-  )(
-    using Arena,
+  def simulation(parameter:    PARAM): (
+    Arena,
     Context,
-    Block
-  ):                                   Unit
+    Block,
+    Testbench[I]
+  ) ?=> Unit
 
 /** Emits a FIRRTL testbench together with its HW/SV simulation wrapper. */
 trait UTApi:

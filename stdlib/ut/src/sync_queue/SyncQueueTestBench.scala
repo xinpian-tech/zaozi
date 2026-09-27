@@ -9,9 +9,6 @@ import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
-
-import java.lang.foreign.Arena
 
 /** The DUT wiring and simulation behavior of the SyncQueue unit testbench. */
 class SyncQueueTestBenchIO(parameter: SyncQueueParameter) extends HWBundle(parameter):
@@ -29,14 +26,8 @@ object SyncQueueTestBench
   override def moduleName(parameter: SyncQueueParameter): String = "SyncQueueTestBench"
   def clockPeriodNs(parameter:       SyncQueueParameter): Long   = 10
 
-  def simulation(
-    parameter: SyncQueueParameter,
-    tb:        Testbench[SyncQueueTestBenchIO]
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Unit =
+  def simulation(parameter: SyncQueueParameter) =
+    val tb     = summon[Testbench[SyncQueueTestBenchIO]]
     val step   = tb.dpiFunction(
       "step",
       Some("zaozi_step"),

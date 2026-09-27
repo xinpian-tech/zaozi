@@ -141,7 +141,7 @@ given UTApi with
               val stimulusFields = fields.tail
               val stimuli        = ports.tail
               val driven         = Array.fill[Option[Value]](stimuli.size)(None)
-              val testbench      = new Testbench[I]:
+              given Testbench[I] = new Testbench[I]:
                 lazy val io:                                            TestbenchIO[I]           = new TestbenchIO[I](this)
                 def clock:                                              Value                    = seqClock
                 def fallingClock:                                       Value                    = fallingSeqClock
@@ -198,7 +198,7 @@ given UTApi with
                   require(value.getType.equal(port.tpe), s"testbench input type mismatch: ${port.name}")
                   driven(index) = Some(value)
 
-              ut.simulation(parameter, testbench)
+              ut.simulation(parameter)
               val inputs = Seq(seqClock) ++ stimuli
                 .zip(driven)
                 .map((port, value) =>
