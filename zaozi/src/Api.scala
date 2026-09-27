@@ -13,6 +13,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
+import org.llvm.circt.scalalib.dialect.hw.operation.Port
 import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
@@ -277,7 +278,7 @@ final case class DpiArg(
   name:      String,
   direction: DPIDirection,
   width:     Int,
-  signed:    Boolean = false):
+  signed: Boolean = false):
   require(width > 0 && width <= 64, s"invalid DPI width: $width")
 
 final case class DpiFunction(symbol: String, arguments: Seq[DpiArg])
@@ -287,19 +288,149 @@ final case class DpiCallResult(values: Map[String, Value]):
 
 /** Declares and calls sim dialect DPI-C functions. */
 trait SimApi:
-  def dpiFunction(symbol: String, cName: Option[String], arguments: Seq[DpiArg])(
+  def dpiFunction(
+    symbol:    String,
+    cName:     Option[String],
+    arguments: Seq[DpiArg]
+  )(
     using Arena,
     Context,
     Block
   ): DpiFunction
 
-  def dpiCall(function: DpiFunction, clock: Value, enabled: Option[Value], inputs: Seq[Value])(
+  def dpiCall(
+    function: DpiFunction,
+    clock:    Value,
+    enabled:  Option[Value],
+    inputs:   Seq[Value]
+  )(
     using Arena,
     Context,
     Block
   ): DpiCallResult
 
-  def clockedTerminate(clock: Value, condition: Value, success: Boolean)(using Arena, Context, Block): Unit
+  def clockedTerminate(
+    clock:     Value,
+    condition: Value,
+    success:   Boolean
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit
+
+/** Builds HW dialect module structure and inserts each operation into the current block. */
+trait HWApi:
+  def module(
+    symbol: String,
+    ports:  Seq[Port]
+  )(body:   (Arena, Context, Block) ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  def moduleExtern(
+    symbol:      String,
+    ports:       Seq[Port],
+    verilogName: Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Instantiates `moduleName` and returns its output values in port order. */
+  def instance(
+    instanceName: String,
+    moduleName:   String,
+    ports:        Seq[Port],
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value]
+
+  def output(
+    values: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+/** Builds the small set of Seq dialect operations needed by simulation wrappers. */
+trait SeqApi:
+  def clockType(
+    using Arena,
+    Context
+  ): Type
+
+  def toClock(
+    input: Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  def clockInv(
+    input: Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+/** Builds SV dialect storage and inline source operations in the current block. */
+trait SVApi:
+  /** Declares a variable and returns its `!hw.inout` handle. */
+  def reg(
+    elementType: Type,
+    name:        String,
+    init:        Option[Value] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  def readInOut(
+    input: Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  def verbatim(
+    formatString:  String,
+    substitutions: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
 
 trait ConstructorApi:
   def Clock(): Clock
