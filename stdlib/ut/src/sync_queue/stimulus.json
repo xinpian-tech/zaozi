@@ -1,0 +1,21 @@
+{
+  "depth": 3,
+  "vectors": [
+    {"reset_n": 0, "push_n": 1, "pop_n": 1, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 0, "push_n": 1, "pop_n": 1, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 0, "pop_n": 1, "diagnostic_n": 1, "data_in": 10},
+    {"reset_n": 1, "push_n": 0, "pop_n": 1, "diagnostic_n": 1, "data_in": 20},
+    {"reset_n": 1, "push_n": 0, "pop_n": 1, "diagnostic_n": 1, "data_in": 30},
+    {"reset_n": 1, "push_n": 1, "pop_n": 1, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 0, "pop_n": 1, "diagnostic_n": 1, "data_in": 99},
+    {"reset_n": 1, "push_n": 1, "pop_n": 0, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 0, "pop_n": 0, "diagnostic_n": 1, "data_in": 40},
+    {"reset_n": 1, "push_n": 1, "pop_n": 0, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 1, "pop_n": 0, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 1, "pop_n": 0, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 0, "push_n": 1, "pop_n": 1, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 0, "pop_n": 1, "diagnostic_n": 1, "data_in": 50},
+    {"reset_n": 1, "push_n": 1, "pop_n": 0, "diagnostic_n": 1, "data_in": 0},
+    {"reset_n": 1, "push_n": 1, "pop_n": 1, "diagnostic_n": 1, "data_in": 0}
+  ]
+}
