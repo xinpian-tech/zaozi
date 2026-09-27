@@ -63,6 +63,11 @@ trait InstanceApi extends HasOperation[Instance]:
   ): Instance
 
   extension (ref: Instance)
+    /** All instance output values in output-port order. */
+    def results(
+      using Arena
+    ): Seq[Value]
+
     def result(
       index: Int
     )(

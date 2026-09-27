@@ -158,6 +158,9 @@ given InstanceApi with
 
   extension (ref: Instance)
     def operation: Operation = ref._operation
+    def results(
+      using Arena
+    ): Seq[Value] = Vector.tabulate(ref.operation.getNumResults.toInt)(index => ref.operation.getResult(index))
     def result(
       index: Int
     )(
