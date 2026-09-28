@@ -109,4 +109,4 @@ import me.jiuyang.utlib.default.{*, given}
 import me.jiuyang.zaozi.default.{*, given}
 
 val parameter = upickle.default.read[SyncQueueParameter](os.read(os.Path(args(0), os.pwd)))
-SyncQueueTestBench.write(parameter)
+SyncQueueTestBench.emit(parameter)
