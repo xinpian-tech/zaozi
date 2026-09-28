@@ -3,7 +3,7 @@
 package me.jiuyang.stdlib.ut
 
 import me.jiuyang.stdlib.queue.default.{SyncQueue, SyncQueueLayers, SyncQueueParameter, SyncQueueProbe, given}
-import me.jiuyang.utlib.*
+import me.jiuyang.tblib.*
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
