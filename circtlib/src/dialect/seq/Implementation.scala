@@ -8,7 +8,13 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, OperationAp
 import java.lang.foreign.Arena
 
 given ToClockApi with
-  def op(input: Value, location: Location)(using Arena, Context): ToClock =
+  def op(
+    input:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): ToClock =
     ToClock(
       summon[OperationApi].operationCreate(
         name = "seq.to_clock",
@@ -18,11 +24,20 @@ given ToClockApi with
       )
     )
   extension (ref: ToClock) def operation: Operation = ref._operation
-  extension (ref: ToClock) def result(using Arena): Value = ref._operation.getResult(0)
+  extension (ref: ToClock)
+    def result(
+      using Arena
+    ): Value = ref._operation.getResult(0)
 end given
 
 given ClockInvApi with
-  def op(input: Value, location: Location)(using Arena, Context): ClockInv =
+  def op(
+    input:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): ClockInv =
     ClockInv(
       summon[OperationApi].operationCreate(
         name = "seq.clock_inv",
@@ -32,5 +47,8 @@ given ClockInvApi with
       )
     )
   extension (ref: ClockInv) def operation: Operation = ref._operation
-  extension (ref: ClockInv) def result(using Arena): Value = ref._operation.getResult(0)
+  extension (ref: ClockInv)
+    def result(
+      using Arena
+    ): Value = ref._operation.getResult(0)
 end given

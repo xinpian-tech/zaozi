@@ -166,7 +166,7 @@ trait EvaluatorApi:
   )(
     using Arena,
     Context
-  ): OMEvaluatorValue
+  ):   OMEvaluatorValue
   extension (primitive:      Attribute)
     /** wrapper to [[fromPrimitive]] */
     inline def toEvaluatorValue(
