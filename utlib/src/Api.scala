@@ -14,7 +14,7 @@ import me.jiuyang.zaozi.{
   Parameter
 }
 import me.jiuyang.zaozi.valuetpe.{BundleField, Data}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Value}
 
 import java.lang.foreign.Arena
 import scala.language.dynamics
@@ -30,18 +30,18 @@ final class TestbenchPort[T <: Data] private[utlib] (
     using Arena
   ): Unit = testbench.bind(field, value)
 
-/** Typed access to the ports of `I` without exposing string-based lookup to the testbench. */
+/** Typed access to the driven ports of `I`. */
 final class TestbenchIO[I <: HWInterface[?]] private[utlib] (private val testbench: Testbench[I]) extends Dynamic:
   private[utlib] def port[T <: Data](name:       String): TestbenchPort[T]         = testbench.port(name)
   private[utlib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] = testbench.portOption(name)
 
   transparent inline def selectDynamic(name: String): Any = ${ testbenchIOSelectDynamic[I]('this, 'name) }
 
-/** Operations and typed IO bindings available while building one simulation wrapper. */
+/** Operations and typed IO bindings for one wrapper elaboration, supplied to `TestbenchGenerator.simulation`. */
 trait Testbench[I <: HWInterface[?]]:
-  def io:           TestbenchIO[I]
   def clock:        Value
   def fallingClock: Value
+  def io:           TestbenchIO[I]
 
   /** Declares a DPI function at the builtin module scope. */
   def dpiFunction(
@@ -50,7 +50,8 @@ trait Testbench[I <: HWInterface[?]]:
     arguments: Seq[DpiArg]
   )(
     using Arena,
-    Context
+    Context,
+    Block
   ): DpiFunction
 
   /** Calls a DPI function on the falling edge of the generated testbench clock. */
@@ -72,18 +73,28 @@ trait Testbench[I <: HWInterface[?]]:
     using Arena,
     Context,
     Block
-  ):                                                      Unit
+  ): Unit
+
   private[utlib] def port[T <: Data](name:       String): TestbenchPort[T]
   private[utlib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]]
   private[utlib] def bind(
-    port:  BundleField[?],
+    field: BundleField[?],
     value: Value
   )(
     using Arena
   ):                                                      Unit
 
-/** Simulation behavior attached to a FIRRTL testbench generator. */
-trait UT[PARAM <: Parameter, I <: HWInterface[PARAM]]:
+  /** Resolves the instance inputs in HW port order, including the generated clock. */
+  private[utlib] def inputValues: Seq[Value]
+
+/** Defines the FIRRTL testbench architecture and the simulation behavior of its wrapper. */
+trait TestbenchGenerator[
+  PARAM <: Parameter,
+  L <: LayerInterface[PARAM],
+  I <: HWInterface[PARAM],
+  P <: DVInterface[PARAM, L]]
+    extends Generator[PARAM, L, I, P]:
+  def wrapperName(parameter:   PARAM): String = s"${moduleName(parameter)}Wrapper"
   def clockPeriodNs(parameter: PARAM): Long
   def simulation(parameter:    PARAM): (
     Arena,
@@ -92,8 +103,34 @@ trait UT[PARAM <: Parameter, I <: HWInterface[PARAM]]:
     Testbench[I]
   ) ?=> Unit
 
-/** Emits a FIRRTL testbench together with its HW/SV simulation wrapper. */
-trait UTApi:
+/** Builds a unit testbench and exports its IR, DPI interface, or SystemVerilog. */
+trait TestbenchGeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
-    ut: Generator[PARAM, L, I, P] & UT[PARAM, I]
-  ) def emit(parameter: PARAM): Unit
+    generator: TestbenchGenerator[PARAM, L, I, P]
+  )
+    /** Links and lowers the FIRRTL inputs, then constructs the simulation wrapper once. The caller owns the returned
+      * builtin module and must destroy it before its context.
+      */
+    def module(
+      parameter:     PARAM,
+      firrtlModules: Seq[Array[Byte]]
+    )(
+      using Arena,
+      Context
+    ): Module
+
+  extension (module: Module)
+    /** Returns the complete testbench, including its wrapper, as MLIR bytecode. */
+    def toMlirBytecode(
+      using Arena
+    ): Array[Byte]
+
+    /** Returns the DPI interface declared in the testbench as structured JSON. */
+    def toDpiJson(
+      using Arena
+    ): ujson.Value
+
+    /** Returns SystemVerilog text by lowering a copy, preserving the original module for further conversions. */
+    def toVerilog(
+      using Arena
+    ): String

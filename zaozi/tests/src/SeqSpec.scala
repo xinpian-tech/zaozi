@@ -28,10 +28,9 @@ object SeqSpec extends TestSuite:
           try
             given Block = container.getBody
             summon[HWApi].module("SeqTop", Seq(Port("input", PortDirection.Input, 1.integerTypeGet))):
-              val api      = summon[SeqApi]
-              val clock    = api.toClock(summon[Block].getArgument(0))
-              val inverted = api.clockInv(clock)
-              assert(api.clockType.isClock)
+              val clock    = summon[Block].getArgument(0).toClock
+              val inverted = clock.clockInv
+              assert(summon[SeqApi].clockType.isClock)
               assert(clock.getType.isClock)
               assert(inverted.getType.isClock)
               summon[HWApi].output(Seq.empty)

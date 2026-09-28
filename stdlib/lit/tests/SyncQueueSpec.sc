@@ -18,13 +18,13 @@
 // RUN: cd %t.dir && firtool Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC-RAM
 // RUN: cd %t.dir && firtool SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC
 
-// Generate the unit-test SystemVerilog and its interface metadata.
+// Build the testbench once, then convert each format in memory and write the results here.
 // RUN: cd %t.dir && %{testbench} %S/../../ut/src/sync_queue/parameter.json
-// RUN: FileCheck %s --check-prefix=COMBINED --input-file=%t.dir/testbench.hw.mlir
-// RUN: test ! -e %t.dir/testbench-wrapper.hw.mlir
-// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/interface.json
-// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/testbench.sv
-// RUN: FileCheck %s --check-prefix=WRAPPER --input-file=%t.dir/testbench.sv
+// RUN: test ! -e %t.dir/linked.mlir
+// RUN: circt-opt %t.dir/SyncQueueTestBenchWrapper.mlirbc | FileCheck %s --check-prefix=COMBINED
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/SyncQueueTestBenchWrapper.json
+// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/SyncQueueTestBenchWrapper.sv
+// RUN: FileCheck %s --check-prefix=WRAPPER --input-file=%t.dir/SyncQueueTestBenchWrapper.sv
 // RUN: rm -rf %t.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
@@ -86,6 +86,9 @@
 // COMBINED-NOT: hw.module.extern
 // COMBINED: hw.module @SyncQueueTestBench(
 // COMBINED: hw.module @SyncQueueTestBenchWrapper()
+// COMBINED: seq.clock_inv
+// COMBINED-NOT: seq.clock_inv
+// COMBINED: {{^  }}sim.func.dpi @step(
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
 
@@ -107,6 +110,38 @@ import me.jiuyang.stdlib.queue.default.{SyncQueueParameter, given}
 import me.jiuyang.stdlib.ut.SyncQueueTestBench
 import me.jiuyang.utlib.default.{*, given}
 import me.jiuyang.zaozi.default.{*, given}
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.verif.{DialectApi as VerifDialectApi, given}
+import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
+
+import java.lang.foreign.Arena
 
 val parameter = upickle.default.read[SyncQueueParameter](os.read(os.Path(args(0), os.pwd)))
-SyncQueueTestBench.emit(parameter)
+val arena     = Arena.ofConfined()
+given Arena   = arena
+given Context = summon[ContextApi].contextCreate
+try
+  summon[FIRRTLDialectApi].loadDialect
+  summon[LTLDialectApi].loadDialect
+  summon[VerifDialectApi].loadDialect
+  SyncQueueTestBench.dumpMlirbc(parameter)
+  val modules = os.list(os.pwd).filter(_.ext == "mlirbc").sortBy(_.last).map(os.read.bytes)
+  val module  = SyncQueueTestBench.module(parameter, modules)
+  try
+    val files    = os.list(os.pwd).toSet
+    val bytecode = module.toMlirBytecode
+    val dpi      = module.toDpiJson
+    val verilog  = module.toVerilog
+    assert(module.toMlirBytecode.sameElements(bytecode))
+    assert(module.toDpiJson == dpi)
+    assert(os.list(os.pwd).toSet == files)
+
+    val name = SyncQueueTestBench.wrapperName(parameter)
+    os.write.over(os.pwd / s"$name.mlirbc", bytecode)
+    os.write.over(os.pwd / s"$name.json", ujson.write(dpi, indent = 2))
+    os.write.over(os.pwd / s"$name.sv", verilog)
+  finally module.destroy()
+finally
+  summon[Context].destroy()
+  arena.close()

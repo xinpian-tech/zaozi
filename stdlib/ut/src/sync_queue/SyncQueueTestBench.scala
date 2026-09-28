@@ -21,8 +21,7 @@ class SyncQueueTestBenchIO(parameter: SyncQueueParameter) extends HWBundle(param
 
 @generator
 object SyncQueueTestBench
-    extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueueTestBenchIO, SyncQueueProbe]
-    with UT[SyncQueueParameter, SyncQueueTestBenchIO]:
+    extends TestbenchGenerator[SyncQueueParameter, SyncQueueLayers, SyncQueueTestBenchIO, SyncQueueProbe]:
   override def moduleName(parameter: SyncQueueParameter): String = "SyncQueueTestBench"
   def clockPeriodNs(parameter:       SyncQueueParameter): Long   = 10
 

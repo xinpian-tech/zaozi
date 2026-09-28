@@ -16,29 +16,26 @@ given SeqApi with
     Context
   ): Type = summon[TypeApi].clockTypeGet
 
-  def toClock(
-    input: Value
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value =
-    val result = summon[ToClockApi].op(input, locate)
-    result.operation.appendToBlock()
-    result.result
+  extension (input: Value)
+    def toClock(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value =
+      val result = summon[ToClockApi].op(input, locate)
+      result.operation.appendToBlock()
+      result.result
 
-  def clockInv(
-    input: Value
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value =
-    val result = summon[ClockInvApi].op(input, locate)
-    result.operation.appendToBlock()
-    result.result
+    def clockInv(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value =
+      val result = summon[ClockInvApi].op(input, locate)
+      result.operation.appendToBlock()
+      result.result
 end given
