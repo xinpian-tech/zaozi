@@ -36,7 +36,7 @@ object LinkCircuitsSmoke extends TestSuite:
 
   val tests: Tests = Tests:
     test("LinkCircuits pass"):
-      given Arena            = Arena.ofAuto()
+      given Arena = Arena.ofAuto()
       given context: Context = summon[ContextApi].contextCreate
       summon[FirrtlDialect].loadDialect
 

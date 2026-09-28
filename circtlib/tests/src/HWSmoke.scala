@@ -34,10 +34,12 @@ object HWSmoke extends TestSuite:
         scope.print(out ++= _)
         assert(out.toString().contains("hw.module"))
         assert(module.symbol == "Top")
-        assert(module.ports.map(port => (port.name, port.direction)) == Seq(
-          "input"  -> PortDirection.Input,
-          "output" -> PortDirection.Output
-        ))
+        assert(
+          module.ports.map(port => (port.name, port.direction)) == Seq(
+            "input"  -> PortDirection.Input,
+            "output" -> PortDirection.Output
+          )
+        )
 
       test("ModuleExtern"):
         val i1     = 1.integerTypeGet
