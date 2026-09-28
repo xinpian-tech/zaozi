@@ -25,7 +25,7 @@ given DialectApi with
 
   extension (module: Module)
     def exportDPIInterface(
-      callback: String => Unit
+      callback:    String => Unit
     )(
       using arena: Arena
     ): LogicalResult =

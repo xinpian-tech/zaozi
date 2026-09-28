@@ -9,10 +9,28 @@ import java.lang.foreign.Arena
 
 class ToClock(val _operation: Operation)
 trait ToClockApi extends HasOperation[ToClock]:
-  def op(input: Value, location: Location)(using Arena, Context): ToClock
-  extension (ref: ToClock) def result(using Arena): Value
+  def op(
+    input:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   ToClock
+  extension (ref: ToClock)
+    def result(
+      using Arena
+    ): Value
 
 class ClockInv(val _operation: Operation)
 trait ClockInvApi extends HasOperation[ClockInv]:
-  def op(input: Value, location: Location)(using Arena, Context): ClockInv
-  extension (ref: ClockInv) def result(using Arena): Value
+  def op(
+    input:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ):   ClockInv
+  extension (ref: ClockInv)
+    def result(
+      using Arena
+    ): Value

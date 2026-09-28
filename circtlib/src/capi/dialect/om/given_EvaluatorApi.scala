@@ -27,8 +27,8 @@ import org.llvm.circt.CAPI.{
   omEvaluatorValueIsAObject,
   omEvaluatorValueIsAPath,
   omEvaluatorValueIsAPrimitive,
-  omEvaluatorValueIsUnknown,
-  omEvaluatorValueIsNull
+  omEvaluatorValueIsNull,
+  omEvaluatorValueIsUnknown
 }
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Location, Module, Type, given}
@@ -108,10 +108,10 @@ given EvaluatorApi with
     using arena: Arena
   ): OMEvaluatorValue = OMEvaluatorValue(omEvaluatorValueFromPrimitive(arena, primitive.segment))
   inline def unknownGet(
-    tpe: Type
+    tpe:         Type
   )(
     using arena: Arena,
-    context: Context
+    context:     Context
   ): OMEvaluatorValue = OMEvaluatorValue(omEvaluatorUnknownGet(arena, context.segment, tpe.segment))
   extension (primitive:      Attribute)
     /** wrapper to [[fromPrimitive]] */

@@ -72,7 +72,7 @@ object SimSmoke extends TestSuite:
       currentContext = context
       given Context = context
       summon[SimDialect].loadDialect
-      val module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      val module    = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       try
         val declaration = summon[DPIFuncApi].op(
           symbol = "step",
@@ -83,10 +83,12 @@ object SimSmoke extends TestSuite:
           ),
           location = summon[LocationApi].locationUnknownGet
         )
-        declaration.operation.appendToBlock()(using module.getBody)
-        val json = new StringBuilder
+        declaration.operation.appendToBlock()(
+          using module.getBody
+        )
+        val json        = new StringBuilder
         assert(module.exportDPIInterface(json.append(_)).succeeded)
-        val schema = ujson.read(json.toString)
+        val schema      = ujson.read(json.toString)
         assert(schema("dpi_functions")(0)("function").str == "zaozi_step")
         assert(schema("dpi_functions")(0)("arguments")(0)("name").str == "value")
         assert(schema("dpi_functions")(0)("arguments")(0)("width").num == 8)
