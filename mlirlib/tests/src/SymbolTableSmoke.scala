@@ -11,12 +11,12 @@ import java.lang.foreign.Arena
 object SymbolTableSmoke extends TestSuite:
   val tests: Tests = Tests:
     test("Symbol table"):
-      given Arena            = Arena.ofAuto()
+      given Arena = Arena.ofAuto()
       given context: Context = summon[ContextApi].contextCreate
-      val module             = summon[ModuleApi].moduleCreateParse(
+      val module      = summon[ModuleApi].moduleCreateParse(
         "module { module @Top {} module @Nested { module @Hidden {} } }"
       )
-      val symbolTable        = summon[SymbolTableApi].symbolTableCreate(module.getOperation)
+      val symbolTable = summon[SymbolTableApi].symbolTableCreate(module.getOperation)
 
       test("Lookup"):
         val operation = symbolTable.lookup("Top")
