@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" --
+// DEFINE: %{testbench} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS %s --
 
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 
@@ -16,6 +17,14 @@
 // RUN: cd %t.dir && %{test} design sync.json
 // RUN: cd %t.dir && firtool Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC-RAM
 // RUN: cd %t.dir && firtool SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC
+
+// Generate the unit-test SystemVerilog and its interface metadata.
+// RUN: cd %t.dir && %{testbench} %S/../../ut/src/sync_queue/parameter.json
+// RUN: FileCheck %s --check-prefix=COMBINED --input-file=%t.dir/testbench.hw.mlir
+// RUN: test ! -e %t.dir/testbench-wrapper.hw.mlir
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/interface.json
+// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/testbench.sv
+// RUN: FileCheck %s --check-prefix=WRAPPER --input-file=%t.dir/testbench.sv
 // RUN: rm -rf %t.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
@@ -72,3 +81,32 @@
 // SYNC: BrentKungAdder_width2_radix4
 // SYNC: Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse ram (
 // SYNC-NOT: GTECH_
+
+// COMBINED-NOT: firrtl.circuit
+// COMBINED-NOT: hw.module.extern
+// COMBINED: hw.module @SyncQueueTestBenchWrapper()
+// COMBINED: hw.module @SyncQueueTestBench(
+// COMBINED-NOT: firrtl.circuit
+// COMBINED-NOT: hw.module.extern
+
+// DPI: "direction": "out"
+// DPI: "name": "resetN"
+// DPI: "direction": "return"
+// DPI: "name": "status"
+// DPI: "function": "zaozi_step"
+
+// DESIGN-LABEL: module SyncQueueTestBench(
+// DESIGN: SyncQueue_{{.*}} dut (
+
+// WRAPPER: import "DPI-C"
+// WRAPPER-LABEL: module SyncQueueTestBenchWrapper();
+// WRAPPER: always #5ns clock = ~clock
+// WRAPPER: SyncQueueTestBench testbench (
+
+import me.jiuyang.stdlib.queue.default.{SyncQueueParameter, given}
+import me.jiuyang.stdlib.ut.SyncQueueTestBench
+import me.jiuyang.utlib.default.{*, given}
+import me.jiuyang.zaozi.default.{*, given}
+
+val parameter = upickle.default.read[SyncQueueParameter](os.read(os.Path(args(0), os.pwd)))
+SyncQueueTestBench.write(parameter)

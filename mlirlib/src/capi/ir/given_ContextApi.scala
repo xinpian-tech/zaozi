@@ -13,6 +13,7 @@ import org.llvm.mlir.CAPI.{
   mlirContextDetachDiagnosticHandler,
   mlirContextEnableMultithreading,
   mlirContextGetOrLoadDialect,
+  mlirContextIsRegisteredOperation,
   mlirContextLoadAllAvailableDialects,
   mlirContextSetAllowUnregisteredDialects,
   mlirContextSetThreadPool
@@ -58,6 +59,12 @@ given ContextApi with
       mlirContextEnableMultithreading(context.segment, enable)
     inline def loadAllAvailableDialects():                       Unit =
       mlirContextLoadAllAvailableDialects(context.segment)
+    inline def isRegisteredOperation(
+      name:        String
+    )(
+      using arena: Arena
+    ): Boolean =
+      mlirContextIsRegisteredOperation(context.segment, name.toStringRef.segment)
     inline def setThreadPool(threadPool: LlvmThreadPool):        Unit =
       mlirContextSetThreadPool(context.segment, threadPool.segment)
 
