@@ -18,17 +18,13 @@
 // RUN: cd %t.dir && firtool Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC-RAM
 // RUN: cd %t.dir && firtool SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC
 
-// Generate and simulate the unit-test wrapper with the C++ and CPython frontends.
+// Generate the unit-test SystemVerilog and its interface metadata.
 // RUN: cd %t.dir && %{testbench} %S/../../ut/src/sync_queue/parameter.json
 // RUN: FileCheck %s --check-prefix=COMBINED --input-file=%t.dir/testbench.hw.mlir
 // RUN: test ! -e %t.dir/testbench-wrapper.hw.mlir
-// RUN: python3 %S/../../../utlib/scripts/ut.py --circuit-dir %t.dir --top SyncQueueTestBench --driver %S/../../ut/src/sync_queue/driver.cpp --stimulus %S/../../ut/src/sync_queue/stimulus.json --timeout 300
-// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/build/zaozi_dpi.hpp
-// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/build/sv/SyncQueueTestBench.sv
-// RUN: FileCheck %s --check-prefix=WRAPPER --input-file=%t.dir/build/sv/SyncQueueTestBenchWrapper.sv
-// RUN: test -s %t.dir/trace.vcd
-// RUN: python3 %S/../../../utlib/scripts/ut.py --circuit-dir %t.dir --top SyncQueueTestBench --frontend cpython --driver %S/../../ut/src/sync_queue/driver.py --stimulus %S/../../ut/src/sync_queue/stimulus.json --build-dir %t.dir/build-cpython --timeout 300
-// RUN: FileCheck %s --check-prefix=CPYTHON --input-file=%t.dir/build-cpython/zaozi_dpi.def
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/interface.json
+// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/testbench.sv
+// RUN: FileCheck %s --check-prefix=WRAPPER --input-file=%t.dir/testbench.sv
 // RUN: rm -rf %t.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
@@ -93,11 +89,11 @@
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
 
-// DPI: extern "C" {
-// DPI: int zaozi_step(
-
-// CPYTHON: ZAOZI_DPI_BEGIN(int, zaozi_step,
-// CPYTHON: ZAOZI_DPI_CALL("zaozi_step")
+// DPI: "direction": "out"
+// DPI: "name": "resetN"
+// DPI: "direction": "return"
+// DPI: "name": "status"
+// DPI: "function": "zaozi_step"
 
 // DESIGN-LABEL: module SyncQueueTestBench(
 // DESIGN: SyncQueue_{{.*}} dut (

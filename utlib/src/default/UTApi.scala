@@ -22,13 +22,13 @@ import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.valuetpe.{Bits, Bool, BundleField, Clock, Data, Reset, SInt, UInt}
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.emit.{DialectApi as EmitDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SVDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.verif.{DialectApi as VerifDialectApi, given}
-import org.llvm.circt.scalalib.capi.exportverilog.given_ExportVerilogApi
 import org.llvm.circt.scalalib.capi.firtool.{FirtoolApi, FirtoolOptions, given}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, ContextApi, ModuleApi, Type, TypeApi, Value, given}
@@ -94,6 +94,7 @@ given UTApi with
       require(modules.nonEmpty, s"no FIRRTL modules in $outDir")
       val linked        = outDir / "linked.mlir"
       val testbenchHW   = outDir / "testbench.hw.mlir"
+      val testbenchSV   = outDir / "testbench.sv"
       os.proc(
         Seq("firld", s"--base-circuit=$testbenchName", "--no-mangle") ++
           modules.map(_.toString) ++ Seq("-o", linked.toString)
@@ -105,6 +106,7 @@ given UTApi with
         given Context = summon[ContextApi].contextCreate
         try
           summon[FIRRTLDialectApi].loadDialect
+          summon[EmitDialectApi].loadDialect
           summon[HWDialectApi].loadDialect
           summon[LTLDialectApi].loadDialect
           summon[SeqDialectApi].loadDialect
@@ -232,6 +234,18 @@ given UTApi with
             module.getOperation.print(source.append(_))
             os.write.over(testbenchHW, source.toString)
             os.write.over(outDir / "interface.json", json.toString)
+
+            val verilog           = new StringBuilder
+            val exportPassManager = summon[PassManagerApi].passManagerCreate
+            try
+              exportPassManager.hwToSV(summon[FirtoolOptions])
+              exportPassManager.exportVerilog(summon[FirtoolOptions], verilog.append(_))
+              exportPassManager.runOnOpOrThrow(
+                module.getOperation,
+                s"SystemVerilog export for unit testbench '$testbenchName'"
+              )
+            finally exportPassManager.destroy()
+            os.write.over(testbenchSV, verilog.toString)
           finally module.destroy()
         finally summon[Context].destroy()
       finally wrapperArena.close()

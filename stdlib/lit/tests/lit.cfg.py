@@ -30,7 +30,7 @@ env_vars_to_pass = [
     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
     "http_proxy", "https_proxy", "all_proxy", "no_proxy",
     "COURSIER_CACHE", "COURSIER_REPOSITORIES", "COURSIER_MIRRORS",
-    "NIX_CFLAGS_COMPILE", "NIX_LDFLAGS", "Z3_LIB"
+    "NIX_LDFLAGS", "Z3_LIB"
 ]
 for var in env_vars_to_pass:
     if var in os.environ:
