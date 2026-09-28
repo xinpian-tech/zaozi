@@ -6,6 +6,7 @@ import org.llvm.circt.*
 import org.llvm.circt.CAPI.{
   firrtlTypeGetAnalog,
   firrtlTypeGetAnyRef,
+  firrtlTypeGetAsyncReset,
   firrtlTypeGetBitWidth,
   firrtlTypeGetBoolean,
   firrtlTypeGetBundle,
@@ -165,6 +166,10 @@ given TypeApi with
     using arena: Arena,
     context:     Context
   ): Type = Type(firrtlTypeGetReset(arena, context.segment))
+  inline def getAsyncReset(
+    using arena: Arena,
+    context:     Context
+  ): Type = Type(firrtlTypeGetAsyncReset(arena, context.segment))
   extension (width:                    Int)
     inline def getSInt(
       using arena: Arena,

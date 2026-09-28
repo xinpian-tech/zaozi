@@ -335,6 +335,10 @@ trait TypeApi:
     using arena: Arena,
     context:     Context
   ):                                                                                Type
+  inline def getAsyncReset(
+    using arena: Arena,
+    context:     Context
+  ):                                                                                Type
   extension (width:              Int)
     inline def getSInt(
       using arena: Arena,
