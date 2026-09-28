@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.utlib.default
+package me.jiuyang.tblib.default
 
-import me.jiuyang.utlib.{Testbench, TestbenchIO, TestbenchPort}
+import me.jiuyang.tblib.{Testbench, TestbenchIO, TestbenchPort}
 import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, HWInterface, SimApi}
 import me.jiuyang.zaozi.default.given
 import me.jiuyang.zaozi.valuetpe.{BundleField, Data}
@@ -71,13 +71,13 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     Block
   ): Unit = summon[SimApi].clockedTerminate(clock, condition, success)
 
-  private[utlib] def port[T <: Data](name: String): TestbenchPort[T] =
+  private[tblib] def port[T <: Data](name: String): TestbenchPort[T] =
     portOption[T](name).getOrElse(throw new IllegalArgumentException(s"$name is not a driven testbench input"))
 
-  private[utlib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] =
+  private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] =
     stimulusFields.find(_.name == name).map(field => new TestbenchPort(field.asInstanceOf[BundleField[T]], this))
 
-  private[utlib] def bind(
+  private[tblib] def bind(
     field: BundleField[?],
     value: Value
   )(
@@ -90,7 +90,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     require(value.getType.equal(port.tpe), s"testbench input type mismatch: ${port.name}")
     driven(index) = Some(value)
 
-  private[utlib] def inputValues: Seq[Value] =
+  private[tblib] def inputValues: Seq[Value] =
     Seq(clock) ++ stimulusPorts
       .zip(driven)
       .map: (port, value) =>

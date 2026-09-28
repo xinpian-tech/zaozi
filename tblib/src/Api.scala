@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.utlib
+package me.jiuyang.tblib
 
-import me.jiuyang.utlib.macros.testbenchIOSelectDynamic
+import me.jiuyang.tblib.macros.testbenchIOSelectDynamic
 import me.jiuyang.zaozi.{
   DVInterface,
   DpiArg,
@@ -20,7 +20,7 @@ import java.lang.foreign.Arena
 import scala.language.dynamics
 
 /** A typed testbench port bound to one simulation-wrapper instance. */
-final class TestbenchPort[T <: Data] private[utlib] (
+final class TestbenchPort[T <: Data] private[tblib] (
   private val field: BundleField[T],
   private val testbench: Testbench[?]):
   /** Binds a wrapper value to this testbench input. */
@@ -31,9 +31,9 @@ final class TestbenchPort[T <: Data] private[utlib] (
   ): Unit = testbench.bind(field, value)
 
 /** Typed access to the driven ports of `I`. */
-final class TestbenchIO[I <: HWInterface[?]] private[utlib] (private val testbench: Testbench[I]) extends Dynamic:
-  private[utlib] def port[T <: Data](name:       String): TestbenchPort[T]         = testbench.port(name)
-  private[utlib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] = testbench.portOption(name)
+final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testbench: Testbench[I]) extends Dynamic:
+  private[tblib] def port[T <: Data](name:       String): TestbenchPort[T]         = testbench.port(name)
+  private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] = testbench.portOption(name)
 
   transparent inline def selectDynamic(name: String): Any = ${ testbenchIOSelectDynamic[I]('this, 'name) }
 
@@ -75,9 +75,9 @@ trait Testbench[I <: HWInterface[?]]:
     Block
   ): Unit
 
-  private[utlib] def port[T <: Data](name:       String): TestbenchPort[T]
-  private[utlib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]]
-  private[utlib] def bind(
+  private[tblib] def port[T <: Data](name:       String): TestbenchPort[T]
+  private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]]
+  private[tblib] def bind(
     field: BundleField[?],
     value: Value
   )(
@@ -85,7 +85,7 @@ trait Testbench[I <: HWInterface[?]]:
   ):                                                      Unit
 
   /** Resolves the instance inputs in HW port order, including the generated clock. */
-  private[utlib] def inputValues: Seq[Value]
+  private[tblib] def inputValues: Seq[Value]
 
 /** Defines the FIRRTL testbench architecture and the simulation behavior of its wrapper. */
 trait TestbenchGenerator[

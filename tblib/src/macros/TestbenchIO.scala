@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.utlib.macros
+package me.jiuyang.tblib.macros
 
-import me.jiuyang.utlib.{TestbenchIO, TestbenchPort}
+import me.jiuyang.tblib.{TestbenchIO, TestbenchPort}
 import me.jiuyang.zaozi.HWInterface
 import me.jiuyang.zaozi.valuetpe.{BundleField, Data}
 

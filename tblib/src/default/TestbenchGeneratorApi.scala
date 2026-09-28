@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
-package me.jiuyang.utlib.default
+package me.jiuyang.tblib.default
 
-import me.jiuyang.utlib.{Testbench, TestbenchGenerator, TestbenchGeneratorApi}
+import me.jiuyang.tblib.{Testbench, TestbenchGenerator, TestbenchGeneratorApi}
 import me.jiuyang.zaozi.{DVInterface, HWApi, HWInterface, LayerInterface, Parameter, SVApi}
 import me.jiuyang.zaozi.default.{*, given}
 

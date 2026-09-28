@@ -108,7 +108,7 @@
 
 import me.jiuyang.stdlib.queue.default.{SyncQueueParameter, given}
 import me.jiuyang.stdlib.ut.SyncQueueTestBench
-import me.jiuyang.utlib.default.{*, given}
+import me.jiuyang.tblib.default.{*, given}
 import me.jiuyang.zaozi.default.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
