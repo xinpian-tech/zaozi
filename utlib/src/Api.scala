@@ -96,4 +96,4 @@ trait UT[PARAM <: Parameter, I <: HWInterface[PARAM]]:
 trait UTApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     ut: Generator[PARAM, L, I, P] & UT[PARAM, I]
-  ) def write(parameter: PARAM): Unit
+  ) def emit(parameter: PARAM): Unit
