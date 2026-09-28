@@ -389,25 +389,22 @@ trait SeqApi:
     Context
   ): Type
 
-  def toClock(
-    input: Value
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value
+  extension (input: Value)
+    def toClock(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
 
-  def clockInv(
-    input: Value
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value
+    def clockInv(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
 
 /** Builds SV dialect storage and inline source operations in the current block. */
 trait SVApi:
@@ -424,15 +421,14 @@ trait SVApi:
     sourcecode.Line
   ): Value
 
-  def readInOut(
-    input: Value
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value
+  extension (input: Value)
+    def readInOut(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
 
   def verbatim(
     formatString:  String,

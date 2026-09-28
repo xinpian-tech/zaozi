@@ -25,18 +25,17 @@ given SVApi with
     result.operation.appendToBlock()
     result.result
 
-  def readInOut(
-    input: Value
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value =
-    val result = summon[ReadInOutApi].op(input, locate)
-    result.operation.appendToBlock()
-    result.result
+  extension (input: Value)
+    def readInOut(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value =
+      val result = summon[ReadInOutApi].op(input, locate)
+      result.operation.appendToBlock()
+      result.result
 
   def verbatim(
     formatString:  String,

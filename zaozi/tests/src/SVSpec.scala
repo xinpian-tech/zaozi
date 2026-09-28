@@ -27,7 +27,7 @@ object SVSpec extends TestSuite:
           try
             given Block  = container.getBody
             val register = summon[SVApi].reg(1.integerTypeGet, "value")
-            summon[SVApi].readInOut(register)
+            register.readInOut
             summon[SVApi].verbatim("initial {{0}} = 1'b0;", Seq(register))
           finally container.destroy()
         finally summon[Context].destroy()
