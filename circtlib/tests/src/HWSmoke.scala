@@ -25,12 +25,19 @@ object HWSmoke extends TestSuite:
       given Block         = scope.getFirstRegion.getFirstBlock
 
       test("Module"):
-        val module = summon[HWModuleApi].op("Top", Seq.empty, unknownLocation)
+        val input  = Port("input", PortDirection.Input, 1.integerTypeGet)
+        val output = Port("output", PortDirection.Output, 1.integerTypeGet)
+        val module = summon[HWModuleApi].op("Top", Seq(input, output), unknownLocation)
         module.operation.appendToBlock()
 
         val out = StringBuilder()
         scope.print(out ++= _)
         assert(out.toString().contains("hw.module"))
+        assert(module.symbol == "Top")
+        assert(module.ports.map(port => (port.name, port.direction)) == Seq(
+          "input"  -> PortDirection.Input,
+          "output" -> PortDirection.Output
+        ))
 
       test("ModuleExtern"):
         val i1     = 1.integerTypeGet

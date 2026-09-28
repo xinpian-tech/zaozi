@@ -84,8 +84,8 @@
 
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
-// COMBINED: hw.module @SyncQueueTestBenchWrapper()
 // COMBINED: hw.module @SyncQueueTestBench(
+// COMBINED: hw.module @SyncQueueTestBenchWrapper()
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
 
