@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 
+circtFirrtlCreateLinkCircuitsPass # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
+
 arcMemoryTypeGet                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcMemoryTypeGetAddressType     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcMemoryTypeGetNumWords        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
