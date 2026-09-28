@@ -4,7 +4,15 @@ package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.HWApi
 
-import org.llvm.circt.scalalib.dialect.hw.operation.{InstanceApi, ModuleApi, ModuleExternApi, OutputApi, Port, given}
+import org.llvm.circt.scalalib.dialect.hw.operation.{
+  InstanceApi,
+  Module,
+  ModuleApi,
+  ModuleExternApi,
+  OutputApi,
+  Port,
+  given
+}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
 import java.lang.foreign.Arena
@@ -59,6 +67,18 @@ given HWApi with
     val instance = summon[InstanceApi].op(instanceName, moduleName, ports, inputs, locate)
     instance.operation.appendToBlock()
     instance.results
+
+  def instance(
+    instanceName: String,
+    module:       Module,
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value] = instance(instanceName, module.symbol, module.ports, inputs)
 
   def output(
     values: Seq[Value]

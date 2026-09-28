@@ -92,6 +92,26 @@ given ModuleApi with
 
   extension (ref: Module)
     def operation: Operation = ref._operation
+    def symbol(
+      using Arena
+    ): String = ref.operation.getInherentAttributeByName("sym_name").stringAttrGetValue
+    def ports(
+      using Arena
+    ): Seq[Port] =
+      val moduleType = ref.operation.getInherentAttributeByName("module_type").typeAttrGetValue
+      val portCount  = moduleType.moduleTypeGetNumInputs() + moduleType.moduleTypeGetNumOutputs()
+      Vector.tabulate(portCount): index =>
+        val nativePort = moduleType.moduleTypeGetPort(index)
+        val direction  = nativePort.portDirection match
+          case value if value == CAPI.Input()  => PortDirection.Input
+          case value if value == CAPI.Output() => PortDirection.Output
+          case value if value == CAPI.InOut()  => PortDirection.InOut
+          case value                           => throw new IllegalArgumentException(s"unknown HW port direction: $value")
+        Port(
+          Attribute(nativePort.portName).stringAttrGetValue,
+          direction,
+          Type(nativePort.portType)
+        )
     def block(
       using Arena
     ): Block = ref.operation.getFirstRegion.getFirstBlock

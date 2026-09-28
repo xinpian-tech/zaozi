@@ -13,7 +13,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
-import org.llvm.circt.scalalib.dialect.hw.operation.Port
+import org.llvm.circt.scalalib.dialect.hw.operation.{Module as HWModule, Port}
 import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
@@ -350,6 +350,19 @@ trait HWApi:
     instanceName: String,
     moduleName:   String,
     ports:        Seq[Port],
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value]
+
+  /** Instantiates an existing HW module and returns its output values in port order. */
+  def instance(
+    instanceName: String,
+    module:       HWModule,
     inputs:       Seq[Value]
   )(
     using Arena,

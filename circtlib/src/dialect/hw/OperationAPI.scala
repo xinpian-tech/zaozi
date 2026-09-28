@@ -25,6 +25,16 @@ trait ModuleApi extends HasOperation[Module]:
   ): Module
 
   extension (ref: Module)
+    /** Module symbol name. */
+    def symbol(
+      using Arena
+    ): String
+
+    /** Ports in declaration order. */
+    def ports(
+      using Arena
+    ): Seq[Port]
+
     /** The module body. Input and inout ports are its block arguments. */
     def block(
       using Arena
