@@ -9,6 +9,7 @@ import me.jiuyang.zaozi.default.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, LinkCircuitsPassApi, given}
 import org.llvm.circt.scalalib.capi.dialect.emit.{DialectApi as EmitDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.comb.{DialectApi as CombDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialectApi, given}
@@ -141,12 +142,12 @@ given TestbenchGeneratorApi with
         val interface = generator.interface(parameter)
         interface.toMlirType
         val fields    = interface.elements
-        require(fields.forall(_.isFlipped), "testbench ports must all be inputs")
         require(
           hwPorts.size == fields.size && hwPorts
             .zip(fields)
             .forall: (port, field) =>
-              port.name == field.name && port.direction == PortDirection.Input,
+              port.name == field.name &&
+                port.direction == (if field.isFlipped then PortDirection.Input else PortDirection.Output),
           "lowered HW ports do not match the testbench interface"
         )
         require(
@@ -155,6 +156,7 @@ given TestbenchGeneratorApi with
         )
 
         given Block = module.getBody
+        summon[CombDialectApi].loadDialect
         summon[HWApi].module(generator.wrapperName(parameter), Seq.empty):
           val clockReg = summon[SVApi].reg(1.integerTypeGet, "clock")
           val seqClock = clockReg.readInOut.toClock
@@ -165,7 +167,8 @@ given TestbenchGeneratorApi with
 
           given testbench: Testbench[I] = new DefaultTestbench[I](seqClock, fields.tail, hwPorts.tail)
           generator.simulation(parameter)
-          summon[HWApi].instance("testbench", dutModule, testbench.inputValues)
+          val outputs = summon[HWApi].instance("testbench", dutModule, testbench.inputValues)
+          testbench.connectOutputs(outputs)
           summon[HWApi].output(Seq.empty)
 
         require(module.getOperation.verify, "invalid unit testbench wrapper")

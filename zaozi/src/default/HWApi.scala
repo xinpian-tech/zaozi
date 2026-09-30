@@ -5,6 +5,8 @@ package me.jiuyang.zaozi.default
 import me.jiuyang.zaozi.HWApi
 
 import org.llvm.circt.scalalib.dialect.hw.operation.{
+  BitcastApi,
+  ConstantApi,
   InstanceApi,
   Module,
   ModuleApi,
@@ -13,11 +15,39 @@ import org.llvm.circt.scalalib.dialect.hw.operation.{
   Port,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value, given}
 
 import java.lang.foreign.Arena
 
 given HWApi with
+  def constant(
+    value: BigInt,
+    width: Int
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value =
+    val op = summon[ConstantApi].op(value, width, locate).operation
+    op.appendToBlock()
+    op.getResult(0)
+
+  def bitcast(
+    input:      Value,
+    resultType: Type
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value =
+    val op = summon[BitcastApi].op(input, resultType, locate).operation
+    op.appendToBlock()
+    op.getResult(0)
+
   def module(
     symbol:      String,
     ports:       Seq[Port]

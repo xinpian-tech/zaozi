@@ -85,6 +85,28 @@ trait InstanceApi extends HasOperation[Instance]:
     ): Value
 end InstanceApi
 
+class Constant(val _operation: Operation)
+trait ConstantApi extends HasOperation[Constant]:
+  def op(
+    value:    BigInt,
+    width:    Int,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Constant
+
+class Bitcast(val _operation: Operation)
+trait BitcastApi extends HasOperation[Bitcast]:
+  def op(
+    input:      Value,
+    resultType: Type,
+    location:   Location
+  )(
+    using Arena,
+    Context
+  ): Bitcast
+
 class Output(val _operation: Operation)
 trait OutputApi extends HasOperation[Output]:
   /** `hw.output` - terminate an `hw.module` body and drive its output ports. */

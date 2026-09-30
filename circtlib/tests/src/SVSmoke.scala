@@ -23,9 +23,49 @@ object SVSmoke extends TestSuite:
       val scope           = summon[OperationApi].operationCreate(
         name = "test.scope",
         location = unknownLocation,
-        regionBlockTypeLocations = Seq(Seq((Seq(inout), Seq(unknownLocation))))
+        regionBlockTypeLocations = Seq(Seq((Seq(inout, 1.integerTypeGet), Seq.fill(2)(unknownLocation))))
       )
       given Block         = scope.getFirstRegion.getFirstBlock
+
+      test("Initial"):
+        val op = summon[InitialApi].op(unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.initial")
+
+      test("If"):
+        val op = summon[IfApi].op(summon[Block].getArgument(1), unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.if")
+
+      test("Case"):
+        val op = summon[CaseApi].op(summon[Block].getArgument(1), Seq(BigInt(0)), unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.case")
+
+      test("Wire"):
+        val op = summon[WireApi].op(1.integerTypeGet, "net", unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.wire")
+
+      test("Assign"):
+        val op = summon[AssignApi].op(summon[Block].getArgument(0), summon[Block].getArgument(1), unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.assign")
+
+      test("BPAssign"):
+        val op = summon[BPAssignApi].op(summon[Block].getArgument(0), summon[Block].getArgument(1), unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.bpassign")
+
+      test("PAssign"):
+        val op = summon[PAssignApi].op(summon[Block].getArgument(0), summon[Block].getArgument(1), unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.passign")
+
+      test("ConstantStr"):
+        val op = summon[ConstantStrApi].op("dram.yaml", unknownLocation)
+        op.operation.appendToBlock()
+        assert(op.operation.getName.str == "sv.constantStr")
 
       test("Reg"):
         val register = summon[RegApi].op(1.integerTypeGet, "value", None, unknownLocation)

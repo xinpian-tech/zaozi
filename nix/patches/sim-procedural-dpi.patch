@@ -1,0 +1,351 @@
+diff --git a/include/circt/Dialect/Sim/SimOps.td b/include/circt/Dialect/Sim/SimOps.td
+index 36c84759a..c5206ce18 100644
+--- a/include/circt/Dialect/Sim/SimOps.td
++++ b/include/circt/Dialect/Sim/SimOps.td
+@@ -140,9 +140,30 @@ def DPIFuncOp : SimOp<"func.dpi",
+   }];
+ }
+ 
+-def DPICallOp : SimOp<"func.dpi.call",
+-     [CallOpInterface, AttrSizedOperandSegments,
+-      DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
++class DPICallOpBase<string mnemonic, list<Trait> traits = []> : SimOp<mnemonic,
++    traits # [CallOpInterface, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
++  let results = (outs Variadic<AnyType>);
++
++  let extraClassDeclaration = [{
++    operand_range getArgOperands() { return getInputs(); }
++    MutableOperandRange getArgOperandsMutable() { return getInputsMutable(); }
++    mlir::CallInterfaceCallable getCallableForCallee() {
++      return (*this)->getAttrOfType<mlir::SymbolRefAttr>("callee");
++    }
++    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
++      (*this)->setAttr("callee", llvm::cast<mlir::SymbolRefAttr>(callee));
++    }
++
++    mlir::ArrayAttr getArgAttrsAttr() { return nullptr; }
++    mlir::ArrayAttr getResAttrsAttr() { return nullptr; }
++    void setArgAttrsAttr(mlir::ArrayAttr args) {}
++    void setResAttrsAttr(mlir::ArrayAttr args) {}
++    mlir::Attribute removeArgAttrsAttr() { return nullptr; }
++    mlir::Attribute removeResAttrsAttr() { return nullptr; }
++  }];
++}
++
++def DPICallOp : DPICallOpBase<"func.dpi.call", [AttrSizedOperandSegments]> {
+   let summary = "A call option for DPI function with an optional clock and enable";
+   let description = [{
+     `sim.func.dpi.call` represents SystemVerilog DPI function call. There are two
+@@ -165,40 +186,31 @@ def DPICallOp : SimOp<"func.dpi.call",
+                       Optional<ClockType>:$clock,
+                       Optional<I1>:$enable,
+                       Variadic<AnyType>:$inputs);
+-  let results = (outs Variadic<AnyType>);
+ 
+   let assemblyFormat = [{
+     $callee `(` $inputs `)` (`clock` $clock^)? (`enable` $enable^)?
+     attr-dict `:` functional-type($inputs, results)
+   }];
+ 
+-  let extraClassDeclaration = [{
+-    operand_range getArgOperands() {
+-      return getInputs();
+-    }
+-    MutableOperandRange getArgOperandsMutable() {
+-      return getInputsMutable();
+-    }
+-    mlir::CallInterfaceCallable getCallableForCallee() {
+-      return (*this)->getAttrOfType<mlir::SymbolRefAttr>("callee");
+-    }
++}
+ 
+-    /// Set the callee for this operation.
+-    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+-      (*this)->setAttr(getCalleeAttrName(), llvm::cast<mlir::SymbolRefAttr>(callee));
+-    }
++def DPICallProcOp : DPICallOpBase<"proc.dpi.call", [ProceduralOp]> {
++  let summary = "Call a DPI function in the current procedural region";
++  let description = [{
++    Calls the DPI function when execution reaches this operation. Calls within
++    the same procedural region execute in program order, including calls whose
++    only dependency is an external side effect. Results are available to later
++    operations in that execution, without a clocked register boundary.
+ 
+-    /// Stub implementations for ArgumentAttributesMethods. If desired,
+-    /// implement these by defining arg_attrs and res_attrs as arguments to the
+-    /// operation as OptionalAttr<DictArrayAttr>.
+-    mlir::ArrayAttr getArgAttrsAttr() { return nullptr; }
+-    mlir::ArrayAttr getResAttrsAttr() { return nullptr; }
+-    void setArgAttrsAttr(mlir::ArrayAttr args) {}
+-    void setResAttrsAttr(mlir::ArrayAttr args) {}
+-    mlir::Attribute removeArgAttrsAttr() { return nullptr; }
+-    mlir::Attribute removeResAttrsAttr() { return nullptr; }
++    The enclosing procedure supplies event control, and procedural conditionals
++    supply conditional execution. This operation creates neither a process nor
++    storage for its results. It may be used in `sim.triggered`, for example.
++    Calls in different processes have no relative ordering guarantee.
++  }];
++  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$inputs);
++  let assemblyFormat = [{
++    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+   }];
+-
+ }
+ 
+ //===----------------------------------------------------------------------===//
+diff --git a/lib/Conversion/SimToSV/SimToSV.cpp b/lib/Conversion/SimToSV/SimToSV.cpp
+index 2e2ed62c4..2f4c3d7a1 100644
+--- a/lib/Conversion/SimToSV/SimToSV.cpp
++++ b/lib/Conversion/SimToSV/SimToSV.cpp
+@@ -393,6 +393,20 @@ public:
+   }
+ };
+ 
++class DPICallProcLowering : public SimConversionPattern<DPICallProcOp> {
++public:
++  using SimConversionPattern<DPICallProcOp>::SimConversionPattern;
++
++  LogicalResult
++  matchAndRewrite(DPICallProcOp op, OpAdaptor adaptor,
++                  ConversionPatternRewriter &rewriter) const final {
++    state.dpiCallees.insert(op.getCalleeAttr().getAttr());
++    rewriter.replaceOpWithNewOp<sv::FuncCallProceduralOp>(
++        op, op.getResultTypes(), op.getCalleeAttr(), adaptor.getInputs());
++    return success();
++  }
++};
++
+ class StringConstantLowering : public OpConversionPattern<StringConstantOp> {
+ public:
+   using OpConversionPattern<StringConstantOp>::OpConversionPattern;
+@@ -1001,6 +1015,7 @@ struct SimToSVPass : public circt::impl::LowerSimToSVBase<SimToSVPass> {
+       patterns.add<PauseOp>(convert);
+       patterns.add<TriggeredLowering>(context, state);
+       patterns.add<DPICallLowering>(context, state);
++      patterns.add<DPICallProcLowering>(context, state);
+       patterns.add<StringConstantLowering, StringConcatLowering>(typeConverter,
+                                                                  context);
+       auto result = applyPartialConversion(module, target, std::move(patterns));
+diff --git a/lib/Dialect/Sim/SimOps.cpp b/lib/Dialect/Sim/SimOps.cpp
+index 6b019466b..a599ed16d 100644
+--- a/lib/Dialect/Sim/SimOps.cpp
++++ b/lib/Dialect/Sim/SimOps.cpp
+@@ -207,41 +207,54 @@ LogicalResult DPIFuncOp::verify() {
+   return success();
+ }
+ 
+-LogicalResult
+-sim::DPICallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
++template <typename CallOp>
++static LogicalResult verifyDPICall(CallOp call,
++                                   SymbolTableCollection &symbolTable) {
+   auto referencedOp =
+-      symbolTable.lookupNearestSymbolFrom(*this, getCalleeAttr());
++      symbolTable.lookupNearestSymbolFrom(call, call.getCalleeAttr());
+   if (!referencedOp)
+-    return emitError("cannot find function declaration '")
+-           << getCallee() << "'";
++    return call.emitError("cannot find function declaration '")
++           << call.getCallee() << "'";
+   if (auto dpiFunc = dyn_cast<sim::DPIFuncOp>(referencedOp)) {
+     auto expectedFuncType = cast<FunctionType>(dpiFunc.getFunctionType());
+     auto expectedInputs = expectedFuncType.getInputs();
+     auto expectedResults = expectedFuncType.getResults();
+-    if (getInputs().size() != expectedInputs.size())
+-      return emitError("expects ")
++    if (call.getInputs().size() != expectedInputs.size())
++      return call.emitError("expects ")
+              << expectedInputs.size() << " DPI operands, but got "
+-             << getInputs().size();
+-    if (getResults().size() != expectedResults.size())
+-      return emitError("expects ")
++             << call.getInputs().size();
++    if (call.getResults().size() != expectedResults.size())
++      return call.emitError("expects ")
+              << expectedResults.size() << " DPI results, but got "
+-             << getResults().size();
+-    for (auto [operand, expectedType] : llvm::zip(getInputs(), expectedInputs))
++             << call.getResults().size();
++    for (auto [operand, expectedType] :
++         llvm::zip(call.getInputs(), expectedInputs))
+       if (operand.getType() != expectedType)
+-        return emitError("operand type mismatch: expected ")
++        return call.emitError("operand type mismatch: expected ")
+                << expectedType << ", but got " << operand.getType();
+-    for (auto [result, expectedType] : llvm::zip(getResults(), expectedResults))
++    for (auto [result, expectedType] :
++         llvm::zip(call.getResults(), expectedResults))
+       if (result.getType() != expectedType)
+-        return emitError("result type mismatch: expected ")
++        return call.emitError("result type mismatch: expected ")
+                << expectedType << ", but got " << result.getType();
+     return success();
+   }
+   if (isa<func::FuncOp>(referencedOp))
+     return success();
+-  return emitError("callee must be 'sim.func.dpi' or 'func.func' but got '")
++  return call.emitError(
++             "callee must be 'sim.func.dpi' or 'func.func' but got '")
+          << referencedOp->getName() << "'";
+ }
+ 
++LogicalResult DPICallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
++  return verifyDPICall(*this, symbolTable);
++}
++
++LogicalResult
++DPICallProcOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
++  return verifyDPICall(*this, symbolTable);
++}
++
+ // Render `value` in the given `radix` and pad it to a field width, returning
+ // the result as a `StringAttr`. The field width and padding semantics are
+ // shared with the Arc runtime through `circt::formatInteger` (see
+diff --git a/lib/Dialect/Sim/Transforms/LowerDPIFunc.cpp b/lib/Dialect/Sim/Transforms/LowerDPIFunc.cpp
+index 74998910c..fa8588e58 100644
+--- a/lib/Dialect/Sim/Transforms/LowerDPIFunc.cpp
++++ b/lib/Dialect/Sim/Transforms/LowerDPIFunc.cpp
+@@ -212,15 +212,14 @@ LogicalResult LowerDPIFuncPass::lowerDPI() {
+     if (failed(lowerDPIFuncOp(simFunc, state, symbolTable)))
+       return failure();
+ 
+-  auto result = op.walk([&](sim::DPICallOp callOp) -> WalkResult {
++  auto updateCallee = [&](auto callOp) {
+     auto callee =
+         state.dpiFuncDeclMapping.lookup(callOp.getCalleeAttr().getAttr());
+     if (callee)
+       callOp.setCallee(callee.getSymNameAttr());
+-    return WalkResult::advance();
+-  });
+-  if (result.wasInterrupted())
+-    return failure();
++  };
++  op.walk([&](sim::DPICallOp callOp) { updateCallee(callOp); });
++  op.walk([&](sim::DPICallProcOp callOp) { updateCallee(callOp); });
+   return success();
+ }
+ 
+diff --git a/test/Conversion/SimToSV/dpi-procedural.mlir b/test/Conversion/SimToSV/dpi-procedural.mlir
+new file mode 100644
+index 000000000..846246a1c
+--- /dev/null
++++ b/test/Conversion/SimToSV/dpi-procedural.mlir
+@@ -0,0 +1,56 @@
++// RUN: circt-opt %s --canonicalize --cse --lower-sim-to-sv | FileCheck %s
++// RUN: circt-opt %s --canonicalize --cse --lower-sim-to-sv --lower-seq-to-sv --export-verilog | FileCheck %s --check-prefix=SV
++
++sim.func.dpi @begin_cycle()
++sim.func.dpi @sample(in %data: i32, out result: i32, return status: i32)
++sim.func.dpi @consume(in %data: i32, in %status: i32)
++sim.func.dpi @end_cycle()
++
++// CHECK-LABEL: hw.module @ordered
++// SV-LABEL: module ordered(
++hw.module @ordered(in %clock: !seq.clock, in %enable: i1, in %data: i32, out result: i32) {
++  %result = sv.reg : !hw.inout<i32>
++  sim.triggered %clock if %enable {
++    // CHECK: sv.always posedge
++    // CHECK-NEXT: sv.if %enable {
++    // CHECK-NEXT: sv.func.call.procedural @begin_cycle()
++    // CHECK-NEXT: %[[RESULT:.*]]:2 = sv.func.call.procedural @sample(%data)
++    // CHECK-NEXT: sv.func.call.procedural @consume(%[[RESULT]]#0, %[[RESULT]]#1)
++    // CHECK-NEXT: sv.func.call.procedural @end_cycle()
++    // CHECK-NEXT: sv.passign %result, %[[RESULT]]#0
++    // CHECK-NEXT: }
++    // CHECK-NEXT: }
++    // CHECK-NOT: sv.always
++    sim.proc.dpi.call @begin_cycle() : () -> ()
++    %value, %status = sim.proc.dpi.call @sample(%data) : (i32) -> (i32, i32)
++    sim.proc.dpi.call @consume(%value, %status) : (i32, i32) -> ()
++    sim.proc.dpi.call @end_cycle() : () -> ()
++    sv.passign %result, %value : i32
++  }
++  %read = sv.read_inout %result : !hw.inout<i32>
++  hw.output %read : i32
++}
++
++// SV: always @(posedge clock) begin
++// SV-NEXT: if (enable) begin
++// SV-NEXT: begin_cycle();
++// SV-NEXT: [[STATUS:[a-zA-Z_][a-zA-Z_0-9]*]] = sample(data, [[VALUE:[a-zA-Z_][a-zA-Z_0-9]*]]);
++// SV-NEXT: consume([[VALUE]], [[STATUS]]);
++// SV-NEXT: end_cycle();
++// SV-NEXT: result{{.*}} <= [[VALUE]];
++// SV-NEXT: end
++// SV-NEXT: end
++// SV-NOT: {{^ *}}always @
++// SV: endmodule
++
++// CHECK-LABEL: hw.module @unconditional
++hw.module @unconditional(in %clock: !seq.clock) {
++  sim.triggered %clock {
++    // CHECK: sv.always posedge
++    // CHECK-NEXT: sv.func.call.procedural @begin_cycle()
++    // CHECK-NEXT: sv.func.call.procedural @end_cycle()
++    // CHECK-NEXT: }
++    sim.proc.dpi.call @begin_cycle() : () -> ()
++    sim.proc.dpi.call @end_cycle() : () -> ()
++  }
++}
+diff --git a/test/Dialect/Sim/dpi-procedural-errors.mlir b/test/Dialect/Sim/dpi-procedural-errors.mlir
+new file mode 100644
+index 000000000..b94170d1c
+--- /dev/null
++++ b/test/Dialect/Sim/dpi-procedural-errors.mlir
+@@ -0,0 +1,56 @@
++// RUN: circt-opt %s --split-input-file --verify-diagnostics
++
++sim.func.dpi @step()
++hw.module @outside() {
++  // expected-error @below {{must not be in a non-procedural region}}
++  sim.proc.dpi.call @step() : () -> ()
++}
++
++// -----
++
++hw.module @missing(in %clock: !seq.clock) {
++  sim.triggered %clock {
++    // expected-error @below {{cannot find function declaration 'absent'}}
++    sim.proc.dpi.call @absent() : () -> ()
++  }
++}
++
++// -----
++
++sim.func.dpi @step(in %x: i8, return result: i8)
++hw.module @wrong_inputs(in %clock: !seq.clock) {
++  sim.triggered %clock {
++    // expected-error @below {{expects 1 DPI operands, but got 0}}
++    %result = sim.proc.dpi.call @step() : () -> i8
++  }
++}
++
++// -----
++
++sim.func.dpi @step(in %x: i8, return result: i8)
++hw.module @wrong_results(in %clock: !seq.clock, in %x: i8) {
++  sim.triggered %clock {
++    // expected-error @below {{expects 1 DPI results, but got 0}}
++    sim.proc.dpi.call @step(%x) : (i8) -> ()
++  }
++}
++
++// -----
++
++sim.func.dpi @step(in %x: i8, return result: i8)
++hw.module @wrong_type(in %clock: !seq.clock, in %x: i1) {
++  sim.triggered %clock {
++    // expected-error @below {{operand type mismatch: expected 'i8', but got 'i1'}}
++    %result = sim.proc.dpi.call @step(%x) : (i1) -> i8
++  }
++}
++
++// -----
++
++sim.func.dpi @step(in %x: i8, return result: i8)
++hw.module @wrong_result_type(in %clock: !seq.clock, in %x: i8) {
++  sim.triggered %clock {
++    // expected-error @below {{result type mismatch: expected 'i8', but got 'i1'}}
++    %result = sim.proc.dpi.call @step(%x) : (i8) -> i1
++  }
++}

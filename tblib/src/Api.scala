@@ -27,10 +27,17 @@ final class TestbenchPort[T <: Data] private[tblib] (
   infix def :=(
     value: Value
   )(
-    using Arena
+    using Arena,
+    Context,
+    Block
   ): Unit = testbench.bind(field, value)
 
-/** Typed access to the driven ports of `I`. */
+  /** Reads an output of the FIRRTL testbench in the simulation wrapper. */
+  def value(
+    using Arena
+  ): Value = testbench.observe(field)
+
+/** Typed access to the input and output ports of `I`. */
 final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testbench: Testbench[I]) extends Dynamic:
   private[tblib] def port[T <: Data](name:       String): TestbenchPort[T]         = testbench.port(name)
   private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] = testbench.portOption(name)
@@ -43,6 +50,28 @@ trait Testbench[I <: HWInterface[?]]:
   def fallingClock: Value
   def io:           TestbenchIO[I]
 
+  /** Runs once at simulation startup. */
+  def initial(
+    body: Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit
+
+  /** Builds one ordered procedure on the rising edge of `clock`; use `fallingClock` for the falling edge. Inputs
+    * assigned through `io` inside this procedure are registered and hold their values between triggers.
+    */
+  def onClock(
+    clock:   Value,
+    enabled: Option[Value] = None
+  )(body:    Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit
+
   /** Declares a DPI function at the builtin module scope. */
   def dpiFunction(
     symbol:    String,
@@ -54,7 +83,7 @@ trait Testbench[I <: HWInterface[?]]:
     Block
   ): DpiFunction
 
-  /** Calls a DPI function on the falling edge of the generated testbench clock. */
+  /** Creates an independent DPI call on the falling edge. Use `dpiCallProcedural` inside `onClock` for ordering. */
   def dpiCall(
     function: DpiFunction,
     inputs:   Seq[Value] = Seq.empty,
@@ -65,7 +94,17 @@ trait Testbench[I <: HWInterface[?]]:
     Block
   ): DpiCallResult
 
-  /** Finishes the simulation when `condition` is true on the generated testbench clock. */
+  /** Calls a DPI function in the current procedure, in order, with immediately usable results. */
+  def dpiCallProcedural(
+    function: DpiFunction,
+    inputs:   Seq[Value] = Seq.empty
+  )(
+    using Arena,
+    Context,
+    Block
+  ): DpiCallResult
+
+  /** Finishes immediately inside a procedure, or on the generated clock when called at module scope. */
   def finish(
     condition: Value,
     success:   Boolean = true
@@ -77,11 +116,25 @@ trait Testbench[I <: HWInterface[?]]:
 
   private[tblib] def port[T <: Data](name:       String): TestbenchPort[T]
   private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]]
+  private[tblib] def observe(
+    field: BundleField[?]
+  )(
+    using Arena
+  ):                                                      Value
+  private[tblib] def connectOutputs(
+    values: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block
+  ):                                                      Unit
   private[tblib] def bind(
     field: BundleField[?],
     value: Value
   )(
-    using Arena
+    using Arena,
+    Context,
+    Block
   ):                                                      Unit
 
   /** Resolves the instance inputs in HW port order, including the generated clock. */

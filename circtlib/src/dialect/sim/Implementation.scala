@@ -100,6 +100,28 @@ given DPICallApi with
   extension (ref: DPICall) def operation: Operation = ref._operation
 end given
 
+given DPICallProcApi with
+  def op(
+    callee:      String,
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): DPICallProc =
+    DPICallProc(
+      summon[OperationApi].operationCreate(
+        name = "sim.proc.dpi.call",
+        location = location,
+        namedAttributes = Seq(named("callee", callee.flatSymbolRefAttrGet)),
+        operands = inputs,
+        resultsTypes = Some(resultTypes)
+      )
+    )
+  extension (ref: DPICallProc) def operation: Operation = ref._operation
+end given
+
 given FormatLiteralApi with
   def op(
     literal:     String,
