@@ -14,6 +14,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Operation,
   OperationApi,
   Type,
+  TypeApi,
   Value,
   given
 }
@@ -187,6 +188,46 @@ given InstanceApi with
       using Arena
     ): Value = ref.operation.getResult(index)
 end given
+
+given ConstantApi with
+  def op(
+    value:    BigInt,
+    width:    Int,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Constant =
+    require(width > 0, "constant width must be positive")
+    val tpe = width.integerTypeGet
+    new Constant(
+      summon[OperationApi].operationCreate(
+        name = "hw.constant",
+        location = location,
+        namedAttributes = Seq(named("value", value.integerAttrGet(tpe))),
+        resultsTypes = Some(Seq(tpe))
+      )
+    )
+  extension (ref: Constant) def operation: Operation = ref._operation
+
+given BitcastApi with
+  def op(
+    input:      Value,
+    resultType: Type,
+    location:   Location
+  )(
+    using Arena,
+    Context
+  ): Bitcast =
+    new Bitcast(
+      summon[OperationApi].operationCreate(
+        name = "hw.bitcast",
+        location = location,
+        operands = Seq(input),
+        resultsTypes = Some(Seq(resultType))
+      )
+    )
+  extension (ref: Bitcast) def operation: Operation = ref._operation
 
 given OutputApi with
   def op(

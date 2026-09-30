@@ -663,6 +663,13 @@ trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
     inline def integerAttrGetValueInt:  Long
     inline def integerAttrGetValueSInt: Long
     inline def integerAttrGetValueUInt: Long
+  extension (int:       BigInt)
+    def integerAttrGet(
+      tpe: Type
+    )(
+      using Arena,
+      Context
+    ):                                                    Attribute
   // Bool
   extension (bool:      Boolean)
     inline def boolAttrGet(

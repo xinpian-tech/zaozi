@@ -146,6 +146,7 @@ mlirGetDialectHandle__firrtl__     # header: $CIRCT_INSTALL_PATH/include/circt-c
 mlirGetDialectHandle__fsm__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FSM.h
 registerFSMPasses           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FSM.h
 hwArrayTypeGet                  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
+hwStringTypeGet                 # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
 hwArrayTypeGetElementType       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
 hwArrayTypeGetSize              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
 hwAttrIsAInnerRefAttr           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h

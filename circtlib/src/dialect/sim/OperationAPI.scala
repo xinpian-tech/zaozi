@@ -46,6 +46,20 @@ trait DPICallApi extends HasOperation[DPICall]:
   ): DPICall
 end DPICallApi
 
+class DPICallProc(val _operation: Operation)
+trait DPICallProcApi extends HasOperation[DPICallProc]:
+  /** `sim.proc.dpi.call` - execute a DPI call in the current procedure, in program order. */
+  def op(
+    callee:      String,
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): DPICallProc
+end DPICallProcApi
+
 class FormatLiteral(val _operation: Operation)
 trait FormatLiteralApi extends HasOperation[FormatLiteral]:
   /** `sim.fmt.literal` — a constant ASCII fragment. */
