@@ -27,7 +27,7 @@
 // RUN: cd %t.dir/wide64 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=WIDE
 // RUN: cd %t.dir/wide64 && %{test} header config.json > registers.h
 // RUN: cmp %t.dir/wide32/registers.h %t.dir/wide64/registers.h
-// DEFINE: %{options} = --pinCount 2 --hsSlots 2 --addressWidth 12 --option '{"gpio":true,"interrupt":true,"padControl":true,"invert":true,"rxOverride":true}' --routes '{"pin":0,"slot":0,"tie":true}' --lsPools '{"pins":[1],"channels":[{"channel":1,"receive":true,"tie":false}]}' --cells '{"name":"PDDW04","control":[{"name":"drive","function":[{"DS0":0,"DS1":0,"drive":"low"},{"DS0":1,"DS1":1,"drive":"high"}]}],"safe":{}}' --pinCell PDDW04 --pinCell PDDW04
+// DEFINE: %{options} = --pinCount 2 --hsSlots 2 --addressWidth 12 --option '{"gpio":true,"interrupt":true,"cellControl":true,"invert":true,"rxOverride":true}' --routes '{"pin":0,"slot":0,"tie":true}' --lsPools '{"pins":[1],"channels":[{"channel":1,"receive":true,"tie":false}]}' --cells '{"name":"PDDW04","control":[{"name":"drive","function":[{"DS0":0,"DS1":0,"drive":"low"},{"DS0":1,"DS1":1,"drive":"high"}]}],"safe":{}}' --pinCell PDDW04 --pinCell PDDW04
 // RUN: mkdir -p %t.dir/options32 %t.dir/options64
 // RUN: cd %t.dir/options32 && %{test} config config.json %{options} --dataWidth 32 && %{test} design config.json
 // RUN: cd %t.dir/options32 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=OPTIONS
@@ -44,7 +44,7 @@
 // RUN: for width in 8 16 128; do %{test} config %t.dir/native/$width.json --pinCount 1 --hsSlots 257 --dataWidth $width --addressWidth 12; done
 // RUN: cd %t.dir/native && %{test} design 8.json && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=NATIVE8
 // RUN: not %{test} config %t.dir/native/invalid.json --pinCount 1 --hsSlots 1 --dataWidth 24 --addressWidth 9 2>&1 | FileCheck %s --check-prefix=WIDTH-INVALID
-// RUN: python3 -c 'import json,sys; json.dump(dict(pinCount=1,hsSlots=2,dataWidth=8,addressWidth=12,option=dict(padControl=True),cells=[dict(name="C17",control=[dict(name="c"+str(i),function=[{"A"+str(i):0,"B"+str(i):0,"c"+str(i):"low"},{"A"+str(i):1,"B"+str(i):1,"c"+str(i):"high"}]) for i in range(17)])],pinCell=["C17"]),open(sys.argv[1],"w"))' %t.dir/control17.json
+// RUN: python3 -c 'import json,sys; json.dump(dict(pinCount=1,hsSlots=2,dataWidth=8,addressWidth=12,option=dict(cellControl=True),cells=[dict(name="C17",control=[dict(name="c"+str(i),function=[{"A"+str(i):0,"B"+str(i):0,"c"+str(i):"low"},{"A"+str(i):1,"B"+str(i):1,"c"+str(i):"high"}]) for i in range(17)])],pinCell=["C17"]),open(sys.argv[1],"w"))' %t.dir/control17.json
 // RUN: %{test} header %t.dir/control17.json | FileCheck %s --check-prefix=CONTROL17
 // RUN: for width in 32 64; do %{test} config %t.dir/exact$width.json --pinCount 1 --hsSlots 1 --dataWidth $width --addressWidth 9 --lsPools '{"pins":[0],"channels":[{"channel":239,"receive":true}]}' && %{test} header %t.dir/exact$width.json | FileCheck %s --check-prefix=EXACT; done
 // RUN: not %{test} config %t.dir/over.json --pinCount 1 --hsSlots 1 --dataWidth 32 --addressWidth 9 --lsPools '{"pins":[0],"channels":[{"channel":247,"receive":true}]}' 2>&1 | FileCheck %s --check-prefix=CAPACITY
@@ -78,31 +78,31 @@
 // COMMON: [[PIN0]] <= req_bits_data[1:0];
 // COMMON: [[PIN1]] <= req_bits_data[5:4];
 // COMMON: [[LASTPIN]] <= req_bits_data[1:0];
-// COMMON: assign padInputEnable =
+// COMMON: assign cellInputEnable =
 // COMMON-NEXT: {[[LAST2]]{{[[:space:]]*}}? inputEnable[4]{{[[:space:]]*}}: [[LAST0]] & inputEnable[3],
 // W32-NEXT: 6'h0,
 // W64-NEXT: 14'h0,
 // COMMON-NEXT: [[P1S0]] & inputEnable[2],
 // COMMON-NEXT: [[P0S1]]{{[[:space:]]*}}? inputEnable[1]{{[[:space:]]*}}: [[P0S0]] & inputEnable[0]};
-// COMMON-NEXT: assign padOutputValue =
+// COMMON-NEXT: assign cellOutputValue =
 // COMMON-NEXT: {[[LAST2]]{{[[:space:]]*}}? outputValue[4]{{[[:space:]]*}}: [[LAST0]] & outputValue[3],
 // W32-NEXT: 6'h0,
 // W64-NEXT: 14'h0,
 // COMMON-NEXT: [[P1S0]] & outputValue[2],
 // COMMON-NEXT: [[P0S1]]{{[[:space:]]*}}? outputValue[1]{{[[:space:]]*}}: [[P0S0]] & outputValue[0]};
-// COMMON-NEXT: assign padOutputEnable =
+// COMMON-NEXT: assign cellOutputEnable =
 // COMMON-NEXT: {[[LAST2]]{{[[:space:]]*}}? outputEnable[4]{{[[:space:]]*}}: [[LAST0]] & outputEnable[3],
 // W32-NEXT: 6'h0,
 // W64-NEXT: 14'h0,
 // COMMON-NEXT: [[P1S0]] & outputEnable[2],
 // COMMON-NEXT: [[P0S1]]{{[[:space:]]*}}? outputEnable[1]{{[[:space:]]*}}: [[P0S0]] & outputEnable[0]};
-// W32-NEXT: assign inputValue = {{.*}}padInputValue[8]{{.*}}padInputValue[1:0], padInputValue[0]};
-// W64-NEXT: assign inputValue = {{.*}}padInputValue[16]{{.*}}padInputValue[1:0], padInputValue[0]};
+// W32-NEXT: assign inputValue = {{.*}}cellInputValue[8]{{.*}}cellInputValue[1:0], cellInputValue[0]};
+// W64-NEXT: assign inputValue = {{.*}}cellInputValue[16]{{.*}}cellInputValue[1:0], cellInputValue[0]};
 
 // EMPTY-LABEL: module IOMux_{{[0-9a-f]+}}(
-// EMPTY: assign padInputEnable = 1'h0;
-// EMPTY-NEXT: assign padOutputValue = 1'h0;
-// EMPTY-NEXT: assign padOutputEnable = 1'h0;
+// EMPTY: assign cellInputEnable = 1'h0;
+// EMPTY-NEXT: assign cellOutputValue = 1'h0;
+// EMPTY-NEXT: assign cellOutputEnable = 1'h0;
 
 // LS-COVER: iomux_ls_pool_0_selection:
 // LS-COVER: cover property
@@ -139,7 +139,7 @@
 // LS: [[TX1]] <= req_bits_data[15:8];
 // LS32: [[RX255]] <= req_bits_data[31:24];
 // LS64: [[RX255]] <= req_bits_data[63:56];
-// LS: assign padInputEnable =
+// LS: assign cellInputEnable =
 // LS-NEXT: {[[HS2]] & [[P2C255]] & lsInputEnable[255],
 // LS-NEXT: [[HS1]]
 // LS-NEXT: & ([[P1C7]]
@@ -150,11 +150,11 @@
 // LS-NEXT: ? lsInputEnable[7]
 // LS-NEXT: : [[P0C0]] & lsInputEnable[0])};
 // LS: assign lsInputValue =
-// LS-NEXT: {[[RX255P2]] & padInputValue[2],
+// LS-NEXT: {[[RX255P2]] & cellInputValue[2],
 // LS-NEXT: 254'h0,
 // LS-NEXT: [[RX0P1]]
-// LS-NEXT: ? padInputValue[1]
-// LS-NEXT: : [[RX0P0]] & padInputValue[0]};
+// LS-NEXT: ? cellInputValue[1]
+// LS-NEXT: : [[RX0P0]] & cellInputValue[0]};
 
 // WIDE: iomux_hs_pin_256_slot_256:
 // WIDE: cover property
@@ -164,9 +164,9 @@
 // WIDE-NEXT: {{.*}}req_bits_mask_layerCapture[1];
 // WIDE: <= req_bits_data[7:0];
 // WIDE: <= req_bits_data[8];
-// WIDE: assign inputValue = padInputValue[256];
+// WIDE: assign inputValue = cellInputValue[256];
 // WIDE: assign lsInputValue =
-// WIDE: ? padInputValue[256]
+// WIDE: ? cellInputValue[256]
 
 // HEADER: #define IOMUX_IMPID_OFFSET 0x0ULL
 // HEADER-NEXT: #define IOMUX_IMPID_VALUE 0xfedcba9876543210ULL
@@ -189,15 +189,15 @@
 // OPTIONS: cover property
 // OPTIONS: iomux_ls_channel_1_override:
 // OPTIONS: cover property
-// OPTIONS: iomux_pad_force:
+// OPTIONS: iomux_cell_force:
 // OPTIONS: cover property
-// OPTIONS: iomux_pad_control_0_register:
+// OPTIONS: iomux_cell_control_0_register:
 // OPTIONS: cover property
 // OPTIONS-LABEL: module IOMux_{{[0-9a-f]+}}(
-// OPTIONS: input          pad_force,
-// OPTIONS: output {{.*}} pad_control_0,
-// OPTIONS: output {{.*}} pad_pin_0_control_0,
-// OPTIONS-NEXT: pad_pin_1_control_0,
+// OPTIONS: input          cell_force,
+// OPTIONS: output {{.*}} cell_control_0,
+// OPTIONS: output {{.*}} cell_pin_0_control_0,
+// OPTIONS-NEXT: cell_pin_1_control_0,
 // OPTIONS: output        interrupt,
 
 // IMPID-ZERO: #define IOMUX_IMPID_VALUE 0x0ULL
