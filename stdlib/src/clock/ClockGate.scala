@@ -14,7 +14,8 @@ case class ClockGateParameter(
   positive:         Boolean,
   clockDuringReset: Boolean,
   library:          ClockCellLibrary = ClockCellLibrary())
-    extends Parameter
+    extends Parameter:
+  def roles: Set[ClockCellKind] = Set(if positive then ClockCellKind.GatePositive else ClockCellKind.GateNegative)
 
 given upickle.default.ReadWriter[ClockGateParameter] = upickle.default.macroRW
 

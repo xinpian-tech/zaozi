@@ -15,8 +15,7 @@
 // RUN: cd %t.dir/bound/rtl && FileCheck %s --check-prefix=GATE --input-file=ClockGate_positivefalse_clockDuringResetfalse.sv
 // RUN: cd %t.dir/bound/rtl && FileCheck %s --check-prefix=MODEL --input-file=$(grep -l "ZaoziClockGateNegative model" ClockCellModel_*.sv)
 // RUN: cd %t.dir/bound/rtl && FileCheck %s --check-prefix=TREE --input-file=$(ls ClockTree_????????.sv)
-// RUN: %{test} config %t.dir/unbound/config.json --inputs a --inputs b --targets '{"name":"out","links":[{"source":"a"},{"source":"b"}],"selection":"Raw"}' %{cells}
-// RUN: cd %t.dir/unbound && not %{test} design %t.dir/unbound/config.json 2>&1 | FileCheck %s --check-prefix=UNBOUND
+// RUN: not %{test} config %t.dir/unbound/config.json --inputs a --targets '{"name":"out","links":[{"source":"a","path":{"gate":{"positive":true,"clockDuringReset":false}}}]}' --cells '{"name":"INV","inputs":["A"],"output":"Y","function":[{"Y":"!A"}]}' 2>&1 | FileCheck %s --check-prefix=UNBOUND
 // RUN: rm -rf %t.dir
 
 // BUF:      BUF libraryCell (
@@ -52,4 +51,4 @@
 // TREE:   ClockCellNetwork_{{[a-f0-9]+}} target_0_inverter_Library (
 // TREE:   ClockCellNetwork_{{[a-f0-9]+}} plain_guide_Library (
 
-// UNBOUND: clock role Mux is used but no declared cell implements it
+// UNBOUND: clock role GatePositive is used but no declared cell implements it

@@ -19,6 +19,10 @@ case class ClockPath(
   require(dividerGuide.isEmpty || divider.nonEmpty, "a divider guide needs a divider")
   require(inverterGuide.isEmpty || invert, "an inverter guide needs an inverter")
 
+  def roles: Set[ClockCellKind] =
+    gate.toSet.flatMap(_.roles) ++ divider.toSet.flatMap(_.roles) ++ Option.when(invert)(ClockCellKind.Inverter) ++
+      Seq(gateGuide, dividerGuide, inverterGuide).flatten.filter(_.cell.isEmpty).map(_ => ClockCellKind.Buffer)
+
   private[clock] def instances(prefix: String): Seq[String] =
     Seq(
       Option.when(gate.nonEmpty)(s"${prefix}_gate"),
@@ -51,6 +55,11 @@ case class ClockTarget(
   )
   require(muxGuide.isEmpty || selection.nonEmpty, s"clock target $name mux guide needs a mux")
   val selectWidth = BigInt(links.size - 1).bitLength.max(1)
+  def roles: Set[ClockCellKind] = links.flatMap(_.path.roles).toSet ++ path.roles ++
+    selection.toSet.flatMap:
+      case ClockSelection.Raw                        => Set(ClockCellKind.Mux)
+      case ClockSelection.GlitchFree(stages, bypass) => ClockMuxParameter(links.size, stages, bypass).roles
+    ++ muxGuide.filter(_.cell.isEmpty).map(_ => ClockCellKind.Buffer)
 
 given upickle.default.ReadWriter[ClockTarget] = upickle.default.macroRW
 
@@ -59,12 +68,14 @@ given mainargs.TokensReader.Simple[ClockTarget]:
   def read(strs: Seq[String]): Right[Nothing, ClockTarget] = Right(upickle.default.read[ClockTarget](strs.head))
 
 case class ClockTreeParameter(
-  inputs:  Seq[String],
-  targets: Seq[ClockTarget],
-  cells:   Seq[ClockCellDeclaration] = Seq.empty)
+  inputs:   Seq[String],
+  targets:  Seq[ClockTarget],
+  cells:    Seq[ClockCellDeclaration] = Seq.empty,
+  composed: Seq[ClockComposition] = Seq.empty)
     extends Parameter:
-  val library = ClockCellLibrary.resolve(cells)
-  val names   = inputs ++ targets.map(_.name)
+  val library = ClockCellLibrary.resolve(cells, composed)
+  def roles: Set[ClockCellKind] = targets.flatMap(_.roles).toSet
+  val names = inputs ++ targets.map(_.name)
   require(names.forall(_.nonEmpty), "clock resource names must not be empty")
   require(names.distinct.size == names.size, "clock resource names must be unique")
   targets.foreach: target =>
@@ -146,9 +157,14 @@ class ClockTreeProbe(parameter: ClockTreeParameter) extends DVBundle[ClockTreePa
 @generator
 object ClockTree extends Generator[ClockTreeParameter, ClockTreeLayers, ClockTreeIO, ClockTreeProbe]:
   def main(args: Array[String]): Unit = args.toList match
-    case "bindings" :: config :: Nil =>
+    case "config" :: config :: arguments =>
+      val parameter = parseParameter(arguments)
+      val cells     = parameter.cells.sortBy(_.name)
+      val composed  = ClockCellLibrary.compose(cells, parameter.roles)
+      os.write.over(os.Path(config, os.pwd), upickle.default.write(parameter.copy(cells = cells, composed = composed)))
+    case "bindings" :: config :: Nil     =>
       println(upickle.default.read[ClockTreeParameter](os.read(os.Path(config, os.pwd))).bindings.render())
-    case _                           => this.mainImpl(args)
+    case _                               => this.mainImpl(args)
 
   def architecture(parameter: ClockTreeParameter) =
     val io = summon[Interface[ClockTreeIO]]

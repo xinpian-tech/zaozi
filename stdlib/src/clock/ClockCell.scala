@@ -112,7 +112,7 @@ object ClockCellNetwork extends Generator[ClockCellParameter, ClockCellLayers, C
       cell.inputs.foreach(pin => instance.io.field[Bool](pin) := source(pin))
       instance.io.field[Bool](cell.output)
     library.roles(parameter.kind) match
-      case ClockRole.Cell(name, pins) =>
+      case ClockRole.Cell(name, pins)      =>
         val cell     = library.cells.find(_.name == name).get
         val instance = declared(name, "libraryCell")
         val ports    = pins.map(_.swap)
@@ -126,7 +126,7 @@ object ClockCellNetwork extends Generator[ClockCellParameter, ClockCellLayers, C
             io.outClock := combinational(cell, instance)(pin =>
               ports.get(pin).fold(port(cell.tie(pin).toString))(port)
             ).asClock
-      case ClockRole.Inverted(gate)   =>
+      case ClockRole.Inverted(gate)        =>
         val inverted = ClockCellNetwork.instantiate(ClockCellParameter(ClockCellKind.Inverter, library))
         val gated    = ClockCellNetwork.instantiate(ClockCellParameter(gate, library))
         val restored = ClockCellNetwork.instantiate(ClockCellParameter(ClockCellKind.Inverter, library))
@@ -135,6 +135,15 @@ object ClockCellNetwork extends Generator[ClockCellParameter, ClockCellLayers, C
         gated.io.enable.get := io.enable.get
         restored.io.a       := gated.io.outClock
         io.outClock         := restored.io.outClock
+      case ClockRole.Composed(composition) =>
+        val outputs = composition.gates.zipWithIndex.foldLeft(Map.empty[String, Referable[Bool]]): (built, entry) =>
+          val (gate, index) = entry
+          val cell          = library.cells.find(_.name == gate.cell).get
+          val value         = combinational(cell, declared(gate.cell, s"gate$index"))(pin =>
+            gate.pins.get(pin).fold(port(cell.tie(pin).toString))(source => built.getOrElse(source, port(source)))
+          )
+          built.updated(s"g$index", value)
+        io.outClock := outputs(s"g${composition.gates.size - 1}").asClock
 
 case class DeclaredCellParameter(cell: ClockCellDeclaration) extends Parameter
 

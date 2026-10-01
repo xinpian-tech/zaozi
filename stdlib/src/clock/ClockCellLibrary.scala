@@ -99,6 +99,9 @@ enum ClockRole derives upickle.default.ReadWriter:
   /** The opposite gate polarity between two inverters. */
   case Inverted(gate: ClockCellKind)
 
+  /** A network of declared cells chosen at `config`. */
+  case Composed(composition: ClockComposition)
+
 /** Declared cells and the clock roles they implement; without cells the roles stay behavioral. */
 case class ClockCellLibrary(
   cells: Seq[ClockCellDeclaration] = Seq.empty,
@@ -113,19 +116,12 @@ given mainargs.TokensReader.Simple[ClockCellLibrary]:
     Right(upickle.default.read[ClockCellLibrary](strs.head))
 
 object ClockCellLibrary:
-  private val functions: Seq[(ClockCellKind, Seq[String], Map[String, Boolean] => Boolean)] = Seq(
-    (ClockCellKind.Buffer, Seq("a"), v => v("a")),
-    (ClockCellKind.Inverter, Seq("a"), v => !v("a")),
-    (ClockCellKind.Or, Seq("a", "b"), v => v("a") || v("b")),
-    (ClockCellKind.Mux, Seq("a", "b", "select"), v => if v("select") then v("b") else v("a")),
-    (ClockCellKind.Xor, Seq("a", "b"), v => v("a") != v("b"))
-  )
-
   /** The role a cell implements and its role-port to cell-pin map. */
   def bind(cell: ClockCellDeclaration): Option[(ClockCellKind, Map[String, String])] = cell.sequential match
     case Some(gate) => Some(gate.`type` -> Map("a" -> gate.clock, "enable" -> gate.enable, "outClock" -> gate.output))
     case None       =>
-      functions.iterator
+      ClockCellKind.values.iterator
+        .flatMap(kind => ClockComposer.functions.get(kind).map((ports, function) => (kind, ports, function)))
         .filter(_._2.size == cell.free.size)
         .flatMap: (kind, ports, function) =>
           cell.free.permutations
@@ -137,7 +133,11 @@ object ClockCellLibrary:
             .map(pins => kind -> (pins + ("outClock" -> cell.output)))
         .nextOption()
 
-  def resolve(cells: Seq[ClockCellDeclaration]): ClockCellLibrary =
+  private def opposite(gate: ClockCellKind): ClockCellKind =
+    if gate == ClockCellKind.GatePositive then ClockCellKind.GateNegative else ClockCellKind.GatePositive
+
+  /** Binds cells to roles; `composed` networks from `config` are checked against the current cells. */
+  def resolve(cells: Seq[ClockCellDeclaration], composed: Seq[ClockComposition] = Seq.empty): ClockCellLibrary =
     require(cells.map(_.name).distinct.size == cells.size, "cell names must be unique")
     val bound = cells.flatMap(cell => bind(cell).map((kind, pins) => (kind, cell.name, pins)))
     bound
@@ -145,11 +145,40 @@ object ClockCellLibrary:
       .foreach: (kind, found) =>
         require(found.size == 1, s"cells ${found.map(_._2).mkString(" and ")} both implement clock role $kind")
     val direct   = bound.map((kind, cell, pins) => kind -> ClockRole.Cell(cell, pins)).toMap
-    val inverted = Seq(
-      ClockCellKind.GatePositive -> ClockCellKind.GateNegative,
-      ClockCellKind.GateNegative -> ClockCellKind.GatePositive
-    ).collect:
-      case (gate, other)
-          if direct.contains(gate) && !direct.contains(other) && direct.contains(ClockCellKind.Inverter) =>
-        other -> ClockRole.Inverted(gate)
-    ClockCellLibrary(cells, direct ++ inverted)
+    val built    = composed.map: composition =>
+      val problem =
+        if direct.contains(composition.role) then Left("is now bound to a declared cell")
+        else ClockComposer.verify(composition, cells)
+      problem.left.foreach: reason =>
+        throw new IllegalArgumentException(
+          s"composed clock role ${composition.role}: $reason; the cells changed since config, rerun config"
+        )
+      composition.role -> ClockRole.Composed(composition)
+    val roles    = direct ++ built
+    val inverted = Seq(ClockCellKind.GatePositive, ClockCellKind.GateNegative).collect:
+      case gate if roles.contains(gate) && !roles.contains(opposite(gate)) && roles.contains(ClockCellKind.Inverter) =>
+        opposite(gate) -> ClockRole.Inverted(gate)
+    ClockCellLibrary(cells, roles ++ inverted)
+
+  /** Composes every used combinational role that no cell binds, including an inverter for a missing gate polarity. */
+  def compose(cells: Seq[ClockCellDeclaration], used: Set[ClockCellKind]): Seq[ClockComposition] =
+    if cells.isEmpty then Seq.empty
+    else
+      val bound    = resolve(cells).roles
+      // A gate with only its opposite polarity bound is built later from that gate and inverters.
+      val inverted = used.filter(gate =>
+        Set(ClockCellKind.GatePositive, ClockCellKind.GateNegative)(gate) && !bound.contains(gate) &&
+          bound.contains(opposite(gate))
+      )
+      val needed   = used -- inverted ++ Option.when(inverted.nonEmpty)(ClockCellKind.Inverter)
+      ClockCellKind.values.toSeq
+        .filter(kind => needed(kind) && !bound.contains(kind))
+        .map: role =>
+          require(
+            ClockComposer.functions.contains(role),
+            s"clock role $role is used but no declared cell implements it"
+          )
+          ClockComposer.compose(role, cells) match
+            case ClockComposer.Result.Found(composition) => composition
+            case ClockComposer.Result.Impossible(reason) =>
+              throw new IllegalArgumentException(s"clock role $role cannot be built from the declared cells: $reason")

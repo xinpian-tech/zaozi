@@ -18,6 +18,8 @@ case class ClockMuxParameter(
   require(inputs > 0, "clock mux requires at least one input")
   val selectWidth = BigInt(inputs - 1).bitLength.max(1)
   require(stages >= 1, s"clock mux synchronization stages must be positive: $stages")
+  def roles: Set[ClockCellKind] =
+    Set(ClockCellKind.Mux, ClockCellKind.GatePositive) ++ Option.when(inputs > 1)(ClockCellKind.Or)
 
 given upickle.default.ReadWriter[ClockMuxParameter] = upickle.default.macroRW
 

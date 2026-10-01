@@ -22,6 +22,7 @@ case class ClockDividerParameter(
   require(width > 0, "divider width must be positive")
   require(initial >= 0 && initial.bitLength <= width, "initial divisor must fit the divider width")
   val initialDivisor = initial.max(1)
+  def roles: Set[ClockCellKind] = Set(ClockCellKind.Xor, ClockCellKind.Mux, ClockCellKind.GatePositive)
 
 given upickle.default.ReadWriter[ClockDividerParameter] = upickle.default.macroRW
 
