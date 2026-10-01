@@ -38,11 +38,11 @@ given mainargs.TokensReader.Simple[IOMuxLsPool]:
   def read(strs: Seq[String]): Right[Nothing, IOMuxLsPool] = Right(upickle.default.read[IOMuxLsPool](strs.head))
 
 case class IOMuxOption(
-  gpio:       Boolean = false,
-  interrupt:  Boolean = false,
-  padControl: Boolean = false,
-  invert:     Boolean = false,
-  rxOverride: Boolean = false)
+  gpio:        Boolean = false,
+  interrupt:   Boolean = false,
+  cellControl: Boolean = false,
+  invert:      Boolean = false,
+  rxOverride:  Boolean = false)
 
 given upickle.default.ReadWriter[IOMuxOption] = upickle.default.macroRW
 
@@ -84,12 +84,12 @@ case class IOMuxParameter(
     require(pinCell.size == pinCount, "pinCell must describe every pin")
     routes.foreach(r => model.validateRoute(r.pin, r.cell))
   require(
-    !option.padControl || cell.exists(model => model.hasPull || model.controlWidths.exists(_ > 0)),
-    "padControl requires a selectable cell"
+    !option.cellControl || cell.exists(model => model.hasPull || model.controlWidths.exists(_ > 0)),
+    "cellControl requires a selectable cell"
   )
-  val hasPull        = cell.exists(_.hasPull)
-  val controlWidths  = cell.toSeq.flatMap(_.controlWidths)
-  val padSourceNames = Option.when(hasPull)("pull").toSeq ++
+  val hasPull         = cell.exists(_.hasPull)
+  val controlWidths   = cell.toSeq.flatMap(_.controlWidths)
+  val cellSourceNames = Option.when(hasPull)("pull").toSeq ++
     controlWidths.zipWithIndex.collect { case (width, index) if width > 0 => s"control_$index" }
 
   private val lsPins     = lsPools.flatMap(_.pins)
@@ -136,9 +136,9 @@ case class IOMuxParameter(
     (if option.gpio then
        Seq(("input_enable_src", BigInt(0), 1), ("output_value_src", BigInt(2), 2), ("output_enable_src", BigInt(4), 2))
      else Seq.empty) ++
-      (if option.padControl && hasPull then Seq(("pull_src", BigInt(6), 1)) else Seq.empty) ++
+      (if option.cellControl && hasPull then Seq(("pull_src", BigInt(6), 1)) else Seq.empty) ++
       (if option.rxOverride then (0 until hsSlots).map(s => (s"rx_src_s$s", BigInt(8) + s, 1)) else Seq.empty) ++
-      (if option.padControl then
+      (if option.cellControl then
          val start = ((BigInt(8) + (if option.rxOverride then hsSlots else 0)).max(16) + 7) / 8 * 8
          controlWidths.zipWithIndex.collect {
            case (width, index) if width > 0 => (s"control_${index}_src", start + index, 1)
@@ -146,8 +146,8 @@ case class IOMuxParameter(
        else Seq.empty)
   val sourceStride = ((sourceShape.map((_, bit, width) => bit + width).maxOption.getOrElse(BigInt(0)) + 63) / 64) * 8
 
-  private val padShape =
-    if option.padControl then
+  private val cellShape =
+    if option.cellControl then
       cell.toSeq.flatMap: model =>
         Seq(
           ("pull_mode", BigInt(0), model.modeWidth),
@@ -159,7 +159,7 @@ case class IOMuxParameter(
               (s"control_$index", BigInt(16) + BigInt(4) * index, width)
           }
     else Seq.empty
-  val padStride        = ((padShape.map((_, bit, width) => bit + width).maxOption.getOrElse(BigInt(0)) + 63) / 64) * 8
+  val cellStride        = ((cellShape.map((_, bit, width) => bit + width).maxOption.getOrElse(BigInt(0)) + 63) / 64) * 8
 
   val selectorLaneWidth   = laneWidth(selectorWidth, 4)
   val lsSelectorLaneWidth = laneWidth(lsSelectorWidth, 8)
@@ -178,7 +178,7 @@ case class IOMuxParameter(
       (if option.invert then
          bankSizes(
            roles.map(n => s"${n}_inv") ++ (0 until hsSlots).map(s => s"rx_inv_s$s") ++
-             padSourceNames.map(n => s"${n}_inv"),
+             cellSourceNames.map(n => s"${n}_inv"),
            pinCount
          )
        else Seq.empty) ++
@@ -191,7 +191,7 @@ case class IOMuxParameter(
       (if option.invert && lsPools.nonEmpty then bankSizes(Seq("ls_rx_inv"), lsChannelCount) else Seq.empty) ++
       Seq(
         ("pin_src_ctrl", BigInt(pinCount) * sourceStride, sourceStride),
-        ("pin_pad_ctrl", BigInt(pinCount) * padStride, padStride)
+        ("pin_cell_ctrl", BigInt(pinCount) * cellStride, cellStride)
       )
   private val blockOffsets = blockSizes.scanLeft(BigInt(0x100))((base, block) => base + block._2)
   val blocks               = blockSizes
@@ -270,9 +270,9 @@ case class IOMuxParameter(
       )
     else Seq.empty
 
-  val padInverts =
+  val cellInverts =
     if option.invert then
-      padSourceNames
+      cellSourceNames
         .map(name => name -> bank(s"${name}_inv", pins)(p => RegField(s"pin_${p}_${name}_inv", 1).readValue.writeValue))
         .toMap
     else Map.empty[String, Map[Int, ReadWriteFieldDefinition[ValueReadDefinition, ValueWriteDefinition]]]
@@ -308,12 +308,12 @@ case class IOMuxParameter(
       )
       .toMap
   )
-  val padBase        = blockBases("pin_pad_ctrl")
-  val padControls    = pins.map(p =>
-    padShape
+  val cellBase       = blockBases("pin_cell_ctrl")
+  val cellControls   = pins.map(p =>
+    cellShape
       .map((name, bit, width) =>
         name -> place(
-          (padBase + BigInt(p) * padStride) * 8 + bit,
+          (cellBase + BigInt(p) * cellStride) * 8 + bit,
           RegField(s"pin_${p}_$name", width).readValue.writeValue
         )
       )
@@ -382,27 +382,27 @@ class IOMuxCellIO(parameter: IOMuxParameter) extends Record:
       Aligned(s"pin_${pin}_control_${model.controlNames.indexOf(control.name)}", Bits(control.table.width))
 
 class IOMuxIO(parameter: IOMuxParameter) extends HWBundle(parameter):
-  val clock           = Flipped(Clock())
+  val clock            = Flipped(Clock())
   // Reset selects HS slot 0, including the LS pool on member pins.
-  val resetN          = Flipped(Reset())
-  val req             = Flipped(Decoupled(new IOMuxRequest(parameter.addressWidth, parameter.dataWidth)))
-  val rsp             = Aligned(Decoupled(new RegMapResponse(parameter.dataWidth, true)))
-  val pad             = Option.when(parameter.cell.nonEmpty)(Aligned(new IOMuxCellIO(parameter)))
-  val interrupt       = Option.when(parameter.option.interrupt)(Aligned(Bits(parameter.interruptCount)))
-  val padInputValue   = Flipped(Bits(parameter.pinCount))
-  val padInputEnable  = Aligned(Bits(parameter.pinCount))
-  val padOutputValue  = Aligned(Bits(parameter.pinCount))
-  val padOutputEnable = Aligned(Bits(parameter.pinCount))
-  // Bit i uses routes(i). Each pad input reaches its declared routes, independent of selection.
-  val inputEnable     = Flipped(Bits(parameter.routes.size))
-  val outputValue     = Flipped(Bits(parameter.routes.size))
-  val outputEnable    = Flipped(Bits(parameter.routes.size))
-  val inputValue      = Aligned(Bits(parameter.routes.size))
+  val resetN           = Flipped(Reset())
+  val req              = Flipped(Decoupled(new IOMuxRequest(parameter.addressWidth, parameter.dataWidth)))
+  val rsp              = Aligned(Decoupled(new RegMapResponse(parameter.dataWidth, true)))
+  val cell             = Option.when(parameter.cell.nonEmpty)(Aligned(new IOMuxCellIO(parameter)))
+  val interrupt        = Option.when(parameter.option.interrupt)(Aligned(Bits(parameter.interruptCount)))
+  val cellInputValue   = Flipped(Bits(parameter.pinCount))
+  val cellInputEnable  = Aligned(Bits(parameter.pinCount))
+  val cellOutputValue  = Aligned(Bits(parameter.pinCount))
+  val cellOutputEnable = Aligned(Bits(parameter.pinCount))
+  // Bit i uses routes(i). Each cell input reaches its declared routes, independent of selection.
+  val inputEnable      = Flipped(Bits(parameter.routes.size))
+  val outputValue      = Flipped(Bits(parameter.routes.size))
+  val outputEnable     = Flipped(Bits(parameter.routes.size))
+  val inputValue       = Aligned(Bits(parameter.routes.size))
   // LS bit indices are global channel numbers. Receive selection is independent of HS and LS transmit selection.
-  val lsInputEnable   = Option.when(parameter.lsPools.nonEmpty)(Flipped(Bits(parameter.lsChannelCount)))
-  val lsOutputValue   = Option.when(parameter.lsPools.nonEmpty)(Flipped(Bits(parameter.lsChannelCount)))
-  val lsOutputEnable  = Option.when(parameter.lsPools.nonEmpty)(Flipped(Bits(parameter.lsChannelCount)))
-  val lsInputValue    = Option.when(parameter.lsPools.nonEmpty)(Aligned(Bits(parameter.lsChannelCount)))
+  val lsInputEnable    = Option.when(parameter.lsPools.nonEmpty)(Flipped(Bits(parameter.lsChannelCount)))
+  val lsOutputValue    = Option.when(parameter.lsPools.nonEmpty)(Flipped(Bits(parameter.lsChannelCount)))
+  val lsOutputEnable   = Option.when(parameter.lsPools.nonEmpty)(Flipped(Bits(parameter.lsChannelCount)))
+  val lsInputValue     = Option.when(parameter.lsPools.nonEmpty)(Aligned(Bits(parameter.lsChannelCount)))
 
 class IOMuxProbe(parameter: IOMuxParameter) extends DVBundle[IOMuxParameter, IOMuxLayers](parameter)
 
@@ -440,9 +440,9 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.asyncActiveLow(io.resetN)
 
-    val padInput = parameter.cell.fold(io.padInputValue: Referable[Bits]): model =>
+    val cellInput = parameter.cell.fold(io.cellInputValue: Referable[Bits]): model =>
       model.pinCellIndex.zipWithIndex
-        .map((cellIndex, pin) => if model.cells(cellIndex).hasReceiver then io.padInputValue.bit(pin) else false.B)
+        .map((cellIndex, pin) => if model.cells(cellIndex).hasReceiver then io.cellInputValue.bit(pin) else false.B)
         .toVec
         .asBits
 
@@ -498,8 +498,8 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
       : Map[K, Referable[Bits]] = fields.map((key, field) => key -> register(field))
 
     val gpio           = parameter.gpio.map((role, fields) => role -> registers(fields))
-    val padRegisters   = parameter.padControls.map(registers)
-    val padInverts     = parameter.padInverts.map((name, fields) => name -> registers(fields))
+    val cellRegisters  = parameter.cellControls.map(registers)
+    val cellInverts    = parameter.cellInverts.map((name, fields) => name -> registers(fields))
     val roleInverts    = parameter.roleInverts.map((role, fields) => role -> registers(fields))
     val rxValues       = parameter.rxValues.zipWithIndex.map: (fields, slot) =>
       fields.map((pin, field) =>
@@ -520,7 +520,7 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
     val sampled        = Option.when(parameter.option.gpio || parameter.option.interrupt):
       val meta = RegInit(BigInt(0).B(parameter.pinCount))
       val sync = RegInit(BigInt(0).B(parameter.pinCount))
-      meta := padInput
+      meta := cellInput
       sync := meta
       sync
     parameter.gpioInputValue.foreach: (pin, field) =>
@@ -603,14 +603,14 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
                 case "input_enable"  => safe.inputEnable
                 case "output_value"  => safe.outputValue
                 case "output_enable" => safe.outputEnable
-              io.pad.get.field[Bool]("force") ? (value.B, inverted)
+              io.cell.get.field[Bool]("force") ? (value.B, inverted)
         .toVec
         .asBits
-    io.padInputEnable := transmit("input_enable")
-    io.padOutputValue  := transmit("output_value")
-    io.padOutputEnable := transmit("output_enable")
+    io.cellInputEnable := transmit("input_enable")
+    io.cellOutputValue  := transmit("output_value")
+    io.cellOutputEnable := transmit("output_enable")
     val received = parameter.routes.map: route =>
-      val raw     = padInput.bit(route.pin)
+      val raw     = cellInput.bit(route.pin)
       val sourced =
         if parameter.option.rxOverride then
           sourceControls(route.pin)(s"rx_src_s${route.slot}").asBool ? (rxValues(route.slot)(route.pin).asBool, raw)
@@ -624,7 +624,7 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
             .get(channel)
             .fold(false.B: Referable[Bool]): pool =>
               val raw     = pool.pins.foldLeft(false.B: Referable[Bool]): (result, pin) =>
-                (lsRxPinByChannel(channel) === BigInt(pin).B(parameter.lsRxWidth)) ? (padInput.bit(pin), result)
+                (lsRxPinByChannel(channel) === BigInt(pin).B(parameter.lsRxWidth)) ? (cellInput.bit(pin), result)
               val sourced =
                 if parameter.option.rxOverride then lsRxSources(channel).asBool ? (lsRxValues(channel).asBool, raw)
                 else raw
@@ -633,7 +633,7 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
         .asBits
 
     parameter.cell.foreach: model =>
-      val padIo = io.pad.get
+      val cellIo = io.cell.get
       def tableValue(table: IOMuxCellTable, code: Referable[Bits]): Referable[Bits] =
         table.rows.zipWithIndex.foldLeft(table.rows(table.default).value.B(table.width): Referable[Bits]):
           (result, row) => (code === BigInt(row._2).B(4)) ? (row._1.value.B(table.width), result)
@@ -658,16 +658,16 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
                 val (route, lane) = item
                 val select        = request(route.cell)
                 val value         = select.on.fold(BigInt(select.off).B(width): Referable[Bits]): on =>
-                  val linked   = padIo.field[Bool](s"route_${lane}_$group") ^ select.invert.B
-                  val inverted = if parameter.option.invert then linked ^ padInverts(group)(pin).asBool else linked
+                  val linked   = cellIo.field[Bool](s"route_${lane}_$group") ^ select.invert.B
+                  val inverted = if parameter.option.invert then linked ^ cellInverts(group)(pin).asBool else linked
                   inverted ? (BigInt(on).B(width), BigInt(select.off).B(width))
                 (selectors(pin) === BigInt(route.slot).B(parameter.selectorWidth)) ? (value, result)
             val sourced =
-              if parameter.option.padControl then
-                sourceControls(pin)(s"${group}_src").asBool ? (padRegisters(pin)(field), routed)
+              if parameter.option.cellControl then
+                sourceControls(pin)(s"${group}_src").asBool ? (cellRegisters(pin)(field), routed)
               else routed
             val forced  =
-              if model.hasSafe then padIo.field[Bool]("force") ? (BigInt(safe).B(width), sourced) else sourced
+              if model.hasSafe then cellIo.field[Bool]("force") ? (BigInt(safe).B(width), sourced) else sourced
             if width < 4 then BigInt(0).B(4 - width) ## forced else forced
 
         val safePull     = cell.safe.fold((0, 0, 0))(s => model.pullCodes(cellIndex, s.pull))
@@ -702,11 +702,11 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
         (pullCodes ++ controlCodes).toMap
 
       def codeBus(field: String): Referable[Bits] = codes.reverse.map(_(field)).reduce(_ ## _)
-      if model.hasPull then padIo.field[Bits]("pullMode") := codeBus("pull_mode")
-      if model.upWidth > 0 then padIo.field[Bits]("upSelect") := codeBus("up_sel")
-      if model.downWidth > 0 then padIo.field[Bits]("downSelect") := codeBus("down_sel")
+      if model.hasPull then cellIo.field[Bits]("pullMode") := codeBus("pull_mode")
+      if model.upWidth > 0 then cellIo.field[Bits]("upSelect") := codeBus("up_sel")
+      if model.downWidth > 0 then cellIo.field[Bits]("downSelect") := codeBus("down_sel")
       model.controlWidths.zipWithIndex.foreach: (width, index) =>
-        if width > 0 then padIo.field[Bits](s"control_$index") := codeBus(s"control_$index")
+        if width > 0 then cellIo.field[Bits](s"control_$index") := codeBus(s"control_$index")
 
       model.pinCellIndex.zipWithIndex.foreach: (cellIndex, pin) =>
         val cell = model.cells(cellIndex)
@@ -721,17 +721,17 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
             val value         = if name == "up" || name == "down" then direction(name) else table.rows.head.value.B(pull.width)
             (mode === BigInt(model.modeNames.indexOf(name)).B(4)) ? (value, result)
           val value  = if model.weaves(cellIndex) then
-            val keeper     = padInput.bit(pin) ? (direction("up"), direction("down"))
-            val oscillator = padInput.bit(pin) ? (direction("down"), direction("up"))
+            val keeper     = cellInput.bit(pin) ? (direction("up"), direction("down"))
+            val oscillator = cellInput.bit(pin) ? (direction("down"), direction("up"))
             (mode === BigInt(3).B(4)) ? (keeper, (mode === BigInt(4).B(4)) ? (oscillator, native))
           else native
-          padIo.field[Bits](s"pin_${pin}_pull") := value
+          cellIo.field[Bits](s"pin_${pin}_pull") := value
         cell.control.foreach: control =>
           val index = model.controlNames.indexOf(control.name)
           val value =
             if control.table.rows.size == 1 then control.table.rows.head.value.B(control.table.width)
             else tableValue(control.table, codes(pin)(s"control_$index"))
-          padIo.field[Bits](s"pin_${pin}_control_$index") := value
+          cellIo.field[Bits](s"pin_${pin}_control_$index") := value
 
     layer("Verification"):
       given ClockEvent = posedge(io.clock)
@@ -788,11 +788,11 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
         lsRxSources.foreach:      (channel, source) =>
           Cover(source.asBool.S, io.resetN.asBool, s"iomux_ls_channel_${channel}_override")
       parameter.cell.foreach:                 model =>
-        if model.hasSafe then Cover(io.pad.get.field[Bool]("force").S, io.resetN.asBool, "iomux_pad_force")
-        if parameter.option.padControl then
-          parameter.padSourceNames.foreach: group =>
+        if model.hasSafe then Cover(io.cell.get.field[Bool]("force").S, io.resetN.asBool, "iomux_cell_force")
+        if parameter.option.cellControl then
+          parameter.cellSourceNames.foreach: group =>
             val takeover = sourceControls.map(_(s"${group}_src").asBool: Referable[Bool]).reduce(_ | _)
-            Cover(takeover.S, io.resetN.asBool, s"iomux_pad_${group}_register")
+            Cover(takeover.S, io.resetN.asBool, s"iomux_cell_${group}_register")
         parameter.routes.zipWithIndex.foreach: (route, lane) =>
           val linked = Option.when(route.cell.pull.on.nonEmpty)("pull").toSeq ++
             route.cell.control.toSeq.collect {
@@ -802,8 +802,8 @@ object IOMux extends Generator[IOMuxParameter, IOMuxLayers, IOMuxIO, IOMuxProbe]
           linked.foreach: group =>
             val active = selectors(route.pin) === BigInt(route.slot).B(parameter.selectorWidth)
             Cover(
-              (active & io.pad.get.field[Bool](s"route_${lane}_$group")).S,
+              (active & io.cell.get.field[Bool](s"route_${lane}_$group")).S,
               io.resetN.asBool,
-              s"iomux_pad_route_${lane}_${group}_input_high"
+              s"iomux_cell_route_${lane}_${group}_input_high"
             )
       Cover((io.req.fire & !aligned & inWindow).S, io.resetN.asBool, "iomux_unaligned_access")
