@@ -27,7 +27,7 @@
 // RUN: cd %t.dir/wide64 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=WIDE
 // RUN: cd %t.dir/wide64 && %{test} header config.json > registers.h
 // RUN: cmp %t.dir/wide32/registers.h %t.dir/wide64/registers.h
-// DEFINE: %{options} = --pinCount 2 --hsSlots 2 --addressWidth 12 --option '{"gpio":true,"interrupt":true,"padControl":true,"invert":true,"rxOverride":true}' --routes '{"pin":0,"slot":0,"tie":true}' --lsPools '{"pins":[1],"channels":[{"channel":1,"receive":true,"tie":false}]}' --cells '{"name":"PDDW04","control":[{"name":"drive","table":{"width":2,"rows":[{"name":"low","value":"0"},{"name":"high","value":"3"}]}}],"safe":{}}' --pinCell PDDW04 --pinCell PDDW04
+// DEFINE: %{options} = --pinCount 2 --hsSlots 2 --addressWidth 12 --option '{"gpio":true,"interrupt":true,"padControl":true,"invert":true,"rxOverride":true}' --routes '{"pin":0,"slot":0,"tie":true}' --lsPools '{"pins":[1],"channels":[{"channel":1,"receive":true,"tie":false}]}' --cells '{"name":"PDDW04","control":[{"name":"drive","function":[{"DS0":0,"DS1":0,"drive":"low"},{"DS0":1,"DS1":1,"drive":"high"}]}],"safe":{}}' --pinCell PDDW04 --pinCell PDDW04
 // RUN: mkdir -p %t.dir/options32 %t.dir/options64
 // RUN: cd %t.dir/options32 && %{test} config config.json %{options} --dataWidth 32 && %{test} design config.json
 // RUN: cd %t.dir/options32 && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=OPTIONS
@@ -44,7 +44,7 @@
 // RUN: for width in 8 16 128; do %{test} config %t.dir/native/$width.json --pinCount 1 --hsSlots 257 --dataWidth $width --addressWidth 12; done
 // RUN: cd %t.dir/native && %{test} design 8.json && firtool IOMux_*.mlirbc --disable-all-randomization --strip-debug-info | FileCheck %s --check-prefix=NATIVE8
 // RUN: not %{test} config %t.dir/native/invalid.json --pinCount 1 --hsSlots 1 --dataWidth 24 --addressWidth 9 2>&1 | FileCheck %s --check-prefix=WIDTH-INVALID
-// RUN: python3 -c 'import json,sys; json.dump(dict(pinCount=1,hsSlots=2,dataWidth=8,addressWidth=12,option=dict(padControl=True),cells=[dict(name="C17",control=[dict(name="c"+str(i),table=dict(width=2,rows=[dict(name="low",value="0"),dict(name="high",value="3")])) for i in range(17)])],pinCell=["C17"]),open(sys.argv[1],"w"))' %t.dir/control17.json
+// RUN: python3 -c 'import json,sys; json.dump(dict(pinCount=1,hsSlots=2,dataWidth=8,addressWidth=12,option=dict(padControl=True),cells=[dict(name="C17",control=[dict(name="c"+str(i),function=[{"A"+str(i):0,"B"+str(i):0,"c"+str(i):"low"},{"A"+str(i):1,"B"+str(i):1,"c"+str(i):"high"}]) for i in range(17)])],pinCell=["C17"]),open(sys.argv[1],"w"))' %t.dir/control17.json
 // RUN: %{test} header %t.dir/control17.json | FileCheck %s --check-prefix=CONTROL17
 // RUN: for width in 32 64; do %{test} config %t.dir/exact$width.json --pinCount 1 --hsSlots 1 --dataWidth $width --addressWidth 9 --lsPools '{"pins":[0],"channels":[{"channel":239,"receive":true}]}' && %{test} header %t.dir/exact$width.json | FileCheck %s --check-prefix=EXACT; done
 // RUN: not %{test} config %t.dir/over.json --pinCount 1 --hsSlots 1 --dataWidth 32 --addressWidth 9 --lsPools '{"pins":[0],"channels":[{"channel":247,"receive":true}]}' 2>&1 | FileCheck %s --check-prefix=CAPACITY
