@@ -2,17 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 package me.jiuyang.stdlib.iomux
 
+import me.jiuyang.stdlib.cell.{*, given}
+
 case class IOMuxCellRow(name: String, value: BigInt)
 
-given upickle.default.ReadWriter[IOMuxCellRow] = upickle.default.macroRW
-
 case class IOMuxCellTable(width: Int, rows: Seq[IOMuxCellRow], default: Int = 0):
-  require(width > 0, "cell table width must be positive")
-  require(rows.nonEmpty && rows.size <= 16, "cell table needs 1 to 16 rows")
-  require(rows.map(_.name).distinct.size == rows.size, "cell row names must be unique")
-  require(rows.forall(r => r.value >= 0 && r.value.bitLength <= width), "cell row value exceeds its width")
-  require(default >= 0 && default < rows.size, "cell default must name a table row")
-
   val selectWidth: Int = BigInt(rows.size - 1).bitLength
 
   def code(name: String): Int =
@@ -20,19 +14,78 @@ case class IOMuxCellTable(width: Int, rows: Seq[IOMuxCellRow], default: Int = 0)
     require(index >= 0, s"unknown cell row $name")
     index
 
-given upickle.default.ReadWriter[IOMuxCellTable] = upickle.default.macroRW
+/** Packs each `function` row: the first pin to appear is the LSB, and x or an absent pin packs as 0. */
+private def packFunction(
+  where:    String,
+  labels:   Seq[String],
+  function: Seq[CellRow]
+): (Seq[String], Seq[(Map[String, String], BigInt)]) =
+  val pins = CellRow.pins(function)
+  require(pins.nonEmpty, s"$where function needs a pin column")
+  val rows = function.zipWithIndex.map: (row, index) =>
+    row.levels.foreach: (column, _) =>
+      require(!labels.contains(column), s"$where row $index column $column must hold a label")
+    row.texts.foreach:  (column, text) =>
+      require(!pins.contains(column), s"$where row $index pin column $column holds text $text")
+      require(
+        labels.contains(column),
+        s"$where row $index column $column is neither a pin nor ${labels.mkString(" or ")}"
+      )
+      require(
+        "[A-Za-z0-9_.]+".r.matches(text) && !Seq("0", "1", "x").contains(text),
+        s"$where row $index column $column: $text is not a label"
+      )
+    require(row.texts.exists(_._1 == labels.head), s"$where row $index needs a ${labels.head} label")
+    row.texts.toMap -> row.levels.collect { case (pin, Some(true)) => BigInt(1) << pins.indexOf(pin) }.sum
+  (pins, rows)
 
-case class IOMuxCellPull(width: Int, modes: Map[String, Seq[IOMuxCellRow]], isDriver: Boolean = false):
-  require(modes.contains("none"), "cell pull table needs a none row")
-  val tables: Map[String, IOMuxCellTable] = modes.map((name, rows) => name -> IOMuxCellTable(width, rows))
-  require(
-    modes.forall((name, rows) => name == "up" || name == "down" || rows.size == 1),
-    "only up and down pull modes select strength rows"
-  )
+case class IOMuxCellPull(function: Seq[CellRow], isDriver: Boolean = false):
+  private val (columns, packed) = packFunction("pull", Seq("pull", "strength"), function)
+  private val rows              = packed.map((labels, value) => (labels("pull"), labels.get("strength"), value))
+  rows.zipWithIndex.foreach:
+    case ((mode, strength, _), index) =>
+      val earlier = rows.take(index).filter(_._1 == mode)
+      require(strength.isEmpty || mode == "up" || mode == "down", s"pull row $index: strength grades up and down only")
+      require(
+        !earlier.exists(_._2 == strength),
+        strength.fold(s"pull row $index writes mode $mode twice")(s =>
+          s"pull row $index writes $mode strength $s twice"
+        )
+      )
+      require(
+        earlier.isEmpty || (strength.nonEmpty && earlier.forall(_._2.nonEmpty)),
+        s"pull row $index: mode $mode has several rows, so each needs a strength"
+      )
+
+  val pins:   Seq[String]                    = columns
+  val width:  Int                            = pins.size
+  val modes:  Map[String, Seq[IOMuxCellRow]] = rows
+    .map(_._1)
+    .distinct
+    .map(mode =>
+      mode -> rows.filter(_._1 == mode).map((_, strength, value) => IOMuxCellRow(strength.getOrElse(mode), value))
+    )
+    .toMap
+  require(modes.contains("none"), "pull needs a none row")
+  modes.foreach((mode, rows) => require(rows.size <= 16, s"pull mode $mode needs at most 16 rows"))
+  val tables: Map[String, IOMuxCellTable]    = modes.map((name, rows) => name -> IOMuxCellTable(width, rows))
 
 given upickle.default.ReadWriter[IOMuxCellPull] = upickle.default.macroRW
 
-case class IOMuxCellControl(name: String, table: IOMuxCellTable)
+case class IOMuxCellControl(name: String, function: Seq[CellRow], default: Option[String] = None):
+  private val (columns, packed) = packFunction(s"control $name", Seq(name), function)
+  private val labels            = packed.map(_._1(name))
+  labels.zipWithIndex.foreach: (label, index) =>
+    require(!labels.take(index).contains(label), s"control $name row $index writes label $label twice")
+  require(labels.size <= 16, s"control $name needs at most 16 rows")
+  default.foreach(label => require(labels.contains(label), s"control $name default $label names no row"))
+
+  val pins:  Seq[String]    = columns
+  val table: IOMuxCellTable = IOMuxCellTable(
+    pins.size,
+    labels.zip(packed).map((label, row) => IOMuxCellRow(label, row._2)),
+    default.fold(0)(labels.indexOf)
+  )
 
 given upickle.default.ReadWriter[IOMuxCellControl] = upickle.default.macroRW
 
@@ -66,6 +119,12 @@ case class IOMuxCell(
   hasReceiver: Boolean = true,
   safe: Option[IOMuxCellSafe] = None):
   require(control.map(_.name).distinct.size == control.size, s"cell $name control names must be unique")
+  private val groups = pull.map("pull" -> _.pins).toSeq ++ control.map(c => s"control ${c.name}" -> c.pins)
+  groups
+    .combinations(2)
+    .foreach:
+      case Seq((first, a), (second, b)) =>
+        require(a.intersect(b).isEmpty, s"cell $name pins ${a.intersect(b).mkString(", ")} are in $first and $second")
 
 given upickle.default.ReadWriter[IOMuxCell] = upickle.default.macroRW
 
