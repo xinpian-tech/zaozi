@@ -5,6 +5,7 @@ package org.llvm.circt.scalalib.capi.dialect.firrtl
 // circt-c/Dialect/Firrtl.h
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Block, Context, Location, Type, Value}
+import org.llvm.mlir.scalalib.capi.pass.Pass
 
 import java.lang.foreign.{Arena, MemorySegment}
 
@@ -394,3 +395,17 @@ end TypeApi
 trait ValueApi:
   extension (value: Value) inline def emitInvalidate(block: Block, loc: Location): Unit
 end ValueApi
+
+/** Firrtl Pass Api
+  * {{{
+  * circtFirrtlCreateLinkCircuitsPass
+  * }}}
+  */
+trait PassApi:
+  inline def linkCircuitsPass(
+    baseCircuit: String,
+    noMangle:    Boolean
+  )(
+    using arena: Arena
+  ): Pass
+end PassApi
