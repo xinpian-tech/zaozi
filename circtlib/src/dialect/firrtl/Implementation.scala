@@ -357,6 +357,47 @@ given LayerApi with
     ): Block = operation.getFirstRegion.getFirstBlock
     inline def operation: Operation = ref._operation
 end given
+
+given OptionApi with
+  inline def op(
+    name:        String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Option =
+    new Option(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.option",
+        location = location,
+        regionBlockTypeLocations = Seq(Seq((Seq.empty, Seq.empty))),
+        namedAttributes = Seq(summon[NamedAttributeApi].namedAttributeGet("sym_name".identifierGet, name.stringAttrGet))
+      )
+    )
+  extension (ref: Option)
+    inline def block(
+      using Arena
+    ): Block = operation.getFirstRegion.getFirstBlock
+    inline def operation: Operation = ref._operation
+end given
+
+given OptionCaseApi with
+  inline def op(
+    name:        String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): OptionCase =
+    new OptionCase(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.option_case",
+        location = location,
+        namedAttributes = Seq(summon[NamedAttributeApi].namedAttributeGet("sym_name".identifierGet, name.stringAttrGet))
+      )
+    )
+  extension (ref: OptionCase) inline def operation: Operation = ref._operation
+end given
 // Declarations
 given InstanceApi with
   inline def op(
@@ -425,6 +466,81 @@ given InstanceApi with
       )
     )
   extension (ref: Instance) def operation: Operation = ref._operation
+end given
+
+given InstanceChoiceApi with
+  inline def op(
+    moduleNames:  Seq[String],
+    option:       String,
+    cases:        Seq[String],
+    instanceName: String,
+    nameKind:     FirrtlNameKind,
+    location:     Location,
+    interface:    Seq[FirrtlBundleField],
+    layers:       Seq[Seq[String]]
+  )(
+    using arena:  Arena,
+    context:      Context
+  ): InstanceChoice =
+    new InstanceChoice(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.instance_choice",
+        location = location,
+        namedAttributes =
+          val namedAttributeApi = summon[NamedAttributeApi]
+          Seq(
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "moduleNames".identifierGet,
+              moduleNames.map(_.flatSymbolRefAttrGet).arrayAttrGet
+            ),
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "caseNames".identifierGet,
+              cases.map(name => option.symbolRefAttrGet(Seq(name.flatSymbolRefAttrGet))).arrayAttrGet
+            ),
+            // ::mlir::StringAttr
+            namedAttributeApi.namedAttributeGet("name".identifierGet, instanceName.stringAttrGet),
+            // ::circt::firrtl::NameKindEnumAttr
+            namedAttributeApi.namedAttributeGet("nameKind".identifierGet, nameKind.attrGetNameKind),
+            // ::mlir::DenseBoolArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "portDirections".identifierGet,
+              interface
+                .map: bf =>
+                  if (bf.getIsFlip) FirrtlDirection.In else FirrtlDirection.Out
+                .attrGetPortDirs
+            ),
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "portNames".identifierGet,
+              interface.map(_.getName.stringAttrGet).arrayAttrGet
+            ),
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "domainInfo".identifierGet,
+              interface.map(_ => Seq.empty.arrayAttrGet).arrayAttrGet
+            ),
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet("annotations".identifierGet, Seq.empty.arrayAttrGet),
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "portAnnotations".identifierGet,
+              interface.map(_ => Seq.empty.arrayAttrGet).arrayAttrGet
+            ),
+            // ::mlir::ArrayAttr
+            namedAttributeApi.namedAttributeGet(
+              "layers".identifierGet,
+              layers
+                .map(path => path.reverse.last.symbolRefAttrGet(path.drop(1).map(_.flatSymbolRefAttrGet)))
+                .arrayAttrGet
+            )
+          )
+        ,
+        resultsTypes = Some(interface.map(_.getType))
+      )
+    )
+  extension (ref: InstanceChoice) def operation: Operation = ref._operation
 end given
 
 given NodeApi with

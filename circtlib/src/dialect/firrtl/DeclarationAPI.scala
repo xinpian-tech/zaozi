@@ -10,8 +10,24 @@ import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Type, Value
 import java.lang.foreign.Arena
 
 class InstanceChoice(val _operation: Operation)
+trait InstanceChoiceApi extends HasOperation[InstanceChoice]:
+  /** `moduleNames` starts with the default target, followed by one target per case of `option`. */
+  inline def op(
+    moduleNames:  Seq[String],
+    option:       String,
+    cases:        Seq[String],
+    instanceName: String,
+    nameKind:     FirrtlNameKind,
+    location:     Location,
+    interface:    Seq[FirrtlBundleField],
+    layers:       Seq[Seq[String]]
+  )(
+    using arena:  Arena,
+    context:      Context
+  ): InstanceChoice
+end InstanceChoiceApi
 class Instance(val _operation: Operation)
-trait InstanceApi extends HasOperation[Instance]:
+trait InstanceApi       extends HasOperation[Instance]:
   inline def op(
     moduleName:   String,
     instanceName: String,
@@ -26,11 +42,11 @@ trait InstanceApi extends HasOperation[Instance]:
 end InstanceApi
 class Mem(val _operation: Operation)
 class Node(val _operation: Operation)
-trait NodeApi     extends HasOperation[Node]:
+trait NodeApi           extends HasOperation[Node]:
 end NodeApi
 class Object(val _operation: Operation)
 class Reg(val _operation: Operation)
-trait RegApi      extends HasOperation[Reg]:
+trait RegApi            extends HasOperation[Reg]:
   inline def op(
     name:        String,
     location:    Location,

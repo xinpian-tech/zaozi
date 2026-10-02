@@ -108,7 +108,7 @@ end ModuleApi
 
 class Formal(val _operation: Operation)
 class Layer(val _operation: Operation)
-trait LayerApi extends HasOperation[Layer]:
+trait LayerApi      extends HasOperation[Layer]:
   inline def op(
     name:            String,
     location:        Location,
@@ -119,4 +119,27 @@ trait LayerApi extends HasOperation[Layer]:
   ): Layer
 end LayerApi
 class OptionCase(val _operation: Operation)
+trait OptionCaseApi extends HasOperation[OptionCase]:
+  inline def op(
+    name:        String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): OptionCase
+end OptionCaseApi
 class Option(val _operation: Operation)
+trait OptionApi     extends HasOperation[Option]:
+  inline def op(
+    name:        String,
+    location:    Location
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Option
+
+  extension (ref: Option)
+    inline def block(
+      using Arena
+    ): Block
+end OptionApi
