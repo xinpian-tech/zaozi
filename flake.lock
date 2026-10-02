@@ -9,11 +9,11 @@
         "slang-src": "slang-src"
       },
       "locked": {
-        "lastModified": 1786705190,
-        "narHash": "sha256-RTa5b+sgY0UFjQyRnV14wOgh6Oz445NHa5LLsp1/3o0=",
+        "lastModified": 1790922786,
+        "narHash": "sha256-2KxmemLY1mIyhcK1jgFy3dgO7Ut7VmZmJZtW1cN0eK4=",
         "owner": "xinpian-tech",
         "repo": "circt-nix",
-        "rev": "7640149ba35aef83cbe21386eea883d3434b8ed2",
+        "rev": "8a5eb903962d86b2c82d7a750dff0e45ddc85c4b",
         "type": "github"
       },
       "original": {
@@ -26,11 +26,11 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1786604801,
-        "narHash": "sha256-af08Ik/BMzyG1WTG2Rh006ze2D7fWZkvESZ2Bx0bpNk=",
+        "lastModified": 1790918643,
+        "narHash": "sha256-dfHLlluGSE4O2J56XTq8dWvQnFwNEVn45BX3VR2JtQ0=",
         "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "306d4f5c0f1b03575a17665d8f2592c33feb8be0",
+        "rev": "272bcfb1e0ebaff0302be35a825b8d0c97cc790d",
         "type": "github"
       },
       "original": {
@@ -153,17 +153,17 @@
     "llvm-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1783919289,
-        "narHash": "sha256-epMcDIyD3zwgH4r4DqvXW0pUHTanXhm+CPaGE53WD7s=",
+        "lastModified": 1788198821,
+        "narHash": "sha256-1qERhNh9h0fbF4e3IRpAPqnWQXGow5l39z1sda6Lxl8=",
         "owner": "llvm",
         "repo": "llvm-project",
-        "rev": "b1c56fb53a9c76d6b045ede49083b647ae049ffe",
+        "rev": "e297b52ec9d8b5c38042e53ae5650922717970cd",
         "type": "github"
       },
       "original": {
         "owner": "llvm",
         "repo": "llvm-project",
-        "rev": "b1c56fb53a9c76d6b045ede49083b647ae049ffe",
+        "rev": "e297b52ec9d8b5c38042e53ae5650922717970cd",
         "type": "github"
       }
     },
