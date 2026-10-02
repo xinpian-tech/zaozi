@@ -170,20 +170,24 @@ object BaseGeneratorHelper:
     using Arena,
     Context
   ): Unit =
-    if !elaboratedModules.contains(parameter) then
+    val collected = Elaborate.collected.value
+    if collected.fold(!elaboratedModules.contains(parameter))(!_.contains(moduleName)) then
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(moduleName)
       summon[Circuit].appendToModule()
       createModule(summon[Arena], summon[Context], summon[Circuit])
       me.jiuyang.zaozi.magic.validateCircuit()
 
-      val mlirbcFile =
-        os.Path(
-          sys.env.getOrElse("ZAOZI_OUTDIR", ""),
-          os.pwd
-        ) / s"${moduleName}.mlirbc"
-      val out        = os.write.outputStream(mlirbcFile, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
-      summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
-      elaboratedModules.add(parameter)
+      collected match
+        case Some(modules) => modules.update(moduleName, summon[MlirModule])
+        case None          =>
+          val mlirbcFile =
+            os.Path(
+              sys.env.getOrElse("ZAOZI_OUTDIR", ""),
+              os.pwd
+            ) / s"${moduleName}.mlirbc"
+          val out        = os.write.outputStream(mlirbcFile, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
+          summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
+          elaboratedModules.add(parameter)
 
 end BaseGeneratorHelper
