@@ -34,6 +34,7 @@ let
           ./../../zaozi
           ./../../smtlib
           ./../../stdlib
+          ./../../tblib
           ./../../testlib
           ./../../rvdecoderdb
           ./../../omlib

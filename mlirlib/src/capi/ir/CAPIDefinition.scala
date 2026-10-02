@@ -34,6 +34,11 @@ trait ContextApi extends HasSegment[Context] with HasSizeOf[Context]:
     inline def appendDialectRegistry(registry:  DialectRegistry): Unit
     inline def enableMultithreading(enable:     Boolean):         Unit
     inline def loadAllAvailableDialects():                        Unit
+    inline def isRegisteredOperation(
+      name:        String
+    )(
+      using arena: Arena
+    ):                                                            Boolean
     inline def setThreadPool(threadPool:        LlvmThreadPool):  Unit
     def attachDiagnosticHandler(
       handler:     Diagnostic => Boolean
@@ -658,6 +663,13 @@ trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
     inline def integerAttrGetValueInt:  Long
     inline def integerAttrGetValueSInt: Long
     inline def integerAttrGetValueUInt: Long
+  extension (int:       BigInt)
+    def integerAttrGet(
+      tpe: Type
+    )(
+      using Arena,
+      Context
+    ):                                                    Attribute
   // Bool
   extension (bool:      Boolean)
     inline def boolAttrGet(
@@ -842,4 +854,21 @@ trait IdentifierApi extends HasSegment[Identifier] with HasSizeOf[Identifier]:
 end IdentifierApi
 
 class SymbolTable(val _segment: MemorySegment)
-trait SymbolTableApi extends HasSegment[SymbolTable] with HasSizeOf[SymbolTable]
+trait SymbolTableApi extends HasSegment[SymbolTable] with HasSizeOf[SymbolTable]:
+  /** Creates a symbol table for an operation with the SymbolTable trait; returns a null handle otherwise. */
+  inline def symbolTableCreate(
+    operation:   Operation
+  )(
+    using arena: Arena
+  ): SymbolTable
+  extension (symbolTable: SymbolTable)
+    /** Looks up a symbol directly in this table; returns a null operation when absent. */
+    inline def lookup(
+      name:        String
+    )(
+      using arena: Arena
+    ): Operation
+
+    /** Releases the symbol table without destroying the operations it refers to. */
+    inline def destroy(): Unit
+end SymbolTableApi

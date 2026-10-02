@@ -58,6 +58,7 @@ import org.llvm.mlir.CAPI.{
   mlirFloatAttrGetTypeID,
   mlirFloatAttrGetValueDouble,
   mlirIntegerAttrGet,
+  mlirIntegerAttrGetFromWords,
   mlirIntegerAttrGetTypeID,
   mlirIntegerAttrGetValueInt,
   mlirIntegerAttrGetValueSInt,
@@ -81,9 +82,28 @@ import org.llvm.mlir.CAPI.{
 }
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
+import java.lang.foreign.{Arena, MemorySegment, ValueLayout}
 
 given AttributeApi with
+  extension (int:       BigInt)
+    def integerAttrGet(
+      tpe:         Type
+    )(
+      using arena: Arena,
+      context:     Context
+    ): Attribute =
+      val width = tpe.integerTypeGetWidth
+      require(
+        width > 0 && int >= -(BigInt(1) << (width - 1)) && int < (BigInt(1) << width),
+        s"integer does not fit in $width bits: $int"
+      )
+      val count = (width + 63) / 64
+      val words = arena.allocate(ValueLayout.JAVA_LONG, count.toLong)
+      (0 until count).foreach(index =>
+        words.setAtIndex(ValueLayout.JAVA_LONG, index.toLong, (int >> (64 * index)).toLong)
+      )
+      Attribute(mlirIntegerAttrGetFromWords(arena, tpe.segment, count, words))
+
   inline def allocateAttribute(
     using arena: Arena
   ): Attribute = Attribute(MlirAttribute.allocate(arena))

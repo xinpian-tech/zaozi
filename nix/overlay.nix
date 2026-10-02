@@ -4,16 +4,12 @@
 final: prev:
 
 let
-  libllvm = prev.llvmPackages_circt.libllvm.override {
+  inherit (prev.llvmPackages_circt) libllvm mlir;
+  circt = (prev.circt.override {
     buildSharedLibs = true;
-  };
-  mlir = prev.llvmPackages_circt.mlir.override {
-    buildSharedLibs = true;
-  };
-  circt = prev.circt.override {
-    inherit libllvm mlir;
-    buildSharedLibs = true;
-  };
+  }).overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./patches/sim-procedural-dpi.patch ./patches/dpi-string.patch ];
+  });
 in
 {
   inherit (mvn-trace-forge.packages.${final.stdenv.hostPlatform.system}) mtf;
