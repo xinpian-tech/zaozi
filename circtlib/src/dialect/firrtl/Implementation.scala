@@ -715,6 +715,24 @@ given WireApi with
 end given
 
 // Statements
+given AttachApi with
+  def op(
+    inputs:   Seq[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Attach =
+    Attach(
+      summon[OperationApi].operationCreate(
+        name = "firrtl.attach",
+        location = location,
+        operands = inputs
+      )
+    )
+  extension (ref: Attach) def operation: Operation = ref._operation
+end given
+
 given ConnectApi with
   inline def op(
     src:         Value,

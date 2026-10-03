@@ -15,6 +15,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
 }
 import org.llvm.circt.scalalib.dialect.firrtl.operation
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
+  AttachApi,
   ConnectApi,
   ConstantApi,
   InstanceApi,
@@ -58,6 +59,17 @@ given ConstructorApi with
       private[zaozi] val _width: Int = w
 
   def Bool(): Bool = new Object with Bool
+
+  def attach(
+    signals: Referable[Analog]*
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit =
+    summon[AttachApi].op(signals.map(_.refer), locate).operation.appendToBlock()
 
   def Vec[T <: Data](size: Int, tpe: T): Vec[T] =
     new Vec[T]:

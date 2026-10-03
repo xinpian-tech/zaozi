@@ -10,6 +10,16 @@ import java.lang.foreign.Arena
 class Assert(val _operation: Operation)
 class Assume(val _operation: Operation)
 class Attach(val _operation: Operation)
+trait AttachApi extends HasOperation[Attach]:
+  def op(
+    inputs:   Seq[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Attach
+end AttachApi
+
 class Connect(val _operation: Operation)
 trait ConnectApi extends HasOperation[Connect]:
 end ConnectApi

@@ -285,6 +285,16 @@ trait ConstructorApi:
 
   def Bool(): Bool
 
+  def attach(
+    signals: Referable[Analog]*
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
   def Vec[T <: Data](size: Int, tpe: T): Vec[T]
 
   def when[COND <: Referable[Bool]](
@@ -2280,6 +2290,11 @@ trait TypeImpl:
     )(
       using sourcecode.Name.Machine
     ): BundleField[T]
+    private[zaozi] def InoutImpl(
+      tpe: Bits
+    )(
+      using sourcecode.Name.Machine
+    ): BundleField[Analog]
   extension (ref:  Aggregate) def elements: Seq[BundleField[?]]
   extension (ref:  ProbeRecord)
     private[zaozi] def toMlirTypeImpl(
@@ -2309,6 +2324,10 @@ trait TypeImpl:
       name: String,
       tpe:  T
     ): BundleField[T]
+    private[zaozi] def InoutImpl(
+      name: String,
+      tpe:  Bits
+    ): BundleField[Analog]
   extension (ref:  RProbe[?])
     private[zaozi] def toMlirTypeImpl(
       using Arena,

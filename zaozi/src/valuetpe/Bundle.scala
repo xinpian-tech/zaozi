@@ -24,6 +24,13 @@ trait Bundle extends Aggregate with Connectable with DynamicSubfield:
     sourcecode.Name.Machine
   ): BundleField[T] = this.AlignedImpl(tpe)
 
+  def Inout(
+    tpe: Bits
+  )(
+    using TypeImpl,
+    sourcecode.Name.Machine
+  ): BundleField[Analog] = this.InoutImpl(tpe)
+
   def getRefViaFieldValName[E <: Data](
     refer:        Value,
     fieldValName: String

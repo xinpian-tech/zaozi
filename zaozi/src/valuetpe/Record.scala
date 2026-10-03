@@ -25,6 +25,13 @@ trait Record extends Aggregate with Connectable with UntypedDynamicSubfield:
     using TypeImpl
   ): BundleField[T] = this.AlignedImpl(name, tpe)
 
+  def Inout(
+    name: String,
+    tpe:  Bits
+  )(
+    using TypeImpl
+  ): BundleField[Analog] = this.InoutImpl(name, tpe)
+
   def getUntypedRefViaFieldValName(
     refer:        Value,
     fieldValName: String
