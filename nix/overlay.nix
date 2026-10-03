@@ -10,10 +10,12 @@ let
   mlir = prev.llvmPackages_circt.mlir.override {
     buildSharedLibs = true;
   };
-  circt = prev.circt.override {
+  circt = (prev.circt.override {
     inherit libllvm mlir;
     buildSharedLibs = true;
-  };
+  }).overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./patches/circt-instance-choice-inout.patch ];
+  });
 in
 {
   inherit (mvn-trace-forge.packages.${final.stdenv.hostPlatform.system}) mtf;

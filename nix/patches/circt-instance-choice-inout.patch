@@ -1,0 +1,73 @@
+diff --git a/lib/Conversion/FIRRTLToHW/LowerToHW.cpp b/lib/Conversion/FIRRTLToHW/LowerToHW.cpp
+index 2fdc89554..2cfa73177 100644
+--- a/lib/Conversion/FIRRTLToHW/LowerToHW.cpp
++++ b/lib/Conversion/FIRRTLToHW/LowerToHW.cpp
+@@ -72,7 +72,8 @@ static Value getSingleNonInstanceOperand(AttachOp op) {
+   Value singleSource;
+   for (auto operand : op.getAttached()) {
+     if (isZeroBitFIRRTLType(operand.getType()) ||
+-        operand.getDefiningOp<InstanceOp>())
++        operand.getDefiningOp<InstanceOp>() ||
++        operand.getDefiningOp<InstanceChoiceOp>())
+       continue;
+     // If it is used by other than attach op or there is already a source
+     // value, bail out.
+@@ -4262,7 +4263,7 @@ LogicalResult FIRRTLLowering::visitDecl(InstanceChoiceOp oldInstanceChoice) {
+   StringRef wirePrefix = oldInstanceChoice.getInstanceName();
+   for (size_t portIndex = 0, e = portInfo.size(); portIndex != e; ++portIndex) {
+     auto &port = portInfo[portIndex];
+-    if (port.isInput())
++    if (!port.isOutput())
+       continue;
+     auto portType = lowerType(port.type);
+     if (!portType || portType.isInteger(0))
+diff --git a/test/Conversion/FIRRTLToHW/lower-instance-choice-clock.mlir b/test/Conversion/FIRRTLToHW/lower-instance-choice-clock.mlir
+index cc00f8904..97d147d65 100644
+--- a/test/Conversion/FIRRTLToHW/lower-instance-choice-clock.mlir
++++ b/test/Conversion/FIRRTLToHW/lower-instance-choice-clock.mlir
+@@ -1,6 +1,6 @@
+ // RUN: circt-opt -lower-firrtl-to-hw %s | FileCheck %s
+ 
+-// Test that instance_choice with clock-typed output ports is lowered correctly.
++// Test that instance_choice with clock outputs and analog ports lowers correctly.
+ // Clock types cannot be used as inout element types, so we use i1 wires and
+ // convert to/from clock when reading/writing.
+ 
+@@ -15,25 +15,28 @@ module {
+       firrtl.option_case @B {case_macro = @__option_Opt_B}
+     }
+     
+-    firrtl.extmodule private @ModA(in clk_in: !firrtl.clock, out clk_out: !firrtl.clock) attributes {convention = #firrtl<convention scalarized>, defname = "ModA"}
+-    firrtl.extmodule private @ModB(in clk_in: !firrtl.clock, out clk_out: !firrtl.clock) attributes {convention = #firrtl<convention scalarized>, defname = "ModB"}
++    firrtl.extmodule private @ModA(in clk_in: !firrtl.clock, out clk_out: !firrtl.clock, out pad: !firrtl.analog<1>) attributes {convention = #firrtl<convention scalarized>, defname = "ModA"}
++    firrtl.extmodule private @ModB(in clk_in: !firrtl.clock, out clk_out: !firrtl.clock, out pad: !firrtl.analog<1>) attributes {convention = #firrtl<convention scalarized>, defname = "ModB"}
+     
+     // CHECK-LABEL: hw.module @Top
+-    firrtl.module @Top(in %clk: !firrtl.clock, out %out_clk: !firrtl.clock) {
++    firrtl.module @Top(in %clk: !firrtl.clock, out %out_clk: !firrtl.clock, out %pad: !firrtl.analog<1>) {
+       // CHECK: %inst.clk_out = sv.wire : !hw.inout<i1>
+       // CHECK-NEXT: %[[READ:.+]] = sv.read_inout %inst.clk_out : !hw.inout<i1>
+       // CHECK-NEXT: %[[TO_CLOCK:.+]] = seq.to_clock %[[READ]]
+-      %inst_clk_in, %inst_clk_out = firrtl.instance_choice inst {instance_macro = @__target_Opt_inst} @ModA alternatives @Opt { @A -> @ModA, @B -> @ModB } (in clk_in: !firrtl.clock, out clk_out: !firrtl.clock)
++      %inst_clk_in, %inst_clk_out, %inst_pad = firrtl.instance_choice inst {instance_macro = @__target_Opt_inst} @ModA alternatives @Opt { @A -> @ModA, @B -> @ModB } (in clk_in: !firrtl.clock, out clk_out: !firrtl.clock, out pad: !firrtl.analog<1>)
+       firrtl.matchingconnect %inst_clk_in, %clk : !firrtl.clock
+       firrtl.matchingconnect %out_clk, %inst_clk_out : !firrtl.clock
++      firrtl.attach %pad, %inst_pad : !firrtl.analog<1>, !firrtl.analog<1>
+       
+       // CHECK: sv.ifdef @__option_Opt_A {
+       // CHECK:   %inst_A.clk_out = hw.instance "inst_A"
++      // CHECK-SAME: pad: %pad: !hw.inout<i1>
+       // CHECK:   %[[FROM_CLOCK_A:.+]] = seq.from_clock %inst_A.clk_out
+       // CHECK:   sv.assign %inst.clk_out, %[[FROM_CLOCK_A]] : i1
+       // CHECK: } else {
+       // CHECK:   sv.ifdef @__option_Opt_B {
+       // CHECK:     %inst_B.clk_out = hw.instance "inst_B"
++      // CHECK-SAME: pad: %pad: !hw.inout<i1>
+       // CHECK:     %[[FROM_CLOCK_B:.+]] = seq.from_clock %inst_B.clk_out
+       // CHECK:     sv.assign %inst.clk_out, %[[FROM_CLOCK_B]] : i1
+       // CHECK:   } else {
+@@ -43,4 +46,3 @@ module {
+     }
+   }
+ }
+-
