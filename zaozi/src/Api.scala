@@ -52,20 +52,20 @@ extension (layers: Seq[LayerTree])
   def nameHierarchies:                           Seq[Seq[String]] =
     layers.flatMap(_._dfs).filter(_.children.isEmpty).map(_.nameHierarchy)
 
-abstract class Parameter                                    extends Product
-abstract class LayerInterface[P <: Parameter](parameter: P) extends Seq[LayerTree]:
+abstract class Parameter                                     extends Product
+abstract class LayerInterface[-P <: Parameter](parameter: P) extends Seq[LayerTree]:
   def layers: Seq[Layer]
 
   final override def apply(idx: Int) = layers.toLayerTrees(idx)
   final override def iterator        = layers.toLayerTrees.iterator
   final override def length          = layers.toLayerTrees.length
 
-trait HWInterface[P <: Parameter](parameter: P)       extends Aggregate:
+trait HWInterface[-P <: Parameter](parameter: P)      extends Aggregate:
   this: Bundle | Record =>
 abstract class HWBundle[P <: Parameter](parameter: P) extends HWInterface(parameter) with Bundle
 abstract class HWRecord[P <: Parameter](parameter: P) extends HWInterface(parameter) with Record
 
-trait DVInterface[P <: Parameter, L <: LayerInterface[P]](parameter: P) extends Aggregate:
+trait DVInterface[-P <: Parameter, L <: LayerInterface[P]](parameter: P) extends Aggregate:
   this: ProbeBundle | ProbeRecord =>
   private var _layersOpt:              Option[L]         = None
   transparent inline def summonLayers: LayerInterface[?] = ${ summonLayersImpl }
