@@ -68,7 +68,7 @@ import java.io.ByteArrayOutputStream
 import java.lang.foreign.Arena
 import java.nio.file.StandardOpenOption.*
 
-export me.jiuyang.zaozi.magic.macros.generator
+export me.jiuyang.zaozi.magic.macros.{generator, InstanceChoice}
 
 given GeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](

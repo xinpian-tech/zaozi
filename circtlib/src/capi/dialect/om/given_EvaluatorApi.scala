@@ -20,13 +20,11 @@ import org.llvm.circt.CAPI.{
   omEvaluatorValueGetContext,
   omEvaluatorValueGetLoc,
   omEvaluatorValueGetPrimitive,
-  omEvaluatorValueGetReferenceValue,
   omEvaluatorValueIsABasePath,
   omEvaluatorValueIsAList,
   omEvaluatorValueIsAObject,
   omEvaluatorValueIsAPath,
   omEvaluatorValueIsAPrimitive,
-  omEvaluatorValueIsAReference,
   omEvaluatorValueIsNull
 }
 import org.llvm.mlir.scalalib.capi.support.{*, given}
@@ -121,14 +119,10 @@ given EvaluatorApi with
     inline def getPrimitive(
       using arena: Arena
     ): Attribute = Attribute(omEvaluatorValueGetPrimitive(arena, evaluatorValue.segment))
-    inline def getReferenceValue(
-      using arena: Arena
-    ): OMEvaluatorValue = OMEvaluatorValue(omEvaluatorValueGetReferenceValue(arena, evaluatorValue.segment))
     inline def isBasePath:  Boolean = omEvaluatorValueIsABasePath(evaluatorValue.segment)
     inline def isList:      Boolean = omEvaluatorValueIsAList(evaluatorValue.segment)
     inline def isObject:    Boolean = omEvaluatorValueIsAObject(evaluatorValue.segment)
     inline def isPath:      Boolean = omEvaluatorValueIsAPath(evaluatorValue.segment)
     inline def isPrimitive: Boolean = omEvaluatorValueIsAPrimitive(evaluatorValue.segment)
-    inline def isReference: Boolean = omEvaluatorValueIsAReference(evaluatorValue.segment)
     inline def isNull:      Boolean = omEvaluatorValueIsNull(evaluatorValue.segment)
 end given

@@ -80,6 +80,7 @@ circtESIWindowTypeGetNumFrames           # header: $CIRCT_INSTALL_PATH/include/c
 mlirGetDialectHandle__esi__              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/ESI.h
 registerESIPasses                        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/ESI.h
 mlirGetDialectHandle__emit__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Emit.h
+circtFirrtlCreateLinkCircuitsPass  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlAttrGetConvention            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlAttrGetEventControl          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
 firrtlAttrGetIntegerFromString     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
@@ -307,14 +308,12 @@ omEvaluatorValueFromPrimitive     # header: $CIRCT_INSTALL_PATH/include/circt-c/
 omEvaluatorValueGetContext        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetLoc            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetPrimitive      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-omEvaluatorValueGetReferenceValue # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetType           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsABasePath       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAList           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAObject         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAPath           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAPrimitive      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-omEvaluatorValueIsAReference      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsNull            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsUnknown         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omFrozenBasePathTypeGetTypeID     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
