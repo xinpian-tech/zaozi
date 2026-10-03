@@ -189,6 +189,18 @@ given TypeImpl with
       ref._elements += bf
       bf
 
+    def InoutImpl(
+      tpe: Bits
+    )(
+      using sourcecode.Name.Machine
+    ): BundleField[Analog] =
+      require(ref.instantiating)
+      val analog = new Analog:
+        private[zaozi] val _width: Int = tpe._width
+      val bf     = BundleField[Analog](name = bundleFieldName, isFlipped = false, dataType = analog)
+      ref._elements += bf
+      bf
+
   extension (ref: Aggregate)
     def elements: Seq[BundleField[?]] =
       require(!ref.instantiating)
@@ -243,6 +255,17 @@ given TypeImpl with
     ): BundleField[T] =
       require(ref.instantiating)
       val bf = BundleField[T](name = name, isFlipped = false, dataType = tpe)
+      ref._elements += bf
+      bf
+
+    def InoutImpl(
+      name: String,
+      tpe:  Bits
+    ): BundleField[Analog] =
+      require(ref.instantiating)
+      val analog = new Analog:
+        private[zaozi] val _width: Int = tpe._width
+      val bf     = BundleField[Analog](name = name, isFlipped = false, dataType = analog)
       ref._elements += bf
       bf
 
