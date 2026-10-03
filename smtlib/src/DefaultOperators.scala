@@ -107,7 +107,20 @@ given ConstructorApi with
     sourcecode.Line,
     sourcecode.Name.Machine
   ): Ref[T] =
-    val op = summon[DeclareFunApi].op(summon[sourcecode.Name.Machine].value, locate, rangeType.toMlirType)
+    smtValue(rangeType, summon[sourcecode.Name.Machine].value)
+
+  def smtValue[T <: Data](
+    rangeType: T,
+    name:      String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine
+  ): Ref[T] =
+    val op = summon[DeclareFunApi].op(name, locate, rangeType.toMlirType)
     op.operation.appendToBlock()
     new Ref[T]:
       val _tpe:       T         = rangeType

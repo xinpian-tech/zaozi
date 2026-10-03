@@ -33,6 +33,12 @@ object CoreSpec extends TestSuite:
             val a = smtValue(Bool)
             smtAssert(a)
           }
+      test("named const"):
+        smtTest("declare-const domain_core Bool"):
+          solver {
+            val a = smtValue(Bool, "domain_core")
+            smtAssert(a)
+          }
       test("fun"):
         smtTest("declare-fun a (Int Bool) Bool"):
           solver {
