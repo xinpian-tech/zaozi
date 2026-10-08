@@ -1,18 +1,38 @@
 #import "../lib.typ": *
 
-= 验证协议 <ch-verification>
+= 验证观测 <ch-verification>
 
-验证环境需要观察设计内部的信号，例如供协同仿真比对的架构状态、供记分板检查的互连事务与各级断言。Syntheke 用一样东西表示这类观察关系：被观察模块上声明的观察点，称为#term[探针源][DV source]。信号以 FIRRTL 的探针（`Probe`，对内部信号的只读引用）形式引出；框架把每个探针叶沿层次树自动上提，直至设计根（@ch-hierarchy）。消费者——协同仿真、记分板、断言环境——不是设计图的节点：图内没有收集端，也没有验证 bind。设计可以声明一个测试平台模块消费全部探针（@sec-dv-testbench）；不声明时探针成为顶层探针端口，由设计外的工具接入。每个探针源还声明一条 FIRRTL 层路径，例如 `verification.cosim`，用于控制对应验证逻辑的生成与移除（@req-verification、@sec-layers）。
+验证环境需要观察设计内部的信号，例如供协同仿真比对的指令退休记录、供记分板检查的互连事务与各级断言。Syntheke 把观察关系拆成三件事：生成器在电路上公开哪些只读引用；设计用什么类型的参数描述这些引用；谁来读取它们。信号以 FIRRTL 的探针（`Probe`，对内部信号的只读引用）形式引出，框架沿层次树为它们规划端口与连线（@ch-hierarchy）。探针不经 bind，也不参与协商。每个探针端口带一条 FIRRTL 层路径，用于控制对应验证逻辑的生成与移除（@req-verification、@sec-layers）。
 
-验证协议是设计协议之外的第二种协议，代码里对应的协议对象是 `DVProtocol`。设计协议在一条 bind 的两端之间双向传播、逐边求解；验证协议没有协商：探针源在声明处给出参数，接口当场导出、当场检查。两种协议的身份都是各自的协议对象。
+== 公开探针端口与探针 <sec-dv-declarations>
 
-== 探针源 <sec-dv-declarations>
+生成器从完整参数决定它的#term[公开探针端口][public probe port]：每个端口是一个 Output 方向的 `Probe` 端口，带端口名、被引用数据的类型和层路径。zaozi 生成器在自己的探针接口中声明这些字段，框架从完整参数读出端口清单。公开探针端口的名字与本模块节点名不得相同。
 
-探针源由生成器模块声明，提供验证协议的 `Down` 与 FIRRTL 层路径。声明记录标识、协议、`Down`、层路径、由协议导出的接口和源码位置，构建期写入 `DesignSpec`。探针源的稳定标识 `DVSourceId` 由所属模块和声明名组成；名称与模块节点共用同一唯一性约束（@sec-generator-module）。
+#term[探针][probe]是生成器模块对一个公开探针端口的类型化描述：`probe[FP, P](selector)` 声明一个名为所在 val 的探针，返回 `ProbeNode[P]`。`P` 是#term[探针参数][probe parameter]类型，描述这个引用是什么，例如“第 0 个 hart 的指令退休记录，XLEN 为 32”。`selector` 在完整参数算出后执行：它读取完整参数与公开端口清单，选出一个端口并给出 `P` 的值，或者说明本实例没有这个探针（例如未打开 trace）。探针名与节点名共用本模块的命名空间；它的稳定标识是 `ModuleNodeId`。
 
-探针源按接口叶对应生成器的若干纯 `Probe` 端口，端口名为源名加叶路径段（@sec-port-naming）。`Probe` 节点即叶，其内部可为聚合——整包数据在一个引用后面，仍是单个端口，不产生开放聚合。
+探针参数类型以 `TypeIdentity` 区分。`TypeIdentity` 由编译期从类型的声明类与类型实参派生，不接受单例类型、通配与未解析的类型表达式，因此两个类型标识相同当且仅当类型相同。
 
-#图([探针的层次路由。两个探针源（紫）的探针叶沿层次树逐层上提，在设计根引出为顶层探针端口；跨越的模块边界均产生带层路径标注的端口。])[
+== 探针目录 <sec-dv-catalog>
+
+协商结束、完整参数算出后，框架执行全部探针的 `selector`，得到设计的#term[探针目录][probe catalog]。目录中的每条记录是一个 `ResolvedProbe[P]`：探针标识、`P` 的值和它选中的公开探针端口。选中不存在的端口、或 `selector` 返回冲突，都在协商期报错。
+
+一个设计#term[公开][publish]的目录包含本设计声明的探针，以及以 `probe.boundary` 从所例化设计转发来的探针。外层设计从例化结果读取它：`instance.probes.query[P]` 按 `TypeIdentity[P]` 取出全部该类型的探针。查询发生在外层的构建期，此时内层设计已经冻结，所以目录是完整的，与声明顺序无关。
+
+#决策([按类型查询探针，不按名字或路径])[
+  消费者按探针参数类型取得探针，不写模块路径或端口名字符串。探针参数说明引用的含义，硬件数据类型由生成器库按参数类型关联（@sec-dv-observation）。拓扑改变时，查询结果随之改变，消费者代码不变。
+] <dec-dv-typed-query>
+
+== 观测 <sec-dv-observation>
+
+读取探针的生成器称为#term[观测者][observer]。观测者是外层设计中的普通生成器模块：它把查询得到的 `ResolvedProbe[P]` 作为用户参数，在完整参数中记录要读的探针。zaozi 侧以 `ProbeBindingFor[P, T]` 把探针参数类型 `P` 关联到硬件数据类型 `T`，`resolved.observe[T]` 得到一个可放进完整参数的探针句柄。
+
+观测者的生成器从完整参数报告它的#term[观测绑定][observation binding]：每个被读探针一条，记录探针标识、输入端口名与引用类型。输入端口是 Input 方向的数据端口，类型是被引用的数据类型，端口名是该探针在设计根上的 Dangle 端口名（@sec-port-naming）。框架核对每个绑定的探针属于本次协商的目录，端口名不与观测者的节点名或公开探针端口名相同。
+
+观测绑定进入观测者的模块名（@sec-dedup）：读不同探针的两个实例是不同模块。
+
+== 路由规则 <sec-dv-routing>
+
+#图([探针的层次路由。两个公开探针端口（紫）沿层次树逐层上提，在设计根引出为探针端口；跨越的模块边界均产生带层路径标注的端口。])[
   #syn-diagram(
     spacing: (15mm, 7.5mm),
     node((0, 0.4), [源 α], name: <s1>, shape: fletcher.shapes.circle, stroke: c-dv),
@@ -20,44 +40,33 @@
     node(enclose: (<s1>,), stroke: c-hier, inset: 10pt, snap: false, name: <m1>),
     node(enclose: (<s2>,), stroke: c-hier, inset: 10pt, snap: false, name: <m2>),
     node(enclose: (<m1>, <m2>), stroke: c-hier, inset: 22pt, snap: false, name: <mid>),
-    node((2.9, -0.75), [顶层探针端口], name: <k>, stroke: c-dv, fill: rgb("#f6f1fd")),
+    node((2.9, -0.75), [根上的探针端口], name: <k>, stroke: c-dv, fill: rgb("#f6f1fd")),
     node(enclose: (<mid>, <k>), stroke: c-hier, inset: 34pt, snap: false),
     node((0, -0.35), text(size: 8pt, fill: c-hier)[核], stroke: none),
     node((1.4, -0.35), text(size: 8pt, fill: c-hier)[核], stroke: none),
     node((0.7, -0.95), text(size: 8pt, fill: c-hier)[簇], stroke: none),
-    node((0.7, -1.62), text(size: 8pt, fill: c-hier)[顶层], stroke: none),
+    node((0.7, -1.62), text(size: 8pt, fill: c-hier)[设计根], stroke: none),
     edge(<s1>, <k>, "--|>", stroke: c-dv),
     edge(<s2>, <k>, "--|>", stroke: c-dv),
   )
 ]
 
-== 验证协议对象 <sec-dv-protocol>
+探针路由复用设计侧的跨层端口规划（@sec-punch-planning），有两种路径：
 
-验证协议只有一种参数：探针源声明的 `Down`。协议对象的函数 `interfaceOf(down, layer)` 从 `Down` 与层路径导出该源的接口 `ProtocolBundle`；接口的每个信号叶必须是携带该层路径的 `Probe`，且不得出现 `Flipped`——观测是单向的。这些契约在探针源声明处当场检查，违反契约的协议在用户的声明行报错（@sec-error-semantics）。
++ *公开路径。*本设计目录中每个探针所选中的公开探针端口，都从源模块的父模块逐层上提到设计根（含根），每个模块边界一个 Output 方向的 `Probe` Dangle 端口，逐层 `ref.define` 传递。根上的端口就是这个设计对外的探针端口，外层设计例化它时从这里读取。
++ *观测路径。*对每个观测绑定，取探针源模块与观测者的最近公共祖先 $W$。源侧从源模块向上生成 `Probe` 端口直到 $W$；观测者侧从观测者向上生成数据输入端口直到 $W$；在 $W$ 内以 `ref.resolve` 读出引用，再连到观测者一侧。
 
-`Down`、`LayerPath` 与接口都是不可变、可序列化的数据；`downRW` 提供 `Down` 的规范化编码，供工具导出（@ch-tooling）。
+两条路径都只经过结构模块，不改变任何生成器的端口。
 
-== 路由规则 <sec-dv-routing>
-
-#决策([探针自动上提到根，图内不设收集端])[
-  探针源声明即完成接线：框架把每个探针叶从源模块逐层上提，直至设计根。收集不经图中逐条声明：没有汇节点、没有验证 bind，测试平台按清单整体接收（@sec-dv-testbench），或由顶层探针端口交给设计外的工具。
+#决策([探针公开到设计根，读取由观测者声明])[
+  设计中每个被探针选中的公开端口都引出到设计根，构成设计对外的观测面；设计内不设收集端。读取是观测者自己的声明：它在完整参数中列出要读的探针，框架据此规划从源到观测者的路径。测试平台不是特殊模块，它就是例化被测设计的外层设计。
 ] <dec-dv-top>
-
-探针路由复用设计侧的跨层端口规划（@sec-punch-planning），但按接口叶展开，且没有目标分支——`Probe` 节点即叶，内部可为聚合，每叶是单个纯引用端口。对源接口的每片叶生成一条 Output 路径——从源的父模块到设计根（含根），每个模块边界一个纯 `Probe` 类型的 Dangle 端口，逐层 `ref.define` 传递；`Vec` 叶按下标展开、与字段叶同样路由。
-
-== 测试平台 <sec-dv-testbench>
-
-#term[测试平台][testbench]是一个特殊的生成器模块：只能声明在设计体最外层、至多一个，由根结构模块与芯片顶层一同例化。它的节点是普通节点，经普通 bind 接住设计的对外节点、照常协商——芯片对外接口的形状就是这些边求解出的接口。它的特殊只有一件事：框架把设计的每个探针叶接进它的同名输入端口（端口名为叶的根作用域 Dangle 名、类型为 `ref.resolve` 后的数据类型），并在绑定检查点一并核对（@dec-binding-check）。
-
-#term[探针清单][probe manifest]——每源的标识、`Down` 与层路径，每叶的端口名（@sec-port-naming 的 Dangle 名）与数据类型——是 `DesignSpec` 的纯函数，可序列化。它在 spec 冻结后计算，经测试平台的 `EdgeView` 送达其 `parameters`：清单必然完整，与声明顺序无关；其他模块视图里的清单为空——框架没有接探针给它们。测试平台作者用它决定探针端口和完整参数；同一份数据供设计外工具使用。
-
-不声明测试平台时，探针路径终止于根的 Dangle 端口，即顶层探针端口，供设计外的消费者按 FIRRTL 引用 ABI 接入，层保持可移除。
 
 == FIRRTL 层与探针移除 <sec-layers>
 
-每个探针源声明一条#term[层路径][layer path]，例如 `verification.cosim` 或 `verification.assert`。框架将穿过同一模块的探针层路径合并为前缀树：
+每个公开探针端口带一条#term[层路径][layer path]，例如 `verification.cosim` 或 `verification.assert`。框架把探针路径经过的每个模块的层路径合并为前缀树，生成器自带的内部层也并入它的全部祖先：
 
-$ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针端口"} $
+$ "layers"(w) = "前缀树并" {"layer"(s) : s in "经过" w "的探针端口"} union {"子树"(w) "中生成器的层"} $
 
 #图([层的前缀树合并。子树包含 `verification.cosim` 与 `verification.assert.fatal` 两条层路径，模块的层声明是二者的前缀树并。])[
   #syn-canvas({
@@ -87,8 +96,8 @@ $ "layers"(w) = "前缀树并" {"layer"(s) : s in "子树"(w) "的全部探针�
   })
 ]
 
-跨层探针端口带层染色；关闭层路径时，FIRRTL 编译流程移除对应的验证逻辑。声明期核对接口中每个 `Probe` 的层标注（@sec-dv-protocol）；例化期再把生成器的实际 Probe 端口与已声明接口比对，失配时当场报错（@sec-generator-contract）。
+跨层探针端口带层染色；关闭层路径时，FIRRTL 编译流程移除对应的验证逻辑。例化期把生成器的实际 Probe 端口与公开端口清单逐个比对，失配时当场报错（@dec-binding-check）。
 
 #决策([层路径按前缀合并])[
-  相同层路径合并为同一声明。不同探针源可以在同一层路径下使用不同协议。
+  相同层路径合并为同一声明。不同探针可以在同一层路径下引用不同类型的数据。
 ] <dec-layer-merge>

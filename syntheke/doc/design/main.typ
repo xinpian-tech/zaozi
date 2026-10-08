@@ -14,8 +14,8 @@
     #text(size: 10pt, fill: luma(110))[_Draft the graph. Negotiate the terms. Enact the hardware._]
     #v(1.6cm)
     #text(size: 10pt, fill: luma(90))[
-      版本 0.1（草案） \
-      2026 年 8 月 18 日
+      版本 0.2（草案） \
+      2026 年 10 月 8 日
     ]
   ]
 ]
