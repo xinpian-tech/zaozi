@@ -41,9 +41,8 @@ final case class ProbePort(name: String, tpe: ProtocolInterface.Probe):
 trait ProbeDeclaration:
   def ports: Vector[ProbePort]
 
-final class ResolvedPublicPort private[syntheke] (
-  val id: ModuleNodeId,
-  val reference: ProtocolInterface.Probe)
+/** A public probe port of a generator module, where its probes are read from. */
+final case class ResolvedPublicPort private[syntheke] (id: ModuleNodeId, reference: ProtocolInterface.Probe)
 
 final case class ProbeBinding(
   source: ModuleNodeId,
@@ -51,6 +50,9 @@ final case class ProbeBinding(
   reference: ProtocolInterface.Probe)
     derives upickle.default.ReadWriter
 
+/** What an observer reads: its sources, and the input port each one arrives at. The port names are fixed where the
+  * observer's design is negotiated and stay when the design is instantiated elsewhere.
+  */
 final class ProbeBindings private[syntheke] (
   private[syntheke] val nodes: Vector[ResolvedPublicPort],
   val ports: Vector[ProbeBinding])
@@ -87,13 +89,13 @@ final class ProbeCatalog private[syntheke] (
 
   /** The observed ports that are not in this catalog. */
   private[syntheke] def foreign(observations: ProbeBindings): Vector[ResolvedPublicPort] =
-    observations.nodes.filterNot(node => ports.exists(_ eq node))
+    observations.nodes.filterNot(ports.contains)
 
 object ProbeCatalog:
   private[syntheke] def resolve(declarations: Vector[(ModuleId, ProbeDeclaration)])(
     settle: Vector[ResolvedPublicPort] => Vector[ResolvedProbe[?]]
   ): ProbeCatalog =
     val ports = declarations.flatMap { (module, declaration) =>
-      declaration.ports.map(port => new ResolvedPublicPort(ModuleNodeId(module, port.name), port.tpe))
+      declaration.ports.map(port => ResolvedPublicPort(ModuleNodeId(module, port.name), port.tpe))
     }
     new ProbeCatalog(ports, settle(ports))

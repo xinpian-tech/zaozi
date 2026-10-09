@@ -19,14 +19,6 @@ private[prcm] object ModelChecker:
           visit(rest.enqueueAll(fresh), seen ++ fresh, result ++ fresh)
     visit(Queue(initial), Set(initial), Vector(initial))
 
-  /** A shortest path from `initial` to a reachable state that breaks `invariant`. */
-  def counterexample[S](initial: S)(successors: S => Seq[S])(invariant: S => Boolean): Option[Vector[S]] =
-    val states = reachable(initial)(successors)
-    states.find(!invariant(_)).flatMap { bad =>
-      val index = states.zipWithIndex.toMap
-      path(states.map(s => successors(s).map(index).toVector), 0, index(bad), states.indices.toSet).map(_.map(states))
-    }
-
   /** A run that never finishes. Over `states` (the first is the initial state), it looks for a cycle of states that
     * are not `finished` under `step`, on which every fairness condition holds somewhere, and returns a prefix that
     * reaches it under `reach` together with the cycle. Successors outside `states` are ignored.

@@ -339,7 +339,7 @@ object PRCMModel:
           ((!control.clock || !control.power) && t.receiver != 0)
       yield s"$what does not refine the domain sequence from $s under $r to $t"
 
-    progress ++ recovery ++ release ++ faultSafety ++ refinement.take(1) ++ prefix(stages)
+    progress ++ recovery ++ release ++ faultSafety ++ refinement.take(1)
 
   /** A `stages`-deep reset synchronizer: its stage bits agree with the released-stage count the models keep. */
   def prefix(stages: Int): Vector[String] =

@@ -101,8 +101,7 @@ private[syntheke] object Settlement:
                 case Some(accept) =>
                   val relation = kind.relate(a.asInstanceOf, b.asInstanceOf)
                   Option.when(!accept.test(relation)) {
-                    val shown = ujson.write(upickle.default.writeJs(relation)(using kind.relationWriter))
-                    s"${bind.id.show}: the protocol does not accept crossing $a -> $b ($shown)"
+                    s"${bind.id.show}: the protocol does not accept crossing $a -> $b ($relation)"
                   }
             case _                  => Some(s"${bind.id.show}: only one end is in a ${kind.name} domain")
         }.map(message => s"$message, at ${bind.loc.show}")

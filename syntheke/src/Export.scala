@@ -30,10 +30,9 @@ object Export:
   private def declared(domain: Domain[?]): ujson.Value =
     val kind   = domain.kind
     val origin = domain.origin match
-      case Domain.Origin.Root(value)            => ujson.Obj("root" -> write(kind.rootWriter, value))
-      case Domain.Origin.Derived(sources, link) =>
-        ujson.Obj("derived" -> ujson.Obj("sources" -> ujson.Arr.from(sources.map(source)), "link" -> write(kind.linkWriter, link)))
-      case Domain.Origin.Imported(of, _)        => ujson.Obj("imported" -> domainId(of.id))
+      case Domain.Origin.Root(_)             => ujson.Str("root")
+      case Domain.Origin.Derived(sources, _) => ujson.Obj("derived" -> ujson.Arr.from(sources.map(source)))
+      case Domain.Origin.Imported(of, _)     => ujson.Obj("imported" -> domainId(of.id))
     ujson.Obj("id" -> domainId(domain.id), "kind" -> ujson.Str(kind.name), "origin" -> origin, "loc" -> loc(domain.loc))
 
   def topology(spec: DesignSpec): ujson.Value =
@@ -81,11 +80,8 @@ object Export:
       val kind   = domain.kind
       val origin =
         domain.imported.map(of => ujson.Obj("imported" -> domainId(of.id)))
-          .orElse(domain.root.map(value => ujson.Obj("root" -> write(kind.rootWriter, value))))
-          .getOrElse(ujson.Obj("derived" -> ujson.Obj(
-            "sources" -> ujson.Arr.from(domain.sources.map(d => domainId(d.id))),
-            "link"    -> write(kind.linkWriter, domain.link.get)
-          )))
+          .orElse(domain.root.map(_ => ujson.Str("root")))
+          .getOrElse(ujson.Obj("derived" -> ujson.Arr.from(domain.sources.map(d => domainId(d.id)))))
       ujson.Obj(
         "id"         -> domainId(domain.id),
         "kind"       -> ujson.Str(kind.name),
@@ -102,7 +98,7 @@ object Export:
       "kind"     -> ujson.Str(kind.name),
       "source"   -> domainId(a.id),
       "target"   -> domainId(b.id),
-      "relation" -> write(kind.relationWriter, kind.relate(a.asInstanceOf, b.asInstanceOf))
+      "relation" -> ujson.Str(kind.relate(a.asInstanceOf, b.asInstanceOf).toString)
     )
     ujson.Obj(
       "domains"     -> ujson.Arr.from(graph.domains.map(settled)),
@@ -128,11 +124,6 @@ object Export:
     )
 
   def plan(resolved: ResolvedDesign): ujson.Value =
-    def origin(o: PlanOrigin):             ujson.Value = o match
-      case PlanOrigin.Design(b)       => ujson.Obj("design" -> bindId(b))
-      case PlanOrigin.Verification(s) => ujson.Obj("verification" -> nodeId(s))
-      case PlanOrigin.ProbeRead(s) => ujson.Obj("probeRead" -> nodeId(s))
-      case PlanOrigin.Observation(s) => ujson.Obj("observation" -> nodeId(s))
     def endpoint(e: LocalEndpoint):        ujson.Value = e match
       case LocalEndpoint.ThisPort(name)        => ujson.Obj("port" -> ujson.Str(name.encoded))
       case LocalEndpoint.ChildPort(inst, port) =>
@@ -149,7 +140,6 @@ object Export:
           "direction" -> ujson.Str(p.direction.toString.toLowerCase),
           "name"      -> ujson.Str(p.name.encoded),
           "interface" -> interface(p.interface),
-          "origin"    -> origin(p.origin),
           "loc"       -> loc(p.loc)
         )
       }),
@@ -158,7 +148,7 @@ object Export:
           "module" -> moduleId(w.module),
           "from"   -> endpoint(w.from),
           "to"     -> endpoint(w.to),
-          "origin" -> origin(w.origin),
+          "kind"   -> ujson.Str(w.kind.toString),
           "loc"    -> loc(w.loc)
         )
       }),

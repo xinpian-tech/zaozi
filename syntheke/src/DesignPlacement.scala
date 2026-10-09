@@ -15,16 +15,16 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
   private val originalProbes =
     (spec.generatorModules.flatMap(_.probes.map(_.node)) ++ definition.probes.nodes.map(_.node)).distinct
 
-  def inward[P <: Protocol](value: InwardPort[P]): InwardPort[P] =
+  private def inward[P <: Protocol](value: InwardPort[P]): InwardPort[P] =
     new InwardPort(value.protocol, node(value.id), value.kinds)
-  def outward[P <: Protocol](value: OutwardPort[P]): OutwardPort[P] =
+  private def outward[P <: Protocol](value: OutwardPort[P]): OutwardPort[P] =
     new OutwardPort(value.protocol, node(value.id), value.kinds)
 
   private def placeBoundary[P <: Protocol](value: Boundary[P]): Boundary[P] = value match
     case b: InwardBoundary[P] =>
-      new InwardBoundary(b.protocol, node(b.id), outward(b.terminal.asInstanceOf[OutwardPort[P]]))
+      new InwardBoundary(b.protocol, outward(b.terminal.asInstanceOf[OutwardPort[P]]))
     case b: OutwardBoundary[P] =>
-      new OutwardBoundary(b.protocol, node(b.id), inward(b.terminal.asInstanceOf[InwardPort[P]]))
+      new OutwardBoundary(b.protocol, inward(b.terminal.asInstanceOf[InwardPort[P]]))
 
   private val boundaries: Map[Boundary[?], Boundary[?]] = spec.boundaries.map(b => b -> placeBoundary(b)).toMap
   def inwardBoundary[P <: Protocol](value: InwardBoundary[P]): InwardBoundary[P] =
@@ -34,12 +34,11 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
 
   private def placeProbe[P](value: ProbeNode[P]): ProbeNode[P] = new ProbeNode(node(value.id), value.contract)
   private val probeNodes: Map[ProbeNode[?], ProbeNode[?]] = originalProbes.map(p => p -> placeProbe(p)).toMap
-  def probe[P](value: ProbeNode[P]): ProbeNode[P] = probeNodes(value).asInstanceOf[ProbeNode[P]]
+  private def probe[P](value: ProbeNode[P]): ProbeNode[P] = probeNodes(value).asInstanceOf[ProbeNode[P]]
 
-  private val publicPorts = (definition.probes.ports ++ definition.observations.values.toVector.flatMap(_.nodes)).distinct
-    .map(p => p -> new ResolvedPublicPort(node(p.id), p.reference)).toMap
+  private def publicPort(value: ResolvedPublicPort): ResolvedPublicPort = value.copy(id = node(value.id))
   private def resolvedProbe[P](value: ResolvedProbe[P]): ResolvedProbe[P] =
-    new ResolvedProbe(probe(value.node), value.parameters, publicPorts(value.port), value.implementation)
+    new ResolvedProbe(probe(value.node), value.parameters, publicPort(value.port), value.implementation)
 
   private def probeSpec[P](value: ProbeSpec[P]): ProbeSpec[P] = new ProbeSpec(probe(value.node), value.selector, value.loc)
 
@@ -50,12 +49,6 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
     case w: WrapperModuleSpec   => w.copy(id = module(w.id))
     case b: BoundaryModuleSpec  => b.copy(id = module(b.id), target = module(b.target))
     case g: GeneratorModuleSpec => g.copy(id = module(g.id), probes = g.probes.map(probeSpec))
-
-  private def origin(value: PlanOrigin): PlanOrigin = value match
-    case PlanOrigin.Design(id) => PlanOrigin.Design(bind(id))
-    case PlanOrigin.Verification(id) => PlanOrigin.Verification(node(id))
-    case PlanOrigin.ProbeRead(id) => PlanOrigin.ProbeRead(node(id))
-    case PlanOrigin.Observation(id) => PlanOrigin.Observation(node(id))
 
   val resolved: ResolvedDesign = definition.copy(
     dependencies = definition.dependencies.map((id, design) => module(id) -> design),
@@ -68,10 +61,10 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
     edges = definition.edges.map(edge),
     generatorModules = definition.generatorModules.map(g =>
       g.copy(module = module(g.module), view = edgeView(g.view))),
-    probes = new ProbeCatalog(definition.probes.ports.map(publicPorts), definition.probes.nodes.map(resolvedProbe)),
+    probes = new ProbeCatalog(definition.probes.ports.map(publicPort), definition.probes.nodes.map(resolvedProbe)),
     observations = definition.observations.map { (id, bindings) =>
-      module(id) -> new ProbeBindings(bindings.nodes.map(publicPorts), bindings.ports.map(p => p.copy(source = node(p.source))))
+      module(id) -> new ProbeBindings(bindings.nodes.map(publicPort), bindings.ports.map(p => p.copy(source = node(p.source))))
     },
-    portPlans = definition.portPlans.map(p => p.copy(module = module(p.module), origin = origin(p.origin))),
-    wirePlans = definition.wirePlans.map(w => w.copy(module = module(w.module), origin = origin(w.origin))),
+    portPlans = definition.portPlans.map(p => p.copy(module = module(p.module))),
+    wirePlans = definition.wirePlans.map(w => w.copy(module = module(w.module))),
     layerDecls = definition.layerDecls.map((id, tree) => module(id) -> tree))

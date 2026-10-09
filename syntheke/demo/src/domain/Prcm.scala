@@ -69,9 +69,9 @@ final case class PRCMManagedDomain(
 
   def reset: PRCMMode = modes.find(_.name == resetMode).get
 
-  /** The services the domain needs in Run. */
+  /** The services the domain needs in Run; every Run mode needs the same. */
   def services: Vector[PRCMService] =
-    modes.filter(_.target == PRCMTarget.Run).flatMap(_.services).distinctBy(_.name).sortBy(_.name)
+    modes.find(_.target == PRCMTarget.Run).toVector.flatMap(_.services).distinctBy(_.name).sortBy(_.name)
 
   /** The domain's policy in chip mode `mode`. */
   def policy(mode: String): PRCMPolicy = chip.find(_._1 == mode).fold(PRCMPolicy.Local)(_._2)
@@ -81,13 +81,10 @@ final case class PRCMManagedDomain(
     case PRCMPolicy.Fixed(name) => modes.find(_.name == name).map(_.target)
     case PRCMPolicy.Local       => None
 
-enum PRCMRelation derives Writer:
-  case Same, Different
-
 object PRCMDomain extends DomainKind:
   type Root     = PRCMController
   type Link     = PRCMManagedDomain
-  type Relation = PRCMRelation
+  type Relation = Unit
 
   val name     = "prcm"
   val physical = false
@@ -105,18 +102,18 @@ object PRCMDomain extends DomainKind:
     line:       sourcecode.Line
   ): Domain[PRCMDomain.type] = PRCMDomain.derive(controller)(domain)
 
-  def isController(domain: Settled[PRCMDomain.type]): Boolean = domain.imported.fold(domain.root.isDefined)(isController)
+  def isController(domain: Settled[PRCMDomain.type]): Boolean = domain.definition.root.isDefined
 
-  def managed(domain: Settled[PRCMDomain.type]): PRCMManagedDomain = domain.imported match
-    case Some(frozen) => managed(frozen)
-    case None         => domain.link.getOrElse(throw IllegalArgumentException(s"$domain is a PRCM controller, not a managed domain"))
+  def settings(controller: Settled[PRCMDomain.type]): PRCMController = controller.definition.root.get
 
-  def settings(controller: Settled[PRCMDomain.type]): PRCMController = controller.imported.fold(controller.root.get)(settings)
+  def managed(domain: Settled[PRCMDomain.type]): PRCMManagedDomain =
+    domain.definition.link.getOrElse(throw IllegalArgumentException(s"$domain is a PRCM controller, not a managed domain"))
 
-  /** The controller of a managed domain this design declares. */
-  def controller(domain: Settled[PRCMDomain.type]): Settled[PRCMDomain.type] = domain.sources.head
+  /** The controller a managed domain derives from. */
+  def controller(domain: Settled[PRCMDomain.type]): Option[Settled[PRCMDomain.type]] =
+    domain.sources.headOption.filter(isController)
 
-  /** The power domain a managed domain switches. */
+  /** The power domain a managed domain switches, as a domain of this design. */
   def power(domain: Settled[PRCMDomain.type]): Settled[PowerDomain.type] = domain.imported match
     case Some(frozen) =>
       domain.counterpart(power(frozen)).getOrElse(fail(s"the power domain $domain switches is not at a boundary of its design"))
@@ -135,19 +132,17 @@ object PRCMDomain extends DomainKind:
       service  <- managed(consumer).services
     yield Edge(consumer, consumer.resolve(service.provider), service.name)
 
-  def relate(a: Settled[PRCMDomain.type], b: Settled[PRCMDomain.type]): PRCMRelation =
-    if a eq b then PRCMRelation.Same else PRCMRelation.Different
+  /** PRCM domains travel with their ports and never cross a bind. */
+  def relate(a: Settled[PRCMDomain.type], b: Settled[PRCMDomain.type]): Unit = ()
 
-  def describe(domain: Settled[PRCMDomain.type]): ujson.Value = domain.imported match
-    case Some(frozen) => describe(frozen)
-    case None         => describeDeclared(domain)
-
-  private def describeDeclared(domain: Settled[PRCMDomain.type]): ujson.Value = domain.root match
+  def describe(domain: Settled[PRCMDomain.type]): ujson.Value =
+    val definition = domain.definition
+    definition.root match
     case Some(controller) => ujson.Obj("controller" -> writeJs(controller))
     case None             =>
-      val d = managed(domain)
+      val d = managed(definition)
       ujson.Obj(
-        "power"       -> PowerDomain.describe(power(domain)),
+        "power"       -> PowerDomain.describe(power(definition)),
         "modes"       -> d.modes.map(m => ujson.Obj("name" -> m.name, "code" -> m.code.toString, "target" -> m.target.toString)),
         "resetMode"   -> d.resetMode,
         "resetStages" -> d.resetStages,
@@ -166,12 +161,14 @@ object PRCMDomain extends DomainKind:
         case d if d.sources.size != 1 || !isController(d.sources.head) =>
           s"$d must derive from exactly one PRCM controller"
       }
-      val names   = managedDomains(graph).filter(_.sources.size == 1).groupBy(d => (controller(d), d.id.name)).collect {
+      val names   = managedDomains(graph).flatMap(d => controller(d).map(c => (c, d))).groupBy((c, d) => (c, d.id.name)).map((key, ds) => key -> ds.map(_._2)).collect {
         case ((controller, name), domains) if domains.size > 1 =>
           s"$controller manages ${domains.mkString(", ")}, all named $name"
       }
       parents ++ names.toVector.sorted
     },
+    // What #159 cannot see in its own parameter: a service named twice with different providers, and a provider of
+    // another controller. Its other service rules run in the parameter check.
     DomainCheck("services", CheckStage.WellFormed) { graph =>
       val edges     = this.edges(graph)
       val providers = edges.groupBy(_.service).toVector.sortBy(_._1).collect {
@@ -179,16 +176,10 @@ object PRCMDomain extends DomainKind:
           s"service $name has providers ${uses.map(_.provider).distinct.mkString(", ")}"
       }
       val local     = edges.collect {
-        case e if !(controller(e.provider) eq controller(e.consumer)) =>
-          s"${e.consumer} needs ${e.service} from ${e.provider}, which another controller manages"
+        case e if controller(e.provider).isEmpty || controller(e.provider) != controller(e.consumer) =>
+          s"${e.consumer} needs ${e.service} from ${e.provider}, which its controller does not manage"
       }
-      val run       = edges.map(_.provider).distinct.collect {
-        case provider if !managed(provider).modes.exists(_.target == PRCMTarget.Run) =>
-          s"service provider $provider must have a Run mode"
-      }
-      val consumers = edges.map(_.consumer).toSet
-      val both      = edges.map(_.provider).distinct.filter(consumers).map(d => s"$d both provides and consumes a service")
-      providers ++ local ++ run ++ both
+      providers ++ local
     },
     DomainCheck("power", CheckStage.WellFormed) { graph =>
       val switched = managedDomains(graph).groupBy(power).toVector.sortBy(_._1.toString)
@@ -200,18 +191,14 @@ object PRCMDomain extends DomainKind:
         .map(d => s"switched $d is managed by no PRCM domain")
       shared ++ loose
     },
+    // A policy in a chip mode the controller does not declare would vanish from #159's parameter.
     DomainCheck("chip", CheckStage.WellFormed) { graph =>
-      managedDomains(graph).flatMap { domain =>
-        val modes = settings(controller(domain)).chip.toVector.flatMap(_.modes.map(_.name))
-        managed(domain).chip.map(_._1).filterNot(modes.contains).map(m => s"$domain sets a policy in undeclared chip mode $m")
-      } ++ edges(graph).flatMap { e =>
-        settings(controller(e.consumer)).chip.toVector.flatMap(_.modes).collect {
-          case mode
-              if managed(e.provider).fixed(mode.name).exists(_ != PRCMTarget.Run) &&
-                !managed(e.consumer).fixed(mode.name).exists(_ != PRCMTarget.Run) =>
-            s"chip mode ${mode.name} prevents ${e.provider} from serving ${e.consumer}"
-        }
-      }
+      for
+        domain <- managedDomains(graph)
+        owner  <- controller(domain).toVector
+        modes   = settings(owner).chip.toVector.flatMap(_.modes.map(_.name))
+        mode   <- managed(domain).chip.map(_._1) if !modes.contains(mode)
+      yield s"$domain sets a policy in undeclared chip mode $mode"
     },
     // #159's own rules on its parameter, on a register port wide enough for any of them.
     DomainCheck("parameter", CheckStage.WellFormed) { graph =>
@@ -231,16 +218,16 @@ object PRCMDomain extends DomainKind:
       if edges(graph).isEmpty then Vector.empty else service
     },
     DomainCheck("receiver", CheckStage.Behavior) { graph =>
-      managedDomains(graph).map(managed(_).resetStages).distinct.sorted
-        .flatMap(stages => receivers.getOrElseUpdate(stages, PRCMModel.receiver(stages))) ++
-        all(graph).flatMap(_.root).map(_.coldResetStages).distinct.sorted
-          .flatMap(stages => prefixes.getOrElseUpdate(stages, PRCMModel.prefix(stages)))
+      val domains = managedDomains(graph).map(managed(_).resetStages).distinct.sorted
+      val cold    = all(graph).flatMap(_.root).map(_.coldResetStages)
+      domains.flatMap(stages => receivers.getOrElseUpdate(stages, PRCMModel.receiver(stages))) ++
+        (domains ++ cold).distinct.sorted.flatMap(stages => prefixes.getOrElseUpdate(stages, PRCMModel.prefix(stages)))
     }
   )
 
   /** The managed domains of `controller`, in #159's port order: by name. */
   def ports(graph: DomainGraph, controller: Settled[PRCMDomain.type]): Vector[Settled[PRCMDomain.type]] =
-    managedDomains(graph).filter(d => this.controller(d) eq controller).sortBy(_.id.name)
+    managedDomains(graph).filter(d => this.controller(d).contains(controller)).sortBy(_.id.name)
 
   /** The #159 `PRCMParameter` of `controller` behind a register port of the given widths. */
   def parameter(
@@ -276,6 +263,3 @@ object PRCMDomain extends DomainKind:
       }
     )
 
-  val rootWriter:     Writer[PRCMController]    = summon
-  val linkWriter:     Writer[PRCMManagedDomain] = summon
-  val relationWriter: Writer[PRCMRelation]      = summon

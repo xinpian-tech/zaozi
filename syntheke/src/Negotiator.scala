@@ -93,7 +93,7 @@ object Negotiator:
   private def parameterOrder(spec: DesignSpec): Vector[ModuleNodeId] =
     val preorder = spec.moduleOrder.zipWithIndex.toMap
     val nodes    = for m <- spec.nodeModules; n <- m.nodes yield ModuleNodeId(m.id, n.name) -> n
-    val key      = nodes.map((id, n) => id -> (preorder(id.module), n.order)).toMap
+    val key      = spec.nodeModules.flatMap(m => m.nodes.zipWithIndex.map((n, i) => ModuleNodeId(m.id, n.name) -> (preorder(m.id), i))).toMap
     val reads    = for
       (id, n) <- nodes
       read    <- n.computation.reads

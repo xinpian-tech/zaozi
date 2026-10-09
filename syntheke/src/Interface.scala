@@ -14,6 +14,9 @@ object LayerPath:
         v => LayerPath(v.arr.toVector.map(_.str))
       )
 
+/** The type of a port, one case per zaozi value type. A case is a type tag: `Bits(1)`, `UInt(1)`, `Bool` and `Reset`
+  * are different types, though all of them are one wire in hardware.
+  */
 sealed trait ProtocolInterface derives CanEqual
 
 object ProtocolInterface:
@@ -33,7 +36,7 @@ object ProtocolInterface:
     require(width >= 0, "Analog width must be nonnegative")
   case object Bool                    extends ProtocolInterface
   case object Clock                   extends ProtocolInterface
-  case object AsyncReset              extends ProtocolInterface
+  case object Reset                   extends ProtocolInterface
 
   final case class Probe(inner: ProtocolInterface, layer: Option[LayerPath])
       extends ProtocolInterface:
@@ -77,7 +80,7 @@ object ProtocolInterface:
     case Analog(w)              => ujson.Obj("type" -> ujson.Str("analog"), "width" -> ujson.Num(w))
     case Bool                   => ujson.Obj("type" -> ujson.Str("bool"))
     case Clock                  => ujson.Obj("type" -> ujson.Str("clock"))
-    case AsyncReset             => ujson.Obj("type" -> ujson.Str("asyncReset"))
+    case Reset                  => ujson.Obj("type" -> ujson.Str("reset"))
     case Probe(i, l)            =>
       ujson.Obj(
         "type"  -> ujson.Str("probe"),
@@ -95,7 +98,7 @@ object ProtocolInterface:
     case "analog"     => Analog(v("width").num.toInt)
     case "bool"       => Bool
     case "clock"      => Clock
-    case "asyncReset" => AsyncReset
+    case "reset"      => Reset
     case "probe"      =>
       Probe(
         decode(v("inner")),

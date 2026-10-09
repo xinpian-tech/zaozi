@@ -30,10 +30,6 @@ trait DomainKind:
 
   def checks: Seq[DomainCheck] = Seq.empty
 
-  def rootWriter:     Writer[Root]
-  def linkWriter:     Writer[Link]
-  def relationWriter: Writer[Relation]
-
 /** Where a domain comes from at build time: a declared domain, or whatever domain a node of this module is in. */
 sealed trait DomainSource[K <: DomainKind]:
   val kind: K
@@ -89,6 +85,11 @@ final class Settled[K <: DomainKind] private[syntheke] (
   def imported: Option[Settled[K]] = origin match
     case Domain.Origin.Imported(domain, _) => Some(domain.asInstanceOf[Settled[K]])
     case _                                 => None
+
+  /** The domain whose root or link defines this one's properties: this domain, or the frozen design's domain it
+    * stands for. Read properties from it; compare identity with the domain itself.
+    */
+  def definition: Settled[K] = imported.fold(this)(_.definition)
 
   /** The domain of this design that stands for `frozen`, a domain of the frozen design this one is imported from, if
     * that domain is at a boundary of the same instance.

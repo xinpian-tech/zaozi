@@ -29,7 +29,7 @@ extension [P](resolved: ResolvedProbe[P])
     ProbeBindingSupport.observe(association, resolved)
 
 extension [T <: Data & CanProbe](handle: Probe[T])
-  def bind[I <: ProbeIO[?, ?]](io: Interface[I])(
+  def bind[I <: ProbeIO[?]](io: Interface[I])(
     using Arena, Context, Block, sourcecode.File, sourcecode.Line
   ): BoundProbe[T] = ProbeAccess.bind(handle, io)
 

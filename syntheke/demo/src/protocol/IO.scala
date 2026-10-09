@@ -8,7 +8,7 @@ object IO extends Protocol:
   type Edge = Unit
 
   val carries: Set[DomainKind] = Set.empty
-  val accepts: Seq[Accept]     = Seq(Accept(PowerDomain)(PowerDomain.atPin))
+  val accepts: Seq[Accept]     = Accepts.pin
 
   def negotiate(down: Unit, up: Unit): Either[Violation, Unit] = Right(())
 

@@ -34,9 +34,9 @@ object Probe:
     )
   }
 
-abstract class ProbeIO[FP <: Parameter, A](parameter: FP, observations: A)(using shape: ProbeShape[A])
-  extends HWRecord(parameter):
-  private[zaozi] val handles: Vector[Probe[?]] = shape.handles(observations).distinctBy(_.node)
+/** The interface of an observer: its parameter's ports, and an input port for each probe it reads. */
+abstract class ProbeIO[FP <: Parameter](parameter: FP, observations: Probe[?]*) extends HWRecord(parameter):
+  private[zaozi] val handles: Vector[Probe[?]] = observations.toVector.distinctBy(_.node)
   private[zaozi] val plan: ProbeBindings = ProbeBindings.from(handles.map(_.node))
 
   handles.zip(plan.ports).foreach { (handle, binding) =>
@@ -47,10 +47,10 @@ final class BoundProbe[T <: Data & CanProbe] private[zaozi] (
   private[zaozi] val value: Node[T])
 
 private[zaozi] object ProbeAccess:
-  def bind[T <: Data & CanProbe, I <: ProbeIO[?, ?]](handle: Probe[T], io: Interface[I])(
+  def bind[T <: Data & CanProbe, I <: ProbeIO[?]](handle: Probe[T], io: Interface[I])(
     using Arena, Context, Block, sourcecode.File, sourcecode.Line
   ): BoundProbe[T] =
-    require(io.getType.handles.exists(_.node eq handle.node), s"${handle.id.show}: source is not observed by this interface")
+    require(io.getType.handles.exists(_.node == handle.node), s"${handle.id.show}: source is not observed by this interface")
     val binding = io.getType.plan.ports.find(_.source == handle.id).get
     val value = PublicProbes.node(handle.dataType, io.field[Data](binding.portName).refer)
     new BoundProbe(value)

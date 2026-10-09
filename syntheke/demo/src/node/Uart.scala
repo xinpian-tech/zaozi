@@ -59,7 +59,7 @@ object UartNodes:
       val power = PowerDomain.tree(domains(clk.domain(PowerDomain)))
       val s     = shapeOf(view.edgeOf(in))
       if freq < baud * 8 then Left(Violation(s"the UART needs at least ${baud * 8} Hz for $baud baud, not $freq Hz"))
-      else if ResetDomain.activeLow(reset) || ResetDomain.releaseClock(reset).isEmpty then
+      else if !ResetDomain.releasedHigh(reset) then
         Left(Violation("the UART needs an active-high reset released on a clock"))
       else if !power.alwaysOn then Left(Violation("the UART needs an always-on supply"))
       else Right(UartP(freq / baud, base, s.addrBits, s.dataBits, s.idBits))

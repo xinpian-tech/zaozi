@@ -24,7 +24,6 @@ final case class NodeSpec private[syntheke] (
   protocol:                          Protocol,
   private[syntheke] val computation: NodeComputation,
   memberships:                       Vector[Membership],
-  order:                             Int,
   loc:                               SourceLoc)
 
 final class ProbeSpec[P] private[syntheke] (
@@ -40,22 +39,22 @@ private[syntheke] sealed trait NodeModuleSpec extends ModuleSpec:
   def nodes: Vector[NodeSpec]
   def node(name: String): Option[NodeSpec] = nodes.find(_.name == name)
 
-/** The boundary of a design: its external nodes, or those of a frozen design as an instantiating design sees them. */
+/** Constant nodes standing for one side of a design boundary: the outside of this design's own boundaries, or, with
+  * `imported`, a frozen design this one instantiates, whose boundaries face the instantiating design.
+  */
 private[syntheke] final case class BoundaryModuleSpec(
   id:       ModuleId,
   target:   ModuleId,
-  external: Boolean,
+  imported: Boolean,
   nodes:    Vector[NodeSpec],
   loc:      SourceLoc)
     extends NodeModuleSpec
 
-/** `definition` is the design and module path the wrapper was declared at; instances of one frozen design share it. */
 final case class WrapperModuleSpec private[syntheke] (
-  id:                               ModuleId,
-  moduleName:                       String,
-  children:                         Vector[String],
-  loc:                              SourceLoc,
-  private[syntheke] val definition: AnyRef)
+  id:         ModuleId,
+  moduleName: String,
+  children:   Vector[String],
+  loc:        SourceLoc)
     extends ModuleSpec
 
 final case class GeneratorModuleSpec private[syntheke] (

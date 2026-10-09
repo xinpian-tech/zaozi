@@ -31,7 +31,7 @@ private[zaozi] object ZaoziDefinitions:
     GeneratorBackend.define[PARAM](name)(
       fullParam => describePublicProbes(name, generator, fullParam),
       fullParam => generator.interface(fullParam) match
-        case observed: ProbeIO[?, ?] => observed.plan
+        case observed: ProbeIO[?] => observed.plan
         case _ => ProbeBindings.empty
     )(definition => new ZaoziBackend(definition, generator))
 

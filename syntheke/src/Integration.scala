@@ -46,7 +46,7 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
   def forwarded(boundary: Boundary[?], at: SourceLoc): Vector[Membership] =
     boundary.terminal.kinds.map(kind => Membership(kind, Some(declared(frozen(boundary, kind))), at))
 
-  private val entries = design.spec.boundaries.zipWithIndex.map { (boundary, order) =>
+  private val entries = design.spec.boundaries.map { boundary =>
     val outward   = boundary.isInstanceOf[OutwardBoundary[?]]
     val direction = if outward then NodeDirection.Outward else NodeDirection.Inward
     val edge      = design.boundaryEdge(boundary)
@@ -61,7 +61,6 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
       boundary.protocol,
       NodeComputation.Constant(if outward then edge.down else edge.up),
       members,
-      order,
       loc
     )
     (boundary.terminal, port, spec)
@@ -109,15 +108,6 @@ private[syntheke] object DesignIntegration:
       moduleOrder = Vector(parent.spec.root) ++ modules.filterNot(_ == parent.spec.root),
       binds = specs.flatMap(_.binds)
     )
-    val names   = spec.generators.groupBy(_.name).toVector.sortBy(_._1).collect {
-      case (name, definitions) if definitions.sizeIs > 1 => s"distinct generators share the module name '$name'"
-    }
-    val wrappers = spec.moduleOrder.flatMap(spec.wrapper).groupBy(_.moduleName).toVector.sortBy(_._1).collect {
-      case (name, ws) if ws.map(_.definition).distinct.sizeIs > 1 =>
-        s"distinct wrappers share the module name '$name', at ${ws.map(_.loc.show).distinct.mkString(", ")}"
-    }
-    report("integration", names ++ wrappers)
-
     val edges                           = children.flatMap(_.edges) ++ parent.edges
     val observations                    = children.flatMap(_.observations).toMap ++ parent.observations
     val (ports, wires, plannedLayers)   = Planner.plan(spec, edges, probes, observations)

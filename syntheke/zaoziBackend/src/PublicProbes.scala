@@ -41,10 +41,10 @@ private[jiuyang] object PublicProbes:
   private def translate(data: Data): ProtocolInterface = data match
     case ref: UInt       => ProtocolInterface.UInt(ref._width)
     case ref: SInt       => ProtocolInterface.SInt(ref._width)
-    case ref: Bits       => ProtocolInterface.UInt(ref._width)
+    case ref: Bits       => ProtocolInterface.Bits(ref._width)
     case ref: Analog     => ProtocolInterface.Analog(ref._width)
-    case _:   Bool       => ProtocolInterface.UInt(1)
-    case _:   Reset      => ProtocolInterface.UInt(1)
+    case _:   Bool       => ProtocolInterface.Bool
+    case _:   Reset      => ProtocolInterface.Reset
     case _:   Clock      => ProtocolInterface.Clock
     case ref: Vec[?]     => ProtocolInterface.Vec(ref._count, translate(ref.elementType))
     case ref: RProbe[?] => reference(ref)

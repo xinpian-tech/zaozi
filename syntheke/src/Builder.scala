@@ -69,7 +69,7 @@ private[syntheke] final class BuildSession(val rootId: ModuleId):
 
   def registerBoundary(node: NodeSpec, boundary: Boundary[?]): Unit =
     check(!boundaryNodes.exists(_.name == node.name), node.loc)(s"duplicate boundary '${node.name}'")
-    boundaryNodes += node.copy(order = boundaryNodes.size)
+    boundaryNodes += node
     boundaries += boundary
 
   def resolve(spec: DesignSpec): ResolvedDesign =
@@ -292,18 +292,18 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
   private[syntheke] def wrapperSpec(loc: SourceLoc): WrapperModuleSpec =
     val children = frame.wrapper.children.map(_.id.path.last).toVector ++
       session.imports.filter(_.spec.target.parent.contains(id)).map(_.spec.target.path.last)
-    WrapperModuleSpec(id, frame.wrapper.moduleName, children, loc, new Object)
+    WrapperModuleSpec(id, frame.wrapper.moduleName, children, loc)
 
   private[syntheke] def generatorSpec(loc: SourceLoc): GeneratorModuleSpec =
     val draft = frame.generator
-    val nodes = draft.nodes.toVector.zipWithIndex.map { (entry, order) =>
+    val nodes = draft.nodes.toVector.map { entry =>
       val direction = entry.draft match
         case _: InwardNodeDraft[?]  => NodeDirection.Inward
         case _: OutwardNodeDraft[?] => NodeDirection.Outward
       val computation = entry.computation.getOrElse(
         fail(s"node ${entry.draft.id.show} has no parameter: call fixed or derive", entry.loc)
       )
-      NodeSpec(entry.draft.id.name, direction, entry.draft.protocol, computation, entry.memberships, order, entry.loc)
+      NodeSpec(entry.draft.id.name, direction, entry.draft.protocol, computation, entry.memberships, entry.loc)
     }
     val compute = draft.params.getOrElse(fail(s"generator module ${id.show} never calls parameters(...)", loc))
     GeneratorModuleSpec(id, draft.definition, nodes, compute, loc, draft.probes.toVector)
@@ -321,18 +321,17 @@ final class BuildContext[+R <: BuildMode] private[syntheke] (
     DeclaredName.check(name, "boundary name", loc)
     val externalId = ModuleNodeId(session.boundaryId, name)
     val members    = memberships(externalId)
-    val publicId   = ModuleNodeId(id, name)
     val boundary   = node match
       case inner: InwardPort[P]  =>
         val external = new OutwardPort(node.protocol, externalId, members.map(_.kind))
         recordBind(external, inner, loc)
-        new InwardBoundary(node.protocol, publicId, external)
+        new InwardBoundary(node.protocol, external)
       case inner: OutwardPort[P] =>
         val external = new InwardPort(node.protocol, externalId, members.map(_.kind))
         recordBind(inner, external, loc)
-        new OutwardBoundary(node.protocol, publicId, external)
+        new OutwardBoundary(node.protocol, external)
     session.registerBoundary(
-      NodeSpec(name, externalDirection, node.protocol, NodeComputation.Constant(externalParams), members, 0, loc),
+      NodeSpec(name, externalDirection, node.protocol, NodeComputation.Constant(externalParams), members, loc),
       boundary
     )
     boundary

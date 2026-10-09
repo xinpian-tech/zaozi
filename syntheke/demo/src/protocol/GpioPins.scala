@@ -9,7 +9,7 @@ object GpioPins extends Protocol:
 
   /** A pad drives the pins on the controller's clock. */
   val carries: Set[DomainKind] = Set(ClockDomain, ResetDomain)
-  val accepts: Seq[Accept]     = Seq(Accept(PowerDomain)(PowerDomain.atPin))
+  val accepts: Seq[Accept]     = Accepts.pin
 
   def negotiate(
     down: Int,

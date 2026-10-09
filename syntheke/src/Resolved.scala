@@ -51,18 +51,15 @@ object PortName:
 enum PortDirection derives CanEqual:
   case Input, Output
 
-enum PlanOrigin derives CanEqual:
-  case Design(bind: BindId)
-  case Verification(source: ModuleNodeId)
-  case ProbeRead(source: ModuleNodeId)
-  case Observation(source: ModuleNodeId)
+/** How a planned wire is emitted: a data connection, a probe reference passed up a level, or a probe read into data. */
+enum WireKind derives CanEqual:
+  case Connect, DefineReference, ReadReference
 
 final case class PortPlan private[syntheke] (
   module:    ModuleId,
   direction: PortDirection,
   name:      PortName,
   interface: ProtocolInterface,
-  origin:    PlanOrigin,
   loc:       SourceLoc)
 
 enum LocalEndpoint derives CanEqual:
@@ -74,7 +71,7 @@ final case class WirePlan private[syntheke] (
   module: ModuleId,
   from:   LocalEndpoint,
   to:     LocalEndpoint,
-  origin: PlanOrigin,
+  kind:   WireKind,
   loc:    SourceLoc)
 
 final case class LayerTree(children: Map[String, LayerTree]):
@@ -104,8 +101,17 @@ private[syntheke] final case class Negotiated(
   edges:            Vector[ResolvedEdge],
   generatorModules: Vector[ResolvedGeneratorModule],
   probes:           ProbeCatalog,
-  observations:     Map[ModuleId, ProbeBindings]):
-  def edgeAt(node: ModuleNodeId): ResolvedEdge = edges.find(e => e.bind.source == node || e.bind.target == node).get
+  observations:     Map[ModuleId, ProbeBindings])
+    extends SettledEdges
+
+/** The edges of a design, each found by either of its nodes. */
+sealed trait SettledEdges:
+  def edges: Vector[ResolvedEdge]
+
+  def edgeAt(node: ModuleNodeId): ResolvedEdge =
+    edges.find(e => e.bind.source == node || e.bind.target == node).getOrElse(
+      throw IllegalArgumentException(s"${node.show} has no settled edge")
+    )
 
 final case class ResolvedDesign private[syntheke] (
   spec:              DesignSpec,
@@ -117,7 +123,8 @@ final case class ResolvedDesign private[syntheke] (
   layerDecls:        Map[ModuleId, LayerTree],
   probes:            ProbeCatalog,
   observations: Map[ModuleId, ProbeBindings],
-  private[syntheke] val dependencies: Vector[(ModuleId, ResolvedDesign)]):
+  private[syntheke] val dependencies: Vector[(ModuleId, ResolvedDesign)])
+    extends SettledEdges:
   private[syntheke] def boundaryEdge(boundary: Boundary[?]): ResolvedEdge =
     require(spec.boundaries.exists(_.terminal eq boundary.terminal), "boundary is not public in this design")
     edgeAt(boundary.terminal.id)
@@ -128,9 +135,4 @@ final case class ResolvedDesign private[syntheke] (
     domains
       .member(boundary.terminal.id, kind)
       .getOrElse(throw IllegalArgumentException(s"boundary ${boundary.id.show} is in no ${kind.name} domain"))
-  def edgeAt(node: ModuleNodeId): ResolvedEdge =
-    val found = edges.find(e => e.bind.source == node || e.bind.target == node)
-    require(found.isDefined, s"${node.show} has no settled edge")
-    found.get
-
   def generatorModule(id: ModuleId): Option[ResolvedGeneratorModule] = generatorModules.find(_.module == id)

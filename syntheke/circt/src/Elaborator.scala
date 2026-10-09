@@ -328,12 +328,12 @@ object Elaborator:
                 )
 
             resolved.wirePlans.filter(_.module == id).foreach { wp =>
-              wp.origin match
-                case PlanOrigin.Design(_) | PlanOrigin.Observation(_) =>
+              wp.kind match
+                case WireKind.Connect         =>
                   summon[ConnectApi].op(baseOf(wp.from), baseOf(wp.to), unknownLoc).operation.appendToBlock()
-                case PlanOrigin.Verification(_) =>
+                case WireKind.DefineReference =>
                   summon[RefDefineApi].op(baseOf(wp.to), baseOf(wp.from), unknownLoc).operation.appendToBlock()
-                case PlanOrigin.ProbeRead(_) =>
+                case WireKind.ReadReference   =>
                   val read = summon[RefResolveApi].op(baseOf(wp.from), unknownLoc)
                   read.operation.appendToBlock()
                   summon[ConnectApi].op(read.result, baseOf(wp.to), unknownLoc).operation.appendToBlock()

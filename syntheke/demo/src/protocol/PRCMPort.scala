@@ -27,7 +27,7 @@ object PRCMPort extends Protocol:
         Field("isolationRequest", Bool),
         Field("quiesceRequest", Bool),
         Field("clock", Clock),
-        Field("resetN", UInt(1))
+        Field("resetN", Reset)
       )
     )
 

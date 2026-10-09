@@ -43,6 +43,6 @@ private[circt] object Translate:
     case ProtocolInterface.Analog(w)              => w.getAnalog
     case ProtocolInterface.Bool                   => 1.getUInt
     case ProtocolInterface.Clock                  => summon[FirrtlTypeApi].getClock
-    case ProtocolInterface.AsyncReset             => summon[FirrtlTypeApi].getAsyncReset
+    case ProtocolInterface.Reset                  => 1.getUInt
     case ProtocolInterface.Probe(i, l) =>
       l.fold(tpe(i).getRef(false))(layer => tpe(i).getRef(false, layer.segments))

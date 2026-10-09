@@ -1,29 +1,17 @@
 package me.jiuyang.syntheke
 
-/** What a design may hand out: handles the instantiating design can move to the instance. A domain is not one; it
-  * leaves its design through a boundary.
+/** What a design hands out: its boundaries, which the instantiating design moves to the instance, alone or in
+  * vectors and case classes of them. Ports, probes and domains leave a design only through boundaries.
   */
 sealed trait Dangles[A]:
   private[syntheke] def place(value: A, placement: DesignPlacement): A
 
 object Dangles:
-  given inward[P <: Protocol]: Dangles[InwardPort[P]] with
-    private[syntheke] def place(value: InwardPort[P], placement: DesignPlacement): InwardPort[P] = placement.inward(value)
-
-  given outward[P <: Protocol]: Dangles[OutwardPort[P]] with
-    private[syntheke] def place(value: OutwardPort[P], placement: DesignPlacement): OutwardPort[P] = placement.outward(value)
-
-  given probe[P]: Dangles[ProbeNode[P]] with
-    private[syntheke] def place(value: ProbeNode[P], placement: DesignPlacement): ProbeNode[P] = placement.probe(value)
-
   given inwardBoundary[P <: Protocol]: Dangles[InwardBoundary[P]] with
     private[syntheke] def place(value: InwardBoundary[P], placement: DesignPlacement): InwardBoundary[P] = placement.inwardBoundary(value)
 
   given outwardBoundary[P <: Protocol]: Dangles[OutwardBoundary[P]] with
     private[syntheke] def place(value: OutwardBoundary[P], placement: DesignPlacement): OutwardBoundary[P] = placement.outwardBoundary(value)
-
-  given option[A](using element: Dangles[A]): Dangles[Option[A]] with
-    private[syntheke] def place(value: Option[A], placement: DesignPlacement): Option[A] = value.map(element.place(_, placement))
 
   given vector[A](using element: Dangles[A]): Dangles[Vector[A]] with
     private[syntheke] def place(value: Vector[A], placement: DesignPlacement): Vector[A] = value.map(element.place(_, placement))

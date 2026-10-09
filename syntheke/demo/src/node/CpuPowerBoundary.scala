@@ -74,9 +74,9 @@ object CpuPowerBoundaryNodes:
         Left(Violation("CPU isolation requires an always-on control supply and a switched CPU supply"))
       else if !(PRCMDomain.power(domains(prcm)) eq domains(cpuPower)) then
         Left(Violation(s"the boundary switches ${domains(cpuPower)} but its control sequences ${domains(prcm)}"))
-      else if ClockDomain.relate(domains(clock), domains(cpuClock)) != ClockRelation.Synchronous(1, 1) then
+      else if ClockDomain.relate(domains(clock), domains(cpuClock)) != ClockRelation.inStep then
         Left(Violation(s"the boundary answers the PRCM on ${domains(clock)}, not on the clock the PRCM gates for the CPU"))
-      else if ResetDomain.activeLow(systemReset) || ResetDomain.releaseClock(systemReset).isEmpty then
+      else if !ResetDomain.releasedHigh(systemReset) then
         Left(Violation("the CPU power boundary needs an active-high reset released on a clock"))
       else
         Right(

@@ -23,7 +23,7 @@ object Jtag extends Protocol:
 
   /** A pad drives the pins on the TAP's clock. */
   val carries: Set[DomainKind] = Set(ClockDomain, ResetDomain)
-  val accepts: Seq[Accept]     = Seq(Accept(PowerDomain)(PowerDomain.atPin))
+  val accepts: Seq[Accept]     = Accepts.pin
 
   def negotiate(
     down: JtagTap,

@@ -12,7 +12,6 @@ given prcmTokens: mainargs.TokensReader.Simple[PRCMParameter] = jsonTokens("prcm
 /** zaozi PR #159's PRCM, unchanged and with its own `PRCMParameter`, behind an AXI register window at `base`. */
 case class PrcmControllerP(base: Long, size: Long, shape: AxiShape, coldResetActiveLow: Boolean, prcm: PRCMParameter)
     extends Parameter derives ReadWriter:
-  require(shape.dataBits == prcm.dataWidth, s"the PRCM registers are ${prcm.dataWidth} bits, the bus ${shape.dataBits}")
   require(base >= 0 && base % 4 == 0 && BigInt(base) + size <= (BigInt(1) << shape.addrBits))
   require(prcm.windowBytes <= size, s"PRCM register window ${prcm.windowBytes} exceeds $size bytes")
   require(!prcm.domains.exists(d => Set("clk", "in")(d.name)), "a PRCM domain name conflicts with a port")

@@ -66,12 +66,23 @@ final case class ClockTarget(
   require(selection.isDefined == (links.size > 1), "a clock target needs selection exactly when it has multiple links")
   require(muxGuide.isEmpty || selection.nonEmpty, "a clock target mux guide needs a mux")
 
-enum ClockRelation derives Writer:
+enum ClockRelation:
   case Same
 
-  /** One root drives both clocks; the source frequency over the target frequency is `numerator / denominator`. */
+  /** One root drives both clocks; the source frequency over the target frequency is `numerator / denominator`, in
+    * lowest terms. Build it with `ClockRelation.synchronous`.
+    */
   case Synchronous(numerator: BigInt, denominator: BigInt)
   case Asynchronous
+
+object ClockRelation:
+  /** The relation of two clocks of one root whose frequencies stand as `numerator / denominator`, in lowest terms. */
+  def synchronous(numerator: BigInt, denominator: BigInt): ClockRelation =
+    val common = numerator.gcd(denominator)
+    Synchronous(numerator / common, denominator / common)
+
+  /** Two clocks of one root at the same frequency. */
+  val inStep: ClockRelation = Synchronous(1, 1)
 
 object ClockDomain extends DomainKind:
   type Root     = ClockInput
@@ -116,7 +127,7 @@ object ClockDomain extends DomainKind:
     val (rootA, divisorA) = trace(a)
     val (rootB, divisorB) = trace(b)
     if a eq b then ClockRelation.Same
-    else if (rootA eq rootB) && !muxed(a) && !muxed(b) then ClockRelation.Synchronous(divisorB, divisorA)
+    else if (rootA eq rootB) && !muxed(a) && !muxed(b) then ClockRelation.synchronous(divisorB, divisorA)
     else ClockRelation.Asynchronous
 
   def describe(domain: Settled[ClockDomain.type]): ujson.Value = ujson.Obj("hz" -> hz(domain))
@@ -132,9 +143,18 @@ object ClockDomain extends DomainKind:
         }
   )
 
-  val rootWriter:     Writer[ClockInput]    = summon
-  val linkWriter:     Writer[ClockTarget]   = summon
-  val relationWriter: Writer[ClockRelation] = summon
+
+/** What a bind may cross, for the demo's protocols. */
+object Accepts:
+  /** A synchronous protocol: both ends on the same clock, reset and supply. */
+  val synchronous: Seq[Accept] = Seq(
+    Accept(ClockDomain)(_ == ClockRelation.Same),
+    Accept(ResetDomain)(_ == ResetRelation.Same),
+    Accept(PowerDomain)(_ == PowerRelation.Same)
+  )
+
+  /** A protocol whose wires leave the chip, as a pin's do: it crosses between always-on supplies only. */
+  val pin: Seq[Accept] = Seq(Accept(PowerDomain)(PowerDomain.atPin))
 
 // ---------------------------------------------------------------- reset
 
@@ -165,7 +185,7 @@ final case class ResetTarget(
   processing: Option[ResetProcessing] = None)
     derives Writer
 
-enum ResetRelation derives Writer:
+enum ResetRelation:
   case Same
   case Different(sameLevel: Boolean)
 
@@ -192,13 +212,15 @@ object ResetDomain extends DomainKind:
   ): Domain[ResetDomain.type] =
     ResetDomain.derive(links.map(_._1)*)(ResetTarget(activeLow, links.map(_._2).toVector, processing))
 
-  def activeLow(reset: Settled[ResetDomain.type]): Boolean = reset.imported match
-    case Some(frozen) => activeLow(frozen)
-    case None         =>
-      reset.link.map(_.activeLow).getOrElse(reset.root.get match
-        case ResetRoot.Source(activeLow) => activeLow
-        case _: ResetRoot.PowerFollow    => true
-        case _: ResetRoot.Managed        => true)
+  def activeLow(reset: Settled[ResetDomain.type]): Boolean =
+    val definition = reset.definition
+    definition.link.map(_.activeLow).getOrElse(definition.root.get match
+      case ResetRoot.Source(activeLow) => activeLow
+      case _: ResetRoot.PowerFollow    => true
+      case _: ResetRoot.Managed        => true)
+
+  /** A reset a synchronous generator can take: active high and released on a clock. */
+  def releasedHigh(reset: Settled[ResetDomain.type]): Boolean = !activeLow(reset) && releaseClock(reset).isDefined
 
   /** The clock a reset is released on, when it is released synchronously; for an imported reset, the clock of this
     * design that stands for the one it was released on, if that clock is at a boundary too.
@@ -257,13 +279,10 @@ object ResetDomain extends DomainKind:
           released      <- releaseClock(reset)
           clock         <- graph.member(node, ClockDomain)
           relation       = ClockDomain.relate(clock, released)
-          if relation != ClockRelation.Same && relation != ClockRelation.Synchronous(1, 1)
+          if relation != ClockRelation.Same && relation != ClockRelation.inStep
         yield s"${node.show} runs on $clock but its reset $reset is released on $released"
   )
 
-  val rootWriter:     Writer[ResetRoot]     = summon
-  val linkWriter:     Writer[ResetTarget]   = summon
-  val relationWriter: Writer[ResetRelation] = summon
 
 // ---------------------------------------------------------------- power
 
@@ -279,7 +298,7 @@ final case class PowerTreeDomain(control: PowerControlParameter, dependencies: V
     derives Writer:
   def alwaysOn: Boolean = !control.hasSwitch
 
-enum PowerRelation derives Writer:
+enum PowerRelation:
   case Same
   case Different(fromAlwaysOn: Boolean, toAlwaysOn: Boolean)
 
@@ -292,7 +311,7 @@ object PowerDomain extends DomainKind:
   val physical = false
   val scoped   = true
 
-  def tree(power: Settled[PowerDomain.type]): PowerTreeDomain = power.imported.fold(power.root.get)(tree)
+  def tree(power: Settled[PowerDomain.type]): PowerTreeDomain = power.definition.root.get
 
   def relate(a: Settled[PowerDomain.type], b: Settled[PowerDomain.type]): PowerRelation =
     if a eq b then PowerRelation.Same
@@ -326,6 +345,3 @@ object PowerDomain extends DomainKind:
         domains.filter(cyclic).map(d => s"$d depends on itself")
   )
 
-  val rootWriter:     Writer[PowerTreeDomain] = summon
-  val linkWriter:     Writer[Nothing]         = upickle.default.writer[Unit].comap(_ => ())
-  val relationWriter: Writer[PowerRelation]   = summon

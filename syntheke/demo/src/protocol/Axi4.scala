@@ -97,11 +97,7 @@ object Axi4 extends Protocol:
   type Edge = AxiEdgeParams
 
   val carries: Set[DomainKind] = Set.empty
-  val accepts: Seq[Accept] = Seq(
-    Accept(ClockDomain)(_ == ClockRelation.Same),
-    Accept(ResetDomain)(_ == ResetRelation.Same),
-    Accept(PowerDomain)(_ == PowerRelation.Same)
-  )
+  val accepts: Seq[Accept] = Accepts.synchronous
 
   def negotiate(
     m:       AxiMasterPort,
