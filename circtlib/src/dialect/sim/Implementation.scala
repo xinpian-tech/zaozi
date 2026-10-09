@@ -3,8 +3,7 @@
 package org.llvm.circt.scalalib.dialect.sim.operation
 
 import org.llvm.circt.scalalib.capi.dialect.sim.{
-  DPIArgument as CApiDPIArgument,
-  DPIDirection as CApiDPIDirection,
+  DPIArgument,
   TypeApi as SimTypeApi,
   given
 }
@@ -49,15 +48,7 @@ given DPIFuncApi with
     using Arena,
     Context
   ): DPIFunc =
-    val dpiType = summon[SimTypeApi].dpiFunctionTypeGet(arguments.map { arg =>
-      val direction = arg.direction match
-        case DPIDirection.In     => CApiDPIDirection.In
-        case DPIDirection.Out    => CApiDPIDirection.Out
-        case DPIDirection.InOut  => CApiDPIDirection.InOut
-        case DPIDirection.Return => CApiDPIDirection.Return
-        case DPIDirection.Ref    => CApiDPIDirection.Ref
-      CApiDPIArgument(arg.name, arg.tpe, direction)
-    })
+    val dpiType = summon[SimTypeApi].dpiFunctionTypeGet(arguments)
     DPIFunc(
       summon[OperationApi].operationCreate(
         name = "sim.func.dpi",

@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, HWInterface, SVApi,
 import me.jiuyang.zaozi.default.given
 import me.jiuyang.zaozi.valuetpe.{BundleField, Data}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
-import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 import org.llvm.mlir.MlirOperation
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 

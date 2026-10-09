@@ -6,9 +6,8 @@ import me.jiuyang.stdlib.queue.default.{SyncQueue, SyncQueueLayers, SyncQueuePar
 import me.jiuyang.tblib.*
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 
 /** The DUT wiring and simulation behavior of the SyncQueue unit testbench. */
 class SyncQueueTestBenchIO(parameter: SyncQueueParameter) extends HWBundle(parameter):
@@ -22,6 +21,8 @@ class SyncQueueTestBenchIO(parameter: SyncQueueParameter) extends HWBundle(param
 @generator
 object SyncQueueTestBench
     extends TestbenchGenerator[SyncQueueParameter, SyncQueueLayers, SyncQueueTestBenchIO, SyncQueueProbe]:
+  val dut = SyncQueue
+
   override def moduleName(parameter: SyncQueueParameter): String = "SyncQueueTestBench"
   def clockPeriodNs(parameter:       SyncQueueParameter): Long   = 10
 
@@ -47,13 +48,3 @@ object SyncQueueTestBench
     tb.io.diagnosticN  := values("diagnosticN")
     tb.io.dataIn       := values("dataIn")
     tb.finish(values("done"))
-
-  def architecture(parameter: SyncQueueParameter) =
-    val io  = summon[Interface[SyncQueueTestBenchIO]]
-    val dut = SyncQueue.instantiate(parameter)
-    dut.io.clock        := io.clock
-    dut.io.resetN       := io.resetN
-    dut.io.pushRequestN := io.pushRequestN
-    dut.io.popRequestN  := io.popRequestN
-    dut.io.diagnosticN  := io.diagnosticN
-    dut.io.dataIn       := io.dataIn

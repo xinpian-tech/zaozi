@@ -14,7 +14,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Module as HWModule, Port}
-import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena

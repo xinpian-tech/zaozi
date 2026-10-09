@@ -8,7 +8,7 @@ import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, give
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SVDialectApi, given}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
-import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, ContextApi, LocationApi, ModuleApi, TypeApi, given}
 
 import java.lang.foreign.Arena

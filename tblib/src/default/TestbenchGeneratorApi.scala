@@ -13,11 +13,12 @@ import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, give
 import org.llvm.circt.scalalib.capi.dialect.comb.{DialectApi as CombDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
-import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.sim.{DPIArgumentApi, DPIDirection, DialectApi as SimDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SVDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.verif.{DialectApi as VerifDialectApi, given}
 import org.llvm.circt.scalalib.capi.firtool.{FirtoolApi, given}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Module as HWModule, PortDirection, given}
+import org.llvm.circt.scalalib.dialect.sim.operation.{DPIFuncApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{
   Attribute,
   Block,
@@ -185,50 +186,64 @@ given TestbenchGeneratorApi with
     def toDpiJson(
       using Arena
     ): ujson.Value =
-      val symbolTable = summon[SymbolTableApi].symbolTableCreate(module.getOperation)
+      given Context = module.getContext
+      summon[SimDialectApi].loadDialect
+      val copy = summon[OperationApi].operationClone(module.getOperation)
       try
-        val functions = Iterator
-          .iterate(module.getBody.getFirstOperation)(_.getNextInBlock)
-          .takeWhile(operation => !operationIsNull(operation))
-          .filter(_.getName.str == "sv.func.dpi.import")
-          .map: dpiImport =>
-            val callee = dpiImport.getInherentAttributeByName("callee").flatSymbolRefAttrGetValue
-            val function = symbolTable.lookup(callee)
-            require(
-              !operationIsNull(function) && function.getName.str == "sv.func",
-              s"DPI function not found: $callee"
-            )
-            val linkageName = dpiImport.getInherentAttributeByName("linkage_name")
-            val verilogName = function.getInherentAttributeByName("verilogName")
-            val name =
-              if MlirAttribute.ptr(linkageName.segment).address != 0 then linkageName.stringAttrGetValue
-              else if MlirAttribute.ptr(verilogName.segment).address != 0 then verilogName.stringAttrGetValue
-              else callee
-            val tpe = function.getInherentAttributeByName("module_type").typeAttrGetValue
-            val argumentAttrs = function.getInherentAttributeByName("per_argument_attrs")
-            val portCount = tpe.moduleTypeGetNumInputs() + tpe.moduleTypeGetNumOutputs()
-            val arguments = (0 until portCount).map: index =>
-              val port = tpe.moduleTypeGetPort(index)
-              val portName = Attribute(port.portName).stringAttrGetValue
-              val portType = Type(port.portType)
-              require(portType.isInteger, s"unsupported testbench DPI argument type: $portName")
-              val isReturn = index == portCount - 1 && MlirAttribute.ptr(argumentAttrs.segment).address != 0 &&
-                MlirAttribute.ptr(
-                  argumentAttrs.arrayAttrGetElement(index)
-                    .dictionaryAttrGetElementByName("sv.func.explicitly_returned").segment
-                ).address != 0
-              val direction = port.portDirection match
-                case value if value == CAPI.Input()  => "in"
-                case value if value == CAPI.Output() => if isReturn then "return" else "out"
-                case value if value == CAPI.InOut()  => "inout"
-                case other => throw new IllegalArgumentException(s"unsupported DPI port direction: $other")
-              val width = portType.integerTypeGetWidth
-              // CIRCT emits these widths as signed SV integer atoms; other widths use bit vectors.
-              val signed = Set(8, 16, 32, 64).contains(width)
-              ujson.Obj("direction" -> direction, "name" -> portName, "signed" -> signed, "width" -> width)
-            ujson.Obj("arguments" -> ujson.Arr.from(arguments), "function" -> name)
-        ujson.Obj("dpi_functions" -> ujson.Arr.from(functions))
-      finally symbolTable.destroy()
+        val exportModule = summon[ModuleApi].moduleFromOperation(copy)
+        val symbolTable = summon[SymbolTableApi].symbolTableCreate(copy)
+        try
+          // The current native exporter accepts Sim declarations. Adapt SV imports in this copy only.
+          Iterator
+            .iterate(module.getBody.getFirstOperation)(_.getNextInBlock)
+            .takeWhile(operation => !operationIsNull(operation))
+            .filter(_.getName.str == "sv.func.dpi.import")
+            .zipWithIndex
+            .foreach: (dpiImport, functionIndex) =>
+              val callee = dpiImport.getInherentAttributeByName("callee").flatSymbolRefAttrGetValue
+              val function = symbolTable.lookup(callee)
+              require(
+                !operationIsNull(function) && function.getName.str == "sv.func",
+                s"DPI function not found: $callee"
+              )
+              val linkageName = dpiImport.getInherentAttributeByName("linkage_name")
+              val verilogName = function.getInherentAttributeByName("verilogName")
+              val name =
+                if MlirAttribute.ptr(linkageName.segment).address != 0 then linkageName.stringAttrGetValue
+                else if MlirAttribute.ptr(verilogName.segment).address != 0 then verilogName.stringAttrGetValue
+                else callee
+              val tpe = function.getInherentAttributeByName("module_type").typeAttrGetValue
+              val argumentAttrs = function.getInherentAttributeByName("per_argument_attrs")
+              val portCount = tpe.moduleTypeGetNumInputs() + tpe.moduleTypeGetNumOutputs()
+              val arguments = (0 until portCount).map: index =>
+                val port = tpe.moduleTypeGetPort(index)
+                val isReturn = index == portCount - 1 && MlirAttribute.ptr(argumentAttrs.segment).address != 0 &&
+                  MlirAttribute.ptr(
+                    argumentAttrs.arrayAttrGetElement(index)
+                      .dictionaryAttrGetElementByName("sv.func.explicitly_returned").segment
+                  ).address != 0
+                val direction = port.portDirection match
+                  case value if value == CAPI.Input()  => DPIDirection.In
+                  case value if value == CAPI.Output() => if isReturn then DPIDirection.Return else DPIDirection.Out
+                  case value if value == CAPI.InOut()  => DPIDirection.InOut
+                  case other => throw new IllegalArgumentException(s"unsupported DPI port direction: $other")
+                summon[DPIArgumentApi].createDPIArgument(
+                  Attribute(port.portName).stringAttrGetValue,
+                  Type(port.portType),
+                  direction
+                )
+              var symbol = s"__zaozi_dpi_export_$functionIndex"
+              while !operationIsNull(symbolTable.lookup(symbol)) do symbol += "_"
+              summon[DPIFuncApi].op(symbol, Some(name), arguments, function.getLocation)
+                .operation.appendToBlock()(using exportModule.getBody)
+        finally symbolTable.destroy()
+        val json = new StringBuilder
+        val (result, diagnostics) = withCapturedDiagnostics:
+          exportModule.exportDPIInterface(json.append(_))
+        if result.failed then
+          throw new IllegalStateException(s"CIRCT DPI interface export failed: ${diagnostics.trim}")
+        ujson.read(json.toString)
+      finally copy.destroy()
 
     def toVerilog(
       using Arena

@@ -4,7 +4,7 @@ package org.llvm.circt.scalalib.dialect.sv.operation
 
 import org.llvm.circt.{CAPI, HWModulePort as NativeHWModulePort}
 import org.llvm.circt.scalalib.capi.dialect.hw.{HWModulePort, TypeApi as HWTypeApi, given}
-import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
+import org.llvm.circt.scalalib.capi.dialect.sim.{DPIArgument, DPIDirection, given}
 import org.llvm.mlir.scalalib.capi.ir.{
   Attribute,
   AttributeApi,
@@ -63,29 +63,36 @@ end given
 given FuncApi with
   def op(
     symbol:      String,
-    ports:       Seq[Port],
-    returnPort:  Option[Int],
     verilogName: Option[String],
+    arguments:   Seq[DPIArgument],
     location:    Location
   )(
     using Arena,
     Context
   ): Func =
-    val nativePorts = ports.map: port =>
+    val returnPorts = arguments.zipWithIndex.collect:
+      case (arg, index) if arg.direction == DPIDirection.Return => index
+    require(
+      returnPorts.size <= 1 && returnPorts.forall(_ == arguments.size - 1),
+      "DPI return value must be the final argument"
+    )
+    val nativePorts = arguments.map: arg =>
       val raw = NativeHWModulePort.allocate(summon[Arena])
-      NativeHWModulePort.name(raw, port.name.stringAttrGet.segment)
-      NativeHWModulePort.`type`(raw, port.tpe.segment)
+      NativeHWModulePort.name(raw, arg.name.stringAttrGet.segment)
+      NativeHWModulePort.`type`(raw, arg.tpe.segment)
       NativeHWModulePort.dir(
         raw,
-        port.direction match
-          case PortDirection.Input  => CAPI.Input()
-          case PortDirection.Output => CAPI.Output()
-          case PortDirection.InOut  => CAPI.InOut()
+        arg.direction match
+          case DPIDirection.In     => CAPI.Input()
+          case DPIDirection.Out    => CAPI.Output()
+          case DPIDirection.InOut  => CAPI.InOut()
+          case DPIDirection.Return => CAPI.Output()
+          case DPIDirection.Ref    => throw new IllegalArgumentException("SV DPI functions do not support ref arguments")
       )
       HWModulePort(raw)
-    val argumentAttrs = ports.indices.map: index =>
+    val argumentAttrs = arguments.indices.map: index =>
       val attributes =
-        if returnPort.contains(index) then
+        if returnPorts.contains(index) then
           Map("sv.func.explicitly_returned" -> summon[AttributeApi].unitAttrGet)
         else Map.empty[String, Attribute]
       attributes.directoryAttrGet
@@ -97,7 +104,7 @@ given FuncApi with
         namedAttributes = Seq(
           named("sym_name", symbol.stringAttrGet),
           named("sym_visibility", "private".stringAttrGet),
-          named("module_type", summon[HWTypeApi].moduleTypeGet(ports.size, nativePorts).typeAttrGet),
+          named("module_type", summon[HWTypeApi].moduleTypeGet(arguments.size, nativePorts).typeAttrGet),
           named("per_argument_attrs", argumentAttrs.arrayAttrGet)
         ) ++ verilogName.toSeq.map(name => named("verilogName", name.stringAttrGet)),
         resultsTypes = Some(Seq.empty)

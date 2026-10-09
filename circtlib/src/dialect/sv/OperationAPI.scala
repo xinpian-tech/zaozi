@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.sv.operation
 
-import org.llvm.circt.scalalib.dialect.hw.operation.Port
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIArgument
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, Type, Value}
 import org.llvm.mlir.scalalib.capi.support.HasOperation
 
@@ -28,12 +28,11 @@ trait AlwaysApi extends HasOperation[Always]:
 
 class Func(val _operation: Operation)
 trait FuncApi extends HasOperation[Func]:
-  /** Declares an SV function; `returnPort` identifies its explicit return value. */
+  /** Declares an SV function using DPI argument directions. */
   def op(
     symbol:      String,
-    ports:       Seq[Port],
-    returnPort:  Option[Int],
     verilogName: Option[String],
+    arguments:   Seq[DPIArgument],
     location:    Location
   )(
     using Arena,

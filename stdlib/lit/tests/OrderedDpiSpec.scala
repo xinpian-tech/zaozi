@@ -44,7 +44,7 @@ import me.jiuyang.zaozi.default.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.verif.{DialectApi as VerifDialectApi, given}
-import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
 
 import java.lang.foreign.Arena
@@ -52,10 +52,10 @@ import java.lang.foreign.Arena
 @generator
 object OrderedDpiTestBench
     extends TestbenchGenerator[SyncQueueParameter, SyncQueueLayers, SyncQueueTestBenchIO, SyncQueueProbe]:
+  val dut = SyncQueueTestBench.dut
+
   override def moduleName(parameter: SyncQueueParameter): String = "OrderedDpiTestBench"
   def clockPeriodNs(parameter:       SyncQueueParameter): Long   = 10
-
-  def architecture(parameter: SyncQueueParameter) = SyncQueueTestBench.architecture(parameter)
 
   def simulation(parameter: SyncQueueParameter) =
     val tb      = summon[Testbench[SyncQueueTestBenchIO]]

@@ -5,9 +5,8 @@ package me.jiuyang.zaozi.default
 import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, SVApi, SVCase}
 
 import org.llvm.circt.scalalib.capi.dialect.hw.given
-import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
+import org.llvm.circt.scalalib.capi.dialect.sim.{DPIArgumentApi, DPIDirection, given}
 import org.llvm.circt.scalalib.dialect.seq.operation.{FromClockApi, given}
-import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
 import org.llvm.circt.scalalib.dialect.sv.operation.{
   AlwaysApi,
   AssignApi,
@@ -63,21 +62,15 @@ given SVApi with
     sourcecode.File,
     sourcecode.Line
   ): DpiFunction =
-    val returnPorts = arguments.zipWithIndex.collect:
-      case (arg, index) if arg.direction == DPIDirection.Return => index
-    require(
-      returnPorts.size <= 1 && returnPorts.forall(_ == arguments.size - 1),
-      "DPI return value must be the final argument"
-    )
-    val ports = arguments.map: arg =>
-      val direction = arg.direction match
-        case DPIDirection.In     => PortDirection.Input
-        case DPIDirection.Out    => PortDirection.Output
-        case DPIDirection.InOut  => PortDirection.InOut
-        case DPIDirection.Return => PortDirection.Output
-        case DPIDirection.Ref    => throw new IllegalArgumentException("SV DPI functions do not support ref arguments")
-      Port(arg.name, direction, if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet)
-    summon[FuncApi].op(symbol, ports, returnPorts.headOption, cName, locate).operation.appendToBlock()
+    summon[FuncApi].op(
+      symbol = symbol,
+      verilogName = cName,
+      arguments = arguments.map { arg =>
+        val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+        summon[DPIArgumentApi].createDPIArgument(arg.name, tpe, arg.direction)
+      },
+      location = locate
+    ).operation.appendToBlock()
     summon[FuncDPIImportApi].op(symbol, None, locate).operation.appendToBlock()
     DpiFunction(symbol, arguments)
 

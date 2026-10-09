@@ -7,7 +7,8 @@ import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HwDialect, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialect, TypeApi as SeqTypeApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SvDialect, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{
-  DPIDirection as CApiDPIDirection,
+  DPIArgumentApi,
+  DPIDirection,
   DialectApi as SimDialect,
   TypeApi as SimTypeApi,
   given
@@ -79,13 +80,16 @@ object SimSmoke extends TestSuite:
       summon[SimDialect].loadDialect
       val module    = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       try
+        val arguments = Seq(
+          ("value", DPIDirection.Out, 8),
+          ("status", DPIDirection.Return, 32)
+        ).map { (name, direction, width) =>
+          summon[DPIArgumentApi].createDPIArgument(name, width.integerTypeGet, direction)
+        }
         val declaration = summon[DPIFuncApi].op(
           symbol = "step",
           verilogName = Some("zaozi_step"),
-          arguments = Seq(
-            DPIArgument("value", DPIDirection.Out, 8.integerTypeGet),
-            DPIArgument("status", DPIDirection.Return, 32.integerTypeGet)
-          ),
+          arguments = arguments,
           location = summon[LocationApi].locationUnknownGet
         )
         declaration.operation.appendToBlock()(
@@ -95,11 +99,11 @@ object SimSmoke extends TestSuite:
         assert(tpe.dpiFunctionTypeGetNumArguments == 2)
         val value = tpe.dpiFunctionTypeGetArgument(0)
         assert(value.name == "value")
-        assert(value.direction == CApiDPIDirection.Out)
+        assert(value.direction == DPIDirection.Out)
         assert(value.tpe.equal(8.integerTypeGet))
         val status = tpe.dpiFunctionTypeGetArgument(1)
         assert(status.name == "status")
-        assert(status.direction == CApiDPIDirection.Return)
+        assert(status.direction == DPIDirection.Return)
         assert(status.tpe.equal(32.integerTypeGet))
       finally module.destroy()
 

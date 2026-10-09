@@ -2,19 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.sim.operation
 
+import org.llvm.circt.scalalib.capi.dialect.sim.DPIArgument
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, Type, Value}
 import org.llvm.mlir.scalalib.capi.support.HasOperation
 
 import java.lang.foreign.Arena
-
-enum DPIDirection(val keyword: String):
-  case In     extends DPIDirection("in")
-  case Out    extends DPIDirection("out")
-  case InOut  extends DPIDirection("inout")
-  case Return extends DPIDirection("return")
-  case Ref    extends DPIDirection("ref")
-
-final case class DPIArgument(name: String, direction: DPIDirection, tpe: Type)
 
 class DPIFunc(val _operation: Operation)
 trait DPIFuncApi extends HasOperation[DPIFunc]:

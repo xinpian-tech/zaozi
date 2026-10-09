@@ -4,16 +4,20 @@ package me.jiuyang.tblib
 
 import me.jiuyang.tblib.macros.testbenchIOSelectDynamic
 import me.jiuyang.zaozi.{
+  ConnectException,
   DVInterface,
   DpiArg,
   DpiCallResult,
   DpiFunction,
   Generator,
   HWInterface,
+  InstanceContext,
   LayerInterface,
   Parameter
 }
-import me.jiuyang.zaozi.valuetpe.{BundleField, Data}
+import me.jiuyang.zaozi.default.given
+import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
+import me.jiuyang.zaozi.valuetpe.{BundleField, Connectable, Data}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Value}
 
 import java.lang.foreign.Arena
@@ -140,13 +144,39 @@ trait Testbench[I <: HWInterface[?]]:
   /** Resolves the instance inputs in HW port order, including the generated clock. */
   private[tblib] def inputValues: Seq[Value]
 
-/** Defines the FIRRTL testbench architecture and the simulation behavior of its wrapper. */
+/** Instantiates and connects the DUT by port name, with simulation behavior defined by the testbench. */
 trait TestbenchGenerator[
   PARAM <: Parameter,
   L <: LayerInterface[PARAM],
   I <: HWInterface[PARAM],
   P <: DVInterface[PARAM, L]]
     extends Generator[PARAM, L, I, P]:
+  def dut: Generator[PARAM, L, ? <: HWInterface[PARAM], P]
+
+  override def architecture(parameter: PARAM): (
+    Arena,
+    Context,
+    Block,
+    Interface[I],
+    ProbeInterface[P],
+    L,
+    InstanceContext
+  ) ?=> Unit =
+    val io        = summon[Interface[I]]
+    val dut       = this.dut.instantiate(parameter)
+    val dutFields = dut.io.getType.elements.map(field => field.name -> field).toMap
+    io.getType.elements.foreach: field =>
+      val dutField = dutFields.getOrElse(
+        field.name,
+        throw ConnectException(s"DUT port not found: ${field.name}")
+      )
+      if field.isFlipped != dutField.isFlipped then
+        throw ConnectException(s"testbench and DUT port directions differ: ${field.name}")
+      val testbenchPort = io.field[Connectable](field.name)
+      val dutPort      = dut.io.field[Connectable](field.name)
+      if field.isFlipped then dutPort :<>= testbenchPort
+      else testbenchPort :<>= dutPort
+
   def wrapperName(parameter:   PARAM): String = s"${moduleName(parameter)}Wrapper"
   def clockPeriodNs(parameter: PARAM): Long
   def simulation(parameter:    PARAM): (
@@ -178,7 +208,7 @@ trait TestbenchGeneratorApi:
       using Arena
     ): Array[Byte]
 
-    /** Reads imported SV function ports through the CIRCT HW type C API and returns their interface as structured JSON. */
+    /** Exports the DPI interface through CIRCT's C API and parses its JSON output. */
     def toDpiJson(
       using Arena
     ): ujson.Value

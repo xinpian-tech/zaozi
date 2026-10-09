@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.sim
 
+import org.llvm.circt.{SimDPIArgument as NativeDPIArgument}
 import org.llvm.circt.CAPI.{
   simAssocArrayTypeGet,
   simDPIFunctionTypeGet,
@@ -14,9 +15,31 @@ import org.llvm.circt.CAPI.{
   simQueueTypeGet
 }
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type, given}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
+import org.llvm.mlir.scalalib.capi.support.{StringRef, given}
 
 import java.lang.foreign.{Arena, MemorySegment}
+
+given DPIArgumentApi with
+  inline def createDPIArgument(
+    name:      String,
+    tpe:       Type,
+    direction: DPIDirection
+  )(
+    using arena: Arena
+  ): DPIArgument =
+    val raw = NativeDPIArgument.allocate(arena)
+    NativeDPIArgument.name(raw, name.toStringRef.segment)
+    NativeDPIArgument.`type`(raw, tpe.segment)
+    NativeDPIArgument.direction(raw, direction.cValue)
+    DPIArgument(raw)
+
+  extension (argument: DPIArgument)
+    inline def segment:   MemorySegment = argument._segment
+    inline def sizeOf:    Int           = NativeDPIArgument.sizeof().toInt
+    inline def name:      String        = StringRef(NativeDPIArgument.name(argument.segment)).toScalaString
+    inline def tpe:       Type          = Type(NativeDPIArgument.`type`(argument.segment))
+    inline def direction: DPIDirection  = DPIDirection.fromOrdinal(NativeDPIArgument.direction(argument.segment))
+end given
 
 given TypeApi with
   def formatStringTypeGet(
@@ -55,12 +78,9 @@ given TypeApi with
   ): Type =
     val buffer =
       if arguments.isEmpty then MemorySegment.NULL
-      else arena.allocate(org.llvm.circt.SimDPIArgument.sizeof() * arguments.size)
+      else NativeDPIArgument.allocateArray(arguments.size.toLong, arena)
     arguments.zipWithIndex.foreach { (arg, index) =>
-      val entry = buffer.asSlice(org.llvm.circt.SimDPIArgument.sizeof() * index)
-      org.llvm.circt.SimDPIArgument.name(entry, arg.name.toStringRef.segment)
-      org.llvm.circt.SimDPIArgument.`type`(entry, arg.tpe.segment)
-      org.llvm.circt.SimDPIArgument.direction(entry, arg.direction.cValue)
+      MemorySegment.copy(arg.segment, 0L, buffer, NativeDPIArgument.sizeof() * index, NativeDPIArgument.sizeof())
     }
     Type(simDPIFunctionTypeGet(arena, context.segment, arguments.size.toLong, buffer))
 
@@ -71,13 +91,7 @@ given TypeApi with
       index: Int
     )(
       using arena: Arena
-    ): DPIArgument =
-      val argument = simDPIFunctionTypeGetArgument(arena, tpe.segment, index.toLong)
-      DPIArgument(
-        StringRef(org.llvm.circt.SimDPIArgument.name(argument)).toScalaString,
-        Type(org.llvm.circt.SimDPIArgument.`type`(argument)),
-        DPIDirection.fromOrdinal(org.llvm.circt.SimDPIArgument.direction(argument))
-      )
+    ): DPIArgument = DPIArgument(simDPIFunctionTypeGetArgument(arena, tpe.segment, index.toLong))
 
     def dpiFunctionTypeGetFunctionType(
       using arena: Arena

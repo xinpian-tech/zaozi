@@ -4,11 +4,10 @@ package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, SimApi}
 
+import org.llvm.circt.scalalib.capi.dialect.sim.{DPIArgumentApi, DPIDirection, given}
 import org.llvm.circt.scalalib.dialect.sim.operation.{
   ClockedTerminateApi,
-  DPIArgument,
   DPICallApi,
-  DPIDirection,
   DPIFuncApi,
   TerminateApi,
   TriggeredApi,
@@ -58,7 +57,7 @@ given SimApi with
       verilogName = cName,
       arguments = arguments.map { arg =>
         val argType = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
-        DPIArgument(arg.name, arg.direction, argType)
+        summon[DPIArgumentApi].createDPIArgument(arg.name, argType, arg.direction)
       },
       location = locate
     )

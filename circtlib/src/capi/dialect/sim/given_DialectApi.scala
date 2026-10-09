@@ -3,12 +3,14 @@
 package org.llvm.circt.scalalib.capi.dialect.sim
 
 import org.llvm.circt.CAPI.{
+  mlirExportDPIInterface,
   mlirGetDialectHandle__sim__ as mlirGetDialectHandle,
   registerSimPasses as r
 }
-import org.llvm.mlir.scalalib.capi.ir.{Context, DialectHandle, given}
+import org.llvm.mlir.scalalib.capi.ir.{Context, DialectHandle, Module, given}
+import org.llvm.mlir.scalalib.capi.support.{LogicalResult, given}
 
-import java.lang.foreign.Arena
+import java.lang.foreign.{Arena, MemorySegment}
 
 given DialectApi with
   inline def loadDialect(
@@ -20,4 +22,14 @@ given DialectApi with
       context
     )
   def registerPasses: Unit = r()
+
+  extension (module: Module)
+    inline def exportDPIInterface(
+      callback: String => Unit
+    )(
+      using arena: Arena
+    ): LogicalResult =
+      LogicalResult(
+        mlirExportDPIInterface(arena, module.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
+      )
 end given

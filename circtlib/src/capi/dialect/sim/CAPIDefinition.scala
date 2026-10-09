@@ -4,9 +4,10 @@
 // circt-c/Dialect/Sim.h
 package org.llvm.circt.scalalib.capi.dialect.sim
 
-import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
+import org.llvm.mlir.scalalib.capi.ir.{Context, Module, Type}
+import org.llvm.mlir.scalalib.capi.support.{HasSegment, HasSizeOf, LogicalResult}
 
-import java.lang.foreign.Arena
+import java.lang.foreign.{Arena, MemorySegment}
 
 /** Sim Dialect Api
   * {{{
@@ -22,6 +23,14 @@ trait DialectApi:
     context:     Context
   ):                  Unit
   def registerPasses: Unit
+
+  extension (module: Module)
+    /** Exports DPI interface JSON through CIRCT's callback-based C API. */
+    inline def exportDPIInterface(
+      callback: String => Unit
+    )(
+      using arena: Arena
+    ): LogicalResult
 end DialectApi
 
 enum DPIDirection(val cValue: Int):
@@ -31,7 +40,22 @@ enum DPIDirection(val cValue: Int):
   case Return extends DPIDirection(3)
   case Ref    extends DPIDirection(4)
 
-final case class DPIArgument(name: String, tpe: Type, direction: DPIDirection)
+/** A view of one native DPI argument, owned by its allocating arena. */
+class DPIArgument(val _segment: MemorySegment)
+trait DPIArgumentApi extends HasSegment[DPIArgument] with HasSizeOf[DPIArgument]:
+  inline def createDPIArgument(
+    name:      String,
+    tpe:       Type,
+    direction: DPIDirection
+  )(
+    using arena: Arena
+  ): DPIArgument
+
+  extension (argument: DPIArgument)
+    inline def name:      String
+    inline def tpe:       Type
+    inline def direction: DPIDirection
+end DPIArgumentApi
 
 /** Construction and inspection of sim dialect types. */
 trait TypeApi:
