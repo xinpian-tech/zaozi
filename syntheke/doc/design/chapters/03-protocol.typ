@@ -18,7 +18,7 @@
   table.header([应用场景], [源 → 目标], [边界 outward 节点的初始 `Down`], [边界 inward 节点的初始 `Up`]),
   [内存互连], [发起者 → 响应者], [要求可达的地址范围、事务身份需求、将发出的操作种类、数据位宽能力], [供给的地址集合、支持的操作、数据位宽能力、可接受的事务身份能力],
   [中断], [设备 → 中断控制器], [供出的中断线数量与触发语义], [可汇聚的线数、支持的触发类型、编号空间],
-  [物理时钟与复位线], [时钟源或时钟树 tap → 时钟输入], [物理接口属性；承载的域由节点域给出], [可接受的物理接口属性；频率与复位类型要求由域结构声明],
+  [物理时钟与复位线], [时钟源或时钟树 tap → 时钟输入], [物理接口属性；承载的域由 outward 端的归属给出], [可接受的物理接口属性；频率与复位类型要求由域结构声明],
   [Debug], [Debug 控制器 → 处理器核], [访问机制与可寻址范围], [断点与触发器数量、编号需求],
   [Trace], [处理器核 → Trace 汇聚器], [Trace 格式与源标识范围], [缓冲深度、可分配的端口编号],
   [MBIST], [存储宏 → MBIST 控制器], [存储几何参数与测试接口形态], [可调度的接口数、支持的测试算法],
@@ -40,13 +40,13 @@
 
 == 协议对象 <sec-protocol-object>
 
-一个协议在代码里是一个协议对象，它的身份就是这个对象。它给出：三种关联类型 `Down`、`Up`、`Edge`；所#term[承载][carries]的域类集合 `carries`；逐边求解函数 `negotiate`；接口描述函数 `interface`；三种参数各自的序列化。
+一个协议在代码里是一个协议对象，它的身份就是这个对象。它给出：三种关联类型 `Down`、`Up`、`Edge`；所#term[承载][carries]的域类集合 `carries`；对其余域类的#term[跨越声明][`accepts`]；逐边求解函数 `negotiate`；接口描述函数 `interface`；三种参数各自的序列化。
 
 `Down`、`Up` 与 `Edge` 关联到同一个协议值。给定协议值 `p`，`p.negotiate` 的参数类型是 `p.Down` 与 `p.Up`，成功结果类型是 `p.Edge`。bind 的源节点与目标节点使用同一个协议 `p`，因此该边上的参数和求解调用共享同一组类型；未经显式转换的跨协议连接表现为类型错误。
 
 同一对象可以被多个模块的节点引用；bind 两端引用同一个协议对象由构造保证，兼容性即对象同一性。
 
-双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate(down, up, domains)`。第三项输入 `EdgeDomains` 给出两端节点的节点域，协议用它构造跨边的域检查（@sec-domain-crossing）。参数兼容时返回 `Right((Edge, constraints))`；参数冲突时返回 `Left(Violation)`，`Violation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置写入异常消息，并立即终止协商（@sec-error-semantics）。
+双向传播完成后，框架按 bind 声明顺序为每条边调用一次 `negotiate(down, up)`。参数兼容时返回 `Right(Edge)`；参数冲突时返回 `Left(Violation)`，`Violation` 是协议给出的冲突描述。端口参数函数发现的传播冲突同样以值返回。@ch-negotiation 把这两类失败连同相关节点、bind 与模块的源码位置写入异常消息，并立即终止协商（@sec-error-semantics）。
 
 `Down`、`Up` 与 `Edge` 均不可变、可序列化，序列化用于工具导出（@sec-export）。
 
@@ -54,20 +54,17 @@
 
 == 跨边的域关系 <sec-domain-crossing>
 
-一条 bind 的两端各有节点域。两端是否必须同域、能否跨电源域，由协议回答；框架只检查协议是否回答了。
+一条 bind 两端的归属中出现的每个域类，称为这条 bind 的#term[活跃域类][active domain kind]。两端是否必须同域、能否跨电源，由协议回答，框架不认识时钟、复位或电源。
 
-一条 bind 两端节点域中出现的每个域类，称为这条 bind 的#term[活跃域类][active domain kind]。对每个活跃域类，必须满足以下之一：
+协议承载的域类由构造同域：inward 端沿 bind 接收 outward 端的域（@sec-domain-physical-carrier）。其余每个活跃域类，协议在 `accepts` 中声明接受哪些关系：`Accept(K)(relation => ...)`，或不加条件的 `Accept.any(K)`。框架用域类的 `relate` 求出两端的关系，交给协议判断，不接受即报错。
 
-- 协议承载该域类（`carries` 含它）：inward 端以 `CarrierIn` 取得 outward 端的域，两端由构造保证同域（@sec-domain-physical-carrier）；
-- `negotiate` 返回的约束中有一项检查同时读取两端该域类的节点域。
+例如 AXI 只接受同一个时钟、同一个复位、同一路电源；Serial 对时钟与复位不加条件；引脚类协议接受板上电源与芯片常开电源之间的跨越。
 
-两者都不满足时协商报错。检查的内容由协议决定：AXI 一类同步协议检查两端时钟与复位是同一个域，即 `view.sameIdentity(out, in)`；Serial 一类天生异步的协议写一项总是接受的检查，明确表示不约束；电源可以按协议允许跨越的条件检查定值，例如数据协议只在两端是同一电源时接受。
-
-#决策([每个活跃域类必须由承载或协议检查覆盖])[
-  框架不维护同步协议名单或异步豁免名单，也不认识时钟、复位或电源。它只要求一条 bind 两端出现的每个域类，要么由协议承载，要么由 `negotiate` 返回的一项读到两端的检查覆盖。漏掉某个域类是协议定义错误，在协商期报出。
+#决策([每个活跃域类必须由承载或协议声明覆盖])[
+  框架不维护同步协议名单或异步豁免名单。一条 bind 两端出现的每个域类，要么由协议承载，要么在协议的 `accepts` 中有一项声明；漏掉是协议定义错误，在协商期报出。不加条件也必须显式写出。
 ] <dec-domain-crossing-coverage>
 
-生成器模块内部哪些端口同域，由节点域的选择器表达（`Follow` 或同一 handle），不从 `Down`、`Up`、`Edge` 或参数依赖推断（@sec-same-domain-follow）。
+生成器模块内部哪些端口同域，由归属表达：同一个域，或另一个节点的域。框架不从 `Down`、`Up`、`Edge` 或参数依赖推断（@sec-same-domain-follow）。
 
 == 协议接口 <sec-protocol-interface>
 
@@ -103,7 +100,7 @@
 一个生成器最终使用的参数从两个来源合并而来：
 
 - #term[用户参数][user parameter]：构建期声明的容量、关联度、基地址与功能开关（@sec-module-kinds）。它在协商开始前就完全确定。
-- #term[已求解参数][resolved parameter]：完整参数中由协商结果决定的部分，包括设计边的协议参数与生成器所需的域定值。协商结束后，框架把本模块每个节点求出的边整理成该模块的#term[边视图][`EdgeView`]，并把域定值整理成#term[域视图][`DomainView`]（@sec-generator-records）；生成器模块以 `parameters { (edgeView, domainView) => ... }` 声明的完整参数函数读取这两份视图，与闭包中的用户参数直接合成完整参数（@sec-generator-parameters）。全局域身份只用于集成检查与导出，不自动进入完整参数。
+- #term[已求解参数][resolved parameter]：完整参数中由协商结果决定的部分，包括设计边的协议参数与生成器所需的域属性。协商结束后，框架把本模块每个节点求出的边整理成该模块的#term[边视图][`EdgeView`]，并提供结算后的#term[域图][`DomainGraph`]（@sec-generator-records）；生成器模块以 `parameters { (edgeView, domainView) => ... }` 声明的完整参数函数读取这两份视图，与闭包中的用户参数直接合成完整参数（@sec-generator-parameters）。全局域身份只用于集成检查与导出，不自动进入完整参数。
 
 协商期调用生成器模块声明的完整参数函数，将两者合并为该模块的 `FullParam` 并存入 `ResolvedDesign`。完整参数穿越 @sec-serialization-boundary 定义的序列化边界：
 
