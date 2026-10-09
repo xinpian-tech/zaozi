@@ -3,7 +3,7 @@
 package me.jiuyang.tblib.default
 
 import me.jiuyang.tblib.{Testbench, TestbenchGenerator, TestbenchGeneratorApi}
-import me.jiuyang.zaozi.{DVInterface, HWApi, HWInterface, LayerInterface, Parameter, SVApi}
+import me.jiuyang.zaozi.{DVInterface, HWApi, HWInterface, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{*, given}
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, LinkCircuitsPassApi, given}
@@ -26,7 +26,6 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Operation,
   OperationApi,
   SymbolTableApi,
-  TypeApi,
   given
 }
 import org.llvm.mlir.scalalib.capi.pass.{PassManagerApi, given}
@@ -113,7 +112,6 @@ given TestbenchGeneratorApi with
       Context
     ): Module =
       val period        = generator.clockPeriodNs(parameter)
-      require(period > 0 && period % 2 == 0, "testbench clock period must be a positive even number of nanoseconds")
       require(firrtlModules.nonEmpty, "unit-test construction requires at least one FIRRTL module")
       val testbenchName = generator.moduleName(parameter)
 
@@ -157,14 +155,9 @@ given TestbenchGeneratorApi with
 
         given Block = module.getBody
         summon[CombDialectApi].loadDialect
+        val clockModule = ClockModule.create(period)
         summon[HWApi].module(generator.wrapperName(parameter), Seq.empty):
-          val clockReg = summon[SVApi].reg(1.integerTypeGet, "clock")
-          val seqClock = clockReg.readInOut.toClock
-
-          // The periodic time source uses SV text; the surrounding structure uses CIRCT operations.
-          val clockSource = s"initial {{0}} = 1'b0;\nalways #${period / 2}ns {{0}} = ~{{0}};"
-          summon[SVApi].verbatim(clockSource, Seq(clockReg))
-
+          val seqClock = summon[HWApi].instance("clockGenerator", clockModule, Seq.empty).head
           given testbench: Testbench[I] = new DefaultTestbench[I](seqClock, fields.tail, hwPorts.tail)
           generator.simulation(parameter)
           val outputs = summon[HWApi].instance("testbench", dutModule, testbench.inputValues)

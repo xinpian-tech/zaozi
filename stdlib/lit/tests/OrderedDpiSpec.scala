@@ -9,6 +9,7 @@
 // RUN: rm -rf %t.dir
 
 // IR-LABEL: hw.module @OrderedDpiTestBenchWrapper()
+// IR: hw.instance "clockGenerator" @Clock_periodNs10
 // IR: sim.triggered
 // IR-NEXT: sim.proc.dpi.call @begin_cycle()
 // IR-NEXT: %[[STEP:.*]]:7 = sim.proc.dpi.call @step()
@@ -20,14 +21,18 @@
 // SV: import "DPI-C" context function void begin_cycle
 // SV: import "DPI-C" context function void consume
 // SV-LABEL: module OrderedDpiTestBenchWrapper();
-// SV: wire [[FALLING:[A-Za-z_][A-Za-z_0-9]*]] = ~clock;
-// SV-NEXT: always @(posedge [[FALLING]]) begin
+// SV-NOT: always #
+// SV-DAG: Clock_periodNs10 clockGenerator (
+// SV-DAG: wire [[FALLING:[A-Za-z_][A-Za-z_0-9]*]] = ~{{[A-Za-z_][A-Za-z_0-9]*}};
+// SV-NOT: always #
+// SV: always @(posedge [[FALLING]]) begin
 // SV-NEXT: begin_cycle();
 // SV-NEXT: [[STATUS:[A-Za-z_][A-Za-z_0-9]*]] = ordered_step({{.*}});
 // SV-NEXT: consume({{.*}}, [[STATUS]]);
 // SV-NEXT: end_cycle();
 // SV: dataIn_stimulus <=
 // SV-NOT: {{^ *}}always @
+// SV-NOT: always #
 // SV: endmodule
 
 import me.jiuyang.stdlib.queue.default.{SyncQueueLayers, SyncQueueParameter, SyncQueueProbe, given}

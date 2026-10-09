@@ -8,6 +8,7 @@
 // RUN: FileCheck %s --check-prefix=SV --input-file=%t.dir/stateful.sv
 
 // IR-LABEL: hw.module @StatefulDpiTestBenchWrapper()
+// IR: hw.instance "clockGenerator" @Clock_periodNs10
 // IR: sv.initial
 // IR: sim.proc.dpi.call @open(
 // IR: sv.if
@@ -28,6 +29,9 @@
 // SV: import "DPI-C" context function int model_open(
 // SV: input string
 // SV-LABEL: module StatefulDpiTestBenchWrapper();
+// SV-NOT: always #
+// SV: Clock_periodNs10 clockGenerator (
+// SV-NOT: always #
 // SV: initial begin
 // SV: model_open("dram.yaml",
 // SV: always @(posedge
@@ -38,6 +42,8 @@
 // SV: model_complete(
 // SV: model_tick();
 // SV: StatefulDpiTestBench testbench (
+// SV-NOT: always #
+// SV: endmodule
 
 import me.jiuyang.stdlib.queue.default.{SyncQueue, SyncQueueLayers, SyncQueueParameter, SyncQueueProbe, given}
 import me.jiuyang.tblib.*

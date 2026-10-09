@@ -85,7 +85,9 @@
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
 // COMBINED: hw.module @SyncQueueTestBench(
+// COMBINED: hw.module @Clock_periodNs10(out clock : !seq.clock)
 // COMBINED: hw.module @SyncQueueTestBenchWrapper()
+// COMBINED: hw.instance "clockGenerator" @Clock_periodNs10
 // COMBINED: seq.clock_inv
 // COMBINED-NOT: seq.clock_inv
 // COMBINED: {{^  }}sim.func.dpi @step(
@@ -102,9 +104,17 @@
 // DESIGN: SyncQueue_{{.*}} dut (
 
 // WRAPPER: import "DPI-C"
+// WRAPPER-LABEL: module Clock_periodNs10(
+// WRAPPER: initial [[CLOCK:[A-Za-z_][A-Za-z_0-9]*]] = 1'b0;
+// WRAPPER-NEXT: always #5ns [[CLOCK]] = ~[[CLOCK]];
+// WRAPPER: endmodule
 // WRAPPER-LABEL: module SyncQueueTestBenchWrapper();
-// WRAPPER: always #5ns clock = ~clock
+// WRAPPER-NOT: always #
+// WRAPPER: Clock_periodNs10 clockGenerator (
+// WRAPPER-NOT: always #
 // WRAPPER: SyncQueueTestBench testbench (
+// WRAPPER-NOT: always #
+// WRAPPER: endmodule
 
 import me.jiuyang.stdlib.queue.default.{SyncQueueParameter, given}
 import me.jiuyang.stdlib.ut.SyncQueueTestBench
