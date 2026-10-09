@@ -53,49 +53,33 @@ final case class ProbeBinding(
 /** What an observer reads: its sources, and the input port each one arrives at. The port names are fixed where the
   * observer's design is negotiated and stay when the design is instantiated elsewhere.
   */
-final class ProbeBindings private[syntheke] (
-  private[syntheke] val nodes: Vector[ResolvedPublicPort],
-  val ports: Vector[ProbeBinding])
+final class ProbeBindings private[syntheke] (val ports: Vector[ProbeBinding]):
+  private[syntheke] def sources: Vector[ResolvedPublicPort] = ports.map(p => ResolvedPublicPort(p.source, p.reference))
 
 object ProbeBindings:
-  private[syntheke] val empty: ProbeBindings = new ProbeBindings(Vector.empty, Vector.empty)
+  private[syntheke] val empty: ProbeBindings = new ProbeBindings(Vector.empty)
 
   def from(sources: Seq[ResolvedPublicPort]): ProbeBindings =
-    val nodes = sources.toVector.distinct
-    val ports = nodes.map { node =>
-      val name = PortName.dangle(ModuleId.root, node.id.module, PortName.probeBase(node.id.name)).encoded
-      ProbeBinding(node.id, name, node.reference)
-    }
-    new ProbeBindings(nodes, ports)
+    new ProbeBindings(sources.toVector.distinct.map { source =>
+      val name = PortName.dangle(ModuleId.root, source.id.module, PortName.probeBase(source.id.name)).encoded
+      ProbeBinding(source.id, name, source.reference)
+    })
 
   given upickle.default.Writer[ProbeBindings] =
     upickle.default.writer[Vector[ProbeBinding]].comap(_.ports)
 
-final class ProbeCatalog private[syntheke] (
-  private[syntheke] val ports: Vector[ResolvedPublicPort],
-  private[syntheke] val nodes: Vector[ResolvedProbe[?]]):
+/** The probes a design publishes, and the public ports they are read from. */
+final class ProbeCatalog private[syntheke] (private[syntheke] val nodes: Vector[ResolvedProbe[?]]):
+  private[syntheke] def ports: Vector[ResolvedPublicPort] = nodes.map(_.port).distinct
 
-  private[syntheke] def combined(that: ProbeCatalog): ProbeCatalog =
-    new ProbeCatalog((ports ++ that.ports).distinct, (nodes ++ that.nodes).distinct)
+  private[syntheke] def combined(that: ProbeCatalog): ProbeCatalog = new ProbeCatalog((nodes ++ that.nodes).distinct)
 
   private[syntheke] def published(local: Set[ProbeNode[?]], forwarded: Vector[ResolvedProbe[?]]): ProbeCatalog =
-    val selected = (nodes.filter(p => local(p.node)) ++ forwarded).distinct
-    new ProbeCatalog(selected.map(_.port).distinct, selected)
+    new ProbeCatalog((nodes.filter(p => local(p.node)) ++ forwarded).distinct)
 
   private[syntheke] def matching[P](contract: ProbeContract[P]): Vector[ResolvedProbe[P]] =
     nodes.collect { case resolved if resolved.node.contract eq contract => resolved.asInstanceOf[ResolvedProbe[P]] }
 
-  private[syntheke] def mappedPorts: Vector[ResolvedPublicPort] = nodes.map(_.port).distinct
-
   /** The observed ports that are not in this catalog. */
   private[syntheke] def foreign(observations: ProbeBindings): Vector[ResolvedPublicPort] =
-    observations.nodes.filterNot(ports.contains)
-
-object ProbeCatalog:
-  private[syntheke] def resolve(declarations: Vector[(ModuleId, ProbeDeclaration)])(
-    settle: Vector[ResolvedPublicPort] => Vector[ResolvedProbe[?]]
-  ): ProbeCatalog =
-    val ports = declarations.flatMap { (module, declaration) =>
-      declaration.ports.map(port => ResolvedPublicPort(ModuleNodeId(module, port.name), port.tpe))
-    }
-    new ProbeCatalog(ports, settle(ports))
+    observations.sources.filterNot(ports.contains)

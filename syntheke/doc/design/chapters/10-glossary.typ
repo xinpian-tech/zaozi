@@ -48,7 +48,7 @@
   [用户参数、已求解参数与完整参数], [user, resolved, and full parameter], [用户参数是模块构造时给定的参数；已求解参数是设计边的协议参数与生成器所需的域属性；完整参数是二者合并后交给生成器的参数（@sec-module-kinds、@sec-serialization-boundary、@sec-two-layer-params）。],
   [结构模块], [wrapper module], [包含子模块与设计 bind 的模块；端口、连线和层声明由框架发射（@sec-module-kinds、@sec-wrapper-emission）。],
   [生成器], [generator], [以可序列化完整参数为输入并返回电路模块的 zaozi 工厂（@sec-module-kinds、@sec-generator-contract）。],
-  [生成器定义], [`GeneratorDefinition`], [生成器在框架侧的代表：名字、完整参数序列化、探针与观测报告，以及例化后端（@sec-generator-contract）。],
+  [生成器定义], [`GeneratorDefinition`], [生成器在框架侧的代表：名字、完整参数序列化、探针与观测报告；`CirctGenerator` 再给出模块名、层与例化（@sec-generator-contract）。],
   [生成器模块], [generator module], [绑定恰好一个生成器定义的叶模块；声明节点、归属、端口参数函数、探针与完整参数函数（@sec-module-kinds、@sec-generator-module）。],
   [bind], [—], [连接声明，写作 `目标 <-- 源`，连接两个模块节点（@sec-node-conn-proto、@sec-attach）。],
   [边视图], [`EdgeView`], [求解完成后按模块整理的“节点到唯一设计边”映射（@sec-generator-records）。],

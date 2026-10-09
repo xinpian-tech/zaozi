@@ -2,6 +2,10 @@ package me.jiuyang.syntheke
 
 final case class Violation(message: String)
 
+/** A value through a writer known only at run time, such as a protocol's or a generator's. */
+private[syntheke] def serialize(writer: upickle.default.Writer[?], value: Any): ujson.Value =
+  upickle.default.writeJs(value)(using writer.asInstanceOf[upickle.default.Writer[Any]])
+
 trait Protocol:
   type Down
   type Up

@@ -12,6 +12,13 @@ final case class ResolvedEdge private[syntheke] (
     require(p eq protocol, s"${bind.show}: read with a protocol object other than the edge's own")
     edge.asInstanceOf[p.Edge]
 
+object ResolvedEdge:
+  /** The edge of the bind `node` is in. */
+  private[syntheke] def at(edges: Vector[ResolvedEdge], node: ModuleNodeId): ResolvedEdge =
+    edges.find(e => e.bind.source == node || e.bind.target == node).getOrElse(
+      throw IllegalArgumentException(s"${node.show} has no settled edge")
+    )
+
 final case class NodeView private[syntheke] (
   node:                             ModuleNodeId,
   direction:                        NodeDirection,
@@ -89,6 +96,10 @@ final case class LayerTree(children: Map[String, LayerTree]):
       (prefix :+ name) +: sub.paths(prefix :+ name)
     }
 
+  /** The paths that end in a layer without children. */
+  def leaves: Vector[Vector[String]] =
+    children.toVector.sortBy(_._1).flatMap((name, sub) => if sub.isEmpty then Vector(Vector(name)) else sub.leaves.map(name +: _))
+
 object LayerTree:
   val empty:               LayerTree = LayerTree(Map.empty)
   private def of(path: LayerPath): LayerTree =
@@ -102,16 +113,6 @@ private[syntheke] final case class Negotiated(
   generatorModules: Vector[ResolvedGeneratorModule],
   probes:           ProbeCatalog,
   observations:     Map[ModuleId, ProbeBindings])
-    extends SettledEdges
-
-/** The edges of a design, each found by either of its nodes. */
-sealed trait SettledEdges:
-  def edges: Vector[ResolvedEdge]
-
-  def edgeAt(node: ModuleNodeId): ResolvedEdge =
-    edges.find(e => e.bind.source == node || e.bind.target == node).getOrElse(
-      throw IllegalArgumentException(s"${node.show} has no settled edge")
-    )
 
 final case class ResolvedDesign private[syntheke] (
   spec:              DesignSpec,
@@ -123,8 +124,9 @@ final case class ResolvedDesign private[syntheke] (
   layerDecls:        Map[ModuleId, LayerTree],
   probes:            ProbeCatalog,
   observations: Map[ModuleId, ProbeBindings],
-  private[syntheke] val dependencies: Vector[(ModuleId, ResolvedDesign)])
-    extends SettledEdges:
+  private[syntheke] val dependencies: Vector[(ModuleId, ResolvedDesign)]):
+  def edgeAt(node: ModuleNodeId): ResolvedEdge = ResolvedEdge.at(edges, node)
+
   private[syntheke] def boundaryEdge(boundary: Boundary[?]): ResolvedEdge =
     require(spec.boundaries.exists(_.terminal eq boundary.terminal), "boundary is not public in this design")
     edgeAt(boundary.terminal.id)

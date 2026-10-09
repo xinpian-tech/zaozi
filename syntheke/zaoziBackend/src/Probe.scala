@@ -14,25 +14,15 @@ import upickle.default.Writer
 private[zaozi] final class ZaoziProbeDeclaration(
   val generator: AnyRef,
   val declaration: DVInterface[?, ?],
-  val generatorName: String,
-  val parameter: ujson.Value,
   val ports: Vector[ProbePort]) extends ProbeDeclaration
 
-final class Probe[T <: Data & CanProbe] private[zaozi] (
-  val dataType: T,
-  private[zaozi] val node: ResolvedPublicPort,
-  private val generatorName: String,
-  private val parameter: ujson.Value):
+/** A probe an observer reads. In the observer's full parameter it is its binding: the source and the input port. */
+final class Probe[T <: Data & CanProbe] private[zaozi] (val dataType: T, private[zaozi] val node: ResolvedPublicPort):
   private[zaozi] def id: ModuleNodeId = node.id
 
 object Probe:
-  given [T <: Data & CanProbe]: Writer[Probe[T]] = upickle.default.writer[ujson.Value].comap { handle =>
-    ujson.Obj(
-      "binding" -> upickle.default.writeJs(ProbeBindings.from(Vector(handle.node)).ports.head),
-      "generator" -> handle.generatorName,
-      "parameter" -> handle.parameter
-    )
-  }
+  given [T <: Data & CanProbe]: Writer[Probe[T]] =
+    upickle.default.writer[ProbeBinding].comap(handle => ProbeBindings.from(Vector(handle.node)).ports.head)
 
 /** The interface of an observer: its parameter's ports, and an input port for each probe it reads. */
 abstract class ProbeIO[FP <: Parameter](parameter: FP, observations: Probe[?]*) extends HWRecord(parameter):

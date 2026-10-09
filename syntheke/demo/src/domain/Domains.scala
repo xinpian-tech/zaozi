@@ -133,14 +133,12 @@ object ClockDomain extends DomainKind:
   def describe(domain: Settled[ClockDomain.type]): ujson.Value = ujson.Obj("hz" -> hz(domain))
 
   override val checks = Seq(
-    new DomainCheck:
-      val name  = "links"
-      val stage = CheckStage.WellFormed
-      def run(graph: DomainGraph): Vector[String] =
-        graph.of(ClockDomain).collect {
-          case clock if clock.link.exists(_.links.size != clock.sources.size) =>
-            s"$clock has ${clock.sources.size} sources but ${clock.link.get.links.size} links"
-        }
+    DomainCheck("links", CheckStage.WellFormed) { graph =>
+      graph.of(ClockDomain).collect {
+        case clock if clock.link.exists(_.links.size != clock.sources.size) =>
+          s"$clock has ${clock.sources.size} sources but ${clock.link.get.links.size} links"
+      }
+    }
   )
 
 
@@ -262,25 +260,21 @@ object ResetDomain extends DomainKind:
           s"$reset is driven by a PRCM controller, not by a domain it manages"
       }
     },
-    new DomainCheck:
-      val name  = "links"
-      val stage = CheckStage.WellFormed
-      def run(graph: DomainGraph): Vector[String] =
-        graph.of(ResetDomain).collect {
-          case reset if reset.link.exists(_.links.size != reset.sources.size) =>
-            s"$reset has ${reset.sources.size} sources but ${reset.link.get.links.size} links"
-        },
-    new DomainCheck:
-      val name  = "release clock"
-      val stage = CheckStage.WellFormed
-      def run(graph: DomainGraph): Vector[String] =
-        for
-          (node, reset) <- graph.members(ResetDomain)
-          released      <- releaseClock(reset)
-          clock         <- graph.member(node, ClockDomain)
-          relation       = ClockDomain.relate(clock, released)
-          if relation != ClockRelation.Same && relation != ClockRelation.inStep
-        yield s"${node.show} runs on $clock but its reset $reset is released on $released"
+    DomainCheck("links", CheckStage.WellFormed) { graph =>
+      graph.of(ResetDomain).collect {
+        case reset if reset.link.exists(_.links.size != reset.sources.size) =>
+          s"$reset has ${reset.sources.size} sources but ${reset.link.get.links.size} links"
+      }
+    },
+    DomainCheck("release clock", CheckStage.WellFormed) { graph =>
+      for
+        (node, reset) <- graph.members(ResetDomain)
+        released      <- releaseClock(reset)
+        clock         <- graph.member(node, ClockDomain)
+        relation       = ClockDomain.relate(clock, released)
+        if relation != ClockRelation.Same && relation != ClockRelation.inStep
+      yield s"${node.show} runs on $clock but its reset $reset is released on $released"
+    }
   )
 
 
@@ -325,23 +319,21 @@ object PowerDomain extends DomainKind:
     case PowerRelation.Different(fromOn, toOn)      => fromOn && toOn
 
   override val checks = Seq(
-    new DomainCheck:
-      val name  = "dependencies"
-      val stage = CheckStage.WellFormed
-      def run(graph: DomainGraph): Vector[String] =
-        // An imported domain's dependencies were checked in its own design.
-        val domains = graph.of(PowerDomain).filter(_.imported.isEmpty)
-        def depends(d: Settled[PowerDomain.type]): Vector[Settled[PowerDomain.type]] =
-          if d.imported.isDefined then Vector.empty else tree(d).dependencies.map(dep => d.resolve(dep.source))
-        def cyclic(start: Settled[PowerDomain.type]): Boolean =
-          @annotation.tailrec
-          def visit(frontier: List[Settled[PowerDomain.type]], seen: Set[Settled[PowerDomain.type]]): Boolean =
-            frontier match
-              case Nil                       => false
-              case head :: _ if head eq start => true
-              case head :: rest              =>
-                if seen(head) then visit(rest, seen) else visit(depends(head).toList ++ rest, seen + head)
-          visit(depends(start).toList, Set.empty)
-        domains.filter(cyclic).map(d => s"$d depends on itself")
+    DomainCheck("dependencies", CheckStage.WellFormed) { graph =>
+      // An imported domain's dependencies were checked in its own design.
+      val domains = graph.of(PowerDomain).filter(_.imported.isEmpty)
+      def depends(d: Settled[PowerDomain.type]): Vector[Settled[PowerDomain.type]] =
+        if d.imported.isDefined then Vector.empty else tree(d).dependencies.map(dep => d.resolve(dep.source))
+      def cyclic(start: Settled[PowerDomain.type]): Boolean =
+        @annotation.tailrec
+        def visit(frontier: List[Settled[PowerDomain.type]], seen: Set[Settled[PowerDomain.type]]): Boolean =
+          frontier match
+            case Nil                       => false
+            case head :: _ if head eq start => true
+            case head :: rest              =>
+              if seen(head) then visit(rest, seen) else visit(depends(head).toList ++ rest, seen + head)
+        visit(depends(start).toList, Set.empty)
+      domains.filter(cyclic).map(d => s"$d depends on itself")
+    }
   )
 

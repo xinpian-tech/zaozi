@@ -32,7 +32,7 @@ private[zaozi] object ProbeBindingSupport:
     resolved.implementation match
       case implementation: ZaoziProbeImplementation[?] if resolved.node.contract eq association =>
         val typed = implementation.asInstanceOf[ZaoziProbeImplementation[T]]
-        new Probe[T](typed.dataType, resolved.port, typed.source.generatorName, typed.source.parameter)
+        new Probe[T](typed.dataType, resolved.port)
       case _ =>
         throw IllegalArgumentException(s"${resolved.id.show} is not a probe of this contract")
 

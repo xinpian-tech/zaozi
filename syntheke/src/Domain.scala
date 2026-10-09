@@ -127,18 +127,7 @@ enum CheckStage derives CanEqual:
   case WellFormed, Behavior
 
 /** A check a domain kind plugs into negotiation. All checks of one stage run; any failure stops before the next. */
-trait DomainCheck:
-  def name:  String
-  def stage: CheckStage
-  def run(graph: DomainGraph): Vector[String]
-
-object DomainCheck:
-  def apply(name: String, stage: CheckStage)(run: DomainGraph => Vector[String]): DomainCheck =
-    val (n, st, r) = (name, stage, run)
-    new DomainCheck:
-      val name  = n
-      val stage = st
-      def run(graph: DomainGraph): Vector[String] = r(graph)
+final case class DomainCheck(name: String, stage: CheckStage)(val run: DomainGraph => Vector[String])
 
 /** A design's settled domains and every node's membership. Checks read it; so do generator parameters. */
 final class DomainGraph private[syntheke] (

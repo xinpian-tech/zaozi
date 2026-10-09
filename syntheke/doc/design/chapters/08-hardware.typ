@@ -2,7 +2,7 @@
 
 = 硬件边界 <ch-hardware>
 
-协商结果通过一份可序列化的完整参数交给 zaozi 生成器。单个 IP 可以使用同一参数独立例化、测试和复现（@req-ip）。本章规定生成器契约、模块节点与生成器端口的对应关系，以及例化与链接的流程。
+协商结果通过一份可序列化的完整参数交给生成器。单个 IP 可以使用同一参数独立例化、测试和复现（@req-ip）。本章规定生成器契约、模块节点与生成器端口的对应关系，以及例化与链接的流程。
 
 == 生成器的契约 <sec-generator-contract>
 
@@ -14,9 +14,9 @@
 
 生成器没有隐式时钟与复位：物理时钟和复位输入一律声明为承载协议的 inward 节点，与其它节点一样对应端口和一次 bind。数据节点的时钟域与复位域取这些 inward 节点的域（@sec-domain-physical-carrier）。归属不替代端口，也不生成连线。
 
-框架侧的#term[生成器定义][`GeneratorDefinition`]给出生成器名字、`FullParam` 的序列化、由完整参数报告公开探针端口清单与观测绑定的两个函数，并能创建例化后端。zaozi 生成器由 `zaozi(generator)` 包装为生成器定义，名字取自生成器对象名；独立例化时，生成器以自己的参数解析读入 JSON。生成器定义的相等即对象同一性；同一设计中两个不同定义不得同名（@sec-error-semantics）。
+框架侧的#term[生成器定义][`GeneratorDefinition`]给出生成器名字、`FullParam` 的序列化、由完整参数报告公开探针端口清单与观测绑定的两个函数。产出 FIRRTL 的生成器定义是 `CirctGenerator`，再给出模块名、层结构与例化；每种硬件语言以一个子类接入。zaozi 生成器由 `zaozi(generator)` 包装，名字取自生成器对象名；独立例化时，生成器以自己的参数解析读入 JSON。生成器定义的相等即对象同一性；同一设计中两个不同定义不得同名（@sec-error-semantics）。
 
-`ResolvedGeneratorModule` 记录生成器定义与完整参数（@sec-generator-records）。例化从定义取得后端，参数导出从定义取得序列化。
+`ResolvedGeneratorModule` 记录生成器定义与完整参数（@sec-generator-records）。例化与参数导出都从这个定义取得。
 
 完整参数函数把框架提供的 `EdgeView`、`DomainGraph` 与闭包中的用户参数直接合成 `FullParam`。`FullParam` 必须足以确定生成器全部设计端口、公开探针端口与观测输入端口的名称、方向和接口结构。对于构建期动态声明的节点，完整参数函数把节点名称和接口形状转换为生成器自有字段；若节点名称由生成器的固定接口决定，`FullParam` 只需保存决定接口结构的参数。进入 `FullParam` 的域信息只有属性与稳定名字（@dec-full-param-content）。
 

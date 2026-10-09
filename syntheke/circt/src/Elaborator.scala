@@ -78,8 +78,7 @@ final case class ElaboratedDesign(
   directory:   os.RelPath,
   mlirbc:      Array[Byte],
   verilog:     Map[String, String],
-  moduleNames: Map[ModuleId, String],
-  resolved: ResolvedDesign,
+  resolved:    ResolvedDesign,
   private[circt] val layers: LayerTree,
   private[circt] val definedModules: Set[String])
 
@@ -114,17 +113,14 @@ object Elaborator:
     def owned(id: ModuleId): Boolean = !dependencies.keys.exists(_.isAncestorOf(id))
     val localModules = spec.moduleOrder.filter(owned)
     val generators = localModules.flatMap(spec.generatorModule)
-    val backendOf: Map[GeneratorDefinition[?], GeneratorBackend] = generators.map(_.definition).distinct.map { definition =>
-      val backend = definition match
-        case provider: GeneratorBackendProvider => provider.createBackend()
-        case _ => fail(s"missing backend for generator ${definition.name}")
-      definition -> backend
-    }.toMap
+    def implementation(definition: GeneratorDefinition[?]): CirctGenerator[Any] = definition match
+      case generator: CirctGenerator[?] => generator.asInstanceOf[CirctGenerator[Any]]
+      case _                            => fail(s"generator ${definition.name} has no FIRRTL implementation")
+    def fullParam(id: ModuleId): Any = resolved.generatorModule(id).get.fullParam
 
     val moduleNames: Map[ModuleId, String] = spec.moduleOrder.filter(id => owned(id) || dependencies.contains(id)).map { id =>
       id -> (spec.modules(id) match
-        case g: GeneratorModuleSpec =>
-          backendOf(g.definition).moduleName(resolved.generatorModule(id).get.fullParam)
+        case g: GeneratorModuleSpec => implementation(g.definition).moduleName(fullParam(id))
         case w: WrapperModuleSpec   => w.moduleName
         case b: BoundaryModuleSpec => spec.wrapper(b.target).get.moduleName)
     }.toMap
@@ -217,10 +213,6 @@ object Elaborator:
           }
           byName.map((n, i) => n -> instOp.getResult(i))
 
-        def leafPaths(t: LayerTree, prefix: Vector[String] = Vector.empty): Vector[Vector[String]] =
-          if t.children.isEmpty then (if prefix.isEmpty then Vector.empty else Vector(prefix))
-          else t.children.toVector.sortBy(_._1).flatMap((n, sub) => leafPaths(sub, prefix :+ n))
-
         val definitions  = mutable.LinkedHashMap.empty[String, MlirModule]
         given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(unknownLoc)
         val circuitName  = moduleNames(ModuleId.root)
@@ -236,31 +228,19 @@ object Elaborator:
             emitLayers(sub, Some(op))
           }
 
-        val generatorLayers: Map[ModuleId, LayerTree] =
-          generators
-            .flatMap(g =>
-              backendOf(g.definition)
-                .layers(resolved.generatorModule(g.id).get.fullParam)
-                .flatMap(path => (0 until g.id.path.length).map(n => ModuleId(g.id.path.take(n)) -> LayerPath(path)))
-            )
-            .foldLeft(Map.empty[ModuleId, LayerTree]) { case (acc, (m, lp)) =>
-              acc.updated(m, acc.getOrElse(m, LayerTree.empty).add(lp))
-            }
+        // A module declares its planned probe layers and every layer of the modules below it.
+        val enabled: Map[ModuleId, LayerTree] =
+          def throughout(id: ModuleId, tree: LayerTree) = (0 to id.path.length).map(n => ModuleId(id.path.take(n)) -> tree)
+          (resolved.layerDecls.toVector ++
+            generators.flatMap(g => throughout(g.id, implementation(g.definition).layers(fullParam(g.id)))) ++
+            dependencies.toVector.flatMap((id, compiled) => throughout(id, compiled.layers)))
+            .groupMapReduce(_._1)(_._2)(_.merge(_))
             .withDefaultValue(LayerTree.empty)
 
         val wrapperPorts = resolved.portPlans
           .groupBy(_.module)
           .view.mapValues(_.sortBy(_.name.encoded)).toMap
           .withDefaultValue(Vector.empty)
-        val dependencyLayers = dependencies.toVector.flatMap { (id, compiled) =>
-          (0 to id.path.size).map(n => ModuleId(id.path.take(n)) -> compiled.layers)
-        }.foldLeft(Map.empty[ModuleId, LayerTree]) { case (acc, (id, tree)) =>
-          acc.updated(id, acc.getOrElse(id, LayerTree.empty).merge(tree))
-        }
-        val wrapperLayers = (localModules ++ dependencies.keys).flatMap(spec.wrapper).map { w =>
-          w.id -> leafPaths(resolved.layerDecls.getOrElse(w.id, LayerTree.empty)
-            .merge(generatorLayers(w.id)).merge(dependencyLayers.getOrElse(w.id, LayerTree.empty)))
-        }.toMap
 
         dependencies.toVector.sortBy(_._1.show).distinctBy(_._2.circuitName).foreach { (id, compiled) =>
           val expected = compiled.resolved.portPlans.filter(_.module == ModuleId.root).sortBy(_.name.encoded)
@@ -269,7 +249,7 @@ object Elaborator:
             fail(s"boundary interface differs from compiled definition at ${id.show}")
           summon[ExtModuleApi].op(compiled.circuitName, compiled.circuitName, unknownLoc,
             FirrtlConvention.Scalarized, actual.map(p => (portField(p), unknownLoc)),
-            leafPaths(compiled.layers), Map.empty).appendToCircuit()
+            compiled.layers.leaves, Map.empty).appendToCircuit()
         }
 
         localModules.filter(id => spec.wrapper(id).isDefined).distinctBy(moduleNames).foreach { id =>
@@ -282,7 +262,7 @@ object Elaborator:
               unknownLoc,
               FirrtlConvention.Scalarized,
               ports.map(p => (portField(p), unknownLoc)),
-              wrapperLayers(id)
+              enabled(id).leaves
             )
             given Block    = module.block
 
@@ -292,7 +272,7 @@ object Elaborator:
                 case _: BoundaryModuleSpec => fail(s"boundary contract ${childId.show} cannot be instantiated as hardware")
                 case gm: GeneratorModuleSpec =>
                   val rgm      = resolved.generatorModule(childId).get
-                  val placed   = backendOf(gm.definition).instantiate(rgm.fullParam, c, gm.loc)
+                  val placed   = implementation(gm.definition).instantiate(rgm.fullParam, c, gm.loc)
                   placed.definitions.foreach((name, definition) => definitions.getOrElseUpdate(name, definition))
                   val instOp   = placed.instance
                   val expected = rgm.view.nodes.map { nv =>
@@ -309,7 +289,7 @@ object Elaborator:
                     FirrtlNameKind.Interesting,
                     unknownLoc,
                     childPorts.map(portField),
-                    wrapperLayers(childId)
+                    enabled(childId).leaves
                   )
                   instOp.operation.appendToBlock()
                   childPorts.zipWithIndex.map((p, i) => ((c, p.name.encoded), instOp.operation.getResult(i)))
@@ -400,7 +380,7 @@ object Elaborator:
 
         val (defined0, referenced0) = moduleSymbols(summon[Circuit].operation)
         val linkedLayers = link((referenced0 -- defined0).toList, defined0, LayerTree.empty)
-        val layers = (resolved.layerDecls.values ++ dependencyLayers.values).foldLeft(linkedLayers)(_.merge(_))
+        val layers = enabled.values.foldLeft(linkedLayers)(_.merge(_))
         emitLayers(layers, None)
 
         if !summon[MlirModule].getOperation.verify then fail("MLIR verification of the linked circuit failed")
@@ -428,6 +408,6 @@ object Elaborator:
           try os.walk(verilogDir).filter(os.isFile).map(p => p.relativeTo(verilogDir).toString -> os.read(p)).toMap
           finally os.remove.all(verilogDir)
 
-        ElaboratedDesign(circuitName, directory, bytecode.toByteArray, verilog, moduleNames, resolved, layers, definedModules)
+        ElaboratedDesign(circuitName, directory, bytecode.toByteArray, verilog, resolved, layers, definedModules)
       finally summon[Context].destroy()
     finally arena.close()

@@ -89,7 +89,7 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
     )(s"the instantiating design changes which domains of ${design.spec.root.show} are the same, at ${loc.show}")
     val contract = design.spec.boundaries.collect {
       case boundary if {
-            val (expected, actual) = (design.boundaryEdge(boundary), parent.edgeAt(port(boundary).id))
+            val (expected, actual) = (design.boundaryEdge(boundary), ResolvedEdge.at(parent.edges, port(boundary).id))
             actual.down != expected.down || actual.up != expected.up || actual.edge != expected.edge ||
             actual.interface != expected.interface
           } =>
@@ -108,26 +108,19 @@ private[syntheke] object DesignIntegration:
       moduleOrder = Vector(parent.spec.root) ++ modules.filterNot(_ == parent.spec.root),
       binds = specs.flatMap(_.binds)
     )
-    val edges                           = children.flatMap(_.edges) ++ parent.edges
-    val observations                    = children.flatMap(_.observations).toMap ++ parent.observations
-    val (ports, wires, plannedLayers)   = Planner.plan(spec, edges, probes, observations)
-    val frozen                          = children.flatMap(_.spec.moduleOrder).toSet
-    val (frozenPorts, frozenWires)      = (children.flatMap(_.portPlans), children.flatMap(_.wirePlans))
-    if !ports.filter(p => frozen(p.module)).forall(frozenPorts.contains) ||
-      !wires.filter(w => frozen(w.module)).forall(frozenWires.contains)
-    then throw IllegalStateException("planning changed the ports or wires of a frozen design")
-    val layers = children.flatMap(_.layerDecls).foldLeft(plannedLayers) { case (acc, (module, tree)) =>
-      acc.updated(module, acc.getOrElse(module, LayerTree.empty).merge(tree))
-    }
+    // The frozen designs keep their plans; this design plans its own binds and the probe paths above them.
+    val frozen                 = children.flatMap(_.spec.moduleOrder).toSet
+    val (ports, wires, layers) = Planner.plan(spec, parent.edges, probes, parent.observations)
+    val planned                = layers.filter((module, _) => !frozen(module))
     ResolvedDesign(
       spec = spec,
       domains = parent.domains,
-      edges = edges,
+      edges = children.flatMap(_.edges) ++ parent.edges,
       generatorModules = children.flatMap(_.generatorModules) ++ parent.generatorModules,
-      portPlans = (frozenPorts ++ ports).distinct,
-      wirePlans = (frozenWires ++ wires).distinct,
-      layerDecls = layers,
+      portPlans = children.flatMap(_.portPlans) ++ ports.filterNot(p => frozen(p.module)),
+      wirePlans = children.flatMap(_.wirePlans) ++ wires.filterNot(w => frozen(w.module)),
+      layerDecls = children.flatMap(_.layerDecls).toMap ++ planned,
       probes = probes,
-      observations = observations,
+      observations = children.flatMap(_.observations).toMap ++ parent.observations,
       dependencies = imports.map(i => i.design.spec.root -> i.definition)
     )

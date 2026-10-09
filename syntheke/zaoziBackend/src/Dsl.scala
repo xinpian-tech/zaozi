@@ -11,7 +11,7 @@ import upickle.default.Writer
 object zaozi:
   def apply[FP <: Parameter, L <: LayerInterface[FP], I <: HWInterface[FP], P <: DVInterface[FP, L]](
     generator: Generator[FP, L, I, P]
-  )(using Writer[FP]): GeneratorDefinition[FP] = ZaoziDefinitions(generator)
+  )(using Writer[FP]): GeneratorDefinition[FP] = ZaoziGenerator(generator)
 
 /** A probe contract served by zaozi generators: probes of it publish data of type `T` and carry parameters `P`. */
 final class ProbeBindingFor[P: Writer, T <: Data & CanProbe] private () extends ProbeContract[P]:

@@ -61,9 +61,9 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
     edges = definition.edges.map(edge),
     generatorModules = definition.generatorModules.map(g =>
       g.copy(module = module(g.module), view = edgeView(g.view))),
-    probes = new ProbeCatalog(definition.probes.ports.map(publicPort), definition.probes.nodes.map(resolvedProbe)),
+    probes = new ProbeCatalog(definition.probes.nodes.map(resolvedProbe)),
     observations = definition.observations.map { (id, bindings) =>
-      module(id) -> new ProbeBindings(bindings.nodes.map(publicPort), bindings.ports.map(p => p.copy(source = node(p.source))))
+      module(id) -> new ProbeBindings(bindings.ports.map(p => p.copy(source = node(p.source))))
     },
     portPlans = definition.portPlans.map(p => p.copy(module = module(p.module))),
     wirePlans = definition.wirePlans.map(w => w.copy(module = module(w.module))),

@@ -66,10 +66,10 @@ private[syntheke] object Planner:
     }
 
     val uses = observations.toVector.sortBy(_._1.show).flatMap { (consumer, bindings) =>
-      bindings.nodes.zip(bindings.ports).map { (source, binding) => (source, Some(consumer -> binding.portName)) }
+      bindings.sources.zip(bindings.ports).map { (source, binding) => (source, Some(consumer -> binding.portName)) }
     }
     val routed: Vector[(ResolvedPublicPort, Option[(ModuleId, String)])] =
-      uses ++ probes.mappedPorts.map(_ -> None)
+      uses ++ probes.ports.map(_ -> None)
     val verification = routed.map { (source, consumer) =>
       val loc = spec.modules(source.id.module).loc
       val common = consumer.map { (target, _) =>

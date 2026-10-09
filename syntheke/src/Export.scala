@@ -17,9 +17,6 @@ object Export:
 
   private def interface(tpe: ProtocolInterface): ujson.Value = upickle.default.writeJs(tpe)
 
-  private def write(writer: upickle.default.Writer[?], value: Any): ujson.Value =
-    upickle.default.writeJs(value)(using writer.asInstanceOf[upickle.default.Writer[Any]])
-
   private def source(value: DomainSource[?]): ujson.Value = value match
     case domain: Domain[?] => ujson.Obj("domain" -> domainId(domain.id))
     case ref: DomainRef[?] => ujson.Obj("node" -> nodeId(ref.node))
@@ -115,9 +112,9 @@ object Export:
         val p        = e.protocol
         ujson.Obj(
           "id"        -> bindId(e.bind),
-          "down"      -> write(p.downWriter, e.down),
-          "up"        -> write(p.upWriter, e.up),
-          "edge"      -> write(p.edgeWriter, e.edge),
+          "down"      -> serialize(p.downWriter, e.down),
+          "up"        -> serialize(p.upWriter, e.up),
+          "edge"      -> serialize(p.edgeWriter, e.edge),
           "interface" -> interface(e.interface)
         )
       })
@@ -167,6 +164,6 @@ object Export:
       ujson.Obj(
         "module"    -> moduleId(g.module),
         "generator" -> ujson.Str(g.definition.name),
-        "fullParam" -> write(g.definition.fullParamWriter, g.fullParam)
+        "fullParam" -> serialize(g.definition.fullParamWriter, g.fullParam)
       )
     })

@@ -8,7 +8,7 @@
 
 Syntheke 把设计中的层次化电路单元称为#term[模块][module]。
 
-Syntheke 把以参数为输入并返回电路模块的 zaozi 工厂称为#term[生成器][generator]。生成器在框架侧由一个#term[生成器定义][`GeneratorDefinition`]代表，它给出生成器名字与完整参数的序列化（@sec-generator-contract）。
+Syntheke 把以参数为输入并返回电路模块的工厂称为#term[生成器][generator]，例如 zaozi 生成器。生成器在框架侧由一个#term[生成器定义][`GeneratorDefinition`]代表，它给出生成器名字与完整参数的序列化（@sec-generator-contract）。
 
 每个模块在构造时收到一份#term[用户参数][user parameter]：它在模块生命周期的最开始就已确定，模块随后声明的一切都可以依赖它。模块分为两种：
 

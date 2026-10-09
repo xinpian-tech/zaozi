@@ -105,9 +105,6 @@ object Negotiator:
       case Left(cycle)   =>
         fail(s"parameter dependency graph has a cycle through ${cycle.map(_.show).mkString(", ")}", cycle.flatMap(spec.nodeSpec(_).map(_.loc))*)
 
-  private def write(writer: upickle.default.Writer[?], value: Any): ujson.Value =
-    upickle.default.writeJs(value)(using writer.asInstanceOf[upickle.default.Writer[Any]])
-
   private def propagate(spec: DesignSpec, order: Vector[ModuleNodeId]): (Map[ModuleNodeId, Any], Map[ModuleNodeId, Any]) =
     val sourceOf = spec.binds.map(b => b.target -> b.source).toMap
     val targetOf = spec.binds.map(b => b.source -> b.target).toMap
@@ -115,7 +112,7 @@ object Negotiator:
     def show(id: ModuleNodeId, value: Any): String =
       val node = spec.nodeSpec(id).get
       val writer = if node.direction == NodeDirection.Inward then node.protocol.downWriter else node.protocol.upWriter
-      s"${id.show}=${ujson.write(write(writer, value))}"
+      s"${id.show}=${ujson.write(serialize(writer, value))}"
 
     def evaluate(values: Map[ModuleNodeId, Any], id: ModuleNodeId): Any =
       val node   = spec.nodeSpec(id).get
@@ -169,7 +166,7 @@ object Negotiator:
       }
     )
 
-    val local   = ProbeCatalog.resolve(generators.map(g => g.module -> g.probeDeclaration)) { ports =>
+    val local   = new ProbeCatalog(
       generators.flatMap { generator =>
         spec.generatorModule(generator.module).get.probes.flatMap { declared =>
           declared.selector.asInstanceOf[ProbeSelector[Any, Any]].resolve(generator.fullParam, generator.probeDeclaration) match
@@ -177,12 +174,13 @@ object Negotiator:
             case Right(None)           => Vector.empty
             case Right(Some(selected)) =>
               val portId = ModuleNodeId(generator.module, selected.portName)
-              val port   = ports.find(_.id == portId)
+              val port   = generator.probeDeclaration.ports.find(_.name == selected.portName)
+                .map(public => ResolvedPublicPort(portId, public.tpe))
                 .getOrElse(fail(s"probe ${declared.node.id.show} selects ${portId.show}, which is not public", declared.loc))
               Vector(new ResolvedProbe(declared.node.asInstanceOf[ProbeNode[Any]], selected.parameters, port, selected.implementation))
         }
       }
-    }
+    )
     val catalog = imported.fold(local)(_.combined(local))
 
     val observations = generators.flatMap { module =>
