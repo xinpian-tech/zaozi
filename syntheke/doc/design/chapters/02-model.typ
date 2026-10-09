@@ -2,7 +2,7 @@
 
 = 概念模型 <ch-model>
 
-@ch-motivation 把参数协商定义为硬件生成流程中的独立阶段（@sec-explicit-phase）。为使该阶段可单独执行和测试，构建结果必须显式表示设计并在进入协商前固化。本章依次定义模块、层次树、连接结构与域结构、节点与 bind、稳定标识、构建阶段、设计与冻结边界、三阶段流水线和序列化边界。
+@ch-motivation 把参数协商定义为硬件生成流程中的独立阶段（@sec-explicit-phase）。为使该阶段可单独执行和测试，构建结果必须显式表示设计并在进入协商前固化。本章依次定义模块、层次树、连接结构与域结构、节点与 bind、稳定标识、构建阶段、设计与冻结边界、三个阶段和序列化边界。
 
 == 模块的两种形态 <sec-module-kinds>
 
@@ -62,7 +62,7 @@ Syntheke 把以参数为输入并返回电路模块的 zaozi 工厂称为#term[�
 
 == 域结构 <sec-domain-model>
 
-#term[域类][domain kind]定义一类域：根的属性 `Root`、派生关系 `Link`、跨越关系 `Relation`、求两个域之间关系的 `relate`、冻结边界据以比较的属性 `describe`，以及该类的检查插件（@sec-domain-checks）。代码里一个域类是实现 `DomainKind` 的对象；一个设计中同一个名字只能对应同一个对象。时钟、复位、电源由设计库定义，框架不认识它们的名字；安全域等其它域类用同样的方式定义。域类实现 `Planned` 时，还由结算后的 `DomainGraph` 规划下游生成器的参数，例如时钟树、复位树、电源树与 PRCM 的参数。
+#term[域类][domain kind]定义一类域：根的属性 `Root`、派生关系 `Link`、跨越关系 `Relation`、求两个域之间关系的 `relate`、冻结边界据以比较的属性 `describe`，以及该类的检查插件（@sec-domain-checks）。代码里一个域类是实现 `DomainKind` 的对象；一个设计中同一个名字只能对应同一个对象。时钟、复位、电源由设计库定义，框架不认识它们的名字；安全域等其它域类用同样的方式定义。域类可以提供把结算后的域换算成下游生成器参数的函数，例如 PRCM 域类给出 PRCM 生成器的参数；生成器在完整参数函数里调用它。
 
 #term[域][domain]在模块体中声明，有两种：
 
@@ -107,7 +107,7 @@ bind 写在结构模块的构建体里，声明它的结构模块必须是两端
 
 节点声明返回一个#term[节点草稿][node draft]。草稿必须恰好封口一次，封口后得到可以 bind 的#term[端口句柄][port handle]：
 
-- `node.derive(sources) { values => ... }`：`sources` 是本模块反方向的节点，或它们的序列、元组。outward 节点读取 inward 节点的 `Down`，inward 节点读取 outward 节点的 `Up`；方向不对是编译错误。函数返回本节点的参数，或一项 `Violation`。
+- `node.derive(sources) { values => ... }`：`sources` 是本模块反方向的节点，或它们的序列。outward 节点读取 inward 节点的 `Down`，inward 节点读取 outward 节点的 `Up`；方向不对是编译错误。函数返回本节点的参数，或一项 `Violation`。
 - `node.fixed(value)`：本节点的参数是常量。
 
 outward 节点的函数称为 `dFn`，inward 节点的函数称为 `uFn`，二者统称#term[端口参数函数][port parameter functions]。`sources` 中的每个反方向节点就是一条#term[模块内部参数依赖][module-internal parameter dependency]：inward 节点 `i` 出现在 outward 节点 `o` 的 `sources` 中，或 `o` 出现在 `i` 的 `sources` 中，都记为从 `i` 到 `o` 的依赖。依赖由读取集合推出，不单独声明，因此函数能读的就是依赖的全部。不读取任何反方向节点的节点称为#term[边界节点][boundary node]，它的值只来自用户参数。同一个函数可以读不同协议的节点。Xbar、NoC 以多个具名节点表示多个端口，以内部参数依赖表示端口之间的参数影响关系；每个节点仍只参与一条 bind。
@@ -122,25 +122,25 @@ outward 节点的函数称为 `dFn`，inward 节点的函数称为 `uFn`，二�
 
 == 稳定标识 <sec-identity>
 
-实体标识由已命名结构派生：`ModuleId` 是从设计根开始的实例名路径；`ModuleNodeId` 由 `module` 与节点名组成；`BindId` 由声明顺序和源、目标 `ModuleNodeId` 组成；`DomainId` 由 `module` 与域的声明名组成；一项归属由 `ModuleNodeId` 与域类标识。同一模块内节点名与探针名共用一个命名空间；域声明名在本模块的域声明中唯一。每个节点唯一关联一条 bind，因此 `ModuleNodeId` 可以确定该节点所在的 `BindId` 和已求解边。探针的标识也是 `ModuleNodeId`（@sec-dv-declarations）。
+实体标识由已命名结构派生：`ModuleId` 是从设计根开始的实例名路径；`ModuleNodeId` 由 `module` 与节点名组成；`BindId` 由源、目标 `ModuleNodeId` 组成；`DomainId` 由 `module` 与域的声明名组成；一项归属由 `ModuleNodeId` 与域类标识。同一模块内节点名与探针名共用一个命名空间；域声明名在本模块的域声明中唯一。每个节点唯一关联一条 bind，因此 `ModuleNodeId` 可以确定该节点所在的 `BindId` 和已求解边。探针的标识也是 `ModuleNodeId`（@sec-dv-declarations）。
 
-每个模块、节点、bind、域、归属和探针都记录声明处的源码位置，直接采用 sourcecode 库的 `File` 与 `Line` 捕获，不自设位置类型。源码位置只用于诊断，实体身份由稳定标识确定。
+每个模块、节点、bind、域、归属和探针都记录声明处的源码位置 `SourceLoc`，即 sourcecode 库捕获的 `File` 与 `Line`。源码位置只用于诊断，实体身份由稳定标识确定。
 
 == 构建阶段 <sec-build>
 
 设计由 `Design(moduleName) { ... }` 定义，它的体就是根结构模块的体。构建期声明节点、域和连接需要框架注入的#term[构建上下文][`BuildContext`]。条件拓扑与循环生成的子系统由宿主语言控制流表达。bind 算子 `<--` 只能在结构模块体中记录连接。声明的名称默认取自绑定它的 val（sourcecode 的 `Name`，与 zaozi 的实例命名一致）；循环等 val 名不可用的场合以局部 `given sourcecode.Name` 覆盖。名称形状限定为 `[A-Za-z_][A-Za-z0-9_]*`，在声明处检查。
 
-每个模块体返回它向外交出的#term[设计引用][design reference]。设计引用的类型必须有 `Dangles` 证据：端口句柄、域、探针、设计边界，以及它们的 `Option`、`Vector` 与字段全为设计引用的积类型。参数读取值和构建上下文无法离开模块体。构建上下文只在它的模块体执行期间有效；模块体返回后再用它声明或连接即报错。
+设计的体返回它向外交出的#term[设计引用][design reference]，例化它的设计会把这些引用移到实例上。设计引用的类型必须有 `Dangles` 证据：端口句柄、探针、设计边界，以及它们的 `Option`、`Vector` 与字段全为设计引用的积类型。域不是设计引用，它只经边界离开设计。构建上下文只在它的模块体执行期间有效；模块体返回后再用它声明或连接即报错。
 
 可复用的模块定义由节点类和定义函数组成：节点类以字段持有端口句柄，定义函数调用 `generator[FP]` 或 `wrapper` 并转发名称上下文，实例名来自调用点的 val。生成器定义以 `given GeneratorDefinition[FP]` 提供，模块体按 `FP` 取得。
 
 节点与域声明的生命周期在用户参数之后开始：模块构造时按用户参数声明它们。`DesignSpec` 固化后节点、域和归属不再增删；协商时每个节点恰好得到一条边，每个域恰好结算一次；例化时每个节点对应生成器的一个端口。节点与域的有无、数量和名字只依赖用户参数与所例化设计的冻结结果（@sec-design-boundary），不依赖本设计的协商结果，也不依赖是否有 bind 指向节点。
 
-协议的身份就是协议对象本身：bind 两端使用同一个对象由构造保证，无需注册表。设计的生成器注册表由模块树推导——先序首次出现的生成器定义序列，不单独存储；同一名字只能对应一个定义。
+协议的身份就是协议对象本身。一个设计里，同一个生成器名字只能对应一个生成器定义。
 
 `DesignSpec` 包含：
 
-- 固化后的模块树：结构模块的模块名与子实例序列；生成器模块的生成器定义、节点规格（方向、协议、归属、端口参数函数）、内部参数依赖、探针与完整参数函数；
+- 固化后的模块树：结构模块的模块名与子实例序列；生成器模块的生成器定义、节点规格（方向、协议、归属、端口参数函数及其读取的节点）、探针与完整参数函数；
 - 按声明顺序的 bind 序列；
 - 域的声明序列；
 - 设计边界，以及代表外侧与所例化设计的边界模块（@sec-design-boundary）。
@@ -156,14 +156,14 @@ outward 节点的函数称为 `dFn`，inward 节点的函数称为 `uFn`，二�
 例化结果 `DesignInstance` 向外层构建期公开冻结结果：`edgeOf(boundary)` 读取边界边，`domainOf(boundary, K)` 读取边界所属的域，`probes` 是公开的探针目录（@ch-verification）。外层可以用这些值决定自己的用户参数，例如测试平台按 SoC 参考时钟的频率配置振荡器。外层还可以用 `boundary.boundary` 把内层的边界转发为自己的边界，用 `probe.boundary` 把内层的探针转发为自己的公开探针。
 
 #决策([设计是冻结的复用单位])[
-  一个设计只协商一次，它的边界契约在外层不可改变；外层协商只确认契约成立。冻结的设计在例化期单独生成一份电路，被多个外层共享（@sec-elaboration-flow）。外层读取内层冻结结果，等于把上一轮协商的产物作为本轮的用户参数，不形成回读环（@apx-readback）。
+  一个设计只协商一次，它的边界契约在外层不可改变；外层协商只确认契约成立。冻结的设计在例化期单独生成一份电路，被多个外层共享（@sec-elaboration-flow）。外层读取内层冻结结果，等于把上一轮协商的产物作为本轮的用户参数，不形成回读环。
 ] <dec-design-frozen>
 
 == 三阶段流水线 <sec-triptych>
 
-设计生成分为三个阶段，前一阶段的输出作为后一阶段的输入。这套流程称为#term[Triptych 流水线][the Triptych pipeline]；执行协商阶段的框架部分称为#term[协商器][negotiator]。
+设计生成分为三个阶段，前一阶段的输出作为后一阶段的输入。执行协商阶段的框架部分称为#term[协商器][negotiator]。
 
-#图([Triptych 流水线。矩形表示阶段，胶囊表示阶段间的不可变产物。])[
+#图([三个阶段。矩形表示阶段，胶囊表示阶段间的不可变产物。])[
   #syn-diagram(
     spacing: (8mm, 9mm),
     node((0, 0), [*构建* \ Build], name: <b>),
@@ -186,7 +186,7 @@ outward 节点的函数称为 `dFn`，inward 节点的函数称为 `uFn`，二�
   [构建],
   [使用宿主语言代码例化模块树、声明节点、域和连接（@sec-build）。产物是设计规格 `DesignSpec`。],
   [协商],
-  [读入设计规格，结算各域与归属，核对每条 bind 跨越的域，并分阶段运行域检查；随后对参数依赖 DAG 做拓扑排序，正向传播 `Down`、反向传播 `Up`，逐边调用协议求解；最后计算各生成器模块的完整参数（@sec-two-layer-params），规划跨模块的端口与连线（@ch-negotiation）。产出协商结果 `ResolvedDesign`；发现首个错误立即终止并报告（@sec-error-semantics）。],
+  [读入设计规格，结算各域与归属，核对每条 bind 跨越的域，并分阶段运行域检查；随后对参数依赖 DAG 做拓扑排序，正向传播 `Down`、反向传播 `Up`，逐边调用协议求解；最后计算各生成器模块的完整参数（@sec-two-layer-params），规划跨模块的端口与连线（@ch-negotiation）。产出协商结果 `ResolvedDesign`。检查整批报告失败，计算在首个失败处终止（@sec-error-semantics）。],
   [例化],
   [读入协商结果：以各生成器模块的完整参数调用 zaozi 生成器，生成结构模块的电路，执行连线计划，链接为一个电路（@ch-hardware）。产出 mlirbc 与一组 Verilog 文件。],
 )
@@ -199,7 +199,11 @@ outward 节点的函数称为 `dFn`，inward 节点的函数称为 `uFn`，二�
 
 协商结果与硬件生成器之间的数据接口是每个生成器模块的#term[完整参数][full parameter]，即用户参数与已求解参数的合成（@sec-two-layer-params）。完整参数可序列化，使每个 IP 能以固定参数文件独立例化和测试，并支持归档与复现（@req-ip）。
 
-规格中的端口参数函数、完整参数函数与域检查属于当前协商进程。跨进程数据包括完整参数，以及按需导出的拓扑、域结算结果、连接求解结果和端口计划（@ch-tooling）。全局 `DomainId` 属于集成元数据，不自动进入生成器完整参数。
+规格中的端口参数函数、完整参数函数与域检查属于当前协商进程。跨进程数据包括完整参数，以及按需导出的拓扑、域结算结果、连接求解结果和端口计划（@ch-tooling）。
+
+#决策([完整参数只含属性与稳定名字])[
+  进入完整参数的是域的属性（如时钟频率、电源的上下电时序）和稳定名字（如域的声明名），不是实例路径。同一个 IP 在不同位置例化时，完整参数相同则模块相同（@sec-dedup）。
+] <dec-full-param-content>
 
 #图([序列化边界。`DesignSpec` 保存当前进程内的闭包，`ResolvedDesign` 保存已求解数据与完整参数；可序列化的完整参数进入生成器。])[
   #syn-canvas({

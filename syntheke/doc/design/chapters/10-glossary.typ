@@ -18,7 +18,7 @@
   [结算后的域], [`Settled`], [源都已确定的域，派生关系是纯数据（@sec-domain-settlement）。],
   [域图], [`DomainGraph`], [结算后的域与全部归属；检查插件与完整参数函数读取它（@sec-domain-settlement）。],
   [跨越声明], [`accepts`], [协议对每个非承载的活跃域类声明接受哪些关系（@sec-domain-crossing）。],
-  [域检查], [`DomainCheck`], [域类插件提供的检查，按良构、行为分阶段运行（@sec-domain-checks）。],
+  [域检查], [`DomainCheck`], [域类插件提供的检查，按良构、行为两个阶段运行（@sec-domain-checks）。],
   [承载], [carries], [协议声明自己经物理连线传送的域类；inward 端从 outward 端取域（@sec-domain-physical-carrier）。],
   [活跃域类], [active domain kind], [一条 bind 两端归属中出现的域类，必须由承载或协议的 `accepts` 覆盖（@sec-domain-crossing）。],
   [模块内部参数依赖], [module-internal parameter dependency], [端口参数函数读取本模块反方向节点所形成的 inward 到 outward 的依赖（@sec-node-conn-proto、@sec-propagation）。],
@@ -27,10 +27,10 @@
   [inward 节点], [inward node], [模块节点的一种：接收所在 bind 的 `Down`，用 `uFn` 产生 `Up`，恰好作为一次 bind 的目标（@sec-node-conn-proto）。],
   [outward 节点], [outward node], [模块节点的一种：用 `dFn` 产生所在 bind 的 `Down`，接收 `Up`，恰好作为一次 bind 的源（@sec-node-conn-proto）。],
   [节点草稿与端口句柄], [node draft, port handle], [节点声明返回草稿，以 `derive` 或 `fixed` 恰好封口一次后得到可以 bind 的端口句柄（@sec-node-conn-proto）。],
-  [稳定标识], [stable identifier], [`ModuleId`、`ModuleNodeId`、`BindId`、`DomainId`；由实例名路径、声明名与声明顺序派生（@sec-identity）。],
+  [稳定标识], [stable identifier], [`ModuleId`、`ModuleNodeId`、`BindId`、`DomainId`；由实例名路径与声明名派生（@sec-identity）。],
   [边], [edge], [一次设计 bind 对应的已求解连接，以 `BindId` 为稳定标识，包含 `Down`、`Up` 与 `Edge`（@sec-node-conn-proto、@sec-settle-pp）。],
   [构建上下文], [`BuildContext`], [框架注入模块体的构建期上下文；结构模块体为 `WrapperScope`，生成器模块体为 `GeneratorScope[FP]`（@sec-build）。],
-  [设计引用], [design reference], [模块体向外交出的值：端口句柄、域、探针、设计边界及其组合，须有 `Dangles` 证据（@sec-build）。],
+  [设计引用], [design reference], [设计体向外交出的值：端口句柄、探针、设计边界及其组合，须有 `Dangles` 证据（@sec-build）。],
   [设计], [`Design`], [一个独立协商的单位，体即根结构模块的体（@sec-build、@sec-design-boundary）。],
   [设计边界], [design boundary], [根上声明的对外端口，附带对外侧参数与域的假设（@sec-design-boundary）。],
   [边界模块], [boundary module], [代表设计外侧或所例化设计的伪模块，以常量节点参与协商，不产生硬件（@sec-design-boundary、@sec-boundary-ports）。],
@@ -54,15 +54,15 @@
   [边视图], [`EdgeView`], [求解完成后按模块整理的“节点到唯一设计边”映射（@sec-generator-records）。],
   [跨层端口规划], [cross-hierarchy port planning], [根据连接两端的层次路径生成所需的 Dangle 端口计划与逐层连线计划（@sec-punch-planning）。],
   [Dangle 端口], [dangle], [框架在被连接穿过的结构模块上生成的端口，名称可逆编码层次路径（@sec-punch-planning、@sec-port-naming）。],
-  [链接键], [linking key], [模块名对（生成器名字，规范化完整参数）的忠实编码，定义共享与链接据此进行（@sec-dedup）。],
+  [链接键], [linking key], [（生成器名字，规范化完整参数）的摘要，即模块名；定义共享与链接据此进行（@sec-dedup）。],
   [公开探针端口], [public probe port], [生成器由完整参数决定的 Output `Probe` 端口（@sec-dv-declarations）。],
-  [探针], [probe], [生成器模块对一个公开探针端口的类型化描述，`ProbeNode[P]`（@sec-dv-declarations）。],
-  [探针目录], [probe catalog], [协商后执行全部探针选择得到的记录；外层按类型查询（@sec-dv-catalog）。],
+  [探针契约], [probe contract], [代表一类探针的 `ProbeContract[P]` 对象，按对象同一性比较（@sec-dv-declarations）。],
+  [探针], [probe], [生成器模块对一个公开探针端口的描述，`ProbeNode[P]`（@sec-dv-declarations）。],
+  [探针目录], [probe catalog], [协商后执行全部探针选择得到的记录；外层按契约查询（@sec-dv-catalog）。],
   [观测者与观测绑定], [observer, observation binding], [读取探针的生成器，及其由完整参数报告的读取清单（@sec-dv-observation）。],
   [层路径], [layer path], [探针所属的 FIRRTL 层名称序列；层的关闭与移除由 FIRRTL 提供（@sec-layers）。],
   [例化单元], [elaboration unit], [一个设计例化成的独立电路（@sec-elaboration-flow）。],
   [zaozi], [—], [Syntheke 使用的独立硬件生成器库，通过基于 MLIR 的 CIRCT 产出 FIRRTL（@sec-generator-contract）。],
-  [Triptych 流水线], [the Triptych pipeline], [构建、协商、例化三阶段（@sec-triptych）。],
   [协商器], [negotiator], [执行协商阶段的框架部分（@sec-triptych、@ch-negotiation）。],
 )
 
@@ -75,8 +75,8 @@
   [@req-negotiation], [域由根和派生关系定义，先于数据结算并分阶段检查；bind 与模块内部参数依赖组成双向参数 DAG，`dFn`、`uFn` 按正反拓扑序传播，随后逐边求解], [@sec-domain-settlement、@sec-three-param-kinds–@sec-protocol-object、@sec-propagation、@sec-domain-checks],
   [@req-interconnect], [互连生成器模块显式声明每个端口节点与归属；物理时钟和复位仍经显式 bind，归属不生成连线], [@ch-interconnect],
   [@req-hierarchy], [跨层端口规划与端口命名], [@sec-punch-planning–@sec-port-naming],
-  [@req-verification], [公开探针端口、类型化探针、观测者与跨层路由], [@ch-verification],
-  [@req-ip], [完整参数作为序列化边界上的生成器输入], [@sec-serialization-boundary、@sec-serialization-list],
+  [@req-verification], [公开探针端口、探针契约、观测者与跨层路由], [@ch-verification],
+  [@req-ip], [完整参数作为序列化边界上的生成器输入], [@sec-serialization-boundary],
   [@req-subsystem], [设计边界、冻结契约与按设计生成电路], [@sec-design-boundary、@sec-boundary-ports、@sec-elaboration-flow],
 )
 
@@ -86,26 +86,23 @@
   columns: (auto, 1fr, auto),
   table.header([编号], [决策], [章节]),
   [@dec-pi-required], [每个设计协议必须实现 `interface`。], [@sec-protocol-interface],
-  [@dec-bits-default], [端口默认采用 `Bits`，只有算术到达的端口采用 `UInt`。], [@sec-protocol-interface],
   [@dec-domain-identity-attachment], [域身份由声明模块与声明名派生；每个节点每个域类至多一项归属。], [@sec-domain-model],
   [@dec-domain-no-wire], [域结构不产生端口和连线；bind 仍是唯一设计连接原语。], [@sec-domain-model],
   [@dec-domain-context], [`scope` 在构建作用域内提供默认域，只用于声明 `scoped` 的域类。], [@sec-domain-model],
   [@dec-design-frozen], [设计是冻结的复用单位，外层只能确认它的边界契约。], [@sec-design-boundary],
-  [@dec-domain-crossing-coverage], [每条 bind 的每个活跃域类必须由承载或协议检查覆盖。], [@sec-domain-crossing],
-  [@dec-domain-same-groups], [模块内部同域由选择器表达，不同域与数值关系由检查表达。], [@sec-same-domain-follow],
-  [@dec-domain-physical-check], [物理时钟与复位 bind 与域结构并存；承载协议的 inward 端从 outward 端取域。], [@sec-domain-physical-carrier],
+  [@dec-domain-crossing-coverage], [每条 bind 的每个活跃域类必须由承载或协议的 `accepts` 覆盖。], [@sec-domain-crossing],
   [@dec-domain-no-feedback], [域先于数据结算；端口参数函数与协议不读也不写域。], [@sec-domain-settlement],
   [@dec-domain-data], [域的根与派生关系是数据；模块对域的要求写在完整参数函数里。], [@sec-domain-model],
-  [@dec-domain-order-errors], [域检查分阶段：阶段内全部运行并一起报告，失败则不进入下一阶段。], [@sec-domain-checks],
-  [@dec-pp-local], [完整参数函数只读本模块的边与结算后的域。], [@sec-generator-parameters],
-  [@dec-dv-typed-query], [按探针参数类型查询探针，不按名字或路径。], [@sec-dv-catalog],
+  [@dec-domain-order-errors], [检查整批报告，有失败不进入下一阶段；计算在首个失败处停止。], [@sec-domain-checks],
+  [@dec-pp-local], [完整参数函数读本模块的边与整张域图。], [@sec-generator-parameters],
+  [@dec-full-param-content], [进入完整参数的是域的属性与稳定名字，不是实例路径。], [@sec-serialization-boundary],
+  [@dec-dv-typed-query], [按契约查询探针，不按名字或路径。], [@sec-dv-catalog],
   [@dec-dv-top], [探针公开到设计根，读取由观测者声明；测试平台不是特殊模块。], [@sec-dv-routing],
-  [@dec-layer-merge], [层路径按前缀合并。], [@sec-layers],
   [@dec-port-naming], [框架生成的 Dangle 端口名采用名称段的可逆编码，长度随层次线性增长。], [@sec-port-naming],
   [@dec-wrapper-module-name], [结构模块的模块名显式声明，并与其它模块名处于同一符号空间。], [@sec-dedup],
   [@dec-binding-check], [端口结构校验在例化期进行。], [@sec-generator-module],
   [@dec-unit-per-design], [每个设计单独生成一个电路。], [@sec-elaboration-flow],
-  [@dec-no-auto-monitor], [不提供自动监视器插入；观测面、检查逻辑与可移除性分别承担。], [@apx-lifecycle-monitor],
+  [@dec-no-auto-monitor], [不提供自动监视器插入；观测面、检查逻辑与可移除性分别承担。], [@sec-no-auto-monitor],
 )
 
 == 与 Diplomacy 的关系 <sec-diplomacy>
@@ -118,7 +115,7 @@ Diplomacy 是 rocket-chip 生态中的参数协商框架：模块在图上声明
 - 去掉 AOP（Aspect-Oriented Programming）带来的过高自由度，硬件只在生成器里（@sec-module-kinds）；
 - 去掉 `resolveStar` 与四种基数算子：端口数量由具名节点的显式声明给出，每个节点恰好参与一次 bind（@sec-attach）。
 
-这样做的目的是减少隐式行为，使模块边界、连接关系和生成过程更加明确，并回应 Diplomacy 在多层次耦合下的几个问题：验证成本高（@req-verification、@req-ip），后端设计无法切分边界（@req-ip、@sec-bridge-boundary），NoC 无法作为生成器模块纳入同一套集成流程（@req-interconnect）。既有代码库中基数算子的实际使用情况另见分析文档《边数机制实证调查》；Diplomacy 惯用的"从图读回参数"在本方案中的承接见 @apx-readback。
+这样做的目的是减少隐式行为，使模块边界、连接关系和生成过程更加明确，并回应 Diplomacy 在多层次耦合下的几个问题：验证成本高（@req-verification、@req-ip），后端设计无法切分边界（@req-ip、@sec-bridge-boundary），NoC 无法作为生成器模块纳入同一套集成流程（@req-interconnect）。既有代码库中基数算子的实际使用情况另见分析文档《边数机制实证调查》。Diplomacy 惯用的“从图读回参数”在本方案中拆到四处：传播折叠进的边参数、先于数据结算的域、按模块投影的完整参数，以及外层读取的冻结结果（@sec-propagation、@dec-design-frozen）。
 
 术语上，凡与 Diplomacy 指同一件事的，本文沿用 Diplomacy 的名字：`InwardNode` 与 `OutwardNode`、`Down` 与 `Up`、边、`dFn` 与 `uFn`、Dangle。下表列出名字不同或概念不完全重合之处。
 

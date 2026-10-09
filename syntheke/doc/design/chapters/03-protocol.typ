@@ -2,7 +2,7 @@
 
 = 协议抽象 <ch-protocol>
 
-协议规定一条连接上传播的参数类型和求解规则（@sec-node-conn-proto）。本章定义设计协议：一条设计 bind 上的 `Down`、`Up`、`Edge` 三种参数，逐边求解函数 `negotiate`，硬件接口描述，协议对跨边域关系的责任，以及生成器参数的双层结构。域结构不是协议（@sec-domain-model）；验证协议见 @ch-verification；参数在模块内部如何传播见 @sec-propagation。
+协议规定一条连接上传播的参数类型和求解规则（@sec-node-conn-proto）。本章定义设计协议：一条设计 bind 上的 `Down`、`Up`、`Edge` 三种参数，逐边求解函数 `negotiate`，硬件接口描述，协议对跨边域关系的责任，以及生成器参数的双层结构。域结构不是协议（@sec-domain-model）；验证观测见 @ch-verification；参数在模块内部如何传播见 @sec-propagation。
 
 == 边上传播的参数与求解结果 <sec-three-param-kinds>
 
@@ -20,11 +20,9 @@
   [中断], [设备 → 中断控制器], [供出的中断线数量与触发语义], [可汇聚的线数、支持的触发类型、编号空间],
   [物理时钟与复位线], [时钟源或时钟树 tap → 时钟输入], [物理接口属性；承载的域由 outward 端的归属给出], [可接受的物理接口属性；频率与复位类型要求由域结构声明],
   [Debug], [Debug 控制器 → 处理器核], [访问机制与可寻址范围], [断点与触发器数量、编号需求],
-  [Trace], [处理器核 → Trace 汇聚器], [Trace 格式与源标识范围], [缓冲深度、可分配的端口编号],
-  [MBIST], [存储宏 → MBIST 控制器], [存储几何参数与测试接口形态], [可调度的接口数、支持的测试算法],
 )
 
-两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interface(edge)` 生成该边的硬件接口（@sec-protocol-interface），接口不得含 `Probe`——探针属于验证协议，求解期检查。边的 `Down`、`Up`、`Edge` 随后进入两端生成器模块各自的 `EdgeView`（@sec-two-layer-params）。
+两遍传播结束后，每条 bind 恰好得到一项 `Down` 和一项 `Up`。`negotiate` 将二者合成为#term[边参数][edge parameter]（类型 `Edge`）；`interface(edge)` 生成该边的硬件接口（@sec-protocol-interface）。边的 `Down`、`Up`、`Edge` 随后进入两端生成器模块各自的 `EdgeView`（@sec-two-layer-params）。
 
 #图([一条边的求解输入。`Down`（蓝）沿 bind 方向传递，`Up`（红）沿相反方向传递；`negotiate` 将二者合成 `Edge`（绿）。])[
   #syn-diagram(
@@ -56,12 +54,12 @@
 
 一条 bind 两端的归属中出现的每个域类，称为这条 bind 的#term[活跃域类][active domain kind]。两端是否必须同域、能否跨电源，由协议回答，框架不认识时钟、复位或电源。
 
-协议承载的域类由构造同域：inward 端沿 bind 接收 outward 端的域（@sec-domain-physical-carrier）。其余每个活跃域类，协议在 `accepts` 中声明接受哪些关系：`Accept(K)(relation => ...)`，或不加条件的 `Accept.any(K)`。框架用域类的 `relate` 求出两端的关系，交给协议判断，不接受即报错。
+协议承载的域类由构造同域：inward 端沿 bind 接收 outward 端的域（@sec-domain-physical-carrier）。其余每个活跃域类，协议在 `accepts` 中声明接受哪些关系：`Accept(K)(relation => ...)`。框架用域类的 `relate` 求出两端的关系，交给协议判断，不接受即报错。
 
-例如 AXI 只接受同一个时钟、同一个复位、同一路电源；Serial 对时钟与复位不加条件；引脚类协议接受板上电源与芯片常开电源之间的跨越。
+例如 AXI 只接受同一个时钟、同一个复位、同一路电源；引脚类协议承载时钟与复位，只接受板上电源与芯片常开电源之间的跨越。
 
 #决策([每个活跃域类必须由承载或协议声明覆盖])[
-  框架不维护同步协议名单或异步豁免名单。一条 bind 两端出现的每个域类，要么由协议承载，要么在协议的 `accepts` 中有一项声明；漏掉是协议定义错误，在协商期报出。不加条件也必须显式写出。
+  框架不维护同步协议名单或异步豁免名单。一条 bind 两端出现的每个域类，要么由协议承载，要么在协议的 `accepts` 中有一项声明；漏掉是协议定义错误，在协商期报出。
 ] <dec-domain-crossing-coverage>
 
 生成器模块内部哪些端口同域，由归属表达：同一个域，或另一个节点的域。框架不从 `Down`、`Up`、`Edge` 或参数依赖推断（@sec-same-domain-follow）。
@@ -83,15 +81,11 @@
   每个设计协议（`Protocol`）必须实现 `interface`，为每个成功求解的 `Edge` 返回一个 `ProtocolBundle`。跨层端口与生成器端口校验均以这份结构为准。
 ] <dec-pi-required>
 
-没有连线的关系不作为协议。设备树、寄存器映射、域结构、UPF 等整机元数据由工具从导出数据生成（@sec-export）。
+没有连线的关系不作为协议；整机元数据从导出数据得到（@sec-export）。
 
 `ProtocolInterface` 是可序列化数据。协商期处理该数据，例化期将其翻译为 FIRRTL 类型。
 
-设计协议的接口由 `Bundle`、`Vec`、`Bits`、`UInt`、`SInt`、`Analog`、`Bool`、`Clock` 与 `AsyncReset` 构成，不得含 `Probe`。探针端口的类型是 `Probe`（FIRRTL 对内部信号的只读引用，@ch-verification），其中记录 `LayerPath`。
-
-#决策([端口默认是 `Bits`，只有算术到达的端口才是 `UInt`])[
-  `Bits`、`UInt` 与 `SInt` 翻译为同一族 FIRRTL 类型，区别只在声明说了什么。端口承载的是位，切片与拼接是对位做的；把不做算术的端口声明为 `UInt`，等于宣称它是一个数，且每次切片都要先撤销这个类型再装回去。因此默认是 `Bits`，只有加减、取模、大小比较真正到达的端口才声明为 `UInt`，转换发生在算术那一处。这条同样适用于生成器模块内部的寄存器与线网。
-] <dec-bits-default>
+设计协议的接口不得含 `Probe`，求解期检查；`Probe` 是探针端口的类型（FIRRTL 对内部信号的只读引用，@ch-verification），其中记录 `LayerPath`。
 
 `ProtocolBundle` 描述源端视角的字段结构。框架为源模块端口赋予 Output 根方向，为目标模块端口赋予 Input 根方向；对齐是无标记的默认，方向取反的字段以 `Flipped` 包装其类型（仅可直接作为字段类型出现）。字段顺序是接口结构的一部分。
 
@@ -100,7 +94,7 @@
 一个生成器最终使用的参数从两个来源合并而来：
 
 - #term[用户参数][user parameter]：构建期声明的容量、关联度、基地址与功能开关（@sec-module-kinds）。它在协商开始前就完全确定。
-- #term[已求解参数][resolved parameter]：完整参数中由协商结果决定的部分，包括设计边的协议参数与生成器所需的域属性。协商结束后，框架把本模块每个节点求出的边整理成该模块的#term[边视图][`EdgeView`]，并提供结算后的#term[域图][`DomainGraph`]（@sec-generator-records）；生成器模块以 `parameters { (edgeView, domainView) => ... }` 声明的完整参数函数读取这两份视图，与闭包中的用户参数直接合成完整参数（@sec-generator-parameters）。全局域身份只用于集成检查与导出，不自动进入完整参数。
+- #term[已求解参数][resolved parameter]：完整参数中由协商结果决定的部分，包括设计边的协议参数与生成器所需的域属性。协商结束后，框架把本模块每个节点求出的边整理成该模块的#term[边视图][`EdgeView`]，并提供结算后的#term[域图][`DomainGraph`]（@sec-generator-records）；生成器模块以 `parameters { (edgeView, domains) => ... }` 声明的完整参数函数读取这两份视图，与闭包中的用户参数直接合成完整参数（@sec-generator-parameters、@dec-full-param-content）。
 
 协商期调用生成器模块声明的完整参数函数，将两者合并为该模块的 `FullParam` 并存入 `ResolvedDesign`。完整参数穿越 @sec-serialization-boundary 定义的序列化边界：
 
