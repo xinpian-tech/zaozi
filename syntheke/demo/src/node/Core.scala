@@ -9,6 +9,7 @@ given GeneratorDefinition[CoreP] = zaozi(CoreGen)
 final case class CoreNodes(
   clk:                   ClockReset.Inward,
   mem:                   Axi4.Outward,
+  retention:             Retention.Inward,
   retirement:            ProbeNode[InstructionRetirement],
   private val debugNode: Option[DebugInterrupt.Inward]):
   def debug: DebugInterrupt.Inward =
@@ -34,11 +35,16 @@ object CoreNodes:
       inward(DebugInterrupt)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     }
 
+    val retentionDraft =
+      given sourcecode.Name = sourcecode.Name("retention")
+      inward(Retention)(clkDraft.domain(ClockDomain))
+
     val memDraft =
       given sourcecode.Name = sourcecode.Name("mem")
       outward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
     val clk       = clkDraft.fixed(())
+    val retention = retentionDraft.fixed(())
     val debugNode = debugDraft.map(_.fixed(DebugHartCap(CoreP.xlen)))
     val mem       = memDraft.fixed(
       AxiMasterPort(
@@ -54,7 +60,7 @@ object CoreNodes:
     val retirement = probe(retirementBinding.from(CoreGen) { (fp, public) =>
       public.instructionTrace.map(field => (InstructionRetirement(fp.xlen, fp.regIndexBits), field))
     })
-    CoreNodes(clk, mem, retirement, debugNode)
+    CoreNodes(clk, mem, retention, retirement, debugNode)
 
 def core(
   idBits:      Int,

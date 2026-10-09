@@ -10,7 +10,7 @@ use probe_rs::architecture::riscv::communication_interface::{
 };
 use probe_rs::config::Registry;
 use probe_rs::probe::Probe;
-use probe_rs::{MemoryInterface, Permissions, Session};
+use probe_rs::{Core, MemoryInterface, Permissions, RegisterId, Session};
 
 use crate::probe::SimProbe;
 
@@ -108,13 +108,38 @@ fn power_cycle(session: &mut Session, base: u64) -> Result<()> {
     Ok(())
 }
 
-fn power_demo(session: &mut Session, base: u64) -> Result<()> {
+// What CPU1 keeps in its retention flops: the GPRs, the machine CSRs it implements, and DCSR/DPC.
+fn retained_state(core: &mut Core<'_>) -> Result<Vec<(u16, u32)>> {
+    (0x1001..=0x100f)
+        .chain([0x300, 0x304, 0x305, 0x340, 0x341, 0x342, 0x343, 0x7b1])
+        .map(|address| {
+            let value: u32 = core.read_core_reg(RegisterId(address))
+                .with_context(|| format!("reading hart 1 register {address:#06x}"))?;
+            Ok((address, value))
+        })
+        .collect()
+}
+
+// Halts hart 1 mid-program, power-cycles CPU1 through the PRCM, and lets it go on from where it stopped.
+fn retention_demo(session: &mut Session, base: u64) -> Result<()> {
+    let before = {
+        let mut core = session.core(1)?;
+        core.halt(Duration::from_secs(10)).context("halting hart 1 before its power cycle")?;
+        retained_state(&mut core)?
+    };
     power_cycle(session, base)?;
-    // Back in Run the hart is out of reset and halted, as after a cold reset.
-    if !session.core(1)?.status().context("reaching hart 1 after its power cycle")?.is_halted() {
+    let mut core = session.core(1)?;
+    if !core.status().context("reaching hart 1 after its power cycle")?.is_halted() {
         bail!("hart 1 is not halted out of its power-on reset");
     }
-    println!("[simprobe] the PRCM brought CPU1 back to Run; hart 1 is out of reset and halted");
+    let after = retained_state(&mut core)?;
+    for ((address, was), (_, is)) in before.iter().zip(&after) {
+        if was != is {
+            bail!("hart 1 register {address:#06x} lost its value: {was:#010x} -> {is:#010x}");
+        }
+    }
+    println!("[simprobe] hart 1 kept 15 GPRs, 7 machine CSRs and DPC across the power cycle");
+    core.run().context("resuming hart 1 after its power cycle")?;
     Ok(())
 }
 
@@ -147,11 +172,6 @@ fn main() -> Result<()> {
         println!("[simprobe] wrote {} words at {:#010x}", words.len(), args.load);
     }
 
-    // CPU1 goes through a power cycle before the program runs: nothing it holds survives Off.
-    if let Some(base) = args.power_base {
-        power_demo(&mut session, base)?;
-    }
-
     for (hart, pc) in &args.hart_pcs {
         let mut core = session.core(*hart).with_context(|| format!("selecting hart {hart}"))?;
         core.halt(Duration::from_secs(10)).with_context(|| format!("halting hart {hart}"))?;
@@ -159,6 +179,10 @@ fn main() -> Result<()> {
         core.write_core_reg(program_counter, *pc).with_context(|| format!("setting hart {hart} pc"))?;
         core.run().with_context(|| format!("resuming hart {hart}"))?;
         println!("[simprobe] hart {hart} runs from {pc:#010x}");
+    }
+
+    if let Some(base) = args.power_base {
+        retention_demo(&mut session, base)?;
     }
 
     Ok(())

@@ -1,6 +1,7 @@
 package com.vowstar.ditdah32
 
 import me.jiuyang.zaozi.*
+import me.jiuyang.stdlib.clock.{ClockGate, ClockGateParameter, given}
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
@@ -30,7 +31,18 @@ object DitDah32Module
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    val pc                  = RegInit(parameter.resetVector.U(parameter.xlen))
+    // The architectural state sits in retention flops: their slave latches, on the always-on supply, see the clock through
+    // a gate that `sleep` closes, and only the always-on reset clears them. A power cycle of the core keeps this state;
+    // the core's own reset clears the rest.
+    val retentionGate = ClockGate.instantiate(ClockGateParameter(positive = true, clockDuringReset = false))
+    retentionGate.io.clock      := io.clock
+    retentionGate.io.resetN     := (!io.retention.reset.asBool).asReset
+    retentionGate.io.enable     := !io.retention.sleep
+    retentionGate.io.testEnable := false.B
+    def retained[T](body: (ClockScope, ResetScope) ?=> T): T =
+      body(using ClockScope.posedge(retentionGate.io.output), ResetScope.asyncActiveHigh(io.retention.reset))
+
+    val pc                  = retained(RegInit(parameter.resetVector.U(parameter.xlen)))
     val instrReg            = RegInit(0.B(parameter.xlen))
     val fetched             = RegInit(false.B)
     val fetchOutstanding    = RegInit(false.B)
@@ -49,17 +61,19 @@ object DitDah32Module
     val memStoreDataReg     = RegInit(0.B(parameter.xlen))
     val memStoreBeReg       = RegInit(0.U(4))
     val irqCauseReg         = RegInit(0.B(parameter.xlen))
-    val csrMstatus          = RegInit(0.B(parameter.xlen))
-    val csrMie              = RegInit(0.B(parameter.xlen))
-    val csrMtvec            = RegInit(0.U(parameter.xlen))
-    val csrMscratch         = RegInit(0.B(parameter.xlen))
-    val csrMepc             = RegInit(0.U(parameter.xlen))
-    val csrMcause           = RegInit(0.B(parameter.xlen))
-    val csrMtval            = RegInit(0.U(parameter.xlen))
+    val csrMstatus          = retained(RegInit(0.B(parameter.xlen)))
+    val csrMie              = retained(RegInit(0.B(parameter.xlen)))
+    val csrMtvec            = retained(RegInit(0.U(parameter.xlen)))
+    val csrMscratch         = retained(RegInit(0.B(parameter.xlen)))
+    val csrMepc             = retained(RegInit(0.U(parameter.xlen)))
+    val csrMcause           = retained(RegInit(0.B(parameter.xlen)))
+    val csrMtval            = retained(RegInit(0.U(parameter.xlen)))
     val trapEventReg        = RegInit(false.B)
     val gpr                 = DitDah32Gpr.instantiate(parameter)
     gpr.io.clock    := io.clock
     gpr.io.reset    := io.reset
+    gpr.io.retention.sleep := io.retention.sleep
+    gpr.io.retention.reset := io.retention.reset
     gpr.io.raddr1   := 0.U(5)
     gpr.io.raddr2   := 0.U(5)
     gpr.io.raddr3   := 0.U(5)
@@ -68,8 +82,8 @@ object DitDah32Module
     gpr.io.wdata    := 0.U(parameter.xlen)
     gpr.io.clearAll := false.B
 
-    val debugDcsr           = Option.when(parameter.enableDebug)(RegInit(0x40000003.U(parameter.xlen)))
-    val debugDpc            = Option.when(parameter.enableDebug)(RegInit(parameter.resetVector.U(parameter.xlen)))
+    val debugDcsr           = Option.when(parameter.enableDebug)(retained(RegInit(0x40000003.U(parameter.xlen))))
+    val debugDpc            = Option.when(parameter.enableDebug)(retained(RegInit(parameter.resetVector.U(parameter.xlen))))
     val debugStepActive     = Option.when(parameter.enableDebug)(RegInit(false.B))
     val debugResumeAck      = Option.when(parameter.enableDebug)(RegInit(false.B))
     val debugResetAck       = Option.when(parameter.enableDebug)(RegInit(false.B))

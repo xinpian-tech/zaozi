@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # bringup.sh <simulator> <simprobe> <artifacts-dir> <program.bin> <program.env> <dram-config>
 #
-# A bring-up: power on a chip that halts out of reset with nothing in memory, attach a debugger over JTAG, power-cycle
-# CPU1 through the PRCM, download the program, give each hart its start PC, let them go, and read the UART.
+# A bring-up: power on a chip that halts out of reset with nothing in memory, attach a debugger over JTAG, download
+# the program, give each hart its start PC and let them go; then halt hart 1 mid-program, power-cycle CPU1 through the
+# PRCM and let it go on from its retention flops. The UART line comes out whole across the cycle.
 #
 # Nothing about the design is written here: `design.env` comes out of the elaboration and `program.env` out of the
 # program's symbol table.

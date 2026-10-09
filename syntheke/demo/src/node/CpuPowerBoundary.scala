@@ -13,7 +13,8 @@ final case class CpuPowerBoundaryNodes(
   cpuMem:   Axi4.Inward,
   bus:      Axi4.Outward,
   debug:    DebugInterrupt.Inward,
-  cpuDebug: DebugInterrupt.Outward)
+  cpuDebug: DebugInterrupt.Outward,
+  retention: Retention.Outward)
 
 object CpuPowerBoundaryNodes:
   private[demo] def build(
@@ -49,10 +50,15 @@ object CpuPowerBoundaryNodes:
     val cpuDebugDraft =
       given sourcecode.Name = sourcecode.Name("cpuDebug")
       outward(DebugInterrupt)(cpuClock, cpuReset, cpuPower)
+    // The CPU's retention flops are clocked with it but held and cleared from the always-on side.
+    val retentionDraft =
+      given sourcecode.Name = sourcecode.Name("retention")
+      outward(Retention)(cpuClock, reset, aonPower)
 
     val clk = clkDraft.fixed(())
     val port = portDraft.fixed(())
     val cpuClk = cpuClkDraft.fixed(())
+    val retention = retentionDraft.fixed(())
     val cpuMem = cpuMemDraft.derive(busDraft)(slave => Right(slave))
     val bus = busDraft.derive(cpuMem) { port =>
       if port.masters.exists(_.maxFlight.forall(_ <= 0)) then
@@ -89,7 +95,7 @@ object CpuPowerBoundaryNodes:
           )
         )
     }
-    CpuPowerBoundaryNodes(clk, port, cpuClk, cpuMem, bus, debug, cpuDebug)
+    CpuPowerBoundaryNodes(clk, port, cpuClk, cpuMem, bus, debug, cpuDebug, retention)
 
 def cpuPowerBoundary(
   cpuPower: Domain[PowerDomain.type]

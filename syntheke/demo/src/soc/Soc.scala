@@ -173,6 +173,8 @@ object Soc:
         cpu1Boundary.clk <-- sysPll.tap("core1")
         core0.clk <-- cpu0Boundary.cpuClk
         core1.clk <-- cpu1Boundary.cpuClk
+        core0.retention <-- cpu0Boundary.retention
+        core1.retention <-- cpu1Boundary.retention
         dma.clk <-- sysPll.tap("dma")
         sysXbar.clk <-- sysPll.tap("sysXbar")
         bridge.clk <-- sysPll.tap("bridge")

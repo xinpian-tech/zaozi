@@ -1,9 +1,11 @@
 package com.vowstar.ditdah32
 
 import me.jiuyang.zaozi.*
+import me.jiuyang.stdlib.clock.{ClockGate, ClockGateParameter, given}
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
+import me.jiuyang.syntheke.demo.zaoziimpl.RetentionBundle
 
 class DitDah32GprLayers(parameter: DitDah32Parameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
@@ -13,6 +15,7 @@ class DitDah32GprProbe(parameter: DitDah32Parameter) extends DVBundle[DitDah32Pa
 class DitDah32GprIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
   val reset = Flipped(Reset())
+  val retention = Flipped(new RetentionBundle)
 
   val raddr1 = Flipped(UInt(5))
   val rdata1 = Aligned(UInt(parameter.xlen))
@@ -37,7 +40,15 @@ object DitDah32Gpr extends Generator[DitDah32Parameter, DitDah32GprLayers, DitDa
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope = ResetScope.syncActiveHigh(io.reset)
 
-    val regs = Seq.tabulate(16)(_ => RegInit(0.U(parameter.xlen)))
+    // The registers are retention flops; see DitDah32.
+    val retentionGate = ClockGate.instantiate(ClockGateParameter(positive = true, clockDuringReset = false))
+    retentionGate.io.clock      := io.clock
+    retentionGate.io.resetN     := (!io.retention.reset.asBool).asReset
+    retentionGate.io.enable     := !io.retention.sleep
+    retentionGate.io.testEnable := false.B
+    val regs = ClockScope.posedge(retentionGate.io.output) {
+      ResetScope.asyncActiveHigh(io.retention.reset)(Seq.tabulate(16)(_ => RegInit(0.U(parameter.xlen))))
+    }
 
     Seq((io.raddr1, io.rdata1), (io.raddr2, io.rdata2)).foreach { case (addr, out) =>
       out := 0.U(parameter.xlen)

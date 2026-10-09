@@ -83,6 +83,7 @@ class CorePIO(p: CoreP) extends HWBundle(p):
   val clk   = Flipped(new ClockBundle)
   val mem   = Aligned(new AxiPortBundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
   val debug = Option.when(p.enableDebug)(Flipped(new DebugHartBundle(p.xlen)))
+  val retention = Flipped(new RetentionBundle)
 
 @generator
 object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
@@ -99,6 +100,8 @@ object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
     )
     core.io.clock        := io.clk.clock
     core.io.reset        := inReset.asReset
+    core.io.retention.sleep := io.retention.sleep
+    core.io.retention.reset := io.retention.reset
     core.io.irq.software := false.B
     core.io.irq.timer    := false.B
     core.io.irq.external := false.B

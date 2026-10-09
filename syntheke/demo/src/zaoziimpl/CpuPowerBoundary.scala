@@ -35,11 +35,12 @@ class CpuPowerBoundaryPIO(p: CpuPowerBoundaryP) extends HWBundle(p):
   val bus = Aligned(new AxiPortBundle(p.axi))
   val debug = Flipped(new DebugHartBundle(p.xlen))
   val cpuDebug = Aligned(new DebugHartBundle(p.xlen))
+  val retention = Aligned(new RetentionBundle)
 
 /** The CPU side of one zaozi PR #159 PRCM port. The PRCM sequences the domain; the boundary switches its supply on
   * `powerRequest`, clamps its outputs on `isolationRequest` and, on `quiesceRequest`, halts the CPU and drains its
-  * AXI traffic before it answers `idle`. Feedback is on the management clock `clk`; the CPU runs on the clock and
-  * reset the PRCM drives.
+  * AXI traffic before it answers `idle`; while power is not good it holds the CPU's retention flops. Feedback is on the
+  * management clock `clk`; the CPU runs on the clock and reset the PRCM drives.
   */
 @generator
 object CpuPowerBoundaryGen
@@ -59,6 +60,9 @@ object CpuPowerBoundaryGen
     powerGoodMeta := supply.io.good
     powerGood := powerGoodMeta
     io.port.powerGood := powerGood
+    // Power is good only once the switch acknowledged it; until then the CPU's retention flops hold.
+    io.retention.sleep := !powerGood
+    io.retention.reset := io.clk.reset
 
     val isolated = RegInit(true.B)
     isolated := io.port.isolationRequest
