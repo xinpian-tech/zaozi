@@ -113,7 +113,7 @@
         # meson driving it all, the simulator, the DRAM model linked into it and
         # the debugger that brings the design up.
         devShells.syntheke = self.devShells.${system}.default.overrideAttrs (old: {
-          nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [ meson ninja cargo rustc ]);
+          nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [ meson ninja verilator cargo rustc ]);
           # What the simulation links, and what brings the design up. The last two are for building the DPI library
           # outside nix: `cargo build` in demo/sim/ binds the C ABI's header, and bindgen wants libclang to do it.
           SYNTHEKE_DPI_INSTALL_PATH = pkgs.syntheke.dpi;

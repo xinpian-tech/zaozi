@@ -8,6 +8,7 @@ prefixes = {}
 foreach tool : [
   ['dpi', 'SYNTHEKE_DPI_INSTALL_PATH'],
   ['riscv', 'RISCV_TOOLCHAIN_INSTALL_PATH'],
+  ['simprobe', 'SIMPROBE_INSTALL_PATH'],
 ]
   prefix = get_option(tool[0])
   if prefix == ''
@@ -48,5 +49,27 @@ program = custom_target(
   build_by_default: true,
 )
 
+# ---- the simulator -----------------------------------------------------------------------------------------------
+# The behavioural definitions of the external modules; what they do beyond driving pins is the DPI library's.
+sim = meson.current_source_dir() / 'sim'
 models = ['ClockGen.sv', 'SimConsole.sv', 'PllAnalog.sv', 'TraceLog.sv', 'JtagDpi.sv', 'DramDpi.sv', 'PowerCells.sv']
+find_program('verilator')
+
+simulator = custom_target(
+  'simulator',
+  input: artifacts,
+  output: 'VTestbench',
+  command: [scripts / 'verilate.sh', '@INPUT@', sim, prefixes['dpi'], '@OUTPUT@'] + models,
+  build_by_default: true,
+  console: true,
+)
+
+# ---- the bring-up: a debugger attaches over JTAG, power-cycles CPU1, loads the harts and lets them go -------------
+test(
+  'soc bring-up',
+  find_program(scripts / 'bringup.sh'),
+  args: [simulator, prefixes['simprobe'] / 'bin' / 'simprobe', artifacts, program[0], program[1], sim / 'dram.yaml'],
+  timeout: 600,
+)
+
 summary({'simulator models': ' '.join(models), 'DPI library': prefixes['dpi']})
