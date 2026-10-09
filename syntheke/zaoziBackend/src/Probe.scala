@@ -1,0 +1,46 @@
+package me.jiuyang.syntheke.zaozi
+
+import me.jiuyang.syntheke.*
+import me.jiuyang.zaozi.{DVInterface, HWRecord, Parameter}
+import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.reftpe.{Interface, Node}
+import me.jiuyang.zaozi.syntheke.PublicProbes
+import me.jiuyang.zaozi.valuetpe.*
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+
+import java.lang.foreign.Arena
+import upickle.default.Writer
+
+private[zaozi] final class ZaoziProbeDeclaration(
+  val generator: AnyRef,
+  val declaration: DVInterface[?, ?],
+  val ports: Vector[ProbePort]) extends ProbeDeclaration
+
+/** A probe an observer reads. In the observer's full parameter it is its binding: the source and the input port. */
+final class Probe[T <: Data & CanProbe] private[zaozi] (val dataType: T, private[zaozi] val node: ResolvedPublicPort):
+  private[zaozi] def id: ModuleNodeId = node.id
+
+object Probe:
+  given [T <: Data & CanProbe]: Writer[Probe[T]] =
+    upickle.default.writer[ProbeBinding].comap(handle => ProbeBindings.from(Vector(handle.node)).ports.head)
+
+/** The interface of an observer: its parameter's ports, and an input port for each probe it reads. */
+abstract class ProbeIO[FP <: Parameter](parameter: FP, observations: Probe[?]*) extends HWRecord(parameter):
+  private[zaozi] val handles: Vector[Probe[?]] = observations.toVector.distinctBy(_.node)
+  private[zaozi] val plan: ProbeBindings = ProbeBindings.from(handles.map(_.node))
+
+  handles.zip(plan.ports).foreach { (handle, binding) =>
+    Flipped(binding.portName, handle.dataType)
+  }
+
+final class BoundProbe[T <: Data & CanProbe] private[zaozi] (
+  private[zaozi] val value: Node[T])
+
+private[zaozi] object ProbeAccess:
+  def bind[T <: Data & CanProbe, I <: ProbeIO[?]](handle: Probe[T], io: Interface[I])(
+    using Arena, Context, Block, sourcecode.File, sourcecode.Line
+  ): BoundProbe[T] =
+    require(io.getType.handles.exists(_.node == handle.node), s"${handle.id.show}: source is not observed by this interface")
+    val binding = io.getType.plan.ports.find(_.source == handle.id).get
+    val value = PublicProbes.node(handle.dataType, io.field[Data](binding.portName).refer)
+    new BoundProbe(value)

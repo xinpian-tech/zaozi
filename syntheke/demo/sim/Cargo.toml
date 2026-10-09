@@ -1,0 +1,12 @@
+[package]
+name = "syntheke-dpi"
+version = "0.1.0"
+edition = "2021"
+description = "What the demo SoC's testbench does outside the RTL: the debugger's socket, and the memory behind the bus"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[build-dependencies]
+bindgen = "0.72"

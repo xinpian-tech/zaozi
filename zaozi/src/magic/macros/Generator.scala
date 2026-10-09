@@ -6,8 +6,11 @@ import scala.annotation.{experimental, MacroAnnotation}
 import scala.quoted.*
 import scala.util.chaining.*
 
+/** Derive interfaces and standalone CLI support. With `inMemory = true`, automatic CLI entry points explicitly reject
+  * use instead of requiring JSON readers or argument parsers; explicit user CLI overrides remain available.
+  */
 @experimental
-class generator extends MacroAnnotation:
+class generator(inMemory: Boolean = false) extends MacroAnnotation:
   def transform(
     using Quotes
   )(definition: quotes.reflect.Definition,
@@ -224,8 +227,23 @@ class generator extends MacroAnnotation:
                 )
         )
 
-        def defOpt[D <: Definition](definition: D)  =
-          Option.unless(definition.symbol.overridingSymbol(objSym).exists)(definition)
+        def inMemoryCliDef(symbolName: String, argumentType: TypeRepr, resultType: TypeRepr): DefDef =
+          DefDef(
+            Symbol.newMethod(objSym, symbolName, MethodType(List("args"))(_ => List(argumentType), _ => resultType)),
+            _ =>
+              Some('{ throw new UnsupportedOperationException("This generator requires in-memory parameters") }.asTerm)
+          )
+
+        def defOpt(symbolName: String)(definition: => DefDef): Option[DefDef] =
+          val owner       = Symbol.requiredClass(
+            if tptVOpt.isDefined then "me.jiuyang.zaozi.VerilogWrapper" else "me.jiuyang.zaozi.Generator"
+          )
+          val required    = owner.declaredMethod(symbolName).head
+          val implemented = objSym
+            .memberMethod(symbolName)
+            .exists: candidate =>
+              !candidate.flags.is(Flags.Deferred) && candidate.signature.paramSigs == required.signature.paramSigs
+          Option.unless(implemented)(definition)
         def defSome[D <: Definition](definition: D) =
           if (definition.symbol.overridingSymbol(objSym).exists)
             report.errorAndAbort(s"Overriding ${definition.symbol.name} is forbidden")
@@ -235,8 +253,12 @@ class generator extends MacroAnnotation:
         val interfaceDefOpt = makeInterfaceDef("interface", tptI).pipe(defSome)
         val probeDefOpt     = makeInterfaceDef("probe", tptP).pipe(defSome)
 
-        val parseParameterDefOpt = parseParameterDef.pipe(defOpt)
-        val mainDefOpt           = mainDef.pipe(defOpt)
+        val parseParameterDefOpt = defOpt("parseParameter"):
+          if inMemory then inMemoryCliDef("parseParameter", TypeRepr.of[Seq[String]], tptParam.tpe)
+          else parseParameterDef
+        val mainDefOpt           = defOpt("main"):
+          if inMemory then inMemoryCliDef("main", TypeRepr.of[Array[String]], TypeRepr.of[Unit])
+          else mainDef
 
         val newBody = List(
           layersDefOpt,

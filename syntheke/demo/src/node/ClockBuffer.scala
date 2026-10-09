@@ -1,0 +1,33 @@
+package me.jiuyang.syntheke.demo
+
+import me.jiuyang.syntheke.*
+import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
+import me.jiuyang.syntheke.zaozi.zaozi
+
+given GeneratorDefinition[ClockBufferP] = zaozi(ClockBufferGen)
+
+final case class ClockBufferNodes(in: ClockReset.Inward, out: ClockReset.Outward)
+
+object ClockBufferNodes:
+  private[demo] def build(
+    using GeneratorScope[ClockBufferP]
+  ): ClockBufferNodes =
+    val inDraft =
+      given sourcecode.Name = sourcecode.Name("in")
+      inward(ClockReset)()
+    val outDraft =
+      given sourcecode.Name = sourcecode.Name("out")
+      outward(ClockReset)(inDraft.domain(ClockDomain), inDraft.domain(ResetDomain))
+
+    val in = inDraft.fixed(())
+    val out = outDraft.fixed(())
+    parameters((_, _) => Right(ClockBufferP()))
+    ClockBufferNodes(in, out)
+
+def clockBuffer()(
+  using
+  ws: WrapperScope,
+  name: sourcecode.Name,
+  file: sourcecode.File,
+  line: sourcecode.Line
+): ClockBufferNodes = generator[ClockBufferP](ClockBufferNodes.build)
