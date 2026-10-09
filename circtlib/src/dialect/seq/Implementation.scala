@@ -30,6 +30,29 @@ given ToClockApi with
     ): Value = ref._operation.getResult(0)
 end given
 
+given FromClockApi with
+  def op(
+    input:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FromClock =
+    FromClock(
+      summon[OperationApi].operationCreate(
+        name = "seq.from_clock",
+        location = location,
+        operands = Seq(input),
+        resultsTypes = Some(Seq(1.integerTypeGet))
+      )
+    )
+  extension (ref: FromClock) def operation: Operation = ref._operation
+  extension (ref: FromClock)
+    def result(
+      using Arena
+    ): Value = ref._operation.getResult(0)
+end given
+
 given ClockInvApi with
   def op(
     input:    Value,

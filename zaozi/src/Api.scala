@@ -274,19 +274,8 @@ trait VerilogWrapperApi:
       InstanceContext
     ): Instance[I, P]
 
-/** DPI scalar/vector integers or a SystemVerilog string. */
-enum DpiType:
-  case Integer(width: Int, signed: Boolean = false)
-  case String
-
-final case class DpiArg(name: String, direction: DPIDirection, tpe: DpiType):
-  tpe match
-    case DpiType.Integer(width, _) => require(width > 0, s"invalid DPI width: $width")
-    case DpiType.String            => ()
-
-object DpiArg:
-  def apply(name: String, direction: DPIDirection, width: Int, signed: Boolean = false): DpiArg =
-    new DpiArg(name, direction, DpiType.Integer(width, signed))
+final case class DpiArg(name: String, direction: DPIDirection, width: Int, signed: Boolean = false):
+  require(width > 0, s"invalid DPI width: $width")
 
 final case class DpiFunction(symbol: String, arguments: Seq[DpiArg])
 
@@ -330,16 +319,6 @@ trait SimApi:
     clock:    Value,
     enabled:  Option[Value],
     inputs:   Seq[Value]
-  )(
-    using Arena,
-    Context,
-    Block
-  ): DpiCallResult
-
-  /** Calls a DPI function at the current point in a procedure; results are immediately available within it. */
-  def dpiCallProcedural(
-    function: DpiFunction,
-    inputs:   Seq[Value] = Seq.empty
   )(
     using Arena,
     Context,
@@ -472,6 +451,44 @@ final class SVCase(val value: BigInt, val body: Block ?=> Unit)
 
 /** Builds SV storage, procedural control flow, and assignments in the current block. */
 trait SVApi:
+  /** Builds an SV always procedure on the rising edge of a `!seq.clock` value. */
+  def onClock(
+    clock:   Value,
+    enabled: Option[Value] = None
+  )(body:    Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Declares an SV function and its DPI import at builtin module scope. */
+  def dpiFunction(
+    symbol:    String,
+    cName:     Option[String],
+    arguments: Seq[DpiArg]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): DpiFunction
+
+  /** Calls a DPI function in the current procedure, with immediately usable results. */
+  def dpiCallProcedural(
+    function: DpiFunction,
+    inputs:   Seq[Value] = Seq.empty
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): DpiCallResult
+
   def initial(
     body: Block ?=> Unit
   )(
@@ -507,16 +524,6 @@ trait SVApi:
     sourcecode.File,
     sourcecode.Line
   ): Unit
-
-  def stringConstant(
-    value: String
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line
-  ): Value
 
   def wire(
     elementType: Type,

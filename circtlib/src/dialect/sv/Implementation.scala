@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.sv.operation
 
-import org.llvm.circt.scalalib.capi.dialect.hw.{TypeApi as HWTypeApi, given}
+import org.llvm.circt.{CAPI, HWModulePort as NativeHWModulePort}
+import org.llvm.circt.scalalib.capi.dialect.hw.{HWModulePort, TypeApi as HWTypeApi, given}
+import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
 import org.llvm.mlir.scalalib.capi.ir.{
   Attribute,
   AttributeApi,
@@ -29,6 +31,123 @@ private inline def named(
   Context
 ): NamedAttribute =
   summon[NamedAttributeApi].namedAttributeGet(name.identifierGet, value)
+
+given AlwaysApi with
+  def op(
+    events:   Seq[EventControl],
+    clocks:   Seq[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Always =
+    Always(
+      summon[OperationApi].operationCreate(
+        name = "sv.always",
+        location = location,
+        operands = clocks,
+        namedAttributes = Seq(
+          named("events", events.map(_.ordinal.toLong.integerAttrGet(32.integerTypeGet)).arrayAttrGet)
+        ),
+        regionBlockTypeLocations = Seq(Seq((Seq.empty, Seq.empty))),
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: Always)
+    def operation: Operation = ref._operation
+    def block(
+      using Arena
+    ): Block = ref.operation.getFirstRegion.getFirstBlock
+end given
+
+given FuncApi with
+  def op(
+    symbol:      String,
+    ports:       Seq[Port],
+    returnPort:  Option[Int],
+    verilogName: Option[String],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): Func =
+    val nativePorts = ports.map: port =>
+      val raw = NativeHWModulePort.allocate(summon[Arena])
+      NativeHWModulePort.name(raw, port.name.stringAttrGet.segment)
+      NativeHWModulePort.`type`(raw, port.tpe.segment)
+      NativeHWModulePort.dir(
+        raw,
+        port.direction match
+          case PortDirection.Input  => CAPI.Input()
+          case PortDirection.Output => CAPI.Output()
+          case PortDirection.InOut  => CAPI.InOut()
+      )
+      HWModulePort(raw)
+    val argumentAttrs = ports.indices.map: index =>
+      val attributes =
+        if returnPort.contains(index) then
+          Map("sv.func.explicitly_returned" -> summon[AttributeApi].unitAttrGet)
+        else Map.empty[String, Attribute]
+      attributes.directoryAttrGet
+    Func(
+      summon[OperationApi].operationCreate(
+        name = "sv.func",
+        location = location,
+        regionBlockTypeLocations = Seq(Seq.empty),
+        namedAttributes = Seq(
+          named("sym_name", symbol.stringAttrGet),
+          named("sym_visibility", "private".stringAttrGet),
+          named("module_type", summon[HWTypeApi].moduleTypeGet(ports.size, nativePorts).typeAttrGet),
+          named("per_argument_attrs", argumentAttrs.arrayAttrGet)
+        ) ++ verilogName.toSeq.map(name => named("verilogName", name.stringAttrGet)),
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: Func) def operation: Operation = ref._operation
+end given
+
+given FuncDPIImportApi with
+  def op(
+    callee:      String,
+    linkageName: Option[String],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): FuncDPIImport =
+    FuncDPIImport(
+      summon[OperationApi].operationCreate(
+        name = "sv.func.dpi.import",
+        location = location,
+        namedAttributes = Seq(named("callee", callee.flatSymbolRefAttrGet)) ++
+          linkageName.toSeq.map(name => named("linkage_name", name.stringAttrGet)),
+        resultsTypes = Some(Seq.empty)
+      )
+    )
+  extension (ref: FuncDPIImport) def operation: Operation = ref._operation
+end given
+
+given FuncCallProceduralApi with
+  def op(
+    callee:      String,
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): FuncCallProcedural =
+    FuncCallProcedural(
+      summon[OperationApi].operationCreate(
+        name = "sv.func.call.procedural",
+        location = location,
+        namedAttributes = Seq(named("callee", callee.flatSymbolRefAttrGet)),
+        operands = inputs,
+        resultsTypes = Some(resultTypes)
+      )
+    )
+  extension (ref: FuncCallProcedural) def operation: Operation = ref._operation
+end given
 
 given InitialApi with
   def op(
@@ -173,24 +292,6 @@ given BPAssignApi with
       )
     )
   extension (ref: BPAssign) def operation: Operation = ref._operation
-
-given ConstantStrApi with
-  def op(
-    value:    String,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ): ConstantStr =
-    new ConstantStr(
-      summon[OperationApi].operationCreate(
-        name = "sv.constantStr",
-        location = location,
-        namedAttributes = Seq(named("str", value.stringAttrGet)),
-        resultsTypes = Some(Seq(summon[HWTypeApi].stringTypeGet))
-      )
-    )
-  extension (ref: ConstantStr) def operation: Operation = ref._operation
 
 given RegApi with
   def op(

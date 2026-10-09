@@ -62,11 +62,6 @@ object SVSmoke extends TestSuite:
         op.operation.appendToBlock()
         assert(op.operation.getName.str == "sv.passign")
 
-      test("ConstantStr"):
-        val op = summon[ConstantStrApi].op("dram.yaml", unknownLocation)
-        op.operation.appendToBlock()
-        assert(op.operation.getName.str == "sv.constantStr")
-
       test("Reg"):
         val register = summon[RegApi].op(1.integerTypeGet, "value", None, unknownLocation)
         register.operation.appendToBlock()

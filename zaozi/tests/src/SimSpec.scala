@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.zaozitest
 
-import me.jiuyang.zaozi.{DpiArg, HWApi, SVApi, SimApi}
+import me.jiuyang.zaozi.{DpiArg, HWApi, SVApi}
 import me.jiuyang.zaozi.default.given
 import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
-import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SVDialectApi, given}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
 import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
@@ -25,13 +24,12 @@ object SimSpec extends TestSuite:
         try
           summon[HWDialectApi].loadDialect
           summon[SeqDialectApi].loadDialect
-          summon[SimDialectApi].loadDialect
           summon[SVDialectApi].loadDialect
           val module = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
           try
             given Block = module.getBody
-            val first   = summon[SimApi].dpiFunction("first", None, Seq(DpiArg("value", DPIDirection.Return, 8)))
-            val second  = summon[SimApi].dpiFunction("second", None, Seq(DpiArg("value", DPIDirection.In, 8)))
+            val first   = summon[SVApi].dpiFunction("first", None, Seq(DpiArg("value", DPIDirection.Return, 8)))
+            val second  = summon[SVApi].dpiFunction("second", None, Seq(DpiArg("value", DPIDirection.In, 8)))
             summon[HWApi].module(
               "SimTop",
               Seq(
@@ -42,10 +40,10 @@ object SimSpec extends TestSuite:
               val clock    = summon[Block].getArgument(0).toClock
               val enable   = summon[Block].getArgument(1)
               val register = summon[SVApi].reg(8.integerTypeGet, "value")
-              summon[SimApi].triggered(clock, Some(enable)):
-                val value = summon[SimApi].dpiCallProcedural(first)("value")
+              summon[SVApi].onClock(clock, Some(enable)):
+                val value = summon[SVApi].dpiCallProcedural(first)("value")
                 assert(value.getType.equal(8.integerTypeGet))
-                summon[SimApi].dpiCallProcedural(second, Seq(value))
+                summon[SVApi].dpiCallProcedural(second, Seq(value))
                 summon[SVApi].nonBlockingAssign(register, value)
               summon[HWApi].output(Seq.empty)
             assert(module.getOperation.verify)

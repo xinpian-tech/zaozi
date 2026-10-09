@@ -4,8 +4,7 @@
 // circt-c/Dialect/Sim.h
 package org.llvm.circt.scalalib.capi.dialect.sim
 
-import org.llvm.mlir.scalalib.capi.ir.{Context, Module, Type}
-import org.llvm.mlir.scalalib.capi.support.LogicalResult
+import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
 import java.lang.foreign.Arena
 
@@ -23,13 +22,6 @@ trait DialectApi:
     context:     Context
   ):                  Unit
   def registerPasses: Unit
-
-  extension (module: Module)
-    def exportDPIInterface(
-      callback: String => Unit
-    )(
-      using Arena
-    ): LogicalResult
 end DialectApi
 
 enum DPIDirection(val cValue: Int):
@@ -41,7 +33,7 @@ enum DPIDirection(val cValue: Int):
 
 final case class DPIArgument(name: String, tpe: Type, direction: DPIDirection)
 
-/** Constructors for the sim dialect types. */
+/** Construction and inspection of sim dialect types. */
 trait TypeApi:
   /** `!sim.fstring` — a format string fragment or concatenation thereof. */
   def formatStringTypeGet(
@@ -71,6 +63,17 @@ trait TypeApi:
     using Arena,
     Context
   ): Type
+
+  extension (tpe: Type)
+    def dpiFunctionTypeGetNumArguments: Int
+    def dpiFunctionTypeGetArgument(
+      index: Int
+    )(
+      using Arena
+    ): DPIArgument
+    def dpiFunctionTypeGetFunctionType(
+      using Arena
+    ): Type
 
   /** `!sim.output_stream` — a console or file output stream handle. */
   def outputStreamTypeGet(

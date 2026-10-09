@@ -7,6 +7,7 @@ import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, HWInterface, SVApi,
 import me.jiuyang.zaozi.default.given
 import me.jiuyang.zaozi.valuetpe.{BundleField, Data}
 import org.llvm.circt.scalalib.dialect.hw.operation.{Port, PortDirection}
+import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
 import org.llvm.mlir.MlirOperation
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
@@ -60,7 +61,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     Iterator
       .iterate(summon[Block].getParentOperation)(_.getParentOperation)
       .takeWhile(operation => MlirOperation.ptr(operation.segment).address != 0)
-      .exists(operation => Set("sim.triggered", "sv.initial").contains(operation.getName.str))
+      .exists(operation => Set("sv.always", "sv.initial").contains(operation.getName.str))
 
   def onClock(
     clock:   Value,
@@ -72,7 +73,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     Block
   ): Unit =
     require(summon[Block].getParentOperation.getName.str == "hw.module", "onClock requires the wrapper module scope")
-    summon[SimApi].triggered(clock, enabled)(body)
+    summon[SVApi].onClock(clock, enabled)(body)
 
   def dpiFunction(
     symbol:    String,
@@ -88,11 +89,9 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
       .takeWhile(operation => MlirOperation.ptr(operation.segment).address != 0)
       .find(_.getName.str == "builtin.module")
       .getOrElse(throw new IllegalArgumentException("DPI declaration requires an enclosing builtin.module"))
-    summon[SimApi].dpiFunction(symbol, cName, arguments)(
-      using summon[Arena],
-      summon[Context],
-      module.getFirstRegion.getFirstBlock
-    )
+    locally:
+      given Block = module.getFirstRegion.getFirstBlock
+      summon[SVApi].dpiFunction(symbol, cName, arguments)
 
   def dpiCall(
     function: DpiFunction,
@@ -107,7 +106,17 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
       summon[Block].getParentOperation.getName.str == "hw.module",
       "dpiCall creates an independent process; use dpiCallProcedural inside onClock"
     )
-    summon[SimApi].dpiCall(function, fallingClock, enabled, inputs)
+    val sv = summon[SVApi]
+    val outputs = function.arguments.filter(arg =>
+      arg.direction == DPIDirection.Out || arg.direction == DPIDirection.Return
+    )
+    val registers = outputs.map: arg =>
+      val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+      arg.name -> sv.reg(tpe, s"${function.symbol}_${arg.name}")
+    onClock(fallingClock, enabled):
+      val values = sv.dpiCallProcedural(function, inputs)
+      registers.foreach((name, register) => sv.nonBlockingAssign(register, values(name)))
+    DpiCallResult(registers.map((name, register) => name -> register.readInOut).toMap)
 
   def dpiCallProcedural(
     function: DpiFunction,
@@ -116,7 +125,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     using Arena,
     Context,
     Block
-  ): DpiCallResult = summon[SimApi].dpiCallProcedural(function, inputs)
+  ): DpiCallResult = summon[SVApi].dpiCallProcedural(function, inputs)
 
   def finish(
     condition: Value,

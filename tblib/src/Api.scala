@@ -178,7 +178,7 @@ trait TestbenchGeneratorApi:
       using Arena
     ): Array[Byte]
 
-    /** Returns the DPI interface declared in the testbench as structured JSON. */
+    /** Reads imported SV function ports through the CIRCT HW type C API and returns their interface as structured JSON. */
     def toDpiJson(
       using Arena
     ): ujson.Value

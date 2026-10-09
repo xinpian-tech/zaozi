@@ -19,7 +19,6 @@ import org.llvm.circt.CAPI.{
   hwModuleTypeGetPort,
   hwParamIntTypeGet,
   hwParamIntTypeGetWidthAttr,
-  hwStringTypeGet,
   hwStructTypeGet,
   hwStructTypeGetField,
   hwStructTypeGetNumFields,
@@ -42,12 +41,6 @@ import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, given}
 import java.lang.foreign.{Arena, MemorySegment}
 
 given TypeApi with
-  def stringTypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type =
-    Type(hwStringTypeGet(arena, context.segment))
-
   def arrayTypeGet(
     element:     Type,
     size:        Int

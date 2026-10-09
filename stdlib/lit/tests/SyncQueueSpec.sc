@@ -90,7 +90,7 @@
 // COMBINED: hw.instance "clockGenerator" @Clock_periodNs10
 // COMBINED: seq.clock_inv
 // COMBINED-NOT: seq.clock_inv
-// COMBINED: {{^  }}sim.func.dpi @step(
+// COMBINED: {{^  }}sv.func private @step(
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
 

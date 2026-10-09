@@ -5,6 +5,9 @@ package org.llvm.circt.scalalib.capi.dialect.sim
 import org.llvm.circt.CAPI.{
   simAssocArrayTypeGet,
   simDPIFunctionTypeGet,
+  simDPIFunctionTypeGetArgument,
+  simDPIFunctionTypeGetFunctionType,
+  simDPIFunctionTypeGetNumArguments,
   simDynamicStringTypeGet,
   simFormatStringTypeGet,
   simOutputStreamTypeGet,
@@ -60,6 +63,25 @@ given TypeApi with
       org.llvm.circt.SimDPIArgument.direction(entry, arg.direction.cValue)
     }
     Type(simDPIFunctionTypeGet(arena, context.segment, arguments.size.toLong, buffer))
+
+  extension (tpe: Type)
+    def dpiFunctionTypeGetNumArguments: Int = simDPIFunctionTypeGetNumArguments(tpe.segment).toInt
+
+    def dpiFunctionTypeGetArgument(
+      index: Int
+    )(
+      using arena: Arena
+    ): DPIArgument =
+      val argument = simDPIFunctionTypeGetArgument(arena, tpe.segment, index.toLong)
+      DPIArgument(
+        StringRef(org.llvm.circt.SimDPIArgument.name(argument)).toScalaString,
+        Type(org.llvm.circt.SimDPIArgument.`type`(argument)),
+        DPIDirection.fromOrdinal(org.llvm.circt.SimDPIArgument.direction(argument))
+      )
+
+    def dpiFunctionTypeGetFunctionType(
+      using arena: Arena
+    ): Type = Type(simDPIFunctionTypeGetFunctionType(arena, tpe.segment))
 
   def outputStreamTypeGet(
     using Arena,

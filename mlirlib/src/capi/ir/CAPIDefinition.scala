@@ -570,6 +570,7 @@ trait TypeApi extends HasSegment[Type] with HasSizeOf[Type]:
       context:     Context
     ): Type
   extension (tpe:   Type)
+    inline def isInteger: Boolean
     inline def equal(that: Type): Boolean
     inline def print(
       callback:    String => Unit
@@ -627,6 +628,11 @@ trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
     )(
       using arena: Arena
     ):                                       Attribute
+    inline def dictionaryAttrGetElementByName(
+      name: String
+    )(
+      using arena: Arena
+    ): Attribute
   // Floating point
   inline def floatAttrGetTypeID(
     using arena: Arena

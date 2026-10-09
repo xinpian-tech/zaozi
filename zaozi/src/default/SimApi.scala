@@ -2,34 +2,23 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.zaozi.default
 
-import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, DpiType, SimApi}
-import org.llvm.circt.scalalib.capi.dialect.hw.{TypeApi as HWTypeApi, given}
+import me.jiuyang.zaozi.{DpiArg, DpiCallResult, DpiFunction, SimApi}
 
 import org.llvm.circt.scalalib.dialect.sim.operation.{
   ClockedTerminateApi,
   DPIArgument,
   DPICallApi,
-  DPICallProcApi,
   DPIDirection,
   DPIFuncApi,
   TerminateApi,
   TriggeredApi,
   given
 }
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Type, TypeApi, Value, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
 import java.lang.foreign.Arena
 
 given SimApi with
-  private def argumentType(
-    arg: DpiArg
-  )(
-    using Arena,
-    Context
-  ): Type = arg.tpe match
-    case DpiType.Integer(width, signed) => if signed then width.integerTypeSignedGet else width.integerTypeGet
-    case DpiType.String                 => summon[HWTypeApi].stringTypeGet
-
   def terminate(
     success: Boolean
   )(
@@ -68,7 +57,7 @@ given SimApi with
       symbol = symbol,
       verilogName = cName,
       arguments = arguments.map { arg =>
-        val argType = argumentType(arg)
+        val argType = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
         DPIArgument(arg.name, arg.direction, argType)
       },
       location = locate
@@ -95,28 +84,7 @@ given SimApi with
       clock = clock,
       enable = enabled,
       inputs = inputs,
-      resultTypes = outArgs.map(argumentType),
-      location = locate
-    )
-    call.operation.appendToBlock()
-    DpiCallResult(outArgs.zipWithIndex.map((arg, index) => arg.name -> call.operation.getResult(index)).toMap)
-
-  def dpiCallProcedural(
-    function: DpiFunction,
-    inputs:   Seq[Value]
-  )(
-    using Arena,
-    Context,
-    Block
-  ): DpiCallResult =
-    val inArgs  =
-      function.arguments.filter(arg => arg.direction == DPIDirection.In || arg.direction == DPIDirection.InOut)
-    val outArgs = function.arguments.filter(arg => arg.direction != DPIDirection.In)
-    require(inArgs.size == inputs.size, "DPI input count does not match the declaration")
-    val call    = summon[DPICallProcApi].op(
-      callee = function.symbol,
-      inputs = inputs,
-      resultTypes = outArgs.map(argumentType),
+      resultTypes = outArgs.map(arg => if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet),
       location = locate
     )
     call.operation.appendToBlock()

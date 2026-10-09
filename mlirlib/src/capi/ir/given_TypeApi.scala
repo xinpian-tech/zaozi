@@ -11,6 +11,7 @@ import org.llvm.mlir.CAPI.{
   mlirIntegerTypeUnsignedGet,
   mlirNoneTypeGet,
   mlirTypeEqual,
+  mlirTypeIsAInteger,
   mlirTypePrint
 }
 import org.llvm.mlir.scalalib.capi.support.{*, given}
@@ -42,6 +43,7 @@ given TypeApi with
       context:     Context
     ): Type = Type(mlirIntegerTypeGet(arena, context.segment, width))
   extension (tpe:   Type)
+    inline def isInteger: Boolean = mlirTypeIsAInteger(tpe.segment)
     inline def integerTypeGetWidth: Int           =
       mlirIntegerTypeGetWidth(tpe.segment)
     inline def equal(that: Type):   Boolean       = mlirTypeEqual(tpe.segment, that.segment)

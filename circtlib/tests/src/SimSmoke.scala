@@ -6,7 +6,12 @@ import org.llvm.circt.scalalib.capi.conversion.{ConversionCreateApi, ConversionR
 import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HwDialect, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialect, TypeApi as SeqTypeApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SvDialect, given}
-import org.llvm.circt.scalalib.capi.dialect.sim.{DialectApi as SimDialect, TypeApi as SimTypeApi, given}
+import org.llvm.circt.scalalib.capi.dialect.sim.{
+  DPIDirection as CApiDPIDirection,
+  DialectApi as SimDialect,
+  TypeApi as SimTypeApi,
+  given
+}
 import org.llvm.circt.scalalib.dialect.sim.operation.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{
   Block,
@@ -66,7 +71,7 @@ object SimSmoke extends TestSuite:
       stream.print(streamOut ++= _)
       assert(streamOut.toString == "!sim.output_stream")
 
-    test("export DPI interface JSON"):
+    test("DPI function type inspection"):
       given Arena   = currentArena
       val context   = summon[ContextApi].contextCreate
       currentContext = context
@@ -86,13 +91,16 @@ object SimSmoke extends TestSuite:
         declaration.operation.appendToBlock()(
           using module.getBody
         )
-        val json        = new StringBuilder
-        assert(module.exportDPIInterface(json.append(_)).succeeded)
-        val schema      = ujson.read(json.toString)
-        assert(schema("dpi_functions")(0)("function").str == "zaozi_step")
-        assert(schema("dpi_functions")(0)("arguments")(0)("name").str == "value")
-        assert(schema("dpi_functions")(0)("arguments")(0)("width").num == 8)
-        assert(schema("dpi_functions")(0)("arguments")(1)("direction").str == "return")
+        val tpe = declaration.operation.getInherentAttributeByName("dpi_function_type").typeAttrGetValue
+        assert(tpe.dpiFunctionTypeGetNumArguments == 2)
+        val value = tpe.dpiFunctionTypeGetArgument(0)
+        assert(value.name == "value")
+        assert(value.direction == CApiDPIDirection.Out)
+        assert(value.tpe.equal(8.integerTypeGet))
+        val status = tpe.dpiFunctionTypeGetArgument(1)
+        assert(status.name == "status")
+        assert(status.direction == CApiDPIDirection.Return)
+        assert(status.tpe.equal(32.integerTypeGet))
       finally module.destroy()
 
     test("sim format string ops"):

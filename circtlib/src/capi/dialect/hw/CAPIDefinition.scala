@@ -43,7 +43,6 @@ end DialectApi
 /** HW Type API
   * {{{
   * hwArrayTypeGet
-  * hwStringTypeGet
   * hwArrayTypeGetElementType
   * hwArrayTypeGetSize
   * hwGetBitWidth
@@ -76,11 +75,6 @@ end DialectApi
   * }}}
   */
 trait TypeApi:
-  def stringTypeGet(
-    using Arena,
-    Context
-  ): org.llvm.mlir.scalalib.capi.ir.Type
-
 end TypeApi
 
 /** HW Attribute API

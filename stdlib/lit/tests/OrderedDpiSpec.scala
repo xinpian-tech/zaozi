@@ -10,11 +10,11 @@
 
 // IR-LABEL: hw.module @OrderedDpiTestBenchWrapper()
 // IR: hw.instance "clockGenerator" @Clock_periodNs10
-// IR: sim.triggered
-// IR-NEXT: sim.proc.dpi.call @begin_cycle()
-// IR-NEXT: %[[STEP:.*]]:7 = sim.proc.dpi.call @step()
-// IR-NEXT: sim.proc.dpi.call @consume(%[[STEP]]#4, %[[STEP]]#6)
-// IR-NEXT: sim.proc.dpi.call @end_cycle()
+// IR: sv.always posedge
+// IR-NEXT: sv.func.call.procedural @begin_cycle()
+// IR-NEXT: %[[STEP:.*]]:7 = sv.func.call.procedural @step()
+// IR-NEXT: sv.func.call.procedural @consume(%[[STEP]]#4, %[[STEP]]#6)
+// IR-NEXT: sv.func.call.procedural @end_cycle()
 // IR: sv.passign %{{.*}}, %[[STEP]]#4 : i8
 // IR: hw.instance "testbench" @OrderedDpiTestBench
 

@@ -21,6 +21,20 @@ trait ToClockApi extends HasOperation[ToClock]:
       using Arena
     ): Value
 
+class FromClock(val _operation: Operation)
+trait FromClockApi extends HasOperation[FromClock]:
+  def op(
+    input:    Value,
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): FromClock
+  extension (ref: FromClock)
+    def result(
+      using Arena
+    ): Value
+
 class ClockInv(val _operation: Operation)
 trait ClockInvApi extends HasOperation[ClockInv]:
   def op(

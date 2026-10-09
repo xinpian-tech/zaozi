@@ -2,10 +2,66 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.sv.operation
 
+import org.llvm.circt.scalalib.dialect.hw.operation.Port
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, Type, Value}
 import org.llvm.mlir.scalalib.capi.support.HasOperation
 
 import java.lang.foreign.Arena
+
+enum EventControl:
+  case PosEdge, NegEdge, Edge
+
+class Always(val _operation: Operation)
+trait AlwaysApi extends HasOperation[Always]:
+  def op(
+    events:   Seq[EventControl],
+    clocks:   Seq[Value],
+    location: Location
+  )(
+    using Arena,
+    Context
+  ): Always
+  extension (ref: Always)
+    def block(
+      using Arena
+    ): Block
+
+class Func(val _operation: Operation)
+trait FuncApi extends HasOperation[Func]:
+  /** Declares an SV function; `returnPort` identifies its explicit return value. */
+  def op(
+    symbol:      String,
+    ports:       Seq[Port],
+    returnPort:  Option[Int],
+    verilogName: Option[String],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): Func
+
+class FuncDPIImport(val _operation: Operation)
+trait FuncDPIImportApi extends HasOperation[FuncDPIImport]:
+  def op(
+    callee:      String,
+    linkageName: Option[String],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): FuncDPIImport
+
+class FuncCallProcedural(val _operation: Operation)
+trait FuncCallProceduralApi extends HasOperation[FuncCallProcedural]:
+  def op(
+    callee:      String,
+    inputs:      Seq[Value],
+    resultTypes: Seq[Type],
+    location:    Location
+  )(
+    using Arena,
+    Context
+  ): FuncCallProcedural
 
 class Initial(val _operation: Operation)
 trait InitialApi extends HasOperation[Initial]:
@@ -87,16 +143,6 @@ trait BPAssignApi extends HasOperation[BPAssign]:
     using Arena,
     Context
   ): BPAssign
-
-class ConstantStr(val _operation: Operation)
-trait ConstantStrApi extends HasOperation[ConstantStr]:
-  def op(
-    value:    String,
-    location: Location
-  )(
-    using Arena,
-    Context
-  ): ConstantStr
 
 class Reg(val _operation: Operation)
 trait RegApi extends HasOperation[Reg]:
