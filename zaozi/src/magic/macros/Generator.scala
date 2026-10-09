@@ -32,6 +32,11 @@ class generator extends MacroAnnotation:
                     List(param: TypeTree, l: TypeTree, i: TypeTree, p: TypeTree, v: TypeTree)
                   ) =>
                 Some(param, l, i, p, Some(v))
+              case parent: TypeTree =>
+                parent.tpe.baseType(Symbol.requiredClass("me.jiuyang.zaozi.Generator")) match
+                  case AppliedType(_, List(param, l, i, p)) =>
+                    Some(Inferred(param), Inferred(l), Inferred(i), Inferred(p), None)
+                  case _                                    => None
               case _ => None
           )
           .flatten

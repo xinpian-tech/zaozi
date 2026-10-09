@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 
+circtFirrtlCreateLinkCircuitsPass # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FIRRTL.h
+
 arcMemoryTypeGet                # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcMemoryTypeGetAddressType     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
 arcMemoryTypeGetNumWords        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Arc.h
@@ -144,6 +146,7 @@ mlirGetDialectHandle__firrtl__     # header: $CIRCT_INSTALL_PATH/include/circt-c
 mlirGetDialectHandle__fsm__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FSM.h
 registerFSMPasses           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/FSM.h
 hwArrayTypeGet                  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
+hwStringTypeGet                 # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
 hwArrayTypeGetElementType       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
 hwArrayTypeGetSize              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
 hwAttrIsAInnerRefAttr           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
@@ -307,14 +310,12 @@ omEvaluatorValueFromPrimitive     # header: $CIRCT_INSTALL_PATH/include/circt-c/
 omEvaluatorValueGetContext        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetLoc            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetPrimitive      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-omEvaluatorValueGetReferenceValue # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetType           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsABasePath       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAList           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAObject         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAPath           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAPrimitive      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-omEvaluatorValueIsAReference      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsNull            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsUnknown         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omFrozenBasePathTypeGetTypeID     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
@@ -494,6 +495,28 @@ seqTypeIsAClock              # header: $CIRCT_INSTALL_PATH/include/circt-c/Diale
 seqTypeIsAFirMem             # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
 seqTypeIsAHLMem              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
 seqTypeIsAImmutable          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Seq.h
+mlirGetDialectHandle__sim__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+registerSimPasses             # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+mlirExportDPIInterface        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simTypeIsAFormatString        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simFormatStringTypeGet        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simTypeIsADynamicString       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simDynamicStringTypeGet       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simTypeIsAQueue               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simQueueTypeGet               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simQueueTypeGetElementType    # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simQueueTypeGetBound          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simTypeIsAAssocArray          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simAssocArrayTypeGet          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simAssocArrayTypeGetElementType # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simAssocArrayTypeGetIndexType # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simTypeIsADPIFunction         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simDPIFunctionTypeGet         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simDPIFunctionTypeGetNumArguments # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simDPIFunctionTypeGetArgument # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simDPIFunctionTypeGetFunctionType # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simTypeIsAOutputStream        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+simOutputStreamTypeGet        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
 mlirGetDialectHandle__verif__ # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Verif.h
 registerVerifPasses           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Verif.h
 mlirExportFIRRTL # header: $CIRCT_INSTALL_PATH/include/circt-c/ExportFIRRTL.h

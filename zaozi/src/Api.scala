@@ -13,6 +13,8 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
+import org.llvm.circt.scalalib.dialect.hw.operation.{Module as HWModule, Port}
+import org.llvm.circt.scalalib.dialect.sim.operation.DPIDirection
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena
@@ -271,6 +273,515 @@ trait VerilogWrapperApi:
       sourcecode.Name.Machine,
       InstanceContext
     ): Instance[I, P]
+
+/** DPI scalar/vector integers or a SystemVerilog string. */
+enum DpiType:
+  case Integer(width: Int, signed: Boolean = false)
+  case String
+
+final case class DpiArg(name: String, direction: DPIDirection, tpe: DpiType):
+  tpe match
+    case DpiType.Integer(width, _) => require(width > 0, s"invalid DPI width: $width")
+    case DpiType.String            => ()
+
+object DpiArg:
+  def apply(name: String, direction: DPIDirection, width: Int, signed: Boolean = false): DpiArg =
+    new DpiArg(name, direction, DpiType.Integer(width, signed))
+
+final case class DpiFunction(symbol: String, arguments: Seq[DpiArg])
+
+final case class DpiCallResult(values: Map[String, Value]):
+  def apply(name: String): Value = values(name)
+
+/** Declares and calls sim dialect DPI-C functions. */
+trait SimApi:
+  /** Terminates the current procedure immediately. */
+  def terminate(
+    success: Boolean = true
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit
+
+  /** Executes `body` in one ordered procedure on the rising edge of `clock`. */
+  def triggered(
+    clock:   Value,
+    enabled: Option[Value] = None
+  )(body:    Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit
+
+  def dpiFunction(
+    symbol:    String,
+    cName:     Option[String],
+    arguments: Seq[DpiArg]
+  )(
+    using Arena,
+    Context,
+    Block
+  ): DpiFunction
+
+  def dpiCall(
+    function: DpiFunction,
+    clock:    Value,
+    enabled:  Option[Value],
+    inputs:   Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block
+  ): DpiCallResult
+
+  /** Calls a DPI function at the current point in a procedure; results are immediately available within it. */
+  def dpiCallProcedural(
+    function: DpiFunction,
+    inputs:   Seq[Value] = Seq.empty
+  )(
+    using Arena,
+    Context,
+    Block
+  ): DpiCallResult
+
+  def clockedTerminate(
+    clock:     Value,
+    condition: Value,
+    success:   Boolean
+  )(
+    using Arena,
+    Context,
+    Block
+  ): Unit
+
+/** Builds HW dialect module structure and inserts each operation into the current block. */
+trait HWApi:
+  /** Builds a signless integer constant; negative values use two's complement. */
+  def constant(
+    value: BigInt,
+    width: Int
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  /** Reinterprets a value without changing its bits. */
+  def bitcast(
+    input:      Value,
+    resultType: Type
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  def module(
+    symbol: String,
+    ports:  Seq[Port]
+  )(body:   (Arena, Context, Block) ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  def moduleExtern(
+    symbol:      String,
+    ports:       Seq[Port],
+    verilogName: Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Instantiates `moduleName` and returns its output values in port order. */
+  def instance(
+    instanceName: String,
+    moduleName:   String,
+    ports:        Seq[Port],
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value]
+
+  /** Instantiates an existing HW module and returns its output values in port order. */
+  def instance(
+    instanceName: String,
+    module:       HWModule,
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value]
+
+  def output(
+    values: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+/** Builds the small set of Seq dialect operations needed by simulation wrappers. */
+trait SeqApi:
+  def clockType(
+    using Arena,
+    Context
+  ): Type
+
+  extension (input: Value)
+    def toClock(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
+    def clockInv(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
+/** One exact runtime switch case; its body is elaborated in that case's region. */
+final class SVCase(val value: BigInt, val body: Block ?=> Unit)
+
+/** Builds SV storage, procedural control flow, and assignments in the current block. */
+trait SVApi:
+  def initial(
+    body: Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Runtime branching in a procedure, distinct from FIRRTL's when. */
+  def ifElse(
+    condition: Value
+  )(thenBody:  Block ?=> Unit
+  )(elseBody:  Block ?=> Unit = ()
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Exact integer cases; an unmatched selector executes defaultBody. */
+  def switch(
+    selector:    Value,
+    cases:       Seq[SVCase]
+  )(defaultBody: Block ?=> Unit = ()
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  def stringConstant(
+    value: String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  def wire(
+    elementType: Type,
+    name:        String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  /** Continuous assignment at module scope. */
+  def assign(
+    destination: Value,
+    source:      Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Updates a procedural variable before the next statement executes. */
+  def blockingAssign(
+    destination: Value,
+    source:      Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Schedules an update of an SV variable from within a procedural region. */
+  def nonBlockingAssign(
+    destination: Value,
+    source:      Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Declares a variable and returns its `!hw.inout` handle. */
+  def reg(
+    elementType: Type,
+    name:        String,
+    init:        Option[Value] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  extension (input: Value)
+    def readInOut(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
+  def verbatim(
+    formatString:  String,
+    substitutions: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+/** Integer operations for HW/SV simulation values. Comparisons explicitly select signed or unsigned semantics. */
+trait CombApi:
+  def concat(
+    inputs: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+  def mux(
+    condition: Value,
+    whenTrue:  Value,
+    whenFalse: Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+  extension (input: Value)
+    def asSignless(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    def extract(
+      high: Int,
+      low:  Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    def zeroExtend(
+      width: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def +(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def -(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def &(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def |(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ^(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ===(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def =/=(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ult(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ule(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ugt(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def uge(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def slt(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def sle(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def sgt(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def sge(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
 
 trait ConstructorApi:
   def Clock(): Clock
