@@ -30,7 +30,7 @@
   [稳定标识], [stable identifier], [`ModuleId`、`ModuleNodeId`、`BindId`、`DomainId`；由实例名路径与声明名派生（@sec-identity）。],
   [边], [edge], [一次设计 bind 对应的已求解连接，以 `BindId` 为稳定标识，包含 `Down`、`Up` 与 `Edge`（@sec-node-conn-proto、@sec-settle-pp）。],
   [构建上下文], [`BuildContext`], [框架注入模块体的构建期上下文；结构模块体为 `WrapperScope`，生成器模块体为 `GeneratorScope[FP]`（@sec-build）。],
-  [设计引用], [design reference], [设计体向外交出的值：端口句柄、探针、设计边界及其组合，须有 `Dangles` 证据（@sec-build）。],
+  [设计引用], [design reference], [设计体向外交出的值：设计边界及其组合，须有 `Dangles` 证据（@sec-build）。],
   [设计], [`Design`], [一个独立协商的单位，体即根结构模块的体（@sec-build、@sec-design-boundary）。],
   [设计边界], [design boundary], [根上声明的对外端口，附带对外侧参数与域的假设（@sec-design-boundary）。],
   [边界模块], [boundary module], [代表设计外侧或所例化设计的伪模块，以常量节点参与协商，不产生硬件（@sec-design-boundary、@sec-boundary-ports）。],

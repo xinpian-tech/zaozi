@@ -66,7 +66,7 @@
 
 == 协议接口 <sec-protocol-interface>
 
-每条已求解的设计边都对应一个实际硬件接口。顶层接口由 `ProtocolInterface.Bundle` 表示，本文简称 `ProtocolBundle`：Bundle 是带具名字段的聚合类型，字段类型由 `ProtocolInterface` 递归描述。接口描述支持 Bundle、定长 Vec、`Bits`、无符号整数、有符号整数、`Analog`、布尔、时钟、异步复位和带层路径的探针字段。每个字段记录名称、方向翻转标记和内部类型。
+每条已求解的设计边都对应一个实际硬件接口。顶层接口由 `ProtocolInterface.Bundle` 表示，本文简称 `ProtocolBundle`：Bundle 是带具名字段的聚合类型，字段类型由 `ProtocolInterface` 递归描述。接口描述与 zaozi 的值类型一一对应：Bundle、定长 Vec、`Bits`、`UInt`、`SInt`、`Analog`、`Bool`、`Clock`、`Reset` 和带层路径的探针字段。每种类型是一个类型标签：`Bits(1)`、`UInt(1)`、`Bool` 与 `Reset` 是不同的类型，比较接口时按标签区分，翻译成 FIRRTL 后才可能是同一种硬件。每个字段记录名称、方向翻转标记和内部类型。
 
 `LayerPath` 是从 FIRRTL 层根开始的非空名称序列，例如 `verification.cosim` 对应 `["verification", "cosim"]`（@sec-layers）。
 
