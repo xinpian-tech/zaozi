@@ -307,14 +307,12 @@ omEvaluatorValueFromPrimitive     # header: $CIRCT_INSTALL_PATH/include/circt-c/
 omEvaluatorValueGetContext        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetLoc            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetPrimitive      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-omEvaluatorValueGetReferenceValue # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueGetType           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsABasePath       # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAList           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAObject         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAPath           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsAPrimitive      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-omEvaluatorValueIsAReference      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsNull            # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omEvaluatorValueIsUnknown         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
 omFrozenBasePathTypeGetTypeID     # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
