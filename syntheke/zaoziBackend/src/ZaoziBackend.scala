@@ -13,6 +13,7 @@ import me.jiuyang.zaozi.{
   Parameter
 }
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.syntheke.circt.Instantiated
 import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
 import me.jiuyang.zaozi.syntheke.PublicProbes
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation}
@@ -98,17 +99,10 @@ private final class ZaoziBackend[
         def main(args:                     Array[String]): Unit   = generator.main(args)
     )
 
-  def instantiate(
-    fullParam:    Any,
-    instanceName: String,
-    loc:          (sourcecode.File, sourcecode.Line)
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Operation =
+  def instantiate(fullParam: Any, instanceName: String, loc: SourceLoc)(using Arena, Context, Block): Instantiated =
     given sourcecode.File         = loc._1
     given sourcecode.Line         = loc._2
     given sourcecode.Name.Machine = sourcecode.Name.Machine(instanceName)
     given InstanceContext         = new InstanceContext
-    delegate(moduleName(fullParam)).instantiate(param(fullParam)).operation
+    val (instance, definitions)   = Elaborate.collect(delegate(moduleName(fullParam)).instantiate(param(fullParam)).operation)
+    Instantiated(instance, definitions)

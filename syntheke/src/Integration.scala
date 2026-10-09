@@ -26,17 +26,16 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
   private val declared: Map[Settled[?], Domain[?]]        = originals.zip(domains).toMap
   private val imported: Map[Settled[?], DomainSource[?]] = declared ++ received
 
-  def domain[K <: DomainKind](boundary: Boundary[?], kind: K): Domain[K] =
+  def domain[K <: DomainKind](boundary: Boundary[?], kind: K, at: SourceLoc): Domain[K] =
     imported(frozen(boundary, kind)) match
       case domain: Domain[?] => domain.asInstanceOf[Domain[K]]
-      case _                 => throw IllegalArgumentException(
-          s"boundary ${boundary.id.show} is in the ${kind.name} domain the instantiating design binds to it"
-        )
+      case _                 =>
+        fail(s"boundary ${boundary.id.show} is in whatever ${kind.name} domain the instantiating design binds to it", at)
 
   /** Memberships of a node standing for `boundary`: an inward carrier receives what is bound to it; every other
     * kind is the domain the frozen design put the boundary in.
     */
-  def memberships(boundary: Boundary[?], direction: NodeDirection, at: (sourcecode.File, sourcecode.Line))
+  def memberships(boundary: Boundary[?], direction: NodeDirection, at: SourceLoc)
     : Vector[Membership] =
     boundary.terminal.kinds.map { kind =>
       if direction == NodeDirection.Inward && boundary.protocol.carries(kind) then Membership(kind, None, at)
@@ -44,8 +43,8 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
     }
 
   /** Memberships of a boundary that forwards inward `boundary`: the frozen design's own domains. */
-  def forwarded(boundary: Boundary[?]): Vector[Membership] =
-    boundary.terminal.kinds.map(kind => Membership(kind, Some(declared(frozen(boundary, kind))), loc))
+  def forwarded(boundary: Boundary[?], at: SourceLoc): Vector[Membership] =
+    boundary.terminal.kinds.map(kind => Membership(kind, Some(declared(frozen(boundary, kind))), at))
 
   private val entries = design.spec.boundaries.zipWithIndex.map { (boundary, order) =>
     val outward   = boundary.isInstanceOf[OutwardBoundary[?]]
@@ -76,73 +75,69 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
   /** The instantiating design must keep every boundary's edge, the properties of every boundary domain, and which
     * boundary domains are the same.
     */
-  def validate(parent: ResolvedDesign): Unit =
-    val pairs = for
+  def violations(parent: Negotiated): Vector[String] =
+    val pairs    = for
       boundary <- design.spec.boundaries
       kind     <- boundary.terminal.kinds
-    yield
-      val expected = frozen(boundary, kind)
-      val actual   = parent.domains.member(port(boundary).id, kind).get
-      require(
-        kind.describe(actual.asInstanceOf) == kind.describe(expected.asInstanceOf),
-        s"integration changes the frozen ${kind.name} domain at ${boundary.id.show}: $expected became $actual"
-      )
-      expected -> actual.underlying
-    val distinct = pairs.distinct
-    require(
-      distinct.groupMap(_._1)(_._2).values.forall(_.size == 1) && distinct.groupMap(_._2)(_._1).values.forall(_.size == 1),
-      s"integration changes which frozen domains are the same in ${design.spec.root.show}"
-    )
-    design.spec.boundaries.foreach { boundary =>
-      val expected = design.boundaryEdge(boundary)
-      val actual   = parent.edgeAt(port(boundary).id)
-      require(
-        actual.down == expected.down && actual.up == expected.up &&
-          actual.interface == expected.interface && actual.edge == expected.edge,
-        s"integration changes the frozen contract at ${boundary.id.show}"
-      )
+    yield (boundary, kind, frozen(boundary, kind), parent.domains.member(port(boundary).id, kind).get)
+    val changed  = pairs.collect {
+      case (boundary, kind, expected, actual) if kind.describe(actual.asInstanceOf) != kind.describe(expected.asInstanceOf) =>
+        s"the ${kind.name} domain of ${boundary.id.show} was $expected when frozen and is $actual here, at ${loc.show}"
     }
+    val same     = pairs.map((_, _, expected, actual) => expected -> actual.underlying).distinct
+    val regroup  = Option.when(
+      same.groupMap(_._1)(_._2).values.exists(_.size > 1) || same.groupMap(_._2)(_._1).values.exists(_.size > 1)
+    )(s"the instantiating design changes which domains of ${design.spec.root.show} are the same, at ${loc.show}")
+    val contract = design.spec.boundaries.collect {
+      case boundary if {
+            val (expected, actual) = (design.boundaryEdge(boundary), parent.edgeAt(port(boundary).id))
+            actual.down != expected.down || actual.up != expected.up || actual.edge != expected.edge ||
+            actual.interface != expected.interface
+          } =>
+        s"the instantiating design changes the frozen contract at ${boundary.id.show}, at ${loc.show}"
+    }
+    changed ++ regroup ++ contract
 
+/** Joins a design with the frozen designs it instantiates and plans the ports and wires of the whole. */
 private[syntheke] object DesignIntegration:
-  def combine(children: Vector[ResolvedDesign], parent: ResolvedDesign): ResolvedDesign =
-    val parts = children :+ parent
-    val modules = parts.flatMap(_.spec.moduleOrder)
-    require(modules.distinct.size == modules.size, "integrated module paths overlap")
-    val declarations = parts.flatMap(_.spec.binds)
-    val binds = declarations.zipWithIndex.map((b, order) => b.copy(order = order))
-    val remapped = declarations.map(_.bindId).zip(binds.map(_.bindId)).toMap
-    def bind(id: BindId): BindId = remapped.getOrElse(id, id)
-    def origin(value: PlanOrigin): PlanOrigin = value match
-      case PlanOrigin.Design(id) => PlanOrigin.Design(bind(id))
-      case value => value
-    val spec = parent.spec.copy(
-      modules = parts.flatMap(_.spec.modules).toMap,
+  def combine(imports: Vector[BoundaryImport], parent: Negotiated, probes: ProbeCatalog): ResolvedDesign =
+    val children = imports.map(_.design)
+    val specs    = children.map(_.spec) :+ parent.spec
+    val modules  = specs.flatMap(_.moduleOrder)
+    val spec     = parent.spec.copy(
+      modules = specs.flatMap(_.modules).toMap,
       moduleOrder = Vector(parent.spec.root) ++ modules.filterNot(_ == parent.spec.root),
-      binds = binds)
-    val edges = parts.flatMap(_.edges).map(e => e.copy(bind = bind(e.bind)))
-    require(spec.generators.map(_.name).distinct.size == spec.generators.size, "distinct generators share a module name")
-    val wrappers = spec.moduleOrder.flatMap(spec.wrapper)
-    require(wrappers.groupBy(_.moduleName).values.forall(_.map(_.definition).distinct.size == 1),
-      "distinct wrapper definitions share a module name")
-    val observations = parts.flatMap(_.observations).toMap
-    val (plannedPorts, plannedWires, plannedLayers) = Planner.plan(spec, edges, parent.probes, observations)
-    val frozenPorts = children.flatMap(_.portPlans).map(p => p.copy(origin = origin(p.origin)))
-    val frozenWires = children.flatMap(_.wirePlans).map(w => w.copy(origin = origin(w.origin)))
-    val frozenModules = children.flatMap(_.spec.moduleOrder).toSet
-    require(plannedPorts.filter(p => frozenModules(p.module)).forall(frozenPorts.contains),
-      "integration adds ports to a frozen design")
-    require(plannedWires.filter(w => frozenModules(w.module)).forall(frozenWires.contains),
-      "integration changes wiring inside a frozen design")
+      binds = specs.flatMap(_.binds)
+    )
+    val names   = spec.generators.groupBy(_.name).toVector.sortBy(_._1).collect {
+      case (name, definitions) if definitions.sizeIs > 1 => s"distinct generators share the module name '$name'"
+    }
+    val wrappers = spec.moduleOrder.flatMap(spec.wrapper).groupBy(_.moduleName).toVector.sortBy(_._1).collect {
+      case (name, ws) if ws.map(_.definition).distinct.sizeIs > 1 =>
+        s"distinct wrappers share the module name '$name', at ${ws.map(_.loc.show).distinct.mkString(", ")}"
+    }
+    report("integration", names ++ wrappers)
+
+    val edges                           = children.flatMap(_.edges) ++ parent.edges
+    val observations                    = children.flatMap(_.observations).toMap ++ parent.observations
+    val (ports, wires, plannedLayers)   = Planner.plan(spec, edges, probes, observations)
+    val frozen                          = children.flatMap(_.spec.moduleOrder).toSet
+    val (frozenPorts, frozenWires)      = (children.flatMap(_.portPlans), children.flatMap(_.wirePlans))
+    if !ports.filter(p => frozen(p.module)).forall(frozenPorts.contains) ||
+      !wires.filter(w => frozen(w.module)).forall(frozenWires.contains)
+    then throw IllegalStateException("planning changed the ports or wires of a frozen design")
     val layers = children.flatMap(_.layerDecls).foldLeft(plannedLayers) { case (acc, (module, tree)) =>
       acc.updated(module, acc.getOrElse(module, LayerTree.empty).merge(tree))
     }
-    val edgeBySource = edges.map(e => e.bind.source -> e).toMap
-    parent.copy(
+    ResolvedDesign(
       spec = spec,
+      domains = parent.domains,
       edges = edges,
-      generatorModules = parts.flatMap(_.generatorModules).map(g => g.copy(
-        view = g.view.copy(nodes = g.view.nodes.map(n => n.copy(edge = edgeBySource(n.edge.bind.source)))))),
-      portPlans = (frozenPorts ++ plannedPorts).distinct,
-      wirePlans = (frozenWires ++ plannedWires).distinct,
+      generatorModules = children.flatMap(_.generatorModules) ++ parent.generatorModules,
+      portPlans = (frozenPorts ++ ports).distinct,
+      wirePlans = (frozenWires ++ wires).distinct,
       layerDecls = layers,
-      observations = observations)
+      probes = probes,
+      observations = observations,
+      dependencies = imports.map(i => i.design.spec.root -> i.definition)
+    )

@@ -6,7 +6,7 @@ import me.jiuyang.syntheke.demo.{*, given}
 
 private[demo] object TraceObservation:
   def select(catalog: ProbeCatalog): Vector[TraceSource] =
-    catalog.query[InstructionRetirement].map { trace =>
+    catalog.query(retirementBinding).map { trace =>
       val module = trace.id.module
       TraceSource(
         module.show,

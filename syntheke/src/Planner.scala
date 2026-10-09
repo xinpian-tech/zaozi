@@ -12,7 +12,7 @@ private[syntheke] object Planner:
 
     def chain(endpoint: ModuleId, port: PortName, base: PortName, stop: Option[ModuleId],
       direction: PortDirection, interface: ProtocolInterface, origin: PlanOrigin,
-      loc: (sourcecode.File, sourcecode.Line)): (Vector[PortPlan], Vector[WirePlan], LocalEndpoint) =
+      loc: SourceLoc): (Vector[PortPlan], Vector[WirePlan], LocalEndpoint) =
       val modules = ancestors(endpoint).takeWhile(m => !stop.contains(m) && spec.root.isAncestorOf(m))
       val ports = modules.map(m => PortPlan(m, direction, PortName.dangle(m, endpoint, base), interface, origin, loc))
       val wires = modules.zipWithIndex.map { (m, i) =>
@@ -33,8 +33,9 @@ private[syntheke] object Planner:
       case boundary: BoundaryModuleSpec => ModuleNodeId(boundary.target, node.name)
       case _ => node
 
+    val declOf = spec.binds.map(b => b.id -> b).toMap
     val functional = edges.map { edge =>
-      val decl = spec.binds(edge.bind.order)
+      val decl = declOf(edge.bind)
       val origin = PlanOrigin.Design(edge.bind)
       val source = endpoint(edge.bind.source)
       val target = endpoint(edge.bind.target)

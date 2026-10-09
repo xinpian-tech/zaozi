@@ -3,64 +3,34 @@ package me.jiuyang.syntheke
 import scala.annotation.publicInBinary
 import scala.compiletime.{erasedValue, error}
 
+/** A node whose parameter a port parameter function can read: Down of an inward node, Up of an outward one. */
 private[syntheke] trait ParameterValue:
   type Value
 
-private[syntheke] final class ReadPlan(val tokens: Vector[ReadToken])
-
-private[syntheke] object ReadPlan:
-  def apply(tokens: ReadToken*): ReadPlan = new ReadPlan(tokens.toVector.distinct)
-
+/** The sources a port parameter function reads: one node, or a sequence of them. */
 private[syntheke] object ParameterInputs:
   type TypedValue[A] = ParameterValue { type Value = A }
   type Values[S] = S match
-    case TypedValue[a] => a
+    case TypedValue[a]           => a
     case scala.collection.Seq[s] => Vector[Values[s]]
-    case Tuple => TupleValues[S & Tuple]
-
-  type TupleValues[S <: Tuple] <: Tuple = S match
-    case EmptyTuple => EmptyTuple
-    case head *: tail => Values[head] *: TupleValues[tail]
 
   inline def validate[S](inline outward: Boolean): Unit =
     inline erasedValue[S] match
-      case _: (InwardNodeDraft[?] | InwardPort[?]) =>
+      case _: (InwardNodeDraft[?] | InwardPort[?])   =>
         inline if !outward then error("an inward node derives Up parameters from outward nodes, not inward nodes")
       case _: (OutwardNodeDraft[?] | OutwardPort[?]) =>
         inline if outward then error("an outward node derives Down parameters from inward nodes, not outward nodes")
-      case _: scala.collection.Seq[s] => validate[s](outward)
-      case _: EmptyTuple => ()
-      case _: (head *: tail) =>
-        validate[head](outward)
-        validate[tail](outward)
-      case _ => error("derive expects opposite-direction node declarations, or tuples/sequences of them")
+      case _: scala.collection.Seq[s]                => validate[s](outward)
+      case _                                         => error("derive expects opposite nodes, or a sequence of them")
 
-  private final case class Inputs(tokens: Vector[ReadToken], read: ReadValues => Any)
+  private def reader(source: Any): (Vector[ModuleNodeId], Map[ModuleNodeId, Any] => Any) = source match
+    case node: NodeHandle[?]           => (Vector(node.id), _(node.id))
+    case sources: scala.collection.Seq[?] =>
+      val parts = sources.toVector.map(reader)
+      (parts.flatMap(_._1), values => parts.map(_._2(values)))
+    case _                             => throw IllegalArgumentException("invalid parameter source")
 
-  private def inputs(source: Any): Inputs =
-    def atom(token: ReadToken): Inputs = Inputs(Vector(token), values => values.lookup(token))
-    def aggregate(sources: Vector[Any], tuple: Boolean): Inputs =
-      val children = sources.map(inputs)
-      Inputs(children.flatMap(_.tokens), values =>
-        val result = children.map(_.read(values))
-        if tuple then Tuple.fromArray(result.toArray) else result)
-    source match
-      case node: (InwardNodeDraft[?] | InwardPort[?]) => atom(new DownReader[node.protocol.Down](node.id))
-      case node: (OutwardNodeDraft[?] | OutwardPort[?]) => atom(new UpReader[node.protocol.Up](node.id))
-      case sources: scala.collection.Seq[?] => aggregate(sources.toVector, false)
-      case sources: Tuple => aggregate(sources.productIterator.toVector, true)
-      case _ => throw IllegalArgumentException("invalid parameter dependency source")
-
-  @publicInBinary private[syntheke] def inward[P <: Protocol, S](
-    node: InwardNodeDraft[P], sources: S,
-    compute: Values[S] => Either[Violation, Any]
-  ): InwardPort[P] =
-    val prepared = inputs(sources)
-    node.scope.seal(node, ReadPlan(prepared.tokens*), values => compute(prepared.read(values).asInstanceOf[Values[S]]))
-
-  @publicInBinary private[syntheke] def outward[P <: Protocol, S](
-    node: OutwardNodeDraft[P], sources: S,
-    compute: Values[S] => Either[Violation, Any]
-  ): OutwardPort[P] =
-    val prepared = inputs(sources)
-    node.scope.seal(node, ReadPlan(prepared.tokens*), values => compute(prepared.read(values).asInstanceOf[Values[S]]))
+  @publicInBinary private[syntheke] def derived[S](sources: S, compute: Values[S] => Either[Violation, Any])
+    : NodeComputation =
+    val (reads, read) = reader(sources)
+    NodeComputation.Derived(reads.distinct, values => compute(read(values).asInstanceOf[Values[S]]))

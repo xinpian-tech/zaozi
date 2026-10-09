@@ -1,5 +1,8 @@
 package me.jiuyang.syntheke
 
+/** What a design may hand out: handles the instantiating design can move to the instance. A domain is not one; it
+  * leaves its design through a boundary.
+  */
 sealed trait Dangles[A]:
   private[syntheke] def place(value: A, placement: DesignPlacement): A
 
@@ -9,10 +12,6 @@ object Dangles:
 
   given outward[P <: Protocol]: Dangles[OutwardPort[P]] with
     private[syntheke] def place(value: OutwardPort[P], placement: DesignPlacement): OutwardPort[P] = placement.outward(value)
-
-  given domain[K <: DomainKind]: Dangles[Domain[K]] with
-    private[syntheke] def place(value: Domain[K], placement: DesignPlacement): Domain[K] =
-      throw IllegalArgumentException(s"domain ${value.id.show} cannot leave its design; export it through a boundary")
 
   given probe[P]: Dangles[ProbeNode[P]] with
     private[syntheke] def place(value: ProbeNode[P], placement: DesignPlacement): ProbeNode[P] = placement.probe(value)

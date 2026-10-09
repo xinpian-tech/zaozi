@@ -114,7 +114,6 @@ object Elaborator:
     def owned(id: ModuleId): Boolean = !dependencies.keys.exists(_.isAncestorOf(id))
     val localModules = spec.moduleOrder.filter(owned)
     val generators = localModules.flatMap(spec.generatorModule)
-    val mlirbcDir = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", os.pwd.toString), os.pwd)
     val backendOf: Map[GeneratorDefinition[?], GeneratorBackend] = generators.map(_.definition).distinct.map { definition =>
       val backend = definition match
         case provider: GeneratorBackendProvider => provider.createBackend()
@@ -222,6 +221,7 @@ object Elaborator:
           if t.children.isEmpty then (if prefix.isEmpty then Vector.empty else Vector(prefix))
           else t.children.toVector.sortBy(_._1).flatMap((n, sub) => leafPaths(sub, prefix :+ n))
 
+        val definitions  = mutable.LinkedHashMap.empty[String, MlirModule]
         given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(unknownLoc)
         val circuitName  = moduleNames(ModuleId.root)
         given Circuit    = summon[CircuitApi].op(circuitName)
@@ -292,7 +292,9 @@ object Elaborator:
                 case _: BoundaryModuleSpec => fail(s"boundary contract ${childId.show} cannot be instantiated as hardware")
                 case gm: GeneratorModuleSpec =>
                   val rgm      = resolved.generatorModule(childId).get
-                  val instOp   = backendOf(gm.definition).instantiate(rgm.fullParam, c, gm.loc)
+                  val placed   = backendOf(gm.definition).instantiate(rgm.fullParam, c, gm.loc)
+                  placed.definitions.foreach((name, definition) => definitions.getOrElseUpdate(name, definition))
+                  val instOp   = placed.instance
                   val expected = rgm.view.nodes.map { nv =>
                     (nv.node.name, nv.direction == NodeDirection.Outward, nv.edge.interface)
                   } ++ rgm.probeDeclaration.ports.map(p => (p.name, true, p.tpe)) ++ (
@@ -375,17 +377,13 @@ object Elaborator:
           case Nil                         => layers
           case sym :: rest if defined(sym) => link(rest, defined, layers)
           case sym :: rest                 =>
-            val file       = mlirbcDir / s"$sym.mlirbc"
-            if !os.exists(file) then fail(s"instantiated module '$sym' has no definition ($file not found)")
-            val parsed     = summon[MlirModuleApi].moduleCreateParse(os.read.bytes(file))
-            if parsed._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0 then
-              fail(s"cannot parse $file")
-            val circuitOps = opsIn(parsed.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
+            val definition = definitions.getOrElse(sym, fail(s"instantiated module '$sym' has no definition"))
+            val circuitOps = opsIn(definition.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
               .filter(_.getName.str == "firrtl.circuit")
               .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
             val moved      = circuitOps.filter(op => Set("firrtl.module", "firrtl.extmodule")(op.getName.str)).filter { op =>
               val s2     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-              val isStub = op.getName.str == "firrtl.extmodule" && s2 != sym && os.exists(mlirbcDir / s"$s2.mlirbc")
+              val isStub = op.getName.str == "firrtl.extmodule" && s2 != sym && definitions.contains(s2)
               if defined(s2) || isStub then false
               else
                 op.removeFromParent()
@@ -397,7 +395,7 @@ object Elaborator:
               .map(layerTreeOf)
               .foldLeft(layers)((t, kv) => t.merge(LayerTree(Map(kv))))
             val defined2   = defined ++ moved.map(_.getInherentAttributeByName("sym_name").stringAttrGetValue)
-            if !defined2(sym) then fail(s"instantiated module '$sym' has no definition in $file")
+            if !defined2(sym) then fail(s"the definition of '$sym' does not contain it")
             link(rest ++ moved.flatMap(op => moduleSymbols(op)._2 -- defined2), defined2, layers2)
 
         val (defined0, referenced0) = moduleSymbols(summon[Circuit].operation)

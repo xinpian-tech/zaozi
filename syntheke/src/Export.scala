@@ -10,10 +10,9 @@ object Export:
   private def domainId(id: DomainId): ujson.Value =
     ujson.Obj("module" -> moduleId(id.module), "name" -> ujson.Str(id.name))
 
-  private def bindId(id: BindId): ujson.Value =
-    ujson.Obj("order" -> ujson.Num(id.order), "source" -> nodeId(id.source), "target" -> nodeId(id.target))
+  private def bindId(id: BindId): ujson.Value = ujson.Obj("source" -> nodeId(id.source), "target" -> nodeId(id.target))
 
-  private def loc(l: (sourcecode.File, sourcecode.Line)): ujson.Value =
+  private def loc(l: SourceLoc): ujson.Value =
     ujson.Obj("file" -> ujson.Str(l._1.value.replace('\\', '/')), "line" -> ujson.Num(l._2.value))
 
   private def interface(tpe: ProtocolInterface): ujson.Value = upickle.default.writeJs(tpe)
@@ -61,23 +60,15 @@ object Export:
                   "id"          -> nodeId(ModuleNodeId(id, n.name)),
                   "direction"   -> ujson.Str(n.direction.toString.toLowerCase),
                   "memberships" -> ujson.Arr.from(n.memberships.map(membership)),
-                  "order"       -> ujson.Num(n.order),
+                  "reads"       -> ujson.Arr.from(n.computation.reads.map(nodeId)),
                   "loc"         -> loc(n.loc)
-                )
-              }),
-              "dependencies" -> ujson.Arr.from(g.dependencies.zipWithIndex.map { (d, order) =>
-                ujson.Obj(
-                  "inward"  -> nodeId(ModuleNodeId(id, d.from)),
-                  "outward" -> nodeId(ModuleNodeId(id, d.to)),
-                  "order"   -> ujson.Num(order),
-                  "loc"     -> loc(d.loc)
                 )
               }),
               "loc"          -> loc(g.loc)
             )
       }),
       "binds"   -> ujson.Arr.from(spec.binds.map { b =>
-        ujson.Obj("id" -> bindId(b.bindId), "declaredIn" -> moduleId(b.declaredIn), "loc" -> loc(b.loc))
+        ujson.Obj("id" -> bindId(b.id), "declaredIn" -> moduleId(b.declaredIn), "loc" -> loc(b.loc))
       }),
       "domains" -> ujson.Arr.from(spec.domains.map(declared)),
       "root"    -> moduleId(spec.root)
@@ -107,7 +98,7 @@ object Export:
       a    <- graph.member(bind.source, kind)
       b    <- graph.member(bind.target, kind)
     yield ujson.Obj(
-      "bind"     -> bindId(bind.bindId),
+      "bind"     -> bindId(bind.id),
       "kind"     -> ujson.Str(kind.name),
       "source"   -> domainId(a.id),
       "target"   -> domainId(b.id),
@@ -119,10 +110,7 @@ object Export:
         case ((node, kind), domain) =>
           ujson.Obj("node" -> nodeId(node), "kind" -> ujson.Str(kind.name), "domain" -> domainId(domain.id))
       }),
-      "crossings"   -> ujson.Arr.from(crossings),
-      "plans"       -> ujson.Obj.from(graph.kinds.collect { case kind: Planned =>
-        kind.name -> write(kind.planWriter, kind.plan(graph))
-      })
+      "crossings"   -> ujson.Arr.from(crossings)
     )
 
   def edges(resolved: ResolvedDesign): ujson.Value =

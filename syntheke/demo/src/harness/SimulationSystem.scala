@@ -24,6 +24,6 @@ object SimulationSystem:
         given sourcecode.Name = sourcecode.Name(s"pin$index")
         pin.boundary
       }
-      soc.probes.query[InstructionRetirement].foreach(_.boundary)
+      soc.probes.query(retirementBinding).foreach(_.boundary)
       Ports(ref, dtmClock, crossingClock, pins)
     }

@@ -34,14 +34,6 @@ trait DomainKind:
   def linkWriter:     Writer[Link]
   def relationWriter: Writer[Relation]
 
-/** A domain kind whose domains configure generators: from the settled graph it plans their parameters, for example
-  * the clock trees a design needs.
-  */
-trait Planned extends DomainKind:
-  type Plan
-  def plan(graph: DomainGraph): Plan
-  def planWriter: Writer[Plan]
-
 /** Where a domain comes from at build time: a declared domain, or whatever domain a node of this module is in. */
 sealed trait DomainSource[K <: DomainKind]:
   val kind: K
@@ -54,16 +46,17 @@ object DomainSource:
 
 /** A domain declared in a module body. */
 final class Domain[K <: DomainKind] private[syntheke] (
-  val kind:                    K,
-  val id:                      DomainId,
-  private[syntheke] val origin: Domain.Origin,
-  private[syntheke] val loc:    (sourcecode.File, sourcecode.Line))
+  val kind:                     K,
+  val id:                       DomainId,
+  private[syntheke] val origin: Domain.Origin[DomainSource[?]],
+  private[syntheke] val loc:    SourceLoc)
     extends DomainSource[K]
 
 object Domain:
-  private[syntheke] enum Origin:
+  /** A root's properties, the sources and link of a derived domain, or a frozen design's domain. */
+  private[syntheke] enum Origin[+S]:
     case Root(value: Any)
-    case Derived(sources: Vector[DomainSource[?]], link: Any)
+    case Derived(sources: Vector[S], link: Any)
     case Imported(domain: Settled[?])
 
 /** The domain of one kind that a node is in, known once binds are resolved. */
@@ -71,40 +64,47 @@ final class DomainRef[K <: DomainKind] private[syntheke] (val kind: K, val node:
 
 /** A domain after negotiation: every source is resolved, so its derivation is plain data. */
 final class Settled[K <: DomainKind] private[syntheke] (
-  val kind:   K,
-  val id:     DomainId,
-  origin:     Settled.Origin,
-  resolver:   DomainSource[?] => Settled[?]):
+  val kind:                     K,
+  val id:                       DomainId,
+  origin:                       Domain.Origin[Settled[?]],
+  private[syntheke] val design: DomainTable):
 
   def root: Option[kind.Root] = origin match
-    case Settled.Origin.Root(value) => Some(value.asInstanceOf[kind.Root])
-    case _                          => None
+    case Domain.Origin.Root(value) => Some(value.asInstanceOf[kind.Root])
+    case _                         => None
 
   def sources: Vector[Settled[K]] = origin match
-    case Settled.Origin.Derived(sources, _) => sources.asInstanceOf[Vector[Settled[K]]]
-    case _                                  => Vector.empty
+    case Domain.Origin.Derived(sources, _) => sources.asInstanceOf[Vector[Settled[K]]]
+    case _                                 => Vector.empty
 
   def link: Option[kind.Link] = origin match
-    case Settled.Origin.Derived(_, link) => Some(link.asInstanceOf[kind.Link])
-    case _                               => None
+    case Domain.Origin.Derived(_, link) => Some(link.asInstanceOf[kind.Link])
+    case _                              => None
 
   /** A domain a frozen design declared; this one stands for it in the instantiating design. */
   def imported: Option[Settled[K]] = origin match
-    case Settled.Origin.Imported(domain) => Some(domain.asInstanceOf[Settled[K]])
-    case _                               => None
+    case Domain.Origin.Imported(domain) => Some(domain.asInstanceOf[Settled[K]])
+    case _                              => None
 
   def underlying: Settled[K] = imported.fold(this)(_.underlying)
 
-  /** Resolves a source mentioned in this domain's root or link, such as the clock a reset is synchronized to. */
-  def resolve[K2 <: DomainKind](source: DomainSource[K2]): Settled[K2] = resolver(source).asInstanceOf[Settled[K2]]
+  /** The settled domain a source in this domain's root or link names, such as the clock a reset is released on. */
+  def resolve[K2 <: DomainKind](source: DomainSource[K2]): Settled[K2] = design(source)
 
   override def toString: String = id.show
 
-object Settled:
-  private[syntheke] enum Origin:
-    case Root(value: Any)
-    case Derived(sources: Vector[Settled[?]], link: Any)
-    case Imported(domain: Settled[?])
+/** The graph a design's settled domains belong to. Settlement seals it once, before any check or parameter function
+  * reads a domain.
+  */
+private[syntheke] final class DomainTable:
+  private var graph = Option.empty[DomainGraph]
+
+  private[syntheke] def seal(settled: DomainGraph): Unit =
+    if graph.isDefined then throw IllegalStateException("domains are settled once")
+    graph = Some(settled)
+
+  def apply[K <: DomainKind](source: DomainSource[K]): Settled[K] =
+    graph.getOrElse(throw IllegalStateException("domains are read before they are settled"))(source)
 
 /** A protocol's answer to what a bind of it may cross in one domain kind. */
 final class Accept private (val kind: DomainKind, private[syntheke] val test: Any => Boolean)
@@ -112,9 +112,6 @@ final class Accept private (val kind: DomainKind, private[syntheke] val test: An
 object Accept:
   def apply[K <: DomainKind](kind: K)(test: kind.Relation => Boolean): Accept =
     new Accept(kind, relation => test(relation.asInstanceOf[kind.Relation]))
-
-  /** The protocol places no condition on this kind. */
-  def any(kind: DomainKind): Accept = new Accept(kind, _ => true)
 
 enum CheckStage derives CanEqual:
   case WellFormed, Behavior
@@ -143,13 +140,11 @@ final class DomainGraph private[syntheke] (
     new DomainGraph(domains, declared, membership.map { case ((id, kind), domain) => (node(id), kind) -> domain })
 
   def apply[K <: DomainKind](source: DomainSource[K]): Settled[K] = source match
-    case domain: Domain[?]  =>
-      declared.getOrElse(domain, throw IllegalArgumentException(s"domain ${domain.id.show} is not of this design"))
+    case domain: Domain[?] =>
+      declared.getOrElse(domain, fail(s"domain ${domain.id.show} is not declared in this design", domain.loc))
         .asInstanceOf[Settled[K]]
     case ref: DomainRef[?] =>
-      member(ref.node, ref.kind)
-        .getOrElse(throw IllegalArgumentException(s"node ${ref.node.show} is in no ${ref.kind.name} domain"))
-        .asInstanceOf[Settled[K]]
+      member(ref.node, ref.kind).getOrElse(fail(s"node ${ref.node.show} is in no ${ref.kind.name} domain"))
 
   /** Every kind with a domain or a member in this graph, by name. */
   def kinds: Vector[DomainKind] = (domains.map(_.kind) ++ membership.keys.map(_._2)).distinct.sortBy(_.name)
@@ -163,12 +158,3 @@ final class DomainGraph private[syntheke] (
   def members[K <: DomainKind](kind: K): Vector[(ModuleNodeId, Settled[K])] =
     membership.toVector.collect { case ((node, k), d) if k eq kind => node -> d.asInstanceOf[Settled[K]] }
       .sortBy(_._1.show)
-
-private[syntheke] trait ReadToken:
-  type Value
-
-private[syntheke] final class ReadValues(values: Map[ReadToken, Any]):
-  private[syntheke] def lookup[T <: ReadToken](token: T): token.Value =
-    values
-      .getOrElse(token, throw new IllegalArgumentException("token is not present in this sealed read plan"))
-      .asInstanceOf[token.Value]

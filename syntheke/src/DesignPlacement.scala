@@ -32,8 +32,7 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
   def outwardBoundary[P <: Protocol](value: OutwardBoundary[P]): OutwardBoundary[P] =
     boundaries(value).asInstanceOf[OutwardBoundary[P]]
 
-  private def placeProbe[P](value: ProbeNode[P]): ProbeNode[P] =
-    new ProbeNode[P](node(value.id))(using value.parameterType, value.parameterWriter)
+  private def placeProbe[P](value: ProbeNode[P]): ProbeNode[P] = new ProbeNode(node(value.id), value.contract)
   private val probeNodes: Map[ProbeNode[?], ProbeNode[?]] = originalProbes.map(p => p -> placeProbe(p)).toMap
   def probe[P](value: ProbeNode[P]): ProbeNode[P] = probeNodes(value).asInstanceOf[ProbeNode[P]]
 
@@ -42,7 +41,7 @@ private[syntheke] final class DesignPlacement(definition: ResolvedDesign, root: 
   private def resolvedProbe[P](value: ResolvedProbe[P]): ResolvedProbe[P] =
     new ResolvedProbe(probe(value.node), value.parameters, publicPorts(value.port), value.implementation)
 
-  private def probeSpec[P](value: ProbeSpec[P]): ProbeSpec[P] = new ProbeSpec(probe(value.node), value.resolve, value.loc)
+  private def probeSpec[P](value: ProbeSpec[P]): ProbeSpec[P] = new ProbeSpec(probe(value.node), value.selector, value.loc)
 
   private def edgeView(value: EdgeView): EdgeView =
     value.copy(module = module(value.module), nodes = value.nodes.map(n => n.copy(node = node(n.node), edge = edge(n.edge))))

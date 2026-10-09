@@ -1,27 +1,22 @@
 package me.jiuyang.syntheke.circt
 
 import me.jiuyang.syntheke.*
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule, Operation}
 
 import java.lang.foreign.Arena
 
 private[syntheke] trait GeneratorBackendProvider:
   def createBackend(): GeneratorBackend
 
+/** An instance a backend placed, and every module it elaborated for it, each a circuit of its own, by module name. */
+final case class Instantiated(instance: Operation, definitions: Vector[(String, MlirModule)])
+
 trait GeneratorBackend:
   def moduleName(fullParam: Any): String
 
   def layers(fullParam: Any): Seq[Vector[String]]
 
-  def instantiate(
-    fullParam:    Any,
-    instanceName: String,
-    loc:          (sourcecode.File, sourcecode.Line)
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Operation
+  def instantiate(fullParam: Any, instanceName: String, loc: SourceLoc)(using Arena, Context, Block): Instantiated
 
 object GeneratorBackend:
   def define[FP: upickle.default.Writer](name: String)(

@@ -1,11 +1,5 @@
 package me.jiuyang.syntheke
 
-private[syntheke] sealed abstract class Reader[T](private[syntheke] val node: ModuleNodeId) extends ReadToken:
-  type Value = T
-
-private[syntheke] final class DownReader[T](node: ModuleNodeId) extends Reader[T](node)
-private[syntheke] final class UpReader[T](node: ModuleNodeId)   extends Reader[T](node)
-
 sealed abstract class NodeHandle[P <: Protocol] private[syntheke] (
   val protocol:                      P,
   val id:                            ModuleNodeId,

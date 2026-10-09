@@ -2,13 +2,12 @@ package me.jiuyang.syntheke.demo
 
 import me.jiuyang.stdlib.power.{PowerControlParameter, given}
 import me.jiuyang.syntheke.*
-import upickle.default.{writeJs, Writer}
+import upickle.default.Writer
 
 // Clock, reset and power domains mirroring zaozi PR #159 field by field: ClockTree (clock/ClockTree.scala),
 // ResetTree (reset/ResetTree.scala) and PowerTree (power/PowerTree.scala). A tree's named inputs and targets are
 // domains here, its string references are typed domain sources, and the cell library stays with the tree generator.
-// Each kind plans the #159 tree parameters of the domains a design declares, naming every domain by its id; a domain
-// a frozen design declared is an input. Once #159 lands these types are replaced by its own.
+// Once #159 lands these types are replaced by its own.
 
 // ---------------------------------------------------------------- clock
 
@@ -74,11 +73,10 @@ enum ClockRelation derives Writer:
   case Synchronous(numerator: BigInt, denominator: BigInt)
   case Asynchronous
 
-object ClockDomain extends DomainKind, Planned:
+object ClockDomain extends DomainKind:
   type Root     = ClockInput
   type Link     = ClockTarget
   type Relation = ClockRelation
-  type Plan     = ujson.Value
 
   val name     = "clock"
   val physical = true
@@ -137,29 +135,9 @@ object ClockDomain extends DomainKind, Planned:
         }
   )
 
-  /** #159 `ClockTreeParameter` without the cell library. */
-  def plan(graph: DomainGraph): ujson.Value =
-    val (targets, inputs) = graph.of(ClockDomain).sortBy(_.id.show).partition(c => c.imported.isEmpty && c.link.isDefined)
-    ujson.Obj(
-      "inputs"  -> inputs.map(_.id.show),
-      "targets" -> targets.map { clock =>
-        val target = clock.link.get
-        ujson.Obj(
-          "name"      -> clock.id.show,
-          "links"     -> clock.sources.zip(target.links).map((source, path) =>
-            ujson.Obj("source" -> source.id.show, "path" -> writeJs(path))
-          ),
-          "selection" -> writeJs(target.selection),
-          "path"      -> writeJs(target.path),
-          "muxGuide"  -> writeJs(target.muxGuide)
-        )
-      }
-    )
-
   val rootWriter:     Writer[ClockInput]    = summon
   val linkWriter:     Writer[ClockTarget]   = summon
   val relationWriter: Writer[ClockRelation] = summon
-  val planWriter:     Writer[ujson.Value]   = summon
 
 // ---------------------------------------------------------------- reset
 
@@ -194,11 +172,10 @@ enum ResetRelation derives Writer:
   case Same
   case Different(sameLevel: Boolean)
 
-object ResetDomain extends DomainKind, Planned:
+object ResetDomain extends DomainKind:
   type Root     = ResetRoot
   type Link     = ResetTarget
   type Relation = ResetRelation
-  type Plan     = ujson.Value
 
   val name     = "reset"
   val physical = true
@@ -284,44 +261,9 @@ object ResetDomain extends DomainKind, Planned:
         yield s"${node.show} runs on $clock but its reset $reset is released on $released"
   )
 
-  /** #159 `ResetTreeParameter`s. A #159 reset target links reset sources only, so a target that derives from another
-    * target goes to a later tree whose source is that target's output.
-    */
-  def plan(graph: DomainGraph): ujson.Value =
-    val targets = graph.of(ResetDomain).filter(r => r.imported.isEmpty && r.link.isDefined)
-    def level(reset: Settled[ResetDomain.type]): Int =
-      if reset.imported.isEmpty && reset.link.isDefined then 1 + reset.sources.map(level).max else 0
-    def processing(reset: Settled[ResetDomain.type], p: ResetProcessing): ujson.Value =
-      val clock = reset.resolve(p.clockSource).id.show
-      p match
-        case ResetProcessing.Async(_, stages)    => ujson.Obj("$type" -> "Async", "clock" -> clock, "stages" -> stages)
-        case ResetProcessing.Pipeline(_, stages) => ujson.Obj("$type" -> "Pipeline", "clock" -> clock, "stages" -> stages)
-        case ResetProcessing.Counter(_, cycles)  => ujson.Obj("$type" -> "Counter", "clock" -> clock, "cycles" -> cycles)
-    def optional(value: Option[ujson.Value]): ujson.Value = value.getOrElse(ujson.Null)
-    ujson.Obj("trees" -> targets.groupBy(level).toVector.sortBy(_._1).map { (_, tree) =>
-      val members = tree.sortBy(_.id.show)
-      ujson.Obj(
-        "sources" -> members.flatMap(_.sources).distinct.sortBy(_.id.show).map(source =>
-          ujson.Obj("name" -> source.id.show, "activeLow" -> activeLow(source))
-        ),
-        "targets" -> members.map { reset =>
-          val target = reset.link.get
-          ujson.Obj(
-            "name"       -> reset.id.show,
-            "activeLow"  -> target.activeLow,
-            "links"      -> reset.sources.zip(target.links).map((source, link) =>
-              ujson.Obj("source" -> source.id.show, "processing" -> optional(link.map(processing(reset, _))))
-            ),
-            "processing" -> optional(target.processing.map(processing(reset, _)))
-          )
-        }
-      )
-    })
-
   val rootWriter:     Writer[ResetRoot]     = summon
   val linkWriter:     Writer[ResetTarget]   = summon
   val relationWriter: Writer[ResetRelation] = summon
-  val planWriter:     Writer[ujson.Value]   = summon
 
 // ---------------------------------------------------------------- power
 
@@ -341,11 +283,10 @@ enum PowerRelation derives Writer:
   case Same
   case Different(fromAlwaysOn: Boolean, toAlwaysOn: Boolean)
 
-object PowerDomain extends DomainKind, Planned:
+object PowerDomain extends DomainKind:
   type Root     = PowerTreeDomain
   type Link     = Nothing
   type Relation = PowerRelation
-  type Plan     = ujson.Value
 
   val name     = "power"
   val physical = false
@@ -384,30 +325,6 @@ object PowerDomain extends DomainKind, Planned:
         domains.filter(d => d.imported.isEmpty && cyclic(d)).map(d => s"$d depends on itself")
   )
 
-  /** #159 `PowerTreeParameter`; a domain follows the `PowerFollow` resets that name it. */
-  def plan(graph: DomainGraph): ujson.Value =
-    val follows = graph.of(ResetDomain).filter(_.imported.isEmpty).sortBy(_.id.show).flatMap { reset =>
-      reset.root.collect { case ResetRoot.PowerFollow(power, clock, stages) =>
-        reset.resolve(power).underlying -> ujson.Obj(
-          "name"   -> reset.id.show,
-          "clock"  -> reset.resolve(clock).id.show,
-          "stages" -> stages
-        )
-      }
-    }
-    ujson.Obj("domains" -> graph.of(PowerDomain).filter(_.imported.isEmpty).sortBy(_.id.show).map { domain =>
-      val power = tree(domain)
-      ujson.Obj(
-        "name"         -> domain.id.show,
-        "parameter"    -> writeJs(power.control),
-        "dependencies" -> power.dependencies.map(d =>
-          ujson.Obj("source" -> domain.resolve(d.source).id.show, "kind" -> writeJs(d.kind))
-        ),
-        "follows"      -> follows.collect { case (d, follow) if d eq domain.underlying => follow }
-      )
-    })
-
   val rootWriter:     Writer[PowerTreeDomain] = summon
   val linkWriter:     Writer[Nothing]         = upickle.default.writer[Unit].comap(_ => ())
   val relationWriter: Writer[PowerRelation]   = summon
-  val planWriter:     Writer[ujson.Value]     = summon

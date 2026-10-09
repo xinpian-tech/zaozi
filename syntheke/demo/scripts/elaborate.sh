@@ -16,8 +16,7 @@ libs=""
 [ -n "${CIRCT_INSTALL_PATH:-}" ] && libs="$libs:$CIRCT_INSTALL_PATH/lib"
 
 rm -rf "$out"
-mkdir -p "$out" "$out.mlirbc"
+mkdir -p "$out"
 
-ZAOZI_OUTDIR="$out.mlirbc" \
-  java -Xss32m --enable-native-access=ALL-UNNAMED \
-    -Djava.library.path="$libs" -jar "$jar" "$out" ${config:+"$config"}
+java -Xss32m --enable-native-access=ALL-UNNAMED \
+  -Djava.library.path="$libs" -jar "$jar" "$out" ${config:+"$config"}

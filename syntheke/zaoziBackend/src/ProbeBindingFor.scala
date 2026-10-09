@@ -13,6 +13,7 @@ private[zaozi] object ProbeBindingSupport:
     select: (FP, D) => Option[(P, BundleField[RProbe[T]])]
   ): ProbeSelector[FP, P] =
     new ProbeSelector[FP, P]:
+      val contract = association
       def resolve(fp: FP, declaration: ProbeDeclaration): Either[Violation, Option[ProbeResolution[P]]] =
         declaration match
           case source: ZaoziProbeDeclaration if source.generator eq generator =>
@@ -23,19 +24,19 @@ private[zaozi] object ProbeBindingSupport:
                   Left(Violation(s"'${field.name}' is not a field of this generator's public Probe declaration"))
                 else
                   Right(Some(ProbeResolution(parameters, field.name,
-                    new ZaoziProbeImplementation[T](association.dataType, field, source))))
+                    new ZaoziProbeImplementation[T](field, source))))
           case _ => Left(Violation("Probe selector belongs to a different generator implementation"))
 
   def observe[P, T <: Data & CanProbe](association: ProbeBindingFor[P, T], resolved: ResolvedProbe[P]): Probe[T] =
+    // A probe of `association` was selected by its own selector, which built this implementation for type `T`.
     resolved.implementation match
-      case implementation: ZaoziProbeImplementation[?] if implementation.dataTypeIdentity == association.dataType =>
+      case implementation: ZaoziProbeImplementation[?] if resolved.node.contract eq association =>
         val typed = implementation.asInstanceOf[ZaoziProbeImplementation[T]]
         new Probe[T](typed.dataType, resolved.port, typed.source.generatorName, typed.source.parameter)
       case _ =>
-        throw new IllegalArgumentException(s"${resolved.id.show}: Probe binding does not match this node's public data type")
+        throw IllegalArgumentException(s"${resolved.id.show} is not a probe of this contract")
 
 private[zaozi] final class ZaoziProbeImplementation[T <: Data & CanProbe](
-  val dataTypeIdentity: TypeIdentity[T],
   val field: BundleField[RProbe[T]],
   val source: ZaoziProbeDeclaration) extends ProbeImplementation:
   def dataType: T = PublicProbes.dataType(field.dataType)

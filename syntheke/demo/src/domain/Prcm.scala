@@ -84,11 +84,10 @@ final case class PRCMManagedDomain(
 enum PRCMRelation derives Writer:
   case Same, Different
 
-object PRCMDomain extends DomainKind, Planned:
+object PRCMDomain extends DomainKind:
   type Root     = PRCMController
   type Link     = PRCMManagedDomain
   type Relation = PRCMRelation
-  type Plan     = ujson.Value
 
   val name     = "prcm"
   val physical = false
@@ -264,21 +263,6 @@ object PRCMDomain extends DomainKind, Planned:
       }
     )
 
-  /** Each controller this design declares, as a #159 `PRCMParameter` without the register port. */
-  def plan(graph: DomainGraph): ujson.Value =
-    ujson.Arr.from(graph.of(PRCMDomain).filter(d => d.imported.isEmpty && d.root.isDefined).sortBy(_.id.show).map {
-      controller =>
-        val p = parameter(graph, controller, 32, 32)
-        ujson.Obj(
-          "name"            -> controller.id.show,
-          "coldResetStages" -> p.coldResetStages,
-          "domains"         -> writeJs(p.domains),
-          "services"        -> writeJs(p.services),
-          "chip"            -> writeJs(p.chip)
-        )
-    })
-
   val rootWriter:     Writer[PRCMController]    = summon
   val linkWriter:     Writer[PRCMManagedDomain] = summon
   val relationWriter: Writer[PRCMRelation]      = summon
-  val planWriter:     Writer[ujson.Value]       = summon

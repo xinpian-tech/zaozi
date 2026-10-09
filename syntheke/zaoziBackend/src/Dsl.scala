@@ -13,8 +13,8 @@ object zaozi:
     generator: Generator[FP, L, I, P]
   )(using Writer[FP]): GeneratorDefinition[FP] = ZaoziDefinitions(generator)
 
-final class ProbeBindingFor[P, T <: Data & CanProbe] private ()(
-  using private[zaozi] val dataType: TypeIdentity[T]):
+/** A probe contract served by zaozi generators: probes of it publish data of type `T` and carry parameters `P`. */
+final class ProbeBindingFor[P: Writer, T <: Data & CanProbe] private () extends ProbeContract[P]:
   def from[FP <: Parameter, L <: LayerInterface[FP], I <: HWInterface[FP], D <: DVInterface[FP, L]](
     generator: Generator[FP, L, I, D]
   )(
@@ -22,7 +22,7 @@ final class ProbeBindingFor[P, T <: Data & CanProbe] private ()(
   ): ProbeSelector[FP, P] = ProbeBindingSupport.selector(this, generator)(select)
 
 object ProbeBindingFor:
-  def apply[P, T <: Data & CanProbe: TypeIdentity](): ProbeBindingFor[P, T] = new ProbeBindingFor[P, T]()
+  def apply[P: Writer, T <: Data & CanProbe](): ProbeBindingFor[P, T] = new ProbeBindingFor[P, T]()
 
 extension [P](resolved: ResolvedProbe[P])
   def observe[T <: Data & CanProbe](using association: ProbeBindingFor[P, T]): Probe[T] =

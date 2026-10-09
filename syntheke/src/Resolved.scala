@@ -1,7 +1,7 @@
 package me.jiuyang.syntheke
 
 
-final case class ResolvedEdge(
+final case class ResolvedEdge private[syntheke] (
   bind:     BindId,
   protocol: Protocol,
   down:     Any,
@@ -12,7 +12,7 @@ final case class ResolvedEdge(
     require(p eq protocol, s"${bind.show}: read with a protocol object other than the edge's own")
     edge.asInstanceOf[p.Edge]
 
-final case class NodeView(
+final case class NodeView private[syntheke] (
   node:                             ModuleNodeId,
   direction:                        NodeDirection,
   edge:                             ResolvedEdge)
@@ -26,7 +26,7 @@ final case class EdgeView private[syntheke] (
     require(view.isDefined, s"node ${n.id.show} is not a node of EdgeView of ${module.show}")
     view.get.edge.edgeAs(n.protocol)
 
-final case class ResolvedGeneratorModule(
+final case class ResolvedGeneratorModule private[syntheke] (
   module:           ModuleId,
   definition:       GeneratorDefinition[?],
   view:             EdgeView,
@@ -57,25 +57,25 @@ enum PlanOrigin derives CanEqual:
   case ProbeRead(source: ModuleNodeId)
   case Observation(source: ModuleNodeId)
 
-final case class PortPlan(
+final case class PortPlan private[syntheke] (
   module:    ModuleId,
   direction: PortDirection,
   name:      PortName,
   interface: ProtocolInterface,
   origin:    PlanOrigin,
-  loc:       (sourcecode.File, sourcecode.Line))
+  loc:       SourceLoc)
 
 enum LocalEndpoint derives CanEqual:
   case ThisPort(name: PortName)
 
   case ChildPort(instance: String, port: PortName)
 
-final case class WirePlan(
+final case class WirePlan private[syntheke] (
   module: ModuleId,
   from:   LocalEndpoint,
   to:     LocalEndpoint,
   origin: PlanOrigin,
-  loc:    (sourcecode.File, sourcecode.Line))
+  loc:    SourceLoc)
 
 final case class LayerTree(children: Map[String, LayerTree]):
   def merge(that: LayerTree): LayerTree =
@@ -97,7 +97,17 @@ object LayerTree:
   private def of(path: LayerPath): LayerTree =
     path.segments.foldRight(empty)((seg, sub) => LayerTree(Map(seg -> sub)))
 
-final case class ResolvedDesign(
+/** One design negotiated on its own, before it is joined with the frozen designs it instantiates. */
+private[syntheke] final case class Negotiated(
+  spec:             DesignSpec,
+  domains:          DomainGraph,
+  edges:            Vector[ResolvedEdge],
+  generatorModules: Vector[ResolvedGeneratorModule],
+  probes:           ProbeCatalog,
+  observations:     Map[ModuleId, ProbeBindings]):
+  def edgeAt(node: ModuleNodeId): ResolvedEdge = edges.find(e => e.bind.source == node || e.bind.target == node).get
+
+final case class ResolvedDesign private[syntheke] (
   spec:              DesignSpec,
   domains:           DomainGraph,
   edges:             Vector[ResolvedEdge],

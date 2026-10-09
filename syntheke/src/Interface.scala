@@ -3,7 +3,7 @@ package me.jiuyang.syntheke
 
 final case class LayerPath(segments: Vector[String]):
   require(segments.nonEmpty, "LayerPath must be non-empty")
-  segments.foreach(DeclaredName.require(_, "LayerPath segment"))
+  require(segments.forall(DeclaredName.legal), s"LayerPath segments must be legal names: ${segments.mkString("/")}")
 
 object LayerPath:
   given upickle.default.ReadWriter[LayerPath] =
@@ -56,7 +56,7 @@ object ProtocolInterface:
     require(!inner.isInstanceOf[Flipped], "Flipped(Flipped(_)) is meaningless")
 
   final case class Field(name: String, tpe: ProtocolInterface):
-    DeclaredName.require(name, "interface field name")
+    require(DeclaredName.legal(name), s"interface field name '$name' is not a legal name")
 
   given upickle.default.ReadWriter[ProtocolInterface] =
     upickle.default.readwriter[ujson.Value].bimap[ProtocolInterface](encode, decode)
@@ -109,33 +109,9 @@ object ProtocolInterface:
     case _: Flipped => true
     case _ => false
 
-  private def containsProbe(t: ProtocolInterface): Boolean = t match
+  private[syntheke] def containsProbe(t: ProtocolInterface): Boolean = t match
     case Bundle(fields) => fields.exists(f => containsProbe(f.tpe))
     case Vec(_, e)      => containsProbe(e)
     case Flipped(i)     => containsProbe(i)
     case _: Probe => true
     case _ => false
-
-  private[syntheke] def leaves(tpe: ProtocolInterface, prefix: InterfacePath = InterfacePath.root)
-    : Vector[(InterfacePath, ProtocolInterface)] =
-    tpe match
-      case Bundle(fields) =>
-        fields.flatMap(f => leaves(f.tpe, prefix.field(f.name)))
-      case Vec(n, elem)   =>
-        (0 until n).toVector.flatMap(i => leaves(elem, prefix.index(i)))
-      case Flipped(t)     => leaves(t, prefix)
-      case leaf           => Vector(prefix -> leaf)
-
-private[syntheke] final case class InterfacePath(segments: Vector[InterfacePath.Segment]):
-  def field(name: String): InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Field(name))
-  def index(i:    Int):    InterfacePath = InterfacePath(segments :+ InterfacePath.Segment.Index(i))
-  def show:                String        = segments.map {
-    case InterfacePath.Segment.Field(n) => s".$n"
-    case InterfacePath.Segment.Index(i) => s"[$i]"
-  }.mkString
-
-private[syntheke] object InterfacePath:
-  val root: InterfacePath = InterfacePath(Vector.empty)
-  enum Segment derives CanEqual:
-    case Field(name: String)
-    case Index(i: Int)
