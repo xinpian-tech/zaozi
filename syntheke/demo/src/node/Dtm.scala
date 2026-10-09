@@ -20,29 +20,17 @@ object DtmNodes:
     abits:  Int
   )(
     using GeneratorScope[DtmP]
-  ): (DtmNodes, Vector[Constraint]) =
+  ): DtmNodes =
     val tckDraft =
       given sourcecode.Name = sourcecode.Name("tck")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
 
     val jtagDraft =
       given sourcecode.Name = sourcecode.Name("jtag")
-      outward(Jtag)(
-        tckDraft.domain(ClockDomain),
-        tckDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Jtag)(tckDraft.domain(ClockDomain), tckDraft.domain(ResetDomain))
     val dmiDraft  =
       given sourcecode.Name = sourcecode.Name("dmi")
-      outward(Dmi)(
-        tckDraft.domain(ClockDomain),
-        tckDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Dmi)(tckDraft.domain(ClockDomain), tckDraft.domain(ResetDomain))
 
 
     val tck  = tckDraft.fixed(())
@@ -54,7 +42,7 @@ object DtmNodes:
       val e = view.edgeOf(dmi)
       Right(DtmP(idcode, DtmNodes.irLength, e.abits, e.dataBits))
     }
-    (DtmNodes(tck, jtag, dmi), Vector.empty)
+    DtmNodes(tck, jtag, dmi)
 
 def debugTransport(
   idcode: Long,

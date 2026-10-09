@@ -11,14 +11,14 @@ type GeneratorScope[FP] = BuildContext[GeneratorMode[FP]]
 
 final class Design[A] private[syntheke] (
   private[syntheke] val moduleName: String,
-  private[syntheke] val body: WrapperScope ?=> (A, Vector[Constraint]),
+  private[syntheke] val body: WrapperScope ?=> A,
   private[syntheke] val loc: (sourcecode.File, sourcecode.Line))(
   using private[syntheke] val dangles: Dangles[A]):
   private[syntheke] lazy val frozen: (ResolvedDesign, A) = Negotiator.build(this)
 
 object Design:
   def apply[A: Dangles](moduleName: String)(
-    body: WrapperScope ?=> (A, Vector[Constraint])
+    body: WrapperScope ?=> A
   )(using file: sourcecode.File, line: sourcecode.Line): Design[A] =
     new Design(moduleName, body, (file, line))
 
@@ -30,8 +30,9 @@ extension (instance: DesignInstance[?])
   def edgeOf[P <: Protocol](boundary: Boundary[P]): boundary.protocol.Edge =
     instance.resolved.boundaryEdge(boundary).edgeAs(boundary.protocol)
 
-  def value[P <: Protocol, D <: Domain](boundary: Boundary[P], domain: D): domain.Value =
-    instance.resolved.boundaryDomain(boundary, domain).value.asInstanceOf[domain.Value]
+  /** The settled domain a boundary of the instantiated design is in. */
+  def domainOf[K <: DomainKind](boundary: Boundary[?], kind: K): Settled[K] =
+    instance.resolved.boundaryDomain(boundary, kind)
 
 extension [A](design: Design[A])
   def instantiate(using scope: WrapperScope, name: sourcecode.Name): DesignInstance[A] =
@@ -39,7 +40,7 @@ extension [A](design: Design[A])
 
 def wrapper[A: Dangles](
   moduleName: String
-)(body:       WrapperScope ?=> (A, Vector[Constraint])
+)(body:       WrapperScope ?=> A
 )(
   using
   ws:         WrapperScope,
@@ -50,54 +51,37 @@ def wrapper[A: Dangles](
 
 def generator[FP]: GeneratorCall[FP] = new GeneratorCall[FP]
 
-extension [D <: Domain](domain: D)
-  def declare(
-    value:       domain.Value,
-    requirement: Option[domain.Requirement]
+extension [K <: DomainKind](kind: K)
+  /** A domain that derives from nothing. */
+  def root(
+    value: kind.Root
   )(
     using
     context: BuildContext[?],
     name:    sourcecode.Name,
     file:    sourcecode.File,
     line:    sourcecode.Line
-  ): DomainHandle[D] =
-    context.declareDomain(domain, name.value, Vector.empty, _ => Right((value, requirement)), (file, line))
+  ): Domain[K] = context.declareDomain(kind, name.value, Domain.Origin.Root(value), (file, line))
 
-extension (sources: DomainReadable[?] | scala.collection.Seq[DomainReadable[?]])
-  def derive[D <: Domain](
-    domain:  D
-  )(compute: DomainView => Either[Violation, (domain.Value, Option[domain.Requirement])]
+  /** A domain derived from `sources` through `link`. */
+  def derive(
+    sources: DomainSource[K]*
+  )(link:    kind.Link
   )(
     using
     context: BuildContext[?],
     name:    sourcecode.Name,
     file:    sourcecode.File,
     line:    sourcecode.Line
-  ): DomainHandle[D] =
-    context.declareDomain(domain, name.value, sources, compute, (file, line))
+  ): Domain[K] = context.declareDomain(kind, name.value, Domain.Origin.Derived(sources.toVector, link), (file, line))
 
-extension [D <: Domain](handle: DomainHandle[D])
-  def provide[R <: BuildMode, A](
+extension (domain: Domain[?])
+  /** Places every module the body creates in `domain`, for a kind that allows scoping. */
+  def scope[R <: BuildMode, A](
     body:          BuildContext[R] ?=> A
   )(
     using context: BuildContext[R]
-  ): A = context.withDomain(handle)(body)
-
-extension [D <: Domain](source: DomainReadable[D])
-  def requirement(
-    value: source.domain.Requirement
-  )(
-    using file: sourcecode.File,
-    line: sourcecode.Line
-  ): Constraint = new Constraint.Required(source)(value, (file, line))
-
-extension (sources: scala.collection.Seq[DomainReadable[?]])
-  def check(
-    run: DomainView => Either[Violation, Unit]
-  )(
-    using file: sourcecode.File,
-    line: sourcecode.Line
-  ): Constraint = new Constraint.Check(sources.toVector.distinct, run, (file, line))
+  ): A = context.scope(domain)(body)
 
 def probe[FP, P: TypeIdentity: Writer](
   selector: ProbeSelector[FP, P]
@@ -110,7 +94,7 @@ def probe[FP, P: TypeIdentity: Writer](
 
 def inward[FP](
   p:    Protocol
-)(domains: (Domain | DomainReadable[?])*
+)(domains: DomainSource[?]*
 )(
   using
   gs:   GeneratorScope[FP],
@@ -121,7 +105,7 @@ def inward[FP](
 
 def outward[FP](
   p:    Protocol
-)(domains: (Domain | DomainReadable[?])*
+)(domains: DomainSource[?]*
 )(
   using
   gs:   GeneratorScope[FP],
@@ -131,7 +115,7 @@ def outward[FP](
 ): p.OutwardDraft = gs.outward(p)(domains)(name.value)
 
 def parameters[FP](
-  compute:  (EdgeView, DomainView) => Either[Violation, FP]
+  compute:  (EdgeView, DomainGraph) => Either[Violation, FP]
 )(
   using gs: GeneratorScope[FP]
 ): Unit = gs.parameters(compute)
@@ -149,7 +133,7 @@ extension [P <: Protocol](target: InwardPort[P])
 
 final class GeneratorCall[FP] private[syntheke] ():
   def apply[A: Dangles](
-    body:       GeneratorScope[FP] ?=> (A, Vector[Constraint])
+    body:       GeneratorScope[FP] ?=> A
   )(
     using
     definition: GeneratorDefinition[FP],
@@ -159,12 +143,9 @@ final class GeneratorCall[FP] private[syntheke] ():
     line:       sourcecode.Line
   ): A = ws.generator(name.value, definition)(body)
 
-extension [P <: Protocol](node: NodeHandle[P])
-  def domain[D <: Domain](domain: D): NodeDomain[D] = node.lookupDomain(domain)
-
 extension [P <: Protocol](node: InwardNodeDraft[P])
   inline def derive[S](sources: S)(
-    compute: ParameterInputs.Values[S] => Either[Violation, (node.protocol.Up, Vector[Constraint])]
+    compute: ParameterInputs.Values[S] => Either[Violation, node.protocol.Up]
   ): InwardPort[P] =
     ParameterInputs.validate[S](false)
     ParameterInputs.inward(node, sources, compute)
@@ -173,7 +154,7 @@ extension [P <: Protocol](node: InwardNodeDraft[P])
 
 extension [P <: Protocol](node: OutwardNodeDraft[P])
   inline def derive[S](sources: S)(
-    compute: ParameterInputs.Values[S] => Either[Violation, (node.protocol.Down, Vector[Constraint])]
+    compute: ParameterInputs.Values[S] => Either[Violation, node.protocol.Down]
   ): OutwardPort[P] =
     ParameterInputs.validate[S](true)
     ParameterInputs.outward(node, sources, compute)
@@ -183,23 +164,11 @@ extension [P <: Protocol](node: OutwardNodeDraft[P])
 extension (view: EdgeView)
   def edgeOf(node: Port[?]): node.protocol.Edge = view.lookupEdge(node)
 
-extension (view: DomainView)
-  def value[D <: Domain](source: DomainReadable[D]): source.domain.Value = view.lookupValue(source)
-
-  def sameIdentity[D <: Domain](a: DomainReadable[D], b: DomainReadable[D]): Boolean = view.compareIdentity(a, b)
-
-extension (domains: EdgeDomains)
-  def inward[D <: Domain](domain: D): NodeDomain[D] = domains.inwardToken(domain)
-
-  def outward[D <: Domain](domain: D): NodeDomain[D] = domains.outwardToken(domain)
-
-  def value[D <: Domain](source: NodeDomain[D]): source.domain.Value = domains.lookupValue(source)
-
 extension (catalog: ProbeCatalog)
   def query[P: TypeIdentity]: Vector[ResolvedProbe[P]] = catalog.matching[P]
 
 extension [P <: Protocol](node: InwardPort[P])
-  def boundary(externalParams: node.protocol.Down)(externalDomains: (Domain | DomainReadable[?])*)(
+  def boundary(externalParams: node.protocol.Down)(externalDomains: DomainSource[?]*)(
     using scope: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line
   ): InwardBoundary[P] = scope.inwardBoundary(node, externalParams, externalDomains, name.value, (file, line))
 
@@ -208,7 +177,7 @@ extension [P <: Protocol](node: InwardPort[P])
   ): Unit = scope.connectBoundary(source, node, (file, line))
 
 extension [P <: Protocol](node: OutwardPort[P])
-  def boundary(externalParams: node.protocol.Up)(externalDomains: (Domain | DomainReadable[?])*)(
+  def boundary(externalParams: node.protocol.Up)(externalDomains: DomainSource[?]*)(
     using scope: WrapperScope, name: sourcecode.Name, file: sourcecode.File, line: sourcecode.Line
   ): OutwardBoundary[P] = scope.outwardBoundary(node, externalParams, externalDomains, name.value, (file, line))
 
@@ -234,5 +203,6 @@ extension [P](probe: ResolvedProbe[P])
   def boundary(using scope: WrapperScope): ResolvedProbe[P] = scope.forwardProbe(probe)
 
 extension [P <: Protocol](boundary: Boundary[P])
-  def domain[D <: Domain](domain: D)(using scope: BuildContext[?]): NodeDomain[D] =
-    scope.boundaryDomain(boundary, domain)
+  /** The domain an instantiated design's boundary is in, as a domain of the instantiating design. */
+  def domain[K <: DomainKind](kind: K)(using scope: BuildContext[?]): Domain[K] =
+    scope.boundaryDomain(boundary, kind)

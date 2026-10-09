@@ -18,8 +18,7 @@ case class CoreP(
   idBits:      Int,
   enableDebug: Boolean,
   enableTrace: Boolean,
-  cpuMillivolts: Int,
-  retentionMillivolts: Int)
+  resetActiveLow: Boolean)
     extends Parameter derives ReadWriter:
   require(dataBits == 32 || dataBits == 128, s"the core shim rides a 32- or 128-bit fabric, got dataBits $dataBits")
   require(addrBits >= 1 && addrBits <= 32, s"the core addresses at most a 32-bit space, got addrBits $addrBits")
@@ -83,7 +82,6 @@ class CorePProbe(parameter: CoreP) extends DVBundle[CoreP, CorePLayers](paramete
 class CorePIO(p: CoreP) extends HWBundle(p):
   val clk   = Flipped(new ClockBundle)
   val mem   = Aligned(new AxiPortBundle(AxiShape(p.addrBits, p.dataBits, p.idBits)))
-  val retention = Flipped(new RetentionBundle)
   val debug = Option.when(p.enableDebug)(Flipped(new DebugHartBundle(p.xlen)))
 
 @generator
@@ -91,19 +89,16 @@ object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
   def architecture(p: CoreP) =
     val io           = summon[Interface[CorePIO]]
     given ClockScope = ClockScope.posedge(io.clk.clock)
-    given ResetScope = ResetScope.asyncActiveHigh(io.clk.reset)
+    given ResetScope =
+      if p.resetActiveLow then ResetScope.asyncActiveLow(io.clk.reset) else ResetScope.asyncActiveHigh(io.clk.reset)
+    // The ditdah32 core takes an active-high reset.
+    val inReset = if p.resetActiveLow then !io.clk.reset.asBool else io.clk.reset.asBool
 
     val core = DitDah32Module.instantiate(
-      DitDah32Parameter(resetVector = p.resetPc, enableTrace = p.enableTrace, enableDebug = p.enableDebug,
-        cpuMillivolts = p.cpuMillivolts, retentionMillivolts = p.retentionMillivolts)
+      DitDah32Parameter(resetVector = p.resetPc, enableTrace = p.enableTrace, enableDebug = p.enableDebug)
     )
     core.io.clock        := io.clk.clock
-    core.io.reset        := io.clk.reset
-    core.io.retention.save := io.retention.save
-    core.io.retention.restore := io.retention.restore
-    core.io.retention.reset := io.retention.reset
-    io.retention.saved := core.io.retention.saved
-    io.retention.restored := core.io.retention.restored
+    core.io.reset        := inReset.asReset
     core.io.irq.software := false.B
     core.io.irq.timer    := false.B
     core.io.irq.external := false.B
@@ -114,7 +109,7 @@ object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
         val t                  = core.probe
         def word               = UInt(p.xlen)
         probe.trace_clock.get <== io.clk.clock
-        probe.trace_inReset.get <== io.clk.reset.asBool
+        probe.trace_inReset.get <== inReset
         val validW             = Wire(Bool())
         validW <== t.trace_valid.get
         probe.trace_valid.get <== validW
@@ -141,7 +136,7 @@ object CoreGen extends Generator[CoreP, CorePLayers, CorePIO, CorePProbe]:
         probe.trace_rdWdata.get <== rdWdataW
         val sample = Wire(new InstructionTrace(p.xlen, p.regIndexBits))
         sample.clock := io.clk.clock
-        sample.inReset := io.clk.reset.asBool
+        sample.inReset := inReset
         sample.valid := validW
         sample.pc := pcW
         sample.instr := instrW

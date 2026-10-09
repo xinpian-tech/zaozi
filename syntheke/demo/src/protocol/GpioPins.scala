@@ -7,17 +7,14 @@ object GpioPins extends Protocol:
   type Up   = Unit
   type Edge = Int
 
-  val carries: Set[Domain] = Set.empty
+  /** A pad drives the pins on the controller's clock. */
+  val carries: Set[DomainKind] = Set(ClockDomain, ResetDomain)
+  val accepts: Seq[Accept]     = Seq(Accept(PowerDomain)(PowerDomain.atPin))
 
   def negotiate(
     down: Int,
-    up: Unit,
-    domains: EdgeDomains
-  ): Either[Violation, (Int, Vector[Constraint])] =
-    val boundaryChecks = Vector(ClockDomain, ResetDomain).map { domain =>
-      Seq(domains.outward(domain), domains.inward(domain)).check(_ => Right(()))
-    }
-    Right((down, boundaryChecks :+ PowerDomain.compatible(domains, allowModel = true)))
+    up: Unit
+  ): Either[Violation, Int] = Right(down)
   def interface(edge: Int): ProtocolInterface.Bundle =
     ProtocolInterface.Bundle(
       Vector(

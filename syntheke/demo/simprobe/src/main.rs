@@ -10,7 +10,7 @@ use probe_rs::architecture::riscv::communication_interface::{
 };
 use probe_rs::config::Registry;
 use probe_rs::probe::Probe;
-use probe_rs::{Core, MemoryInterface, Permissions, RegisterId, Session};
+use probe_rs::{MemoryInterface, Permissions, Session};
 
 use crate::probe::SimProbe;
 
@@ -65,30 +65,27 @@ fn parse_u64(s: &str) -> Result<u64> {
     })
 }
 
-fn retained_state(core: &mut Core<'_>) -> Result<Vec<(u16, u32)>> {
-    (0x1001..=0x100f)
-        .chain([0x300, 0x304, 0x305, 0x340, 0x341, 0x342, 0x343, 0x7b0, 0x7b1])
-        .map(|address| {
-            let value: u32 = core.read_core_reg(RegisterId(address))
-                .with_context(|| format!("reading hart 1 register {address:#06x}"))?;
-            Ok((address, value))
-        })
-        .collect()
-}
+// The PRCM of zaozi PR #159 orders its domains by name: cpu0, then cpu1, three words each (request, status,
+// event). A status holds the requested mode code, then the done, invalid and fault bits.
+const BANK: u64 = 12;
+const STATUS: u64 = 4;
+const OFF: u32 = 0;
+const RUN: u32 = 1;
+const DONE: u32 = 1 << 1;
 
-fn wait_power(bus: &mut impl MemoryInterface, base: u64, expected: u32) -> Result<()> {
-    let deadline = Instant::now() + Duration::from_secs(30);
+fn wait_mode(bus: &mut impl MemoryInterface, base: u64, mode: u32) -> Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        let cpu0 = bus.read_word_32(base + 4)?;
-        let cpu1 = bus.read_word_32(base + 8)?;
-        if cpu0 & 0xf != 0x5 {
-            bail!("CPU0 must remain powered: status={cpu0:#010x}");
+        let cpu0 = bus.read_word_32(base + STATUS)?;
+        let cpu1 = bus.read_word_32(base + BANK + STATUS)?;
+        if cpu0 & 0xf != RUN | DONE {
+            bail!("CPU0 must remain running: status={cpu0:#010x}");
         }
-        if cpu1 & 0xf == expected {
+        if cpu1 & 0xf == mode | DONE {
             return Ok(());
         }
         if Instant::now() >= deadline {
-            bail!("CPU1 power transition timed out: status={cpu1:#010x}, expected={expected:#x}");
+            bail!("CPU1 did not reach mode {mode}: status={cpu1:#010x}");
         }
     }
 }
@@ -97,54 +94,27 @@ fn power_cycle(session: &mut Session, base: u64) -> Result<()> {
     let mut bus = session.get_riscv_interface(0)?;
     let sbcs: u32 = bus.read_dm_register::<Sbcs>()?.into();
     if sbcs >> 29 != 1 || sbcs & (1 << 2) == 0 {
-        bail!("retention demo requires 32-bit Debug Module system bus access");
+        bail!("the power demo requires 32-bit Debug Module system bus access");
     }
     bus.memory_access_config().set_region_override(
-        RiscvBusAccess::A32, base..base + 12, MemoryAccessMethod::SystemBus,
+        RiscvBusAccess::A32, base..base + 2 * BANK, MemoryAccessMethod::SystemBus,
     );
-    wait_power(&mut bus, base, 0x5)?;
-    bus.write_word_32(base, 0x1)?;
-    wait_power(&mut bus, base, 0x8)?;
-    println!("[simprobe] CPU1 supply off and isolated; CPU0 supply remains on");
-    bus.write_word_32(base, 0x3)?;
-    wait_power(&mut bus, base, 0x5)?;
+    wait_mode(&mut bus, base, RUN)?;
+    bus.write_word_32(base + BANK, OFF)?;
+    wait_mode(&mut bus, base, OFF)?;
+    println!("[simprobe] the PRCM sequenced CPU1 to Off; CPU0 keeps running");
+    bus.write_word_32(base + BANK, RUN)?;
+    wait_mode(&mut bus, base, RUN)?;
     Ok(())
 }
 
-fn retention_demo(session: &mut Session, base: u64) -> Result<()> {
-    let saved = {
-        let mut core = session.core(1)?;
-        core.halt(Duration::from_secs(10)).context("halting hart 1 before retention")?;
-        retained_state(&mut core)?
-    };
-
+fn power_demo(session: &mut Session, base: u64) -> Result<()> {
     power_cycle(session, base)?;
-
-    {
-        let mut core = session.core(1)?;
-        if !core.status()?.is_halted() {
-            bail!("hart 1 did not preserve its halted state across power loss");
-        }
-        let restored = retained_state(&mut core)?;
-        for ((address, before), (_, after)) in saved.iter().zip(&restored) {
-            if before != after {
-                bail!("hart 1 register {address:#06x} lost retention: {before:#010x} -> {after:#010x}");
-            }
-        }
-        let dpc = restored.last().unwrap().1;
-        println!("[simprobe] hart 1 retained 15 GPRs, 7 machine CSRs and DPC/DCSR; DPC={dpc:#010x}");
-        core.run().context("resuming hart 1 after retained-state readback")?;
-        if !core.status()?.is_running() {
-            bail!("hart 1 did not resume before the running-state power cycle");
-        }
+    // Back in Run the hart is out of reset and halted, as after a cold reset.
+    if !session.core(1)?.status().context("reaching hart 1 after its power cycle")?.is_halted() {
+        bail!("hart 1 is not halted out of its power-on reset");
     }
-
-    power_cycle(session, base)?;
-
-    if !session.core(1)?.status()?.is_running() {
-        bail!("hart 1 did not automatically resume after its running-state power cycle");
-    }
-    println!("[simprobe] hart 1 automatically resumed after retention without a debugger resume request");
+    println!("[simprobe] the PRCM brought CPU1 back to Run; hart 1 is out of reset and halted");
     Ok(())
 }
 
@@ -177,6 +147,11 @@ fn main() -> Result<()> {
         println!("[simprobe] wrote {} words at {:#010x}", words.len(), args.load);
     }
 
+    // CPU1 goes through a power cycle before the program runs: nothing it holds survives Off.
+    if let Some(base) = args.power_base {
+        power_demo(&mut session, base)?;
+    }
+
     for (hart, pc) in &args.hart_pcs {
         let mut core = session.core(*hart).with_context(|| format!("selecting hart {hart}"))?;
         core.halt(Duration::from_secs(10)).with_context(|| format!("halting hart {hart}"))?;
@@ -184,10 +159,6 @@ fn main() -> Result<()> {
         core.write_core_reg(program_counter, *pc).with_context(|| format!("setting hart {hart} pc"))?;
         core.run().with_context(|| format!("resuming hart {hart}"))?;
         println!("[simprobe] hart {hart} runs from {pc:#010x}");
-    }
-
-    if let Some(base) = args.power_base {
-        retention_demo(&mut session, base)?;
     }
 
     Ok(())

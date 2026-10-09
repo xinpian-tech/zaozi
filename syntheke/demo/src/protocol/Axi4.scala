@@ -96,13 +96,17 @@ object Axi4 extends Protocol:
   type Up   = AxiSlavePort
   type Edge = AxiEdgeParams
 
-  val carries: Set[Domain] = Set.empty
+  val carries: Set[DomainKind] = Set.empty
+  val accepts: Seq[Accept] = Seq(
+    Accept(ClockDomain)(_ == ClockRelation.Same),
+    Accept(ResetDomain)(_ == ResetRelation.Same),
+    Accept(PowerDomain)(_ == PowerRelation.Same)
+  )
 
   def negotiate(
     m:       AxiMasterPort,
-    s:       AxiSlavePort,
-    domains: EdgeDomains
-  ): Either[Violation, (AxiEdgeParams, Vector[Constraint])] =
+    s:       AxiSlavePort
+  ): Either[Violation, AxiEdgeParams] =
     def fail(msg: String) = Left(Violation(msg))
     m.idOverlap match
       case Some((x, y)) => return fail(s"master id ranges of '${x.name}' and '${y.name}' overlap")
@@ -118,24 +122,13 @@ object Axi4 extends Protocol:
       )
     if s.maxTransfer > s.beatBytes * 256 then
       return fail(s"maxTransfer ${s.maxTransfer} unencodable in AxLEN on a ${s.beatBytes}B bus")
-    val domainChecks      = Vector(ClockDomain, ResetDomain).map { domain =>
-      val out = domains.outward(domain)
-      val in  = domains.inward(domain)
-      Seq(out, in).check { view =>
-        if view.sameIdentity(out, in) then Right(())
-        else Left(Violation(s"${domain.key.show} differs between ${out.key.node.show} and ${in.key.node.show}"))
-      }
-    }
     Right(
-      (
-        AxiEdgeParams(
-          master = m,
-          slave = s,
-          addrBits = math.max(1, log2Up(s.maxAddress + 1)),
-          dataBits = s.beatBytes * 8,
-          idBits = idBits
-        ),
-        domainChecks :+ PowerDomain.compatible(domains, allowModel = false)
+      AxiEdgeParams(
+        master = m,
+        slave = s,
+        addrBits = math.max(1, log2Up(s.maxAddress + 1)),
+        dataBits = s.beatBytes * 8,
+        idBits = idBits
       )
     )
 

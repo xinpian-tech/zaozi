@@ -11,6 +11,7 @@ case class IOPadP() extends Parameter derives ReadWriter
 
 class IOPadPLayers(p: IOPadP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class IOPadPProbe(p: IOPadP) extends DVBundle[IOPadP, IOPadPLayers](p)
 class IOPadPIO(p: IOPadP) extends HWBundle(p):
   val pin = Flipped(new IOBundle)

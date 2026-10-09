@@ -2,10 +2,8 @@ package com.vowstar.ditdah32
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.ltltpe.ClockEvent
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-import me.jiuyang.syntheke.demo.zaoziimpl.{RetentionCell, RetentionBundle, RetentionP}
 
 class DitDah32GprLayers(parameter: DitDah32Parameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification"))
@@ -15,7 +13,6 @@ class DitDah32GprProbe(parameter: DitDah32Parameter) extends DVBundle[DitDah32Pa
 class DitDah32GprIO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
   val reset = Flipped(Reset())
-  val retention = Flipped(new RetentionBundle)
 
   val raddr1 = Flipped(UInt(5))
   val rdata1 = Aligned(UInt(parameter.xlen))
@@ -65,25 +62,3 @@ object DitDah32Gpr extends Generator[DitDah32Parameter, DitDah32GprLayers, DitDa
           regs(i) := 0.U(parameter.xlen)
         }
       }
-
-    val save = io.retention.save & !io.reset.asBool & !io.retention.restore
-    val restore = io.retention.restore & !io.reset.asBool & !io.retention.save
-    val retained = (1 to 15).map { i =>
-      val cell = RetentionCell.instantiate(
-        RetentionP(parameter.xlen, parameter.cpuMillivolts, parameter.retentionMillivolts)
-      )
-      cell.io.clock := io.clock
-      cell.io.reset := io.retention.reset
-      cell.io.in := regs(i).asBits
-      cell.io.save := save
-      cell.io.restore := restore
-      when(restore) { regs(i) := cell.io.out.asUInt }
-      (regs(i), cell)
-    }
-    io.retention.saved := save & retained.map(entry => Node(entry._2.io.saved)).reduce(_ & _)
-    io.retention.restored := restore & retained.map(entry => Node(entry._2.io.restored)).reduce(_ & _)
-
-    layer("Verification"):
-      given ClockEvent = posedge(io.clock)
-      val restoredValues = retained.map { (reg, cell) => reg.asBits === cell.io.out }.reduce(_ & _)
-      Assert((!io.retention.restored | restoredValues).S, !io.reset.asBool, "retention_gpr_restored")

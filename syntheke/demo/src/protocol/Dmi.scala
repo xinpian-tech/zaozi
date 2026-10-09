@@ -19,13 +19,20 @@ object Dmi extends Protocol:
   type Up   = DmiSlave
   type Edge = DmiEdge
 
-  val carries: Set[Domain] = Set.empty
+  val carries: Set[DomainKind] = Set.empty
+  val accepts: Seq[Accept]     = Seq(
+    Accept(ClockDomain)(_ == ClockRelation.Same),
+    Accept(ResetDomain) {
+      case ResetRelation.Same                 => true
+      case ResetRelation.Different(sameLevel) => sameLevel
+    },
+    Accept(PowerDomain)(_ == PowerRelation.Same)
+  )
 
   def negotiate(
     m: DmiMaster,
-    s: DmiSlave,
-    domains: EdgeDomains
-  ): Either[Violation, (DmiEdge, Vector[Constraint])] =
+    s: DmiSlave
+  ): Either[Violation, DmiEdge] =
     if s.addrBits > m.abits then
       Left(
         Violation(
@@ -34,17 +41,7 @@ object Dmi extends Protocol:
       )
     else if s.dataBits != m.dataBits then
       Left(Violation(s"DMI data width mismatch: transport ${m.dataBits}, module ${s.dataBits}"))
-    else
-      val outClock = domains.outward(ClockDomain)
-      val inClock  = domains.inward(ClockDomain)
-      val clockCheck = Seq(outClock, inClock).check { view =>
-        if view.sameIdentity(outClock, inClock) then Right(())
-        else Left(Violation(s"clock domain differs between ${outClock.key.node.show} and ${inClock.key.node.show}"))
-      }
-      Right((
-        DmiEdge(m.abits, m.dataBits),
-        Vector(clockCheck, ResetDomain.compatible(domains), PowerDomain.compatible(domains, allowModel = false))
-      ))
+    else Right(DmiEdge(m.abits, m.dataBits))
 
   def interface(e: DmiEdge): ProtocolInterface.Bundle =
     import ProtocolInterface.*

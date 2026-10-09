@@ -4,7 +4,6 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-import me.jiuyang.syntheke.demo.zaoziimpl.RetentionBundle
 
 class DitDah32Layers(parameter: DitDah32Parameter) extends LayerInterface(parameter):
   def layers = Seq(Layer("Verification")) ++ Option.when(parameter.enableTrace)(Layer("DV"))
@@ -54,7 +53,6 @@ class StatusBundle extends Bundle:
 class DitDah32IO(parameter: DitDah32Parameter) extends HWBundle(parameter):
   val clock = Flipped(Clock())
   val reset = Flipped(Reset())
-  val retention = Flipped(new RetentionBundle)
 
   val axi    = Aligned(new AxiLiteBundle(parameter))
   val irq    = Aligned(new InterruptBundle)

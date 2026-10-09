@@ -34,37 +34,25 @@ object AxiXbarNodes:
     arbitration: Arbitration
   )(
     using GeneratorScope[XbarP]
-  ): (AxiXbarNodes, Vector[Constraint]) =
+  ): AxiXbarNodes =
     val clkDraft     =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val inputDrafts  = ins.map { n =>
       given sourcecode.Name = sourcecode.Name(n)
-      inward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     }
     val outputDrafts = outs.map { n =>
       given sourcecode.Name = sourcecode.Name(n)
-      outward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     }
 
     val outputs = outputDrafts.map { out =>
-      out.derive(inputDrafts)(masters => Right((Axi4Xbar.mapInputs(masters), Vector.empty)))
+      out.derive(inputDrafts)(masters => Right(Axi4Xbar.mapInputs(masters)))
     }
     val inputs  = inputDrafts.map { in =>
       in.derive(outputs)(slaves =>
-        Axi4Xbar.aggregate(slaves, inputDrafts.size).map(value => (value, Vector.empty))
+        Axi4Xbar.aggregate(slaves, inputDrafts.size)
       )
     }
     val clk     = clkDraft.fixed(())
@@ -82,7 +70,7 @@ object AxiXbarNodes:
         )
       )
     }
-    (AxiXbarNodes(clk, inputs, outputs), Vector.empty)
+    AxiXbarNodes(clk, inputs, outputs)
 
 def axiXbar(
   ins:         Vector[String],

@@ -8,8 +8,8 @@ given GeneratorDefinition[PllP] = zaozi(PllGen)
 
 final case class PllNodes(
   ref:                 ClockReset.Inward,
-  systemClockDomain:   DomainHandle[ClockDomain.type],
-  systemResetDomain:   DomainHandle[ResetDomain.type],
+  systemClockDomain:   Domain[ClockDomain.type],
+  systemResetDomain:   Domain[ResetDomain.type],
   private val outputs: Vector[ClockReset.Outward]):
   def tap(n: String): ClockReset.Outward =
     outputs
@@ -29,81 +29,42 @@ object PllNodes:
     taps:  Vector[String]
   )(
     using GeneratorScope[PllP]
-  ): (PllNodes, Vector[Constraint]) =
+  ): PllNodes =
     val refDraft =
       given sourcecode.Name = sourcecode.Name("ref")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
 
     val refClock = refDraft.domain(ClockDomain)
     val refReset = refDraft.domain(ResetDomain)
 
-    val systemClockDomain = refClock.derive(ClockDomain) { domains =>
-      val refHz = domains.value(refClock).hz.toLong
-      Right((
-        ClockValue(outHz),
-        Some(ClockRequirement(
-          minHz = Some(((refHz + PllNodes.maxDiv - 1) / PllNodes.maxDiv).toInt),
-          maxHz = Some((refHz * PllNodes.maxMult).min(Int.MaxValue.toLong).toInt)
-        ))
-      ))
-    }
-    val clocks = Seq(refClock, systemClockDomain)
-    val systemResetDomain = (Seq(refReset) ++ clocks).derive(ResetDomain) { domains =>
-      val incoming    = domains.value(refReset)
-      val frequencies = clocks.map(clock => domains.value(clock).hz)
-      if !incoming.activeHigh then Left(Violation("the PLL macro requires an active-high reference reset"))
-      else if frequencies.exists(_ <= 0) then Left(Violation("the PLL reference and output clocks must be positive"))
-      else
-        Right((
-          ResetValue(
-            activeHigh = true,
-            assertion = ResetAssertion.Asynchronous,
-            release = ResetRelease.Synchronous
-          ),
-          None
-        ))
-    }
+    // The loop starts a new root clock; its reset is the reference reset released on that clock.
+    val systemClockDomain = ClockDomain.root(ClockInput(outHz))
+    val systemResetDomain =
+      ResetDomain.target(activeLow = false, refReset -> None)(Some(ResetProcessing.Async(systemClockDomain, 2)))
 
     val outputDrafts = taps.map { n =>
       given sourcecode.Name = sourcecode.Name(n)
-      outward(ClockReset)(
-        systemClockDomain,
-        systemResetDomain,
-        PowerDomain
-      )
-    }
-
-    val ratio = clocks.check { domains =>
-      val refHz = domains.value(refClock).hz
-      val out   = domains.value(systemClockDomain).hz
-      val gcd   = BigInt(out).gcd(BigInt(refHz)).toInt
-      val mult  = out / gcd
-      val div   = refHz / gcd
-      if mult > PllNodes.maxMult || div > PllNodes.maxDiv then
-        Left(
-          Violation(
-            s"$refHz Hz to $out Hz needs a $mult/$div loop, beyond the PLL's ${PllNodes.maxMult}/${PllNodes.maxDiv}"
-          )
-        )
-      else Right(())
+      outward(ClockReset)(systemClockDomain, systemResetDomain)
     }
 
     val ref     = refDraft.fixed(())
     val outputs = outputDrafts.map(_.fixed(()))
 
     parameters { (_, domains) =>
-      val refHz       = domains.value(refClock).hz
-      val actualOutHz = domains.value(systemClockDomain).hz
-      val ratio       = BigInt(actualOutHz).gcd(BigInt(refHz)).toInt
-      val mult        = actualOutHz / ratio
-      val div         = refHz / ratio
-      Right(PllP(refHz, actualOutHz, mult, div, taps))
+      val refHz = ClockDomain.hz(domains(refClock))
+      val gcd   = BigInt(outHz).gcd(BigInt(refHz)).toInt
+      val mult  = outHz / gcd
+      val div   = refHz / gcd
+      if ResetDomain.activeLow(domains(refReset)) then Left(Violation("the PLL macro requires an active-high reference reset"))
+      else if mult > PllNodes.maxMult || div > PllNodes.maxDiv then
+        Left(
+          Violation(
+            s"$refHz Hz to $outHz Hz needs a $mult/$div loop, beyond the PLL's ${PllNodes.maxMult}/${PllNodes.maxDiv}"
+          )
+        )
+      else Right(PllP(refHz, outHz, mult, div, taps))
     }
-    (PllNodes(ref, systemClockDomain, systemResetDomain, outputs), Vector(ratio))
+    PllNodes(ref, systemClockDomain, systemResetDomain, outputs)
 
 def pll(
   outHz: Int,

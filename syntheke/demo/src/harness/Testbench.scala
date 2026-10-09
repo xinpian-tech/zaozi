@@ -4,6 +4,7 @@ import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.{*, given}
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.syntheke.zaozi.zaozi
+import me.jiuyang.stdlib.power.PowerControlParameter
 
 given GeneratorDefinition[BoardP] = zaozi(BoardGen)
 given GeneratorDefinition[OscillatorP] = zaozi(OscillatorGen)
@@ -16,41 +17,43 @@ object Testbench:
     Design("Testbench") {
       val dut = system.instantiate
       val ports = dut.ports
-      val boardPower = PowerDomain.declare(PowerValue.ExternalDigitalModel, None)
-      val reference = ClockDomain.declare(dut.value(ports.ref, ClockDomain), None)
-      val reset = ResetDomain.declare(dut.value(ports.ref, ResetDomain), None)
-      boardPower.provide {
+      val refHz      = ClockDomain.hz(dut.domainOf(ports.ref, ClockDomain))
+      val refLow     = ResetDomain.activeLow(dut.domainOf(ports.ref, ResetDomain))
+      val boardPower = PowerDomain.root(PowerTreeDomain(PowerControlParameter(hasSwitch = false, 0, 0, 0)))
+      val reference  = ClockDomain.root(ClockInput(refHz))
+      val reset      = ResetDomain.root(ResetRoot.Source(refLow))
+      boardPower.scope {
         val oscillator = generator[OscillatorP] {
           val taps = Vector("dutRef", "board", "console").map { name =>
             given sourcecode.Name = sourcecode.Name(name)
-            outward(ClockReset)(reference, reset, PowerDomain).fixed(())
+            outward(ClockReset)(reference, reset).fixed(())
           }
-          parameters((_, _) => Right(OscillatorP(dut.value(ports.ref, ClockDomain).hz, Vector("dutRef", "board", "console"))))
-          (taps, Vector.empty)
+          parameters((_, _) => Right(OscillatorP(refHz, Vector("dutRef", "board", "console"))))
+          taps
         }
         ports.ref <-- oscillator(0)
 
         val board = Design("SimulationBoard") {
-          val power = PowerDomain.declare(PowerValue.ExternalDigitalModel, None)
-          val reference = ClockDomain.declare(dut.value(ports.ref, ClockDomain), None)
-          val reset = ResetDomain.declare(dut.value(ports.ref, ResetDomain), None)
-          val tck = ClockDomain.declare(dut.value(ports.dtmClock, ClockDomain), None)
-          val model = power.provide {
+          val power     = PowerDomain.root(PowerTreeDomain(PowerControlParameter(hasSwitch = false, 0, 0, 0)))
+          val reference = ClockDomain.root(ClockInput(refHz))
+          val reset     = ResetDomain.root(ResetRoot.Source(refLow))
+          val tck       = ClockDomain.root(ClockInput(ClockDomain.hz(dut.domainOf(ports.dtmClock, ClockDomain))))
+          val model = power.scope {
             generator[BoardP] {
-              val clk = inward(ClockReset)(ClockDomain, ResetDomain, PowerDomain).fixed(())
+              val clk = inward(ClockReset)().fixed(())
               val pins = ports.pins.indices.map { i =>
                 given sourcecode.Name = sourcecode.Name(s"pin$i")
-                inward(IO)(PowerDomain).fixed(())
+                inward(IO)().fixed(())
               }.toVector
               val clocks = Vector("dtm", "dmiCross").map { name =>
                 given sourcecode.Name = sourcecode.Name(name)
-                outward(ClockReset)(tck, reset, PowerDomain).fixed(())
+                outward(ClockReset)(tck, reset).fixed(())
               }
-              val serial = outward(Serial)(clk.domain(ClockDomain), clk.domain(ResetDomain), PowerDomain).fixed(config.baud)
+              val serial = outward(Serial)(clk.domain(ClockDomain), clk.domain(ResetDomain)).fixed(config.baud)
               parameters((_, _) => Right(BoardP(
-                dut.value(ports.ref, ClockDomain).hz, Vector("dtm", "dmiCross"),
+                refHz, Vector("dtm", "dmiCross"),
                 config.baud, ports.pins.size, config.uartPins, config.jtagPins, config.jtagPort, config.tckDiv)))
-              ((clk, pins, clocks, serial), Vector.empty)
+              (clk, pins, clocks, serial)
             }
           }
           val clk = model._1.boundary(())(reference, reset, power)
@@ -60,10 +63,10 @@ object Testbench:
           }
           val clocks = model._3.zipWithIndex.map { (clock, index) =>
             given sourcecode.Name = sourcecode.Name(s"clock$index")
-            clock.boundary(())(ClockDomain, ResetDomain, power)
+            clock.boundary(())(power)
           }
-          val serial = model._4.boundary(())(reference, reset, power)
-          ((clk, pins, clocks, serial), Vector.empty)
+          val serial = model._4.boundary(())(power)
+          (clk, pins, clocks, serial)
         }.instantiate
         board.ports._1 <-- oscillator(1)
         board.ports._2.zip(ports.pins).foreach((model, pin) => model <-- pin)
@@ -71,10 +74,10 @@ object Testbench:
         ports.crossingClock <-- board.ports._3(1)
 
         val console = generator[ConsoleP] {
-          val clk = inward(ClockReset)(ClockDomain, ResetDomain, PowerDomain).fixed(())
-          val serial = inward(Serial)(clk.domain(ClockDomain), clk.domain(ResetDomain), PowerDomain).fixed(())
-          parameters((view, domains) => Right(ConsoleP(domains.value(clk.domain(ClockDomain)).hz / view.edgeOf(serial))))
-          ((clk, serial), Vector.empty)
+          val clk = inward(ClockReset)().fixed(())
+          val serial = inward(Serial)().fixed(())
+          parameters((view, domains) => Right(ConsoleP(ClockDomain.hz(domains(clk.domain(ClockDomain))) / view.edgeOf(serial))))
+          (clk, serial)
         }
         console._1 <-- oscillator(2)
         console._2 <-- board.ports._4
@@ -85,13 +88,13 @@ object Testbench:
               given sourcecode.Name = sourcecode.Name(s"hart$index")
               val monitor = generator[TraceMonitorP] {
                 parameters((_, _) => Right(TraceMonitorP(trace)))
-                (EmptyTuple, Vector.empty)
+                EmptyTuple
               }
             }
-            (EmptyTuple, Vector.empty)
+            EmptyTuple
           }
-          (EmptyTuple, Vector.empty)
+          EmptyTuple
         }
       }
-      (EmptyTuple, Vector.empty)
+      EmptyTuple
     }

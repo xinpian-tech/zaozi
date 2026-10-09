@@ -11,18 +11,18 @@ final case class ClockBufferNodes(in: ClockReset.Inward, out: ClockReset.Outward
 object ClockBufferNodes:
   private[demo] def build(
     using GeneratorScope[ClockBufferP]
-  ): (ClockBufferNodes, Vector[Constraint]) =
+  ): ClockBufferNodes =
     val inDraft =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(ClockReset)(ClockDomain, ResetDomain, PowerDomain)
+      inward(ClockReset)()
     val outDraft =
       given sourcecode.Name = sourcecode.Name("out")
-      outward(ClockReset)(inDraft.domain(ClockDomain), inDraft.domain(ResetDomain), PowerDomain)
+      outward(ClockReset)(inDraft.domain(ClockDomain), inDraft.domain(ResetDomain))
 
     val in = inDraft.fixed(())
     val out = outDraft.fixed(())
     parameters((_, _) => Right(ClockBufferP()))
-    (ClockBufferNodes(in, out), Vector.empty)
+    ClockBufferNodes(in, out)
 
 def clockBuffer()(
   using

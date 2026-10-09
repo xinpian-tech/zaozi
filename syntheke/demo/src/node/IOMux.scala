@@ -30,17 +30,17 @@ def ioMux(
   generator[IOMuxP] {
     val clkDraft =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(ClockDomain, ResetDomain, PowerDomain)
+      inward(ClockReset)()
     val inDraft =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain), PowerDomain)
+      inward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     val pads = Vector.tabulate(pinCount) { i =>
       given sourcecode.Name = sourcecode.Name(s"pad$i")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     }
     val ports = routes.map { (name, _) =>
       given sourcecode.Name = sourcecode.Name(name)
-      inward(IO)(PowerDomain).fixed(())
+      inward(IO)().fixed(())
     }
     val clk = clkDraft.fixed(())
     val in = inDraft.fixed(AxiSlavePort(
@@ -59,5 +59,5 @@ def ioMux(
     parameters { (view, _) =>
       Right(IOMuxP(base, size, shapeOf(view.edgeOf(in)), pinCount, routes))
     }
-    (IOMuxNodes(clk, in, pads, ports), Vector.empty)
+    IOMuxNodes(clk, in, pads, ports)
   }

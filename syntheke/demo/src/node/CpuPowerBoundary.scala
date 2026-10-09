@@ -8,33 +8,32 @@ given GeneratorDefinition[CpuPowerBoundaryP] = zaozi(CpuPowerBoundaryGen)
 
 final case class CpuPowerBoundaryNodes(
   clk:      ClockReset.Inward,
+  port:     PRCMPort.Inward,
   cpuClk:   ClockReset.Outward,
   cpuMem:   Axi4.Inward,
   bus:      Axi4.Outward,
   debug:    DebugInterrupt.Inward,
-  cpuDebug: DebugInterrupt.Outward,
-  retention: Retention.Outward,
-  control:  PowerControl.Inward)
+  cpuDebug: DebugInterrupt.Outward)
 
 object CpuPowerBoundaryNodes:
   private[demo] def build(
-    cpuPower:      DomainHandle[PowerDomain.type],
-    startupCycles: Int
+    cpuPower: Domain[PowerDomain.type]
   )(
     using GeneratorScope[CpuPowerBoundaryP]
-  ): (CpuPowerBoundaryNodes, Vector[Constraint]) =
+  ): CpuPowerBoundaryNodes =
     val clkDraft =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(ClockDomain, ResetDomain, PowerDomain)
+      inward(ClockReset)()
     val clock = clkDraft.domain(ClockDomain)
     val reset = clkDraft.domain(ResetDomain)
     val aonPower = clkDraft.domain(PowerDomain)
-    val cpuClock = clock.derive(ClockDomain) { view =>
-      Right((view.value(clock), None))
-    }
-    val cpuReset = reset.derive(ResetDomain) { view =>
-      Right((view.value(reset), None))
-    }
+    // The PRCM port brings the managed domain and the clock and reset it drives for the CPU.
+    val portDraft =
+      given sourcecode.Name = sourcecode.Name("port")
+      inward(PRCMPort)(aonPower)
+    val prcm = portDraft.domain(PRCMDomain)
+    val cpuClock = portDraft.domain(ClockDomain)
+    val cpuReset = portDraft.domain(ResetDomain)
     val cpuClkDraft =
       given sourcecode.Name = sourcecode.Name("cpuClk")
       outward(ClockReset)(cpuClock, cpuReset, cpuPower)
@@ -50,64 +49,50 @@ object CpuPowerBoundaryNodes:
     val cpuDebugDraft =
       given sourcecode.Name = sourcecode.Name("cpuDebug")
       outward(DebugInterrupt)(cpuClock, cpuReset, cpuPower)
-    val controlDraft =
-      given sourcecode.Name = sourcecode.Name("control")
-      inward(PowerControl)(clock, reset, aonPower)
-    val retentionReset = reset.derive(ResetDomain)(view => Right((view.value(reset), None)))
-    val retentionDraft =
-      given sourcecode.Name = sourcecode.Name("retention")
-      outward(Retention)(cpuClock, retentionReset, aonPower)
 
     val clk = clkDraft.fixed(())
+    val port = portDraft.fixed(())
     val cpuClk = cpuClkDraft.fixed(())
-    val control = controlDraft.fixed(())
-    val retention = retentionDraft.fixed(())
-    val cpuMem = cpuMemDraft.derive(busDraft)(slave => Right((slave, Vector.empty)))
-    val busPower = busDraft.domain(PowerDomain)
-    val bus = busDraft.derive((cpuMem, busPower)) { (port, supply) =>
-      if !supply.isInstanceOf[PowerValue.Supply] then
-        Left(Violation("CPU power boundary requires physical supply declarations"))
-      else if port.masters.exists(_.maxFlight.forall(_ <= 0)) then
+    val cpuMem = cpuMemDraft.derive(busDraft)(slave => Right(slave))
+    val bus = busDraft.derive(cpuMem) { port =>
+      if port.masters.exists(_.maxFlight.forall(_ <= 0)) then
         Left(Violation("CPU power shutdown requires a finite positive AXI maxFlight for every master"))
       else if port.masters.map(m => BigInt(m.maxFlight.get) * (m.id.end - m.id.start)).sum > Int.MaxValue then
         Left(Violation("CPU power shutdown AXI outstanding bound exceeds the counter capacity"))
-      else Right((port, Vector(busPower.requirement(PowerRequirement(requiresAlwaysOn = true)))))
+      else Right(port)
     }
-    val debug = debugDraft.derive(cpuDebugDraft)(hart => Right((hart, Vector.empty)))
-    val cpuDebug = cpuDebugDraft.derive(debug)(request => Right((request, Vector.empty)))
-
-    val isolation = Seq(aonPower, cpuPower).check { view =>
-      (view.value(aonPower), view.value(cpuPower)) match
-        case (_: PowerValue.Supply, PowerValue.Supply(_, false)) =>
-          if view.sameIdentity(aonPower, cpuPower) then
-            Left(Violation("CPU isolation requires independent AON and CPU supplies"))
-          else Right(())
-        case _ => Left(Violation("CPU isolation requires an AON supply and a switchable CPU supply"))
-    }
+    val debug = debugDraft.derive(cpuDebugDraft)(hart => Right(hart))
+    val cpuDebug = cpuDebugDraft.derive(debug)(request => Right(request))
 
     parameters { (view, domains) =>
-      val edge = view.edgeOf(bus)
+      val edge           = view.edgeOf(bus)
       val maxOutstanding = edge.master.masters.map(m => m.maxFlight.get.toLong * (m.id.end - m.id.start)).sum.toInt
-      (domains.value(aonPower), domains.value(cpuPower)) match
-        case (PowerValue.Supply(aonMv, _), PowerValue.Supply(cpuMv, _)) =>
-          Right(CpuPowerBoundaryP(shapeOf(edge), view.edgeOf(cpuDebug).xlen, startupCycles, maxOutstanding, aonMv, cpuMv))
-        case _ => Left(Violation("CPU power boundary requires physical supply declarations"))
+      val aon            = PowerDomain.tree(domains(aonPower))
+      val cpu            = PowerDomain.tree(domains(cpuPower))
+      val systemReset    = domains(reset)
+      if !aon.alwaysOn || cpu.alwaysOn then
+        Left(Violation("CPU isolation requires an always-on control supply and a switched CPU supply"))
+      else if !(PRCMDomain.power(domains(prcm)) eq domains(cpuPower).underlying) then
+        Left(Violation(s"the boundary switches ${domains(cpuPower)} but its control sequences ${domains(prcm)}"))
+      else if ClockDomain.relate(domains(clock), domains(cpuClock)) != ClockRelation.Synchronous(1, 1) then
+        Left(Violation(s"the boundary answers the PRCM on ${domains(clock)}, not on the clock the PRCM gates for the CPU"))
+      else if ResetDomain.activeLow(systemReset) || ResetDomain.releaseClock(systemReset).isEmpty then
+        Left(Violation("the CPU power boundary needs an active-high reset released on a clock"))
+      else
+        Right(
+          CpuPowerBoundaryP(
+            shapeOf(edge),
+            view.edgeOf(cpuDebug).xlen,
+            cpu.control.settleOnCycles.toInt,
+            cpu.control.settleOffCycles.toInt,
+            maxOutstanding
+          )
+        )
     }
-    (
-      CpuPowerBoundaryNodes(clk, cpuClk, cpuMem, bus, debug, cpuDebug, retention, control),
-      Vector(
-        reset.requirement(ResetRequirement(
-          requireAsynchronousAssertion = true,
-          requireSynchronousRelease = true,
-          requiredActiveHigh = Some(true)
-        )),
-        isolation
-      )
-    )
+    CpuPowerBoundaryNodes(clk, port, cpuClk, cpuMem, bus, debug, cpuDebug)
 
 def cpuPowerBoundary(
-  cpuPower:      DomainHandle[PowerDomain.type],
-  startupCycles: Int
+  cpuPower: Domain[PowerDomain.type]
 )(
   using
   ws:   WrapperScope,
@@ -115,4 +100,4 @@ def cpuPowerBoundary(
   file: sourcecode.File,
   line: sourcecode.Line
 ): CpuPowerBoundaryNodes =
-  generator[CpuPowerBoundaryP](CpuPowerBoundaryNodes.build(cpuPower, startupCycles))
+  generator[CpuPowerBoundaryP](CpuPowerBoundaryNodes.build(cpuPower))

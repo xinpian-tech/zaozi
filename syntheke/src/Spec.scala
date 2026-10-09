@@ -4,43 +4,21 @@ package me.jiuyang.syntheke
 enum NodeDirection derives CanEqual:
   case Inward, Outward
 
-sealed trait DomainSelectorSpec
-object DomainSelectorSpec:
-  private[syntheke] final case class Frozen(source: DomainReadable[?], provenance: AttachmentProvenance) extends DomainSelectorSpec
-  final case class Direct(private[syntheke] val domain: DomainHandle[?]) extends DomainSelectorSpec
-  final case class Contextual(
-    private[syntheke] val domain: DomainHandle[?],
-    providedAt:                  ModuleId)
-      extends DomainSelectorSpec
-  final case class Follow(use: NodeDomain[?]) extends DomainSelectorSpec
-  final case class CarrierOut(private[syntheke] val source: DomainReadable[?]) extends DomainSelectorSpec
-  case object CarrierIn extends DomainSelectorSpec
-
-final case class NodeDomainSpec(
-  key:                              NodeDomainKey,
-  domain:                             Domain,
-  selector:                         DomainSelectorSpec,
-  order:                            Int,
-  loc:                              (sourcecode.File, sourcecode.Line),
-  private[syntheke] val capability: NodeDomain[?])
-
-final case class ConstraintSpec(
-  source: DomainContributor,
-  constraint: Constraint,
-  order: Int):
-  private[syntheke] def reads: Vector[DomainReadable[?]] = constraint.reads
-  private[syntheke] def loc: (sourcecode.File, sourcecode.Line) = constraint.loc
+/** A node's place in one domain kind: a declared domain or another node's domain, or, with no source, the domain
+  * its carrier bind delivers.
+  */
+final case class Membership(kind: DomainKind, source: Option[DomainSource[?]], loc: (sourcecode.File, sourcecode.Line))
 
 private[syntheke] enum NodeComputation:
   case Constant(value: Any)
-  case Derived(plan: ReadPlan, compute: ReadValues => Either[Violation, (Any, Vector[Constraint])])
+  case Derived(plan: ReadPlan, compute: ReadValues => Either[Violation, Any])
 
   def readPlan: ReadPlan = this match
     case Constant(_)      => ReadPlan()
     case Derived(plan, _) => plan
 
-  def apply(values: ReadValues): Either[Violation, (Any, Vector[Constraint])] = this match
-    case Constant(value)     => Right((value, Vector.empty))
+  def apply(values: ReadValues): Either[Violation, Any] = this match
+    case Constant(value)     => Right(value)
     case Derived(_, compute) => compute(values)
 
 final case class NodeSpec(
@@ -48,16 +26,11 @@ final case class NodeSpec(
   direction:                         NodeDirection,
   protocol:                          Protocol,
   private[syntheke] val computation: NodeComputation,
-  nodeDomains:                        Vector[NodeDomainSpec],
+  memberships:                       Vector[Membership],
   order:                             Int,
-  loc:                               (sourcecode.File, sourcecode.Line),
-  private[syntheke] val capability: NodeCapability)
+  loc:                               (sourcecode.File, sourcecode.Line))
 
-final case class ParamDependencySpec(
-  from:  String,
-  to:    String,
-  order: Int,
-  loc:   (sourcecode.File, sourcecode.Line))
+final case class ParamDependencySpec(from: String, to: String, loc: (sourcecode.File, sourcecode.Line))
 
 final class ProbeSpec[P] private[syntheke] (
   val node: ProbeNode[P],
@@ -94,7 +67,7 @@ final case class GeneratorModuleSpec(
   definition:                       GeneratorDefinition[?],
   nodes:                            Vector[NodeSpec],
   dependencies:                     Vector[ParamDependencySpec],
-  private[syntheke] val parameters: (EdgeView, DomainView) => Either[Violation, Any],
+  private[syntheke] val parameters: (EdgeView, DomainGraph) => Either[Violation, Any],
   loc:                              (sourcecode.File, sourcecode.Line),
   probes: Vector[ProbeSpec[?]])
     extends NodeModuleSpec
@@ -108,12 +81,10 @@ final case class BindDecl(
   def bindId: BindId = BindId(order, source, target)
 
 final case class DesignSpec(
-  private[syntheke] val owner: DesignOwner,
   modules:                     Map[ModuleId, ModuleSpec],
   moduleOrder:                 Vector[ModuleId],
   binds:                       Vector[BindDecl],
-  domainDecls:                 Vector[DomainHandle[?]],
-  constraints:                 Vector[ConstraintSpec],
+  domains:                     Vector[Domain[?]],
   root: ModuleId,
   private[syntheke] val boundaries: Vector[Boundary[?]]):
 
@@ -125,8 +96,6 @@ final case class DesignSpec(
   private[syntheke] def nodeModules: Vector[NodeModuleSpec] = moduleOrder.flatMap(id => modules.get(id).collect { case n: NodeModuleSpec => n })
   def nodeSpec(id: ModuleNodeId):       Option[NodeSpec]            =
     modules.get(id.module).collect { case n: NodeModuleSpec => n }.flatMap(_.node(id.name))
-  def domainDecl(id: DomainDeclId):     Option[DomainHandle[?]]     = domainDecls.find(_.id == id)
-  def nodeDomains:                       Vector[NodeDomainSpec]   = nodeModules.flatMap(_.nodes.flatMap(_.nodeDomains))
 
   def generators: Vector[GeneratorDefinition[?]] =
     generatorModules.map(_.definition).foldLeft(Vector.empty[GeneratorDefinition[?]]) { (acc, e) =>

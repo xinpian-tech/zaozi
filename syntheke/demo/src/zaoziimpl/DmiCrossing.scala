@@ -1,10 +1,12 @@
 package me.jiuyang.syntheke.demo.zaoziimpl
 
+import me.jiuyang.stdlib.default.{SynchronizedReset, SynchronizedResetParameter}
 import me.jiuyang.stdlib.queue.default.{AsyncQueue, AsyncQueueParameter}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
+import org.llvm.circt.scalalib.dialect.firrtl.operation.RegResetPolarity
 import upickle.default.ReadWriter
 
 
@@ -47,7 +49,12 @@ object DmiCrossingGen extends Generator[DmiCrossingP, DmiCrossingPLayers, DmiCro
     given ClockScope = ClockScope.posedge(io.deqClk.clock)
     given ResetScope = ResetScope.asyncActiveHigh(io.deqClk.reset)
 
-    val resetN = (!io.deqClk.reset.asBool).asReset
+    // The queues take one reset for both sides; it is released on the enqueue clock. The dequeue side still sees
+    // that release asynchronously: a known gap until AsyncQueue takes a reset per side.
+    val enqReset = SynchronizedReset.instantiate(SynchronizedResetParameter(2, RegResetPolarity.PosReset))
+    enqReset.io.clock := io.enqClk.clock
+    enqReset.io.reset := io.deqClk.reset
+    val resetN = (!enqReset.io.synchronizedReset.asBool).asReset
 
     val req = AsyncQueue.instantiate(p.queueP(p.reqBits))
     req.io.resetN        := resetN

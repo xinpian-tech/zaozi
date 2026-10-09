@@ -12,9 +12,13 @@ trait Protocol:
   type Inward       = InwardPort[this.type]
   type Outward      = OutwardPort[this.type]
 
-  val carries: Set[Domain]
+  /** Domain kinds the protocol's wires carry; the inward end of a bind is in the outward end's domain. */
+  val carries: Set[DomainKind]
 
-  def negotiate(down: Down, up: Up, domains: EdgeDomains): Either[Violation, (Edge, Vector[Constraint])]
+  /** What a bind may cross in every other domain kind its ends are in. A kind left out is an error. */
+  def accepts: Seq[Accept]
+
+  def negotiate(down: Down, up: Up): Either[Violation, Edge]
 
   def interface(edge: Edge): ProtocolInterface.Bundle
 

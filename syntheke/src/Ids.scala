@@ -22,11 +22,8 @@ object ModuleId:
 final case class ModuleNodeId(module: ModuleId, name: String) derives upickle.default.ReadWriter:
   def show: String = s"${module.show}#$name"
 
-final case class DomainDeclId(module: ModuleId, name: String):
+final case class DomainId(module: ModuleId, name: String):
   def show: String = s"${module.show}@$name"
-
-final case class NodeDomainKey(node: ModuleNodeId, domain: DomainKey):
-  def show: String = s"${node.show}@${domain.show}"
 
 final case class BindId(order: Int, source: ModuleNodeId, target: ModuleNodeId):
   def show: String = s"bind[$order] ${source.show} -> ${target.show}"

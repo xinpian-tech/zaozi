@@ -2,10 +2,8 @@ package com.vowstar.ditdah32
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.ltltpe.ClockEvent
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-import me.jiuyang.syntheke.demo.zaoziimpl.{RetentionCell, RetentionP}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
 import java.lang.foreign.Arena
@@ -20,7 +18,6 @@ object DitDah32Module
   override def moduleName(parameter: DitDah32Parameter): String = s"DitDah32_${parameter.hashCode.toHexString}"
 
   def architecture(parameter: DitDah32Parameter) =
-    require(parameter.enableDebug, "retention requires the debug halt and resume interface")
     val io    = summon[Interface[DitDah32IO]]
     val probe = summon[ProbeInterface[DitDah32Probe]]
 
@@ -1145,67 +1142,6 @@ object DitDah32Module
         trapVector,
         irqMip
       )
-
-    val quiescent = stateDebug & !fetchOutstanding & !memOutstanding & !debugMemBusy.get &
-      !debugMemOutstanding.get & !debugResetReq & !debugResumeReq & !io.debug.get.abstractValid
-    val save = io.retention.save & quiescent & !io.reset.asBool & !io.retention.restore
-    val restore = io.retention.restore & !io.reset.asBool & !debugResetReq & !io.retention.save
-    gpr.io.retention.reset := io.retention.reset
-    gpr.io.retention.save := save
-    gpr.io.retention.restore := restore
-
-    def retain(value: Referable[Bits]) =
-      val cell = RetentionCell.instantiate(
-        RetentionP(parameter.xlen, parameter.cpuMillivolts, parameter.retentionMillivolts)
-      )
-      cell.io.clock := io.clock
-      cell.io.reset := io.retention.reset
-      cell.io.in := value
-      cell.io.save := save
-      cell.io.restore := restore
-      cell
-
-    val retainedUInt = Seq(pc, csrMtvec, csrMepc, csrMtval, debugDpc.get, debugDcsr.get)
-      .map(reg => (reg, retain(reg.asBits)))
-    val retainedBits = Seq(csrMstatus, csrMie, csrMscratch, csrMcause)
-      .map(reg => (reg, retain(reg)))
-    val retained = retainedUInt.map(_._2) ++ retainedBits.map(_._2)
-    io.retention.saved := save & gpr.io.retention.saved & retained.map(cell => Node(cell.io.saved)).reduce(_ & _)
-    io.retention.restored := restore & gpr.io.retention.restored & retained.map(cell => Node(cell.io.restored)).reduce(_ & _)
-
-    when(restore) {
-      retainedUInt.foreach { (reg, cell) => reg := cell.io.out.asUInt }
-      retainedBits.foreach { (reg, cell) => reg := cell.io.out }
-      state := CoreState.DEBUG.U(3)
-      fetched := false.B
-      fetchOutstanding := false.B
-      memOutstanding := false.B
-      storeAwDone := false.B
-      storeWDone := false.B
-      trapEventReg := false.B
-      debugStepActive.get := false.B
-      debugResumeAck.get := false.B
-      debugResetAck.get := false.B
-      debugResetActive.get := false.B
-      debugAbstractDone.get := false.B
-      debugMemBusy.get := false.B
-      debugMemOutstanding.get := false.B
-      debugMemAwDone.get := false.B
-      debugMemWDone.get := false.B
-      gpr.io.we := false.B
-      gpr.io.clearAll := false.B
-    }
-
-    layer("Verification"):
-      given ClockEvent = posedge(io.clock)
-      val restoredValues = (
-        retainedUInt.map { (reg, cell) => reg.asBits === cell.io.out } ++
-          retainedBits.map { (reg, cell) => reg === cell.io.out }
-      ).reduce(_ & _)
-      Assert((!io.retention.save | quiescent).S, !io.reset.asBool, "retention_save_quiescent")
-      Assert((!io.retention.save | !io.retention.restore).S, !io.reset.asBool, "retention_requests_exclusive")
-      Assert((!io.retention.restored | (stateDebug & restoredValues)).S, !io.reset.asBool, "retention_cpu_restored")
-      Cover(io.retention.restored.S, !io.reset.asBool, "retention_cpu_restore")
 
     if parameter.enableTrace then
       layer("DV"):

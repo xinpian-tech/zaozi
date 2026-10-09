@@ -7,14 +7,10 @@ object ClockReset extends Protocol:
   type Up   = Unit
   type Edge = Unit
 
-  val carries: Set[Domain] = Set(ClockDomain, ResetDomain)
+  val carries: Set[DomainKind] = Set(ClockDomain, ResetDomain)
+  val accepts: Seq[Accept]     = Seq(Accept(PowerDomain)(PowerDomain.atPin))
 
-  def negotiate(
-    down: Unit,
-    up: Unit,
-    domains: EdgeDomains
-  ): Either[Violation, (Unit, Vector[Constraint])] =
-    Right(((), Vector(PowerDomain.compatible(domains, allowModel = true))))
+  def negotiate(down: Unit, up: Unit): Either[Violation, Unit] = Right(())
 
   def interface(edge: Unit): ProtocolInterface.Bundle =
     ProtocolInterface.Bundle(

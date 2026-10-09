@@ -1,5 +1,7 @@
 package me.jiuyang.syntheke.demo
 
+import me.jiuyang.stdlib.power.PowerControlParameter
+import me.jiuyang.stdlib.prcm.PRCMTarget
 import me.jiuyang.syntheke.*
 import me.jiuyang.syntheke.demo.zaoziimpl.{*, given}
 import me.jiuyang.stdlib.iomux.IOMuxRoute
@@ -27,23 +29,35 @@ object Soc:
   def build(config: SocConfig): Design[Ports] =
     import config.*
     Design("Soc") {
-      val refClock = ClockDomain.declare(ClockValue(refHz), None)
-      val tckClock = ClockDomain.declare(ClockValue(refHz / (2 * tckDiv)), None)
-      val boardReset = ResetDomain.declare(ResetValue(true, ResetAssertion.Asynchronous, ResetRelease.Synchronous), None)
+      val refClock   = ClockDomain.root(ClockInput(refHz))
+      val tckClock   = ClockDomain.root(ClockInput(refHz / (2 * tckDiv)))
+      val boardReset = ResetDomain.root(ResetRoot.Source(activeLow = false))
 
-      val alwaysOnPowerDomain = PowerDomain.declare(
-        PowerValue.Supply(millivolts = 900, alwaysOn = true),
-        Some(PowerRequirement(minMillivolts = Some(850), maxMillivolts = Some(950), requiresAlwaysOn = true))
-      )
-      val cpu0PowerDomain     = PowerDomain.declare(
-        PowerValue.Supply(millivolts = 850, alwaysOn = false),
-        None
-      )
-      val cpu1PowerDomain     = PowerDomain.declare(
-        PowerValue.Supply(millivolts = 950, alwaysOn = false),
-        None
-      )
-      alwaysOnPowerDomain.provide:
+      val alwaysOnPowerDomain =
+        PowerDomain.root(PowerTreeDomain(PowerControlParameter(hasSwitch = false, 0, 0, 0)))
+      def cpuPower(settleOnCycles: Int)(using WrapperScope, sourcecode.Name, sourcecode.File, sourcecode.Line) =
+        PowerDomain.root(
+          PowerTreeDomain(
+            PowerControlParameter(hasSwitch = true, waitDependencyCycles = 0, settleOnCycles, settleOffCycles = 2),
+            Vector(PowerDependency(alwaysOnPowerDomain, PowerDependencyKind.Hard))
+          )
+        )
+      val cpu0PowerDomain     = cpuPower(settleOnCycles = 8)
+      val cpu1PowerDomain     = cpuPower(settleOnCycles = 16)
+      // One PRCM sequences both CPUs between Off and Run, starting in Run.
+      val prcmDomain          = PRCMDomain.root(PRCMController(coldResetStages = 2))
+      def cpuPrcm(power: Domain[PowerDomain.type])(using WrapperScope, sourcecode.Name, sourcecode.File, sourcecode.Line) =
+        PRCMDomain.manage(prcmDomain)(
+          PRCMManagedDomain(
+            power,
+            Vector(PRCMMode("off", 0, PRCMTarget.Off), PRCMMode("run", 1, PRCMTarget.Run)),
+            resetMode = "run",
+            resetStages = 2
+          )
+        )
+      val cpu0                = cpuPrcm(cpu0PowerDomain)
+      val cpu1                = cpuPrcm(cpu1PowerDomain)
+      alwaysOnPowerDomain.scope:
 
         val sysPll = pll(
           outHz = sysHz,
@@ -63,16 +77,16 @@ object Soc:
             "dm"
           )
         )
-        val ref = sysPll.ref.boundary(())(refClock, boardReset, PowerDomain)
+        val ref = sysPll.ref.boundary(())(refClock, boardReset)
 
-        val core0        = cpu0PowerDomain.provide {
+        val core0        = cpu0PowerDomain.scope {
           core(idBits = 2, maxFlight = 4, resetPc = 0, enableDebug = true, enableTrace = true)
         }
-        val core1        = cpu1PowerDomain.provide {
+        val core1        = cpu1PowerDomain.scope {
           core(idBits = 3, maxFlight = 8, resetPc = 0, enableDebug = true, enableTrace = true)
         }
-        val cpu0Boundary = cpuPowerBoundary(cpu0PowerDomain, startupCycles = 8)
-        val cpu1Boundary = cpuPowerBoundary(cpu1PowerDomain, startupCycles = 16)
+        val cpu0Boundary = cpuPowerBoundary(cpu0PowerDomain)
+        val cpu1Boundary = cpuPowerBoundary(cpu1PowerDomain)
         val dma          = dmaCtrl(idBits = 1, maxFlight = 1, targetBase = dmaTarget, windowLog2 = dmaWindowLog2)
 
         val sysXbar = axiXbar(
@@ -84,7 +98,8 @@ object Soc:
         val bridge = widthBridge(wideBeatBytes = 16)
 
         val periphXbar = axiXbar(Vector("bridge"), Vector("uart", "gpio", "power", "iomux"), Arbitration.FixedPriority)
-        val power      = powerController(base = powerBase, size = periphSize, idCapacityBits = 8)
+        val power      =
+          prcmController(base = powerBase, size = periphSize, idCapacityBits = 8, prcmDomain, Vector(cpu0, cpu1))
 
         val uart      = uartCtrl(base = uartBase, size = periphSize, idCapacityBits = 8, baud = baud)
         val uartClock = clockBuffer()
@@ -109,10 +124,7 @@ object Soc:
           val dm    = debugModule(harts = 2, haltOnReset = true, sbIdBits = 1)
           cross.in <-- dtm.dmi
           dm.dmi <-- cross.out
-          (
-            DebugIsland(dtm.jtag, dtm.tck, cross.enqClk, cross.deqClk, dm.clk, dm.sb, dm.hart(0), dm.hart(1)),
-            Vector.empty
-          )
+          DebugIsland(dtm.jtag, dtm.tck, cross.enqClk, cross.deqClk, dm.clk, dm.sb, dm.hart(0), dm.hart(1))
         }
         val jtagPads = jtagIO(debug.jtag)
 
@@ -128,8 +140,8 @@ object Soc:
         gpio.in <-- periphXbar.output("gpio")
         power.in <-- periphXbar.output("power")
         mux.in <-- periphXbar.output("iomux")
-        cpu0Boundary.control <-- power.cpu0
-        cpu1Boundary.control <-- power.cpu1
+        cpu0Boundary.port <-- power.port(cpu0)
+        cpu1Boundary.port <-- power.port(cpu1)
 
         cpu0Boundary.debug <-- debug.hart0
         cpu1Boundary.debug <-- debug.hart1
@@ -140,8 +152,8 @@ object Soc:
           slaves = Vector(AxiSlaveParams("dram", AddressSet.misaligned(loadBase, dramBytes),
             RegionType.Uncached, executable = true, supportsWrite = TransferSizes(1, 64), supportsRead = TransferSizes(1, 64))),
           beatBytes = 16, idCapacityBits = 6, minLatency = 8
-        ))(sysPll.systemClockDomain, sysPll.systemResetDomain, PowerDomain)
-        val memoryClock = sysPll.tap("mem").boundary(())(ClockDomain, ResetDomain, PowerDomain)
+        ))(sysPll.systemClockDomain, sysPll.systemResetDomain)
+        val memoryClock = sysPll.tap("mem").boundary(())()
 
         mux.input("uartTx") <-- uartIO.tx
         mux.input("uartRx") <-- uartIO.rx
@@ -152,17 +164,15 @@ object Soc:
         gpioIOs.zipWithIndex.foreach((pin, i) => mux.input(s"gpio$i") <-- pin)
         val pins = mux.pads.zipWithIndex.map { (pad, i) =>
           given sourcecode.Name = sourcecode.Name(s"pin$i")
-          pad.boundary(())(PowerDomain)
+          pad.boundary(())()
         }
-        val dtmClock = debug.tckClk.boundary(())(tckClock, boardReset, PowerDomain)
-        val crossingClock = debug.crossTck.boundary(())(tckClock, boardReset, PowerDomain)
+        val dtmClock = debug.tckClk.boundary(())(tckClock, boardReset)
+        val crossingClock = debug.crossTck.boundary(())(tckClock, boardReset)
 
         cpu0Boundary.clk <-- sysPll.tap("core0")
         cpu1Boundary.clk <-- sysPll.tap("core1")
         core0.clk <-- cpu0Boundary.cpuClk
         core1.clk <-- cpu1Boundary.cpuClk
-        core0.retention <-- cpu0Boundary.retention
-        core1.retention <-- cpu1Boundary.retention
         dma.clk <-- sysPll.tap("dma")
         sysXbar.clk <-- sysPll.tap("sysXbar")
         bridge.clk <-- sysPll.tap("bridge")
@@ -174,5 +184,5 @@ object Soc:
         mux.clk <-- sysPll.tap("iomux")
         debug.crossSys <-- sysPll.tap("dmiCross")
         debug.dmClk <-- sysPll.tap("dm")
-        (Ports(ref, dtmClock, crossingClock, memory, memoryClock, pins), Vector.empty)
+        Ports(ref, dtmClock, crossingClock, memory, memoryClock, pins)
     }

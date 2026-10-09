@@ -28,38 +28,22 @@ object DmNodes:
     sbIdBits:    Int
   )(
     using GeneratorScope[DmP]
-  ): (DmNodes, Vector[Constraint]) =
+  ): DmNodes =
     val clkDraft =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val dmiDraft =
       given sourcecode.Name = sourcecode.Name("dmi")
-      inward(Dmi)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(Dmi)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
     val hartDrafts = (0 until harts).map { i =>
       given sourcecode.Name = sourcecode.Name(s"hart$i")
-      outward(DebugInterrupt)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(DebugInterrupt)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     }.toVector
 
     val sbDraft =
       given sourcecode.Name = sourcecode.Name("sb")
-      outward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
     val clk       = clkDraft.fixed(())
     val dmi       = dmiDraft.fixed(DmiSlave(DmNodes.addrBits, 32))
@@ -89,7 +73,7 @@ object DmNodes:
         val s = shapeOf(sbE)
         DmP(harts, e.abits, e.dataBits, distinctXlens.head, haltOnReset, s.addrBits, s.dataBits, s.idBits)
     }
-    (DmNodes(clk, dmi, sb, hartPorts), Vector.empty)
+    DmNodes(clk, dmi, sb, hartPorts)
 
 def debugModule(
   harts:       Int,

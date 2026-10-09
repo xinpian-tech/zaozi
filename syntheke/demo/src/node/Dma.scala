@@ -19,21 +19,13 @@ object DmaNodes:
     windowLog2: Int
   )(
     using GeneratorScope[DmaP]
-  ): (DmaNodes, Vector[Constraint]) =
+  ): DmaNodes =
     val clkDraft =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val memDraft =
       given sourcecode.Name = sourcecode.Name("mem")
-      outward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
 
     val clk = clkDraft.fixed(())
@@ -47,7 +39,7 @@ object DmaNodes:
       val s = shapeOf(view.edgeOf(mem))
       Right(DmaP(targetBase, windowLog2, s.addrBits, s.dataBits, s.idBits))
     }
-    (DmaNodes(clk, mem), Vector.empty)
+    DmaNodes(clk, mem)
 
 def dmaCtrl(
   idBits:     Int,

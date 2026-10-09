@@ -28,13 +28,12 @@ private[syntheke] object ParameterInputs:
         inline if !outward then error("an inward node derives Up parameters from outward nodes, not inward nodes")
       case _: (OutwardNodeDraft[?] | OutwardPort[?]) =>
         inline if outward then error("an outward node derives Down parameters from inward nodes, not outward nodes")
-      case _: NodeDomain[?] => ()
       case _: scala.collection.Seq[s] => validate[s](outward)
       case _: EmptyTuple => ()
       case _: (head *: tail) =>
         validate[head](outward)
         validate[tail](outward)
-      case _ => error("derive expects opposite-direction node declarations, local node domains, or tuples/sequences of these sources")
+      case _ => error("derive expects opposite-direction node declarations, or tuples/sequences of them")
 
   private final case class Inputs(tokens: Vector[ReadToken], read: ReadValues => Any)
 
@@ -46,23 +45,22 @@ private[syntheke] object ParameterInputs:
         val result = children.map(_.read(values))
         if tuple then Tuple.fromArray(result.toArray) else result)
     source match
-      case node: (InwardNodeDraft[?] | InwardPort[?]) => atom(new DownReader[node.protocol.Down](node.id, node.capability, node.owner))
-      case node: (OutwardNodeDraft[?] | OutwardPort[?]) => atom(new UpReader[node.protocol.Up](node.id, node.capability, node.owner))
-      case domain: NodeDomain[?] => atom(domain)
+      case node: (InwardNodeDraft[?] | InwardPort[?]) => atom(new DownReader[node.protocol.Down](node.id))
+      case node: (OutwardNodeDraft[?] | OutwardPort[?]) => atom(new UpReader[node.protocol.Up](node.id))
       case sources: scala.collection.Seq[?] => aggregate(sources.toVector, false)
       case sources: Tuple => aggregate(sources.productIterator.toVector, true)
       case _ => throw IllegalArgumentException("invalid parameter dependency source")
 
   @publicInBinary private[syntheke] def inward[P <: Protocol, S](
     node: InwardNodeDraft[P], sources: S,
-    compute: Values[S] => Either[Violation, (Any, Vector[Constraint])]
+    compute: Values[S] => Either[Violation, Any]
   ): InwardPort[P] =
     val prepared = inputs(sources)
     node.scope.seal(node, ReadPlan(prepared.tokens*), values => compute(prepared.read(values).asInstanceOf[Values[S]]))
 
   @publicInBinary private[syntheke] def outward[P <: Protocol, S](
     node: OutwardNodeDraft[P], sources: S,
-    compute: Values[S] => Either[Violation, (Any, Vector[Constraint])]
+    compute: Values[S] => Either[Violation, Any]
   ): OutwardPort[P] =
     val prepared = inputs(sources)
     node.scope.seal(node, ReadPlan(prepared.tokens*), values => compute(prepared.read(values).asInstanceOf[Values[S]]))

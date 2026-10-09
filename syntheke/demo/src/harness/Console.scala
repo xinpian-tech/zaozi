@@ -13,6 +13,7 @@ case class ConsoleP(divisor: Int) extends Parameter derives ReadWriter:
 
 class ConsolePLayers(p: ConsoleP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class ConsolePProbe(p: ConsoleP)  extends DVBundle[ConsoleP, ConsolePLayers](p)
 class ConsolePIO(p: ConsoleP)     extends HWBundle(p):
   val clk    = Flipped(new ClockBundle)

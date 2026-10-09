@@ -32,6 +32,7 @@ case class BoardP(
 
 class BoardPLayers(p: BoardP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class BoardPProbe(p: BoardP)  extends DVRecord[BoardP, BoardPLayers](p)
 class BoardPIO(p: BoardP)     extends HWRecord(p):
   val clk = Flipped("clk", new ClockRecord)
@@ -78,6 +79,7 @@ object BoardGen extends Generator[BoardP, BoardPLayers, BoardPIO, BoardPProbe]:
 case class TraceMonitorP(source: TraceSource) extends Parameter derives Writer
 class TraceMonitorLayers(p: TraceMonitorP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class TraceMonitorProbe(p: TraceMonitorP) extends DVRecord[TraceMonitorP, TraceMonitorLayers](p)
 class TraceMonitorIO(p: TraceMonitorP) extends ProbeIO(p, p.source.trace)
 
@@ -100,6 +102,7 @@ object TraceMonitorGen extends Generator[TraceMonitorP, TraceMonitorLayers, Trac
 case class OscillatorP(freqHz: Int, taps: Vector[String]) extends Parameter derives Writer
 class OscillatorLayers(p: OscillatorP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class OscillatorProbe(p: OscillatorP) extends DVRecord[OscillatorP, OscillatorLayers](p)
 class OscillatorIO(p: OscillatorP) extends HWRecord(p):
   val taps = p.taps.map(n => Aligned(n, new ClockRecord))

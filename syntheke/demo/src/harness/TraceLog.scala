@@ -14,6 +14,7 @@ case class TraceLogP(hart: String, xlen: Int, regIndexBits: Int) extends Paramet
 
 class TraceLogPLayers(p: TraceLogP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class TraceLogPProbe(p: TraceLogP)  extends DVBundle[TraceLogP, TraceLogPLayers](p)
 class TraceLogIO(p: TraceLogP)      extends HWBundle(p):
   val clock   = Flipped(Clock())

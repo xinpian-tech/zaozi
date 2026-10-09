@@ -13,6 +13,7 @@ case class ClockGenP(freqHz: Int, watchdogMs: Int) extends Parameter derives Rea
 
 class ClockGenPLayers(p: ClockGenP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class ClockGenPProbe(p: ClockGenP)  extends DVBundle[ClockGenP, ClockGenPLayers](p)
 class ClockGenIO(p: ClockGenP)      extends HWBundle(p):
   val clock = Aligned(Clock())

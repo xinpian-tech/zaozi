@@ -20,28 +20,16 @@ object GpioNodes:
     width:          Int
   )(
     using GeneratorScope[GpioP]
-  ): (GpioNodes, Vector[Constraint]) =
+  ): GpioNodes =
     val clkDraft  =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val pinsDraft =
       given sourcecode.Name = sourcecode.Name("pins")
-      outward(GpioPins)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(GpioPins)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     val inDraft   =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
 
     val clk  = clkDraft.fixed(())
@@ -68,7 +56,7 @@ object GpioNodes:
       val s = shapeOf(view.edgeOf(in))
       Right(GpioP(width, base, s.addrBits, s.dataBits, s.idBits))
     }
-    (GpioNodes(clk, pins, in), Vector.empty)
+    GpioNodes(clk, pins, in)
 
 def gpioCtrl(
   base:           Long,

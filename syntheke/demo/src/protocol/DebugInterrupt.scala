@@ -17,25 +17,17 @@ object DebugInterrupt extends Protocol:
   type Up   = DebugHartCap
   type Edge = DebugEdge
 
-  val carries: Set[Domain] = Set.empty
+  val carries: Set[DomainKind] = Set.empty
+  val accepts: Seq[Accept] = Seq(
+    Accept(ClockDomain)(_ == ClockRelation.Same),
+    Accept(ResetDomain)(_ == ResetRelation.Same),
+    Accept(PowerDomain)(_ == PowerRelation.Same)
+  )
 
   def negotiate(
     d: DebugRequest,
-    u: DebugHartCap,
-    domains: EdgeDomains
-  ): Either[Violation, (DebugEdge, Vector[Constraint])] =
-    val domainChecks = Vector(ClockDomain, ResetDomain).map { domain =>
-      val out = domains.outward(domain)
-      val in  = domains.inward(domain)
-      Seq(out, in).check { view =>
-        if view.sameIdentity(out, in) then Right(())
-        else Left(Violation(s"${domain.key.show} differs between ${out.key.node.show} and ${in.key.node.show}"))
-      }
-    }
-    Right((
-      DebugEdge(d.hartId, u.xlen),
-      domainChecks :+ PowerDomain.compatible(domains, allowModel = false)
-    ))
+    u: DebugHartCap
+  ): Either[Violation, DebugEdge] = Right(DebugEdge(d.hartId, u.xlen))
 
   def interface(e: DebugEdge): ProtocolInterface.Bundle =
     import ProtocolInterface.*

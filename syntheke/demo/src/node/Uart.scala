@@ -20,28 +20,16 @@ object UartNodes:
     baud:           Int
   )(
     using GeneratorScope[UartP]
-  ): (UartNodes, Vector[Constraint]) =
+  ): UartNodes =
     val clkDraft    =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val serialDraft =
       given sourcecode.Name = sourcecode.Name("serial")
-      outward(Serial)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Serial)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     val inDraft     =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
     val clkClock = clkDraft.domain(ClockDomain)
 
@@ -66,21 +54,17 @@ object UartNodes:
     )
 
     parameters { (view, domains) =>
-      val freq = domains.value(clkClock).hz
-      val s    = shapeOf(view.edgeOf(in))
-      Right(UartP(freq / baud, base, s.addrBits, s.dataBits, s.idBits))
+      val freq  = ClockDomain.hz(domains(clkClock))
+      val reset = domains(clk.domain(ResetDomain))
+      val power = PowerDomain.tree(domains(clk.domain(PowerDomain)))
+      val s     = shapeOf(view.edgeOf(in))
+      if freq < baud * 8 then Left(Violation(s"the UART needs at least ${baud * 8} Hz for $baud baud, not $freq Hz"))
+      else if ResetDomain.activeLow(reset) || ResetDomain.releaseClock(reset).isEmpty then
+        Left(Violation("the UART needs an active-high reset released on a clock"))
+      else if !power.alwaysOn then Left(Violation("the UART needs an always-on supply"))
+      else Right(UartP(freq / baud, base, s.addrBits, s.dataBits, s.idBits))
     }
-    (UartNodes(clk, serial, in), Vector(
-      clk.domain(ClockDomain).requirement(ClockRequirement(minHz = Some(baud * 8))),
-      clk.domain(ResetDomain).requirement(ResetRequirement(
-        requireAsynchronousAssertion = true,
-        requireSynchronousRelease = true,
-        requiredActiveHigh = Some(true)
-      )),
-      clk.domain(PowerDomain).requirement(
-        PowerRequirement(minMillivolts = Some(850), maxMillivolts = Some(950), requiresAlwaysOn = true)
-      )
-    ))
+    UartNodes(clk, serial, in)
 
 def uartCtrl(
   base:           Long,

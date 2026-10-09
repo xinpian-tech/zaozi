@@ -9,7 +9,6 @@ given GeneratorDefinition[CoreP] = zaozi(CoreGen)
 final case class CoreNodes(
   clk:                   ClockReset.Inward,
   mem:                   Axi4.Outward,
-  retention:             Retention.Inward,
   retirement:            ProbeNode[InstructionRetirement],
   private val debugNode: Option[DebugInterrupt.Inward]):
   def debug: DebugInterrupt.Inward =
@@ -26,37 +25,20 @@ object CoreNodes:
     enableTrace: Boolean
   )(
     using GeneratorScope[CoreP]
-  ): (CoreNodes, Vector[Constraint]) =
+  ): CoreNodes =
     val clkDraft   =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val debugDraft = Option.when(enableDebug) {
       given sourcecode.Name = sourcecode.Name("debug")
-      inward(DebugInterrupt)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(DebugInterrupt)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     }
-
-    val retentionDraft =
-      given sourcecode.Name = sourcecode.Name("retention")
-      inward(Retention)(clkDraft.domain(ClockDomain), ResetDomain, PowerDomain)
 
     val memDraft =
       given sourcecode.Name = sourcecode.Name("mem")
-      outward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
     val clk       = clkDraft.fixed(())
-    val retention = retentionDraft.fixed(())
     val debugNode = debugDraft.map(_.fixed(DebugHartCap(CoreP.xlen)))
     val mem       = memDraft.fixed(
       AxiMasterPort(
@@ -66,23 +48,13 @@ object CoreNodes:
 
     parameters { (view, domains) =>
       val s = shapeOf(view.edgeOf(mem))
-      (domains.value(clk.domain(PowerDomain)), domains.value(retention.domain(PowerDomain))) match
-        case (PowerValue.Supply(cpuMv, _), PowerValue.Supply(retentionMv, _)) =>
-          Right(CoreP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug, enableTrace, cpuMv, retentionMv))
-        case _ => Left(Violation("CPU retention requires physical CPU and retention supplies"))
+      val reset = domains(clk.domain(ResetDomain))
+      Right(CoreP(resetPc, s.addrBits, s.dataBits, s.idBits, enableDebug, enableTrace, ResetDomain.activeLow(reset)))
     }
     val retirement = probe(retirementBinding.from(CoreGen) { (fp, public) =>
       public.instructionTrace.map(field => (InstructionRetirement(fp.xlen, fp.regIndexBits), field))
     })
-    (
-      CoreNodes(clk, mem, retention, retirement, debugNode),
-      Vector(
-        clk.domain(PowerDomain).requirement(
-          PowerRequirement(minMillivolts = Some(850), maxMillivolts = Some(950))
-        ),
-        retention.domain(PowerDomain).requirement(PowerRequirement(requiresAlwaysOn = true))
-      )
-    )
+    CoreNodes(clk, mem, retirement, debugNode)
 
 def core(
   idBits:      Int,

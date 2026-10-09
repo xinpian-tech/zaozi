@@ -13,6 +13,7 @@ case class JtagDpiP(port: Int, tckDiv: Int) extends Parameter derives ReadWriter
 
 class JtagDpiPLayers(p: JtagDpiP) extends LayerInterface(p):
   def layers = Seq.empty
+
 class JtagDpiPProbe(p: JtagDpiP)  extends DVBundle[JtagDpiP, JtagDpiPLayers](p)
 class JtagDpiIO(p: JtagDpiP)      extends HWBundle(p):
   val clock = Flipped(Clock())

@@ -21,21 +21,14 @@ object Jtag extends Protocol:
   type Up   = Unit
   type Edge = JtagTap
 
-  val carries: Set[Domain] = Set.empty
+  /** A pad drives the pins on the TAP's clock. */
+  val carries: Set[DomainKind] = Set(ClockDomain, ResetDomain)
+  val accepts: Seq[Accept]     = Seq(Accept(PowerDomain)(PowerDomain.atPin))
 
   def negotiate(
     down: JtagTap,
-    up: Unit,
-    domains: EdgeDomains
-  ): Either[Violation, (JtagTap, Vector[Constraint])] =
-    val outClock = domains.outward(ClockDomain)
-    val inClock  = domains.inward(ClockDomain)
-    val clockCheck = Seq(outClock, inClock).check { view =>
-      if view.sameIdentity(outClock, inClock) then Right(())
-      else Left(Violation(s"clock domain differs between ${outClock.key.node.show} and ${inClock.key.node.show}"))
-    }
-    val resetCheck = Seq(domains.outward(ResetDomain), domains.inward(ResetDomain)).check(_ => Right(()))
-    Right((down, Vector(clockCheck, resetCheck, PowerDomain.compatible(domains, allowModel = true))))
+    up: Unit
+  ): Either[Violation, JtagTap] = Right(down)
 
   def interface(edge: JtagTap): ProtocolInterface.Bundle =
     import ProtocolInterface.*

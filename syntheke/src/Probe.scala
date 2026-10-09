@@ -3,13 +3,11 @@ package me.jiuyang.syntheke
 import upickle.default.Writer
 
 final class ProbeNode[P] private[syntheke] (
-  val id: ModuleNodeId,
-  private[syntheke] val owner: DesignOwner)(
+  val id: ModuleNodeId)(
   using private[syntheke] val parameterType: TypeIdentity[P],
   private[syntheke] val parameterWriter: Writer[P])
 
-trait ProbeImplementation:
-  def validate(declaration: ProbeDeclaration, portName: String): Either[Violation, Unit]
+trait ProbeImplementation
 
 final case class ProbeResolution[P](
   parameters: P,
@@ -76,8 +74,8 @@ final class ProbeCatalog private[syntheke] (
   private[syntheke] def combined(that: ProbeCatalog): ProbeCatalog =
     new ProbeCatalog((ports ++ that.ports).distinct, (nodes ++ that.nodes).distinct)
 
-  private[syntheke] def published(owner: DesignOwner, forwarded: Vector[ResolvedProbe[?]]): ProbeCatalog =
-    val selected = (nodes.filter(_.node.owner eq owner) ++ forwarded).distinct
+  private[syntheke] def published(local: Set[ProbeNode[?]], forwarded: Vector[ResolvedProbe[?]]): ProbeCatalog =
+    val selected = (nodes.filter(p => local(p.node)) ++ forwarded).distinct
     new ProbeCatalog(selected.map(_.port).distinct, selected)
 
   private[syntheke] def matching[P](using parameterType: TypeIdentity[P]): Vector[ResolvedProbe[P]] =

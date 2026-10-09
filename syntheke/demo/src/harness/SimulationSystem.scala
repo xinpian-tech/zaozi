@@ -25,5 +25,5 @@ object SimulationSystem:
         pin.boundary
       }
       soc.probes.query[InstructionRetirement].foreach(_.boundary)
-      (Ports(ref, dtmClock, crossingClock, pins), Vector.empty)
+      Ports(ref, dtmClock, crossingClock, pins)
     }

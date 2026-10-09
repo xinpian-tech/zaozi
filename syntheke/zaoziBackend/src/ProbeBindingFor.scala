@@ -39,7 +39,3 @@ private[zaozi] final class ZaoziProbeImplementation[T <: Data & CanProbe](
   val field: BundleField[RProbe[T]],
   val source: ZaoziProbeDeclaration) extends ProbeImplementation:
   def dataType: T = PublicProbes.dataType(field.dataType)
-
-  override def validate(declaration: ProbeDeclaration, portName: String): Either[Violation, Unit] =
-    if (declaration eq source) && portName == field.name then Right(())
-    else Left(Violation("typed Probe evidence belongs to a different public declaration or port"))

@@ -17,56 +17,40 @@ object DmiCrossingNodes:
     depth: Int
   )(
     using GeneratorScope[DmiCrossingP]
-  ): (DmiCrossingNodes, Vector[Constraint]) =
+  ): DmiCrossingNodes =
     val enqClkDraft =
       given sourcecode.Name = sourcecode.Name("enqClk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
 
     val deqClkDraft =
       given sourcecode.Name = sourcecode.Name("deqClk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
+    // The dequeue reset, released on the enqueue clock.
+    val enqReset    = ResetDomain.target(activeLow = false, deqClkDraft.domain(ResetDomain) -> None)(
+      Some(ResetProcessing.Async(enqClkDraft.domain(ClockDomain), 2))
+    )
     val inDraft     =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Dmi)(
-        enqClkDraft.domain(ClockDomain),
-        deqClkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(Dmi)(enqClkDraft.domain(ClockDomain), enqReset)
     val outDraft    =
       given sourcecode.Name = sourcecode.Name("out")
-      outward(Dmi)(
-        deqClkDraft.domain(ClockDomain),
-        deqClkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Dmi)(deqClkDraft.domain(ClockDomain), deqClkDraft.domain(ResetDomain))
 
     val enqClock = enqClkDraft.domain(ClockDomain)
     val deqClock = deqClkDraft.domain(ClockDomain)
 
-    val distinctClocks = Seq(enqClock, deqClock).check { domains =>
-      if domains.sameIdentity(enqClock, deqClock) then
-        Left(Violation("DMI crossing endpoints must use distinct clock-domain identities"))
-      else Right(())
-    }
-
     val enqClk = enqClkDraft.fixed(())
     val deqClk = deqClkDraft.fixed(())
-    val out    = outDraft.derive(inDraft)(master => Right((master, Vector.empty)))
-    val in     = inDraft.derive(out)(slave => Right((slave, Vector.empty)))
+    val out    = outDraft.derive(inDraft)(master => Right(master))
+    val in     = inDraft.derive(out)(slave => Right(slave))
 
-    parameters { (view, _) =>
+    parameters { (view, domains) =>
       val e = view.edgeOf(out)
-      Right(DmiCrossingP(e.abits, e.dataBits, depth))
+      if ClockDomain.relate(domains(enqClock), domains(deqClock)) != ClockRelation.Asynchronous then
+        Left(Violation("the DMI crossing synchronizes between two asynchronous clocks"))
+      else Right(DmiCrossingP(e.abits, e.dataBits, depth))
     }
-    (DmiCrossingNodes(enqClk, deqClk, in, out), Vector(distinctClocks))
+    DmiCrossingNodes(enqClk, deqClk, in, out)
 
 def dmiCrossing(
   depth: Int

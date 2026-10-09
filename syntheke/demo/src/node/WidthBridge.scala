@@ -16,47 +16,32 @@ object WidthBridgeNodes:
     wideBeatBytes: Int
   )(
     using GeneratorScope[WidthBridgeP]
-  ): (WidthBridgeNodes, Vector[Constraint]) =
+  ): WidthBridgeNodes =
     val clkDraft =
       given sourcecode.Name = sourcecode.Name("clk")
-      inward(ClockReset)(
-        ClockDomain,
-        ResetDomain,
-        PowerDomain
-      )
+      inward(ClockReset)()
     val inDraft  =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      inward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
     val outDraft =
       given sourcecode.Name = sourcecode.Name("out")
-      outward(Axi4)(
-        clkDraft.domain(ClockDomain),
-        clkDraft.domain(ResetDomain),
-        PowerDomain
-      )
+      outward(Axi4)(clkDraft.domain(ClockDomain), clkDraft.domain(ResetDomain))
 
     val clk = clkDraft.fixed(())
-    val out = outDraft.derive(inDraft)(master => Right((master, Vector.empty)))
+    val out = outDraft.derive(inDraft)(master => Right(master))
     val in  = inDraft.derive(out) { narrow =>
       def singleBeat(sizes: TransferSizes): TransferSizes =
         if sizes.min > narrow.beatBytes then TransferSizes(0, 0)
         else TransferSizes(sizes.min, math.min(sizes.max, narrow.beatBytes))
       Right(
-        (
-          narrow.copy(
-            beatBytes = wideBeatBytes,
-            slaves = narrow.slaves.map(s =>
-              s.copy(
-                supportsRead = singleBeat(s.supportsRead),
-                supportsWrite = singleBeat(s.supportsWrite)
-              )
+        narrow.copy(
+          beatBytes = wideBeatBytes,
+          slaves = narrow.slaves.map(s =>
+            s.copy(
+              supportsRead = singleBeat(s.supportsRead),
+              supportsWrite = singleBeat(s.supportsWrite)
             )
-          ),
-          Vector.empty
+          )
         )
       )
     }
@@ -64,7 +49,7 @@ object WidthBridgeNodes:
     parameters { (view, _) =>
       Right(WidthBridgeP(shapeOf(view.edgeOf(in)), shapeOf(view.edgeOf(out))))
     }
-    (WidthBridgeNodes(clk, in, out), Vector.empty)
+    WidthBridgeNodes(clk, in, out)
 
 def widthBridge(
   wideBeatBytes: Int

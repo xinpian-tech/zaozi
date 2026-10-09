@@ -17,15 +17,15 @@ def serialIO(source: Serial.Outward)(using
   val (in, pins) = generator[SerialIOP] {
     val in =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Serial)(source.domain(ClockDomain), source.domain(ResetDomain), PowerDomain).fixed(())
+      inward(Serial)().fixed(())
     val tx =
       given sourcecode.Name = sourcecode.Name("tx")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     val rx =
       given sourcecode.Name = sourcecode.Name("rx")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     parameters((_, _) => Right(SerialIOP()))
-    ((in, SerialIONodes(tx, rx)), Vector.empty)
+    (in, SerialIONodes(tx, rx))
   }
   in <-- source
   pins
@@ -36,17 +36,17 @@ def gpioIO(source: GpioPins.Outward, width: Int)(using
   val (in, pins) = generator[GpioIOP] {
     val in =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(GpioPins)(source.domain(ClockDomain), source.domain(ResetDomain), PowerDomain).fixed(())
+      inward(GpioPins)().fixed(())
     val pins = Vector.tabulate(width) { i =>
       given sourcecode.Name = sourcecode.Name(s"pin$i")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     }
     parameters { (view, _) =>
       val actual = view.edgeOf(in)
       if actual == width then Right(GpioIOP(width))
       else Left(Violation(s"GPIO has $actual bits but IO adapter declares $width pins"))
     }
-    ((in, pins), Vector.empty)
+    (in, pins)
   }
   in <-- source
   pins
@@ -57,21 +57,21 @@ def jtagIO(source: Jtag.Outward)(using
   val (in, pins) = generator[JtagIOP] {
     val in =
       given sourcecode.Name = sourcecode.Name("in")
-      inward(Jtag)(source.domain(ClockDomain), source.domain(ResetDomain), PowerDomain).fixed(())
+      inward(Jtag)().fixed(())
     val tms =
       given sourcecode.Name = sourcecode.Name("tms")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     val tdi =
       given sourcecode.Name = sourcecode.Name("tdi")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     val trstN =
       given sourcecode.Name = sourcecode.Name("trstN")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     val tdo =
       given sourcecode.Name = sourcecode.Name("tdo")
-      outward(IO)(PowerDomain).fixed(())
+      outward(IO)().fixed(())
     parameters((_, _) => Right(JtagIOP()))
-    ((in, JtagIONodes(tms, tdi, trstN, tdo)), Vector.empty)
+    (in, JtagIONodes(tms, tdi, trstN, tdo))
   }
   in <-- source
   pins

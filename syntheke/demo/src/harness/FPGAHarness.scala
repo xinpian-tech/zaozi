@@ -17,5 +17,5 @@ object FPGAHarness:
         given sourcecode.Name = sourcecode.Name(s"pin$index")
         pin.boundary
       }
-      (Soc.Ports(ref, dtmClock, crossingClock, memory, memoryClock, pins), Vector.empty)
+      Soc.Ports(ref, dtmClock, crossingClock, memory, memoryClock, pins)
     }
