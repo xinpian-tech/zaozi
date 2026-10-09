@@ -101,8 +101,6 @@ end TypeApi
   * omEvaluatorBasePathGetEmpty
   * omEvaluatorValueIsAPath
   * omEvaluatorPathGetAsString
-  * omEvaluatorValueIsAReference
-  * omEvaluatorValueGetReferenceValue
   * }}}
   */
 trait EvaluatorApi:
@@ -175,15 +173,11 @@ trait EvaluatorApi:
     inline def getPrimitive(
       using arena: Arena
     ):                      Attribute
-    inline def getReferenceValue(
-      using arena: Arena
-    ):                      OMEvaluatorValue
     inline def isBasePath:  Boolean
     inline def isList:      Boolean
     inline def isObject:    Boolean
     inline def isPath:      Boolean
     inline def isPrimitive: Boolean
-    inline def isReference: Boolean
 end EvaluatorApi
 
 /** OM Attribute API
