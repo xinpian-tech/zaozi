@@ -151,12 +151,38 @@ given ConstructorApi with
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
-      tpe = refType.toMlirType
+      tpe = refType.toMlirType,
+      forceable = false
     )
     wireOp.operation.appendToBlock()
     new Wire[T]:
       val _tpe:   T     = refType
       val _refer: Value = wireOp.operation.getResult(0)
+
+  def Wire[T <: Data & CanProbe](
+    refType:   T,
+    forceable: true
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Wire[T] & ForceableReferable[T] =
+    val wireOp = summon[WireApi].op(
+      name = valName,
+      location = locate,
+      nameKind = FirrtlNameKind.Interesting,
+      tpe = refType.toMlirType,
+      forceable = forceable
+    )
+    wireOp.operation.appendToBlock()
+    new Wire[T] with ForceableReferable[T]:
+      val _tpe:            T     = refType
+      val _refer:          Value = wireOp.operation.getResult(0)
+      val _forceableRefer: Value = wireOp.operation.getResult(1)
 
   def Reg[T <: Data](
     refType: T
@@ -178,12 +204,43 @@ given ConstructorApi with
       nameKind = FirrtlNameKind.Interesting,
       tpe = refType.toMlirType,
       clock = clockScope.clock.refer,
-      clockEdge = clockScope.clockEdge
+      clockEdge = clockScope.clockEdge,
+      forceable = false
     )
     regOp.operation.appendToBlock()
     new Reg[T]:
       val _tpe:   T     = refType
       val _refer: Value = regOp.operation.getResult(0)
+
+  def Reg[T <: Data & CanProbe](
+    refType:   T,
+    forceable: true
+  )(
+    using ClockScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Reg[T] & ForceableReferable[T] =
+    val clockScope = summon[ClockScope]
+    val regOp      = summon[RegApi].op(
+      name = valName,
+      location = locate,
+      nameKind = FirrtlNameKind.Interesting,
+      tpe = refType.toMlirType,
+      clock = clockScope.clock.refer,
+      clockEdge = clockScope.clockEdge,
+      forceable = forceable
+    )
+    regOp.operation.appendToBlock()
+    new Reg[T] with ForceableReferable[T]:
+      val _tpe:            T     = refType
+      val _refer:          Value = regOp.operation.getResult(0)
+      val _forceableRefer: Value = regOp.operation.getResult(1)
 
   def RegInit[T <: Data](
     input: Const[T]
@@ -212,12 +269,50 @@ given ConstructorApi with
       resetValue = input.refer,
       clockEdge = clockScope.clockEdge,
       resetType = resetScope.resetType,
-      resetPolarity = resetScope.resetPolarity
+      resetPolarity = resetScope.resetPolarity,
+      forceable = false
     )
     regResetOp.operation.appendToBlock()
     new Reg[T]:
       val _tpe:   T     = input._tpe
       val _refer: Value = regResetOp.operation.getResult(0)
+
+  def RegInit[T <: Data & CanProbe](
+    input:     Const[T],
+    forceable: true
+  )(
+    using ClockScope
+  )(
+    using ResetScope
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Reg[T] & ForceableReferable[T] =
+    val clockScope = summon[ClockScope]
+    val resetScope = summon[ResetScope]
+    val regResetOp = summon[RegResetApi].op(
+      name = valName,
+      location = locate,
+      nameKind = FirrtlNameKind.Interesting,
+      tpe = input._tpe.toMlirType,
+      clock = clockScope.clock.refer,
+      reset = resetScope.reset.refer,
+      resetValue = input.refer,
+      clockEdge = clockScope.clockEdge,
+      resetType = resetScope.resetType,
+      resetPolarity = resetScope.resetPolarity,
+      forceable = forceable
+    )
+    regResetOp.operation.appendToBlock()
+    new Reg[T] with ForceableReferable[T]:
+      val _tpe:            T     = input._tpe
+      val _refer:          Value = regResetOp.operation.getResult(0)
+      val _forceableRefer: Value = regResetOp.operation.getResult(1)
 
   def Node[T <: Data](
     ref: Referable[T]
@@ -234,12 +329,38 @@ given ConstructorApi with
       name = valName,
       location = locate,
       nameKind = FirrtlNameKind.Interesting,
-      input = ref.refer
+      input = ref.refer,
+      forceable = false
     )
     nodeOp.operation.appendToBlock()
     new Node[T]:
       val _tpe:   T     = ref._tpe
       val _refer: Value = nodeOp.operation.getResult(0)
+
+  def Node[T <: Data & CanProbe](
+    ref:       Referable[T],
+    forceable: true
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Node[T] & ForceableReferable[T] =
+    val nodeOp = summon[NodeApi].op(
+      name = valName,
+      location = locate,
+      nameKind = FirrtlNameKind.Interesting,
+      input = ref.refer,
+      forceable = forceable
+    )
+    nodeOp.operation.appendToBlock()
+    new Node[T] with ForceableReferable[T]:
+      val _tpe:            T     = ref._tpe
+      val _refer:          Value = nodeOp.operation.getResult(0)
+      val _forceableRefer: Value = nodeOp.operation.getResult(1)
 
   extension (bigInt: BigInt)
     def U(
