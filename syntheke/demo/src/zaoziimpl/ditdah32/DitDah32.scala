@@ -46,6 +46,7 @@ object DitDah32Module
     val instrReg            = RegInit(0.B(parameter.xlen))
     val fetched             = RegInit(false.B)
     val fetchOutstanding    = RegInit(false.B)
+    val fetchArWaiting      = RegInit(false.B)
     val memOutstanding      = RegInit(false.B)
     val storeAwDone         = RegInit(false.B)
     val storeWDone          = RegInit(false.B)
@@ -84,6 +85,8 @@ object DitDah32Module
 
     val debugDcsr           = Option.when(parameter.enableDebug)(retained(RegInit(0x40000003.U(parameter.xlen))))
     val debugDpc            = Option.when(parameter.enableDebug)(retained(RegInit(parameter.resetVector.U(parameter.xlen))))
+    // A hart halted when its power went off comes out of reset halted; a hart reset from the debugger does not.
+    val debugHalted         = retained(RegInit(false.B))
     val debugStepActive     = Option.when(parameter.enableDebug)(RegInit(false.B))
     val debugResumeAck      = Option.when(parameter.enableDebug)(RegInit(false.B))
     val debugResetAck       = Option.when(parameter.enableDebug)(RegInit(false.B))
@@ -303,9 +306,11 @@ object DitDah32Module
     pcFetchAddr         := (pc.asBits.bits(parameter.xlen - 1, 2) ## 0.B(2)).asUInt
 
     fetchRequest                               := stateRun | stateStraddle
-    if parameter.enableDebug then fetchRequest := (stateRun | stateStraddle) & !debugHaltReq
+    // A halt request stops new fetches; a fetch the bus has not taken yet stays valid until it is taken.
+    if parameter.enableDebug then fetchRequest := (stateRun | stateStraddle) & (!debugHaltReq | fetchArWaiting)
     fetchArValid                               := fetchRequest & !fetchOutstanding
     fetchArFire                                := fetchArValid & axiAr.ready
+    fetchArWaiting                             := fetchArValid & !axiAr.ready
     fetchAcceptsResponse                       := fetchOutstanding | fetchArFire
     fetchResponseFire                          := fetchAcceptsResponse & axiR.valid
     fetchResponseError                         := fetchResponseFire & (axiR.bits.resp =/= 0.U(2))
@@ -869,12 +874,13 @@ object DitDah32Module
     io.status.sleep := stateSleep
 
     when(stateReset) {
-      state            := CoreState.RUN.U(3)
+      state            := debugHalted.?(CoreState.DEBUG.U(3), CoreState.RUN.U(3))
       fetchOutstanding := false.B
       memOutstanding   := false.B
       storeAwDone      := false.B
       storeWDone       := false.B
     }.otherwise {
+      debugHalted  := stateDebug
       trapEventReg := false.B
 
       when(fetchArFire) {
@@ -1086,6 +1092,9 @@ object DitDah32Module
         }
       }
     }
+    when(debugResetReq) {
+      debugHalted := false.B
+    }
 
     if parameter.enableDebug then
       connectDebugHart(
@@ -1143,6 +1152,7 @@ object DitDah32Module
         stateSleep,
         stateIrq,
         stateDebug,
+        fetchArValid,
         fetchResponseFire,
         loadResponseOk,
         loadResponseError,

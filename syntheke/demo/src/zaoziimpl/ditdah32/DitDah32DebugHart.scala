@@ -66,6 +66,7 @@ trait DitDah32DebugHart:
     stateSleep:          Referable[Bool],
     stateIrq:            Referable[Bool],
     stateDebug:          Referable[Bool],
+    fetchArValid:        Referable[Bool],
     fetchResponseFire:   Referable[Bool],
     loadResponseOk:      Referable[Bool],
     loadResponseError:   Referable[Bool],
@@ -389,7 +390,9 @@ trait DitDah32DebugHart:
       ).asUInt
     }
 
-    val debugFetchDrained = !fetchOutstanding | fetchResponseFire
+    // A fetch is drained once its response is back; one whose request the bus has not taken yet is not, since a
+    // request once valid stays valid until it is taken.
+    val debugFetchDrained = (!fetchOutstanding | fetchResponseFire) & !fetchArValid
     when(dm.haltReq & (stateRun | stateStraddle) & debugFetchDrained) {
       state     := CoreState.DEBUG.U(3)
       debugDpc  := pc
