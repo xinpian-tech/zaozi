@@ -96,29 +96,26 @@ object ClockDomain extends DomainKind:
   ): Domain[ClockDomain.type] =
     ClockDomain.derive(links.map(_._1)*)(ClockTarget(links.map(_._2).toVector, selection, path))
 
-  /** The root a clock comes from and the division along the way. A mux follows its first link, the one it selects
-    * out of reset.
+  /** The root a clock comes from in this design, a declared root or a clock imported from a frozen design, and the
+    * division along the way. A mux follows its first link, the one it selects out of reset.
     */
-  private def trace(domain: Settled[ClockDomain.type]): (Settled[ClockDomain.type], BigInt) =
-    val clock = domain.underlying
-    clock.link match
-      case None         => clock -> BigInt(1)
-      case Some(target) =>
-        val (root, divisor) = trace(clock.sources.head)
-        root -> divisor * target.links.head.divisor * target.path.divisor
+  private def trace(clock: Settled[ClockDomain.type]): (Settled[ClockDomain.type], BigInt) = clock.link match
+    case None         => clock -> BigInt(1)
+    case Some(target) =>
+      val (root, divisor) = trace(clock.sources.head)
+      root -> divisor * target.links.head.divisor * target.path.divisor
 
-  def hz(domain: Settled[ClockDomain.type]): Int =
-    val (root, divisor) = trace(domain)
-    (BigInt(root.root.get.hz) / divisor).toInt
+  def hz(clock: Settled[ClockDomain.type]): Int =
+    val (root, divisor) = trace(clock)
+    (BigInt(root.imported.fold(root.root.get.hz)(hz)) / divisor).toInt
 
-  private def muxed(domain: Settled[ClockDomain.type]): Boolean =
-    val clock = domain.underlying
+  private def muxed(clock: Settled[ClockDomain.type]): Boolean =
     clock.link.exists(_.selection.isDefined) || clock.sources.exists(muxed)
 
   def relate(a: Settled[ClockDomain.type], b: Settled[ClockDomain.type]): ClockRelation =
     val (rootA, divisorA) = trace(a)
     val (rootB, divisorB) = trace(b)
-    if a.underlying eq b.underlying then ClockRelation.Same
+    if a eq b then ClockRelation.Same
     else if (rootA eq rootB) && !muxed(a) && !muxed(b) then ClockRelation.Synchronous(divisorB, divisorA)
     else ClockRelation.Asynchronous
 
@@ -195,17 +192,20 @@ object ResetDomain extends DomainKind:
   ): Domain[ResetDomain.type] =
     ResetDomain.derive(links.map(_._1)*)(ResetTarget(activeLow, links.map(_._2).toVector, processing))
 
-  def activeLow(domain: Settled[ResetDomain.type]): Boolean =
-    val reset = domain.underlying
-    reset.link.map(_.activeLow).getOrElse(reset.root.get match
-      case ResetRoot.Source(activeLow)  => activeLow
-      case _: ResetRoot.PowerFollow     => true
-      case _: ResetRoot.Managed         => true)
+  def activeLow(reset: Settled[ResetDomain.type]): Boolean = reset.imported match
+    case Some(frozen) => activeLow(frozen)
+    case None         =>
+      reset.link.map(_.activeLow).getOrElse(reset.root.get match
+        case ResetRoot.Source(activeLow) => activeLow
+        case _: ResetRoot.PowerFollow    => true
+        case _: ResetRoot.Managed        => true)
 
-  /** The clock a reset is released on, when it is released synchronously. */
-  def releaseClock(domain: Settled[ResetDomain.type]): Option[Settled[ClockDomain.type]] =
-    val reset = domain.underlying
-    (reset.root, reset.link) match
+  /** The clock a reset is released on, when it is released synchronously; for an imported reset, the clock of this
+    * design that stands for the one it was released on, if that clock is at a boundary too.
+    */
+  def releaseClock(reset: Settled[ResetDomain.type]): Option[Settled[ClockDomain.type]] = reset.imported match
+    case Some(frozen) => releaseClock(frozen).flatMap(reset.counterpart)
+    case None         => (reset.root, reset.link) match
       case (Some(ResetRoot.PowerFollow(_, clock, _)), _) => Some(reset.resolve(clock))
       case (Some(ResetRoot.Managed(_, clock)), _)        => Some(reset.resolve(clock))
       case (_, Some(target)) =>
@@ -214,14 +214,14 @@ object ResetDomain extends DomainKind:
             case (Some(processing), _) => Some(reset.resolve(processing.clockSource))
             case (None, source)        => releaseClock(source)
           }
-          released.distinctBy(_.map(_.underlying)) match
+          released.distinct match
             case Vector(clock) => clock
             case _             => None
         }
       case _ => None
 
   def relate(a: Settled[ResetDomain.type], b: Settled[ResetDomain.type]): ResetRelation =
-    if a.underlying eq b.underlying then ResetRelation.Same
+    if a eq b then ResetRelation.Same
     else ResetRelation.Different(activeLow(a) == activeLow(b))
 
   def describe(domain: Settled[ResetDomain.type]): ujson.Value =
@@ -234,7 +234,7 @@ object ResetDomain extends DomainKind:
     DomainCheck("managed", CheckStage.WellFormed) { graph =>
       graph.of(ResetDomain).collect {
         case reset if reset.root.exists {
-              case ResetRoot.Managed(prcm, _) => reset.resolve(prcm).underlying.link.isEmpty
+              case ResetRoot.Managed(prcm, _) => PRCMDomain.isController(reset.resolve(prcm))
               case _                          => false
             } =>
           s"$reset is driven by a PRCM controller, not by a domain it manages"
@@ -292,10 +292,10 @@ object PowerDomain extends DomainKind:
   val physical = false
   val scoped   = true
 
-  def tree(domain: Settled[PowerDomain.type]): PowerTreeDomain = domain.underlying.root.get
+  def tree(power: Settled[PowerDomain.type]): PowerTreeDomain = power.imported.fold(power.root.get)(tree)
 
   def relate(a: Settled[PowerDomain.type], b: Settled[PowerDomain.type]): PowerRelation =
-    if a.underlying eq b.underlying then PowerRelation.Same
+    if a eq b then PowerRelation.Same
     else PowerRelation.Different(tree(a).alwaysOn, tree(b).alwaysOn)
 
   def describe(domain: Settled[PowerDomain.type]): ujson.Value = upickle.default.writeJs(tree(domain).control)
@@ -310,9 +310,10 @@ object PowerDomain extends DomainKind:
       val name  = "dependencies"
       val stage = CheckStage.WellFormed
       def run(graph: DomainGraph): Vector[String] =
-        val domains = graph.of(PowerDomain)
+        // An imported domain's dependencies were checked in its own design.
+        val domains = graph.of(PowerDomain).filter(_.imported.isEmpty)
         def depends(d: Settled[PowerDomain.type]): Vector[Settled[PowerDomain.type]] =
-          tree(d).dependencies.map(dep => d.underlying.resolve(dep.source).underlying)
+          if d.imported.isDefined then Vector.empty else tree(d).dependencies.map(dep => d.resolve(dep.source))
         def cyclic(start: Settled[PowerDomain.type]): Boolean =
           @annotation.tailrec
           def visit(frontier: List[Settled[PowerDomain.type]], seen: Set[Settled[PowerDomain.type]]): Boolean =
@@ -322,7 +323,7 @@ object PowerDomain extends DomainKind:
               case head :: rest              =>
                 if seen(head) then visit(rest, seen) else visit(depends(head).toList ++ rest, seen + head)
           visit(depends(start).toList, Set.empty)
-        domains.filter(d => d.imported.isEmpty && cyclic(d)).map(d => s"$d depends on itself")
+        domains.filter(cyclic).map(d => s"$d depends on itself")
   )
 
   val rootWriter:     Writer[PowerTreeDomain] = summon

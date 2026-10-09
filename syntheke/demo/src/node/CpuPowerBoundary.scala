@@ -72,7 +72,7 @@ object CpuPowerBoundaryNodes:
       val systemReset    = domains(reset)
       if !aon.alwaysOn || cpu.alwaysOn then
         Left(Violation("CPU isolation requires an always-on control supply and a switched CPU supply"))
-      else if !(PRCMDomain.power(domains(prcm)) eq domains(cpuPower).underlying) then
+      else if !(PRCMDomain.power(domains(prcm)) eq domains(cpuPower)) then
         Left(Violation(s"the boundary switches ${domains(cpuPower)} but its control sequences ${domains(prcm)}"))
       else if ClockDomain.relate(domains(clock), domains(cpuClock)) != ClockRelation.Synchronous(1, 1) then
         Left(Violation(s"the boundary answers the PRCM on ${domains(clock)}, not on the clock the PRCM gates for the CPU"))

@@ -33,7 +33,7 @@ object Export:
       case Domain.Origin.Root(value)            => ujson.Obj("root" -> write(kind.rootWriter, value))
       case Domain.Origin.Derived(sources, link) =>
         ujson.Obj("derived" -> ujson.Obj("sources" -> ujson.Arr.from(sources.map(source)), "link" -> write(kind.linkWriter, link)))
-      case Domain.Origin.Imported(of)           => ujson.Obj("imported" -> domainId(of.id))
+      case Domain.Origin.Imported(of, _)        => ujson.Obj("imported" -> domainId(of.id))
     ujson.Obj("id" -> domainId(domain.id), "kind" -> ujson.Str(kind.name), "origin" -> origin, "loc" -> loc(domain.loc))
 
   def topology(spec: DesignSpec): ujson.Value =

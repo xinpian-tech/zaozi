@@ -53,11 +53,13 @@ final class Domain[K <: DomainKind] private[syntheke] (
     extends DomainSource[K]
 
 object Domain:
-  /** A root's properties, the sources and link of a derived domain, or a frozen design's domain. */
+  /** A root's properties, the sources and link of a derived domain, or a frozen design's domain together with what
+    * names, in the instantiating design, each domain of the same instance.
+    */
   private[syntheke] enum Origin[+S]:
     case Root(value: Any)
     case Derived(sources: Vector[S], link: Any)
-    case Imported(domain: Settled[?])
+    case Imported(domain: Settled[?], peers: Settled[?] => Option[DomainSource[?]])
 
 /** The domain of one kind that a node is in, known once binds are resolved. */
 final class DomainRef[K <: DomainKind] private[syntheke] (val kind: K, val node: ModuleNodeId) extends DomainSource[K]
@@ -81,12 +83,19 @@ final class Settled[K <: DomainKind] private[syntheke] (
     case Domain.Origin.Derived(_, link) => Some(link.asInstanceOf[kind.Link])
     case _                              => None
 
-  /** A domain a frozen design declared; this one stands for it in the instantiating design. */
+  /** The frozen design's domain this one stands for in the instantiating design. Its properties are this domain's;
+    * its identity is not: every instance of a frozen design has domains of its own, a root here like any other.
+    */
   def imported: Option[Settled[K]] = origin match
-    case Domain.Origin.Imported(domain) => Some(domain.asInstanceOf[Settled[K]])
-    case _                              => None
+    case Domain.Origin.Imported(domain, _) => Some(domain.asInstanceOf[Settled[K]])
+    case _                                 => None
 
-  def underlying: Settled[K] = imported.fold(this)(_.underlying)
+  /** The domain of this design that stands for `frozen`, a domain of the frozen design this one is imported from, if
+    * that domain is at a boundary of the same instance.
+    */
+  def counterpart[K2 <: DomainKind](frozen: Settled[K2]): Option[Settled[K2]] = origin match
+    case Domain.Origin.Imported(_, peers) => peers(frozen).map(source => design(source.asInstanceOf[DomainSource[K2]]))
+    case _                                => None
 
   /** The settled domain a source in this domain's root or link names, such as the clock a reset is released on. */
   def resolve[K2 <: DomainKind](source: DomainSource[K2]): Settled[K2] = design(source)

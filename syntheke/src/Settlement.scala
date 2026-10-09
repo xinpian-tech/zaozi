@@ -48,7 +48,7 @@ private[syntheke] object Settlement:
         val origin = domain.origin match
           case Domain.Origin.Derived(sources, link) => Domain.Origin.Derived(sources.map(resolve), link)
           case Domain.Origin.Root(value)            => Domain.Origin.Root(value)
-          case Domain.Origin.Imported(of)           => Domain.Origin.Imported(of)
+          case Domain.Origin.Imported(of, peers)    => Domain.Origin.Imported(of, peers)
         val result = new Settled(domain.kind, domain.id, origin, table)
         settled(domain) = result
         result

@@ -74,7 +74,7 @@ object PrcmControllerNodes:
       val ports  = PRCMDomain.ports(graph, owner)
       if !PowerDomain.tree(graph(clk.domain(PowerDomain))).alwaysOn then
         Left(Violation("the PRCM must be always on"))
-      else if drives.exists(d => !(PRCMDomain.controller(d) eq owner.underlying)) || drives.size != ports.size then
+      else if drives.exists(d => !(PRCMDomain.controller(d) eq owner)) || drives.size != ports.size then
         Left(Violation(s"the PRCM drives ${drives.mkString(", ")} but $owner manages ${ports.mkString(", ")}"))
       else
         val indexWidth = java.lang.Long.numberOfTrailingZeros(size) - 2

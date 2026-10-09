@@ -105,31 +105,44 @@ object PRCMDomain extends DomainKind:
     line:       sourcecode.Line
   ): Domain[PRCMDomain.type] = PRCMDomain.derive(controller)(domain)
 
-  def managed(domain: Settled[PRCMDomain.type]): PRCMManagedDomain =
-    domain.underlying.link.getOrElse(throw IllegalArgumentException(s"$domain is a PRCM controller, not a managed domain"))
+  def isController(domain: Settled[PRCMDomain.type]): Boolean = domain.imported.fold(domain.root.isDefined)(isController)
 
-  def controller(domain: Settled[PRCMDomain.type]): Settled[PRCMDomain.type] = domain.underlying.sources.head.underlying
+  def managed(domain: Settled[PRCMDomain.type]): PRCMManagedDomain = domain.imported match
+    case Some(frozen) => managed(frozen)
+    case None         => domain.link.getOrElse(throw IllegalArgumentException(s"$domain is a PRCM controller, not a managed domain"))
 
-  def power(domain: Settled[PRCMDomain.type]): Settled[PowerDomain.type] =
-    domain.underlying.resolve(managed(domain).power).underlying
+  def settings(controller: Settled[PRCMDomain.type]): PRCMController = controller.imported.fold(controller.root.get)(settings)
+
+  /** The controller of a managed domain this design declares. */
+  def controller(domain: Settled[PRCMDomain.type]): Settled[PRCMDomain.type] = domain.sources.head
+
+  /** The power domain a managed domain switches. */
+  def power(domain: Settled[PRCMDomain.type]): Settled[PowerDomain.type] = domain.imported match
+    case Some(frozen) =>
+      domain.counterpart(power(frozen)).getOrElse(fail(s"the power domain $domain switches is not at a boundary of its design"))
+    case None         => domain.resolve(managed(domain).power)
 
   private[demo] final case class Edge(consumer: Settled[PRCMDomain.type], provider: Settled[PRCMDomain.type], service: String)
 
-  private def all(graph: DomainGraph): Vector[Settled[PRCMDomain.type]] = graph.of(PRCMDomain).map(_.underlying).distinct
+  /** The PRCM domains this design declares; an imported one was checked in its own design. */
+  private def all(graph: DomainGraph): Vector[Settled[PRCMDomain.type]] = graph.of(PRCMDomain).filter(_.imported.isEmpty)
 
-  /** The domains a graph manages, each once. */
   private[demo] def managedDomains(graph: DomainGraph): Vector[Settled[PRCMDomain.type]] = all(graph).filter(_.link.isDefined)
 
   private[demo] def edges(graph: DomainGraph): Vector[Edge] =
     for
       consumer <- managedDomains(graph)
       service  <- managed(consumer).services
-    yield Edge(consumer, consumer.resolve(service.provider).underlying, service.name)
+    yield Edge(consumer, consumer.resolve(service.provider), service.name)
 
   def relate(a: Settled[PRCMDomain.type], b: Settled[PRCMDomain.type]): PRCMRelation =
-    if a.underlying eq b.underlying then PRCMRelation.Same else PRCMRelation.Different
+    if a eq b then PRCMRelation.Same else PRCMRelation.Different
 
-  def describe(domain: Settled[PRCMDomain.type]): ujson.Value = domain.underlying.root match
+  def describe(domain: Settled[PRCMDomain.type]): ujson.Value = domain.imported match
+    case Some(frozen) => describe(frozen)
+    case None         => describeDeclared(domain)
+
+  private def describeDeclared(domain: Settled[PRCMDomain.type]): ujson.Value = domain.root match
     case Some(controller) => ujson.Obj("controller" -> writeJs(controller))
     case None             =>
       val d = managed(domain)
@@ -150,7 +163,7 @@ object PRCMDomain extends DomainKind:
   override val checks = Seq(
     DomainCheck("controllers", CheckStage.WellFormed) { graph =>
       val parents = managedDomains(graph).collect {
-        case d if d.sources.size != 1 || d.sources.head.underlying.root.isEmpty =>
+        case d if d.sources.size != 1 || !isController(d.sources.head) =>
           s"$d must derive from exactly one PRCM controller"
       }
       val names   = managedDomains(graph).filter(_.sources.size == 1).groupBy(d => (controller(d), d.id.name)).collect {
@@ -183,16 +196,16 @@ object PRCMDomain extends DomainKind:
         case (power, managers) if managers.size > 1 => s"$power is managed by ${managers.mkString(", ")}"
       }
       val loose    = graph.of(PowerDomain).filter(d => d.imported.isEmpty && !PowerDomain.tree(d).alwaysOn)
-        .filterNot(d => switched.exists(_._1 eq d.underlying))
+        .filterNot(d => switched.exists(_._1 eq d))
         .map(d => s"switched $d is managed by no PRCM domain")
       shared ++ loose
     },
     DomainCheck("chip", CheckStage.WellFormed) { graph =>
       managedDomains(graph).flatMap { domain =>
-        val modes = controller(domain).root.get.chip.toVector.flatMap(_.modes.map(_.name))
+        val modes = settings(controller(domain)).chip.toVector.flatMap(_.modes.map(_.name))
         managed(domain).chip.map(_._1).filterNot(modes.contains).map(m => s"$domain sets a policy in undeclared chip mode $m")
       } ++ edges(graph).flatMap { e =>
-        controller(e.consumer).root.get.chip.toVector.flatMap(_.modes).collect {
+        settings(controller(e.consumer)).chip.toVector.flatMap(_.modes).collect {
           case mode
               if managed(e.provider).fixed(mode.name).exists(_ != PRCMTarget.Run) &&
                 !managed(e.consumer).fixed(mode.name).exists(_ != PRCMTarget.Run) =>
@@ -202,7 +215,7 @@ object PRCMDomain extends DomainKind:
     },
     // #159's own rules on its parameter, on a register port wide enough for any of them.
     DomainCheck("parameter", CheckStage.WellFormed) { graph =>
-      graph.of(PRCMDomain).filter(d => d.imported.isEmpty && d.root.isDefined).flatMap { controller =>
+      all(graph).filter(_.root.isDefined).flatMap { controller =>
         if ports(graph, controller).isEmpty then Vector(s"$controller manages no domain")
         else
           try
@@ -227,7 +240,7 @@ object PRCMDomain extends DomainKind:
 
   /** The managed domains of `controller`, in #159's port order: by name. */
   def ports(graph: DomainGraph, controller: Settled[PRCMDomain.type]): Vector[Settled[PRCMDomain.type]] =
-    managedDomains(graph).filter(d => this.controller(d) eq controller.underlying).sortBy(_.id.name)
+    managedDomains(graph).filter(d => this.controller(d) eq controller).sortBy(_.id.name)
 
   /** The #159 `PRCMParameter` of `controller` behind a register port of the given widths. */
   def parameter(
@@ -236,7 +249,7 @@ object PRCMDomain extends DomainKind:
     indexWidth: Int,
     dataWidth:  Int
   ): prcm.PRCMParameter =
-    val config  = controller.underlying.root.get
+    val config  = settings(controller)
     val domains = ports(graph, controller)
     prcm.PRCMParameter(
       indexWidth,

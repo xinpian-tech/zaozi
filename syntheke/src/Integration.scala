@@ -20,11 +20,11 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
   private val originals = design.spec.boundaries.flatMap(b => b.terminal.kinds.map(frozen(b, _))).distinct
 
   val domains: Vector[Domain[?]] = originals.zipWithIndex.map { (domain, index) =>
-    new Domain(domain.kind, DomainId(id, s"domain$index"), Domain.Origin.Imported(domain), loc)
+    new Domain(domain.kind, DomainId(id, s"domain$index"), Domain.Origin.Imported(domain, frozen => imported.get(frozen)), loc)
   }
 
-  private val declared: Map[Settled[?], Domain[?]]        = originals.zip(domains).toMap
-  private val imported: Map[Settled[?], DomainSource[?]] = declared ++ received
+  private lazy val declared: Map[Settled[?], Domain[?]]        = originals.zip(domains).toMap
+  private lazy val imported: Map[Settled[?], DomainSource[?]] = declared ++ received
 
   def domain[K <: DomainKind](boundary: Boundary[?], kind: K, at: SourceLoc): Domain[K] =
     imported(frozen(boundary, kind)) match
@@ -84,7 +84,7 @@ private[syntheke] final class BoundaryImport(val design: ResolvedDesign, val def
       case (boundary, kind, expected, actual) if kind.describe(actual.asInstanceOf) != kind.describe(expected.asInstanceOf) =>
         s"the ${kind.name} domain of ${boundary.id.show} was $expected when frozen and is $actual here, at ${loc.show}"
     }
-    val same     = pairs.map((_, _, expected, actual) => expected -> actual.underlying).distinct
+    val same     = pairs.map((_, _, expected, actual) => expected -> actual).distinct
     val regroup  = Option.when(
       same.groupMap(_._1)(_._2).values.exists(_.size > 1) || same.groupMap(_._2)(_._1).values.exists(_.size > 1)
     )(s"the instantiating design changes which domains of ${design.spec.root.show} are the same, at ${loc.show}")
