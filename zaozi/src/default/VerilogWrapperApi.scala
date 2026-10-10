@@ -122,12 +122,24 @@ given VerilogWrapperApi:
       sourcecode.Name.Machine,
       InstanceContext
     ): Instance[I, P] =
-      BaseGeneratorHelper.createInstance(
+      val instance    = BaseGeneratorHelper.createInstance(
         wrapper.moduleName(parameter),
         wrapper.interface(parameter),
         wrapper.probe(parameter),
         wrapper.layers(parameter)
       )
+      val declaration = wrapper.extmodule(parameter)
+      try
+        instance._operation.setAttributeByName(
+          "zaozi.verilog_defname",
+          declaration.operation.getAttributeByName("defname")
+        )
+        instance._operation.setAttributeByName(
+          "zaozi.verilog_parameters",
+          declaration.operation.getAttributeByName("parameters")
+        )
+      finally declaration.operation.destroy()
+      instance
 
     def dumpMlirbc(
       parameter: PARAM
@@ -135,6 +147,10 @@ given VerilogWrapperApi:
       using Arena,
       Context
     ): Unit =
+      wrapper
+        .verilogSources(parameter)
+        .foreach: (name, source) =>
+          os.write.over(os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", ""), os.pwd) / os.RelPath(name), source)
       BaseGeneratorHelper.dumpMlirbc(
         wrapper.moduleName(parameter),
         wrapper.elaboratedModules,
