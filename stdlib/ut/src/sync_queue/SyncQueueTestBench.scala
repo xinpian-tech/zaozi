@@ -4,6 +4,7 @@ package me.jiuyang.stdlib.ut
 
 import me.jiuyang.stdlib.queue.default.{SyncQueue, SyncQueueLayers, SyncQueueParameter, SyncQueueProbe, given}
 import me.jiuyang.tblib.*
+import me.jiuyang.tblib.default.given
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.valuetpe.*
@@ -24,6 +25,16 @@ object SyncQueueTestBench
 
   override def moduleName(parameter: SyncQueueParameter): String = "SyncQueueTestBench"
   def clockPeriodNs(parameter:       SyncQueueParameter): Long   = 10
+
+  override def architecture(parameter: SyncQueueParameter) =
+    super.architecture(parameter)
+    layer("Verification"):
+      val dataOut = Wire(UInt(parameter.width))
+      dataOut <== probe.dataOut
+      val empty = Wire(Bool())
+      empty <== probe.empty
+      val error = Wire(Bool())
+      error <== probe.error
 
   def simulation(parameter: SyncQueueParameter) =
     val tb     = summon[Testbench[SyncQueueTestBenchIO]]

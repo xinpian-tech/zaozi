@@ -9,7 +9,7 @@ import me.jiuyang.tblib.{
   TestbenchGenerator,
   TestbenchGeneratorApi
 }
-import me.jiuyang.zaozi.{DVInterface, HWInterface, LayerInterface, Parameter}
+import me.jiuyang.zaozi.{DVInterface, GeneratorApi, HWInterface, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{*, given}
 
 import org.llvm.circt.CAPI
@@ -34,6 +34,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Attribute,
   Block,
   Context,
+  ContextApi,
   LocationApi,
   Module,
   ModuleApi,
@@ -41,6 +42,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   OperationApi,
   SymbolTableApi,
   Type,
+  WalkEnum,
+  WalkResultEnum,
   given
 }
 import org.llvm.mlir.scalalib.capi.pass.{PassManagerApi, given}
@@ -116,9 +119,74 @@ given TestbenchGeneratorApi with
       finally pm.destroy()
     finally firtoolOptions.destroy
 
+  private def readFIRRTLModules(
+    topModuleName: String,
+    directory:     os.Path
+  )(
+    using Arena,
+    Context
+  ): Seq[Array[Byte]] =
+    val modules = scala.collection.mutable.LinkedHashMap.empty[String, Array[Byte]]
+    def read(moduleName: String): Unit =
+      if !modules.contains(moduleName) then
+        val bytecode        = os.read.bytes(directory / s"$moduleName.mlirbc")
+        modules(moduleName) = bytecode
+        val source = summon[ModuleApi].moduleCreateParse(bytecode)
+        require(MlirModule.ptr(source.segment).address != 0, s"failed to parse FIRRTL module '$moduleName'")
+        try
+          val dependencies = scala.collection.mutable.ArrayBuffer.empty[String]
+          source.getOperation.walk(
+            operation =>
+              if operation.getName.str == "firrtl.extmodule" then
+                dependencies += operation.getInherentAttributeByName("sym_name").stringAttrGetValue
+              WalkResultEnum.Advance,
+            WalkEnum.PreOrder
+          )
+          dependencies.foreach: dependency =>
+            if os.isFile(directory / s"$dependency.mlirbc") then read(dependency)
+        finally source.destroy()
+    read(topModuleName)
+    modules.values.toSeq
+
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: TestbenchGenerator[PARAM, L, I, P]
   )
+    def mainImpl(
+      args: Array[String]
+    )(
+      using upickle.default.ReadWriter[PARAM]
+    ): Unit =
+      args.toList match
+        case "design" :: configPath :: _ =>
+          val parameter = upickle.default.read[PARAM](os.read(os.Path(configPath, os.pwd)))
+          val directory = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", ""), os.pwd)
+          os.makeDir.all(directory)
+          val arena = Arena.ofConfined()
+          try
+            given Arena   = arena
+            given Context = summon[ContextApi].contextCreate
+            try
+              summon[FIRRTLDialectApi].loadDialect
+              summon[HWDialectApi].loadDialect
+              summon[SeqDialectApi].loadDialect
+              summon[SVDialectApi].loadDialect
+              summon[LTLDialectApi].loadDialect
+              summon[VerifDialectApi].loadDialect
+              generator.dumpMlirbc(parameter)
+              val name   = generator.moduleName(parameter)
+              val module = generator.module(parameter, readFIRRTLModules(name, directory))
+              try
+                val bytecode = module.toMlirBytecode
+                val dpi      = module.toDpiJson
+                val verilog  = module.toVerilog
+                os.write.over(directory / s"$name.hw.mlirbc", bytecode)
+                os.write.over(directory / s"$name.json", ujson.write(dpi, indent = 2))
+                os.write.over(directory / s"$name.sv", verilog)
+              finally module.destroy()
+            finally summon[Context].destroy()
+          finally arena.close()
+        case _ => summon[GeneratorApi].mainImpl(generator)(args)
+
     def module(
       parameter:     PARAM,
       firrtlModules: Seq[Array[Byte]]

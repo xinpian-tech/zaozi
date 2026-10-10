@@ -195,39 +195,42 @@ class generator extends MacroAnnotation:
                   )
               )
 
-        def mainDef = DefDef(
-          Symbol.newMethod(
-            objSym,
-            "main",
-            Symbol.requiredClass("me.jiuyang.zaozi.Generator").declaredMethod("main").head.info
-          ),
-          (argss: List[List[Tree]]) =>
-            tptParam.tpe.asType match
-              case '[tParam] =>
-                Some(
-                  Select
-                    .unique(
-                      Expr
-                        .summon[me.jiuyang.zaozi.GeneratorApi]
-                        .getOrElse:
-                          report.errorAndAbort("No given instance of me.jiuyang.zaozi.GeneratorApi was found")
-                        .asTerm,
-                      "mainImpl"
-                    )
-                    .appliedToTypeTrees(List(tptParam, tptL, tptI, tptP))
-                    .appliedTo(This(objSym))
-                    .appliedTo(argss.head.head.asExpr.asTerm)
-                    .appliedTo(
-                      Expr
-                        .summon[upickle.default.ReadWriter[tParam]]
-                        .getOrElse:
-                          report.errorAndAbort(
-                            s"No given instance of upickle.default.ReadWriter[${tptParam.show}] was Found"
-                          )
-                        .asTerm
-                    )
-                )
-        )
+        def mainDef =
+          val apiName =
+            if objSym.typeRef.baseClasses.exists(_.fullName == "me.jiuyang.tblib.TestbenchGenerator") then
+              "me.jiuyang.tblib.TestbenchGeneratorApi"
+            else "me.jiuyang.zaozi.GeneratorApi"
+          val api = Symbol.requiredClass(apiName).typeRef.asType match
+            case '[apiType] =>
+              Expr.summon[apiType].getOrElse {
+                report.errorAndAbort(s"No given instance of $apiName was found")
+              }.asTerm
+          DefDef(
+            Symbol.newMethod(
+              objSym,
+              "main",
+              Symbol.requiredClass("me.jiuyang.zaozi.Generator").declaredMethod("main").head.info
+            ),
+            (argss: List[List[Tree]]) =>
+              tptParam.tpe.asType match
+                case '[tParam] =>
+                  Some(
+                    Select
+                      .unique(api, "mainImpl")
+                      .appliedToTypeTrees(List(tptParam, tptL, tptI, tptP))
+                      .appliedTo(This(objSym))
+                      .appliedTo(argss.head.head.asExpr.asTerm)
+                      .appliedTo(
+                        Expr
+                          .summon[upickle.default.ReadWriter[tParam]]
+                          .getOrElse:
+                            report.errorAndAbort(
+                              s"No given instance of upickle.default.ReadWriter[${tptParam.show}] was Found"
+                            )
+                          .asTerm
+                      )
+                  )
+          )
 
         def defOpt[D <: Definition](definition: D)  =
           Option.unless(definition.symbol.overridingSymbol(objSym).exists)(definition)

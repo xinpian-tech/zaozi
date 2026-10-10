@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class OrderedDpiLit %s --
+// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class OrderedDpiTestBench %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
-// RUN: cd %t.dir && %{test} %S/../../ut/src/sync_queue/parameter.json
-// RUN: circt-opt %t.dir/ordered.mlirbc | FileCheck %s --check-prefix=IR
-// RUN: FileCheck %s --check-prefix=SV --input-file=%t.dir/ordered.sv
+// RUN: cd %t.dir && %{test} design %S/../../ut/src/sync_queue/parameter.json
+// RUN: circt-opt %t.dir/OrderedDpiTestBench.hw.mlirbc | FileCheck %s --check-prefix=IR
+// RUN: FileCheck %s --check-prefix=SV --input-file=%t.dir/OrderedDpiTestBench.sv
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/OrderedDpiTestBench.json
 // RUN: rm -rf %t.dir
 
 // IR-LABEL: hw.module @OrderedDpiTestBench()
@@ -35,19 +36,18 @@
 // SV-NOT: always #
 // SV: endmodule
 
+// DPI-DAG: "function": "begin_cycle"
+// DPI-DAG: "function": "ordered_step"
+// DPI-DAG: "function": "consume"
+// DPI-DAG: "function": "end_cycle"
+
 import me.jiuyang.stdlib.queue.default.{SyncQueueLayers, SyncQueueParameter, SyncQueueProbe, given}
 import me.jiuyang.stdlib.ut.{SyncQueueTestBench, SyncQueueTestBenchIO}
 import me.jiuyang.tblib.*
 import me.jiuyang.tblib.default.{*, given}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, given}
-import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
-import org.llvm.circt.scalalib.capi.dialect.verif.{DialectApi as VerifDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
-import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, given}
-
-import java.lang.foreign.Arena
 
 @generator
 object OrderedDpiTestBench
@@ -89,32 +89,3 @@ object OrderedDpiTestBench
       tb.io.popRequestN  := values("popRequestN")
       tb.io.diagnosticN  := values("diagnosticN")
       tb.io.dataIn       := values("dataIn")
-
-object OrderedDpiLit:
-  def main(args: Array[String]): Unit =
-    val parameter = upickle.default.read[SyncQueueParameter](os.read(os.Path(args(0), os.pwd)))
-    val arena     = Arena.ofConfined()
-    given Arena   = arena
-    given Context = summon[ContextApi].contextCreate
-    try
-      summon[FIRRTLDialectApi].loadDialect
-      summon[LTLDialectApi].loadDialect
-      summon[VerifDialectApi].loadDialect
-      OrderedDpiTestBench.dumpMlirbc(parameter)
-      val modules = os.list(os.pwd).filter(_.ext == "mlirbc").map(os.read.bytes)
-      val module  = OrderedDpiTestBench.module(parameter, modules)
-      try
-        val bytecode = module.toMlirBytecode
-        val schema   = module.toDpiJson
-        assert(
-          schema("dpi_functions").arr.map(_("function").str).toSet ==
-            Set("begin_cycle", "ordered_step", "consume", "end_cycle")
-        )
-        os.write.over(os.pwd / "ordered.sv", module.toVerilog)
-        assert(module.toMlirBytecode.sameElements(bytecode))
-        assert(module.toDpiJson == schema)
-        os.write.over(os.pwd / "ordered.mlirbc", bytecode)
-      finally module.destroy()
-    finally
-      summon[Context].destroy()
-      arena.close()

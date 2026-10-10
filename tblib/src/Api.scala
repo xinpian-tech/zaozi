@@ -136,6 +136,9 @@ trait TestbenchGenerator[
     extends Generator[PARAM, L, I, P]:
   def dut: Generator[PARAM, L, ? <: HWInterface[PARAM], P]
 
+  /** The forwarded DUT Probe interface in the current FIRRTL elaboration. */
+  def probe(using current: ProbeInterface[P]): ProbeInterface[P] = current
+
   /** Instantiates the clock and DUT, connects stimulus inputs, and forwards the DUT Probe interface in FIRRTL.
     * Consumers access the forwarded interface through the testbench instance's `probe`.
     */
@@ -159,7 +162,6 @@ trait TestbenchGenerator[
       dut.io.field[Connectable](field.name) :<= io.field[Connectable](field.name)
 
     // probe
-    val probe = summon[ProbeInterface[P]]
     probe.getType.elements.indices.foreach: index =>
       val destination = summon[OpenSubfieldApi].op(probe.refer, index, locate)
       destination.operation.appendToBlock()
@@ -180,6 +182,15 @@ trait TestbenchGeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: TestbenchGenerator[PARAM, L, I, P]
   )
+    /** Handles `config` and `design`. Design writes FIRRTL `.mlirbc`, complete testbench `.hw.mlirbc`, DPI `.json`,
+      * and SystemVerilog `.sv` files.
+      */
+    def mainImpl(
+      args: Array[String]
+    )(
+      using upickle.default.ReadWriter[PARAM]
+    ): Unit
+
     /** Links and lowers the FIRRTL inputs, then adds simulation behavior to the testbench. The caller owns the returned
       * builtin module and must destroy it before its context.
       */
