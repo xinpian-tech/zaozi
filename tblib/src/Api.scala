@@ -4,7 +4,6 @@ package me.jiuyang.tblib
 
 import me.jiuyang.tblib.macros.testbenchIOSelectDynamic
 import me.jiuyang.zaozi.{
-  ConnectException,
   DVInterface,
   DpiArg,
   DpiCallResult,
@@ -23,7 +22,7 @@ import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Value}
 import java.lang.foreign.Arena
 import scala.language.dynamics
 
-/** A typed testbench port bound to one simulation-wrapper instance. */
+/** A typed testbench input bound to one simulation-wrapper instance. */
 final class TestbenchPort[T <: Data] private[tblib] (
   private val field: BundleField[T],
   private val testbench: Testbench[?]):
@@ -36,12 +35,7 @@ final class TestbenchPort[T <: Data] private[tblib] (
     Block
   ): Unit = testbench.bind(field, value)
 
-  /** Reads an output of the FIRRTL testbench in the simulation wrapper. */
-  def value(
-    using Arena
-  ): Value = testbench.observe(field)
-
-/** Typed access to the input and output ports of `I`. */
+/** Typed access to the stimulus input ports of `I`. */
 final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testbench: Testbench[I]) extends Dynamic:
   private[tblib] def port[T <: Data](name:       String): TestbenchPort[T]         = testbench.port(name)
   private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] = testbench.portOption(name)
@@ -120,18 +114,6 @@ trait Testbench[I <: HWInterface[?]]:
 
   private[tblib] def port[T <: Data](name:       String): TestbenchPort[T]
   private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]]
-  private[tblib] def observe(
-    field: BundleField[?]
-  )(
-    using Arena
-  ):                                                      Value
-  private[tblib] def connectOutputs(
-    values: Seq[Value]
-  )(
-    using Arena,
-    Context,
-    Block
-  ):                                                      Unit
   private[tblib] def bind(
     field: BundleField[?],
     value: Value
@@ -144,7 +126,7 @@ trait Testbench[I <: HWInterface[?]]:
   /** Resolves the instance inputs in HW port order, including the generated clock. */
   private[tblib] def inputValues: Seq[Value]
 
-/** Instantiates and connects the DUT by port name, with simulation behavior defined by the testbench. */
+/** Instantiates the DUT and connects stimulus inputs by port name. DUT observation uses Probe. */
 trait TestbenchGenerator[
   PARAM <: Parameter,
   L <: LayerInterface[PARAM],
@@ -162,20 +144,10 @@ trait TestbenchGenerator[
     L,
     InstanceContext
   ) ?=> Unit =
-    val io        = summon[Interface[I]]
-    val dut       = this.dut.instantiate(parameter)
-    val dutFields = dut.io.getType.elements.map(field => field.name -> field).toMap
+    val io  = summon[Interface[I]]
+    val dut = this.dut.instantiate(parameter)
     io.getType.elements.foreach: field =>
-      val dutField = dutFields.getOrElse(
-        field.name,
-        throw ConnectException(s"DUT port not found: ${field.name}")
-      )
-      if field.isFlipped != dutField.isFlipped then
-        throw ConnectException(s"testbench and DUT port directions differ: ${field.name}")
-      val testbenchPort = io.field[Connectable](field.name)
-      val dutPort      = dut.io.field[Connectable](field.name)
-      if field.isFlipped then dutPort :<>= testbenchPort
-      else testbenchPort :<>= dutPort
+      dut.io.field[Connectable](field.name) :<= io.field[Connectable](field.name)
 
   def wrapperName(parameter:   PARAM): String = s"${moduleName(parameter)}Wrapper"
   def clockPeriodNs(parameter: PARAM): Long

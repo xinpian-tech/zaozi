@@ -144,12 +144,13 @@ given TestbenchGeneratorApi with
         val interface = generator.interface(parameter)
         interface.toMlirType
         val fields    = interface.elements
+        require(fields.forall(_.isFlipped), "testbench IO must contain only inputs; observe DUT signals through Probe")
         require(
           hwPorts.size == fields.size && hwPorts
             .zip(fields)
             .forall: (port, field) =>
               port.name == field.name &&
-                port.direction == (if field.isFlipped then PortDirection.Input else PortDirection.Output),
+                port.direction == PortDirection.Input,
           "lowered HW ports do not match the testbench interface"
         )
         require(
@@ -164,8 +165,7 @@ given TestbenchGeneratorApi with
           val seqClock = summon[HWApi].instance("clockGenerator", clockModule, Seq.empty).head
           given testbench: Testbench[I] = new DefaultTestbench[I](seqClock, fields.tail, hwPorts.tail)
           generator.simulation(parameter)
-          val outputs = summon[HWApi].instance("testbench", dutModule, testbench.inputValues)
-          testbench.connectOutputs(outputs)
+          summon[HWApi].instance("testbench", dutModule, testbench.inputValues)
           summon[HWApi].output(Seq.empty)
 
         require(module.getOperation.verify, "invalid unit testbench wrapper")

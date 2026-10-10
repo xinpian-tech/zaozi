@@ -25,24 +25,14 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
   require(
     fields.size == ports.size && fields
       .zip(ports)
-      .forall((field, port) => field.name == port.name),
-    "testbench fields must match the HW ports"
+      .forall((field, port) => field.name == port.name && field.isFlipped && port.direction == PortDirection.Input),
+    "testbench fields must match the HW input ports"
   )
 
   val fallingClock: Value = clock.clockInv
-  private val stimulusPorts  = ports.filter(_.direction == PortDirection.Input)
-  private val stimulusFields =
-    fields.zip(ports).collect { case (field, port) if port.direction == PortDirection.Input => field }
-  private val driven         = Array.fill[Option[Value]](stimulusPorts.size)(None)
+  private val driven = Array.fill[Option[Value]](ports.size)(None)
   val io: TestbenchIO[I] = new TestbenchIO[I](this)
   private val wrapperBlock = summon[Block]
-  // Output wires allow simulation to refer to DUT results before its instance is assembled.
-  private val observations = fields
-    .zip(ports)
-    .collect:
-      case (field, port) if port.direction == PortDirection.Output =>
-        val wire = summon[SVApi].wire(port.tpe, s"${port.name}_observed")
-        (field, wire, wire.readInOut)
 
   def initial(
     body: Block ?=> Unit
@@ -147,29 +137,6 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
   private[tblib] def portOption[T <: Data](name: String): Option[TestbenchPort[T]] =
     fields.find(_.name == name).map(field => new TestbenchPort(field.asInstanceOf[BundleField[T]], this))
 
-  private[tblib] def observe(
-    field: BundleField[?]
-  )(
-    using Arena
-  ): Value =
-    observations
-      .find((candidate, _, _) => candidate.eq(field))
-      .map(_._3)
-      .getOrElse(throw new IllegalArgumentException(s"${field.name} is not a testbench output"))
-
-  private[tblib] def connectOutputs(
-    values: Seq[Value]
-  )(
-    using Arena,
-    Context,
-    Block
-  ): Unit =
-    require(values.size == observations.size, "testbench output count mismatch")
-    observations
-      .zip(values)
-      .foreach: (observation, value) =>
-        summon[SVApi].assign(observation._2, value)
-
   private[tblib] def bind(
     field: BundleField[?],
     value: Value
@@ -178,9 +145,9 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     Context,
     Block
   ): Unit =
-    val index = stimulusFields.indexWhere(candidate => candidate.eq(field))
+    val index = fields.indexWhere(candidate => candidate.eq(field))
     require(index >= 0, s"${field.name} is not a driven testbench input")
-    val port  = stimulusPorts(index)
+    val port  = ports(index)
     require(driven(index).isEmpty, s"testbench input driven twice: ${port.name}")
     require(value.getType.equal(port.tpe), s"testbench input type mismatch: ${port.name}")
     val input = if inProcedure then
@@ -195,7 +162,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     driven(index) = Some(input)
 
   private[tblib] def inputValues: Seq[Value] =
-    Seq(clock) ++ stimulusPorts
+    Seq(clock) ++ ports
       .zip(driven)
       .map: (port, value) =>
         value.getOrElse(throw new IllegalArgumentException(s"testbench input is not driven: ${port.name}"))
