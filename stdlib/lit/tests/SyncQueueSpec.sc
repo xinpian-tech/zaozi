@@ -21,10 +21,10 @@
 // Build the testbench once, then convert each format in memory and write the results here.
 // RUN: cd %t.dir && %{testbench} %S/../../ut/src/sync_queue/parameter.json
 // RUN: test ! -e %t.dir/linked.mlir
-// RUN: circt-opt %t.dir/SyncQueueTestBenchWrapper.mlirbc | FileCheck %s --check-prefix=COMBINED
-// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/SyncQueueTestBenchWrapper.json
-// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/SyncQueueTestBenchWrapper.sv
-// RUN: FileCheck %s --check-prefix=WRAPPER --input-file=%t.dir/SyncQueueTestBenchWrapper.sv
+// RUN: circt-opt %t.dir/SyncQueueTestBench.mlirbc | FileCheck %s --check-prefix=COMBINED
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/SyncQueueTestBench.json
+// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/SyncQueueTestBench.sv
+// RUN: FileCheck %s --check-prefix=CLOCK --input-file=%t.dir/SyncQueueTestBench.sv
 // RUN: rm -rf %t.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
@@ -84,10 +84,9 @@
 
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
-// COMBINED: hw.module @SyncQueueTestBench(
-// COMBINED: hw.module @Clock_periodNs10(out clock : !seq.clock)
-// COMBINED: hw.module @SyncQueueTestBenchWrapper()
-// COMBINED: hw.instance "clockGenerator" @Clock_periodNs10
+// COMBINED: hw.module @SyncQueueTestBench()
+// COMBINED: hw.instance "clock" @Clock_periodNs10
+// COMBINED: hw.instance "dut" @SyncQueue_
 // COMBINED: seq.clock_inv
 // COMBINED-NOT: seq.clock_inv
 // COMBINED: {{^  }}sv.func private @step(
@@ -100,21 +99,19 @@
 // DPI: "name": "status"
 // DPI: "function": "zaozi_step"
 
-// DESIGN-LABEL: module SyncQueueTestBench(
-// DESIGN: SyncQueue_{{.*}} dut (
+// DESIGN: import "DPI-C"
+// DESIGN-LABEL: module SyncQueueTestBench();
+// DESIGN-NOT: always #
+// DESIGN-DAG: Clock_periodNs10 clock (
+// DESIGN-DAG: SyncQueue_{{.*}} dut (
+// DESIGN-NOT: always #
+// DESIGN: endmodule
 
-// WRAPPER: import "DPI-C"
-// WRAPPER-LABEL: module Clock_periodNs10(
-// WRAPPER: initial [[CLOCK:[A-Za-z_][A-Za-z_0-9]*]] = 1'b0;
-// WRAPPER-NEXT: always #5ns [[CLOCK]] = ~[[CLOCK]];
-// WRAPPER: endmodule
-// WRAPPER-LABEL: module SyncQueueTestBenchWrapper();
-// WRAPPER-NOT: always #
-// WRAPPER: Clock_periodNs10 clockGenerator (
-// WRAPPER-NOT: always #
-// WRAPPER: SyncQueueTestBench testbench (
-// WRAPPER-NOT: always #
-// WRAPPER: endmodule
+// CLOCK-LABEL: module Clock_periodNs10(
+// CLOCK: initial
+// CLOCK: [[CLOCK:[A-Za-z_][A-Za-z_0-9]*]] = 1'{{[bh]}}0;
+// CLOCK: always #5ns [[CLOCK]] = ~[[CLOCK]];
+// CLOCK: endmodule
 
 import me.jiuyang.stdlib.queue.default.{SyncQueueParameter, given}
 import me.jiuyang.stdlib.ut.SyncQueueTestBench
@@ -147,7 +144,7 @@ try
     assert(module.toDpiJson == dpi)
     assert(os.list(os.pwd).toSet == files)
 
-    val name = SyncQueueTestBench.wrapperName(parameter)
+    val name = SyncQueueTestBench.moduleName(parameter)
     os.write.over(os.pwd / s"$name.mlirbc", bytecode)
     os.write.over(os.pwd / s"$name.json", ujson.write(dpi, indent = 2))
     os.write.over(os.pwd / s"$name.sv", verilog)

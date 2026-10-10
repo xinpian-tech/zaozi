@@ -8,21 +8,21 @@
 // RUN: FileCheck %s --check-prefix=SV --input-file=%t.dir/ordered.sv
 // RUN: rm -rf %t.dir
 
-// IR-LABEL: hw.module @OrderedDpiTestBenchWrapper()
-// IR: hw.instance "clockGenerator" @Clock_periodNs10
+// IR-LABEL: hw.module @OrderedDpiTestBench()
+// IR: hw.instance "clock" @Clock_periodNs10
+// IR: hw.instance "dut" @SyncQueue_
 // IR: sv.always posedge
 // IR-NEXT: sv.func.call.procedural @begin_cycle()
 // IR-NEXT: %[[STEP:.*]]:7 = sv.func.call.procedural @step()
 // IR-NEXT: sv.func.call.procedural @consume(%[[STEP]]#4, %[[STEP]]#6)
 // IR-NEXT: sv.func.call.procedural @end_cycle()
 // IR: sv.passign %{{.*}}, %[[STEP]]#4 : i8
-// IR: hw.instance "testbench" @OrderedDpiTestBench
 
 // SV: import "DPI-C" context function void begin_cycle
 // SV: import "DPI-C" context function void consume
-// SV-LABEL: module OrderedDpiTestBenchWrapper();
+// SV-LABEL: module OrderedDpiTestBench();
 // SV-NOT: always #
-// SV-DAG: Clock_periodNs10 clockGenerator (
+// SV-DAG: Clock_periodNs10 clock (
 // SV-DAG: wire [[FALLING:[A-Za-z_][A-Za-z_0-9]*]] = ~{{[A-Za-z_][A-Za-z_0-9]*}};
 // SV-NOT: always #
 // SV: always @(posedge [[FALLING]]) begin

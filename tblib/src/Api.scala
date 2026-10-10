@@ -14,19 +14,20 @@ import me.jiuyang.zaozi.{
   LayerInterface,
   Parameter
 }
-import me.jiuyang.zaozi.default.given
+import me.jiuyang.zaozi.default.{locate, given}
 import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
-import me.jiuyang.zaozi.valuetpe.{BundleField, Connectable, Data}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Value}
+import me.jiuyang.zaozi.valuetpe.{BundleField, Clock as ClockType, Connectable, Data}
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{OpenSubfieldApi, RefDefineApi, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Value, given}
 
 import java.lang.foreign.Arena
 import scala.language.dynamics
 
-/** A typed testbench input bound to one simulation-wrapper instance. */
+/** A typed stimulus input of one testbench. */
 final class TestbenchPort[T <: Data] private[tblib] (
   private val field: BundleField[T],
   private val testbench: Testbench[?]):
-  /** Binds a wrapper value to this testbench input. */
+  /** Binds a simulation value to this testbench input. */
   infix def :=(
     value: Value
   )(
@@ -42,7 +43,7 @@ final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testben
 
   transparent inline def selectDynamic(name: String): Any = ${ testbenchIOSelectDynamic[I]('this, 'name) }
 
-/** Operations and typed IO bindings for one wrapper elaboration, supplied to `TestbenchGenerator.simulation`. */
+/** Operations and typed IO bindings supplied to `TestbenchGenerator.simulation`. */
 trait Testbench[I <: HWInterface[?]]:
   def clock:        Value
   def fallingClock: Value
@@ -123,10 +124,10 @@ trait Testbench[I <: HWInterface[?]]:
     Block
   ):                                                      Unit
 
-  /** Resolves the instance inputs in HW port order, including the generated clock. */
+  /** Resolves the stimulus values in HW input port order. */
   private[tblib] def inputValues: Seq[Value]
 
-/** Instantiates the DUT and connects stimulus inputs by port name. DUT observation uses Probe. */
+/** Instantiates the clock and DUT, and connects stimulus inputs by port name. DUT observation uses Probe. */
 trait TestbenchGenerator[
   PARAM <: Parameter,
   L <: LayerInterface[PARAM],
@@ -135,6 +136,9 @@ trait TestbenchGenerator[
     extends Generator[PARAM, L, I, P]:
   def dut: Generator[PARAM, L, ? <: HWInterface[PARAM], P]
 
+  /** Instantiates the clock and DUT, connects stimulus inputs, and forwards the DUT Probe interface in FIRRTL.
+    * Consumers access the forwarded interface through the testbench instance's `probe`.
+    */
   override def architecture(parameter: PARAM): (
     Arena,
     Context,
@@ -144,12 +148,25 @@ trait TestbenchGenerator[
     L,
     InstanceContext
   ) ?=> Unit =
+    // clock
+    val clock = Clock.instantiate(ClockParameter(clockPeriodNs(parameter)))
+
+    // io
     val io  = summon[Interface[I]]
     val dut = this.dut.instantiate(parameter)
+    dut.io.field[ClockType]("clock") := clock.io.clock
     io.getType.elements.foreach: field =>
       dut.io.field[Connectable](field.name) :<= io.field[Connectable](field.name)
 
-  def wrapperName(parameter:   PARAM): String = s"${moduleName(parameter)}Wrapper"
+    // probe
+    val probe = summon[ProbeInterface[P]]
+    probe.getType.elements.indices.foreach: index =>
+      val destination = summon[OpenSubfieldApi].op(probe.refer, index, locate)
+      destination.operation.appendToBlock()
+      val source      = summon[OpenSubfieldApi].op(dut.probe.refer, index, locate)
+      source.operation.appendToBlock()
+      summon[RefDefineApi].op(destination.result, source.result, locate).operation.appendToBlock()
+
   def clockPeriodNs(parameter: PARAM): Long
   def simulation(parameter:    PARAM): (
     Arena,
@@ -163,7 +180,7 @@ trait TestbenchGeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: TestbenchGenerator[PARAM, L, I, P]
   )
-    /** Links and lowers the FIRRTL inputs, then constructs the simulation wrapper once. The caller owns the returned
+    /** Links and lowers the FIRRTL inputs, then adds simulation behavior to the testbench. The caller owns the returned
       * builtin module and must destroy it before its context.
       */
     def module(
@@ -175,7 +192,7 @@ trait TestbenchGeneratorApi:
     ): Module
 
   extension (module: Module)
-    /** Returns the complete testbench, including its wrapper, as MLIR bytecode. */
+    /** Returns the complete testbench as MLIR bytecode. */
     def toMlirBytecode(
       using Arena
     ): Array[Byte]

@@ -11,7 +11,6 @@ import org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 
 /** The DUT wiring and simulation behavior of the SyncQueue unit testbench. */
 class SyncQueueTestBenchIO(parameter: SyncQueueParameter) extends HWBundle(parameter):
-  val clock        = Flipped(Clock())
   val resetN       = Flipped(Reset())
   val pushRequestN = Flipped(Bool())
   val popRequestN  = Flipped(Bool())

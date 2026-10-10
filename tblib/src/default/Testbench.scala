@@ -32,7 +32,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
   val fallingClock: Value = clock.clockInv
   private val driven = Array.fill[Option[Value]](ports.size)(None)
   val io: TestbenchIO[I] = new TestbenchIO[I](this)
-  private val wrapperBlock = summon[Block]
+  private val testbenchBlock = summon[Block]
 
   def initial(
     body: Block ?=> Unit
@@ -41,7 +41,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     Context,
     Block
   ): Unit =
-    require(summon[Block].getParentOperation.getName.str == "hw.module", "initial requires the wrapper module scope")
+    require(summon[Block].getParentOperation.getName.str == "hw.module", "initial requires the testbench module scope")
     summon[SVApi].initial(body)
 
   private def inProcedure(
@@ -62,7 +62,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     Context,
     Block
   ): Unit =
-    require(summon[Block].getParentOperation.getName.str == "hw.module", "onClock requires the wrapper module scope")
+    require(summon[Block].getParentOperation.getName.str == "hw.module", "onClock requires the testbench module scope")
     summon[SVApi].onClock(clock, enabled)(body)
 
   def dpiFunction(
@@ -151,9 +151,9 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     require(driven(index).isEmpty, s"testbench input driven twice: ${port.name}")
     require(value.getType.equal(port.tpe), s"testbench input type mismatch: ${port.name}")
     val input = if inProcedure then
-      // Procedure-local SSA results cannot escape the region. Store them in wrapper registers instead.
+      // Procedure-local SSA results cannot escape the region. Store them in testbench registers instead.
       val (register, read) =
-        given Block  = wrapperBlock
+        given Block  = testbenchBlock
         val register = summon[SVApi].reg(port.tpe, s"${port.name}_stimulus")
         (register, register.readInOut)
       summon[SVApi].nonBlockingAssign(register, value)
@@ -162,7 +162,7 @@ private[default] final class DefaultTestbench[I <: HWInterface[?]](
     driven(index) = Some(input)
 
   private[tblib] def inputValues: Seq[Value] =
-    Seq(clock) ++ ports
+    ports
       .zip(driven)
       .map: (port, value) =>
         value.getOrElse(throw new IllegalArgumentException(s"testbench input is not driven: ${port.name}"))

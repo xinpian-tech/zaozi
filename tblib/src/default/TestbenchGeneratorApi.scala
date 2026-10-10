@@ -2,14 +2,25 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.tblib.default
 
-import me.jiuyang.tblib.{Testbench, TestbenchGenerator, TestbenchGeneratorApi}
-import me.jiuyang.zaozi.{DVInterface, HWApi, HWInterface, LayerInterface, Parameter}
+import me.jiuyang.tblib.{
+  Clock,
+  ClockParameter,
+  Testbench,
+  TestbenchGenerator,
+  TestbenchGeneratorApi
+}
+import me.jiuyang.zaozi.{DVInterface, HWInterface, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{*, given}
 
 import org.llvm.circt.CAPI
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{DialectApi as FIRRTLDialectApi, LinkCircuitsPassApi, given}
 import org.llvm.circt.scalalib.capi.dialect.emit.{DialectApi as EmitDialectApi, given}
-import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.hw.{
+  DialectApi as HWDialectApi,
+  HWModulePort,
+  TypeApi as HWTypeApi,
+  given
+}
 import org.llvm.circt.scalalib.capi.dialect.comb.{DialectApi as CombDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
@@ -115,7 +126,6 @@ given TestbenchGeneratorApi with
       using Arena,
       Context
     ): Module =
-      val period        = generator.clockPeriodNs(parameter)
       require(firrtlModules.nonEmpty, "unit-test construction requires at least one FIRRTL module")
       val testbenchName = generator.moduleName(parameter)
 
@@ -139,11 +149,11 @@ given TestbenchGeneratorApi with
         linkFIRRTLCircuits(module, testbenchName)
         lowerFIRRTLToHW(module, testbenchName)
         require(module.getOperation.verify, "invalid lowered unit under test")
-        val dutModule = findHWModule(module, testbenchName)
-        val hwPorts   = dutModule.ports
-        val interface = generator.interface(parameter)
+        val testbenchModule = findHWModule(module, testbenchName)
+        val hwPorts         = testbenchModule.ports
+        val interface       = generator.interface(parameter)
         interface.toMlirType
-        val fields    = interface.elements
+        val fields          = interface.elements
         require(fields.forall(_.isFlipped), "testbench IO must contain only inputs; observe DUT signals through Probe")
         require(
           hwPorts.size == fields.size && hwPorts
@@ -153,22 +163,40 @@ given TestbenchGeneratorApi with
                 port.direction == PortDirection.Input,
           "lowered HW ports do not match the testbench interface"
         )
-        require(
-          hwPorts.headOption.exists(port => port.name == "clock" && port.tpe.isClock),
-          "first testbench port must be clock"
-        )
-
-        given Block = module.getBody
+        given Block = testbenchModule.block
         summon[CombDialectApi].loadDialect
-        val clockModule = ClockModule.create(period)
-        summon[HWApi].module(generator.wrapperName(parameter), Seq.empty):
-          val seqClock = summon[HWApi].instance("clockGenerator", clockModule, Seq.empty).head
-          given testbench: Testbench[I] = new DefaultTestbench[I](seqClock, fields.tail, hwPorts.tail)
-          generator.simulation(parameter)
-          summon[HWApi].instance("testbench", dutModule, testbench.inputValues)
-          summon[HWApi].output(Seq.empty)
+        val block           = summon[Block]
+        val clockModuleName = Clock.moduleName(ClockParameter(generator.clockPeriodNs(parameter)))
+        val clockInstance   = Iterator
+          .iterate(block.getFirstOperation)(_.getNextInBlock)
+          .takeWhile(operation => !operationIsNull(operation))
+          .find(operation =>
+            operation.getName.str == "hw.instance" &&
+              operation.getInherentAttributeByName("moduleName").flatSymbolRefAttrGetValue == clockModuleName
+          )
+          .getOrElse(throw new IllegalStateException("testbench clock instance is missing"))
+        val arguments       = hwPorts.indices.map(index => block.getArgument(index.toLong))
+        val terminator      = block.getTerminator
+        given testbench: Testbench[I] = new DefaultTestbench[I](clockInstance.getResult(0), fields, hwPorts)
+        generator.simulation(parameter)
 
-        require(module.getOperation.verify, "invalid unit testbench wrapper")
+        // Simulation APIs append to the module block. Move their operations before hw.output.
+        var appended = terminator.getNextInBlock
+        while !operationIsNull(appended) do
+          val next = appended.getNextInBlock
+          appended.moveBefore(terminator)
+          appended = next
+
+        arguments.zip(testbench.inputValues).foreach((argument, value) => argument.replaceAllUsesOfWith(value))
+        hwPorts.indices.reverse.foreach(block.eraseArgument)
+        testbenchModule.operation.setInherentAttributeByName(
+          "module_type",
+          summon[HWTypeApi].moduleTypeGet(0, Seq.empty[HWModulePort]).typeAttrGet
+        )
+        testbenchModule.operation.setInherentAttributeByName("per_port_attrs", Seq.empty[Attribute].arrayAttrGet)
+        testbenchModule.operation.setInherentAttributeByName("result_locs", Seq.empty[Attribute].arrayAttrGet)
+
+        require(module.getOperation.verify, "invalid unit testbench")
         module
       catch
         case NonFatal(exception) =>
