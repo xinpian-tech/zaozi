@@ -3,6 +3,7 @@
 package org.llvm.mlir.scalalib.capi.target.exportsmtlib
 
 import org.llvm.mlir.scalalib.capi.ir.{Module, Operation}
+import org.llvm.mlir.scalalib.capi.support.LogicalResult
 
 import java.lang.foreign.Arena
 
@@ -18,7 +19,7 @@ trait ExportSmtlibApi:
       emitReset:   Boolean
     )(
       using arena: Arena
-    ): Unit
+    ): LogicalResult
 
   extension (operation: Operation)
     inline def exportSMTLIB(
@@ -31,5 +32,5 @@ trait ExportSmtlibApi:
       emitReset:   Boolean
     )(
       using arena: Arena
-    ): Unit
+    ): LogicalResult
 end ExportSmtlibApi
