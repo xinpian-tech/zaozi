@@ -4,7 +4,7 @@ package me.jiuyang.smtlib.default
 
 import org.llvm.mlir.scalalib.capi.dialect.smt.{given_TypeApi, TypeApi}
 import org.llvm.mlir.scalalib.dialect.smt.operation.{*, given}
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, LocationApi, Operation, Type, Value, given}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value, given}
 import me.jiuyang.smtlib.*
 import me.jiuyang.smtlib.tpe.*
 
@@ -105,9 +105,10 @@ given ConstructorApi with
     Block,
     sourcecode.File,
     sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Name.Machine,
+    SolverContext
   ): Ref[T] =
-    val op = summon[DeclareFunApi].op(summon[sourcecode.Name.Machine].value, locate, rangeType.toMlirType)
+    val op = summon[DeclareFunApi].op(valName, locate, rangeType.toMlirType)
     op.operation.appendToBlock()
     new Ref[T]:
       val _tpe:       T         = rangeType
@@ -122,10 +123,11 @@ given ConstructorApi with
     Block,
     sourcecode.File,
     sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Name.Machine,
+    SolverContext
   ): Ref[SMTFunc[T, U]] =
     val tpe = SMTFunc(domainTypes, rangeType)
-    val op  = summon[DeclareFunApi].op(summon[sourcecode.Name.Machine].value, locate, tpe.toMlirType)
+    val op  = summon[DeclareFunApi].op(valName, locate, tpe.toMlirType)
     op.operation.appendToBlock()
     new Ref[SMTFunc[T, U]]:
       val _tpe:       SMTFunc[T, U] = tpe
@@ -335,7 +337,7 @@ given ConstructorApi with
     op.operation.appendToBlock()
 
   def solver(
-    body: (Arena, Context, Block) ?=> Unit
+    body: (Arena, Context, Block, SolverContext) ?=> Unit
   )(
     using Arena,
     Context,
@@ -348,7 +350,8 @@ given ConstructorApi with
     body(
       using summon[Arena],
       summon[Context],
-      op.bodyBlock
+      op.bodyBlock,
+      new SolverContext
     )
     op.operation.appendToBlock()
 
@@ -1157,15 +1160,3 @@ given [T <: Data, U <: Data, R <: Referable[SMTFunc[?, U]], S <: Referable[?]]: 
         val _operation: Operation = op.operation
 
 end given
-
-private inline def locate(
-  using Arena,
-  Context,
-  sourcecode.File,
-  sourcecode.Line
-): Location =
-  summon[LocationApi].locationFileLineColGet(
-    summon[sourcecode.File].value,
-    summon[sourcecode.Line].value,
-    0
-  )

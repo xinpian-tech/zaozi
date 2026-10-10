@@ -43,7 +43,7 @@ def smtTest(checkLines: String*)(body: (Arena, Context, Block) ?=> Unit): Unit =
     else checkLines.foreach(l => assert(out.toString.contains(l)))
   finally arena.close()
 
-def smtZ3Test(checkLines: String*)(body: (Arena, Context, Block) ?=> Unit): Z3Result =
+def smtZ3Test(checkLines: String*)(body: (Arena, Context, Block, SolverContext) ?=> Unit): Z3Result =
   val arena = Arena.ofConfined()
   try
     given Arena   = arena

@@ -34,6 +34,9 @@ trait ConstructorApi:
   ): Sort[T]
 
   // values
+  /** Uses the contextual source name, or a solver-local `_GEN_n` name for synthetic names. Supply a local
+    * `given sourcecode.Name.Machine` to override the name.
+    */
   def smtValue[T <: Data](
     rangeType: T
   )(
@@ -42,9 +45,11 @@ trait ConstructorApi:
     Block,
     sourcecode.File,
     sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Name.Machine,
+    SolverContext
   ): Ref[T]
 
+  /** Declares a function using the same contextual naming rules as `smtValue`. */
   def smtFunc[T <: Data, U <: Data](
     domainTypes: Seq[T],
     rangeType:   U
@@ -54,7 +59,8 @@ trait ConstructorApi:
     Block,
     sourcecode.File,
     sourcecode.Line,
-    sourcecode.Name.Machine
+    sourcecode.Name.Machine,
+    SolverContext
   ): Ref[SMTFunc[T, U]]
 
   // smt functions
@@ -194,8 +200,9 @@ trait ConstructorApi:
     sourcecode.Name.Machine
   ): Unit
 
+  /** Builds a solver body with fresh naming state for anonymous declarations. */
   def solver(
-    body: (Arena, Context, Block) ?=> Unit
+    body: (Arena, Context, Block, SolverContext) ?=> Unit
   )(
     using Arena,
     Context,
