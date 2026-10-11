@@ -13,6 +13,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
+import org.llvm.circt.scalalib.dialect.hw.operation.{Module as HWModule, Port}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
 import java.lang.foreign.Arena
@@ -271,6 +272,93 @@ trait VerilogWrapperApi:
       sourcecode.Name.Machine,
       InstanceContext
     ): Instance[I, P]
+
+/** Builds HW dialect module structure and inserts each operation into the current block. */
+trait HWApi:
+  /** Builds a signless integer constant; negative values use two's complement. */
+  def constant(
+    value: BigInt,
+    width: Int
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  /** Reinterprets a value without changing its bits. */
+  def bitcast(
+    input:      Value,
+    resultType: Type
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  def module(
+    symbol: String,
+    ports:  Seq[Port]
+  )(body:   (Arena, Context, Block) ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  def moduleExtern(
+    symbol:      String,
+    ports:       Seq[Port],
+    verilogName: Option[String] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Instantiates `moduleName` and returns its output values in port order. */
+  def instance(
+    instanceName: String,
+    moduleName:   String,
+    ports:        Seq[Port],
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value]
+
+  /** Instantiates an existing HW module and returns its output values in port order. */
+  def instance(
+    instanceName: String,
+    module:       HWModule,
+    inputs:       Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Seq[Value]
+
+  def output(
+    values: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
 
 /** One exact runtime switch case; its body is elaborated in that case's region. */
 final class SVCase(val value: BigInt, val body: Block ?=> Unit)
