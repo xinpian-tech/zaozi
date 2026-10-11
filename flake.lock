@@ -26,16 +26,16 @@
     "circt-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1790966098,
-        "narHash": "sha256-59wq+Mm8VBTDMyP3VhLLPCYPadg3MvE/JlX+fqaolaA=",
+        "lastModified": 1791535486,
+        "narHash": "sha256-gCO2q+qMXM2BxbxFXbfpCjxh6theGvGQvqUQLAPPzHM=",
         "owner": "xinpian-tech",
         "repo": "circt",
-        "rev": "4a1a1ae24590322263cc68e852d975010d72a766",
+        "rev": "98b887bd5c37c84dba8e81f676987b870607d3db",
         "type": "github"
       },
       "original": {
         "owner": "xinpian-tech",
-        "ref": "master",
+        "ref": "origin/dpi-interface-json",
         "repo": "circt",
         "type": "github"
       }
