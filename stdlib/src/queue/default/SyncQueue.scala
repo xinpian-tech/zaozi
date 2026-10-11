@@ -96,7 +96,15 @@ class SyncQueueIO(parameter: SyncQueueParameter) extends HWBundle(parameter):
   /** Data at the current read address. */
   val dataOut = Aligned(UInt(parameter.width))
 
-class SyncQueueProbe(parameter: SyncQueueParameter) extends DVBundle[SyncQueueParameter, SyncQueueLayers](parameter)
+/** Read-only queue outputs exposed to verification consumers. */
+class SyncQueueProbe(parameter: SyncQueueParameter) extends DVBundle[SyncQueueParameter, SyncQueueLayers](parameter):
+  val empty       = ProbeRead(Bool(), layers("Verification"))
+  val almostEmpty = ProbeRead(Bool(), layers("Verification"))
+  val halfFull    = ProbeRead(Bool(), layers("Verification"))
+  val almostFull  = ProbeRead(Bool(), layers("Verification"))
+  val full        = ProbeRead(Bool(), layers("Verification"))
+  val error       = ProbeRead(Bool(), layers("Verification"))
+  val dataOut     = ProbeRead(UInt(parameter.width), layers("Verification"))
 
 @generator
 object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueueIO, SyncQueueProbe]:
@@ -109,6 +117,7 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
 
   def architecture(parameter: SyncQueueParameter) =
     val io           = summon[Interface[SyncQueueIO]]
+    val probe        = summon[ProbeInterface[SyncQueueProbe]]
     given ClockScope = ClockScope.posedge(io.clock)
 
     given ResetScope =
@@ -214,6 +223,14 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val nextError       = underrun | overrun | pointerMismatch | retainedError
 
     layer("Verification"):
+      probe.empty       <== io.empty
+      probe.almostEmpty <== io.almostEmpty
+      probe.halfFull    <== io.halfFull
+      probe.almostFull  <== io.almostFull
+      probe.full        <== io.full
+      probe.error       <== io.error
+      probe.dataOut     <== io.dataOut
+
       given ClockEvent = posedge(io.clock)
 
       Cover((!writeN).S, io.resetN.asBool, "sync_queue_push_accept")

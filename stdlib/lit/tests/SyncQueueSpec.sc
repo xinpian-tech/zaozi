@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" --
+// DEFINE: %{testbench} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.tb.SyncQueueTestBench" --
 
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 
@@ -16,6 +17,15 @@
 // RUN: cd %t.dir && %{test} design sync.json
 // RUN: cd %t.dir && firtool Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC-RAM
 // RUN: cd %t.dir && firtool SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrortrue_enableDiagnosticstrue_asyncResetfalse_resetMemfalse.mlirbc | FileCheck %s --check-prefix=SYNC
+
+// Generate all testbench artifacts through its design command.
+// RUN: cd %t.dir && %{testbench} design %S/../../tb/src/sync_queue/parameter.json
+// RUN: test ! -e %t.dir/linked.mlir
+// RUN: circt-opt %t.dir/SyncQueueTestBench.mlirbc | FileCheck %s --check-prefix=PROBE
+// RUN: circt-opt %t.dir/SyncQueueTestBench.hw.mlirbc | FileCheck %s --check-prefix=COMBINED
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/SyncQueueTestBench.json
+// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/SyncQueueTestBench.sv
+// RUN: FileCheck %s --check-prefix=CLOCK --input-file=%t.dir/SyncQueueTestBench.sv
 // RUN: rm -rf %t.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
@@ -72,3 +82,47 @@
 // SYNC: BrentKungAdder_width2_radix4
 // SYNC: Ram_dataWidth8_depth3_asyncResetfalse_resetMemfalse ram (
 // SYNC-NOT: GTECH_
+
+// PROBE-LABEL: firrtl.module @SyncQueueTestBench(
+// PROBE: firrtl.instance dut{{.*}} @SyncQueue_
+// PROBE: firrtl.layerblock @Verification
+// PROBE: %[[DATA_REF:[^ ]+]] = firrtl.opensubfield %{{.*}}[dataOut]
+// PROBE: %[[DATA:[^ ]+]] = firrtl.ref.resolve %[[DATA_REF]]
+// PROBE: firrtl.connect %{{.*}}, %[[DATA]]
+// PROBE: %[[EMPTY_REF:[^ ]+]] = firrtl.opensubfield %{{.*}}[empty]
+// PROBE: %[[EMPTY:[^ ]+]] = firrtl.ref.resolve %[[EMPTY_REF]]
+// PROBE: firrtl.connect %{{.*}}, %[[EMPTY]]
+// PROBE: %[[ERROR_REF:[^ ]+]] = firrtl.opensubfield %{{.*}}[error]
+// PROBE: %[[ERROR:[^ ]+]] = firrtl.ref.resolve %[[ERROR_REF]]
+// PROBE: firrtl.connect %{{.*}}, %[[ERROR]]
+
+// COMBINED-NOT: firrtl.circuit
+// COMBINED-NOT: hw.module.extern
+// COMBINED: hw.module @SyncQueueTestBench()
+// COMBINED: hw.instance "clock" @Clock_periodNs10
+// COMBINED: hw.instance "dut" @SyncQueue_
+// COMBINED: seq.clock_inv
+// COMBINED-NOT: seq.clock_inv
+// COMBINED: {{^  }}sv.func private @step(
+// COMBINED-NOT: firrtl.circuit
+// COMBINED-NOT: hw.module.extern
+
+// DPI: "direction": "out"
+// DPI: "name": "resetN"
+// DPI: "direction": "return"
+// DPI: "name": "status"
+// DPI: "function": "zaozi_step"
+
+// DESIGN: import "DPI-C"
+// DESIGN-LABEL: module SyncQueueTestBench();
+// DESIGN-NOT: always #
+// DESIGN-DAG: Clock_periodNs10 clock (
+// DESIGN-DAG: SyncQueue_{{.*}} dut (
+// DESIGN-NOT: always #
+// DESIGN: endmodule
+
+// CLOCK-LABEL: module Clock_periodNs10(
+// CLOCK: initial
+// CLOCK: [[CLOCK:[A-Za-z_][A-Za-z_0-9]*]] = 1'{{[bh]}}0;
+// CLOCK: always #5ns [[CLOCK]] = ~[[CLOCK]];
+// CLOCK: endmodule
