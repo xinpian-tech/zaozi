@@ -15,7 +15,7 @@ import me.jiuyang.zaozi.ConstructorApi
 import me.jiuyang.zaozi.InstanceContext
 import javax.naming.NameNotFoundException
 
-private inline def locate(
+inline def locate(
   using Arena,
   Context,
   sourcecode.File,

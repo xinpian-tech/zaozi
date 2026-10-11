@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
+package build.tblib
+
+import mill._
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+
+import build.{v, zaozi}
+
+object `package` extends ScalaModule with ScalafmtModule {
+  def scalaVersion = Task(v.scala)
+  def moduleDeps = Seq(zaozi)
+  override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() :+ "-experimental")
+}
