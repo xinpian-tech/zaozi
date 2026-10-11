@@ -120,6 +120,14 @@ end DialectApi
   * }}}
   */
 trait AttributeApi:
+  inline def paramDeclAttrGet(
+    name:        String,
+    tpe:         Type,
+    value:       Attribute
+  )(
+    using arena: Arena,
+    context:     Context
+  ):        Attribute
   extension (firrtlConvention:      FirrtlConvention)
     inline def toAttribute(
       using arena: Arena,

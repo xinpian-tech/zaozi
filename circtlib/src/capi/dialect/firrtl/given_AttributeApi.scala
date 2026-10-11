@@ -10,6 +10,16 @@ import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, TypeApi, given}
 import java.lang.foreign.{Arena, MemorySegment}
 
 given AttributeApi with
+  inline def paramDeclAttrGet(
+    name:        String,
+    tpe:         Type,
+    value:       Attribute
+  )(
+    using arena: Arena,
+    context:     Context
+  ): Attribute =
+    Attribute(firrtlAttrGetParamDecl(arena, context.segment, name.identifierGet.segment, tpe.segment, value.segment))
+
   extension (firrtlConvention:      FirrtlConvention)
     inline def toAttribute(
       using arena: Arena,

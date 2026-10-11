@@ -18,6 +18,8 @@ class generator extends MacroAnnotation:
       case ClassDef(name, constr, parents, selfOpt, body)
           // a bit of dirty but quotes does not expose the SingletonTypeTree
           if selfOpt.exists(_.tpt.toString().startsWith("SingletonTypeTree")) =>
+        if definition.symbol.typeRef.baseClasses.contains(Symbol.requiredClass("me.jiuyang.zaozi.sv.SVGenerator")) then
+          return me.jiuyang.zaozi.sv.magic.svGeneratorTransform(definition)
         val objSym                                = definition.symbol
         val (tptParam, tptL, tptI, tptP, tptVOpt) = parents
           .map(parent =>
@@ -37,7 +39,7 @@ class generator extends MacroAnnotation:
           .flatten
           .headOption
           .getOrElse {
-            report.errorAndAbort("@generator object should extends trait Generator or VerilogWrapper")
+            report.errorAndAbort("@generator object should extend Generator, VerilogWrapper or SVGenerator")
           }
 
         def makeInterfaceDef(symbolName: String, resultType: TypeTree) = DefDef(
