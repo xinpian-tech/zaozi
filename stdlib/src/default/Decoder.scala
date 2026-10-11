@@ -39,7 +39,7 @@ given TokensReader.Simple[TruthTable]:
   def read(strs: Seq[String]): Right[Nothing, TruthTable] = Right(TruthTable(strs.head))
 
 class DecoderLayers(parameter: DecoderParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class DecoderOutput(tables: Seq[TruthTable]) extends Record:
   tables.map(t => Aligned(t.name, Bits(t.outputBits)))

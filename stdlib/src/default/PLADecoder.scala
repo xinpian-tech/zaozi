@@ -61,3 +61,23 @@ object PLADecoder extends Generator[DecoderParameter, DecoderLayers, DecoderIO, 
         .map(_.asBits)
         .reduce(_ ## _)
     io.output :<= invMatrixOutputs.asRecord(new DecoderOutput(parameter.tables))
+
+    // Check the original table, before espresso minimization and output inversion.
+    layer("Verification"):
+      parameter.tables.foreach: table =>
+        val output  = io.output.field[Bits](table.name)
+        val matches = table.table.map: (input, expected) =>
+          val selected = (io.instruction & input.mask.B(input.width)) === input.value.B(input.width)
+          if expected.mask != 0 then
+            Assert(
+              (!selected | ((output & expected.mask.B(expected.width)) === expected.value.B(expected.width))).I,
+              s"${table.name}_${input.toString}"
+            )
+          selected
+        val matched = matches.reduce(_ | _)
+        val default = table.encoding(table.default)
+        if default.mask != 0 then
+          Assert(
+            (matched | ((output & default.mask.B(default.width)) === default.value.B(default.width))).I,
+            s"${table.name}_default"
+          )

@@ -453,6 +453,54 @@ final case class RegMapDefinition(
       if queueEntries > 0 then Cover((requestFire & rsp.valid).I, active, "regmap_accept_with_response_pending")
       rsp.bits.error.foreach(error => Cover((responseFire & error).I, active, "regmap_error_response"))
 
+      val clockScope                           = summon[ClockScope]
+      given me.jiuyang.zaozi.ltltpe.ClockEvent =
+        me.jiuyang.zaozi.ltltpe.ClockEvent(clockScope.clockEdge, clockScope.clock)
+      circuits.foreach: (wordIndex, fields) =>
+        fields.foreach: field =>
+          val name  = field.layout.definition.name
+          val read  =
+            requestFire & req.bits.read & inputHit(req.bits.index, wordIndex) & readMask(field.layout, req.bits.mask)
+          val write =
+            requestFire & !req.bits.read & inputHit(req.bits.index, wordIndex) & writeMask(field.layout, req.bits.mask)
+          Assert(((field.readInputValid & field.readInputReady) === read).I, active, s"regmap_${name}_read_handshake")
+          Assert(
+            ((field.writeInputValid & field.writeInputReady) === write).I,
+            active,
+            s"regmap_${name}_write_handshake"
+          )
+      // For a single response slot, every accepted request must be the next response.
+      // Request/response fields may add their own latency and are checked by their protocol.
+      val immediateFields = layouts.forall: (_, fields) =>
+        fields.forall: field =>
+          val read  = field.definition match
+            case d: RegReadDefinition => !d.read.isInstanceOf[RequestResponseRead]
+            case _ => true
+          val write = field.definition match
+            case d: RegWriteDefinition => !d.write.isInstanceOf[RequestResponseWrite]
+            case _ => true
+          read && write
+      if queueEntries == 1 && immediateFields then
+        Assert(requestFire.S |=> rsp.valid.S, active, "regmap_accepted_request_gets_response")
+        Assert((requestFire & req.bits.read).S |=> rsp.bits.read.S, active, "regmap_read_response")
+        Assert((requestFire & !req.bits.read).S |=> (!rsp.bits.read).S, active, "regmap_write_response")
+        val mapped =
+          circuits.map((wordIndex, _) => inputHit(req.bits.index, wordIndex)).reduceOption(_ | _).getOrElse(false.B)
+        rsp.bits.error.foreach:      error =>
+          Assert((requestFire & mapped).S |=> (!error).S, active, "regmap_mapped_response")
+          Assert((requestFire & !mapped).S |=> error.S, active, "regmap_unmapped_response")
+        (0 until dataWidth).foreach: bit =>
+          Assert(
+            (requestFire & req.bits.read & frontReadWord.bit(bit)).S |=> rsp.bits.data.bit(bit).S,
+            active,
+            s"regmap_read_${bit}_one"
+          )
+          Assert(
+            (requestFire & req.bits.read & !frontReadWord.bit(bit)).S |=> (!rsp.bits.data.bit(bit)).S,
+            active,
+            s"regmap_read_${bit}_zero"
+          )
+
       circuits.foreach: (wordIndex, fields) =>
         fields.foreach: field =>
           val name = field.layout.definition.name
