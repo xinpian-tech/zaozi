@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.firrtl
 
-// circt-c/Dialect/Firrtl.h
+// circt-c/Dialect/FIRRTL.h
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Block, Context, Location, Type, Value}
+import org.llvm.mlir.scalalib.capi.pass.Pass
 
 import java.lang.foreign.{Arena, MemorySegment}
 
@@ -103,6 +104,15 @@ trait DialectApi:
     context:     Context
   ): Unit
 end DialectApi
+
+trait LinkCircuitsPassApi:
+  def createLinkCircuitsPass(
+    baseCircuit: String,
+    noMangle:    Boolean = false
+  )(
+    using arena: Arena
+  ): Pass
+end LinkCircuitsPassApi
 
 /** Firrtl Attribute Api
   * {{{

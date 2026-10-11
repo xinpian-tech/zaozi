@@ -13,6 +13,7 @@ HWUnionFieldInfo                  # header: $CIRCT_INSTALL_PATH/include/circt-c/
 CirctMSFTPlacementDB                           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/MSFT.h
 CirctMSFTPrimitiveDB                           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/MSFT.h
 CirctMSFTWalkOrder                             # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/MSFT.h
-OMEvaluator                         # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
-OMEvaluatorValue                    # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
+OMEvaluator                      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
+OMEvaluatorValue                 # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/OM.h
+SimDPIArgument                      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
 CirctFirtoolFirtoolOptions                                                # header: $CIRCT_INSTALL_PATH/include/circt-c/Firtool/Firtool.h

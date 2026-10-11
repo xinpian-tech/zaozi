@@ -101,8 +101,9 @@ end TypeApi
   * omEvaluatorBasePathGetEmpty
   * omEvaluatorValueIsAPath
   * omEvaluatorPathGetAsString
-  * omEvaluatorValueIsAReference
-  * omEvaluatorValueGetReferenceValue
+  * omEvaluatorValueIsUnknown
+  * omEvaluatorUnknownGet
+  * omEvaluatorValueGetType
   * }}}
   */
 trait EvaluatorApi:
@@ -160,6 +161,12 @@ trait EvaluatorApi:
   )(
     using arena: Arena
   ):   OMEvaluatorValue
+  inline def unknownGet(
+    tpe: Type
+  )(
+    using Arena,
+    Context
+  ):   OMEvaluatorValue
   extension (primitive:      Attribute)
     /** wrapper to [[fromPrimitive]] */
     inline def toEvaluatorValue(
@@ -175,15 +182,15 @@ trait EvaluatorApi:
     inline def getPrimitive(
       using arena: Arena
     ):                      Attribute
-    inline def getReferenceValue(
+    inline def getType(
       using arena: Arena
-    ):                      OMEvaluatorValue
+    ):                      Type
     inline def isBasePath:  Boolean
     inline def isList:      Boolean
     inline def isObject:    Boolean
     inline def isPath:      Boolean
     inline def isPrimitive: Boolean
-    inline def isReference: Boolean
+    inline def isUnknown:   Boolean
 end EvaluatorApi
 
 /** OM Attribute API
