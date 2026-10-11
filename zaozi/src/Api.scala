@@ -272,6 +272,165 @@ trait VerilogWrapperApi:
       InstanceContext
     ): Instance[I, P]
 
+/** One exact runtime switch case; its body is elaborated in that case's region. */
+final class SVCase(val value: BigInt, val body: Block ?=> Unit)
+
+/** Builds SV storage, procedural control flow, and assignments in the current block. */
+trait SVApi:
+  /** Builds an SV always procedure on the rising edge of a `!seq.clock` value. */
+  def onClock(
+    clock:   Value,
+    enabled: Option[Value] = None
+  )(body:    Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Declares an SV function and its DPI import at builtin module scope. */
+  def dpiFunction(
+    symbol:    String,
+    cName:     Option[String],
+    arguments: Seq[DpiArg]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): DpiFunction
+
+  /** Calls a DPI function in the current procedure, with immediately usable results. */
+  def dpiCallProcedural(
+    function: DpiFunction,
+    inputs:   Seq[Value] = Seq.empty
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): DpiCallResult
+
+  def initial(
+    body: Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Runtime branching in a procedure, distinct from FIRRTL's when. */
+  def ifElse(
+    condition: Value
+  )(thenBody:  Block ?=> Unit
+  )(elseBody:  Block ?=> Unit = ()
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Exact integer cases; an unmatched selector executes defaultBody. */
+  def switch(
+    selector:    Value,
+    cases:       Seq[SVCase]
+  )(defaultBody: Block ?=> Unit = ()
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  def wire(
+    elementType: Type,
+    name:        String
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  /** Continuous assignment at module scope. */
+  def assign(
+    destination: Value,
+    source:      Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Updates a procedural variable before the next statement executes. */
+  def blockingAssign(
+    destination: Value,
+    source:      Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Schedules an update of an SV variable from within a procedural region. */
+  def nonBlockingAssign(
+    destination: Value,
+    source:      Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
+  /** Declares a variable and returns its `!hw.inout` handle. */
+  def reg(
+    elementType: Type,
+    name:        String,
+    init:        Option[Value] = None
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+
+  extension (input: Value)
+    def readInOut(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
+  def verbatim(
+    formatString:  String,
+    substitutions: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Unit
+
 trait ConstructorApi:
   def Clock(): Clock
 
