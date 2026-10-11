@@ -360,6 +360,30 @@ trait HWApi:
     sourcecode.Line
   ): Unit
 
+/** Builds the small set of Seq dialect operations needed by simulation wrappers. */
+trait SeqApi:
+  def clockType(
+    using Arena,
+    Context
+  ): Type
+
+  extension (input: Value)
+    def toClock(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
+    def clockInv(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
 /** One exact runtime switch case; its body is elaborated in that case's region. */
 final class SVCase(val value: BigInt, val body: Block ?=> Unit)
 
