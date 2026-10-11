@@ -605,6 +605,191 @@ trait SVApi:
     sourcecode.Line
   ): Unit
 
+/** Integer operations for HW/SV simulation values. Comparisons explicitly select signed or unsigned semantics. */
+trait CombApi:
+  def concat(
+    inputs: Seq[Value]
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+  def mux(
+    condition: Value,
+    whenTrue:  Value,
+    whenFalse: Value
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line
+  ): Value
+  extension (input: Value)
+    def asSignless(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    def extract(
+      high: Int,
+      low:  Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    def zeroExtend(
+      width: Int
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def +(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def -(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def &(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def |(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ^(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ===(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def =/=(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ult(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ule(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def ugt(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def uge(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def slt(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def sle(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def sgt(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+    infix def sge(
+      rhs: Value
+    )(
+      using Arena,
+      Context,
+      Block,
+      sourcecode.File,
+      sourcecode.Line
+    ): Value
+
 trait ConstructorApi:
   def Clock(): Clock
 
