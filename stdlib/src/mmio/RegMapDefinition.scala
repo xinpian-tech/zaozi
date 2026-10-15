@@ -138,32 +138,46 @@ final case class RegMapDefinition(
     // Read data is sampled when the request is accepted and travels with the queue entry.
     val frontReadWord = Wire(Bits(dataWidth))
 
-    val queue = Option.when(queueEntries > 0):
+    val queuedRequestWidth = 1 + indexWidth + dataWidth + dataWidth / 8
+    val queue              = Option.when(queueEntries > 0):
       val resetScope = summon[ResetScope]
-      val instance   = Queue(
-        QueueParameter(
-          req.bits.getType,
-          entries = queueEntries,
-          asyncReset = resetScope.resetType == RegResetType.AsyncReset
+      val instance   = SyncQueue(
+        SyncQueueParameter(
+          width = queuedRequestWidth,
+          depth = queueEntries,
+          almostEmptyLevel = 1,
+          almostFullLevel = 1,
+          stickyError = false,
+          enableDiagnostics = false,
+          asyncReset = resetScope.resetType == RegResetType.AsyncReset,
+          resetMem = false
         )
       )
-      instance.clock          := summon[ClockScope].clock
-      instance.reset          := (
-        if resetScope.resetPolarity == RegResetPolarity.PosReset then resetScope.reset
-        else (!resetScope.reset.asBool).asReset
+      instance.clock       := summon[ClockScope].clock
+      instance.resetN      := (
+        if resetScope.resetPolarity == RegResetPolarity.PosReset then (!resetScope.reset.asBool).asReset
+        else resetScope.reset
       )
-      instance.enq.bits.read  := req.bits.read
-      instance.enq.bits.index := req.bits.index
-      instance.enq.bits.mask  := req.bits.mask
-      instance.enq.bits.data  := frontReadWord
+      instance.diagnosticN := true.B
+      instance.dataIn      := (req.bits.read.asBits ## req.bits.index.asBits ## req.bits.mask ## frontReadWord).asUInt
       instance
 
-    val frontReady = Wire(Bool())
-    val backValid  = Wire(Bool())
-    val backRead:     Referable[Bool] = queue.map(_.deq.bits.read: Referable[Bool]).getOrElse(req.bits.read)
-    val backIndex:    Referable[UInt] = queue.map(_.deq.bits.index: Referable[UInt]).getOrElse(req.bits.index)
-    val backReadWord: Referable[Bits] = queue.map(_.deq.bits.data: Referable[Bits]).getOrElse(frontReadWord)
-    val backMask:     Referable[Bits] = queue.map(_.deq.bits.mask: Referable[Bits]).getOrElse(req.bits.mask)
+    val queuedMaskLow   = dataWidth
+    val queuedMaskHigh  = queuedMaskLow + dataWidth / 8 - 1
+    val queuedIndexLow  = queuedMaskHigh + 1
+    val queuedIndexHigh = queuedIndexLow + indexWidth - 1
+    val frontReady      = Wire(Bool())
+    val backValid       = Wire(Bool())
+    val backRead:     Referable[Bool] =
+      queue.map(_.dataOut.asBits.bit(queuedRequestWidth - 1): Referable[Bool]).getOrElse(req.bits.read)
+    val backIndex:    Referable[UInt] =
+      queue
+        .map(_.dataOut.asBits.bits(queuedIndexHigh, queuedIndexLow).asUInt: Referable[UInt])
+        .getOrElse(req.bits.index)
+    val backReadWord: Referable[Bits] =
+      queue.map(_.dataOut.asBits.bits(dataWidth - 1, 0): Referable[Bits]).getOrElse(frontReadWord)
+    val backMask:     Referable[Bits] =
+      queue.map(_.dataOut.asBits.bits(queuedMaskHigh, queuedMaskLow): Referable[Bits]).getOrElse(req.bits.mask)
 
     def reduceOthers(
       values: Seq[Referable[Bool]]
@@ -358,10 +372,10 @@ final case class RegMapDefinition(
 
     queue match
       case Some(instance) =>
-        frontReady         := instance.enq.ready
-        backValid          := instance.deq.valid
-        instance.enq.valid := req.valid & selectedInputReady
-        instance.deq.ready := rsp.ready & selectedOutputValid
+        frontReady            := !instance.full
+        backValid             := !instance.empty
+        instance.pushRequestN := !(req.valid & frontReady & selectedInputReady)
+        instance.popRequestN  := !(rsp.ready & backValid & selectedOutputValid)
       case None           =>
         frontReady := rsp.ready & selectedOutputValid
         backValid  := req.valid & selectedInputReady

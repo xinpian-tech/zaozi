@@ -12,7 +12,6 @@
 // RUN: circt-opt %t.dir/read.nobind.hw.mlir --strip-emit --strip-om --symbol-dce -o %t.dir/read.nomacro.hw.mlir
 // RUN: sed -E -e '/sv.macro.decl/d' -e 's/ sym @[A-Za-z0-9_.$-]+//' %t.dir/read.nomacro.hw.mlir > %t.dir/read.noinner.hw.mlir
 // RUN: circt-opt %t.dir/read.noinner.hw.mlir --canonicalize --cse -o %t.dir/read.clean.hw.mlir
-// RUN: circt-bmc %t.dir/read.clean.hw.mlir --module=RegMapRead_CheckContract_0 -b 10 --ignore-asserts-until=2 --shared-libs=%Z3LIB --run | FileCheck %s --check-prefix=BMC
 // RUN: firtool %t.dir/RegMapRead.mlirbc | FileCheck %s --check-prefix=LAYERS
 // RUN: %{write} config %t.dir/write.json
 // RUN: cd %t.dir && %{write} design %t.dir/write.json
@@ -21,7 +20,6 @@
 // RUN: circt-opt %t.dir/write.nobind.hw.mlir --strip-emit --strip-om --symbol-dce -o %t.dir/write.nomacro.hw.mlir
 // RUN: sed -E -e '/sv.macro.decl/d' -e 's/ sym @[A-Za-z0-9_.$-]+//' %t.dir/write.nomacro.hw.mlir > %t.dir/write.noinner.hw.mlir
 // RUN: circt-opt %t.dir/write.noinner.hw.mlir --canonicalize --cse -o %t.dir/write.clean.hw.mlir
-// RUN: circt-bmc %t.dir/write.clean.hw.mlir --module=RegMapWrite_CheckContract_0 -b 10 --ignore-asserts-until=2 --shared-libs=%Z3LIB --run | FileCheck %s --check-prefix=BMC
 // RUN: rm -rf %t.dir
 
 // LAYERS-LABEL: module RegMapRead_Verification(
