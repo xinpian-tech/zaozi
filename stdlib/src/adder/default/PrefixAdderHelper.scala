@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
-package me.jiuyang.stdlib
+package me.jiuyang.stdlib.adder.default
 
 import java.lang.foreign.Arena
+import me.jiuyang.stdlib.adder.AdderParameter
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
@@ -10,6 +11,12 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
 import scala.collection.immutable.SeqMap
+
+case class PrefixAdderParameter(width: Int, radix: Int = 4) extends AdderParameter:
+  require(width > 0, "width must be positive")
+  require(radix >= 2, "radix must be at least 2")
+
+given upickle.default.ReadWriter[PrefixAdderParameter] = upickle.default.macroRW
 
 // Generic radix prefix tree node. Leaves keep the original bit/column index;
 // internal node indices are only sibling-group indices produced by grouping.
@@ -95,16 +102,3 @@ def prefixTreeGenerates(
   internal.foldLeft(gMap0)((g, nd) =>
     g + (nd -> nd.leafs.tail.foldLeft[Referable[Bool]](g(nd.leafs.head))((acc, ch) => (propagates(ch) & acc) | g(ch)))
   )
-
-trait PrefixAdderParameter:
-  def width: Int
-
-class PrefixAdderLayers[P <: Parameter & PrefixAdderParameter](parameter: P) extends LayerInterface(parameter):
-  def layers = Seq.empty
-
-class PrefixAdderIO[P <: Parameter & PrefixAdderParameter](parameter: P) extends HWBundle[P](parameter):
-  val A   = Flipped(Bits(parameter.width))
-  val B   = Flipped(Bits(parameter.width))
-  val CI  = Flipped(Bool())
-  val CO  = Aligned(Bool())
-  val SUM = Aligned(Bits(parameter.width))
