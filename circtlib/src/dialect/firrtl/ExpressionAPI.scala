@@ -3,7 +3,7 @@
 package org.llvm.circt.scalalib.dialect.firrtl.operation
 
 import org.llvm.mlir.scalalib.capi.support.HasOperation
-import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Value}
+import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Type, Value}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 
 import java.lang.foreign.Arena
@@ -321,7 +321,20 @@ trait VectorCreateApi extends HasOperation[VectorCreate]
 end VectorCreateApi
 
 class VerbatimExpr(val _operation: Operation)
-trait VerbatimExprApi extends HasOperation[VerbatimExpr]
+trait VerbatimExprApi extends HasOperation[VerbatimExpr]:
+  def op(
+    text:          String,
+    substitutions: Seq[Value],
+    resultType:    Type,
+    location:      Location
+  )(
+    using Arena,
+    Context
+  ):   VerbatimExpr
+  extension (ref: VerbatimExpr)
+    def result(
+      using Arena
+    ): Value
 end VerbatimExprApi
 
 class VerbatimWire(val _operation: Operation)
