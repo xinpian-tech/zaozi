@@ -1,0 +1,10 @@
+{
+  "width": 8,
+  "depth": 3,
+  "almostEmptyLevel": 1,
+  "almostFullLevel": 1,
+  "stickyError": false,
+  "enableDiagnostics": false,
+  "asyncReset": false,
+  "resetMem": true
+}

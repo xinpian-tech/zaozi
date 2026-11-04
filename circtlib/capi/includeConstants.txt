@@ -35,6 +35,11 @@ NONE                                         # header: $CIRCT_INSTALL_PATH/inclu
 RTG_LABEL_VISIBILITY_EXTERNAL               # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/RTG.h
 RTG_LABEL_VISIBILITY_GLOBAL                 # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/RTG.h
 RTG_LABEL_VISIBILITY_LOCAL                  # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/RTG.h
+SIM_DPI_DIRECTION_INOUT           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+SIM_DPI_DIRECTION_INPUT           # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+SIM_DPI_DIRECTION_OUTPUT          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+SIM_DPI_DIRECTION_REF             # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
+SIM_DPI_DIRECTION_RETURN          # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/Sim.h
 CIRCT_FIRTOOL_BUILD_MODE_DEBUG                                          # header: $CIRCT_INSTALL_PATH/include/circt-c/Firtool/Firtool.h
 CIRCT_FIRTOOL_BUILD_MODE_DEFAULT                                        # header: $CIRCT_INSTALL_PATH/include/circt-c/Firtool/Firtool.h
 CIRCT_FIRTOOL_BUILD_MODE_RELEASE                                        # header: $CIRCT_INSTALL_PATH/include/circt-c/Firtool/Firtool.h
