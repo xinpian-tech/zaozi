@@ -20,7 +20,7 @@ trait AlwaysApi extends HasOperation[Always]:
   )(
     using Arena,
     Context
-  ): Always
+  ):   Always
   extension (ref: Always)
     def block(
       using Arena

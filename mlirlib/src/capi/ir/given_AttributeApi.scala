@@ -167,7 +167,7 @@ given AttributeApi with
       using arena: Arena
     ): Attribute = Attribute(mlirDictionaryAttrGetElement(arena, attribute.segment, idx.toLong))
     inline def dictionaryAttrGetElementByName(
-      name: String
+      name:        String
     )(
       using arena: Arena
     ): Attribute = Attribute(mlirDictionaryAttrGetElementByName(arena, attribute.segment, name.toStringRef.segment))

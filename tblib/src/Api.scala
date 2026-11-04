@@ -32,8 +32,7 @@ export org.llvm.circt.scalalib.capi.dialect.sim.DPIDirection
 /** A DUT input awaiting a module-scope connection during simulation construction. */
 final class TestbenchPort[T <: Data] private[tblib] (
   private[tblib] val name: String,
-  private[tblib] val argument: Value
-):
+  private[tblib] val argument: Value):
   private[tblib] var connected: Boolean = false
 
   /** Binds a DUT input directly to a value at module scope. */
@@ -48,7 +47,8 @@ final class TestbenchPort[T <: Data] private[tblib] (
     summon[TestbenchGeneratorApi].connect(this)(value)
 
 /** Typed access to the stimulus input ports of `I`. */
-final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testbench: TestbenchContext[I]) extends Dynamic:
+final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testbench: TestbenchContext[I])
+    extends Dynamic:
   private[tblib] def port[T <: Data](name: String): TestbenchPort[T] =
     portOption[T](name).getOrElse(throw new IllegalArgumentException(s"$name is not a testbench port"))
 
@@ -59,24 +59,29 @@ final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testben
 
 /** State belonging to one testbench module during simulation construction. */
 final class TestbenchContext[I <: HWInterface[?]] private[tblib] (
-  val clock: Value,
+  val clock:        Value,
   val fallingClock: Value,
-  private[tblib] val inputPorts: Map[String, TestbenchPort[Data]]
-):
+  private[tblib] val inputPorts: Map[String, TestbenchPort[Data]]):
   val io: TestbenchIO[I] = new TestbenchIO[I](this)
 
 /** Internal FIRRTL input ports derived from the DUT, excluding its automatically connected clock. */
 final class TestbenchInputs[PARAM <: Parameter] private[tblib] (
   parameter: PARAM,
-  source: HWInterface[PARAM]
-) extends HWRecord(parameter):
+  source:    HWInterface[PARAM])
+    extends HWRecord(parameter):
   private var populated = false
 
-  override def toMlirType(using Arena, Context, TypeImpl): Type =
+  override def toMlirType(
+    using Arena,
+    Context,
+    TypeImpl
+  ): Type =
     if !populated then
       source.toMlirType
-      source.elements.filter(field => field.isFlipped && field.name != "clock").foreach: field =>
-        Flipped(field.name, field.dataType)
+      source.elements
+        .filter(field => field.isFlipped && field.name != "clock")
+        .foreach: field =>
+          Flipped(field.name, field.dataType)
       populated = true
     super.toMlirType
 
@@ -87,51 +92,95 @@ trait TestbenchGenerator[
   I <: HWInterface[PARAM],
   P <: DVInterface[PARAM, L]]
     extends Generator[PARAM, L, TestbenchInputs[PARAM], P]:
-  def dut: Generator[PARAM, L, I, P]
+  def dut:   Generator[PARAM, L, I, P]
   def clock: ClockGenerator
 
   final override def interface(parameter: PARAM): TestbenchInputs[PARAM] =
     new TestbenchInputs(parameter, dut.interface(parameter))
 
   /** The forwarded DUT Probe interface in the current FIRRTL elaboration. */
-  def probe(using current: ProbeInterface[P]): ProbeInterface[P] = current
+  def probe(
+    using current: ProbeInterface[P]
+  ): ProbeInterface[P] = current
 
-  protected final def risingClock(using TestbenchContext[I]): Value = summon[TestbenchContext[I]].clock
-  protected final def fallingClock(using TestbenchContext[I]): Value = summon[TestbenchContext[I]].fallingClock
+  protected final def risingClock(
+    using TestbenchContext[I]
+  ): Value = summon[TestbenchContext[I]].clock
+  protected final def fallingClock(
+    using TestbenchContext[I]
+  ): Value = summon[TestbenchContext[I]].fallingClock
 
-  protected final def initial(body: Block ?=> Unit)(using Arena, Context, Block, TestbenchContext[I], TestbenchGeneratorApi): Unit =
+  protected final def initial(
+    body: Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    TestbenchContext[I],
+    TestbenchGeneratorApi
+  ): Unit =
     summon[TestbenchGeneratorApi].initial(summon[TestbenchContext[I]])(body)
 
   protected final def onClock(
     clock:   Value,
     enabled: Option[Value] = None
-  )(body: Block ?=> Unit)(using Arena, Context, Block, TestbenchContext[I], TestbenchGeneratorApi): Unit =
+  )(body:    Block ?=> Unit
+  )(
+    using Arena,
+    Context,
+    Block,
+    TestbenchContext[I],
+    TestbenchGeneratorApi
+  ): Unit =
     summon[TestbenchGeneratorApi].onClock(summon[TestbenchContext[I]])(clock, enabled)(body)
 
   protected final def dpiFunction(
     symbol:    String,
     cName:     Option[String],
     arguments: Seq[DpiArg]
-  )(using Arena, Context, Block, TestbenchContext[I], TestbenchGeneratorApi): DpiFunction =
+  )(
+    using Arena,
+    Context,
+    Block,
+    TestbenchContext[I],
+    TestbenchGeneratorApi
+  ): DpiFunction =
     summon[TestbenchGeneratorApi].dpiFunction(summon[TestbenchContext[I]])(symbol, cName, arguments)
 
   protected final def dpiCall(
     function: DpiFunction,
     inputs:   Seq[Value] = Seq.empty,
     enabled:  Option[Value] = None
-  )(using Arena, Context, Block, TestbenchContext[I], TestbenchGeneratorApi): DpiCallResult =
+  )(
+    using Arena,
+    Context,
+    Block,
+    TestbenchContext[I],
+    TestbenchGeneratorApi
+  ): DpiCallResult =
     summon[TestbenchGeneratorApi].dpiCall(summon[TestbenchContext[I]])(function, inputs, enabled)
 
   protected final def dpiCallProcedural(
     function: DpiFunction,
     inputs:   Seq[Value] = Seq.empty
-  )(using Arena, Context, Block, SVApi): DpiCallResult =
+  )(
+    using Arena,
+    Context,
+    Block,
+    SVApi
+  ): DpiCallResult =
     summon[SVApi].dpiCallProcedural(function, inputs)
 
   protected final def finish(
     condition: Value,
     success:   Boolean = true
-  )(using Arena, Context, Block, TestbenchContext[I], TestbenchGeneratorApi): Unit =
+  )(
+    using Arena,
+    Context,
+    Block,
+    TestbenchContext[I],
+    TestbenchGeneratorApi
+  ): Unit =
     summon[TestbenchGeneratorApi].finish(summon[TestbenchContext[I]])(condition, success)
 
   /** Instantiates the clock and DUT, connects stimulus inputs, and forwards the DUT Probe interface in FIRRTL.
@@ -174,7 +223,13 @@ trait TestbenchGenerator[
 /** Builds a unit testbench and exports its IR, DPI interface, or SystemVerilog. */
 trait TestbenchGeneratorApi:
   extension [T <: Data](port: TestbenchPort[T])
-    def connect(value: Value)(using Arena, Context, Block): Unit
+    def connect(
+      value: Value
+    )(
+      using Arena,
+      Context,
+      Block
+    ): Unit
 
   extension [I <: HWInterface[?]](testbench: TestbenchContext[I])
     /** Runs once at simulation startup. */
@@ -233,13 +288,15 @@ trait TestbenchGeneratorApi:
     dut: Generator[PARAM, L, I, P]
   )
     /** The DUT stimulus inputs in the current simulation construction. */
-    def io(using TestbenchContext[I]): TestbenchIO[I]
+    def io(
+      using TestbenchContext[I]
+    ): TestbenchIO[I]
 
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: TestbenchGenerator[PARAM, L, I, P]
   )
-    /** Handles `config` and `design`. Design writes complete testbench `.mlirbc`, DPI `.json`,
-      * and SystemVerilog `.sv` files to `ZAOZI_OUTDIR` or the current working directory.
+    /** Handles `config` and `design`. Design writes complete testbench `.mlirbc`, DPI `.json`, and SystemVerilog `.sv`
+      * files to `ZAOZI_OUTDIR` or the current working directory.
       */
     def mainImpl(
       args: Array[String]

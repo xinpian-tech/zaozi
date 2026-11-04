@@ -18,17 +18,17 @@ class generator extends MacroAnnotation:
       case ClassDef(name, constr, parents, selfOpt, body)
           // a bit of dirty but quotes does not expose the SingletonTypeTree
           if selfOpt.exists(_.tpt.toString().startsWith("SingletonTypeTree")) =>
-        val objSym        = definition.symbol
-        val selfType      = objSym.typeRef
-        val wrapperType   = selfType.baseType(Symbol.requiredClass("me.jiuyang.zaozi.VerilogWrapper"))
-        val generatorType = selfType.baseType(Symbol.requiredClass("me.jiuyang.zaozi.Generator"))
+        val objSym                                = definition.symbol
+        val selfType                              = objSym.typeRef
+        val wrapperType                           = selfType.baseType(Symbol.requiredClass("me.jiuyang.zaozi.VerilogWrapper"))
+        val generatorType                         = selfType.baseType(Symbol.requiredClass("me.jiuyang.zaozi.Generator"))
         val (tptParam, tptL, tptI, tptP, tptVOpt) =
           (wrapperType, generatorType) match
             case (AppliedType(_, List(param, l, i, p, v)), _) =>
               (Inferred(param), Inferred(l), Inferred(i), Inferred(p), Some(Inferred(v)))
-            case (_, AppliedType(_, List(param, l, i, p))) =>
+            case (_, AppliedType(_, List(param, l, i, p)))    =>
               (Inferred(param), Inferred(l), Inferred(i), Inferred(p), None)
-            case _ =>
+            case _                                            =>
               report.errorAndAbort("@generator requires Generator or VerilogWrapper")
 
         def makeInterfaceDef(symbolName: String, resultType: TypeTree) = DefDef(
@@ -182,21 +182,24 @@ class generator extends MacroAnnotation:
               )
 
         def mainDef =
-          val testbenchBase = objSym.typeRef.baseClasses.find(_.fullName == "me.jiuyang.tblib.TestbenchGenerator")
-          val apiName =
-            if testbenchBase.nonEmpty then
-              "me.jiuyang.tblib.TestbenchGeneratorApi"
+          val testbenchBase     = objSym.typeRef.baseClasses.find(_.fullName == "me.jiuyang.tblib.TestbenchGenerator")
+          val apiName           =
+            if testbenchBase.nonEmpty then "me.jiuyang.tblib.TestbenchGeneratorApi"
             else "me.jiuyang.zaozi.GeneratorApi"
           val mainTypeArguments = testbenchBase match
-            case Some(base) => objSym.typeRef.baseType(base) match
-              case AppliedType(_, arguments) => arguments.map(Inferred(_))
-              case _ => report.errorAndAbort("Cannot determine testbench type arguments")
-            case None => List(tptParam, tptL, tptI, tptP)
-          val api = Symbol.requiredClass(apiName).typeRef.asType match
+            case Some(base) =>
+              objSym.typeRef.baseType(base) match
+                case AppliedType(_, arguments) => arguments.map(Inferred(_))
+                case _                         => report.errorAndAbort("Cannot determine testbench type arguments")
+            case None       => List(tptParam, tptL, tptI, tptP)
+          val api               = Symbol.requiredClass(apiName).typeRef.asType match
             case '[apiType] =>
-              Expr.summon[apiType].getOrElse {
-                report.errorAndAbort(s"No given instance of $apiName was found")
-              }.asTerm
+              Expr
+                .summon[apiType]
+                .getOrElse {
+                  report.errorAndAbort(s"No given instance of $apiName was found")
+                }
+                .asTerm
           DefDef(
             Symbol.newMethod(
               objSym,
@@ -233,9 +236,10 @@ class generator extends MacroAnnotation:
 
         val layersDefOpt    = makeInterfaceDef("layers", tptL).pipe(defSome)
         val interfaceDefOpt =
-          if objSym.methodMember("interface").exists(method =>
-              method.owner != objSym && !method.flags.is(Flags.Deferred)
-            ) then None
+          if objSym
+              .methodMember("interface")
+              .exists(method => method.owner != objSym && !method.flags.is(Flags.Deferred))
+          then None
           else makeInterfaceDef("interface", tptI).pipe(defSome)
         val probeDefOpt     = makeInterfaceDef("probe", tptP).pipe(defSome)
 

@@ -80,7 +80,7 @@ object SimSmoke extends TestSuite:
       summon[SimDialect].loadDialect
       val module    = summon[ModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       try
-        val arguments = Seq(
+        val arguments   = Seq(
           ("value", DPIDirection.Out, 8),
           ("status", DPIDirection.Return, 32)
         ).map { (name, direction, width) =>
@@ -95,13 +95,13 @@ object SimSmoke extends TestSuite:
         declaration.operation.appendToBlock()(
           using module.getBody
         )
-        val tpe = declaration.operation.getInherentAttributeByName("dpi_function_type").typeAttrGetValue
+        val tpe         = declaration.operation.getInherentAttributeByName("dpi_function_type").typeAttrGetValue
         assert(tpe.dpiFunctionTypeGetNumArguments == 2)
-        val value = tpe.dpiFunctionTypeGetArgument(0)
+        val value       = tpe.dpiFunctionTypeGetArgument(0)
         assert(value.name == "value")
         assert(value.direction == DPIDirection.Out)
         assert(value.tpe.equal(8.integerTypeGet))
-        val status = tpe.dpiFunctionTypeGetArgument(1)
+        val status      = tpe.dpiFunctionTypeGetArgument(1)
         assert(status.name == "status")
         assert(status.direction == DPIDirection.Return)
         assert(status.tpe.equal(32.integerTypeGet))

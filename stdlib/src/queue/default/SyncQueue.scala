@@ -223,13 +223,13 @@ object SyncQueue extends Generator[SyncQueueParameter, SyncQueueLayers, SyncQueu
     val nextError       = underrun | overrun | pointerMismatch | retainedError
 
     layer("Verification"):
-      probe.empty       <== io.empty
+      probe.empty <== io.empty
       probe.almostEmpty <== io.almostEmpty
-      probe.halfFull    <== io.halfFull
-      probe.almostFull  <== io.almostFull
-      probe.full        <== io.full
-      probe.error       <== io.error
-      probe.dataOut     <== io.dataOut
+      probe.halfFull <== io.halfFull
+      probe.almostFull <== io.almostFull
+      probe.full <== io.full
+      probe.error <== io.error
+      probe.dataOut <== io.dataOut
 
       given ClockEvent = posedge(io.clock)
 

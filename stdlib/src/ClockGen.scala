@@ -25,8 +25,7 @@ class ClockProbe(parameter: ClockParameter) extends DVBundle[ClockParameter, Clo
 /** A clock generator with the parameters to use when instantiating it. */
 final case class ClockGenerator(
   generator: Generator[ClockParameter, ClockLayers, ClockIO, ClockProbe],
-  parameter: ClockParameter
-)
+  parameter: ClockParameter)
 
 /** A simulation clock source instantiated through the ordinary FIRRTL Generator API. */
 @generator
@@ -54,5 +53,4 @@ object ClockGen extends Generator[ClockParameter, ClockLayers, ClockIO, ClockPro
       resultsTypes = Some(Seq(io.clock.refer.getType))
     )
     cast.appendToBlock()
-    summon[ConnectApi].op(src = cast.getResult(0), dst = io.clock.refer, location = locate)
-      .operation.appendToBlock()
+    summon[ConnectApi].op(src = cast.getResult(0), dst = io.clock.refer, location = locate).operation.appendToBlock()

@@ -2,11 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.dialect.sim.operation
 
-import org.llvm.circt.scalalib.capi.dialect.sim.{
-  DPIArgument,
-  TypeApi as SimTypeApi,
-  given
-}
+import org.llvm.circt.scalalib.capi.dialect.sim.{DPIArgument, TypeApi as SimTypeApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{
   Attribute,
   AttributeApi,

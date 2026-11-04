@@ -27,7 +27,7 @@ trait DialectApi:
   extension (module: Module)
     /** Exports DPI interface JSON through CIRCT's callback-based C API. */
     inline def exportDPIInterface(
-      callback: String => Unit
+      callback:    String => Unit
     )(
       using arena: Arena
     ): LogicalResult
@@ -44,9 +44,9 @@ enum DPIDirection(val cValue: Int):
 class DPIArgument(val _segment: MemorySegment)
 trait DPIArgumentApi extends HasSegment[DPIArgument] with HasSizeOf[DPIArgument]:
   inline def createDPIArgument(
-    name:      String,
-    tpe:       Type,
-    direction: DPIDirection
+    name:        String,
+    tpe:         Type,
+    direction:   DPIDirection
   )(
     using arena: Arena
   ): DPIArgument
@@ -94,10 +94,10 @@ trait TypeApi:
       index: Int
     )(
       using Arena
-    ): DPIArgument
+    ):                                  DPIArgument
     def dpiFunctionTypeGetFunctionType(
       using Arena
-    ): Type
+    ):                                  Type
 
   /** `!sim.output_stream` — a console or file output stream handle. */
   def outputStreamTypeGet(

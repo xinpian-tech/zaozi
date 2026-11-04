@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.sim
 
-import org.llvm.circt.{SimDPIArgument as NativeDPIArgument}
+import org.llvm.circt.SimDPIArgument as NativeDPIArgument
 import org.llvm.circt.CAPI.{
   simAssocArrayTypeGet,
   simDPIFunctionTypeGet,
@@ -21,9 +21,9 @@ import java.lang.foreign.{Arena, MemorySegment}
 
 given DPIArgumentApi with
   inline def createDPIArgument(
-    name:      String,
-    tpe:       Type,
-    direction: DPIDirection
+    name:        String,
+    tpe:         Type,
+    direction:   DPIDirection
   )(
     using arena: Arena
   ): DPIArgument =
@@ -88,7 +88,7 @@ given TypeApi with
     def dpiFunctionTypeGetNumArguments: Int = simDPIFunctionTypeGetNumArguments(tpe.segment).toInt
 
     def dpiFunctionTypeGetArgument(
-      index: Int
+      index:       Int
     )(
       using arena: Arena
     ): DPIArgument = DPIArgument(simDPIFunctionTypeGetArgument(arena, tpe.segment, index.toLong))

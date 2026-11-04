@@ -3,7 +3,18 @@
 package me.jiuyang.tblib.default
 
 import me.jiuyang.tblib.{TestbenchContext, TestbenchGenerator, TestbenchGeneratorApi, TestbenchIO, TestbenchPort}
-import me.jiuyang.zaozi.{DVInterface, DpiArg, DpiCallResult, DpiFunction, Generator, HWInterface, LayerInterface, Parameter, SVApi, SimApi}
+import me.jiuyang.zaozi.{
+  DVInterface,
+  DpiArg,
+  DpiCallResult,
+  DpiFunction,
+  Generator,
+  HWInterface,
+  LayerInterface,
+  Parameter,
+  SVApi,
+  SimApi
+}
 import me.jiuyang.zaozi.valuetpe.Data
 import me.jiuyang.zaozi.default.{*, given}
 
@@ -45,7 +56,13 @@ import scala.util.control.NonFatal
 
 given TestbenchGeneratorApi with
   extension [T <: Data](port: TestbenchPort[T])
-    def connect(value: Value)(using Arena, Context, Block): Unit =
+    def connect(
+      value: Value
+    )(
+      using Arena,
+      Context,
+      Block
+    ): Unit =
       require(
         summon[Block].getParentOperation.getName.str == "hw.module",
         "DUT inputs must be connected at module scope"
@@ -63,7 +80,10 @@ given TestbenchGeneratorApi with
       Context,
       Block
     ): Unit =
-      require(summon[Block].getParentOperation.getName.str == "hw.module", "initial requires the testbench module scope")
+      require(
+        summon[Block].getParentOperation.getName.str == "hw.module",
+        "initial requires the testbench module scope"
+      )
       summon[SVApi].initial(body)
 
     private def inProcedure(
@@ -84,7 +104,10 @@ given TestbenchGeneratorApi with
       Context,
       Block
     ): Unit =
-      require(summon[Block].getParentOperation.getName.str == "hw.module", "onClock requires the testbench module scope")
+      require(
+        summon[Block].getParentOperation.getName.str == "hw.module",
+        "onClock requires the testbench module scope"
+      )
       summon[SVApi].onClock(clock, enabled)(body)
 
     def dpiFunction(
@@ -118,10 +141,9 @@ given TestbenchGeneratorApi with
         summon[Block].getParentOperation.getName.str == "hw.module",
         "dpiCall creates an independent process; use dpiCallProcedural inside onClock"
       )
-      val sv = summon[SVApi]
-      val outputs = function.arguments.filter(arg =>
-        arg.direction == DPIDirection.Out || arg.direction == DPIDirection.Return
-      )
+      val sv        = summon[SVApi]
+      val outputs   =
+        function.arguments.filter(arg => arg.direction == DPIDirection.Out || arg.direction == DPIDirection.Return)
       val registers = outputs.map: arg =>
         val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
         arg.name -> sv.reg(tpe, s"${function.symbol}_${arg.name}")
@@ -147,7 +169,9 @@ given TestbenchGeneratorApi with
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     dut: Generator[PARAM, L, I, P]
   )
-    def io(using testbench: TestbenchContext[I]): TestbenchIO[I] = testbench.io
+    def io(
+      using testbench: TestbenchContext[I]
+    ): TestbenchIO[I] = testbench.io
 
   private def operationIsNull(operation: Operation): Boolean = MlirOperation.ptr(operation.segment).address == 0
 
@@ -278,7 +302,7 @@ given TestbenchGeneratorApi with
         val block           = summon[Block]
 
         // Find the clock instance created by architecture.
-        val clockInstance   = Iterator
+        val clockInstance = Iterator
           .iterate(block.getFirstOperation)(_.getNextInBlock)
           .takeWhile(operation => !operationIsNull(operation))
           .find(operation =>
@@ -286,7 +310,7 @@ given TestbenchGeneratorApi with
               operation.getInherentAttributeByName("instanceName").stringAttrGetValue == "clock"
           )
           .getOrElse(throw new IllegalStateException("testbench clock instance is missing"))
-        val arguments       = hwPorts.indices.map(index => block.getArgument(index.toLong))
+        val arguments     = hwPorts.indices.map(index => block.getArgument(index.toLong))
 
         // Remove hw.output first and append it later
         val terminator = block.getTerminator
@@ -294,11 +318,14 @@ given TestbenchGeneratorApi with
 
         // Add Simulation logic
         try
-          val clock = clockInstance.getResult(0)
+          val clock        = clockInstance.getResult(0)
           val fallingClock = clock.clockInv
-          val inputPorts = hwPorts.zip(arguments).map { (port, argument) =>
-            port.name -> new TestbenchPort[Data](port.name, argument)
-          }.toMap
+          val inputPorts   = hwPorts
+            .zip(arguments)
+            .map { (port, argument) =>
+              port.name -> new TestbenchPort[Data](port.name, argument)
+            }
+            .toMap
           given testbench: TestbenchContext[I] =
             new TestbenchContext[I](clock, fallingClock, inputPorts)
           generator.simulation(parameter)

@@ -70,13 +70,13 @@ given FuncApi with
     using Arena,
     Context
   ): Func =
-    val returnPorts = arguments.zipWithIndex.collect:
+    val returnPorts   = arguments.zipWithIndex.collect:
       case (arg, index) if arg.direction == DPIDirection.Return => index
     require(
       returnPorts.size <= 1 && returnPorts.forall(_ == arguments.size - 1),
       "DPI return value must be the final argument"
     )
-    val nativePorts = arguments.map: arg =>
+    val nativePorts   = arguments.map: arg =>
       val raw = NativeHWModulePort.allocate(summon[Arena])
       NativeHWModulePort.name(raw, arg.name.stringAttrGet.segment)
       NativeHWModulePort.`type`(raw, arg.tpe.segment)
@@ -92,8 +92,7 @@ given FuncApi with
       HWModulePort(raw)
     val argumentAttrs = arguments.indices.map: index =>
       val attributes =
-        if returnPorts.contains(index) then
-          Map("sv.func.explicitly_returned" -> summon[AttributeApi].unitAttrGet)
+        if returnPorts.contains(index) then Map("sv.func.explicitly_returned" -> summon[AttributeApi].unitAttrGet)
         else Map.empty[String, Attribute]
       attributes.directoryAttrGet
     Func(

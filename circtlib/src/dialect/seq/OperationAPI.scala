@@ -29,7 +29,7 @@ trait FromClockApi extends HasOperation[FromClock]:
   )(
     using Arena,
     Context
-  ): FromClock
+  ):   FromClock
   extension (ref: FromClock)
     def result(
       using Arena

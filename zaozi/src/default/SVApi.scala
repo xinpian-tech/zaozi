@@ -62,15 +62,18 @@ given SVApi with
     sourcecode.File,
     sourcecode.Line
   ): DpiFunction =
-    summon[FuncApi].op(
-      symbol = symbol,
-      verilogName = cName,
-      arguments = arguments.map { arg =>
-        val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
-        summon[DPIArgumentApi].createDPIArgument(arg.name, tpe, arg.direction)
-      },
-      location = locate
-    ).operation.appendToBlock()
+    summon[FuncApi]
+      .op(
+        symbol = symbol,
+        verilogName = cName,
+        arguments = arguments.map { arg =>
+          val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+          summon[DPIArgumentApi].createDPIArgument(arg.name, tpe, arg.direction)
+        },
+        location = locate
+      )
+      .operation
+      .appendToBlock()
     summon[FuncDPIImportApi].op(symbol, None, locate).operation.appendToBlock()
     DpiFunction(symbol, arguments)
 
@@ -84,17 +87,17 @@ given SVApi with
     sourcecode.File,
     sourcecode.Line
   ): DpiCallResult =
-    val inArgs = function.arguments.filter(arg =>
-      arg.direction == DPIDirection.In || arg.direction == DPIDirection.InOut
-    )
-    val outArgs = function.arguments.filter(arg =>
-      arg.direction == DPIDirection.Out || arg.direction == DPIDirection.Return
-    )
+    val inArgs  =
+      function.arguments.filter(arg => arg.direction == DPIDirection.In || arg.direction == DPIDirection.InOut)
+    val outArgs =
+      function.arguments.filter(arg => arg.direction == DPIDirection.Out || arg.direction == DPIDirection.Return)
     require(inArgs.size == inputs.size, "DPI input count does not match the declaration")
-    inArgs.zip(inputs).foreach: (arg, input) =>
-      val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
-      val expected = if arg.direction == DPIDirection.InOut then tpe.inOutTypeGet() else tpe
-      require(input.getType.equal(expected), s"DPI input type mismatch: ${arg.name}")
+    inArgs
+      .zip(inputs)
+      .foreach: (arg, input) =>
+        val tpe      = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+        val expected = if arg.direction == DPIDirection.InOut then tpe.inOutTypeGet() else tpe
+        require(input.getType.equal(expected), s"DPI input type mismatch: ${arg.name}")
     val call = summon[FuncCallProceduralApi].op(
       callee = function.symbol,
       inputs = inputs,
