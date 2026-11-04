@@ -19,8 +19,10 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   FirrtlConvention,
   FirrtlNameKind
 }
+import org.llvm.circt.scalalib.capi.dialect.hw.{given_DialectApi as given_HWDialectApi, DialectApi as HWDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi as given_LTLDialectApi, DialectApi as LTLDialectApi}
-import org.llvm.circt.scalalib.capi.dialect.sv.given_DialectApi as SvDialectApi
+import org.llvm.circt.scalalib.capi.dialect.seq.{given_DialectApi as given_SeqDialectApi, DialectApi as SeqDialectApi}
+import org.llvm.circt.scalalib.capi.dialect.sv.{given_DialectApi as given_SVDialectApi, DialectApi as SVDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.verif.{
   given_DialectApi as given_VerifDialectApi,
   DialectApi as VerifDialectApi
@@ -195,6 +197,9 @@ given GeneratorApi:
         given Arena   = arena
         given Context = summon[ContextApi].contextCreate
         summon[FirrtlDialectApi].loadDialect
+        summon[HWDialectApi].loadDialect
+        summon[SeqDialectApi].loadDialect
+        summon[SVDialectApi].loadDialect
         summon[LTLDialectApi].loadDialect
         summon[VerifDialectApi].loadDialect
 
