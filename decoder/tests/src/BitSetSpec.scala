@@ -7,6 +7,19 @@ import utest.*
 
 object BitSetSpec extends TestSuite {
   val tests = Tests {
+    test("hashCode agrees with equals") {
+      val pattern = BitSet.bitpat("1??")
+      val split   = BitSet.bitset("10?|11?")
+      val range   = BitSet.range(BigInt(4), BigInt(4), 3)
+      assert(pattern == split, pattern.hashCode == split.hashCode)
+      assert(pattern == range, pattern.hashCode == range.hashCode)
+      assert(BitSet.bitpat("101").hashCode == BitSet.bitpat(BigInt(5), BigInt(7), 3).hashCode)
+      assert(BitSet.empty.hashCode == BitSet(Set.empty[BitSet]).hashCode)
+
+      val minterms = (0 until 16).map(i => BitSet.bitpat(BigInt(i), BigInt(15), 4))
+      assert((minterms ++ minterms.map(m => BitSet.bitpat(m.value, m.mask, m.width))).toSet.size == 16)
+    }
+
     test("BitSet.bitpat") {
       test("creation") {
         val pat1: BitPat = BitSet.bitpat("101")

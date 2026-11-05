@@ -144,6 +144,12 @@ trait BitSet:
       case that: BitSet => this.width == that.width && this.cover(that) && that.cover(this)
       case _ => false
 
+  override def hashCode: Int =
+    if terms.isEmpty then width.hashCode
+    else
+      val all = (BigInt(1) << width) - 1
+      (width, terms.map(t => t.value & t.mask).min, terms.map(t => t.value & t.mask | ~t.mask & all).max).hashCode
+
   /** Calculate the inverse of this pattern set.
     *
     * @return
