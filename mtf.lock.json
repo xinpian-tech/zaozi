@@ -5647,14 +5647,14 @@
       }
     },
     "org/scala-lang/scala3-library_3": {
-      "narHash": "sha256-zRqT4JIVEXr3E6iapJgxcrndiu9gOSBhsAbxIGMsaw4=",
+      "narHash": "sha256-mRzn4sPoxPVJAVFRU+enUyZKFaZ0Zy+Lv3EKrF7G6jA=",
       "runs": [
         "104bb53c6cb5",
         "7044fbf8e835"
       ],
       "files": {
-        "maven-metadata.xml": "sha256-l2lz+yiQT098R8fhhtbC+20m0tiae48Uz5gH2kLZCPA=",
-        "maven-metadata.xml.sha1": "sha256-SsIC1rrEnpYNmAR4ahMBAc9AqMvmW6GiCG+SgjLwwvY="
+        "maven-metadata.xml": "sha256-y3mzuZKRq3HG0sfyPi6MrGZJDyo4mkfvFI6pcXqXB8I=",
+        "maven-metadata.xml.sha1": "sha256-b1TGH/BRIITzNBszcTJvUXeni/8/pTR1UWMMeX4G/f0="
       }
     },
     "org/scala-lang/scala3-library_3/3.3.1": {
