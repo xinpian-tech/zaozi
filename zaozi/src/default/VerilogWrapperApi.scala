@@ -99,7 +99,7 @@ given VerilogWrapperApi:
                 throw new IllegalArgumentException(
                   s"Invalid Verilog parameter type for '$name': ${value.getClass.getName}. Only String, BigInt, Int, Long, Double, and Boolean are supported."
                 )
-        .toMap
+        .toSeq
       val extmodule       = summon[ExtModuleApi].op(
         wrapper.moduleName(parameter),
         wrapper.verilogModuleName(parameter),

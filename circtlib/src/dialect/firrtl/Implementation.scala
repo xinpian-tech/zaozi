@@ -114,7 +114,7 @@ given ExtModuleApi with
     firrtlConvention: FirrtlConvention,
     interface:        Seq[(FirrtlBundleField, Location)],
     layers:           Seq[Seq[String]],
-    verilogParameter: Map[String, VerilogParameterType]
+    verilogParameter: Seq[(String, VerilogParameterType)]
   )(
     using Arena,
     Context
