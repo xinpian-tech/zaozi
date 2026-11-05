@@ -161,17 +161,16 @@ object BaseGeneratorHelper:
         private[zaozi] val _tpe   = probeTpe
         private[zaozi] val _refer = probeWire.operation.getResult(0)
 
-  def dumpMlirbc[PARAM <: Parameter](
+  def dumpMlirbc(
     moduleName:        String,
-    elaboratedModules: scala.collection.mutable.HashSet[PARAM],
-    parameter:         PARAM,
+    elaboratedModules: scala.collection.mutable.HashSet[String],
     createModule:      (Arena, Context, Circuit) => Unit
   )(
     using Arena,
     Context
   ): Unit =
     val collected = Elaborate.collected.value
-    if collected.fold(!elaboratedModules.contains(parameter))(!_.contains(moduleName)) then
+    if !collected.fold(elaboratedModules.contains(moduleName))(_.contains(moduleName)) then
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(moduleName)
       summon[Circuit].appendToModule()
@@ -188,6 +187,6 @@ object BaseGeneratorHelper:
             ) / s"${moduleName}.mlirbc"
           val out        = os.write.outputStream(mlirbcFile, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
           summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
-          elaboratedModules.add(parameter)
+          elaboratedModules.add(moduleName)
 
 end BaseGeneratorHelper

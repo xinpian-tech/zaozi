@@ -14,5 +14,8 @@ object PLADecoderSpec extends TestSuite:
     test("equal tables name the same module"):
       assert(PLADecoder.moduleName(decoder("000|111")) == PLADecoder.moduleName(decoder("000|111")))
 
+    test("tables matching the same values name the same module"):
+      assert(PLADecoder.moduleName(decoder("1??")) == PLADecoder.moduleName(decoder("10?|11?")))
+
     test("tables matching different values name different modules"):
       assert(PLADecoder.moduleName(decoder("000|111")) != PLADecoder.moduleName(decoder("000|001|111")))
