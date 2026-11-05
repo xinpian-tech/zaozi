@@ -10,7 +10,7 @@
 // RUN: rm -rf %t.dir
 
 // CONFIG: {"name":"ALU","tables":["[alu][default][add:01,default:00,sub:10][00:add,01:sub]"]}
-// VERILOG-LABEL: module PLA_ALU_ab20769e62f3728d(
+// VERILOG-LABEL: module PLA_ALU_a8e10b7aaaab9866(
 // VERILOG: input [1:0] instruction
 // VERILOG: output [1:0] output_alu
 // VERILOG: assign output_alu = {instruction[0] & ~(instruction[1]), instruction == 2'h0}
