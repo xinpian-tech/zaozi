@@ -36,10 +36,9 @@ object Elaborate:
     using Arena,
     Context
   ): MlirModule =
-    val modules = scala.collection.mutable.LinkedHashMap.empty[String, MlirModule]
-    collected.withValue(Some(modules))(generator.dumpMlirbc(parameter))
-    val linked  = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    modules.values.foreach: module =>
+    val (_, modules) = collect(generator.dumpMlirbc(parameter))
+    val linked       = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+    modules.foreach: (_, module) =>
       val circuit = module.getBody.getFirstOperation
       circuit.removeFromParent()
       linked.getBody.appendOwnedOperation(circuit)
@@ -50,4 +49,10 @@ object Elaborate:
       s"cannot link the modules of ${generator.moduleName(parameter)}"
     )
     linked
+
+  /** Runs `body`, keeping every module it elaborates, each as a circuit of its own, by module name. */
+  def collect[A](body: => A): (A, Vector[(String, MlirModule)]) =
+    val modules = scala.collection.mutable.LinkedHashMap.empty[String, MlirModule]
+    val result  = collected.withValue(Some(modules))(body)
+    (result, modules.toVector)
 end Elaborate
