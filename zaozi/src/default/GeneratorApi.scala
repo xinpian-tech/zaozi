@@ -156,7 +156,6 @@ given GeneratorApi:
       BaseGeneratorHelper.dumpMlirbc(
         generator.moduleName(parameter),
         generator.elaboratedModules,
-        parameter,
         (arena, context, circuit) =>
           given Arena   = arena
           given Context = context
