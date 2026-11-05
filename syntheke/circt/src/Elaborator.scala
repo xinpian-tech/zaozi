@@ -9,6 +9,7 @@ import me.jiuyang.syntheke.circt.Diagnostics.runOnOpOrThrow
 import org.llvm.circt.scalalib.capi.dialect.emit.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.emit.DialectApi as EmitDialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_PassApi, PassApi}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   given_FirrtlBundleFieldApi,
   given_FirrtlDirectionApi,
@@ -64,9 +65,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   ModuleApi as MlirModuleApi,
   Operation,
   Type as MlirType,
-  Value,
-  WalkEnum,
-  WalkResultEnum
+  Value
 }
 import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi, PassManager, PassManagerApi}
 
@@ -328,67 +327,27 @@ object Elaborator:
           }
         }
 
-        def moduleSymbols(root: Operation): (Vector[String], Vector[String]) =
-          val defined    = mutable.ArrayBuffer.empty[String]
-          val referenced = mutable.ArrayBuffer.empty[String]
-          root.walk(
-            op =>
-              op.getName.str match
-                case "firrtl.instance"                    =>
-                  referenced += op.getInherentAttributeByName("moduleName").flatSymbolRefAttrGetValue
-                case "firrtl.module" | "firrtl.extmodule" =>
-                  defined += op.getInherentAttributeByName("sym_name").stringAttrGetValue
-                case _                                    => ()
-              WalkResultEnum.Advance
-            ,
-            WalkEnum.PreOrder
-          )
-          (defined.toVector.distinct, referenced.toVector.distinct)
+        // The circuits the generators elaborated join this one; an extmodule standing for a module resolves to it.
+        emitLayers(enabled.values.foldLeft(LayerTree.empty)(_.merge(_)), None)
+        definitions.values.foreach { definition =>
+          val circuit = definition.getBody.getFirstOperation
+          circuit.removeFromParent()
+          summon[MlirModule].getBody.appendOwnedOperation(circuit)
+        }
+        val linker = summon[PassManagerApi].passManagerCreate
+        linker.addOwnedPass(summon[PassApi].linkCircuitsPass(circuitName, noMangle = true))
+        linker.runOnOpOrThrow(summon[MlirModule].getOperation, s"linking circuit '$circuitName'")
 
         def isNullOp(op: Operation): Boolean           =
           op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
         def opsIn(first: Operation): Vector[Operation] =
           Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => !isNullOp(op)).toVector
-
-        def layerTreeOf(op: Operation): (String, LayerTree) =
-          val name     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-          val children = opsIn(op.getFirstRegion.getFirstBlock.getFirstOperation)
-            .filter(_.getName.str == "firrtl.layer")
-            .map(layerTreeOf)
-          name -> LayerTree(SortedMap.from(children))
-
-        @annotation.tailrec
-        def link(needed: List[String], defined: Vector[String], layers: LayerTree): LayerTree = needed match
-          case Nil                                  => layers
-          case sym :: rest if defined.contains(sym) => link(rest, defined, layers)
-          case sym :: rest                          =>
-            val definition = definitions.getOrElse(sym, fail(s"instantiated module '$sym' has no definition"))
-            val circuitOps = opsIn(definition.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
-              .filter(_.getName.str == "firrtl.circuit")
-              .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
-            val moved      =
-              circuitOps.filter(op => Vector("firrtl.module", "firrtl.extmodule").contains(op.getName.str)).filter {
-                op =>
-                  val s2     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-                  val isStub = op.getName.str == "firrtl.extmodule" && s2 != sym && definitions.contains(s2)
-                  if defined.contains(s2) || isStub then false
-                  else
-                    op.removeFromParent()
-                    summon[Circuit].block.appendOwnedOperation(op)
-                    true
-              }
-            val layers2    = circuitOps
-              .filter(_.getName.str == "firrtl.layer")
-              .map(layerTreeOf)
-              .foldLeft(layers)((t, kv) => t.merge(LayerTree(SortedMap(kv))))
-            val defined2   = defined ++ moved.map(_.getInherentAttributeByName("sym_name").stringAttrGetValue)
-            if !defined2.contains(sym) then fail(s"the definition of '$sym' does not contain it")
-            link(rest ++ moved.flatMap(op => moduleSymbols(op)._2.filterNot(defined2.contains)), defined2, layers2)
-
-        val (defined0, referenced0) = moduleSymbols(summon[Circuit].operation)
-        val linkedLayers            = link(referenced0.filterNot(defined0.contains).toList, defined0, LayerTree.empty)
-        val layers                  = enabled.values.foldLeft(linkedLayers)(_.merge(_))
-        emitLayers(layers, None)
+        def layersIn(op: Operation): LayerTree         =
+          LayerTree(SortedMap.from(opsIn(op.getFirstRegion.getFirstBlock.getFirstOperation).collect {
+            case layer if layer.getName.str == "firrtl.layer" =>
+              layer.getInherentAttributeByName("sym_name").stringAttrGetValue -> layersIn(layer)
+          }))
+        val layers = layersIn(summon[MlirModule].getBody.getFirstOperation)
 
         if !summon[MlirModule].getOperation.verify then fail("MLIR verification of the linked circuit failed")
 
