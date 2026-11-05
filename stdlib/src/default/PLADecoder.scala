@@ -15,7 +15,11 @@ import java.lang.foreign.Arena
 @generator
 object PLADecoder extends Generator[DecoderParameter, DecoderLayers, DecoderIO, DecoderProbe]:
   override def moduleName(parameter: DecoderParameter): String =
-    "PLA" + "_" + parameter.name + "_" + parameter.hashCode.toHexString
+    val outputs = parameter.tables.map(t => s"${t.name}:${t.outputBits}").mkString(",")
+    val digest  = java.security.MessageDigest
+      .getInstance("SHA-256")
+      .digest(s"${parameter.pla}\n$outputs".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+    "PLA" + "_" + parameter.name + "_" + digest.take(8).map(b => f"$b%02x").mkString
   def architecture(parameter: DecoderParameter) =
     val io                        = summon[Interface[DecoderIO]]
     val (inputTerms, outputTerms) = parameter.pla.table.unzip
