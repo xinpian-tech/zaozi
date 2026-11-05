@@ -1,0 +1,34 @@
+package build.syntheke
+
+import mill._
+import mill.scalalib._
+import mill.scalalib.scalafmt._
+
+import build.{circtlib, v, zaozi, ZaoziPublishModule, ZaoziScalaModule}
+
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
+  def scalaVersion = Task(v.scala)
+  def mvnDeps      = Seq(v.oslib, v.upickle, v.sourcecode)
+
+  object circt extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(m, circtlib)
+
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+
+  object zaoziBackend extends ZaoziScalaModule with ScalafmtModule {
+    def scalaVersion = Task(v.scala)
+    def moduleDeps   = Seq(circt, zaozi)
+
+    override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
+
+    override def forkArgs: T[Seq[String]] = Task(
+      super.forkArgs() ++ circtlib.forkArgs()
+    )
+  }
+}
