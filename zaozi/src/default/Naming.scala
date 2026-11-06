@@ -15,7 +15,7 @@ import me.jiuyang.zaozi.ConstructorApi
 import me.jiuyang.zaozi.InstanceContext
 import javax.naming.NameNotFoundException
 
-private inline def locate(
+private[zaozi] inline def locate(
   using Arena,
   Context,
   sourcecode.File,
@@ -27,14 +27,14 @@ private inline def locate(
     0
   )
 
-private inline def valName(
+private[zaozi] inline def valName(
   using sourcecode.Name.Machine,
   InstanceContext
 ): String = summon[sourcecode.Name.Machine].value match
   case actualName if !sourcecode.Util.isSyntheticName(actualName) => actualName
   case _                                                          => s"_GEN_${summon[InstanceContext].anonSignalCounter.inc()}"
 
-private inline def bundleFieldName(
+private[zaozi] inline def bundleFieldName(
   using sourcecode.Name.Machine
 ): String = summon[sourcecode.Name.Machine].value match
   case actualName if !sourcecode.Util.isSyntheticName(actualName) => actualName

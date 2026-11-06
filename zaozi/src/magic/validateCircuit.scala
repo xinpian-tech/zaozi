@@ -169,6 +169,14 @@ def validateCircuit(
                   regionBlockTypeLocations = Seq(Seq())
                 )
               )
+              val svModule    = op.getAttributeByName("zaozi.sv.module")
+              if org.llvm.mlir.MlirAttribute.ptr(svModule.segment) != java.lang.foreign.MemorySegment.NULL then
+                extmoduleOp.operation.setAttributeByName("defname", svModule)
+                extmoduleOp.operation.setAttributeByName("parameters", op.getAttributeByName("zaozi.sv.parameters"))
+                val macros = op.getAttributeByName("zaozi.sv.macros")
+                if org.llvm.mlir.MlirAttribute.ptr(macros.segment) != java.lang.foreign.MemorySegment.NULL then
+                  extmoduleOp.operation.setAttributeByName("zaozi.sv.macros", macros)
+                extmoduleOp.operation.setAttributeByName("convention", FirrtlConvention.Scalarized.toAttribute)
               summon[Circuit].block.appendOwnedOperation(extmoduleOp.operation)
           // get layers from module, append it to circuit to create symbol table.
           case i if i == "firrtl.module"                                    =>
