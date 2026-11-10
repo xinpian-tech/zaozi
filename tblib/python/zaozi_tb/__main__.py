@@ -47,7 +47,9 @@ def configure_bindings(interface, overrides):
 def main():
     os.chdir(os.environ.pop("ZAOZI_TB_CWD", os.getcwd()))
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("driver", type=Path, help="Python or C++ implementation of the DPI API")
+    parser.add_argument(
+        "driver", type=Path, help="Python or C++ implementation of the DPI API"
+    )
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--generator", help="Scala testbench main class to elaborate")
     source.add_argument(
@@ -160,7 +162,7 @@ def main():
 
         print("Building Python CFFI implementation...", flush=True)
         bridge = emit_bridge(dpi)
-        python_config = str(Path(sys.base_executable).with_name("python3-config"))
+        python_config = str(Path(sys.executable).resolve().with_name("python3-config"))
         cflags = shlex.split(
             subprocess.check_output([python_config, "--cflags"], text=True)
         )

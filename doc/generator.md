@@ -168,15 +168,15 @@ For the SyncQueue interface, write `step()` returning the `out`, `inout` and
 
 ```python
 def step():
-    return dict(
-        resetN=1,
-        pushRequestN=1,
-        popRequestN=1,
-        diagnosticN=1,
-        dataIn=0,
-        done=1,
-        status=0,
-    )
+    return {
+        "resetN": 1,
+        "pushRequestN": 1,
+        "popRequestN": 1,
+        "diagnosticN": 1,
+        "dataIn": 0,
+        "done": 1,
+        "status": 0,
+    }
 ```
 
 The generated testbench calls this function on falling clock edges. `in` and
@@ -204,17 +204,21 @@ python3 tblib/python/run.py path/to/dpi_impl.py \
 
 A single DPI function maps to `step()` by default. With multiple functions,
 Python function names default to the DPI symbols; `--bind symbol=callback`
-overrides a mapping. No application-specific native bridge is needed.
+overrides a mapping. A C++ driver can instead define the exported C functions
+declared by the generated `.build/dpi/dpi_api.h` (include the framework's
+`native/capi.h` for C++ linkage) and be passed as the positional source file.
 
 Python exceptions and invalid output values produce a nonzero exit code.
 Simulation and wall-clock timeouts default to 1000 ns and 30 seconds; override
 them with `--max-time-ns` and `--wall-timeout`. Errors are printed to the terminal;
 the waveform recorded before a runtime failure is retained.
 
-The framework lives in `tblib/python/zaozi_tb`. Only C API declarations and thin
-argument-forwarding entry points are generated from the interface JSON. Python
-loading, value checking, simulator scheduling and waveform capture use fixed
-framework sources. The initial implementation supports CIRCT's scalar `bit`,
+The framework lives in `tblib/python/zaozi_tb`. The interface JSON generates
+only C API declarations in `dpi_api.h`. For Python implementations, CFFI emits
+its bridge into `.build/`; fixed framework code loads the Python driver and
+checks returned values. C++ implementations export the same C API directly.
+Simulator scheduling and waveform capture use fixed framework sources. The
+initial implementation supports CIRCT's scalar `bit`,
 signed `byte`, `shortint`, `int` and `longint` interfaces. Unsupported vectors,
 arrays and four-state values are rejected rather than guessing their ABI;
 signed byte outputs must be in -128..127.

@@ -11,7 +11,7 @@ try:
     from zaozi_tb.runtime import register
 
     register(ffi)
-except BaseException:
+except BaseException:  # noqa: BLE001 - Any driver failure must fail the simulation.
     traceback.print_exc()
     sys.stdout.flush()
     sys.stderr.flush()
