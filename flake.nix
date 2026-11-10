@@ -69,6 +69,7 @@
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
+          testbench-python = pkgs.python3.withPackages (ps: [ ps.cffi ]);
         };
         devShells.default = pkgs.mkShell {
           inputsFrom = [ pkgs.zaozi.zaozi-assembly ];

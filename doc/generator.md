@@ -133,3 +133,88 @@ ZAOZI_OUTDIR=result ./gcd.jar design config.json
 ```
 
 Additionally, users can provide a `GeneratorApi` with `mainImpl` to support custom elaboration flows, or simply override the `main` method in a specific generator.
+
+## Python testbench stimulus
+
+A simulation directory contains the inputs, the user's driver and the outputs:
+
+```text
+syncqueue-verilator/
+  run.py
+  dpi_impl.py
+  SyncQueueTestBench.json
+  SyncQueueTestBench.mlirbc
+  SyncQueueTestBench.sv
+  wave.vcd
+  .build/                     # All intermediate RTL, C API and compiler files
+```
+
+Edit `dpi_impl.py`, then run from any working directory:
+
+```shell
+python3 out/syncqueue-verilator/run.py
+```
+
+The entry point consumes the existing testbench inputs. The framework obtains
+its toolchain from the repository's pinned nixpkgs and handles compilation,
+Python loading, live console output and VCD capture. It does not overwrite `dpi_impl.py` or
+re-elaborate the input design on this path. All intermediate files stay under
+`.build/`; Python bytecode caches are disabled for the user driver. Generation,
+compilation, Python prints and errors go directly to the terminal; no log files
+are written.
+
+For the SyncQueue interface, write `step()` returning the `out`, `inout` and
+`return` fields named in `SyncQueueTestBench.json`:
+
+```python
+def step():
+    return dict(
+        resetN=1,
+        pushRequestN=1,
+        popRequestN=1,
+        diagnosticN=1,
+        dataIn=0,
+        done=1,
+        status=0,
+    )
+```
+
+The generated testbench calls this function on falling clock edges. `in` and
+`inout` parameters, when present, are passed as keyword arguments. The example
+has no observation inputs, so Python supplies stimulus; DUT outputs are visible
+in the VCD, without an additional result checker.
+
+To prepare a new SyncQueue simulation directory from the Scala example:
+
+```shell
+python3 tblib/python/run.py stdlib/tb/src/sync_queue/dpi_impl.py \
+  --generator me.jiuyang.stdlib.tb.SyncQueueTestBench --mill-module stdlib.tb \
+  --parameter stdlib/tb/src/sync_queue/parameter.json --top SyncQueueTestBench \
+  --out out/syncqueue-verilator
+cp -n stdlib/tb/src/sync_queue/run.py stdlib/tb/src/sync_queue/dpi_impl.py out/syncqueue-verilator/
+```
+
+For another already generated testbench, use the reusable Python runner:
+
+```shell
+python3 tblib/python/run.py path/to/dpi_impl.py \
+  --mlir path/to/Testbench.mlirbc --interface path/to/Testbench.json \
+  --top Testbench --out out/my-simulation
+```
+
+A single DPI function maps to `step()` by default. With multiple functions,
+Python function names default to the DPI symbols; `--bind symbol=callback`
+overrides a mapping. No application-specific native bridge is needed.
+
+Python exceptions and invalid output values produce a nonzero exit code.
+Simulation and wall-clock timeouts default to 1000 ns and 30 seconds; override
+them with `--max-time-ns` and `--wall-timeout`. Errors are printed to the terminal;
+the waveform recorded before a runtime failure is retained.
+
+The framework lives in `tblib/python/zaozi_tb`. Only C API declarations and thin
+argument-forwarding entry points are generated from the interface JSON. Python
+loading, value checking, simulator scheduling and waveform capture use fixed
+framework sources. The initial implementation supports CIRCT's scalar `bit`,
+signed `byte`, `shortint`, `int` and `longint` interfaces. Unsupported vectors,
+arrays and four-state values are rejected rather than guessing their ABI;
+signed byte outputs must be in -128..127.
