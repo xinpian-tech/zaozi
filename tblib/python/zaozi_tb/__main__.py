@@ -13,7 +13,7 @@ import sys
 import sysconfig
 from pathlib import Path
 
-from .codegen import functions, generate_header, generate_source
+from .codegen import functions, generate_header
 
 NATIVE = Path(__file__).parent / "native"
 
@@ -47,7 +47,7 @@ def configure_bindings(interface, overrides):
 def main():
     os.chdir(os.environ.pop("ZAOZI_TB_CWD", os.getcwd()))
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("driver", type=Path, help="Python file implementing step()")
+    parser.add_argument("driver", type=Path, help="Python or C++ implementation of the DPI API")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--generator", help="Scala testbench main class to elaborate")
     source.add_argument(
@@ -84,7 +84,13 @@ def main():
         parser.error("Time limits and job count must be positive and finite")
 
     driver, output = args.driver.resolve(), args.out.resolve()
-    ast.parse(driver.read_text(), filename=str(driver))
+    if driver.suffix not in (".py", ".cc", ".cpp", ".cxx"):
+        parser.error("Driver must be a Python or C++ source file")
+    python_driver = driver.suffix == ".py"
+    if python_driver:
+        ast.parse(driver.read_text(), filename=str(driver))
+    elif args.bind:
+        parser.error("--bind applies only to Python drivers")
     output.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     # A failed build/run must not leave an older waveform looking like a new result.
@@ -119,14 +125,13 @@ def main():
         args.interface.resolve() if args.interface else mlir.with_suffix(".json")
     )
     interface = json.loads(interface_path.read_text())
-    bindings = configure_bindings(interface, args.bind)
+    bindings = configure_bindings(interface, args.bind) if python_driver else None
 
     build = output / ".build"
     dpi, rtl, objects = (build / name for name in ("dpi", "rtl", "obj_dir"))
     dpi.mkdir(parents=True, exist_ok=True)
-    (dpi / "dpi.h").write_text(generate_header(interface))
-    (dpi / "dpi.c").write_text(generate_source(interface))
-    print("Exporting RTL and building Python DPI bridge...", flush=True)
+    (dpi / "dpi_api.h").write_text(generate_header(interface))
+    print("Exporting RTL...", flush=True)
     run_command(
         [
             "firtool",
@@ -149,36 +154,45 @@ def main():
             + "\n`endif\n"
         )
 
-    python_config = str(Path(sys.executable).with_name("python3-config"))
-    cflags = shlex.split(
-        subprocess.check_output([python_config, "--cflags"], text=True)
-    )
-    ldflags = shlex.split(
-        subprocess.check_output([python_config, "--embed", "--ldflags"], text=True)
-    )
-    compiler = shlex.split(env.get("CC", "cc"))
-    run_command(
-        [
-            *compiler,
+    include_paths = ["-I" + str(dpi), "-I" + str(NATIVE)]
+    if python_driver:
+        from .python_backend import emit_bridge
+
+        print("Building Python CFFI implementation...", flush=True)
+        bridge = emit_bridge(dpi)
+        python_config = str(Path(sys.base_executable).with_name("python3-config"))
+        cflags = shlex.split(
+            subprocess.check_output([python_config, "--cflags"], text=True)
+        )
+        ldflags = shlex.split(
+            subprocess.check_output([python_config, "--embed", "--ldflags"], text=True)
+        )
+        command = [
+            *shlex.split(env.get("CC", "cc")),
             "-std=c11",
             "-shared",
             "-fPIC",
-            "-pthread",
-            "-Wextra",
-            "-Werror",
             *cflags,
-            "-I" + str(dpi),
-            "-I" + str(NATIVE),
-            str(dpi / "dpi.c"),
-            str(NATIVE / "python_runtime.c"),
+            *include_paths,
+            str(bridge),
             "-o",
             str(dpi / "libdpi.so"),
             *ldflags,
             "-Wl,-rpath," + sysconfig.get_config_var("LIBDIR"),
-        ],
-        cwd=output,
-        env=env,
-    )
+        ]
+    else:
+        print("Building C++ DPI implementation...", flush=True)
+        command = [
+            *shlex.split(env.get("CXX", "c++")),
+            "-std=c++17",
+            "-shared",
+            "-fPIC",
+            *include_paths,
+            str(driver),
+            "-o",
+            str(dpi / "libdpi.so"),
+        ]
+    run_command(command, cwd=output, env=env)
     verilator = env.get("ZAOZI_TB_VERILATOR") or shutil.which("verilator")
     if not verilator:
         raise RuntimeError(
@@ -209,23 +223,25 @@ def main():
             str(rtl / "filelist.f"),
             str(NATIVE / "simulator.cpp"),
             "-CFLAGS",
-            shlex.join(["-I" + str(dpi)]),
+            shlex.join(include_paths),
             "-LDFLAGS",
             shlex.join(["-L" + str(dpi), "-Wl,-rpath," + str(dpi), "-ldpi"]),
         ],
         cwd=output,
         env=env,
     )
-    env.update(
-        ZAOZI_TB_DRIVER=str(driver),
-        ZAOZI_TB_BINDINGS=json.dumps(bindings),
-        ZAOZI_TB_MAX_TIME_NS=str(args.max_time_ns),
-        PYTHONHOME=sys.base_prefix,
-        PYTHONUNBUFFERED="1",
-        PYTHONDONTWRITEBYTECODE="1",
-        PYTHONPATH=str(Path(__file__).resolve().parents[1]),
-    )
-    print("Running Python stimulus...", flush=True)
+    env["ZAOZI_TB_MAX_TIME_NS"] = str(args.max_time_ns)
+    if python_driver:
+        env.update(
+            ZAOZI_TB_DRIVER=str(driver),
+            ZAOZI_TB_INTERFACE=str(interface_path),
+            ZAOZI_TB_BINDINGS=json.dumps(bindings),
+            PYTHONHOME=sys.base_prefix,
+            PYTHONUNBUFFERED="1",
+            PYTHONDONTWRITEBYTECODE="1",
+            PYTHONPATH=str(Path(__file__).resolve().parents[1]),
+        )
+    print(f"Running {'Python' if python_driver else 'C++'} stimulus...", flush=True)
     try:
         result = subprocess.run(
             [str(objects / "VTestbench")],
