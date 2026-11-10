@@ -67,6 +67,7 @@
         packages = {
           default = pkgs.zaozi.zaozi-assembly;
           zaozi-assembly = pkgs.zaozi.zaozi-assembly;
+          tbh = pkgs.zaozi.tbh;
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
           testbench-python = pkgs.python3.withPackages (ps: [ ps.cffi ]);
@@ -99,6 +100,10 @@
           # without it scalac throws StackOverflowError in pullOutFirstConstr.
           shellHook = ''
             export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Xss32m"
+            if tbh_root=$(git rev-parse --show-toplevel 2>/dev/null) && [ -f "$tbh_root/tblib/tbh/tbh" ]; then
+              export PATH="$tbh_root/tblib/tbh:$PATH"
+            fi
+            unset tbh_root
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               install -Dm644 ${zedSettings} .zed/settings.json
             ''}

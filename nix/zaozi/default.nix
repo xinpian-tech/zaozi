@@ -3,6 +3,7 @@
 
 { lib, newScope, }:
 lib.makeScope newScope (scope: {
+  tbh = scope.callPackage ./tbh.nix { };
   zaozi-assembly = scope.callPackage ./zaozi.nix { };
 })
 

@@ -4,6 +4,7 @@
 #include "VTestbench__Dpi.h"
 #include "capi.h"  // Compiler verifies the JSON ABI against Verilator's ABI.
 #include "verilated.h"
+#include "verilated_cov.h"
 #include "verilated_vcd_c.h"
 #include <cmath>
 #include <cstdint>
@@ -15,11 +16,14 @@ int main(int argc, char **argv) {
     auto context = std::make_unique<VerilatedContext>();
     context->threads(1);
     context->commandArgs(argc, argv);
-    context->traceEverOn(true);
+    const char *wave_file = std::getenv("ZAOZI_TB_WAVE_FILE");
+    if (wave_file) context->traceEverOn(true);
     auto model = std::make_unique<VTestbench>(context.get());
     VerilatedVcdC trace;
-    model->trace(&trace, 99);
-    trace.open("wave.vcd");
+    if (wave_file) {
+        model->trace(&trace, 99);
+        trace.open(wave_file);
+    }
     const char *limit = std::getenv("ZAOZI_TB_MAX_TIME_NS");
     double max_ns = limit ? std::strtod(limit, nullptr) : 1000;
     if (!std::isfinite(max_ns) || max_ns <= 0) {
@@ -30,8 +34,10 @@ int main(int argc, char **argv) {
     int status = 0;
     while (!context->gotFinish()) {
         model->eval();
-        trace.dump(context->time());
-        trace.flush(); // Preserve the last completed timestep if Python fails.
+        if (wave_file) {
+            trace.dump(context->time());
+            trace.flush(); // Preserve the last completed timestep if Python fails.
+        }
         if (context->gotFinish()) break;
         if (!model->eventsPending()) {
             std::fprintf(stderr, "ERROR: no pending events before $finish\n");
@@ -47,7 +53,10 @@ int main(int argc, char **argv) {
         context->time(next);
     }
     model->final();
-    trace.close();
+    if (wave_file) trace.close();
+    if (const char *coverage_file = std::getenv("ZAOZI_TB_COVERAGE_FILE")) {
+        context->coveragep()->write(coverage_file);
+    }
     context->statsPrintSummary();
     return status;
 }

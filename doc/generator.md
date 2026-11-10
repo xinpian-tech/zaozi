@@ -149,6 +149,7 @@ syncqueue-verilator/
   .build/                     # All intermediate RTL, C API and compiler files
 ```
 
+The harness writes `run.py`; the DUT supplies only the DPI implementation.
 Edit `dpi_impl.py`, then run from any working directory:
 
 ```shell
@@ -184,23 +185,58 @@ The generated testbench calls this function on falling clock edges. `in` and
 has no observation inputs, so Python supplies stimulus; DUT outputs are visible
 in the VCD, without an additional result checker.
 
-To prepare a new SyncQueue simulation directory from the Scala example:
+With Zaozi's Nix package on `PATH`, run these commands from a project that
+has a `build.mill` and a `<module>/tb/src` testbench module:
 
 ```shell
-python3 tblib/python/run.py stdlib/tb/src/sync_queue/dpi_impl.py \
-  --generator me.jiuyang.stdlib.tb.SyncQueueTestBench --mill-module stdlib.tb \
-  --parameter stdlib/tb/src/sync_queue/parameter.json --top SyncQueueTestBench \
-  --out out/syncqueue-verilator
-cp -n stdlib/tb/src/sync_queue/run.py stdlib/tb/src/sync_queue/dpi_impl.py out/syncqueue-verilator/
+nix shell path:/path/to/zaozi#tbh
+tbh list
+tbh run SyncQueue -o wave.vcd
 ```
+
+The default `zaozi-assembly` package includes `bin/tbh`; the smaller `tbh`
+package is also available separately. The packaged command supplies Python,
+Verilator, CIRCT and the other harness tools. The project still supplies its
+own Mill modules, Scala testbench source, `parameter.json` and `dpi_impl.py`.
+In this repository's Nix development shell, `tbh` is also on `PATH`.
+To invoke the source checkout directly, use `./tblib/tbh/tbh`.
+`tbh list` uses ripgrep to list `*TestBench.scala` below the current directory.
+`tbh run SyncQueue` verifies the Scala source, `parameter.json` and
+`dpi_impl.py`, elaborates the design, builds the CFFI bridge and links the
+Verilator executable, then checks the Python DPI implementation before
+simulating and writing `out/syncqueue-verilator/coverage.txt`.
+Use `tbh run SyncQueue -o coverage.txt` for a report in the current directory,
+or `tbh run SyncQueue -o wave.vcd` for a waveform there. Verilator's raw
+coverage data and compiler files stay under `.build/`.
+The report is the unmodified plain-text output of
+`verilator_coverage --report summary,hier`. Native annotated source files are
+written to `.build/coverage/` with `--annotate-all --annotate-points --annotate-min 1`.
+These contain individual coverage points and hit counts; `-` marks uncovered
+points and `+` marks covered points. Coverage requires at least one hit.
+The harness compiles the top-level layer bind files emitted by firtool so
+verification layers participate in simulation. Named `Cover` properties appear
+as `type=user` points in the annotated sources. Only properties
+elaborated for the selected parameters are counted. Verilator 5.050 has an
+[inline SVA expression-coverage bug](https://github.com/verilator/verilator/issues/7898);
+the harness disables expression coverage on that version while retaining user
+`Cover` coverage and the other coverage types.
+
+The tool locates the Scala generator and `parameter.json`, links `dpi_impl.py`
+to its source on the first run, then preserves the output directory's driver on
+later runs. Drivers can resolve `__file__` to load their own adjacent resources;
+the harness does not prescribe or inspect a stimulus file format.
+The current SyncQueue driver supplies stimulus but contains no DUT-output
+assertions; successful simulation alone does not verify FIFO correctness.
 
 For another already generated testbench, use the reusable Python runner:
 
 ```shell
-python3 tblib/python/run.py path/to/dpi_impl.py \
-  --mlir path/to/Testbench.mlirbc --interface path/to/Testbench.json \
-  --top Testbench --out out/my-simulation
+python3 tblib/tbh/run.py out/my-simulation
 ```
+
+The simulation directory must contain one `.mlirbc`, the matching `.json`,
+and one `dpi_impl.py`, `.cc`, `.cpp` or `.cxx`. The harness derives the top module
+and links the directory's `run.py` to its own entry point.
 
 A single DPI function maps to `step()` by default. With multiple functions,
 Python function names default to the DPI symbols; `--bind symbol=callback`
@@ -213,7 +249,9 @@ Simulation and wall-clock timeouts default to 1000 ns and 30 seconds; override
 them with `--max-time-ns` and `--wall-timeout`. Errors are printed to the terminal;
 the waveform recorded before a runtime failure is retained.
 
-The framework lives in `tblib/python/zaozi_tb`. The interface JSON generates
+The CLI and framework live together in `tblib/tbh`: `tbh` is the command entry,
+`run.py` launches generated simulation directories, and `zaozi_tb/` contains
+the framework and native sources. The interface JSON generates
 only C API declarations in `dpi_api.h`. For Python implementations, CFFI emits
 its bridge into `.build/`; fixed framework code loads the Python driver and
 checks returned values. C++ implementations export the same C API directly.
@@ -222,3 +260,25 @@ initial implementation supports CIRCT's scalar `bit`,
 signed `byte`, `shortint`, `int` and `longint` interfaces. Unsupported vectors,
 arrays and four-state values are rejected rather than guessing their ABI;
 signed byte outputs must be in -128..127.
+
+For Python development, `pyrightconfig.json` checks Python sources under `tblib`
+and uses `.venv` for CFFI dependencies. Create it from the pinned Nix environment:
+
+```shell
+nix shell .#testbench-python -c python3 - <<'PY'
+import site
+import subprocess
+import sys
+from pathlib import Path
+
+subprocess.run([sys.executable, "-m", "venv", "--without-pip", ".venv"], check=True)
+packages = next(Path(".venv/lib").glob("python*/site-packages"))
+(packages / "nix-dependencies.pth").write_text("\n".join(site.getsitepackages()) + "\n")
+PY
+```
+
+The `.pth` file also makes the Nix dependency paths visible to static import
+resolution. Recreate this environment after updating the pinned Python packages.
+Run basedpyright from the repository root; also check `tblib/tbh/tbh` explicitly
+because the command entry has no `.py` extension. The declarations in
+`tblib/tbh/typings` describe the CFFI dynamic module.

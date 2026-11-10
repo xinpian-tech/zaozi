@@ -1,0 +1,18 @@
+{
+  "stubPath": "tblib/tbh/typings",
+  "executionEnvironments": [
+    {
+      "root": "tblib/tbh"
+    }
+  ],
+  "exclude": [
+    "**/out",
+    "**/__pycache__",
+    ".venv"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "tblib"
+  ]
+}

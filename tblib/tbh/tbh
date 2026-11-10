@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Discover and run repository testbenches."""
+
+import argparse
+import ast
+import re
+import subprocess
+import sys
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from zaozi_tb.data import json_value
+
+DRIVER_SUFFIXES = (".py", ".cc", ".cpp", ".cxx")
+
+
+def testbench_files(directory: Path) -> list[Path]:
+    result = subprocess.run(
+        ["rg", "--files", "-g", "*TestBench.scala"],
+        cwd=directory,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode not in (0, 1):
+        raise RuntimeError(result.stderr.strip() or "ripgrep failed")
+    return sorted(Path(line) for line in result.stdout.splitlines())
+
+
+def find_testbench(
+    repository: Path, directory: Path, name: str
+) -> tuple[Path, str, str, str]:
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name):
+        raise ValueError(f"Invalid testbench name: {name!r}")
+    full_name = name if name.endswith("TestBench") else name + "TestBench"
+    matches = [
+        directory / path
+        for path in testbench_files(directory)
+        if path.name == full_name + ".scala"
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected one {full_name}.scala below {directory}; found {len(matches)}"
+        )
+    source = matches[0]
+    source_text = source.read_text()
+    package = re.search(r"^\s*package\s+([A-Za-z_][\w.]*)", source_text, re.MULTILINE)
+    if package is None or not re.search(
+        rf"\bobject\s+{re.escape(full_name)}\b", source_text
+    ):
+        raise ValueError(f"Missing package or object {full_name} in {source}")
+    parts = source.relative_to(repository).parts
+    if len(parts) < 4 or parts[1:3] != ("tb", "src"):
+        raise ValueError(f"Unsupported testbench module location: {source}")
+    return source, f"{package.group(1)}.{full_name}", f"{parts[0]}.tb", full_name
+
+
+def drivers(directory: Path) -> list[Path]:
+    return [
+        path
+        for suffix in DRIVER_SUFFIXES
+        if (path := directory / f"dpi_impl{suffix}").is_file()
+    ]
+
+
+def prepare(
+    repository: Path, directory: Path, name: str, out: Path | None
+) -> tuple[Path, Path, str, str, str, Path]:
+    source, generator, mill_module, full_name = find_testbench(
+        repository, directory, name
+    )
+    source_dir = source.parent
+    parameter = source_dir / "parameter.json"
+    if not parameter.is_file():
+        raise ValueError(f"Missing parameter file: {parameter}")
+    if not isinstance(json_value(parameter.read_text()), dict):
+        raise TypeError(f"Parameter file must contain a JSON object: {parameter}")
+    source_drivers = drivers(source_dir)
+    if len(source_drivers) != 1:
+        raise ValueError(f"Expected one dpi_impl source beside {source}")
+    if source_drivers[0].suffix == ".py":
+        _ = ast.parse(source_drivers[0].read_text(), filename=str(source_drivers[0]))
+    stem = full_name.removesuffix("TestBench") or full_name
+    output = (out or repository / "out" / f"{stem.lower()}-verilator").resolve()
+    existing_drivers = drivers(output)
+    if len(existing_drivers) > 1:
+        raise ValueError(f"Multiple dpi_impl files in {output}")
+    if existing_drivers:
+        driver = existing_drivers[0]
+    else:
+        output.mkdir(parents=True, exist_ok=True)
+        driver = output / source_drivers[0].name
+        # Keep the driver's source location so it can load its own resources.
+        driver.symlink_to(source_drivers[0].resolve())
+    return driver, parameter, generator, mill_module, full_name, output
+
+
+def invoke(command: Sequence[str], repository: Path) -> int:
+    result = subprocess.run(command, cwd=repository, check=False)
+    return result.returncode if result.returncode >= 0 else 128 - result.returncode
+
+
+def project_root(directory: Path) -> Path:
+    for candidate in (directory, *directory.parents):
+        if (candidate / "build.mill").is_file():
+            return candidate
+    raise ValueError(f"No build.mill found above {directory}")
+
+
+@dataclass
+class Options(argparse.Namespace):
+    action: str = ""
+    testbench: str = ""
+    out: Path | None = None
+    jobs: int | None = None
+    output: Path | None = None
+    max_time_ns: float | None = None
+    wall_timeout: float | None = None
+    bind: list[str] = field(default_factory=list)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    actions = parser.add_subparsers(dest="action", required=True)
+    _ = actions.add_parser(
+        "list", help="List *TestBench.scala under the current directory"
+    )
+    command = actions.add_parser("run", help="Check, build and simulate a testbench")
+    _ = command.add_argument("testbench", help="Name, for example SyncQueue")
+    _ = command.add_argument("--out", type=Path, help="Simulation directory")
+    _ = command.add_argument("-j", "--jobs", type=int, help="Parallel build jobs")
+    _ = command.add_argument(
+        "-o", "--output", type=Path, help="Coverage .txt or waveform .vcd"
+    )
+    _ = command.add_argument("--max-time-ns", type=float)
+    _ = command.add_argument("--wall-timeout", type=float)
+    _ = command.add_argument("--bind", action="append", default=[])
+    args = parser.parse_args(namespace=Options())
+    directory = Path.cwd().resolve()
+    try:
+        if args.action == "list":
+            for path in testbench_files(directory):
+                print(path)
+            return 0
+        repository = project_root(directory)
+        driver, parameter, generator, mill_module, top, output = prepare(
+            repository, directory, args.testbench, args.out
+        )
+        if args.output and args.output.suffix not in (".txt", ".vcd"):
+            raise ValueError("-o must end in .txt or .vcd")
+        report = args.output.resolve() if args.output else output / "coverage.txt"
+        report.unlink(missing_ok=True)
+        bundle = Path(__file__).resolve().parent
+        runner = bundle / "run.py"
+        harness = [sys.executable, "-B", str(runner)]
+        check = [
+            *harness,
+            str(driver),
+            "--generator",
+            generator,
+            "--mill-module",
+            mill_module,
+            "--parameter",
+            str(parameter),
+            "--top",
+            top,
+            "--out",
+            str(output),
+            "--check-only",
+        ]
+        if args.jobs is not None:
+            check.extend(("--jobs", str(args.jobs)))
+        for binding in args.bind:
+            check.extend(("--bind", binding))
+        status = invoke(check, repository)
+        if status:
+            return status
+        run = [*harness, str(output), "--skip-build", "--report", str(report)]
+        if args.max_time_ns is not None:
+            run.extend(("--max-time-ns", str(args.max_time_ns)))
+        if args.wall_timeout is not None:
+            run.extend(("--wall-timeout", str(args.wall_timeout)))
+        for binding in args.bind:
+            run.extend(("--bind", binding))
+        return invoke(run, repository)
+    except (OSError, ValueError, TypeError, RuntimeError, SyntaxError) as error:
+        parser.exit(2, f"tbh: {error}\n")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
