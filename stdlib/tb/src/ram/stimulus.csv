@@ -1,0 +1,28 @@
+resetN,chipSelectN,writeN,readAddress,writeAddress,writeData,done,label
+0,1,1,0,0,0,0,reset entry 0
+0,1,1,1,0,0,0,reset entry 1
+1,1,1,0,0,0,0,release reset
+1,0,0,0,0,0x11,0,write and read entry 0
+1,0,0,0,1,0x22,0,write entry 1 while reading entry 0
+1,0,1,1,0,0,0,read entry 1
+1,0,1,0,0,0xFF,0,write disabled: preserve entry 0
+1,1,0,1,1,0xFF,0,chip deselected: preserve entry 1
+1,1,1,0,0,0,0,read entry 0 while deselected
+1,1,1,1,0,0,0,read entry 1 while deselected
+1,0,0,0,0,0xFF,0,overwrite entry 0 with all ones
+1,0,0,1,1,0xFF,0,overwrite entry 1 with all ones
+1,0,0,0,0,0x00,0,overwrite entry 0 with all zeros
+1,0,0,1,1,0x00,0,overwrite entry 1 with all zeros
+1,0,0,0,0,0xAA,0,write alternating bits to entry 0
+1,0,0,1,1,0x55,0,write alternating bits to entry 1
+1,0,0,0,0,0x55,0,invert entry 0
+1,0,0,1,1,0xAA,0,invert entry 1
+0,0,0,0,0,0xFF,0,reset populated memory with write requested
+0,1,1,1,0,0,0,hold reset and read entry 1
+1,0,1,0,0,0,0,read cleared entry 0
+1,0,1,1,0,0,0,read cleared entry 1
+1,0,0,0,0,0x80,0,write high bit after reset
+1,0,0,1,1,0x01,0,write low bit after reset
+1,1,1,0,0,0,0,read entry 0 after reset
+1,1,1,1,0,0,0,read entry 1 after reset
+1,1,1,0,0,0,1,done
