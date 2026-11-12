@@ -31,34 +31,3 @@ private[circt] object Compilation:
           }
       paths.updated(module, os.RelPath((prefix :+ module).mkString("/")))
     }
-
-  def filelists(units: Vector[ElaboratedDesign]): Vector[ElaboratedDesign] =
-    val byName = VectorMap.from(units.map(u => u.circuitName -> u))
-    units.map { unit =>
-      val closure     = order(Vector(unit.resolved)).map(d => byName(name(d)))
-      val headers     = unit.resolved.dependencies
-        .map(d => byName(name(d._2)))
-        .distinct
-        .flatMap(_.verilog.keys.filter(n => n.startsWith("ref_") && n.endsWith(".sv")))
-        .distinct
-        .sorted
-      val includes    = headers.map(n => s"`include \"$n\"\n").mkString
-      val files       = unit.verilog.map { (path, text) =>
-        val body     = if path.endsWith(".sv") then includes + text else text
-        val packaged = if path.startsWith("ref_") && path.endsWith(".sv") then
-          val guard = s"syntheke_${path.stripSuffix(".sv")}"
-          s"`ifndef $guard\n`define $guard\n$body\n`endif\n"
-        else body
-        path -> packaged
-      }
-      val sourceFiles = closure.flatMap { dependency =>
-        dependency.verilog("filelist.f").linesIterator.filter(_.nonEmpty).map(p => s"${dependency.directory}/$p")
-      }
-      val filelist    = (closure.map(u => s"+incdir+${u.directory}") ++ sourceFiles).mkString("", "\n", "\n")
-      val layerLists  = files.keys.toVector.sorted.collect {
-        case path if path.startsWith(s"layers-${unit.circuitName}-") && path.endsWith(".sv") =>
-          val layer = path.stripPrefix(s"layers-${unit.circuitName}-").stripSuffix(".sv")
-          s"layers-$layer.f" -> s"${unit.directory}/$path\n"
-      }
-      unit.copy(verilog = files ++ layerLists + ("filelist.f" -> filelist))
-    }
