@@ -1,13 +1,10 @@
 package me.jiuyang.syntheke.circt
 
-import scala.collection.immutable.{SortedMap, VectorMap}
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 
 import me.jiuyang.syntheke.*
-import me.jiuyang.syntheke.circt.Diagnostics.runOnOpOrThrow
 
-import org.llvm.circt.scalalib.capi.dialect.emit.given_DialectApi
-import org.llvm.circt.scalalib.capi.dialect.emit.DialectApi as EmitDialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   given_FirrtlBundleFieldApi,
@@ -25,12 +22,8 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.ltl.DialectApi as LTLDialectApi
-import org.llvm.circt.scalalib.capi.dialect.sv.given_DialectApi
-import org.llvm.circt.scalalib.capi.dialect.sv.DialectApi as SvDialectApi
 import org.llvm.circt.scalalib.capi.dialect.verif.given_DialectApi
 import org.llvm.circt.scalalib.capi.dialect.verif.DialectApi as VerifDialectApi
-import org.llvm.circt.scalalib.capi.exportfirrtl.given_ExportFirrtlApi
-import org.llvm.circt.scalalib.capi.firtool.{given_FirtoolApi, given_FirtoolOptionsApi, FirtoolApi, FirtoolOptions}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.given
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   Circuit,
@@ -64,24 +57,33 @@ import org.llvm.mlir.scalalib.capi.ir.{
   ModuleApi as MlirModuleApi,
   Operation,
   Type as MlirType,
-  Value,
-  WalkEnum,
-  WalkResultEnum
+  Value
 }
-import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi, PassManager, PassManagerApi}
 
 import java.lang.foreign.Arena
 
 final class ElaborationException(message: String) extends RuntimeException(message)
 
+/** A design as FIRRTL circuits, unlinked: its own circuit and one for each module its generators elaborated, by file
+  * name. `dependencies` are the output directories of the designs it instantiates.
+  */
 final case class ElaboratedDesign(
-  circuitName:                       String,
-  directory:                         os.RelPath,
-  mlirbc:                            Array[Byte],
-  verilog:                           VectorMap[String, String],
-  resolved:                          ResolvedDesign,
-  private[circt] val layers:         LayerTree,
-  private[circt] val definedModules: Vector[String])
+  circuitName:               String,
+  directory:                 os.RelPath,
+  mlirbc:                    VectorMap[String, Array[Byte]],
+  dependencies:              Vector[os.RelPath],
+  resolved:                  ResolvedDesign,
+  private[circt] val layers: LayerTree,
+  private[circt] val definedModules: Vector[String]):
+  /** What a build reads to link and lower the design: the circuit its files link into, the files, its own circuit
+    * first, and the designs it instantiates.
+    */
+  def metadata: ujson.Obj =
+    ujson.Obj(
+      "circuit"      -> circuitName,
+      "files"        -> ujson.Arr.from(mlirbc.keys.map(ujson.Str(_))),
+      "dependencies" -> ujson.Arr.from(dependencies.map(d => ujson.Str(d.toString)))
+    )
 
 object Elaborator:
 
@@ -90,7 +92,7 @@ object Elaborator:
   def elaborate(roots: Seq[ResolvedDesign]): Vector[ElaboratedDesign] =
     val ordered     = Compilation.order(roots)
     val directories = Compilation.directories(ordered, roots)
-    val compiled    = ordered.foldLeft(Vector.empty[ElaboratedDesign]) { (done, resolved) =>
+    ordered.foldLeft(Vector.empty[ElaboratedDesign]) { (done, resolved) =>
       val dependencies = VectorMap.from(resolved.dependencies.map { (id, definition) =>
         id -> done.find(_.resolved eq definition).get
       })
@@ -105,7 +107,6 @@ object Elaborator:
       }
       done :+ unit
     }
-    Compilation.filelists(compiled)
 
   private def elaborateUnit(
     resolved:     ResolvedDesign,
@@ -138,10 +139,7 @@ object Elaborator:
       try
         summon[FirrtlDialectApi].loadDialect
         summon[LTLDialectApi].loadDialect
-        summon[SvDialectApi].loadDialect
-        summon[EmitDialectApi].loadDialect
         summon[VerifDialectApi].loadDialect
-        summon[VerifDialectApi].registerPasses
 
         val unknownLoc = summon[LocationApi].locationUnknownGet
 
@@ -328,100 +326,34 @@ object Elaborator:
           }
         }
 
-        def moduleSymbols(root: Operation): (Vector[String], Vector[String]) =
-          val defined    = mutable.ArrayBuffer.empty[String]
-          val referenced = mutable.ArrayBuffer.empty[String]
-          root.walk(
-            op =>
-              op.getName.str match
-                case "firrtl.instance"                    =>
-                  referenced += op.getInherentAttributeByName("moduleName").flatSymbolRefAttrGetValue
-                case "firrtl.module" | "firrtl.extmodule" =>
-                  defined += op.getInherentAttributeByName("sym_name").stringAttrGetValue
-                case _                                    => ()
-              WalkResultEnum.Advance
-            ,
-            WalkEnum.PreOrder
-          )
-          (defined.toVector.distinct, referenced.toVector.distinct)
-
-        def isNullOp(op: Operation): Boolean           =
-          op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
-        def opsIn(first: Operation): Vector[Operation] =
-          Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => !isNullOp(op)).toVector
-
-        def layerTreeOf(op: Operation): (String, LayerTree) =
-          val name     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-          val children = opsIn(op.getFirstRegion.getFirstBlock.getFirstOperation)
-            .filter(_.getName.str == "firrtl.layer")
-            .map(layerTreeOf)
-          name -> LayerTree(SortedMap.from(children))
-
-        @annotation.tailrec
-        def link(needed: List[String], defined: Vector[String], layers: LayerTree): LayerTree = needed match
-          case Nil                                  => layers
-          case sym :: rest if defined.contains(sym) => link(rest, defined, layers)
-          case sym :: rest                          =>
-            val definition = definitions.getOrElse(sym, fail(s"instantiated module '$sym' has no definition"))
-            val circuitOps = opsIn(definition.getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
-              .filter(_.getName.str == "firrtl.circuit")
-              .flatMap(c => opsIn(c.getFirstRegion.getFirstBlock.getFirstOperation))
-            val moved      =
-              circuitOps.filter(op => Vector("firrtl.module", "firrtl.extmodule").contains(op.getName.str)).filter {
-                op =>
-                  val s2     = op.getInherentAttributeByName("sym_name").stringAttrGetValue
-                  val isStub = op.getName.str == "firrtl.extmodule" && s2 != sym && definitions.contains(s2)
-                  if defined.contains(s2) || isStub then false
-                  else
-                    op.removeFromParent()
-                    summon[Circuit].block.appendOwnedOperation(op)
-                    true
-              }
-            val layers2    = circuitOps
-              .filter(_.getName.str == "firrtl.layer")
-              .map(layerTreeOf)
-              .foldLeft(layers)((t, kv) => t.merge(LayerTree(SortedMap(kv))))
-            val defined2   = defined ++ moved.map(_.getInherentAttributeByName("sym_name").stringAttrGetValue)
-            if !defined2.contains(sym) then fail(s"the definition of '$sym' does not contain it")
-            link(rest ++ moved.flatMap(op => moduleSymbols(op)._2.filterNot(defined2.contains)), defined2, layers2)
-
-        val (defined0, referenced0) = moduleSymbols(summon[Circuit].operation)
-        val linkedLayers            = link(referenced0.filterNot(defined0.contains).toList, defined0, LayerTree.empty)
-        val layers                  = enabled.values.foldLeft(linkedLayers)(_.merge(_))
+        summon[Circuit].declareInstantiatedModules()
+        val layers = enabled.values.foldLeft(LayerTree.empty)(_.merge(_))
         emitLayers(layers, None)
 
-        if !summon[MlirModule].getOperation.verify then fail("MLIR verification of the linked circuit failed")
+        def bytecode(module: MlirModule):                  Array[Byte]       =
+          val out = new java.io.ByteArrayOutputStream
+          module.getOperation.writeBytecode(bc => out.write(bc))
+          out.toByteArray
+        def isNullOp(op: Operation):                       Boolean           =
+          op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
+        def opsIn(first: Operation):                       Vector[Operation] =
+          Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => !isNullOp(op)).toVector
+        def defines(definition: MlirModule, name: String): Boolean           =
+          opsIn(definition.getBody.getFirstOperation.getFirstRegion.getFirstBlock.getFirstOperation).exists { op =>
+            op.getName.str == "firrtl.module" && op.getInherentAttributeByName("sym_name").stringAttrGetValue == name
+          }
+        val definedModules = (spec.moduleOrder.filter(id => spec.wrapper(id).isDefined).map(moduleNames) ++
+          definitions.collect { case (name, definition) if defines(definition, name) => name }).distinct
 
-        val bytecode = new java.io.ByteArrayOutputStream
-        summon[MlirModule].getOperation.writeBytecode(bc => bytecode.write(bc))
-
-        given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
-        val firtoolOptions   = summon[FirtoolOptions]
-        val verilogDir       = os.temp.dir(prefix = s"syntheke-$circuitName-verilog", deleteOnExit = false)
-        given PassManager    = summon[PassManagerApi].passManagerCreate
-        summon[PassManager].preprocessTransforms(firtoolOptions)
-        summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
-        summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
-        summon[PassManager].hwToSV(firtoolOptions)
-        summon[PassManager].exportSplitVerilog(firtoolOptions, verilogDir.toString)
-        summon[PassManager].runOnOpOrThrow(
-          summon[MlirModule].getOperation,
-          s"firtool lowering pipeline for circuit '$circuitName'"
+        ElaboratedDesign(
+          circuitName,
+          directory,
+          VectorMap(s"$circuitName.mlirbc" -> bytecode(summon[MlirModule])) ++
+            definitions.map((name, definition) => s"$name.mlirbc" -> bytecode(definition)),
+          dependencies.values.map(_.directory).toVector.distinct,
+          resolved,
+          layers,
+          definedModules
         )
-        val definedModules   = opsIn(summon[MlirModule].getOperation.getFirstRegion.getFirstBlock.getFirstOperation)
-          .filter(_.getName.str == "hw.module")
-          .map(_.getInherentAttributeByName("sym_name").stringAttrGetValue)
-          .distinct
-        val verilog          =
-          try
-            VectorMap.from(
-              os.walk(verilogDir)
-                .filter(os.isFile)
-                .map(p => p.relativeTo(verilogDir).toString -> os.read(p))
-                .sortBy(_._1)
-            )
-          finally os.remove.all(verilogDir)
-
-        ElaboratedDesign(circuitName, directory, bytecode.toByteArray, verilog, resolved, layers, definedModules)
       finally summon[Context].destroy()
     finally arena.close()
