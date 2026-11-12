@@ -26,6 +26,15 @@ trait CircuitApi extends HasOperation[Circuit]:
       using arena: Arena,
       module:      MlirModule
     ): Unit
+
+    /** Declares each module an instance in the circuit references but the circuit neither defines nor declares, as an
+      * extmodule standing for it until the circuit is linked.
+      */
+    def declareInstantiatedModules(
+    )(
+      using Arena,
+      Context
+    ): Unit
 end CircuitApi
 
 class Class(val _operation: Operation)

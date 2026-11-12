@@ -67,6 +67,87 @@ object Smoke extends TestSuite:
           test("Create Circuit"):
             val circuit: Circuit = summon[CircuitApi].op("Passthrough")
             circuit.appendToModule()
+        test("Declare instantiated modules"):
+          val api          = summon[FirrtlBundleFieldApi]
+          given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(unknownLocation)
+          given Circuit    = summon[CircuitApi].op("Top")
+          summon[Circuit].appendToModule()
+          summon[ExtModuleApi]
+            .op(
+              "Declared",
+              "Declared",
+              unknownLocation,
+              FirrtlConvention.Scalarized,
+              Seq((api.createFirrtlBundleField("i", true, 1.getUInt), unknownLocation)),
+              Seq.empty,
+              Seq.empty
+            )
+            .appendToCircuit()
+          val platform     = summon[OptionApi].op("Platform", unknownLocation)
+          platform.block.appendOwnedOperation(summon[OptionCaseApi].op("FPGA", unknownLocation).operation)
+          summon[Circuit].block.appendOwnedOperation(platform.operation)
+          def instance(
+            module: String,
+            name:   String
+          )(
+            using Block
+          ) =
+            summon[InstanceApi]
+              .op(
+                module,
+                name,
+                FirrtlNameKind.Interesting,
+                unknownLocation,
+                Seq(api.createFirrtlBundleField("i", true, 1.getUInt)),
+                Seq.empty
+              )
+              .operation
+              .appendToBlock()
+          // `Local` is defined after the module that instantiates it; `Missing` is used only by the second module.
+          val top          = summon[ModuleApi].op("Top", unknownLocation, FirrtlConvention.Scalarized, Seq.empty, Seq.empty)
+          locally:
+            given Block = top.block
+            instance("Local", "local")
+            instance("Declared", "declared")
+            summon[InstanceChoiceApi]
+              .op(
+                Seq("Default", "Fpga", "Asic"),
+                "Platform",
+                Seq("FPGA", "ASIC"),
+                "choice",
+                FirrtlNameKind.Interesting,
+                unknownLocation,
+                Seq(api.createFirrtlBundleField("i", true, 1.getUInt)),
+                Seq.empty
+              )
+              .operation
+              .appendToBlock()
+          top.appendToCircuit()
+          val local = summon[ModuleApi].op(
+            "Local",
+            unknownLocation,
+            FirrtlConvention.Scalarized,
+            Seq((api.createFirrtlBundleField("i", true, 1.getUInt), unknownLocation)),
+            Seq.empty
+          )
+          locally:
+            given Block = local.block
+            instance("Missing", "missing")
+          local.appendToCircuit()
+
+          summon[Circuit].declareInstantiatedModules()
+          summon[Circuit].declareInstantiatedModules()
+
+          val out                    = StringBuilder()
+          summon[MlirModule].getOperation.print(out ++= _)
+          def count(pattern: String) = pattern.r.findAllIn(out.toString).size
+          assert(count("""firrtl\.extmodule @Declared\(""") == 1)
+          assert(count("""firrtl\.extmodule @Local\(""") == 0)
+          Seq("Missing", "Default", "Fpga", "Asic").foreach(m => assert(count(s"""firrtl\\.extmodule @$m\\(""") == 1))
+          assert(count("""firrtl\.option @Platform""") == 1)
+          assert(count("""firrtl\.option_case @FPGA""") == 1)
+          assert(count("""firrtl\.option_case @ASIC""") == 1)
+          assert(summon[MlirModule].getOperation.verify)
         test("Create CirctModule"):
           val api = summon[FirrtlBundleFieldApi]
           val module: Module = summon[ModuleApi].op(
