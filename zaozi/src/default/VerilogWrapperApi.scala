@@ -137,7 +137,6 @@ given VerilogWrapperApi:
     ): Unit =
       BaseGeneratorHelper.dumpMlirbc(
         wrapper.moduleName(parameter),
-        wrapper.elaboratedModules,
         (arena, context, circuit) =>
           given Arena   = arena
           given Context = context
