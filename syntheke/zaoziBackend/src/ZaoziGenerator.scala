@@ -3,12 +3,12 @@ package me.jiuyang.syntheke.zaozi
 import scala.collection.mutable
 
 import me.jiuyang.syntheke.*
-import me.jiuyang.syntheke.circt.{CirctGenerator, Instantiated}
+import me.jiuyang.syntheke.circt.CirctGenerator
 import me.jiuyang.zaozi.{DVInterface, Generator, HWInterface, InstanceContext, LayerInterface, Parameter}
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
 import me.jiuyang.zaozi.syntheke.PublicProbes
-import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
+import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule, Operation}
 
 import java.lang.foreign.Arena
 import upickle.default.Writer
@@ -69,15 +69,15 @@ private[zaozi] final class ZaoziGenerator[
   def instantiate(
     fullParam:    PARAM,
     instanceName: String,
-    loc:          SourceLoc
+    loc:          SourceLoc,
+    definitions:  mutable.LinkedHashMap[String, MlirModule]
   )(
     using Arena,
     Context,
     Block
-  ): Instantiated =
+  ): Operation =
     given sourcecode.File         = loc._1
     given sourcecode.Line         = loc._2
     given sourcecode.Name.Machine = sourcecode.Name.Machine(instanceName)
     given InstanceContext         = new InstanceContext
-    val (instance, definitions)   = Elaborate.collect(named(moduleName(fullParam)).instantiate(fullParam).operation)
-    Instantiated(instance, definitions)
+    Elaborate.collect(definitions)(named(moduleName(fullParam)).instantiate(fullParam).operation)

@@ -68,13 +68,12 @@ final class ElaborationException(message: String) extends RuntimeException(messa
   * name. `dependencies` are the output directories of the designs it instantiates.
   */
 final case class ElaboratedDesign(
-  circuitName:               String,
-  directory:                 os.RelPath,
-  mlirbc:                    VectorMap[String, Array[Byte]],
-  dependencies:              Vector[os.RelPath],
-  resolved:                  ResolvedDesign,
-  private[circt] val layers: LayerTree,
-  private[circt] val definedModules: Vector[String]):
+  circuitName:  String,
+  directory:    os.RelPath,
+  mlirbc:       VectorMap[String, Array[Byte]],
+  dependencies: Vector[os.RelPath],
+  resolved:     ResolvedDesign,
+  private[circt] val layers: LayerTree):
   /** What a build reads to link and lower the design: the circuit its files link into, the files, its own circuit
     * first, and the designs it instantiates.
     */
@@ -97,15 +96,7 @@ object Elaborator:
         id -> done.find(_.resolved eq definition).get
       })
       val directory    = directories(resolved.spec.wrapper(ModuleId.root).get.moduleName)
-      val unit         = elaborateUnit(resolved, dependencies, directory)
-      done.foreach { previous =>
-        val overlap = previous.definedModules.intersect(unit.definedModules)
-        if overlap.nonEmpty then
-          fail(
-            s"duplicate modules in boundaries ${previous.circuitName} and ${unit.circuitName}: ${overlap.toVector.sorted.mkString(", ")}"
-          )
-      }
-      done :+ unit
+      done :+ elaborateUnit(resolved, dependencies, directory)
     }
 
   private def elaborateUnit(
@@ -125,12 +116,6 @@ object Elaborator:
         id -> implementation(spec.generatorModule(id).get.definition).moduleName(fullParam(id))
       case id if spec.wrapper(id).isDefined         => id -> spec.wrapper(id).get.moduleName
     }) ++ dependencies.map((id, compiled) => id -> compiled.circuitName)
-
-    val generatorNames = generators.map(g => moduleNames(g.id))
-    (spec.moduleOrder.filter(id => spec.wrapper(id).isDefined) ++ dependencies.keys).foreach { id =>
-      if generatorNames.contains(moduleNames(id)) then
-        fail(s"${id.show} is named '${moduleNames(id)}', which a generator module of this design also takes")
-    }
 
     val arena = Arena.ofConfined()
     try
@@ -278,9 +263,7 @@ object Elaborator:
               spec.modules.get(childId) match
                 case Some(gm: GeneratorModuleSpec) =>
                   val rgm      = resolved.generatorModule(childId).get
-                  val placed   = implementation(gm.definition).instantiate(rgm.fullParam, c, gm.loc)
-                  placed.definitions.foreach((name, definition) => definitions.getOrElseUpdate(name, definition))
-                  val instOp   = placed.instance
+                  val instOp   = implementation(gm.definition).instantiate(rgm.fullParam, c, gm.loc, definitions)
                   val expected = rgm.view.nodes.map { nv =>
                     (nv.node.name, nv.edge.bind.source == nv.node, nv.edge.interface)
                   } ++ rgm.probeDeclaration.ports.map(p => (p.name, true, p.tpe)) ++ (
@@ -330,20 +313,10 @@ object Elaborator:
         val layers = enabled.values.foldLeft(LayerTree.empty)(_.merge(_))
         emitLayers(layers, None)
 
-        def bytecode(module: MlirModule):                  Array[Byte]       =
+        def bytecode(module: MlirModule): Array[Byte] =
           val out = new java.io.ByteArrayOutputStream
           module.getOperation.writeBytecode(bc => out.write(bc))
           out.toByteArray
-        def isNullOp(op: Operation):                       Boolean           =
-          op._segment.get(java.lang.foreign.ValueLayout.ADDRESS, 0).address == 0
-        def opsIn(first: Operation):                       Vector[Operation] =
-          Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => !isNullOp(op)).toVector
-        def defines(definition: MlirModule, name: String): Boolean           =
-          opsIn(definition.getBody.getFirstOperation.getFirstRegion.getFirstBlock.getFirstOperation).exists { op =>
-            op.getName.str == "firrtl.module" && op.getInherentAttributeByName("sym_name").stringAttrGetValue == name
-          }
-        val definedModules = (spec.moduleOrder.filter(id => spec.wrapper(id).isDefined).map(moduleNames) ++
-          definitions.collect { case (name, definition) if defines(definition, name) => name }).distinct
 
         ElaboratedDesign(
           circuitName,
@@ -352,8 +325,7 @@ object Elaborator:
             definitions.map((name, definition) => s"$name.mlirbc" -> bytecode(definition)),
           dependencies.values.map(_.directory).toVector.distinct,
           resolved,
-          layers,
-          definedModules
+          layers
         )
       finally summon[Context].destroy()
     finally arena.close()
