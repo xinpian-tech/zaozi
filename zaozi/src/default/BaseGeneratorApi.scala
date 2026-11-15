@@ -50,7 +50,6 @@ import org.llvm.mlir.scalalib.capi.ir.{
 }
 
 import java.lang.foreign.Arena
-import java.nio.file.StandardOpenOption.*
 
 object BaseGeneratorHelper:
   def createInstance[
@@ -162,31 +161,19 @@ object BaseGeneratorHelper:
         private[zaozi] val _refer = probeWire.operation.getResult(0)
 
   def dumpMlirbc(
-    moduleName:        String,
-    elaboratedModules: scala.collection.mutable.HashSet[String],
-    createModule:      (Arena, Context, Circuit) => Unit
+    moduleName:   String,
+    createModule: (Arena, Context, Circuit) => Unit
   )(
     using Arena,
     Context
   ): Unit =
-    val collected = Elaborate.collected.value
-    if !collected.fold(elaboratedModules.contains(moduleName))(_.contains(moduleName)) then
+    val modules = Elaborate.modules.value
+    if !modules.contains(moduleName) then
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(moduleName)
       summon[Circuit].appendToModule()
       createModule(summon[Arena], summon[Context], summon[Circuit])
       me.jiuyang.zaozi.magic.validateCircuit()
-
-      collected match
-        case Some(modules) => modules.update(moduleName, summon[MlirModule])
-        case None          =>
-          val mlirbcFile =
-            os.Path(
-              sys.env.getOrElse("ZAOZI_OUTDIR", ""),
-              os.pwd
-            ) / s"${moduleName}.mlirbc"
-          val out        = os.write.outputStream(mlirbcFile, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
-          summon[MlirModule].getOperation.writeBytecode(bc => out.write(bc))
-          elaboratedModules.add(moduleName)
+      modules.add(moduleName, summon[MlirModule])
 
 end BaseGeneratorHelper
