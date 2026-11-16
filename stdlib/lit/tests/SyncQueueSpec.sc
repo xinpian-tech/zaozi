@@ -4,7 +4,7 @@
 // DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" --
 // DEFINE: %{testbench} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.tb.SyncQueueTestBench" --
 
-// RUN: rm -rf %t.dir && mkdir -p %t.dir/async %t.dir/sync %t.dir/testbench
+// RUN: rm -rf %t.dir && mkdir -p %t.dir/async %t.dir/sync %t.dir/testbench %t.dir/wide
 
 // Asynchronous reset with resettable RAM.
 // RUN: cd %t.dir/async && %{test} config async.json --width 8 --depth 4 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError false --enableDiagnostics false --asyncReset true --resetMem true
@@ -21,11 +21,15 @@
 // Elaborate and link the testbench in memory, then write its HW, DPI and SV artifacts.
 // RUN: cd %t.dir/testbench && %{testbench} design %S/../../tb/src/sync_queue/parameter.json
 // RUN: test ! -e %t.dir/testbench/linked.mlir
-// RUN: circt-opt %t.dir/testbench/SyncQueueTestBench.mlirbc | FileCheck %s --check-prefix=COMBINED
-// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/testbench/SyncQueueTestBench.json
-// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/testbench/SyncQueueTestBench.sv
-// RUN: FileCheck %s --check-prefix=IMPORT --input-file=%t.dir/testbench/SyncQueueTestBench.sv
-// RUN: FileCheck %s --check-prefix=CLOCK --input-file=%t.dir/testbench/SyncQueueTestBench.sv
+// RUN: circt-opt %t.dir/testbench/SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResetfalse_resetMemtrueTestBench.mlirbc | FileCheck %s --check-prefix=COMBINED
+// RUN: FileCheck %s --check-prefix=DPI --input-file=%t.dir/testbench/SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResetfalse_resetMemtrueTestBench.json
+// RUN: FileCheck %s --check-prefix=DESIGN --input-file=%t.dir/testbench/SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResetfalse_resetMemtrueTestBench.sv
+// RUN: FileCheck %s --check-prefix=IMPORT --input-file=%t.dir/testbench/SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResetfalse_resetMemtrueTestBench.sv
+// RUN: FileCheck %s --check-prefix=CLOCK --input-file=%t.dir/testbench/SyncQueue_width8_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResetfalse_resetMemtrueTestBench.sv
+// Changing the DUT width must change the inferred step ABI without a handwritten DPI declaration.
+// RUN: cd %t.dir/wide && %{testbench} config parameter.json --width 13 --depth 3 --almostEmptyLevel 1 --almostFullLevel 1 --stickyError false --enableDiagnostics false --asyncReset false --resetMem true
+// RUN: cd %t.dir/wide && %{testbench} design parameter.json
+// RUN: circt-opt %t.dir/wide/SyncQueue_width13_depth3_almostEmptyLevel1_almostFullLevel1_stickyErrorfalse_enableDiagnosticsfalse_asyncResetfalse_resetMemtrueTestBench.mlirbc | FileCheck %s --check-prefix=WIDE
 // RUN: rm -rf %t.dir
 
 // ASYNC-RAM-LABEL: module Ram_dataWidth8_depth4_asyncResettrue_resetMemtrue(
@@ -85,7 +89,7 @@
 
 // COMBINED-NOT: firrtl.circuit
 // COMBINED-NOT: hw.module.extern
-// COMBINED: hw.module @SyncQueueTestBench()
+// COMBINED: hw.module @SyncQueue_{{.*}}TestBench()
 // COMBINED: hw.instance "clock"{{.*}} @ClockGen_periodNs10
 // COMBINED: hw.instance "dut"{{.*}} @SyncQueue_
 // COMBINED: seq.clock_inv
@@ -101,7 +105,7 @@
 // DPI: "function": "zaozi_step"
 
 // IMPORT: import "DPI-C" context function int zaozi_step(
-// DESIGN-LABEL: module SyncQueueTestBench();
+// DESIGN-LABEL: module SyncQueue_{{.*}}TestBench();
 // DESIGN-NOT: always #
 // DESIGN-DAG: ClockGen_periodNs10 clock (
 // DESIGN-DAG: SyncQueue_{{.*}} dut (
@@ -113,3 +117,5 @@
 // CLOCK: [[CLOCK:[A-Za-z_][A-Za-z_0-9]*]] = 1'{{[bh]}}0;
 // CLOCK: always #5ns [[CLOCK]] = ~[[CLOCK]];
 // CLOCK: endmodule
+
+// WIDE: sv.func private @step({{.*}}out dataIn : ui13{{.*}}out done : ui1{{.*}}out status : si32

@@ -20,8 +20,10 @@ import me.jiuyang.zaozi.{
 }
 import me.jiuyang.zaozi.default.{locate, given}
 import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
-import me.jiuyang.zaozi.valuetpe.{Clock as ClockType, Connectable, Data}
-import org.llvm.circt.scalalib.dialect.firrtl.operation.{OpenSubfieldApi, RefDefineApi, given}
+import me.jiuyang.zaozi.valuetpe.{Connectable, Data}
+import me.jiuyang.tblib.default.TestbenchConnections
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, given}
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{OpenSubfieldApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Type, Value, given}
 
 import java.lang.foreign.Arena
@@ -61,7 +63,8 @@ final class TestbenchIO[I <: HWInterface[?]] private[tblib] (private val testben
 final class TestbenchContext[I <: HWInterface[?]] private[tblib] (
   val clock:        Value,
   val fallingClock: Value,
-  private[tblib] val inputPorts: Map[String, TestbenchPort[Data]]):
+  private[tblib] val orderedInputPorts: Seq[TestbenchPort[Data]]):
+  private[tblib] val inputPorts = orderedInputPorts.map(port => port.name -> port).toMap
   val io: TestbenchIO[I] = new TestbenchIO[I](this)
 
 /** Internal FIRRTL input ports derived from the DUT, excluding its automatically connected clock. */
@@ -77,9 +80,11 @@ final class TestbenchInputs[PARAM <: Parameter] private[tblib] (
     TypeImpl
   ): Type =
     if !populated then
-      source.toMlirType
+      val tpe    = source.toMlirType
+      val fields = Seq.tabulate(tpe.getBundleNumFields.toInt)(tpe.getBundleFieldByIndex)
+      val inputs = TestbenchConnections.exposed(fields).map(i => fields(i).getName).toSet
       source.elements
-        .filter(field => field.isFlipped && field.name != "clock")
+        .filter(field => field.isFlipped && inputs.contains(field.name))
         .foreach: field =>
           Flipped(field.name, field.dataType)
       populated = true
@@ -94,6 +99,8 @@ trait TestbenchGenerator[
     extends Generator[PARAM, L, TestbenchInputs[PARAM], P]:
   def dut:   Generator[PARAM, L, I, P]
   def clock: ClockGenerator
+
+  override def moduleName(parameter: PARAM): String = s"${dut.moduleName(parameter)}TestBench"
 
   final override def interface(parameter: PARAM): TestbenchInputs[PARAM] =
     new TestbenchInputs(parameter, dut.interface(parameter))
@@ -195,30 +202,50 @@ trait TestbenchGenerator[
     L,
     InstanceContext
   ) ?=> Unit =
-    // clock
     val clock = this.clock.generator.instantiate(this.clock.parameter)
+    val dut   = this.dut.instantiate(parameter)
+    val io    = summon[Interface[TestbenchInputs[PARAM]]]
 
-    // io
-    val io  = summon[Interface[TestbenchInputs[PARAM]]]
-    val dut = this.dut.instantiate(parameter)
-    dut.io.field[ClockType]("clock") := clock.io.clock
-    io.getType.elements.foreach: field =>
-      dut.io.field[Connectable](field.name) :<= io.field[Connectable](field.name)
+    def ioPorts[T <: HWInterface[?]](interface: Interface[T]): Seq[(FirrtlBundleField, Value)] =
+      val tpe = interface.getType.toMlirType
+      Seq.tabulate(tpe.getBundleNumFields.toInt): i =>
+        val field = tpe.getBundleFieldByIndex(i)
+        (field, interface.field[Connectable](field.getName).refer)
 
-    // probe
-    probe.getType.elements.indices.foreach: index =>
-      val destination = summon[OpenSubfieldApi].op(probe.refer, index, locate)
-      destination.operation.appendToBlock()
-      val source      = summon[OpenSubfieldApi].op(dut.probe.refer, index, locate)
-      source.operation.appendToBlock()
-      summon[RefDefineApi].op(destination.result, source.result, locate).operation.appendToBlock()
+    def probePorts(tpe: Type, refer: Value): Seq[(FirrtlBundleField, Value)] =
+      Seq.tabulate(tpe.getBundleNumFields.toInt): i =>
+        val field    = tpe.getBundleFieldByIndex(i)
+        val subfield = summon[OpenSubfieldApi].op(refer, i, locate)
+        subfield.operation.appendToBlock()
+        (field, subfield.result)
+
+    TestbenchConnections.connect(
+      ioPorts(dut.io) ++ probePorts(dut.probe.getType.toMlirType, dut.probe.refer),
+      ioPorts(clock.io),
+      (ioPorts(io) ++ probePorts(probe.getType.toMlirType, probe.refer))
+        .map((field, value) => field.getName -> value)
+        .toMap
+    )
+
+  /** Drives all non-clock DUT inputs using a DPI step inferred from the lowered IR. */
+  protected final def step(
+  )(
+    using Arena,
+    Context,
+    Block,
+    TestbenchContext[I],
+    TestbenchGeneratorApi
+  ): Unit =
+    summon[TestbenchGeneratorApi].step(summon[TestbenchContext[I]])()
 
   def simulation(parameter: PARAM): (
     Arena,
     Context,
     Block,
     TestbenchContext[I]
-  ) ?=> Unit
+  ) ?=> Unit =
+    import me.jiuyang.tblib.default.given
+    step()
 
 /** Builds a unit testbench and exports its IR, DPI interface, or SystemVerilog. */
 trait TestbenchGeneratorApi:
@@ -232,6 +259,16 @@ trait TestbenchGeneratorApi:
     ): Unit
 
   extension [I <: HWInterface[?]](testbench: TestbenchContext[I])
+    /** Infers stimulus arguments from HW input types, connects them, and finishes on `done`. `done` and `status` are
+      * reserved control names. Signless HW inputs use unsigned DPI arguments.
+      */
+    def step(
+    )(
+      using Arena,
+      Context,
+      Block
+    ): Unit
+
     /** Runs once at simulation startup. */
     def initial(
       body: Block ?=> Unit
@@ -305,6 +342,14 @@ trait TestbenchGeneratorApi:
     ): Unit
 
   extension (module: Module)
+    /** Takes ownership of a linked FIRRTL testbench, lowers it and installs simulation logic. */
+    def buildTestbench[I <: HWInterface[?]](
+      buildSimulation: (Block, TestbenchContext[I]) ?=> Unit
+    )(
+      using Arena,
+      Context
+    ): Module
+
     /** Returns the complete testbench as MLIR bytecode. */
     def toMlirBytecode(
       using Arena

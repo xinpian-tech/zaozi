@@ -4,6 +4,7 @@ package me.jiuyang.stdlib.default
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
+import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -27,7 +28,7 @@ case class RamParameter(
 given upickle.default.ReadWriter[RamParameter] = upickle.default.macroRW
 
 class RamLayers(parameter: RamParameter) extends LayerInterface(parameter):
-  def layers = Seq.empty
+  def layers = Seq(Layer("Verification"))
 
 class RamIO(parameter: RamParameter) extends HWBundle(parameter):
   /** Clock used for writes and optional storage reset. */
@@ -87,3 +88,14 @@ object Ram extends Generator[RamParameter, RamLayers, RamIO, RamProbe]:
         readData := entry
       }
     io.readData := readData
+
+    layer("Verification"):
+      given ClockEvent = posedge(io.clock)
+      val enabled      = io.resetN.asBool
+      Cover(writeEnable.S, enabled, "ram_write")
+      Cover((io.chipSelectN & !io.writeN).S, enabled, "ram_write_blocked_by_select")
+      Cover((!io.chipSelectN & io.writeN).S, enabled, "ram_write_disabled")
+      Cover((writeEnable & (io.readAddress === io.writeAddress)).S, enabled, "ram_read_write_same_address")
+      Cover((writeEnable & (io.readAddress =/= io.writeAddress)).S, enabled, "ram_read_write_other_address")
+      Cover((io.readData === 0.U(parameter.width)).S, enabled, "ram_read_zero")
+      Cover((io.readData === ((BigInt(1) << parameter.width) - 1).U(parameter.width)).S, enabled, "ram_read_ones")

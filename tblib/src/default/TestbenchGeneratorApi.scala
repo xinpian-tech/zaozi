@@ -24,7 +24,7 @@ import org.llvm.circt.scalalib.capi.dialect.emit.{DialectApi as EmitDialectApi, 
 import org.llvm.circt.scalalib.capi.dialect.hw.{DialectApi as HWDialectApi, HWModulePort, TypeApi as HWTypeApi, given}
 import org.llvm.circt.scalalib.capi.dialect.comb.{DialectApi as CombDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{DialectApi as LTLDialectApi, given}
-import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, given}
+import org.llvm.circt.scalalib.capi.dialect.seq.{DialectApi as SeqDialectApi, TypeApi as SeqTypeApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sim.{DPIArgumentApi, DPIDirection, DialectApi as SimDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.sv.{DialectApi as SVDialectApi, given}
 import org.llvm.circt.scalalib.capi.dialect.verif.{DialectApi as VerifDialectApi, given}
@@ -73,6 +73,30 @@ given TestbenchGeneratorApi with
       port.connected = true
 
   extension [I <: HWInterface[?]](testbench: TestbenchContext[I])
+    def step(
+    )(
+      using Arena,
+      Context,
+      Block
+    ): Unit =
+      val ports     = testbench.orderedInputPorts
+      val arguments = ports.map: port =>
+        require(!Set("done", "status").contains(port.name), s"DUT input uses a reserved step name: ${port.name}")
+        val tpe = port.argument.getType
+        require(tpe.isInteger, s"automatic step requires an integer HW input: ${port.name}")
+        DpiArg(port.name, DPIDirection.Out, tpe.integerTypeGetWidth)
+      val function  = testbench.dpiFunction(
+        "step",
+        Some("zaozi_step"),
+        arguments ++ Seq(
+          DpiArg("done", DPIDirection.Out, 1),
+          DpiArg("status", DPIDirection.Return, 32, signed = true)
+        )
+      )
+      val values    = testbench.dpiCall(function, Seq.empty, None)
+      ports.foreach(port => port.connect(values(port.name)))
+      testbench.finish(values("done"), true)
+
     def initial(
       body: Block ?=> Unit
     )(
@@ -191,12 +215,12 @@ given TestbenchGeneratorApi with
     finally symbolTable.destroy()
 
   private def lowerFIRRTLToHW(
-    module:        Module,
-    testbenchName: String
+    module: Module
   )(
     using Arena,
     Context
-  ): Unit =
+  ): HWModule =
+    val testbenchName  = FirrtlTestbench.circuitName(module)
     val firtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
     try
       val pm = summon[PassManagerApi].passManagerCreate
@@ -210,6 +234,8 @@ given TestbenchGeneratorApi with
         )
       finally pm.destroy()
     finally firtoolOptions.destroy
+    require(module.getOperation.verify, "invalid lowered unit under test")
+    findHWModule(module, testbenchName)
 
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: TestbenchGenerator[PARAM, L, I, P]
@@ -278,29 +304,28 @@ given TestbenchGeneratorApi with
       Context
     ): Module =
       val module = Elaborate(generator, parameter)
+      module.buildTestbench[I]:
+        generator.simulation(parameter)
+
+  extension (module: Module)
+    def buildTestbench[I <: HWInterface[?]](
+      buildSimulation: (Block, TestbenchContext[I]) ?=> Unit
+    )(
+      using Arena,
+      Context
+    ): Module =
       try
         // Lower modules from firrtl to hw
-        val testbenchName = generator.moduleName(parameter)
-        lowerFIRRTLToHW(module, testbenchName)
-        require(module.getOperation.verify, "invalid lowered unit under test")
+        val testbenchModule = lowerFIRRTLToHW(module)
 
-        // Check ports and args mismatch
-        val testbenchModule = findHWModule(module, testbenchName)
-        val hwPorts         = testbenchModule.ports
-        val interface       = generator.interface(parameter)
-        interface.toMlirType
-        val fields          = interface.elements
-        require(fields.forall(_.isFlipped), "testbench IO must contain only inputs; observe DUT signals through Probe")
+        // The lowered IR is the source of truth for stimulus names, order and types.
+        val hwPorts = testbenchModule.ports
         require(
-          hwPorts.size == fields.size && hwPorts
-            .zip(fields)
-            .forall: (port, field) =>
-              port.name == field.name &&
-                port.direction == PortDirection.Input,
-          "lowered HW ports do not match the testbench interface"
+          hwPorts.forall(_.direction == PortDirection.Input),
+          "testbench IO must contain only inputs; observe DUT signals through Probe"
         )
-        given Block         = testbenchModule.block
-        val block           = summon[Block]
+        given Block = testbenchModule.block
+        val block   = summon[Block]
 
         // Find the clock instance created by architecture.
         val clockInstance = Iterator
@@ -311,6 +336,11 @@ given TestbenchGeneratorApi with
               operation.getInherentAttributeByName("instanceName").stringAttrGetValue == "clock"
           )
           .getOrElse(throw new IllegalStateException("testbench clock instance is missing"))
+        require(clockInstance.getNumResults == 1, "testbench clock instance must provide exactly one clock output")
+        require(
+          summon[SeqTypeApi].isClock(clockInstance.getResult(0).getType),
+          "testbench clock output must have Clock type"
+        )
         val arguments     = hwPorts.indices.map(index => block.getArgument(index.toLong))
 
         // Remove hw.output first and append it later
@@ -324,13 +354,15 @@ given TestbenchGeneratorApi with
           val inputPorts   = hwPorts
             .zip(arguments)
             .map { (port, argument) =>
-              port.name -> new TestbenchPort[Data](port.name, argument)
+              new TestbenchPort[Data](port.name, argument)
             }
-            .toMap
           given testbench: TestbenchContext[I] =
             new TestbenchContext[I](clock, fallingClock, inputPorts)
-          generator.simulation(parameter)
-          hwPorts.foreach(port => require(inputPorts(port.name).connected, s"DUT input is not connected: ${port.name}"))
+          buildSimulation(
+            using block,
+            testbench
+          )
+          inputPorts.foreach(port => require(port.connected, s"DUT input is not connected: ${port.name}"))
           hwPorts.indices.reverse.foreach(block.eraseArgument)
           testbenchModule.operation.setInherentAttributeByName(
             "module_type",
