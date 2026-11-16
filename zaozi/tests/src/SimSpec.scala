@@ -39,10 +39,10 @@ object SimSpec extends TestSuite:
             ):
               val clock    = summon[Block].getArgument(0).toClock
               val enable   = summon[Block].getArgument(1)
-              val register = summon[SVApi].reg(8.integerTypeGet, "value")
+              val register = summon[SVApi].reg(8.integerTypeUnsignedGet, "value")
               summon[SVApi].onClock(clock, Some(enable)):
                 val value = summon[SVApi].dpiCallProcedural(first)("value")
-                assert(value.getType.equal(8.integerTypeGet))
+                assert(value.getType.equal(8.integerTypeUnsignedGet))
                 summon[SVApi].dpiCallProcedural(second, Seq(value))
                 summon[SVApi].nonBlockingAssign(register, value)
               summon[HWApi].output(Seq.empty)

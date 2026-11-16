@@ -67,7 +67,7 @@ given SVApi with
         symbol = symbol,
         verilogName = cName,
         arguments = arguments.map { arg =>
-          val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+          val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeUnsignedGet
           summon[DPIArgumentApi].createDPIArgument(arg.name, tpe, arg.direction)
         },
         location = locate
@@ -95,13 +95,14 @@ given SVApi with
     inArgs
       .zip(inputs)
       .foreach: (arg, input) =>
-        val tpe      = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+        val tpe      = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeUnsignedGet
         val expected = if arg.direction == DPIDirection.InOut then tpe.inOutTypeGet() else tpe
         require(input.getType.equal(expected), s"DPI input type mismatch: ${arg.name}")
     val call = summon[FuncCallProceduralApi].op(
       callee = function.symbol,
       inputs = inputs,
-      resultTypes = outArgs.map(arg => if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet),
+      resultTypes =
+        outArgs.map(arg => if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeUnsignedGet),
       location = locate
     )
     call.operation.appendToBlock()

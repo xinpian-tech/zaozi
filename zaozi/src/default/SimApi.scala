@@ -56,7 +56,7 @@ given SimApi with
       symbol = symbol,
       verilogName = cName,
       arguments = arguments.map { arg =>
-        val argType = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+        val argType = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeUnsignedGet
         summon[DPIArgumentApi].createDPIArgument(arg.name, argType, arg.direction)
       },
       location = locate
@@ -83,7 +83,8 @@ given SimApi with
       clock = clock,
       enable = enabled,
       inputs = inputs,
-      resultTypes = outArgs.map(arg => if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet),
+      resultTypes =
+        outArgs.map(arg => if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeUnsignedGet),
       location = locate
     )
     call.operation.appendToBlock()

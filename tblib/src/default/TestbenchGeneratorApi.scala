@@ -145,11 +145,12 @@ given TestbenchGeneratorApi with
       val outputs   =
         function.arguments.filter(arg => arg.direction == DPIDirection.Out || arg.direction == DPIDirection.Return)
       val registers = outputs.map: arg =>
-        val tpe = if arg.signed then arg.width.integerTypeSignedGet else arg.width.integerTypeGet
+        // Hardware connections and process conditions use signless bit vectors.
+        val tpe = arg.width.integerTypeGet
         arg.name -> sv.reg(tpe, s"${function.symbol}_${arg.name}")
       onClock(testbench.fallingClock, enabled):
         val values = sv.dpiCallProcedural(function, inputs)
-        registers.foreach((name, register) => sv.nonBlockingAssign(register, values(name)))
+        registers.foreach((name, register) => sv.nonBlockingAssign(register, values(name).asSignless))
       DpiCallResult(registers.map((name, register) => name -> register.readInOut).toMap)
 
     def finish(
