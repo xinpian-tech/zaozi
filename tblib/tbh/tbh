@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Build and run a testbench from DUT/clock IR or a Scala testbench source."""
+
+import argparse
+import ast
+import math
+import os
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+
+from zaozi_tb.data import json_value
+from zaozi_tb.launcher import launch
+
+
+@dataclass
+class Options(argparse.Namespace):
+    dut: Path | None = None
+    dut_mlir: Path | None = None
+    clock_mlir: Path | None = None
+    parameter: Path | None = None
+    driver: Path = Path(".")
+    out: Path = Path(".")
+    output: Path | None = None
+    jobs: int = 4
+    max_time_ns: float = 1000
+    wall_timeout: float = 30
+    bind: list[str] = field(default_factory=list)
+
+
+def input_file(value: str) -> Path:
+    path = Path(value).resolve()
+    if not path.is_file():
+        raise argparse.ArgumentTypeError(f"File not found: {value}")
+    return path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, allow_abbrev=False,
+        usage="%(prog)s --dut-mlir DUT.mlirbc --clock-mlir CLOCK.mlirbc --driver FILE --out DIR [OPTIONS]\n"
+        + "       %(prog)s --dut TestBench.scala --driver FILE --out DIR [OPTIONS]",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    inputs = parser.add_argument_group(
+        "inputs", "Choose --dut, or both --dut-mlir and --clock-mlir. These modes cannot be combined."
+    )
+    dut_input = inputs.add_mutually_exclusive_group(required=True)
+    _ = dut_input.add_argument("--dut", type=input_file, metavar="TestBench.scala",
+                              help="Scala testbench source; defines its own DUT and clock")
+    _ = dut_input.add_argument("--dut-mlir", type=input_file, metavar="FILE",
+                            help="complete linked FIRRTL DUT circuit; requires --clock-mlir")
+    _ = inputs.add_argument("--clock-mlir", type=input_file, metavar="FILE",
+                            help="complete linked FIRRTL clock circuit; requires --dut-mlir")
+    _ = inputs.add_argument("--parameter", type=input_file, metavar="JSON",
+                            help="Scala parameter JSON (default: parameter.json beside source)")
+    _ = inputs.add_argument("--driver", type=input_file, required=True, metavar="FILE",
+                            help="Python or C++ DPI driver (required)")
+    outputs = parser.add_argument_group("outputs")
+    _ = outputs.add_argument("--out", type=Path, required=True, metavar="DIR",
+                             help="directory for generated artifacts and build files (required)")
+    _ = outputs.add_argument("-o", "--output", type=Path, metavar="FILE",
+                             help="coverage report (.txt) or waveform (.vcd) (default: OUT/coverage.txt)")
+    simulation = parser.add_argument_group("simulation")
+    _ = simulation.add_argument("-j", "--jobs", type=int, default=4, metavar="N",
+                                help="parallel build jobs (default: %(default)s)")
+    _ = simulation.add_argument("--max-time-ns", type=float, default=1000, metavar="NS",
+                                help="simulation time limit in nanoseconds (default: %(default)s)")
+    _ = simulation.add_argument("--wall-timeout", type=float, default=30, metavar="SECONDS",
+                                help="simulation wall-clock timeout (default: %(default)s)")
+    _ = simulation.add_argument("--bind", action="append", default=[], metavar="SYMBOL=FUNCTION",
+                                help="map a DPI symbol to a Python function; repeat for multiple bindings")
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return 0
+    args = Options()
+    _ = parser.parse_args(namespace=args)
+    try:
+        if args.dut:
+            if args.clock_mlir:
+                raise ValueError("--clock-mlir cannot be combined with --dut")
+            if args.dut.suffix != ".scala":
+                raise ValueError("--dut must be a .scala testbench file")
+            args.parameter = args.parameter or args.dut.with_name("parameter.json")
+            if not isinstance(json_value(args.parameter.read_text()), dict):
+                raise ValueError("Parameter file must contain a JSON object")
+            source = ["--testbench", str(args.dut), "--parameter", str(args.parameter)]
+        else:
+            if not args.dut_mlir or not args.clock_mlir:
+                raise ValueError("--dut-mlir requires --clock-mlir")
+            if args.parameter:
+                raise ValueError("--parameter applies only to a Scala testbench")
+            source = ["--dut-mlir", str(args.dut_mlir), "--clock-mlir", str(args.clock_mlir)]
+        if args.jobs < 1 or any(not math.isfinite(v) or v <= 0 for v in (args.max_time_ns, args.wall_timeout)):
+            raise ValueError("Jobs and time limits must be positive and finite")
+        args.out = args.out.resolve()
+        report = args.output.resolve() if args.output else args.out / "coverage.txt"
+        if report.suffix not in (".txt", ".vcd"):
+            raise ValueError("--output must end in .txt or .vcd")
+        if args.driver.suffix not in (".py", ".cc", ".cpp", ".cxx"):
+            raise ValueError("Driver must be a Python or C++ source")
+        if args.driver.suffix == ".py":
+            _ = ast.parse(args.driver.read_text(), filename=str(args.driver))
+        elif args.bind:
+            raise ValueError("--bind applies only to Python drivers")
+        # Resolve all caller paths before running Mill at the project root.
+        repository = next((p for p in (Path.cwd(), *Path.cwd().parents) if (p / "build.mill").is_file()), None)
+        if repository is None:
+            raise ValueError("Run tbh inside a project containing build.mill and tblib")
+        args.out.mkdir(parents=True, exist_ok=True)
+        local_driver = args.out / ("dpi_impl" + args.driver.suffix)
+        existing = list(args.out.glob("dpi_impl.*"))
+        if any(path != local_driver for path in existing):
+            raise ValueError(f"Conflicting DPI drivers in {args.out}")
+        if local_driver.is_symlink():
+            if local_driver.resolve() != args.driver.resolve():
+                local_driver.unlink()
+        elif local_driver.exists() and local_driver.resolve() != args.driver.resolve():
+            raise ValueError(f"Existing driver would be replaced: {local_driver}")
+        if not local_driver.exists():
+            local_driver.symlink_to(args.driver.resolve())
+        command = [str(args.driver), *source, "--out", str(args.out), "--report", str(report),
+                   "--jobs", str(args.jobs), "--max-time-ns", str(args.max_time_ns),
+                   "--wall-timeout", str(args.wall_timeout)]
+        for binding in args.bind:
+            command.extend(("--bind", binding))
+        os.chdir(repository)
+        return launch(command)
+    except (OSError, ValueError, TypeError, SyntaxError) as error:
+        parser.error(str(error))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

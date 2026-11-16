@@ -1,27 +1,34 @@
-import platform
 import os
-import lit.formats
-from lit.llvm import llvm_config
-from lit.llvm.subst import ToolSubst
+import sys
+import urllib.parse
+
+from lit.TestingConfig import TestingConfig
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ScalaCliTest import ScalaCliTest
+from ScalaCliTest import (
+    ScalaCliTest,  # Requires the local search path above.
+)
 
-config.name = 'ZAOZI'
+# Injected by lit when this configuration is executed.
+config: TestingConfig = globals()["config"]
+
+config.name = "ZAOZI"
 config.test_format = ScalaCliTest(True)
 config.suffixes = [".scala", ".sc"]
 # %REPOROOT resolves to the zaozi project root so lit fixtures can reach
 # repo-relative resources (e.g. circtlib/tests/resources/gcd.mlir) without
 # embedding paths from out/. test_source_root is .../zaozi/lit/tests, so the
 # project root is three directories up.
-config.repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
+config.repo_root = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir)
+)
 config.substitutions = [
-    ('%SCALAVERSION', config.scala_version),
-    ('%RUNCLASSPATH', ':'.join(config.run_classpath)),
-    ('%JAVAHOME', config.java_home),
-    ('%JAVALIBRARYPATH', ':'.join(config.java_library_path)),
-    ('%JAVAOPTS', ' '.join(config.java_opts)),
-    ('%REPOROOT', config.repo_root),
+    ("%SCALAVERSION", config.scala_version),
+    ("%RUNCLASSPATH", ":".join(config.run_classpath)),
+    ("%JAVAHOME", config.java_home),
+    ("%JAVALIBRARYPATH", ":".join(config.java_library_path)),
+    ("%JAVAOPTS", " ".join(config.java_opts)),
+    ("%REPOROOT", config.repo_root),
 ]
 config.test_source_root = os.path.dirname(__file__)
 
@@ -31,10 +38,20 @@ config.test_source_root = os.path.dirname(__file__)
 # nix develop provides the locked local repository through
 # COURSIER_REPOSITORIES.
 env_vars_to_pass = [
-    "SCALA_CLI_HOME", "JAVA_OPTS", "JAVA_TOOL_OPTIONS",
-    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
-    "http_proxy", "https_proxy", "all_proxy", "no_proxy",
-    "COURSIER_CACHE", "COURSIER_REPOSITORIES", "COURSIER_MIRRORS"
+    "SCALA_CLI_HOME",
+    "JAVA_OPTS",
+    "JAVA_TOOL_OPTIONS",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "COURSIER_CACHE",
+    "COURSIER_REPOSITORIES",
+    "COURSIER_MIRRORS",
 ]
 for var in env_vars_to_pass:
     if var in os.environ:
@@ -45,11 +62,10 @@ for var in env_vars_to_pass:
 # proxy URL into JVM-property JAVA_OPTS so scala-cli's resolver routes through
 # it. Without this, scala-cli connects directly to repo1.maven.org (resolved
 # to a Cloudflare IP) and stalls in SYN-SENT inside the sandbox.
-import urllib.parse
 java_opts_extra = []
 for env_name, host_prop, port_prop in [
     ("HTTPS_PROXY", "https.proxyHost", "https.proxyPort"),
-    ("HTTP_PROXY",  "http.proxyHost",  "http.proxyPort"),
+    ("HTTP_PROXY", "http.proxyHost", "http.proxyPort"),
 ]:
     proxy_url = os.environ.get(env_name)
     if proxy_url:
@@ -60,4 +76,6 @@ for env_name, host_prop, port_prop in [
             java_opts_extra.append(f"-D{port_prop}={parsed.port}")
 if java_opts_extra:
     existing = config.environment.get("JAVA_OPTS", "")
-    config.environment["JAVA_OPTS"] = (existing + " " + " ".join(java_opts_extra)).strip()
+    config.environment["JAVA_OPTS"] = (
+        existing + " " + " ".join(java_opts_extra)
+    ).strip()

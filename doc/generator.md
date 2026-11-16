@@ -120,16 +120,233 @@ sub1.io.b := y
 
 ## Elaboration
 
-Zaozi supports invoking any generator directly from the command line without additional code. By default, the `main` method has two subcommands: `config` and `design`.
+Zaozi supports invoking any generator directly from the command line without additional code. By default, the `main` method has three subcommands: `config`, `design`, and `linked`.
 
 - The `config` subcommand parses command-line arguments into a parameter and serializes it to a JSON file.
-- The `design` subcommand accepts a JSON file to elaborate MLIR Bytecode.
+- The `design` subcommand accepts a JSON file and emits separate module circuits as `.mlirbc` files, including instantiated dependencies. Link these files before using the complete design.
+- The `linked` subcommand accepts the same JSON file, runs `Elaborate` to link the generator and all its instantiated dependencies, and writes one `<moduleName>.mlirbc` containing the complete FIRRTL circuit. Submodule definitions and instance hierarchy remain in that file; separate child bytecode files are not emitted.
 
 Users can specify the output directory by setting the environment variable `ZAOZI_OUTDIR`, as shown below:
 
 ```shell
 ./gcd.jar config config.json --width 32 --use-async-reset false
 ZAOZI_OUTDIR=result ./gcd.jar design config.json
+ZAOZI_OUTDIR=linked-result ./gcd.jar linked config.json
 ```
 
 Additionally, users can provide a `GeneratorApi` with `mainImpl` to support custom elaboration flows, or simply override the `main` method in a specific generator.
+
+## Python testbench stimulus
+
+`TestbenchGenerator.moduleName(parameter)` defaults to
+`dut.moduleName(parameter) + "TestBench"`. A Scala testbench only needs to declare
+its DUT and clock; override `moduleName` only when a custom name is wanted.
+The harness reads the top from the generated IR's module hierarchy; it does not
+write or read a separate top-name metadata file. Ambiguous tops are rejected. Generation uses an
+isolated temporary directory to identify its output, so older artifacts cannot
+be selected accidentally.
+
+`TestbenchGenerator` supplies a default simulation: it reads the lowered HW
+wrapper's input ports in IR order, declares `step` / `zaozi_step`, and connects
+the returned stimulus values to those ports. Names and widths come entirely
+from the IR; no parameter fields or Scala IO reflection are used to construct
+this DPI signature. The wrapper already excludes the generated clock.
+
+The automatic step adds `done` (one-bit output) and `status` (signed 32-bit
+return), so these names are reserved. It runs on falling edges and finishes
+when `done` is asserted. Only integer stimulus ports are supported; signless HW
+values use unsigned DPI arguments. DUT outputs and Probe observations are not
+automatically added to this stimulus-only callback. Override `simulation` for
+custom behavior; it can call `step()` to reuse the automatic stimulus setup.
+DUT elaboration still takes its parameter as before.
+
+Both input paths use the same default port-selection and connection rules in
+`default.TestbenchConnections`: identify the single clock by FIRRTL type, connect
+stimulus inputs, and forward reference outputs. The `default` package supplies
+implementations used by both paths, not a separate IR-only backend.
+A Scala `TestbenchGenerator` may override `architecture` to customize FIRRTL
+connections and `simulation` to customize HW simulation logic. Its default
+`architecture` adapts typed IO and probe values to the shared connection builder;
+its default `simulation` calls `step()`. Both paths finish through `buildTestbench`.
+
+Use `tbh` with one of two mutually exclusive inputs:
+
+```shell
+tbh --dut-mlir dut.mlirbc --clock-mlir clock.mlirbc \
+  --driver dpi_impl.py --out out/sim
+
+tbh --dut path/to/QueueTestBench.scala \
+  --parameter parameter.json --driver dpi_impl.py --out out/sim
+```
+
+IR mode takes two complete, linked FIRRTL circuits. Each circuit's name identifies
+its main module; multiple circuits, missing dependencies and invalid IR are rejected.
+The DUT must have exactly one Clock input. The clock module must have no inputs
+and exactly one Clock output. Their names need not be `clock`: tblib connects them
+by type and direction. Multiple clocks are unsupported. Clock timing comes entirely
+from the clock IR. The generated top is the DUT top name followed by `TestBench`.
+Use the generator's `linked` command to produce each complete circuit.
+
+Scala mode compiles the selected file against the project's tblib classpath,
+then calls its generated `design` entry point. The source must define the generator
+object with the same name as the file. The testbench defines its own top and clock.
+`--parameter` defaults to `parameter.json` beside the Scala file and is rejected
+in IR mode. This path supports custom probe connections and simulation logic.
+
+`--driver` is required and accepts a Python (`.py`) or C++ (`.cc`, `.cpp`, `.cxx`)
+source file. `--out` is required. `-o`/`--output` chooses a `.vcd`
+waveform or `.txt` coverage report; the default is `coverage.txt` inside `--out`.
+`--jobs`, `--max-time-ns`, `--wall-timeout` and `--bind` apply to both modes.
+The command must run within a Mill project providing a `tblib` module.
+
+Python owns argument parsing, defaults, source selection and simulator execution.
+Scala exposes `Testbench(dut, clock)`, which borrows two IR modules and returns
+a complete simulation module. File IO and process setup live in the harness
+adapter `tblib/tbh/TestbenchMain.scala`; it receives two resolved paths and
+`ZAOZI_OUTDIR` from Python.
+Both input modes produce testbench bytecode, DPI JSON and SystemVerilog, then use
+the same simulator build/run flow. DUT Verification layers remain part of the design.
+
+For a testbench with a custom name `SyncQueueTestBench`, a simulation directory
+contains the inputs, the user's driver and the outputs:
+
+```text
+syncqueue-verilator/
+  run.py
+  dpi_impl.py
+  SyncQueueTestBench.json
+  SyncQueueTestBench.mlirbc
+  SyncQueueTestBench.sv
+  wave.vcd
+  .build/                     # All intermediate RTL, C API and compiler files
+```
+
+The harness writes `run.py`; the DUT supplies only the DPI implementation.
+Edit `dpi_impl.py`, then run from any working directory:
+
+```shell
+python3 out/syncqueue-verilator/run.py
+```
+
+The entry point consumes the existing testbench inputs. The framework obtains
+its toolchain from the repository's pinned nixpkgs and handles compilation,
+Python loading, live console output and VCD capture. It does not overwrite `dpi_impl.py` or
+re-elaborate the input design on this path. All intermediate files stay under
+`.build/`; Python bytecode caches are disabled for the user driver. Generation,
+compilation, Python prints and errors go directly to the terminal; no log files
+are written.
+
+For the SyncQueue interface, write `step()` returning the `out`, `inout` and
+`return` fields named in `SyncQueueTestBench.json`:
+
+```python
+def step():
+    return {
+        "resetN": 1,
+        "pushRequestN": 1,
+        "popRequestN": 1,
+        "diagnosticN": 1,
+        "dataIn": 0,
+        "done": 1,
+        "status": 0,
+    }
+```
+
+The generated testbench calls this function on falling clock edges. `in` and
+`inout` parameters, when present, are passed as keyword arguments. The example
+has no observation inputs, so Python supplies stimulus; DUT outputs are visible
+in the VCD, without an additional result checker.
+
+With Zaozi's Nix package on `PATH`, run these commands from a project that
+has a `build.mill` and a `<module>/tb/src` testbench module:
+
+```shell
+nix shell path:/path/to/zaozi#tbh
+tbh --dut stdlib/tb/src/sync_queue/SyncQueueTestBench.scala \
+  --driver stdlib/tb/src/sync_queue/dpi_impl.py --out out/sim -o wave.vcd
+```
+
+The default `zaozi-assembly` package includes `bin/tbh`; the smaller `tbh`
+package is also available separately. The packaged command supplies Python,
+Verilator, CIRCT and the other harness tools. The project still supplies its
+own Mill modules, Scala testbench source, `parameter.json` and `dpi_impl.py`.
+In this repository's Nix development shell, `tbh` is also on `PATH`.
+To invoke the source checkout directly, use `./tblib/tbh/tbh`.
+The CLI uses Python’s standard-library `argparse`, with no extra CLI dependencies.
+Use `tbh --help` for usage and grouped input, output and simulation options.
+`tbh` validates the selected inputs, elaborates the testbench, builds the CFFI
+bridge and links the Verilator executable, then checks the Python DPI implementation
+before simulation. Verilator's raw coverage data and compiler files stay under `.build/`.
+The report is the unmodified plain-text output of
+`verilator_coverage --report summary,hier`. Native annotated source files are
+written to `.build/coverage/` with `--annotate-all --annotate-points --annotate-min 1`.
+These contain individual coverage points and hit counts; `-` marks uncovered
+points and `+` marks covered points. Coverage requires at least one hit.
+The harness compiles the top-level layer bind files emitted by firtool so
+verification layers participate in simulation. Named `Cover` properties appear
+as `type=user` points in the annotated sources. Only properties
+elaborated for the selected parameters are counted. Verilator 5.050 has an
+[inline SVA expression-coverage bug](https://github.com/verilator/verilator/issues/7898);
+the harness disables expression coverage on that version while retaining user
+`Cover` coverage and the other coverage types.
+
+The tool links the selected driver into the output directory for subsequent `run.py`
+invocations. An existing regular driver file is never silently replaced. Drivers can resolve `__file__` to load their own adjacent resources;
+the harness does not prescribe or inspect a stimulus file format.
+The current SyncQueue driver supplies stimulus but contains no DUT-output
+assertions; successful simulation alone does not verify FIFO correctness.
+
+For another already generated testbench, use the reusable Python runner:
+
+```shell
+python3 tblib/tbh/run.py out/my-simulation
+```
+
+The simulation directory must contain one `.mlirbc`, the matching `.json`,
+and one `dpi_impl.py`, `.cc`, `.cpp` or `.cxx`. The harness derives the top module
+and links the directory's `run.py` to its own entry point.
+
+A single DPI function maps to `step()` by default. With multiple functions,
+Python function names default to the DPI symbols; `--bind symbol=callback`
+overrides a mapping. A C++ driver can instead define the exported C functions
+declared by the generated `.build/dpi/dpi_api.h` (include the framework's
+`native/capi.h` for C++ linkage) and be passed as the positional source file.
+
+Python exceptions and invalid output values produce a nonzero exit code.
+Simulation and wall-clock timeouts default to 1000 ns and 30 seconds; override
+them with `--max-time-ns` and `--wall-timeout`. Errors are printed to the terminal;
+the waveform recorded before a runtime failure is retained.
+
+The CLI and framework live together in `tblib/tbh`: `tbh` is the command entry,
+`run.py` launches generated simulation directories, and `zaozi_tb/` contains
+the framework and native sources. The interface JSON generates
+only C API declarations in `dpi_api.h`. For Python implementations, CFFI emits
+its bridge into `.build/`; fixed framework code loads the Python driver and
+checks returned values. C++ implementations export the same C API directly.
+Simulator scheduling and waveform capture use fixed framework sources. The
+initial implementation supports CIRCT's scalar `bit`,
+signed `byte`, `shortint`, `int` and `longint` interfaces. Unsupported vectors,
+arrays and four-state values are rejected rather than guessing their ABI;
+signed byte outputs must be in -128..127.
+
+For Python development, `pyrightconfig.json` checks Python sources under `tblib`
+and uses `.venv` for CFFI dependencies. Create it from the pinned Nix environment:
+
+```shell
+nix shell .#testbench-python -c python3 - <<'PY'
+import site
+import subprocess
+import sys
+from pathlib import Path
+
+subprocess.run([sys.executable, "-m", "venv", "--without-pip", ".venv"], check=True)
+packages = next(Path(".venv/lib").glob("python*/site-packages"))
+(packages / "nix-dependencies.pth").write_text("\n".join(site.getsitepackages()) + "\n")
+PY
+```
+
+The `.pth` file also makes the Nix dependency paths visible to static import
+resolution. Recreate this environment after updating the pinned Python packages.
+Run basedpyright from the repository root; also check `tblib/tbh/tbh` explicitly
+because the command entry has no `.py` extension. The declarations in
+`tblib/tbh/typings` describe the CFFI dynamic module.
