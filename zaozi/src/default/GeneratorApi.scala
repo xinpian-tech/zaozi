@@ -188,7 +188,8 @@ given GeneratorApi:
     ) = os.write.over(configFile, upickle.default.write(parameter))
 
     private def designImpl(
-      configFile: os.Path
+      configFile: os.Path,
+      linked:     Boolean = false
     )(
       using upickle.default.Reader[PARAM]
     ) =
@@ -203,8 +204,18 @@ given GeneratorApi:
         summon[LTLDialectApi].loadDialect
         summon[VerifDialectApi].loadDialect
 
-        generator.dumpMlirbc(upickle.default.read(os.read(configFile)))
-
+        val parameter = upickle.default.read[PARAM](os.read(configFile))
+        if linked then
+          val module = Elaborate(generator, parameter)
+          try
+            require(module.getOperation.verify, "invalid elaborated DUT circuit")
+            val bytecode  = new ByteArrayOutputStream
+            module.getOperation.writeBytecode(bytes => bytecode.write(bytes))
+            val directory = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", ""), os.pwd)
+            os.makeDir.all(directory)
+            os.write.over(directory / s"${generator.moduleName(parameter)}.mlirbc", bytecode.toByteArray)
+          finally module.destroy()
+        else generator.dumpMlirbc(parameter)
         summon[Context].destroy()
       finally arena.close()
 
@@ -219,8 +230,9 @@ given GeneratorApi:
           subcmd match
             case "config" => configImpl(generator.parseParameter(tail), configFile)
             case "design" => designImpl(configFile)
+            case "linked" => designImpl(configFile, linked = true)
         case _                                                                          =>
-          println("Need to specify a sub command and provide a config path: config/design <path>")
+          println("Need to specify a sub command and provide a config path: config/design/linked <path>")
           sys.exit(1)
 
 end given
