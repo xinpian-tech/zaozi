@@ -10,12 +10,12 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_FirrtlBundleFieldApi, 
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{BitCastApi, NodeApi, SubaccessApi, SubindexApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
   extension [R <: Referable[V]](ref: R)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -34,14 +34,14 @@ given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
       propagate[R, Bits](ref, tpe, bitcastOp.operation.getResult(0))
 
     def length(
-      using Arena,
+      using Zone,
       Context
     ) = ref.refer.getType.getVectorElementNum.toInt
 
     def ref(
       idx: Referable[UInt] | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -66,7 +66,7 @@ given [E <: Data, V <: Vec[E]]: VecApi[E, V] with
     def apply(
       idx: Referable[UInt] | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

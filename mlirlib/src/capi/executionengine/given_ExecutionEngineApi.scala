@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.llvm.mlir.scalalib.capi.executionengine
 
-import org.llvm.mlir.{CAPI, MlirExecutionEngine, MlirLogicalResult}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Module, given}
-import java.lang.foreign.{Arena, MemorySegment, ValueLayout}
 
 given ExecutionEngineApi with
   def executionEngineCreate(
@@ -14,63 +16,66 @@ given ExecutionEngineApi with
     enableObjectDump: Boolean,
     enablePIC:        Boolean
   )(
-    using arena:      Arena
+    using zone:       Zone
   ): ExecutionEngine =
     require(optLevel >= 0 && optLevel <= 3, "JIT optimization level must be between 0 and 3")
     ExecutionEngine(
-      CAPI.mlirExecutionEngineCreate(
-        arena,
-        module.segment,
-        optLevel,
-        sharedLibPaths.size,
-        sharedLibPaths.map(_.toStringRef).toMlirArray,
-        enableObjectDump,
-        enablePIC
+      nativeResult[MlirStructs.MlirExecutionEngine](out =>
+        mlirApi.mlirExecutionEngineCreate(
+          module.native,
+          optLevel,
+          sharedLibPaths.size,
+          sharedLibPaths.map(_.toStringRef).toMlirArray,
+          enableObjectDump,
+          enablePIC
+        )(out)
       )
     )
 
   extension (engine: ExecutionEngine)
-    inline def segment: MemorySegment = engine._segment
-    inline def sizeOf:  Int           = MlirExecutionEngine.sizeof().toInt
-    def isNull:         Boolean       = MlirExecutionEngine.ptr(engine.segment).address() == 0
-    def destroy():      Unit          = CAPI.mlirExecutionEngineDestroy(engine.segment)
-    def initialize():   Unit          = CAPI.mlirExecutionEngineInitialize(engine.segment)
+
+    inline def sizeOf: Int     = sizeof[MlirStructs.MlirExecutionEngine].toInt
+    def isNull:        Boolean = (!engine.native).ptr == null
+    def destroy():     Unit    = mlirApi.mlirExecutionEngineDestroy(engine.native)
+    def initialize():  Unit    = mlirApi.mlirExecutionEngineInitialize(engine.native)
     def invokePacked(
-      name:        String,
-      arguments:   Seq[MemorySegment]
+      name:       String,
+      arguments:  Seq[Ptr[?]]
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult =
       // InvokePacked's missing-symbol path leaves an llvm::Error unchecked in
       // some MLIR versions. LookupPacked consumes that error and returns null.
-      if engine.lookupPacked(s"_mlir_ciface_$name").address() == 0 then LogicalResult(MlirLogicalResult.allocate(arena))
+      if engine.lookupPacked(s"_mlir_ciface_$name") == null then LogicalResult(MlirStructs.MlirLogicalResult(0))
       else
-        val pointers =
-          if arguments.isEmpty then MemorySegment.NULL else arena.allocate(ValueLayout.ADDRESS, arguments.size)
-        arguments.zipWithIndex.foreach((argument, index) => pointers.setAtIndex(ValueLayout.ADDRESS, index, argument))
-        LogicalResult(CAPI.mlirExecutionEngineInvokePacked(arena, engine.segment, name.toStringRef.segment, pointers))
+        val pointers = nativeArray(arguments.map(_.asInstanceOf[Ptr[Byte]]))
+        LogicalResult(
+          nativeResult[MlirStructs.MlirLogicalResult](out =>
+            mlirApi.mlirExecutionEngineInvokePacked(engine.native, name.toStringRef.native, pointers)(out)
+          )
+        )
     def lookup(
       name: String
     )(
-      using Arena
-    ): MemorySegment =
-      CAPI.mlirExecutionEngineLookup(engine.segment, name.toStringRef.segment)
+      using Zone
+    ): Ptr[Byte] =
+      mlirApi.mlirExecutionEngineLookup(engine.native, name.toStringRef.native)
     def lookupPacked(
       name: String
     )(
-      using Arena
-    ): MemorySegment =
-      CAPI.mlirExecutionEngineLookupPacked(engine.segment, name.toStringRef.segment)
+      using Zone
+    ): Ptr[Byte] =
+      mlirApi.mlirExecutionEngineLookupPacked(engine.native, name.toStringRef.native)
     def registerSymbol(
       name:   String,
-      symbol: MemorySegment
+      symbol: Ptr[Byte]
     )(
-      using Arena
+      using Zone
     ): Unit =
-      CAPI.mlirExecutionEngineRegisterSymbol(engine.segment, name.toStringRef.segment, symbol)
+      mlirApi.mlirExecutionEngineRegisterSymbol(engine.native, name.toStringRef.native, symbol)
     def dumpToObjectFile(
       fileName: String
     )(
-      using Arena
+      using Zone
     ): Unit =
-      CAPI.mlirExecutionEngineDumpToObjectFile(engine.segment, fileName.toStringRef.segment)
+      mlirApi.mlirExecutionEngineDumpToObjectFile(engine.native, fileName.toStringRef.native)

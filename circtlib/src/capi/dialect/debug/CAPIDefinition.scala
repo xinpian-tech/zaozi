@@ -6,7 +6,7 @@ package org.llvm.circt.scalalib.capi.dialect.debug
 
 import org.llvm.mlir.scalalib.capi.ir.Context
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** Debug Dialect API
   * {{{
@@ -16,7 +16,7 @@ import java.lang.foreign.Arena
 
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi

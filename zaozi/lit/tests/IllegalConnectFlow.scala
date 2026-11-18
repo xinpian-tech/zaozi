@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class IllegalConnectFlow %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class IllegalConnectFlow %s --
 // RUN: rm -rf %t && mkdir -p %t && cd %t
 // RUN: %{test} config %t/config.json --width 8
 // RUN: %{test} design %t/config.json
@@ -12,8 +12,6 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.Interface
 import me.jiuyang.zaozi.valuetpe.*
-
-import java.lang.foreign.Arena
 
 case class IllegalConnectFlowParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[IllegalConnectFlowParameter] = upickle.default.macroRW

@@ -11,7 +11,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.DialectApi as FirrtlDialectAp
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import utest.*
 import me.jiuyang.zaozi.magic.macros.generator
 
@@ -32,15 +32,15 @@ class WidthBundle extends Bundle:
   val y = Aligned(SInt(8))
 
 object WidthSpec extends TestSuite:
-  private def withContext(body: (Arena, Context) ?=> Unit): Unit =
-    val arena = Arena.ofConfined()
+  private def withContext(body: (Zone, Context) ?=> Unit): Unit =
+    val zone = Zone.open()
     try
-      given Arena   = arena
+      given Zone    = zone
       given Context = summon[ContextApi].contextCreate
       summon[FirrtlDialectApi].loadDialect
       body
       summon[Context].destroy()
-    finally arena.close()
+    finally zone.close()
 
   val tests = Tests:
     test("Data"):

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.iomux.IOMux" --
+// DEFINE: %{test} = %t.bin
+// RUN: scala-cli --power package --force --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class "me.jiuyang.stdlib.iomux.IOMux" %s -o %t.bin
 // RUN: rm -rf %t.dir && mkdir -p %t.dir/32 %t.dir/64 %t.dir/empty
 // RUN: cd %t.dir/32 && %{test} config config.json --pinCount 9 --hsSlots 3 --dataWidth 32 --addressWidth 16 --routes '{"pin":0,"slot":0}' --routes '{"pin":0,"slot":1}' --routes '{"pin":1,"slot":0}' --routes '{"pin":8,"slot":0}' --routes '{"pin":8,"slot":2}'
 // RUN: cd %t.dir/32 && %{test} design config.json

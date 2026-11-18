@@ -185,7 +185,7 @@ object PluginSpec extends TestSuite:
           |import me.jiuyang.zaozi.valuetpe.*
           |import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
           |
-          |import java.lang.foreign.Arena
+          |import scala.scalanative.unsafe.Zone
           |
           |class NavBundle extends Bundle:
           |  val field1 = Aligned(UInt(8))
@@ -194,7 +194,7 @@ object PluginSpec extends TestSuite:
           |  def use(
           |    io: Referable[NavBundle]
           |  )(
-          |    using Arena,
+          |    using Zone,
           |    Block,
           |    Context,
           |    TypeImpl,

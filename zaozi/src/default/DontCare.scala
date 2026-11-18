@@ -9,13 +9,13 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [D <: Data, SINK <: Writable[D]]: DontCare[D, SINK] with
   extension (ref: SINK)
     def dontCare(
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

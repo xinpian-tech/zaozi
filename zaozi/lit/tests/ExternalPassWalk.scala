@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class ExternalPassWalkMain %s
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class ExternalPassWalkMain %s
 // RUN: %{test} -- %REPOROOT/circtlib/tests/resources/gcd.mlir 2>&1 | FileCheck %s
 
+import org.llvm.circt.scalalib.capi.dialect.comb.{given_DialectApi, DialectApi as CombDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_DialectApi, DialectApi as FirrtlDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.hw.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.hw.{given_DialectApi, DialectApi as HWDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.om.{given_DialectApi, DialectApi as OMDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.seq.{given_DialectApi, DialectApi as SeqDialectApi}
 import org.llvm.circt.scalalib.capi.dialect.sv.{given_DialectApi, DialectApi as SVDialectApi}
-import org.llvm.mlir.CAPI.mlirTypeIDCreate
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
 import org.llvm.mlir.scalalib.capi.pass.{*, given}
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, ValueLayout}
 import java.nio.file.{Files, Path}
 
 // Drives the planned end-to-end ExternalPass path against the actual GCD
@@ -36,36 +39,28 @@ object ExternalPassWalkMain:
   def main(args: Array[String]): Unit =
     require(args.length >= 1, "ExternalPassWalkMain expects a path to gcd.mlir as args(0)")
     val gcdMlirBytes = Files.readAllBytes(Path.of(args(0)))
-    val outer        = Arena.ofConfined()
+    val outer        = Zone.open()
     try
-      given Arena = outer
+      given Zone  = outer
       val context = summon[ContextApi].contextCreate
       try
         given Context = context
-        // gcd.mlir references hw, seq, comb, om plus sv.namehint and
-        // firrtl.random_init_start. Load every dialect the project's
-        // circtlib linkLibraries currently expose (hw, seq, om, sv,
-        // firrtl); the comb dialect is parsed as unregistered because
-        // CIRCTCAPIComb is not in circtlib/capi/linkLibraries.txt and
-        // mlirGetDialectHandle__comb__ symbol-lookup would fail. The
-        // fixture only introspects hw.module ports, not comb ops, so
-        // comb being unregistered does not affect the assertions.
+        summon[CombDialectApi].loadDialect
         summon[HWDialectApi].loadDialect
         summon[SeqDialectApi].loadDialect
         summon[OMDialectApi].loadDialect
         summon[SVDialectApi].loadDialect
         summon[FirrtlDialectApi].loadDialect
-        context.allowUnregisteredDialects(true)
-        val module   = summon[ModuleApi].moduleCreateParse(gcdMlirBytes)
-        val moduleOp = module.getOperation
+        val module    = summon[ModuleApi].moduleCreateParse(gcdMlirBytes)
+        val moduleOp  = module.getOperation
         try
           val pm = summon[PassManagerApi].passManagerCreate
           try
-            val transient = Arena.ofConfined()
+            val transient = Zone.open()
             try
-              given Arena   = transient
-              val uniquePtr = transient.allocate(ValueLayout.JAVA_LONG)
-              val passId    = TypeID(mlirTypeIDCreate(transient, uniquePtr))
+              given Zone    = transient
+              val uniquePtr = alloc[Long]().asInstanceOf[Ptr[Byte]]
+              val passId    = TypeID(nativeResult[MlirStructs.MlirTypeID](out => mlirApi.mlirTypeIDCreate(uniquePtr)(out)))
               val pass      = summon[PassApi].createExternalPass(
                 passId = passId,
                 name = "ExternalPassPortWalk",
@@ -78,12 +73,12 @@ object ExternalPassWalkMain:
                 initializeCallback = None,
                 cloneCallback = () => (),
                 runCallback = (op, _) =>
-                  // Inner arena scopes the port-decoding allocations; closes
+                  // Inner zone scopes the port-decoding allocations; closes
                   // before the upcall returns so the run callback does not
                   // hold memory across pass-manager iterations.
-                  val a = Arena.ofConfined()
+                  val a = Zone.open()
                   try
-                    given Arena = a
+                    given Zone = a
                     op.walk(
                       o =>
                         if o.getName.str == "hw.module" then
@@ -95,8 +90,8 @@ object ExternalPassWalkMain:
                           var i              = 0
                           while i < numPorts do
                             val port      = moduleType.moduleTypeGetPort(i)
-                            val nameAttr  = Attribute(port.portName)
-                            val portType  = Type(port.portType)
+                            val nameAttr  = port.portName
+                            val portType  = port.portType
                             val name      = nameAttr.stringAttrGetValue
                             // hwGetBitWidth returns -1 for non-HW types such
                             // as !seq.clock; the conventional clock signal
@@ -106,14 +101,15 @@ object ExternalPassWalkMain:
                             val direction = directionName(port.portDirection)
                             println(s"PORT: name=$name width=$width direction=$direction")
                             i += 1
-                        WalkResultEnum.Advance,
+                        WalkResultEnum.Advance
+                      ,
                       WalkEnum.PreOrder
                     )
                   finally a.close()
               )
               pm.addOwnedPass(pass)
             finally transient.close()
-            val result = pm.runOnOp(moduleOp)
+            val result    = pm.runOnOp(moduleOp)
             println(s"PASS: status=${if result.succeeded then "success" else "failure"}")
           finally pm.destroy()
         finally module.destroy()

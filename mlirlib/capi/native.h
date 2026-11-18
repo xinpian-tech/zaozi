@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-#ifndef JEXTRACT_HEADERS_H
-#define JEXTRACT_HEADERS_H
+#ifndef ZAOZI_MLIR_C_H
+#define ZAOZI_MLIR_C_H
 
 #include <mlir-c/IntegerSet.h>
 #include <mlir-c/BuiltinTypes.h>
@@ -50,4 +50,4 @@
 #include <mlir-c/RegisterEverything.h>
 #include <mlir-c/ExecutionEngine.h>
 
-#endif // JEXTRACT_HEADERS_H
+#endif // ZAOZI_MLIR_C_H

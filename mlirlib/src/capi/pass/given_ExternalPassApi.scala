@@ -1,14 +1,81 @@
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.pass
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{mlirCreateExternalPass, mlirExternalPassSignalFailure}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
-import org.llvm.mlir.scalalib.capi.ir.{*, given}
-
-import java.lang.foreign.{Arena, MemorySegment}
 import java.util.concurrent.atomic.AtomicReference
+import org.llvm.mlir.raw.{functions as api, structs as raw}
+import org.llvm.mlir.scalalib.capi.ir.{*, given}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
+import scala.scalanative.unsafe.*
+
+private final class PassCallbacks(
+  val construct:  () => Unit,
+  val destruct:   () => Unit,
+  val initialize: Option[Context => LogicalResult],
+  val clonePass:  () => Unit,
+  val run:        (Operation, ExternalPass) => Unit,
+  val failure: AtomicReference[UpcallFailure | Null]):
+  @volatile var invocation: Zone = null
+
+  // The C trampoline exposes stack-local by-value handles. Store their contents
+  // with the caller's run, whose lifetime can outlast the pass manager itself.
+  def copyHandle[T: Tag](address: Ptr[T]): Ptr[T] =
+    val zone = invocation
+    zone.synchronized {
+      nativeCopy(!address)(
+        using summon[Tag[T]],
+        zone
+      )
+    }
+
+  def record(t: Throwable, op: Ptr[Byte] = null, pass: Ptr[Byte] = null): Unit =
+    failure.set(UpcallFailure(t, op, pass, System.nanoTime()))
+
+@extern
+private object PassTrampoline:
+  @name("zaozi_pass_callbacks")
+  def fill(callbacks: Ptr[raw.MlirExternalPassCallbacks], initialize: Boolean): Unit = extern
+
+private object PassEntryPoints:
+  private def callbacks(id: Ptr[Byte]): PassCallbacks = NativeCallbacks.entry[PassCallbacks](id).value
+
+  def withInvocation[A](passes: java.util.ArrayList[Pass], zone: Zone)(body: => A): A =
+    def setInvocation(value: Zone): Unit =
+      val itr = passes.iterator()
+      while itr.hasNext do
+        val id = itr.next()._callbackState
+        if id != null then callbacks(id).invocation = value
+    setInvocation(zone)
+    try body
+    finally setInvocation(null)
+
+  private def invoke(id: Ptr[Byte])(f: PassCallbacks => Unit): Unit =
+    val state = callbacks(id)
+    try f(state)
+    catch case t: Throwable => state.record(t)
+
+  @exported("zaozi_pass_construct")
+  def construct(id: Ptr[Byte]):                                 Unit    = invoke(id)(_.construct())
+  @exported("zaozi_pass_destruct")
+  def destruct(id:  Ptr[Byte]):                                 Unit    = invoke(id)(_.destruct())
+  @exported("zaozi_pass_clone")
+  def clonePass(id: Ptr[Byte]):                                 Unit    = invoke(id)(_.clonePass())
+  @exported("zaozi_pass_initialize")
+  def initialize(context: Ptr[raw.MlirContext], id: Ptr[Byte]): Boolean =
+    val state = callbacks(id)
+    try state.initialize.forall(f => f(Context(state.copyHandle(context))).succeeded)
+    catch
+      case t: Throwable =>
+        state.record(t)
+        false
+
+  @exported("zaozi_pass_run")
+  def run(op: Ptr[raw.MlirOperation], pass: Ptr[raw.MlirExternalPass], id: Ptr[Byte]): Unit =
+    val state = callbacks(id)
+    try state.run(Operation(state.copyHandle(op)), ExternalPass(pass))
+    catch
+      case t: Throwable =>
+        state.record(t, (!op).ptr, (!pass).ptr)
+        api.mlirExternalPassSignalFailure(pass)
 
 given PassApi with
   def createExternalPass(
@@ -24,122 +91,50 @@ given PassApi with
     cloneCallback:      () => Unit,
     runCallback:        (Operation, ExternalPass) => Unit
   )(
-    using arena:        Arena
+    using Zone
   ): Pass =
-    // ofShared rather than ofConfined: MLIR's pass manager may dispatch the
-    // upcall on a worker thread when nested pass pipelines run in parallel
-    // (mlir::PassManager::run uses MLIRContext::isMultithreadingEnabled to
-    // dispatch op-level passes via the context's thread pool). A confined
-    // arena rejects access from any thread other than its creator, so the
-    // upcall stubs must live in a shared arena to survive that dispatch.
-    val callbackArena           = Arena.ofShared()
-    val initializeFailureResult = MlirLogicalResult.allocate(callbackArena)
-    val lastFailure: AtomicReference[UpcallFailure | Null] = new AtomicReference()
-
-    def recordFailure(t: Throwable, op: MemorySegment, ep: MemorySegment): Unit =
-      lastFailure.set(new UpcallFailure(t, op, ep, System.nanoTime()))
-      // Void upcalls (construct/destruct/clone) have no signalFailure path
-      // back to the C++ pass manager; surface their failures to stderr as a
-      // minimum so users do not see silently-lost exceptions.
-      System.err.println(s"[zaozi:external-pass:upcall] ${t.getClass.getName}: ${t.getMessage}")
-      t.printStackTrace(System.err)
-
-    val constructUpcall: MlirExternalPassCallbacks.construct.Function =
-      (userData: MemorySegment) =>
-        try constructCallback()
-        catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
-
-    val destructUpcall: MlirExternalPassCallbacks.destruct.Function =
-      (userData: MemorySegment) =>
-        try destructCallback()
-        catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
-
-    val callbacksSegment = MlirExternalPassCallbacks.allocate(arena)
-    MlirExternalPassCallbacks.construct(
-      callbacksSegment,
-      MlirExternalPassCallbacks.construct.allocate(constructUpcall, callbackArena)
+    val failure = new AtomicReference[UpcallFailure | Null]()
+    val state   = NativeCallbacks.retain(
+      PassCallbacks(constructCallback, destructCallback, initializeCallback, cloneCallback, runCallback, failure)
     )
-    MlirExternalPassCallbacks.destruct(
-      callbacksSegment,
-      MlirExternalPassCallbacks.destruct.allocate(destructUpcall, callbackArena)
-    )
-
-    initializeCallback.foreach(cb =>
-      MlirExternalPassCallbacks.initialize(
-        callbacksSegment,
-        MlirExternalPassCallbacks.initialize.allocate(
-          (context: MemorySegment, nil: MemorySegment) =>
-            try cb(Context(context)).segment
-            catch
-              case t: Throwable =>
-                recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
-                initializeFailureResult,
-          callbackArena
-        )
+    try
+      val callbacks = alloc[raw.MlirExternalPassCallbacks]()
+      PassTrampoline.fill(callbacks, initializeCallback.isDefined)
+      val pass      = nativeResult[raw.MlirPass](out =>
+        api.mlirCreateExternalPass(
+          passId.native,
+          name.toStringRef.native,
+          argument.toStringRef.native,
+          description.toStringRef.native,
+          opName.toStringRef.native,
+          dependentDialects.size.toSize,
+          dependentDialects.toMlirArray,
+          callbacks,
+          state
+        )(out)
       )
-    )
-    MlirExternalPassCallbacks.`clone`(
-      callbacksSegment,
-      MlirExternalPassCallbacks.`clone`.allocate(
-        (nil: MemorySegment) =>
-          try cloneCallback()
-          catch case t: Throwable => recordFailure(t, MemorySegment.NULL, MemorySegment.NULL)
-            // mlir-c returns null userData for cloned external passes; see
-            // mlir/lib/CAPI/IR/Pass.cpp ExternalPass::clonePass.
-          MemorySegment.NULL
-        ,
-        callbackArena
-      )
-    )
-    MlirExternalPassCallbacks.run(
-      callbacksSegment,
-      MlirExternalPassCallbacks.run.allocate(
-        (operation: MemorySegment, externalPass: MemorySegment, userData: MemorySegment) =>
-          try runCallback(Operation(operation), ExternalPass(externalPass))
-          catch
-            case t: Throwable =>
-              recordFailure(t, operation, externalPass)
-              mlirExternalPassSignalFailure(externalPass),
-        callbackArena
-      )
-    )
-    Pass(
-      mlirCreateExternalPass(
-        arena,
-        passId.segment,
-        name.toStringRef.segment,
-        argument.toStringRef.segment,
-        description.toStringRef.segment,
-        opName.toStringRef.segment,
-        dependentDialects.size,
-        dependentDialects.toMlirArray,
-        callbacksSegment,
-        MemorySegment.NULL
-      ),
-      callbackArena,
-      lastFailure
-    )
+      Pass(pass, state, failure)
+    catch
+      case t: Throwable =>
+        NativeCallbacks.release(state)
+        throw t
 
   extension (pass: Pass)
-    inline def segment:           MemorySegment         = pass._segment
-    inline def sizeOf:            Int                   = MlirPass.sizeof().toInt
-    inline def destroy():         Unit                  =
-      val a = pass._callbackArena
-      if a != null then a.close()
-    inline def lastUpcallFailure: Option[UpcallFailure] =
-      Option(pass._lastFailure.get())
-end given
+    inline def sizeOf:            Int                   = sizeof[raw.MlirPass].toInt
+    def destroy(
+    )(
+      using Zone,
+      Context
+    ): Unit =
+      val manager = summon[PassManagerApi].passManagerCreate
+      try manager.addOwnedPass(pass)
+      finally manager.destroy()
+    inline def lastUpcallFailure: Option[UpcallFailure] = Option(pass._lastFailure.get())
 
 given ExternalPassApi with
   extension (pass: ExternalPass)
-    inline def signalFailure(): Unit          = mlirExternalPassSignalFailure(pass.segment)
-    inline def segment:         MemorySegment = pass._segment
-    inline def sizeOf:          Int           = MlirExternalPass.sizeof().toInt
-end given
+    inline def signalFailure(): Unit = api.mlirExternalPassSignalFailure(pass.native)
+    inline def sizeOf:          Int  = sizeof[raw.MlirExternalPass].toInt
 
 given ExternalPassCallbacksApi with
-  extension (pass: ExternalPassCallbacks)
-    inline def signalFailure(): Unit          = mlirExternalPassSignalFailure(pass.segment)
-    inline def segment:         MemorySegment = pass._segment
-    inline def sizeOf:          Int           = MlirExternalPassCallbacks.sizeof().toInt
-end given
+  extension (callbacks: ExternalPassCallbacks) inline def sizeOf: Int = sizeof[raw.MlirExternalPassCallbacks].toInt

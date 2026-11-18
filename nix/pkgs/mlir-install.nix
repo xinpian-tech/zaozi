@@ -6,6 +6,8 @@ symlinkJoin {
   name = "mlir-install";
   paths = [
     libllvm
+    libllvm.lib
+    libllvm.dev
     mlir
     mlir.dev
   ];

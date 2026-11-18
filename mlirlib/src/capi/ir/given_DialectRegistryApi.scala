@@ -2,19 +2,21 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{mlirDialectRegistryCreate, mlirDialectRegistryDestroy}
-
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
 
 given DialectRegistryApi with
   inline def registryCreate(
   )(
-    using arena: Arena
-  ): DialectRegistry = DialectRegistry(mlirDialectRegistryCreate(arena))
+    using zone: Zone
+  ): DialectRegistry = DialectRegistry(
+    nativeResult[MlirStructs.MlirDialectRegistry](out => mlirApi.mlirDialectRegistryCreate()(out))
+  )
 
   extension (dialectRegistry: DialectRegistry)
-    inline def destroy(): Unit          = mlirDialectRegistryDestroy(dialectRegistry.segment)
-    inline def segment:   MemorySegment = dialectRegistry._segment
-    inline def sizeOf:    Int           = MlirDialectRegistry.sizeof().toInt
+    inline def destroy(): Unit = mlirApi.mlirDialectRegistryDestroy(dialectRegistry.native)
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirDialectRegistry].toInt
 end given

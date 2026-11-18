@@ -2,19 +2,24 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.sv
 
-import org.llvm.circt.CAPI.{mlirGetDialectHandle__sv__ as mlirGetDialectHandle, registerSVPasses as r}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
 import org.llvm.mlir.scalalib.capi.ir.{Context, DialectHandle, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given DialectApi with
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit =
-    DialectHandle(mlirGetDialectHandle(arena)).loadDialect(
-      using arena,
+    DialectHandle(
+      org.llvm.mlir.scalalib.capi.support.nativeResult[MlirStructs.MlirDialectHandle](out =>
+        circtApi.mlirGetDialectHandle__sv__()(out)
+      )
+    ).loadDialect(
+      using zone,
       context
     )
-  def registerPasses: Unit = r()
+  def registerPasses: Unit = circtApi.registerSVPasses()
 end given

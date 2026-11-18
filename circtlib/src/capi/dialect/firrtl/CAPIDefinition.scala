@@ -2,41 +2,44 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.firrtl
 
+import org.llvm.circt.raw.structs as CirctStructs
+import scala.scalanative.unsafe.*
+
 // circt-c/Dialect/Firrtl.h
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Block, Context, Location, Type, Value}
 import org.llvm.mlir.scalalib.capi.pass.Pass
 
-import java.lang.foreign.{Arena, MemorySegment}
-
-class FirrtlBundleField(val _segment: MemorySegment)
-trait FirrtlBundleFieldApi extends HasSegment[FirrtlBundleField] with HasSizeOf[FirrtlBundleField]:
+class FirrtlBundleField(handle: Ptr[CirctStructs.FIRRTLBundleField]) extends NativeHandle(handle)
+trait FirrtlBundleFieldApi                                           extends HasSizeOf[FirrtlBundleField]:
   inline def createFirrtlBundleField(
-    name:        String,
-    isFlip:      Boolean,
-    tpe:         Type
+    name:       String,
+    isFlip:     Boolean,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): FirrtlBundleField
 
   extension (firrtlBundleField: FirrtlBundleField)
     inline def getName(
-      using arena: Arena
+      using zone: Zone
     ):                    String
     inline def getIsFlip: Boolean
-    inline def getType:   Type
+    inline def getType(
+      using Zone
+    ):                    Type
 end FirrtlBundleFieldApi
 
-class FirrtlClassElement(val _segment: MemorySegment)
-trait FirrtlClassElementApi extends HasSegment[FirrtlClassElement] with HasSizeOf[FirrtlClassElement]:
+class FirrtlClassElement(handle: Ptr[CirctStructs.FIRRTLClassElement]) extends NativeHandle(handle)
+trait FirrtlClassElementApi                                            extends HasSizeOf[FirrtlClassElement]:
   inline def createFirrtlClassElement(
-    name:        String,
-    direction:   FirrtlDirection,
-    tpe:         Type
+    name:       String,
+    direction:  FirrtlDirection,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): FirrtlClassElement
 end FirrtlClassElementApi
 
@@ -100,8 +103,8 @@ trait FirrtlMemDirApi extends HasSizeOf[FirrtlMemDir] with EnumHasToNative[Firrt
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
@@ -122,82 +125,82 @@ end DialectApi
 trait AttributeApi:
   extension (firrtlConvention:      FirrtlConvention)
     inline def toAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (ref:                   FirrtlEventControl)
     inline def attrGetEventControl(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (bigInt:                BigInt)
     inline def attrGetIntegerFromString(
-      tpe:         Type,
-      width:       Option[Int] = None
+      tpe:        Type,
+      width:      Option[Int] = None
     )(
-      using arena: Arena
+      using zone: Zone
     ):      Attribute
   extension (firrtlLayerConvention: FirrtlLayerConvention)
     inline def toAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (memDir:                FirrtlMemDir)
     inline def toAttribute(
-      using arena: Arena,
-      context:     Context
-    ):      MemorySegment
+      using zone: Zone,
+      context:    Context
+    ):      Attribute
   inline def getMemInit(
-    filename:    String,
-    isBinary:    Boolean,
-    isInline:    Boolean
+    filename:   String,
+    isBinary:   Boolean,
+    isInline:   Boolean
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):        Attribute
   extension (ref:                   FirrtlNameKind)
     inline def attrGetNameKind(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (value:                 String)
     inline def getParamDeclAttribute(
-      name:        String
+      name:       String
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (value:                 BigInt)
     inline def getParamDeclAttribute(
-      name:        String
+      name:       String
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (value:                 Double)
     inline def getParamDeclAttribute(
-      name:        String
+      name:       String
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (value:                 Boolean)
     inline def getParamDeclAttribute(
-      name:        String
+      name:       String
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (portDirections:        Seq[FirrtlDirection])
     inline def attrGetPortDirs(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (ruw:                   FirrtlRUW)
     inline def toAttribute(
-      using arena: Arena,
-      context:     Context
-    ):      MemorySegment
+      using zone: Zone,
+      context:    Context
+    ):      Attribute
 end AttributeApi
 
 /** Firrtl Type Api
@@ -252,113 +255,115 @@ end AttributeApi
 trait TypeApi:
   extension (width:              Int)
     inline def getAnalog(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                                              Type
   inline def getAnyRef(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   extension (tpe:                Type) inline def getBitWidth(ignoreFlip: Boolean): Long
   inline def getBoolean(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   extension (firrtlBundleFields: Seq[FirrtlBundleField])
     inline def getBundle(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                                              Type
   extension (tpe:                Type)
     inline def getBundleFieldByIndex(
-      idx:         Int
+      idx:        Int
     )(
-      using arena: Arena
+      using zone: Zone
     ):                             FirrtlBundleField
     inline def getBundleFieldIndex(
-      fieldName:   String
+      fieldName:  String
     )(
-      using arena: Arena
+      using zone: Zone
     ):                             Int
     inline def getBundleNumFields: Long
   inline def getClassTpe(
     name:                String,
     firrtlClassElements: Seq[FirrtlClassElement]
   )(
-    using arena:         Arena,
+    using zone:          Zone,
     context:             Context
   ):                                                                                Type
   inline def getClock(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   extension (tpe:                Type)
     inline def getConstType(
-      using arena: Arena
+      using zone: Zone
     ):                                                                              Type
   inline def getDouble(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   inline def getInteger(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   inline def getList(
-    element:     Type
+    element:    Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   inline def getMaskType(
-    using arena: Arena,
-    context:     Context
+    tpe:        Type
+  )(
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   inline def getPath(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   extension (tpe:                Type)
     inline def getRef(
-      forceable:   Boolean
+      forceable:  Boolean
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type
     inline def getRef(
-      forceable:   Boolean,
-      layers:      Seq[String]
+      forceable:  Boolean,
+      layers:     Seq[String]
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type
   inline def getReset(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   extension (width:              Int)
     inline def getSInt(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                                              Type
   inline def getString(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                                                Type
   extension (width:              Int)
     inline def getUInt(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                                              Type
   extension (tpe:                Type)
     inline def getVector(
-      count:       Int
+      count:      Int
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                              Type
     inline def getVectorElementType(
-      using arena: Arena
+      using zone: Zone
     ):                              Type
     inline def getVectorElementNum: Long
   extension (tpe:                Type)
@@ -406,6 +411,6 @@ trait PassApi:
     baseCircuit: String,
     noMangle:    Boolean
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Pass
 end PassApi

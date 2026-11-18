@@ -5,7 +5,7 @@ package org.llvm.circt.scalalib.dialect.verif.operation
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, Type, Value}
 import org.llvm.mlir.scalalib.capi.support.HasOperation
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 class Contract(val _operation: Operation)
 trait ContractApi extends HasOperation[Contract]:
@@ -14,16 +14,16 @@ trait ContractApi extends HasOperation[Contract]:
     resultTypes: Seq[Type],
     location:    Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Contract
 
   extension (ref: Contract)
     def block(
-      using Arena
+      using Zone
     ): Block
     def result(
-      using Arena
+      using Zone
     ): Value
 end ContractApi
 
@@ -34,7 +34,7 @@ trait AssertApi extends HasOperation[Assert]:
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Assert
 end AssertApi
@@ -46,7 +46,7 @@ trait AssumeApi extends HasOperation[Assume]:
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Assume
 end AssumeApi
@@ -58,7 +58,7 @@ trait CoverApi extends HasOperation[Cover]:
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Cover
 end CoverApi
@@ -70,7 +70,7 @@ trait RequireApi extends HasOperation[Require]:
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Require
 end RequireApi
@@ -82,7 +82,7 @@ trait EnsureApi extends HasOperation[Ensure]:
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Ensure
 end EnsureApi

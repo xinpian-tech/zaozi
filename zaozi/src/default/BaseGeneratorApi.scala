@@ -49,7 +49,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Value
 }
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 object BaseGeneratorHelper:
   def createInstance[
@@ -62,7 +62,7 @@ object BaseGeneratorHelper:
     probeTpe:   P,
     layers:     L
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -88,7 +88,7 @@ object BaseGeneratorHelper:
     option: String,
     cases:  Seq[(String, String, I, P, L)]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -120,7 +120,7 @@ object BaseGeneratorHelper:
     ioTpe:      I,
     probeTpe:   P
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -162,18 +162,23 @@ object BaseGeneratorHelper:
 
   def dumpMlirbc(
     moduleName:   String,
-    createModule: (Arena, Context, Circuit) => Unit
+    createModule: (Zone, Context, Circuit) => Unit
   )(
-    using Arena,
+    using Zone,
     Context
   ): Unit =
-    val modules = Elaborate.modules.value
-    if !modules.contains(moduleName) then
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(moduleName)
-      summon[Circuit].appendToModule()
-      createModule(summon[Arena], summon[Context], summon[Circuit])
-      me.jiuyang.zaozi.magic.validateCircuit()
-      modules.add(moduleName, summon[MlirModule])
+    Elaborate.withModules: modules =>
+      if !modules.contains(moduleName) then
+        given module: MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+        try
+          given Circuit = summon[CircuitApi].op(moduleName)
+          summon[Circuit].appendToModule()
+          createModule(summon[Zone], summon[Context], summon[Circuit])
+          me.jiuyang.zaozi.magic.validateCircuit()
+          modules.add(moduleName, module)
+        catch
+          case t: Throwable =>
+            module.destroy()
+            throw t
 
 end BaseGeneratorHelper

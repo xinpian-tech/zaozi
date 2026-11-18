@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 
-// RUN: not scala-cli compile %s --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" 2>&1 >/dev/null | FileCheck %s -check-prefix=ERROR
+// RUN: not scala-cli compile %s %NATIVEOPTS --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" 2>&1 >/dev/null | FileCheck %s -check-prefix=ERROR
 
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.*
@@ -9,8 +9,6 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.DialectApi as FirrtlDialectApi
 import org.llvm.circt.scalalib.capi.dialect.firrtl.given_DialectApi
-
-import java.lang.foreign.Arena
 
 case class PassthroughParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[PassthroughParameter] = upickle.default.macroRW

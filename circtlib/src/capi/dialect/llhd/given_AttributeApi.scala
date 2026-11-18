@@ -2,38 +2,43 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.llhd
 
-import org.llvm.circt.CAPI.{
-  llhdAttrIsATimeAttr,
-  llhdTimeAttrGet,
-  llhdTimeAttrGetDelta,
-  llhdTimeAttrGetEpsilon,
-  llhdTimeAttrGetSeconds,
-  llhdTimeAttrGetTimeUnit
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, given}
 
-import java.lang.foreign.Arena
-
 given AttributeApi with
-  extension (attribute: Attribute) def isTimeAttr(): Boolean = llhdAttrIsATimeAttr(attribute.segment)
+  extension (attribute: Attribute) def isTimeAttr(): Boolean = circtApi.llhdAttrIsATimeAttr(attribute.native)
   def TimeAttrGet(
-    timeUnit:    String,
-    seconds:     BigInt,
-    delta:       BigInt,
-    epsilon:     BigInt
+    timeUnit:   String,
+    seconds:    BigInt,
+    delta:      BigInt,
+    epsilon:    BigInt
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Attribute = Attribute(
-    llhdTimeAttrGet(arena, context.segment, timeUnit.toStringRef.segment, seconds.toLong, delta.toLong, epsilon.toLong)
+    nativeResult[MlirStructs.MlirAttribute](out =>
+      circtApi.llhdTimeAttrGet(
+        context.native,
+        timeUnit.toStringRef.native,
+        seconds.toLong.toULong,
+        delta.toLong.toULong,
+        epsilon.toLong.toULong
+      )(out)
+    )
   )
   extension (attribute: Attribute)
-    def TimeAttrGetDelta():   BigInt = llhdTimeAttrGetDelta(attribute.segment)
-    def TimeAttrGetEpsilon(): BigInt = llhdTimeAttrGetEpsilon(attribute.segment)
-    def TimeAttrGetSeconds(): BigInt = llhdTimeAttrGetSeconds(attribute.segment)
+    def TimeAttrGetDelta():   BigInt = circtApi.llhdTimeAttrGetDelta(attribute.native).toLong
+    def TimeAttrGetEpsilon(): BigInt = circtApi.llhdTimeAttrGetEpsilon(attribute.native).toLong
+    def TimeAttrGetSeconds(): BigInt = circtApi.llhdTimeAttrGetSeconds(attribute.native).toLong
     def TimeAttrGetTimeUnit(
     )(
-      using arena: Arena
-    ): String = StringRef(llhdTimeAttrGetTimeUnit(arena, attribute.segment)).toScalaString
+      using zone: Zone
+    ): String = StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.llhdTimeAttrGetTimeUnit(attribute.native)(out))
+    ).toScalaString
 end given

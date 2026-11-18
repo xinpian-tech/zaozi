@@ -65,7 +65,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
 
 import java.io.ByteArrayOutputStream
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import java.nio.file.StandardOpenOption.*
 
 export me.jiuyang.zaozi.magic.macros.{generator, InstanceChoice}
@@ -77,7 +77,7 @@ given GeneratorApi:
     def module(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context
     ): CirctModule =
       val io                  = generator.interface(parameter)
@@ -132,7 +132,7 @@ given GeneratorApi:
     def instance(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -150,13 +150,13 @@ given GeneratorApi:
     def dumpMlirbc(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit =
       BaseGeneratorHelper.dumpMlirbc(
         generator.moduleName(parameter),
-        (arena, context, circuit) =>
-          given Arena   = arena
+        (zone, context, circuit) =>
+          given Zone    = zone
           given Context = context
           given Circuit = circuit
           generator.module(parameter).appendToCircuit()
@@ -165,7 +165,7 @@ given GeneratorApi:
     def instantiate(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -188,18 +188,12 @@ given GeneratorApi:
     )(
       using upickle.default.Reader[PARAM]
     ) =
-      val arena = Arena.ofConfined()
-      try
-        given Arena   = arena
-        given Context = summon[ContextApi].contextCreate
+      org.llvm.mlir.scalalib.Mlir.withContext {
         summon[FirrtlDialectApi].loadDialect
         summon[LTLDialectApi].loadDialect
         summon[VerifDialectApi].loadDialect
-
         generator.dumpMlirbc(upickle.default.read(os.read(configFile)))
-
-        summon[Context].destroy()
-      finally arena.close()
+      }
 
     def mainImpl(
       args: Array[String]

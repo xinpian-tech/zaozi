@@ -14,7 +14,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 // DW_fifo_s1_sf
 case class DwbbFifoParameter(
@@ -81,7 +81,7 @@ given QueueImpl with
   def apply[D <: HardwareDataType](
     parameter: QueueParameter[D]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

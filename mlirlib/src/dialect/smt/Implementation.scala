@@ -18,15 +18,15 @@ import org.llvm.mlir.scalalib.capi.ir.{
 }
 import org.llvm.mlir.scalalib.capi.dialect.smt.{*, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given AndApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): And =
     And(
       summon[OperationApi].operationCreate(
@@ -39,18 +39,18 @@ given AndApi with
   extension (ref: And)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ApplyFuncApi with
   def op(
-    func:        Value,
-    args:        Seq[Value],
-    location:    Location
+    func:       Value,
+    args:       Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ApplyFunc =
     ApplyFunc(
       summon[OperationApi].operationCreate(
@@ -63,18 +63,18 @@ given ApplyFuncApi with
   extension (ref: ApplyFunc)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ArrayBroadcastApi with
   def op(
-    value:       Value,
-    location:    Location,
-    tpe:         Type
+    value:      Value,
+    location:   Location,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ArrayBroadcast =
     ArrayBroadcast(
       summon[OperationApi].operationCreate(
@@ -87,18 +87,18 @@ given ArrayBroadcastApi with
   extension (ref: ArrayBroadcast)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ArraySelectApi with
   def op(
-    array:       Value,
-    index:       Value,
-    location:    Location
+    array:      Value,
+    index:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ArraySelect =
     ArraySelect(
       summon[OperationApi].operationCreate(
@@ -111,19 +111,19 @@ given ArraySelectApi with
   extension (ref: ArraySelect)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ArrayStoreApi with
   def op(
-    array:       Value,
-    index:       Value,
-    value:       Value,
-    location:    Location
+    array:      Value,
+    index:      Value,
+    value:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ArrayStore =
     ArrayStore(
       summon[OperationApi].operationCreate(
@@ -136,17 +136,17 @@ given ArrayStoreApi with
   extension (ref: ArrayStore)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given AssertApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Assert =
     Assert(
       summon[OperationApi].operationCreate(
@@ -159,18 +159,18 @@ given AssertApi with
   extension (ref: Assert)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BV2IntApi with
   def op(
-    isSigned:    Boolean,
-    input:       Value,
-    location:    Location
+    isSigned:   Boolean,
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BV2Int =
     BV2Int(
       summon[OperationApi].operationCreate(
@@ -193,18 +193,18 @@ given BV2IntApi with
   extension (ref: BV2Int)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVAShrApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVAShr =
     BVAShr(
       summon[OperationApi].operationCreate(
@@ -217,18 +217,18 @@ given BVAShrApi with
   extension (ref: BVAShr)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVAddApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVAdd =
     BVAdd(
       summon[OperationApi].operationCreate(
@@ -241,18 +241,18 @@ given BVAddApi with
   extension (ref: BVAdd)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVAndApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVAnd =
     BVAnd(
       summon[OperationApi].operationCreate(
@@ -265,19 +265,19 @@ given BVAndApi with
   extension (ref: BVAnd)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVCmpApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    pred:        String,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    pred:       String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVCmp =
     BVCmp(
       summon[OperationApi].operationCreate(
@@ -297,18 +297,18 @@ given BVCmpApi with
   extension (ref: BVCmp)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVConstantApi with
   def op(
-    value:       Int,
-    width:       Int,
-    location:    Location
+    value:      Int,
+    width:      Int,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVConstant =
     BVConstant(
       summon[OperationApi].operationCreate(
@@ -327,18 +327,18 @@ given BVConstantApi with
   extension (ref: BVConstant)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVLShrApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVLShr =
     BVLShr(
       summon[OperationApi].operationCreate(
@@ -351,18 +351,18 @@ given BVLShrApi with
   extension (ref: BVLShr)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVMulApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVMul =
     BVMul(
       summon[OperationApi].operationCreate(
@@ -375,17 +375,17 @@ given BVMulApi with
   extension (ref: BVMul)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVNegApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVNeg =
     BVNeg(
       summon[OperationApi].operationCreate(
@@ -398,17 +398,17 @@ given BVNegApi with
   extension (ref: BVNeg)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVNotApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVNot =
     BVNot(
       summon[OperationApi].operationCreate(
@@ -421,18 +421,18 @@ given BVNotApi with
   extension (ref: BVNot)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVOrApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVOr =
     BVOr(
       summon[OperationApi].operationCreate(
@@ -445,18 +445,18 @@ given BVOrApi with
   extension (ref: BVOr)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVSDivApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVSDiv =
     BVSDiv(
       summon[OperationApi].operationCreate(
@@ -469,18 +469,18 @@ given BVSDivApi with
   extension (ref: BVSDiv)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVSModApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVSMod =
     BVSMod(
       summon[OperationApi].operationCreate(
@@ -493,18 +493,18 @@ given BVSModApi with
   extension (ref: BVSMod)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVSRemApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVSRem =
     BVSRem(
       summon[OperationApi].operationCreate(
@@ -517,18 +517,18 @@ given BVSRemApi with
   extension (ref: BVSRem)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVShlApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVShl =
     BVShl(
       summon[OperationApi].operationCreate(
@@ -541,18 +541,18 @@ given BVShlApi with
   extension (ref: BVShl)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVUDivApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVUDiv =
     BVUDiv(
       summon[OperationApi].operationCreate(
@@ -565,18 +565,18 @@ given BVUDivApi with
   extension (ref: BVUDiv)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVURemApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVURem =
     BVURem(
       summon[OperationApi].operationCreate(
@@ -589,18 +589,18 @@ given BVURemApi with
   extension (ref: BVURem)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BVXOrApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BVXOr =
     BVXOr(
       summon[OperationApi].operationCreate(
@@ -613,17 +613,17 @@ given BVXOrApi with
   extension (ref: BVXOr)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BoolConstantApi with
   def op(
-    value:       Boolean,
-    location:    Location
+    value:      Boolean,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BoolConstant =
     BoolConstant(
       summon[OperationApi].operationCreate(
@@ -639,7 +639,7 @@ given BoolConstantApi with
   extension (ref: BoolConstant)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -648,7 +648,7 @@ given CheckApi with
     location:    Location,
     resultTypes: Seq[Type] = Seq.empty
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
   ): Check =
     Check(
@@ -669,24 +669,24 @@ given CheckApi with
   extension (ref: Check)
     def operation: Operation = ref._operation
     def satBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(0).getFirstBlock
     def unknownBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(1).getFirstBlock
     def unsatBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(2).getFirstBlock
 end given
 
 given ConcatApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Concat =
     Concat(
       summon[OperationApi].operationCreate(
@@ -699,18 +699,18 @@ given ConcatApi with
   extension (ref: Concat)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given DeclareFunApi with
   def op(
-    namePrefix:  String,
-    location:    Location,
-    tpe:         Type
+    namePrefix: String,
+    location:   Location,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): DeclareFun =
     DeclareFun(
       summon[OperationApi].operationCreate(
@@ -729,17 +729,17 @@ given DeclareFunApi with
   extension (ref: DeclareFun)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given DistinctApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Distinct =
     Distinct(
       summon[OperationApi].operationCreate(
@@ -752,17 +752,17 @@ given DistinctApi with
   extension (ref: Distinct)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given EqApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Eq =
     Eq(
       summon[OperationApi].operationCreate(
@@ -775,7 +775,7 @@ given EqApi with
   extension (ref: Eq)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -787,7 +787,7 @@ given ExistsApi with
     boundVarNames: Seq[String],
     location:      Location
   )(
-    using arena:   Arena,
+    using zone:    Zone,
     context:       Context
   ): Exists =
     Exists(
@@ -827,22 +827,22 @@ given ExistsApi with
   extension (ref: Exists)
     def operation: Operation = ref._operation
     def bodyBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(0).getFirstBlock
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ExtractApi with
   def op(
-    lowBit:      BigInt,
-    input:       Value,
-    location:    Location,
-    tpe:         Type
+    lowBit:     BigInt,
+    input:      Value,
+    location:   Location,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Extract =
     Extract(
       summon[OperationApi].operationCreate(
@@ -862,7 +862,7 @@ given ExtractApi with
   extension (ref: Extract)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -873,7 +873,7 @@ given ForallApi with
     boundVarNames: Seq[String],
     location:      Location
   )(
-    using arena:   Arena,
+    using zone:    Zone,
     context:       Context
   ): Forall =
     Forall(
@@ -913,24 +913,24 @@ given ForallApi with
   extension (ref: Forall)
     def operation: Operation = ref._operation
     def bodyBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(0).getFirstBlock
     def patternBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(1).getFirstBlock
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ImpliesApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Implies =
     Implies(
       summon[OperationApi].operationCreate(
@@ -943,18 +943,18 @@ given ImpliesApi with
   extension (ref: Implies)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given Int2BVApi with
   def op(
-    input:       Value,
-    location:    Location,
-    tpe:         Type
+    input:      Value,
+    location:   Location,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Int2BV =
     Int2BV(
       summon[OperationApi].operationCreate(
@@ -967,17 +967,17 @@ given Int2BVApi with
   extension (ref: Int2BV)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntAbsApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntAbs =
     IntAbs(
       summon[OperationApi].operationCreate(
@@ -990,17 +990,17 @@ given IntAbsApi with
   extension (ref: IntAbs)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntAddApi with
   def op(
-    input:       Seq[Value],
-    location:    Location
+    input:      Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntAdd =
     IntAdd(
       summon[OperationApi].operationCreate(
@@ -1013,19 +1013,19 @@ given IntAddApi with
   extension (ref: IntAdd)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntCmpApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    pred:        String,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    pred:       String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntCmp =
     IntCmp(
       summon[OperationApi].operationCreate(
@@ -1045,17 +1045,17 @@ given IntCmpApi with
   extension (ref: IntCmp)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntConstantApi with
   def op(
-    value:       BigInt,
-    location:    Location
+    value:      BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntConstant =
     IntConstant(
       summon[OperationApi].operationCreate(
@@ -1074,18 +1074,18 @@ given IntConstantApi with
   extension (ref: IntConstant)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntDivApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntDiv =
     IntDiv(
       summon[OperationApi].operationCreate(
@@ -1098,18 +1098,18 @@ given IntDivApi with
   extension (ref: IntDiv)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntModApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntMod =
     IntMod(
       summon[OperationApi].operationCreate(
@@ -1122,17 +1122,17 @@ given IntModApi with
   extension (ref: IntMod)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntMulApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntMul =
     IntMul(
       summon[OperationApi].operationCreate(
@@ -1145,18 +1145,18 @@ given IntMulApi with
   extension (ref: IntMul)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntSubApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): IntSub =
     IntSub(
       summon[OperationApi].operationCreate(
@@ -1169,19 +1169,19 @@ given IntSubApi with
   extension (ref: IntSub)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IteApi with
   def op(
-    cond:        Value,
-    thenValue:   Value,
-    elseValue:   Value,
-    location:    Location
+    cond:       Value,
+    thenValue:  Value,
+    elseValue:  Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Ite =
     Ite(
       summon[OperationApi].operationCreate(
@@ -1194,17 +1194,17 @@ given IteApi with
   extension (ref: Ite)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given NotApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Not =
     Not(
       summon[OperationApi].operationCreate(
@@ -1217,17 +1217,17 @@ given NotApi with
   extension (ref: Not)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given OrApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Or =
     Or(
       summon[OperationApi].operationCreate(
@@ -1240,17 +1240,17 @@ given OrApi with
   extension (ref: Or)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given PopApi with
   def op(
-    count:       BigInt,
-    location:    Location
+    count:      BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Pop =
     Pop(
       summon[OperationApi].operationCreate(
@@ -1271,11 +1271,11 @@ end given
 
 given PushApi with
   def op(
-    count:       BigInt,
-    location:    Location
+    count:      BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Push =
     Push(
       summon[OperationApi].operationCreate(
@@ -1296,12 +1296,12 @@ end given
 
 given RepeatApi with
   def op(
-    input:       Value,
-    location:    Location,
-    tpe:         Type
+    input:      Value,
+    location:   Location,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Repeat =
     Repeat(
       summon[OperationApi].operationCreate(
@@ -1314,16 +1314,16 @@ given RepeatApi with
   extension (ref: Repeat)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ResetApi with
   def op(
-    location:    Location
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Reset =
     Reset(
       summon[OperationApi].operationCreate(
@@ -1337,11 +1337,11 @@ end given
 
 given SetLogicApi with
   def op(
-    logic:       String,
-    location:    Location
+    logic:      String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): SetLogic =
     SetLogic(
       summon[OperationApi].operationCreate(
@@ -1362,11 +1362,11 @@ end given
 
 given SolverApi with
   def op(
-    location:    Location,
-    inputs:      Seq[Value] = Seq.empty
+    location:   Location,
+    inputs:     Seq[Value] = Seq.empty
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Solver =
     Solver(
       summon[OperationApi].operationCreate(
@@ -1382,17 +1382,17 @@ given SolverApi with
   extension (ref: Solver)
     def operation: Operation = ref._operation
     def bodyBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(0).getFirstBlock
 end given
 
 given XOrApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): XOr =
     XOr(
       summon[OperationApi].operationCreate(
@@ -1405,17 +1405,17 @@ given XOrApi with
   extension (ref: XOr)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given YieldApi with
   def op(
-    values:      Seq[Value],
-    location:    Location
+    values:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Yield =
     Yield(
       summon[OperationApi].operationCreate(
@@ -1428,6 +1428,6 @@ given YieldApi with
   extension (ref: Yield)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given

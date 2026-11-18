@@ -18,7 +18,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
 }
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], PROBE <: Referable[P]]
   : ProbeConnect[D, P, DATA, PROBE] with
@@ -27,7 +27,7 @@ given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], 
     def <==(
       that: DATA
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       LayerTree,
@@ -55,7 +55,7 @@ given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], 
     def <==(
       that: PROBE
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       LayerTree,
@@ -75,7 +75,7 @@ given [D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Referable[D], 
     def <==(
       that: PROBE
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       LayerTree,

@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 case class ClockEvent(edge: FirrtlEventControl, clock: Referable[Clock]):
   def apply[T](
@@ -22,12 +22,12 @@ trait Sequence:
   private[zaozi] val _refer: Value
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value = this.referImpl
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl

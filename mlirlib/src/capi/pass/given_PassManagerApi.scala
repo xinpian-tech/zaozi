@@ -2,55 +2,63 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.pass
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirPassManagerAddOwnedPass,
-  mlirPassManagerCreate,
-  mlirPassManagerCreateOnOperation,
-  mlirPassManagerDestroy,
-  mlirPassManagerEnableIRPrinting,
-  mlirPassManagerEnableVerifier,
-  mlirPassManagerGetAsOpPassManager,
-  mlirPassManagerGetNestedUnder,
-  mlirPassManagerRunOnOp
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
 given PassManagerApi with
   inline def passManagerCreate(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): PassManager =
-    PassManager(mlirPassManagerCreate(arena, context.segment))
+    PassManager(nativeResult[MlirStructs.MlirPassManager](out => mlirApi.mlirPassManagerCreate(context.native)(out)))
   inline def passManagerCreateOnOperation(
-    name:        String
+    name:       String
   )(
-    using arena: Arena,
-    context:     Context
-  ): PassManager = PassManager(mlirPassManagerCreateOnOperation(arena, context.segment, name.toStringRef.segment))
+    using zone: Zone,
+    context:    Context
+  ): PassManager = PassManager(
+    nativeResult[MlirStructs.MlirPassManager](out =>
+      mlirApi.mlirPassManagerCreateOnOperation(context.native, name.toStringRef.native)(out)
+    )
+  )
   extension (passManager: PassManager)
     inline def getAsOpPassManager(
-      using arena: Arena
+      using zone: Zone
     ): OpPassManager =
       OpPassManager(
-        mlirPassManagerGetAsOpPassManager(arena, passManager.segment),
-        passManager._callbackArenas,
+        nativeResult[MlirStructs.MlirOpPassManager](out =>
+          mlirApi.mlirPassManagerGetAsOpPassManager(passManager.native)(out)
+        ),
+        passManager._callbackStates,
         passManager._ownedPasses
       )
-    inline def runOnOp(
-      operation:   Operation
+    def runOnOp(
+      operation:  Operation
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult =
       // Clear every owned pass's `_lastFailure` slot before invoking the native
       // pass manager so a stale `UpcallFailure` from a prior `runOnOp` cannot
       // be surfaced as the cause of this run's native failure.
-      val pre    = passManager._ownedPasses.iterator()
+      val pre       = passManager._ownedPasses.iterator()
       while pre.hasNext do pre.next()._lastFailure.set(null)
-      val result = LogicalResult(mlirPassManagerRunOnOp(arena, passManager.segment, operation.segment))
+      val callbacks = passManager._callbackStates.iterator()
+      while callbacks.hasNext do NativeCallbacks.entry[Any](callbacks.next()).failure = null
+      val result    = LogicalResult(
+        nativeResult[MlirStructs.MlirLogicalResult](out =>
+          PassEntryPoints.withInvocation(passManager._ownedPasses, zone) {
+            mlirApi.mlirPassManagerRunOnOp(passManager.native, operation.native)(out)
+          }
+        )
+      )
+      val completed = passManager._callbackStates.iterator()
+      while completed.hasNext do
+        val error = NativeCallbacks.entry[Any](completed.next()).failure
+        if error != null then throw error
       if result.failed then
         passManager.lastUpcallFailure match
           case Some(f) => throw new PassRunFailure(f)
@@ -59,25 +67,21 @@ given PassManagerApi with
     inline def getNestedUnder(
       operationName: String
     )(
-      using arena:   Arena
+      using zone:    Zone
     ): OpPassManager = OpPassManager(
-      mlirPassManagerGetNestedUnder(arena, passManager.segment, operationName.toStringRef.segment),
-      passManager._callbackArenas,
+      nativeResult[MlirStructs.MlirOpPassManager](out =>
+        mlirApi.mlirPassManagerGetNestedUnder(passManager.native, operationName.toStringRef.native)(out)
+      ),
+      passManager._callbackStates,
       passManager._ownedPasses
     )
-    inline def destroy(): Unit =
-      // Destroy the native pass manager FIRST so it can run any final
-      // callbacks while the callback arenas are still alive. Then close every
-      // retained callback arena. Use a try/finally so a partial-failure
-      // mid-list still closes the rest.
-      try mlirPassManagerDestroy(passManager.segment)
+    inline def destroy():                       Unit                  =
+      try mlirApi.mlirPassManagerDestroy(passManager.native)
       finally
-        val it = passManager._callbackArenas.iterator()
-        while it.hasNext do
-          val a = it.next()
-          try a.close()
-          catch case _: Throwable => ()
-        passManager._callbackArenas.clear()
+        val it = passManager._callbackStates.iterator()
+        while it.hasNext do NativeCallbacks.release(it.next())
+        passManager._callbackStates.clear()
+        passManager._ownedPasses.clear()
     inline def enableIRPrinting(
       printBeforeAll:          Boolean,
       printAfterAll:           Boolean,
@@ -87,24 +91,24 @@ given PassManagerApi with
       flags:                   OpPrintingFlags,
       treePrintingPath:        String
     )(
-      using arena:             Arena
-    ): Unit = mlirPassManagerEnableIRPrinting(
-      passManager.segment,
+      using zone:              Zone
+    ): Unit = mlirApi.mlirPassManagerEnableIRPrinting(
+      passManager.native,
       printBeforeAll,
       printAfterAll,
       printModuleScope,
       printAfterOnlyOnChange,
       printAfterOnlyOnFailure,
-      flags.segment,
-      treePrintingPath.toStringRef.segment
+      flags.native,
+      treePrintingPath.toStringRef.native
     )
-    inline def enableVerifier(enable: Boolean): Unit                  = mlirPassManagerEnableVerifier(passManager.segment, enable)
+    inline def enableVerifier(enable: Boolean): Unit                  = mlirApi.mlirPassManagerEnableVerifier(passManager.native, enable)
     inline def addOwnedPass(
       pass: Pass
     ): Unit =
-      mlirPassManagerAddOwnedPass(passManager.segment, pass.segment)
-      val a = pass._callbackArena
-      if a != null then passManager._callbackArenas.add(a)
+      mlirApi.mlirPassManagerAddOwnedPass(passManager.native, pass.native)
+      val a = pass._callbackState
+      if a != null then passManager._callbackStates.add(a)
       passManager._ownedPasses.add(pass)
     inline def lastUpcallFailure:               Option[UpcallFailure] =
       val it = passManager._ownedPasses.iterator()
@@ -114,6 +118,6 @@ given PassManagerApi with
         val f = p._lastFailure.get()
         if f != null then if found == null || f.timestampNs > found.timestampNs then found = f
       Option(found)
-    inline def segment:                         MemorySegment         = passManager._segment
-    inline def sizeOf:                          Int                   = MlirPassManager.sizeof().toInt
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirPassManager].toInt
 end given

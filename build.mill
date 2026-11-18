@@ -1,7 +1,5 @@
 //| mill-version: 1.1.2
 //| mill-jvm-version: system
-//| mvnDeps:
-//| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
 //| bspScriptIgnore:
 //| - ".metals"
 //| - "**/.scala-build"
@@ -17,26 +15,52 @@ import mill.scalalib.TestModule.Utest
 import mill.scalalib._
 import mill.scalalib.publish._
 import mill.scalalib.scalafmt._
-import contrib.jmh.JmhModule
+import mill.scalanativelib.ScalaNativeModule
 import os.Path
 
 object v {
+  val native     = "0.5.13-20261114-143517b-SNAPSHOT"
+  val nativeRepo = "https://central.sonatype.com/repository/maven-snapshots"
   val scala      = "3.8.4"
-  val mainargs   = mvn"com.lihaoyi::mainargs:0.7.6"
-  val oslib      = mvn"com.lihaoyi::os-lib:0.11.3"
-  val upickle    = mvn"com.lihaoyi::upickle:4.0.2"
-  val utest      = mvn"com.lihaoyi::utest:0.8.4"
-  val sourcecode = mvn"com.lihaoyi::sourcecode:0.4.2"
-  val fastparse  = mvn"com.lihaoyi::fastparse:3.1.1"
-  val pprint     = mvn"com.lihaoyi::pprint:0.9.0"
-  val jmh        = "1.35"
+  val mainargs   = mvn"com.lihaoyi::mainargs::0.7.6"
+  val oslib      = mvn"com.lihaoyi::os-lib::0.11.3"
+  val upickle    = mvn"com.lihaoyi::upickle::4.0.2"
+  val utest      = mvn"com.lihaoyi::utest::0.8.4"
+  val sourcecode = mvn"com.lihaoyi::sourcecode::0.4.2"
+  val fastparse  = mvn"com.lihaoyi::fastparse::3.1.1"
+  val pprint     = mvn"com.lihaoyi::pprint::0.9.0"
 }
 
-trait ZaoziScalaModule extends ScalaModule {
+trait NativeModule extends ScalaNativeModule { outer =>
+  override def repositories         = Task(super.repositories() :+ v.nativeRepo)
+  override def nativeMultithreading = Task(Some(true): Option[Boolean])
+
+  def scalaVersion                  = Task(v.scala)
+  def scalaNativeVersion            = Task(v.native)
+  def nativeInstalls                = Task.Input(
+    Seq("MLIR_INSTALL_PATH", "CIRCT_INSTALL_PATH").flatMap(Task.env.get).map(os.Path(_))
+  )
+  override def nativeCompileOptions = Task(
+    super.nativeCompileOptions() ++ nativeInstalls().map(p => s"-I${p / "include"}")
+  )
+  override def nativeLinkingOptions = Task(
+    super.nativeLinkingOptions() ++ nativeInstalls().flatMap(p => Seq(s"-L${p / "lib"}", s"-Wl,-rpath,${p / "lib"}"))
+  )
+  override def nativeEmbedResources = Task(true)
+  trait NativeTests extends ScalaNativeTests {
+    def testEnvironment               = Task.Input(Task.env.view.filterKeys(Set("PATH", "Z3_LIB")).toMap)
+    override def forkEnv              = Task(super.forkEnv() ++ testEnvironment())
+    override def repositories         = outer.repositories()
+    override def nativeMultithreading = outer.nativeMultithreading()
+    override def nativeCompileOptions = outer.nativeCompileOptions()
+    override def nativeLinkingOptions = outer.nativeLinkingOptions()
+    override def nativeEmbedResources = outer.nativeEmbedResources()
+  }
+}
+
+trait ZaoziScalaModule extends NativeModule {
   override def scalacOptions: T[Seq[String]] = Task(
     super.scalacOptions() ++ Seq(
-      "-java-output-version",
-      "25",
       // Emit SemanticDB so the project can be indexed by SemanticDB-based
       // tooling (Metals, scalafix, scala3-bsp-semantic-ls). Built into the
       // Scala 3 compiler; -sourceroot keeps emitted URIs workspace-relative.
@@ -81,185 +105,55 @@ trait ZaoziPublishModule extends PublishModule {
   )
 }
 
-// Panama API
-trait PanamaModule extends JavaModule {
-  val license = Seq(
-    "# SPDX-License-Identifier: Apache-2.0",
-    "# SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>",
-    ""
-  )
-
-  // System C headers (e.g. <stdint.h>) needed by libclang when parsing project
-  // headers. Provided by the Nix dev shell via LIBC_INCLUDE_PATH.
-  def libcIncludePath: T[os.Path] = Task.Input(
-    os.Path(Task.env.getOrElse("LIBC_INCLUDE_PATH", "LIBC_INCLUDE_PATH not found, you are not in the nix env?"))
-  )
-
-  // jextract triggers scala/bug#9272's static-inheritance scalac stack
-  // overflow when its header class is split into multiple files. Pass
-  // -Djextract.decls.per.header=65535 to the jextract subprocess.
-  private def jextractEnv: Map[String, String] =
-    Map("JAVA_TOOL_OPTIONS" -> "-Djextract.decls.per.header=65535")
-
-  // API to regenerate all C-API from headers
-  def dumpIncludes(): Command[Unit] = Task.Command {
-    val f = os.temp()
+trait RawBindingsModule extends NativeModule with ZaoziPublishModule {
+  def group: String
+  def install                   = Task.Input(os.Path(Task.env(group.toUpperCase + "_INSTALL_PATH")))
+  def generator                 = Task.Source(mill.api.BuildCtx.workspaceRoot / "native" / "bindings.py")
+  def header                    = Task.Source(moduleDir / os.up / "capi" / "native.h")
+  def bindgen                   = Task.Input(Task.env.getOrElse("SN_BINDGEN", "bindgen"))
+  def clangCommand              = Task.Input(Task.env.getOrElse("CLANG", "clang"))
+  def systemIncludes            = Task.Input(Task.env.get("LIBC_INCLUDE_PATH").toSeq)
+  def bindings                  = Task {
+    val inc = nativeInstalls().map(p => (p / "include").toString) ++ systemIncludes()
     os.proc(
-      Seq(jextractBinary().toString, header().path.toString)
-        ++ Seq("-I", libcIncludePath().toString)
-        ++ includePaths().flatMap(p => Seq("-I", p.path.toString))
-        ++ Seq("--dump-includes", f.toString)
-    ).call(env = jextractEnv)
-
-    includeFiles().foreach { file =>
-      os.remove(file.path)
-      os.write(file.path, "")
-    }
-
-    os.read
-      .lines(f)
-      .filter(s => s.nonEmpty && !s.startsWith("#"))
-      .filter(str => !str.contains("jextract"))
-      .foreach { str =>
-        val writeStr = str.replaceFirst("--include.+? ", "") + "\n"
-        if (str.startsWith("--include-constant")) os.write.append(includeConstantsFile().path, writeStr)
-        if (str.startsWith("--include-function")) os.write.append(includeFunctionsFile().path, writeStr)
-        if (str.startsWith("--include-struct")) os.write.append(includeStructsFile().path, writeStr)
-        if (str.startsWith("--include-typedef")) os.write.append(includeTypedefsFile().path, writeStr)
-        if (str.startsWith("--include-union")) os.write.append(includeUnionsFile().path, writeStr)
-        if (str.startsWith("--include-var")) os.write.append(includeVarsFile().path, writeStr)
-      }
+      Seq(
+        "python3",
+        generator().path.toString,
+        group,
+        header().path.toString,
+        Task.dest.toString,
+        "--binary",
+        bindgen(),
+        "--clang",
+        clangCommand(),
+        "--library-dir",
+        (install() / "lib").toString
+      ) ++
+        inc.flatMap(p => Seq("--include", p))
+    ).call()
+    PathRef(Task.dest)
   }
-
-  override def generatedSources: T[Seq[PathRef]] = Task {
-    super.generatedSources() ++ {
-      // @formatter:off
-      os.proc(
-        Seq(jextractBinary().toString, header().path.toString)
-          ++ Seq("-I", libcIncludePath().toString)
-          ++ includePaths().flatMap(p => Seq("-I", p.path.toString))
-          ++ Seq(
-          "-t", target(),
-          "--header-class-name", headerClassName(),
-          "--use-system-load-library",
-          "--output", Task.dest.toString
-        ) ++ includeFunctions().flatMap(f => Seq("--include-function", f)) ++
-          includeConstants().flatMap(f => Seq("--include-constant", f)) ++
-          includeStructs().flatMap(f => Seq("--include-struct", f)) ++
-          includeTypedefs().flatMap(f => Seq("--include-typedef", f)) ++
-          includeUnions().flatMap(f => Seq("--include-union", f)) ++
-          includeVars().flatMap(f => Seq("--include-var", f)) ++
-          linkLibraries().flatMap(l => Seq("-l", l))
-      ).call(Task.dest, env = jextractEnv)
-      // @formatter:on
-      Seq(PathRef(Task.dest))
-    }
-  }
-
-  override def javacOptions: T[Seq[String]] = Task(
-    super.javacOptions() ++ Seq("--release", "25")
-  )
-
-  override def forkArgs: T[Seq[String]] = Task(
-    super.forkArgs() ++ Seq("--enable-native-access=ALL-UNNAMED")
-      ++ Some(s"-Djava.library.path=${libraryPaths().map(_.path).distinct.mkString(":")}")
-  )
-
-  def includeFiles = Task(
-    Seq(
-      includeConstantsFile(),
-      includeFunctionsFile(),
-      includeStructsFile(),
-      includeTypedefsFile(),
-      includeUnionsFile(),
-      includeVarsFile()
-    )
-  )
-
-  def includeConstantsFile: T[PathRef]
-  def includeConstants:     T[IndexedSeq[String]] = Task(
-    os.read
-      .lines(includeConstantsFile().path)
-      .filter(s => s.nonEmpty && !s.startsWith("#"))
-      .map(_.replaceFirst(" .*", ""))
-  )
-
-  def includeFunctionsFile: T[PathRef]
-  def includeFunctions:     T[IndexedSeq[String]] = Task(
-    os.read
-      .lines(includeFunctionsFile().path)
-      .filter(s => s.nonEmpty && !s.startsWith("#"))
-      .map(_.replaceFirst(" .*", ""))
-  )
-
-  def includeStructsFile: T[PathRef]
-  def includeStructs:     T[IndexedSeq[String]] = Task(
-    os.read
-      .lines(includeStructsFile().path)
-      .filter(s => s.nonEmpty && !s.startsWith("#"))
-      .map(_.replaceFirst(" .*", ""))
-  )
-
-  def includeTypedefsFile: T[PathRef]
-  def includeTypedefs:     T[IndexedSeq[String]] = Task(
-    os.read
-      .lines(includeTypedefsFile().path)
-      .filter(s => s.nonEmpty && !s.startsWith("#"))
-      .map(_.replaceFirst(" .*", ""))
-  )
-
-  def includeUnionsFile: T[PathRef]
-  def includeUnions:     T[IndexedSeq[String]] = Task(
-    os.read.lines(includeUnionsFile().path).filter(s => s.nonEmpty && !s.startsWith("#")).map(_.replaceFirst(" .*", ""))
-  )
-
-  def includeVarsFile: T[PathRef]
-  def includeVars:     T[IndexedSeq[String]] = Task(
-    os.read.lines(includeVarsFile().path).filter(s => s.nonEmpty && !s.startsWith("#")).map(_.replaceFirst(" .*", ""))
-  )
-
-  def linkLibrariesFile: T[PathRef]
-  def linkLibraries:     T[IndexedSeq[String]] = Task(
-    os.read.lines(linkLibrariesFile().path).filter(s => s.nonEmpty && !s.startsWith("#")).map(_.replaceFirst(" .*", ""))
-  )
-
-  def target: T[String]
-
-  def headerClassName: T[String]
-
-  def header: T[PathRef]
-
-  def includePaths: T[Seq[PathRef]]
-
-  def libraryPaths: T[Seq[PathRef]]
-
-  def jextractBinary: T[Path]
+  override def generatedSources = Task(super.generatedSources() :+ PathRef(bindings().path / "src"))
+  override def resources        = Task(super.resources() :+ PathRef(bindings().path / "resources"))
 }
 
 // Lit-based Test
 trait LitModule extends Module {
-  def scalaVersion:    T[String]
-  def runClasspath:    T[Seq[os.Path]]
-  def javaLibraryPath: T[Seq[os.Path]]
-  def javaHome:        T[os.Path]
-  def litDir:          T[os.Path]
-  def litConfigIn:     T[PathRef]
-  def z3Lib:           T[String] = Task.Input(Task.env.getOrElse("Z3_LIB", ""))
-  def javaOpts:        T[Seq[String]] = Task(
-    Seq(
-      "--java-opt=--enable-native-access=ALL-UNNAMED",
-      s"--java-opt=-Djava.library.path=${javaLibraryPath().mkString(":")}"
-    )
-  )
-  def litConfig:       T[PathRef] = Task {
+  def scalaVersion:   T[String]
+  def runClasspath:   T[Seq[os.Path]]
+  def nativeInstalls: T[Seq[os.Path]]
+  def litDir:         T[os.Path]
+  def litConfigIn:    T[PathRef]
+  def z3Lib:          T[String]  = Task.Input(Task.env.getOrElse("Z3_LIB", ""))
+  def litConfig:      T[PathRef] = Task {
     os.write(
       Task.dest / "lit.site.cfg.py",
       os.read(litConfigIn().path)
         .replaceAll("@SCALA_VERSION@", scalaVersion())
         .replaceAll("@RUN_CLASSPATH@", runClasspath().mkString(","))
-        .replaceAll("@JAVA_HOME@", javaHome().toString)
-        .replaceAll("@JAVA_LIBRARY_PATH@", javaLibraryPath().mkString(","))
-        .replaceAll("@JAVA_OPTS@", javaOpts().mkString(","))
+        .replace("@NATIVE_VERSION@", v.native)
+        .replace("@NATIVE_REPO@", v.nativeRepo)
+        .replace("@NATIVE_INSTALLS@", nativeInstalls().mkString(","))
         .replaceAll("@LIT_DIR@", litDir().toString)
         .replaceAll("@Z3_LIB@", z3Lib())
     )
@@ -271,7 +165,7 @@ trait LitModule extends Module {
     ) / "bin" / "lit"
   )
   def run(args: String*) = Task.Command(
-    os.proc(litBinary().toString(), litConfig().path, "-a")
+    os.proc(Seq(litBinary().toString(), litConfig().path.toString, "-a") ++ args)
       .call(Task.dest, stdout = os.ProcessOutput.Readlines(line => Task.ctx().log.info("[lit] " + line)))
   )
 }

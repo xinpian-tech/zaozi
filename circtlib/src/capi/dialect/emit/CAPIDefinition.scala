@@ -5,11 +5,11 @@ package org.llvm.circt.scalalib.capi.dialect.emit
 // circt-c/Dialect/Esi.h
 import org.llvm.mlir.scalalib.capi.ir.Context
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi

@@ -8,7 +8,7 @@ import org.llvm.circt.scalalib.capi.dialect.om.{*, given}
 import org.llvm.circt.scalalib.capi.dialect.hw.given_AttributeApi
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import upickle.default._
 
 sealed trait OMValue:
@@ -78,7 +78,7 @@ case class OMPath(value: String)                        extends OMValue
 
 extension (evaluatorValue: OMEvaluatorValue)
   def toScala(
-    using Arena,
+    using Zone,
     Context
   ): OMValue = evaluatorValue match
     case obj if obj.isObject                =>

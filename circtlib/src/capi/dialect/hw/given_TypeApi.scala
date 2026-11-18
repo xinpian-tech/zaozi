@@ -2,167 +2,166 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.hw
 
-import org.llvm.circt.CAPI.{
-  hwArrayTypeGet,
-  hwArrayTypeGetElementType,
-  hwArrayTypeGetSize,
-  hwGetBitWidth,
-  hwInOutTypeGet,
-  hwInOutTypeGetElementType,
-  hwModuleTypeGet,
-  hwModuleTypeGetInputName,
-  hwModuleTypeGetInputType,
-  hwModuleTypeGetNumInputs,
-  hwModuleTypeGetNumOutputs,
-  hwModuleTypeGetOutputName,
-  hwModuleTypeGetOutputType,
-  hwModuleTypeGetPort,
-  hwParamIntTypeGet,
-  hwParamIntTypeGetWidthAttr,
-  hwStructTypeGet,
-  hwStructTypeGetField,
-  hwStructTypeGetNumFields,
-  hwTypeAliasTypeGet,
-  hwTypeAliasTypeGetCanonicalType,
-  hwTypeAliasTypeGetInnerType,
-  hwTypeAliasTypeGetName,
-  hwTypeAliasTypeGetScope,
-  hwTypeIsAArrayType,
-  hwTypeIsAInOut,
-  hwTypeIsAIntType,
-  hwTypeIsAModuleType,
-  hwTypeIsAStructType,
-  hwTypeIsATypeAliasType,
-  hwTypeIsAValueType
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.structs as CirctStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
 given TypeApi with
   def arrayTypeGet(
-    element:     Type,
-    size:        Int
+    element:    Type,
+    size:       Int
   )(
-    using arena: Arena
-  ): Type = Type(hwArrayTypeGet(arena, element.segment, size))
+    using zone: Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwArrayTypeGet(element.native, size.toUSize)(out)))
   extension (tpe: Type)
     def arrayTypeGetElementType(
-      using arena: Arena
-    ) = Type(hwArrayTypeGetElementType(arena, tpe.segment))
-    def arrayTypeGetSize(): Int = hwArrayTypeGetSize(tpe.segment).toInt
-    def getBitWidth():      Int = hwGetBitWidth(tpe.segment).toInt
+      using zone: Zone
+    ) = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwArrayTypeGetElementType(tpe.native)(out)))
+    def arrayTypeGetSize(): Int = circtApi.hwArrayTypeGetSize(tpe.native).toLong.toInt
+    def getBitWidth():      Int = circtApi.hwGetBitWidth(tpe.native).toLong.toInt
     def inOutTypeGet(
     )(
-      using arena: Arena
-    ) = Type(hwInOutTypeGet(arena, tpe.segment))
+      using zone: Zone
+    ) = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwInOutTypeGet(tpe.native)(out)))
     def inOutTypeGetElementType(
     )(
-      using arena: Arena
-    ) = Type(hwInOutTypeGetElementType(arena, tpe.segment))
+      using zone: Zone
+    ) = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwInOutTypeGetElementType(tpe.native)(out)))
   def moduleTypeGet(
-    numPorts:    Int,
-    ports:       Seq[HWModulePort]
+    numPorts:   Int,
+    ports:      Seq[HWModulePort]
   )(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(hwModuleTypeGet(arena, context.segment, numPorts, ports.toMlirArray))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out =>
+      circtApi.hwModuleTypeGet(context.native, numPorts.toSize, ports.toMlirArray)(out)
+    )
+  )
   extension (tpe: Type)
     def moduleTypeGetInputName(
-      index:       Int
+      index:      Int
     )(
-      using arena: Arena
-    ): String = StringRef(hwModuleTypeGetInputName(arena, tpe.segment, index)).toScalaString
+      using zone: Zone
+    ): String = StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwModuleTypeGetInputName(tpe.native, index.toSize)(out))
+    ).toScalaString
     def moduleTypeGetInputType(
-      index:       Int
+      index:      Int
     )(
-      using arena: Arena
-    ): Type = Type(hwModuleTypeGetInputType(arena, tpe.segment, index))
-    def moduleTypeGetNumInputs(): Int = hwModuleTypeGetNumInputs(tpe.segment).toInt
+      using zone: Zone
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out => circtApi.hwModuleTypeGetInputType(tpe.native, index.toSize)(out))
+    )
+    def moduleTypeGetNumInputs(): Int = circtApi.hwModuleTypeGetNumInputs(tpe.native).toLong.toInt
     def moduleTypeGetNumOutputs(
     )(
-      using arena: Arena
-    ): Int = hwModuleTypeGetNumOutputs(tpe.segment).toInt
+      using zone: Zone
+    ): Int = circtApi.hwModuleTypeGetNumOutputs(tpe.native).toLong.toInt
     def moduleTypeGetOutputName(
-      index:       Int
+      index:      Int
     )(
-      using arena: Arena
-    ): String = StringRef(hwModuleTypeGetOutputName(arena, tpe.segment, index)).toScalaString
+      using zone: Zone
+    ): String = StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwModuleTypeGetOutputName(tpe.native, index.toSize)(out))
+    ).toScalaString
     def moduleTypeGetOutputType(
-      index:       Int
+      index:      Int
     )(
-      using arena: Arena
-    ): Type = Type(hwModuleTypeGetOutputType(arena, tpe.segment, index))
+      using zone: Zone
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out => circtApi.hwModuleTypeGetOutputType(tpe.native, index.toSize)(out))
+    )
     // Decodes the HWModuleType port at `index` in declaration order (the
     // unified order across inputs + outputs). The returned HWModulePort
     // exposes `portName` (MlirAttribute, typically a StringAttr), `portType`
     // (MlirType segment), and `portDirection` (0=input, 1=output, 2=inout).
     def moduleTypeGetPort(
-      index:       Int
+      index:      Int
     )(
-      using arena: Arena
+      using zone: Zone
     ): HWModulePort =
-      val portSegment = org.llvm.circt.HWModulePort.allocate(arena)
-      hwModuleTypeGetPort(tpe.segment, index, portSegment)
+      val portSegment = alloc[CirctStructs.HWModulePort]()
+      circtApi.hwModuleTypeGetPort(tpe.native, index.toSize, portSegment)
       HWModulePort(portSegment)
   def paramIntTypeGet(
-    attribute:   Attribute
+    attribute:  Attribute
   )(
-    using arena: Arena
-  ): Type = Type(hwParamIntTypeGet(arena, attribute.segment))
+    using zone: Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwParamIntTypeGet(attribute.native)(out)))
   extension (tpe: Type)
     def paramIntTypeGetWidthAttr(
     )(
-      using arena: Arena
-    ): Attribute = Attribute(hwParamIntTypeGetWidthAttr(arena, tpe.segment))
+      using zone: Zone
+    ): Attribute = Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwParamIntTypeGetWidthAttr(tpe.native)(out))
+    )
   def structTypeGet(
     numElements: Int,
     elements:    Seq[HWStructFieldInfo]
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
-  ): Type = Type(hwStructTypeGet(arena, context.segment, numElements, elements.toMlirArray))
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out =>
+      circtApi.hwStructTypeGet(context.native, numElements.toSize, elements.toMlirArray)(out)
+    )
+  )
   extension (tpe: Type)
     def structTypeGetField(
-      name:        String
+      name:       String
     )(
-      using arena: Arena
-    ): Type = Type(hwStructTypeGetField(arena, tpe.segment, name.toStringRef.segment))
+      using zone: Zone
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out => circtApi.hwStructTypeGetField(tpe.native, name.toStringRef.native)(out))
+    )
     def structTypeGetNumFields(
     )(
-      using arena: Arena
-    ): Int = hwStructTypeGetNumFields(tpe.segment).toInt
+      using zone: Zone
+    ): Int = circtApi.hwStructTypeGetNumFields(tpe.native).toLong.toInt
   def typeAliasTypeGet(
-    scope:       String,
-    name:        String,
-    innerType:   Type
+    scope:      String,
+    name:       String,
+    innerType:  Type
   )(
-    using arena: Arena
-  ): Type = Type(hwTypeAliasTypeGet(arena, scope.toStringRef.segment, name.toStringRef.segment, innerType.segment))
+    using zone: Zone
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out =>
+      circtApi.hwTypeAliasTypeGet(scope.toStringRef.native, name.toStringRef.native, innerType.native)(out)
+    )
+  )
   extension (tpe: Type)
     def typeAliasTypeGetCanonicalType(
     )(
-      using arena: Arena
-    ): Type = Type(hwTypeAliasTypeGetCanonicalType(arena, tpe.segment))
+      using zone: Zone
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwTypeAliasTypeGetCanonicalType(tpe.native)(out)))
     def typeAliasTypeGetInnerType(
     )(
-      using arena: Arena
-    ): Type = Type(hwTypeAliasTypeGetInnerType(arena, tpe.segment))
+      using zone: Zone
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwTypeAliasTypeGetInnerType(tpe.native)(out)))
     def typeAliasTypeGetName(
     )(
-      using arena: Arena
-    ): String = StringRef(hwTypeAliasTypeGetName(arena, tpe.segment)).toScalaString
+      using zone: Zone
+    ): String = StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwTypeAliasTypeGetName(tpe.native)(out))
+    ).toScalaString
     def typeAliasTypeGetScope(
     )(
-      using arena: Arena
-    ): String = StringRef(hwTypeAliasTypeGetScope(arena, tpe.segment)).toScalaString
+      using zone: Zone
+    ): String = StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwTypeAliasTypeGetScope(tpe.native)(out))
+    ).toScalaString
   extension (tpe: Type)
-    def isArrayType():     Boolean = hwTypeIsAArrayType(tpe.segment)
-    def isInOut():         Boolean = hwTypeIsAInOut(tpe.segment)
-    def isIntType():       Boolean = hwTypeIsAIntType(tpe.segment)
-    def isModuleType():    Boolean = hwTypeIsAModuleType(tpe.segment)
-    def isStructType():    Boolean = hwTypeIsAStructType(tpe.segment)
-    def isTypeAliasType(): Boolean = hwTypeIsATypeAliasType(tpe.segment)
-    def isValueType():     Boolean = hwTypeIsAValueType(tpe.segment)
+    def isArrayType():     Boolean = circtApi.hwTypeIsAArrayType(tpe.native)
+    def isInOut():         Boolean = circtApi.hwTypeIsAInOut(tpe.native)
+    def isIntType():       Boolean = circtApi.hwTypeIsAIntType(tpe.native)
+    def isModuleType():    Boolean = circtApi.hwTypeIsAModuleType(tpe.native)
+    def isStructType():    Boolean = circtApi.hwTypeIsAStructType(tpe.native)
+    def isTypeAliasType(): Boolean = circtApi.hwTypeIsATypeAliasType(tpe.native)
+    def isValueType():     Boolean = circtApi.hwTypeIsAValueType(tpe.native)
 end given

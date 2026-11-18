@@ -21,8 +21,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManagerApi}
 import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
 
-import java.lang.foreign.Arena
-import java.nio.file.StandardOpenOption.*
+import scala.scalanative.unsafe.Zone
+import org.llvm.mlir.scalalib.Mlir
 
 /** Where elaborated modules go, and elaborating a generator into one linked circuit in memory. */
 object Elaborate:
@@ -33,62 +33,72 @@ object Elaborate:
       name:   String,
       module: MlirModule
     )(
-      using Arena
+      using Zone
     ):                          Unit
 
-  /** Modules written as mlirbc files under `ZAOZI_OUTDIR`, once per name in this process. */
-  private object Files extends Modules:
+  /** Modules written as mlirbc files under `ZAOZI_OUTDIR`, once per name in the current elaboration. */
+  private final class Files extends Modules:
     private val written = scala.collection.mutable.HashSet.empty[String]
     def contains(name: String): Boolean = written.contains(name)
     def add(
       name:   String,
       module: MlirModule
     )(
-      using Arena
+      using Zone
     ): Unit =
       val file = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", ""), os.pwd) / s"$name.mlirbc"
-      val out  = os.write.outputStream(file, openOptions = Seq(WRITE, CREATE, TRUNCATE_EXISTING))
-      module.getOperation.writeBytecode(bc => out.write(bc))
+      os.write.over(file, Mlir.bytecode(module))
       written.add(name)
+      module.destroy()
 
-  /** Where the modules elaborated now go: files, or the table of the enclosing `collect`. */
-  private[default] val modules = DynamicVariable[Modules](Files)
+  private val current = new DynamicVariable[Option[Modules]](None)
+
+  private[default] def withModules[A](body: Modules => A): A = current.value match
+    case Some(modules) => body(modules)
+    case None          =>
+      val files = new Files
+      current.withValue(Some(files))(body(files))
 
   def apply[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: Generator[PARAM, L, I, P],
     parameter: PARAM
   )(
-    using Arena,
+    using Zone,
     Context
   ): MlirModule =
-    val table  = scala.collection.mutable.LinkedHashMap.empty[String, MlirModule]
-    collect(table)(generator.dumpMlirbc(parameter))
-    val linked = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-    table.foreach: (_, module) =>
-      val circuit = module.getBody.getFirstOperation
-      circuit.removeFromParent()
-      linked.getBody.appendOwnedOperation(circuit)
-    val passManager = summon[PassManagerApi].passManagerCreate
-    passManager.addOwnedPass(summon[PassApi].linkCircuitsPass(generator.moduleName(parameter), noMangle = false))
-    require(
-      passManager.runOnOp(linked.getOperation).succeeded,
-      s"cannot link the modules of ${generator.moduleName(parameter)}"
-    )
-    linked
+    val table = scala.collection.mutable.LinkedHashMap.empty[String, MlirModule]
+    try
+      collect(table)(generator.dumpMlirbc(parameter))
+      val linked = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+      try
+        table.valuesIterator.foreach: module =>
+          val circuit = module.getBody.getFirstOperation
+          circuit.removeFromParent()
+          linked.getBody.appendOwnedOperation(circuit)
+        val manager = summon[PassManagerApi].passManagerCreate
+        try
+          manager.addOwnedPass(summon[PassApi].linkCircuitsPass(generator.moduleName(parameter), noMangle = false))
+          require(manager.runOnOp(linked.getOperation).succeeded, s"cannot link ${generator.moduleName(parameter)}")
+        finally manager.destroy()
+        linked
+      catch
+        case t: Throwable =>
+          linked.destroy()
+          throw t
+    finally table.valuesIterator.foreach(_.destroy())
 
   /** Runs `body`, adding to `table` every module it elaborates, each as a circuit of its own, by module name. A module
     * already in `table` is not elaborated again. The modules belong to the context they were elaborated in, so a table
     * is reused only within one context.
     */
   def collect[A](table: scala.collection.mutable.LinkedHashMap[String, MlirModule])(body: => A): A =
-    modules.withValue(
-      new Modules:
-        def contains(name: String): Boolean = table.contains(name)
-        def add(
-          name:   String,
-          module: MlirModule
-        )(
-          using Arena
-        ): Unit = table.update(name, module)
-    )(body)
+    val modules = new Modules:
+      def contains(name: String): Boolean = table.contains(name)
+      def add(
+        name:   String,
+        module: MlirModule
+      )(
+        using Zone
+      ): Unit = table.update(name, module)
+    current.withValue(Some(modules))(body)
 end Elaborate

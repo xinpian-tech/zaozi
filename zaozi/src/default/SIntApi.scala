@@ -30,12 +30,12 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
 }
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given SIntApi with
   extension [LHS <: Referable[SInt]](ref: LHS)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -59,7 +59,7 @@ given SIntApi with
     def +[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -84,7 +84,7 @@ given SIntApi with
     def -[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -109,7 +109,7 @@ given SIntApi with
     def *[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -134,7 +134,7 @@ given SIntApi with
     def /[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -159,7 +159,7 @@ given SIntApi with
     def %[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -184,7 +184,7 @@ given SIntApi with
     def <[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -208,7 +208,7 @@ given SIntApi with
     def <=[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -232,7 +232,7 @@ given SIntApi with
     def >[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -256,7 +256,7 @@ given SIntApi with
     def >=[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -280,7 +280,7 @@ given SIntApi with
     def ===[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -304,7 +304,7 @@ given SIntApi with
     def =/=[RHS <: Referable[SInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -328,7 +328,7 @@ given SIntApi with
     def <<(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -359,7 +359,7 @@ given SIntApi with
     def >>(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

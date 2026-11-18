@@ -9,7 +9,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, ContextApi}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import utest.*
 import me.jiuyang.zaozi.magic.macros.generator
 
@@ -247,7 +247,7 @@ object BitsSpec extends TestSuite:
           node: Node[Bool]
         )(
           using And[Bool, Bool],
-          Arena,
+          Zone,
           Context,
           Block,
           sourcecode.File,
@@ -278,7 +278,7 @@ object BitsSpec extends TestSuite:
           node: Node[Bits]
         )(
           using Cat[Bits],
-          Arena,
+          Zone,
           Context,
           Block,
           sourcecode.File,

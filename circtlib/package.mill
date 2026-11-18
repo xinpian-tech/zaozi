@@ -7,74 +7,16 @@ import mill.scalalib._
 import mill.scalalib.TestModule.Utest
 import mill.scalalib.scalafmt._
 
-import build.{mlirlib, v, PanamaModule, ZaoziPublishModule, ZaoziScalaModule}
+import build.{v, RawBindingsModule, ZaoziPublishModule, ZaoziScalaModule}
 
-object `package` extends ZaoziScalaModule with ScalafmtModule with PanamaModule with ZaoziPublishModule {
-  outer =>
-  def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(mlirlib)
-  def mvnDeps      = Seq(v.mainargs, v.pprint, v.upickle)
-
-  override def dumpIncludes() = Task.Command {
-    super.dumpIncludes()()
-    includeFiles().foreach { file =>
-      val lines =
-        os.read
-          .lines(file.path)
-          .filter(str => str.contains(circtInstallPath().toString))
-          .map(_.replaceAll(circtInstallPath().toString, "\\$CIRCT_INSTALL_PATH").trim)
-      os.write.over(file.path, (license ++ lines).mkString("\n"))
-    }
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule {
+  object raw extends RawBindingsModule {
+    def group      = "circt"
+    def moduleDeps = Seq(build.mlirlib.raw)
   }
-
-  override def includeFunctions = Task(super.includeFunctions() ++ mlirlib.includeFunctions())
-  override def includeStructs   = Task(super.includeStructs()   ++ mlirlib.includeStructs())
-  override def includeTypedefs  = Task(super.includeTypedefs()  ++ mlirlib.includeTypedefs())
-  override def includeConstants = Task(super.includeConstants() ++ mlirlib.includeConstants())
-  override def includeUnions    = Task(super.includeUnions()    ++ mlirlib.includeUnions())
-  override def includeVars      = Task(super.includeVars()      ++ mlirlib.includeVars())
-
-  def includeConstantsFile = Task.Source(moduleDir / "capi" / "includeConstants.txt")
-
-  def includeFunctionsFile = Task.Source(moduleDir / "capi" / "includeFunctions.txt")
-
-  def includeStructsFile = Task.Source(moduleDir / "capi" / "includeStructs.txt")
-
-  def includeTypedefsFile = Task.Source(moduleDir / "capi" / "includeTypedefs.txt")
-
-  def includeUnionsFile = Task.Source(moduleDir / "capi" / "includeUnions.txt")
-
-  def includeVarsFile = Task.Source(moduleDir / "capi" / "includeVars.txt")
-
-  def linkLibrariesFile = Task.Source(moduleDir / "capi" / "linkLibraries.txt")
-
-  def target = Task("org.llvm.circt")
-
-  def headerClassName = Task("CAPI")
-
-  def header = Task.Source(moduleDir / "capi" / "jextract-headers.h")
-
-  def circtInstallPath = Task.Input(
-    os.Path(Task.env.getOrElse("CIRCT_INSTALL_PATH", "CIRCT_INSTALL_PATH not found, you are not in the nix env?"))
-  )
-
-  def jextractBinary = Task.Input(
-    os.Path(
-      Task.env.getOrElse("JEXTRACT_INSTALL_PATH", "JEXTRACT_INSTALL_PATH not found, you are not in the nix env?")
-    ) / "bin" / "jextract"
-  )
-
-  def includePaths = Task(Seq(mlirlib.mlirInstallPath() / "include", circtInstallPath() / "include").map(PathRef(_)))
-
-  def libraryPaths = Task(Seq(mlirlib.mlirInstallPath() / "lib", circtInstallPath() / "lib").map(PathRef(_)))
-
-  object tests extends ZaoziScalaModule with ScalafmtModule with Utest {
-    override def forkArgs: T[Seq[String]] = outer.forkArgs
-
-    override def moduleDeps = Seq(outer, mlirlib)
-
-    def mvnDeps = Seq(v.utest, v.oslib, v.upickle)
-
-    override def scalaVersion = outer.scalaVersion
+  def moduleDeps = Seq(raw, build.mlirlib)
+  def mvnDeps = Seq(v.mainargs, v.pprint, v.upickle)
+  object tests extends NativeTests with ScalafmtModule with Utest {
+    override def mvnDeps = super.mvnDeps() ++ Seq(v.utest, v.oslib, v.upickle)
   }
 }

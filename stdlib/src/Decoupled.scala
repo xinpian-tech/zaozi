@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait HasFire[T <: HardwareDataType, R <: Referable[T]]:
   extension (ref: R)
@@ -19,7 +19,7 @@ trait HasFire[T <: HardwareDataType, R <: Referable[T]]:
       valName:   sourcecode.Name.Machine,
       instCtx:   InstanceContext
     )(
-      using Arena,
+      using Zone,
       Block
     ): Node[Bool]
 

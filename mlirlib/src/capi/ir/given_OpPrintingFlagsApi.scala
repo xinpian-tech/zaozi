@@ -2,39 +2,32 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirOpPrintingFlagsAssumeVerified,
-  mlirOpPrintingFlagsCreate,
-  mlirOpPrintingFlagsDestroy,
-  mlirOpPrintingFlagsElideLargeElementsAttrs,
-  mlirOpPrintingFlagsElideLargeResourceString,
-  mlirOpPrintingFlagsEnableDebugInfo,
-  mlirOpPrintingFlagsPrintGenericOpForm,
-  mlirOpPrintingFlagsSkipRegions,
-  mlirOpPrintingFlagsUseLocalScope
-}
-
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
 given OpPrintingFlagsApi with
   inline def opPrintingFlagsCreate(
   )(
-    using arena: Arena
-  ): OpPrintingFlags = OpPrintingFlags(mlirOpPrintingFlagsCreate(arena))
+    using zone: Zone
+  ): OpPrintingFlags = OpPrintingFlags(
+    nativeResult[MlirStructs.MlirOpPrintingFlags](out => mlirApi.mlirOpPrintingFlagsCreate()(out))
+  )
 
   extension (opPrintingFlags: OpPrintingFlags)
-    inline def flagsDestroy():                                             Unit          = mlirOpPrintingFlagsDestroy(opPrintingFlags.segment)
-    inline def flagsElideLargeElementsAttrs(largeElementLimit: Long):      Unit          =
-      mlirOpPrintingFlagsElideLargeElementsAttrs(opPrintingFlags.segment, largeElementLimit)
-    inline def flagsElideLargeResourceString(largeResourceLimit: Long):    Unit          =
-      mlirOpPrintingFlagsElideLargeResourceString(opPrintingFlags.segment, largeResourceLimit)
-    inline def flagsEnableDebugInfo(enable: Boolean, prettyForm: Boolean): Unit          =
-      mlirOpPrintingFlagsEnableDebugInfo(opPrintingFlags.segment, enable, prettyForm)
-    inline def flagsPrintGenericOpForm():                                  Unit          = mlirOpPrintingFlagsPrintGenericOpForm(opPrintingFlags.segment)
-    inline def flagsUseLocalScope():                                       Unit          = mlirOpPrintingFlagsUseLocalScope(opPrintingFlags.segment)
-    inline def flagsAssumeVerified():                                      Unit          = mlirOpPrintingFlagsAssumeVerified(opPrintingFlags.segment)
-    inline def flagsSkipRegions():                                         Unit          = mlirOpPrintingFlagsSkipRegions(opPrintingFlags.segment)
-    inline def segment:                                                    MemorySegment = opPrintingFlags._segment
-    inline def sizeOf:                                                     Int           = MlirOpPrintingFlags.sizeof().toInt
+    inline def flagsDestroy():                                             Unit = mlirApi.mlirOpPrintingFlagsDestroy(opPrintingFlags.native)
+    inline def flagsElideLargeElementsAttrs(largeElementLimit: Long):      Unit =
+      mlirApi.mlirOpPrintingFlagsElideLargeElementsAttrs(opPrintingFlags.native, largeElementLimit.toSize)
+    inline def flagsElideLargeResourceString(largeResourceLimit: Long):    Unit =
+      mlirApi.mlirOpPrintingFlagsElideLargeResourceString(opPrintingFlags.native, largeResourceLimit.toSize)
+    inline def flagsEnableDebugInfo(enable: Boolean, prettyForm: Boolean): Unit =
+      mlirApi.mlirOpPrintingFlagsEnableDebugInfo(opPrintingFlags.native, enable, prettyForm)
+    inline def flagsPrintGenericOpForm():                                  Unit = mlirApi.mlirOpPrintingFlagsPrintGenericOpForm(opPrintingFlags.native)
+    inline def flagsUseLocalScope():                                       Unit = mlirApi.mlirOpPrintingFlagsUseLocalScope(opPrintingFlags.native)
+    inline def flagsAssumeVerified():                                      Unit = mlirApi.mlirOpPrintingFlagsAssumeVerified(opPrintingFlags.native)
+    inline def flagsSkipRegions():                                         Unit = mlirApi.mlirOpPrintingFlagsSkipRegions(opPrintingFlags.native)
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirOpPrintingFlags].toInt
 end given

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class ElaborateTop %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class ElaborateTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir && cd %t.dir
 // RUN: %{test} > %t.dir/top.mlir
 // RUN: FileCheck %s --check-prefix=IR --input-file=%t.dir/top.mlir
@@ -19,7 +19,7 @@ import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi, DialectApi as
 import org.llvm.circt.scalalib.capi.dialect.verif.{given_DialectApi, DialectApi as VerifDialect}
 import org.llvm.mlir.scalalib.capi.ir.{ContextApi, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 case class ElaborateParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[ElaborateParameter] = upickle.default.macroRW
@@ -39,7 +39,7 @@ case class ElaborateVerilogParameter(WIDTH: Int) extends VerilogParameter
 object ElaborateBuffer
     extends VerilogWrapper[ElaborateParameter, ElaborateLayers, ElaborateIO, ElaborateProbe, ElaborateVerilogParameter]:
   def verilogModuleName(parameter: ElaborateParameter) = "ExternalBuffer"
-  def verilogParameter(parameter: ElaborateParameter) = ElaborateVerilogParameter(parameter.width)
+  def verilogParameter(parameter:  ElaborateParameter) = ElaborateVerilogParameter(parameter.width)
 
 @generator
 object ElaborateChild extends Generator[ElaborateParameter, ElaborateLayers, ElaborateIO, ElaborateProbe]:
@@ -47,30 +47,30 @@ object ElaborateChild extends Generator[ElaborateParameter, ElaborateLayers, Ela
     val io     = summon[Interface[ElaborateIO]]
     val buffer = ElaborateBuffer.instantiate(parameter)
     buffer.io.a := io.a
-    io.b := buffer.io.b
+    io.b        := buffer.io.b
 
 @generator
 object ElaborateTop extends Generator[ElaborateParameter, ElaborateLayers, ElaborateIO, ElaborateProbe]:
   override def moduleName(parameter: ElaborateParameter): String = "ElaborateTop"
-  override def main(args: Array[String]): Unit =
-    val arena = Arena.ofConfined()
+  override def main(args: Array[String]):                 Unit   =
+    val zone = Zone.open()
     try
-      given Arena   = arena
+      given Zone                                   = zone
       given org.llvm.mlir.scalalib.capi.ir.Context = summon[ContextApi].contextCreate
       summon[FirrtlDialect].loadDialect
       summon[LtlDialect].loadDialect
       summon[VerifDialect].loadDialect
-      val module = Elaborate(ElaborateTop, ElaborateParameter(7))
+      val module                                   = Elaborate(ElaborateTop, ElaborateParameter(7))
       require(module.getOperation.verify)
       module.getOperation.print(print)
-    finally arena.close()
+    finally zone.close()
   def architecture(parameter: ElaborateParameter) =
     val io     = summon[Interface[ElaborateIO]]
     val first  = ElaborateChild.instantiate(parameter)
     val second = ElaborateChild.instantiate(parameter)
     first.io.a  := io.a
     second.io.a := first.io.b
-    io.b := second.io.b
+    io.b        := second.io.b
 
 // IR:     firrtl.circuit "ElaborateTop"
 // IR-DAG:  firrtl.extmodule {{.*}}@ExternalBuffer_{{.*}}defname = "ExternalBuffer"

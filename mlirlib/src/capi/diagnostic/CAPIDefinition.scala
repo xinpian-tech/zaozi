@@ -2,29 +2,30 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.diagnostic
 
+import org.llvm.mlir.raw.structs as MlirStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.ir.Location
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
-class Diagnostic(val _segment: MemorySegment)
-trait DiagnosticApi extends HasSegment[Diagnostic] with HasSizeOf[Diagnostic]:
+class Diagnostic(handle: Ptr[MlirStructs.MlirDiagnostic]) extends NativeHandle(handle)
+trait DiagnosticApi                                       extends HasSizeOf[Diagnostic]:
   extension (diagnostic: Diagnostic)
     inline def getLocation(
-      using arena: Arena
+      using zone: Zone
     ): Location
     inline def print(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
 end DiagnosticApi
 
-class DiagnosticHandler(val _segment: MemorySegment)
-trait DiagnosticHandlerApi extends HasSegment[DiagnosticHandler]
+class DiagnosticHandler(val native: org.llvm.mlir.raw.aliases.MlirDiagnosticHandler)
+trait DiagnosticHandlerApi
 
-class DiagnosticHandlerID(val _segment: MemorySegment)
-trait DiagnosticHandlerIDApi extends HasSegment[DiagnosticHandlerID]
+class DiagnosticHandlerID(val native: org.llvm.mlir.raw.aliases.MlirDiagnosticHandlerID)
+trait DiagnosticHandlerIDApi
 
 enum DiagnosticSeverityEnum:
   case Error

@@ -21,12 +21,12 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
 }
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given BoolApi with
   extension [LHS <: Referable[Bool]](ref: LHS)
     def asClock(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -46,7 +46,7 @@ given BoolApi with
       propagate[LHS, Clock](ref, new Object with Clock, nodeOp.operation.getResult(0))
 
     def asReset(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -64,7 +64,7 @@ given BoolApi with
       propagate[LHS, Reset](ref, new Object with Reset, nodeOp.operation.getResult(0))
 
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -86,7 +86,7 @@ given BoolApi with
         val _refer: Value = nodeOp.operation.getResult(0)
 
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -108,7 +108,7 @@ given BoolApi with
     def ===[RHS <: Referable[Bool]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -132,7 +132,7 @@ given BoolApi with
     def =/=[RHS <: Referable[Bool]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -156,7 +156,7 @@ given BoolApi with
     def &[RHS <: Referable[Bool]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -180,7 +180,7 @@ given BoolApi with
     def |[RHS <: Referable[Bool]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -204,7 +204,7 @@ given BoolApi with
     def ^[RHS <: Referable[Bool]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -229,7 +229,7 @@ given BoolApi with
       con: Referable[Ret],
       alt: Referable[Ret]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

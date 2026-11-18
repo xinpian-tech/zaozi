@@ -2,62 +2,59 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirOperationStateAddAttributes,
-  mlirOperationStateAddOperands,
-  mlirOperationStateAddOwnedRegions,
-  mlirOperationStateAddResults,
-  mlirOperationStateAddSuccessors,
-  mlirOperationStateEnableResultTypeInference,
-  mlirOperationStateGet
-}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 given OperationStateApi with
   inline def operationStateGet(
-    name:        String,
-    loc:         Location
+    name:       String,
+    loc:        Location
   )(
-    using arena: Arena
+    using zone: Zone
   ): OperationState =
-    OperationState(mlirOperationStateGet(arena, name.toStringRef.segment, loc.segment))
+    OperationState(
+      nativeResult[MlirStructs.MlirOperationState](out =>
+        mlirApi.mlirOperationStateGet(name.toStringRef.native, loc.native)(out)
+      )
+    )
 
   extension (operationState: OperationState)
     inline def addResults(
-      results:     Seq[Type]
+      results:    Seq[Type]
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit =
-      mlirOperationStateAddResults(operationState.segment, results.size, results.toMlirArray)
+      mlirApi.mlirOperationStateAddResults(operationState.native, results.size.toSize, results.toMlirArray)
     inline def addOperands(
-      operands:    Seq[Value]
+      operands:   Seq[Value]
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit =
-      mlirOperationStateAddOperands(operationState.segment, operands.size, operands.toMlirArray)
+      mlirApi.mlirOperationStateAddOperands(operationState.native, operands.size.toSize, operands.toMlirArray)
     inline def addOwnedRegions(
-      regions:     Seq[Region]
+      regions:    Seq[Region]
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit =
-      mlirOperationStateAddOwnedRegions(operationState.segment, regions.size, regions.toMlirArray)
+      mlirApi.mlirOperationStateAddOwnedRegions(operationState.native, regions.size.toSize, regions.toMlirArray)
     inline def addSuccessors(
-      blocks:      Seq[Block]
+      blocks:     Seq[Block]
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit =
-      mlirOperationStateAddSuccessors(operationState.segment, blocks.size, blocks.toMlirArray)
+      mlirApi.mlirOperationStateAddSuccessors(operationState.native, blocks.size.toSize, blocks.toMlirArray)
     inline def addAttributes(
-      attrs:       Seq[NamedAttribute]
+      attrs:      Seq[NamedAttribute]
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit =
-      mlirOperationStateAddAttributes(operationState.segment, attrs.size, attrs.toMlirArray)
-    inline def enableResultTypeInference(): Unit          =
-      mlirOperationStateEnableResultTypeInference(operationState.segment)
-    inline def segment:                     MemorySegment = operationState._segment
-    inline def sizeOf:                      Int           = MlirOperationState.sizeof().toInt
+      mlirApi.mlirOperationStateAddAttributes(operationState.native, attrs.size.toSize, attrs.toMlirArray)
+    inline def enableResultTypeInference(): Unit =
+      mlirApi.mlirOperationStateEnableResultTypeInference(operationState.native)
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirOperationState].toInt
 end given

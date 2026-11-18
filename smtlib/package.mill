@@ -11,17 +11,14 @@ import os.Path
 import build.{circtlib, v, ZaoziPublishModule, ZaoziScalaModule}
 
 object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
-  def scalaVersion = Task(v.scala)
-  def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode, v.fastparse)
-  def moduleDeps   = Seq(circtlib)
+
+  def mvnDeps    = Seq(v.mainargs, v.oslib, v.upickle, v.sourcecode, v.fastparse)
+  def moduleDeps = Seq(circtlib)
 
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Some("-Xprint-suspension"))
 
-  object tests extends ScalaTests with ScalafmtModule with Utest {
-    def mvnDeps = Seq(v.utest)
+  object tests extends NativeTests with ScalafmtModule with Utest {
+    override def mvnDeps = super.mvnDeps() ++ Seq(v.utest)
 
-    override def forkArgs: T[Seq[String]] = Task(
-      super.forkArgs() ++ circtlib.forkArgs()
-    )
   }
 }

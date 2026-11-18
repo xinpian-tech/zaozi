@@ -2,91 +2,84 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirContextAppendDialectRegistry,
-  mlirContextAttachDiagnosticHandler,
-  mlirContextCreate,
-  mlirContextCreateWithRegistry,
-  mlirContextCreateWithThreading,
-  mlirContextDestroy,
-  mlirContextDetachDiagnosticHandler,
-  mlirContextEnableMultithreading,
-  mlirContextGetOrLoadDialect,
-  mlirContextLoadAllAvailableDialects,
-  mlirContextSetAllowUnregisteredDialects,
-  mlirContextSetThreadPool
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import org.llvm.mlir.scalalib.capi.diagnostic.Diagnostic
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
 given ContextApi with
   inline def contextCreate(
-    using arena: Arena
+    using zone: Zone
   ): Context =
-    Context(mlirContextCreate(arena))
+    Context(nativeResult[MlirStructs.MlirContext](out => mlirApi.mlirContextCreate()(out)))
 
   inline def contextCreateWithThreading(
     threadingEnabled: Boolean
   )(
-    using arena:      Arena
+    using zone:       Zone
   ): Context =
-    Context(mlirContextCreateWithThreading(arena, threadingEnabled))
+    Context(nativeResult[MlirStructs.MlirContext](out => mlirApi.mlirContextCreateWithThreading(threadingEnabled)(out)))
 
   inline def contextCreateWithRegistry(
     registry:         DialectRegistry,
     threadingEnabled: Boolean
   )(
-    using arena:      Arena
+    using zone:       Zone
   ): Context =
-    Context(mlirContextCreateWithRegistry(arena, registry.segment, threadingEnabled))
+    Context(
+      nativeResult[MlirStructs.MlirContext](out =>
+        mlirApi.mlirContextCreateWithRegistry(registry.native, threadingEnabled)(out)
+      )
+    )
 
   extension (context: Context)
     inline def getOrLoadDialect(
-      name:        String
+      name:       String
     )(
-      using arena: Arena
-    ): Dialect = Dialect(mlirContextGetOrLoadDialect(arena, context.segment, name.toStringRef.segment))
-    inline def destroy():                                        Unit = mlirContextDestroy(context.segment)
+      using zone: Zone
+    ): Dialect = Dialect(
+      nativeResult[MlirStructs.MlirDialect](out =>
+        mlirApi.mlirContextGetOrLoadDialect(context.native, name.toStringRef.native)(out)
+      )
+    )
+    inline def destroy():                                        Unit = mlirApi.mlirContextDestroy(context.native)
     inline def allowUnregisteredDialects(allow: Boolean):        Unit =
-      mlirContextSetAllowUnregisteredDialects(context.segment, allow)
+      mlirApi.mlirContextSetAllowUnregisteredDialects(context.native, allow)
     inline def appendDialectRegistry(registry: DialectRegistry): Unit =
-      mlirContextAppendDialectRegistry(context.segment, registry.segment)
+      mlirApi.mlirContextAppendDialectRegistry(context.native, registry.native)
     inline def enableMultithreading(enable: Boolean):            Unit =
-      mlirContextEnableMultithreading(context.segment, enable)
+      mlirApi.mlirContextEnableMultithreading(context.native, enable)
     inline def loadAllAvailableDialects():                       Unit =
-      mlirContextLoadAllAvailableDialects(context.segment)
+      mlirApi.mlirContextLoadAllAvailableDialects(context.native)
     inline def setThreadPool(threadPool: LlvmThreadPool):        Unit =
-      mlirContextSetThreadPool(context.segment, threadPool.segment)
+      mlirApi.mlirContextSetThreadPool(context.native, threadPool.native)
 
     def attachDiagnosticHandler(
-      handler:     Diagnostic => Boolean
+      handler:    Diagnostic => Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Long =
-      // MLIR handler protocol: a success result consumes the diagnostic, failure propagates it.
-      val consumed  = MlirLogicalResult.allocate(arena)
-      MlirLogicalResult.value(consumed, 1.toByte)
-      val propagate = MlirLogicalResult.allocate(arena)
-      val stub      = MlirDiagnosticHandler.allocate(
-        // A Throwable crossing this native upcall boundary aborts the JVM.
-        (diagnosticSegment: MemorySegment, _userData: MemorySegment) =>
-          try if handler(Diagnostic(diagnosticSegment)) then consumed else propagate
-          catch
-            case t: Throwable =>
-              System.err.println(s"diagnostic handler threw ${t.getClass.getName}: ${t.getMessage}")
-              propagate
-        ,
-        arena
-      )
-      mlirContextAttachDiagnosticHandler(context.segment, stub, MemorySegment.NULL, MemorySegment.NULL)
+      val state = NativeCallbacks.retain(handler)
+      try
+        mlirApi
+          .mlirContextAttachDiagnosticHandler(
+            context.native,
+            CallbackFunctions.diagnostic(),
+            state,
+            CallbackFunctions.release()
+          )
+          .toLong
+      catch
+        case t: Throwable =>
+          NativeCallbacks.release(state)
+          throw t
 
     inline def detachDiagnosticHandler(id: Long): Unit =
-      mlirContextDetachDiagnosticHandler(context.segment, id)
+      mlirApi.mlirContextDetachDiagnosticHandler(context.native, id.toULong)
 
-    inline def segment: MemorySegment = context._segment
-    inline def sizeOf:  Int           = MlirContext.sizeof().toInt
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirContext].toInt
 
 end given
