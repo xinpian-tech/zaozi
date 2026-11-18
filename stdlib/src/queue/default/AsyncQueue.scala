@@ -6,107 +6,20 @@ import java.lang.foreign.Arena
 
 import me.jiuyang.stdlib.{BKAIncrementerParameter, BrentKungAdder, BrentKungAdderParameter, Incrementer, PrefixAdderIO}
 import me.jiuyang.stdlib.default.{Ram, RamParameter}
+import me.jiuyang.stdlib.queue.{
+  AsyncQueueIO,
+  AsyncQueueImpl,
+  AsyncQueueLayers,
+  AsyncQueueParameter,
+  AsyncQueueProbe,
+  given
+}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.ltltpe.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
-
-/** Operation-oriented implementation of `DW_fifo_s2_sf`.
-  *
-  * The controller, directional pointer logic, and synchronizers are elaboration helpers. [[Ram]] and the arithmetic
-  * primitives are the queue's child modules.
-  */
-case class AsyncQueueParameter(
-  /** Number of bits stored in each queue entry. */
-  width:                Int,
-  /** Logical number of entries available to the queue. */
-  depth:                Int,
-  /** Assert push-domain almost-empty when its estimated occupancy is at most this value. */
-  pushAlmostEmptyLevel: Int,
-  /** Assert push-domain almost-full when its estimated occupancy reaches `depth - pushAlmostFullLevel`. */
-  pushAlmostFullLevel:  Int,
-  /** Assert pop-domain almost-empty when its estimated occupancy is at most this value. */
-  popAlmostEmptyLevel:  Int,
-  /** Assert pop-domain almost-full when its estimated occupancy reaches `depth - popAlmostFullLevel`. */
-  popAlmostFullLevel:   Int,
-  /** Keep overflow and underflow errors asserted until reset; otherwise report only the current illegal request. */
-  stickyError:          Boolean,
-  /** Synchronizer stages used to transfer the pop Gray pointer into the push clock domain. */
-  pushSync:             Int,
-  /** Synchronizer stages used to transfer the push Gray pointer into the pop clock domain. */
-  popSync:              Int,
-  /** Use asynchronous active-low reset when true, or synchronous active-low reset when false. */
-  asyncReset:           Boolean,
-  /** Reset all RAM entries to zero when true; otherwise reset only queue control state. */
-  resetMem:             Boolean)
-    extends Parameter:
-  require(width >= 1 && width <= 256, s"AsyncQueue width must be 1..256, got $width")
-  require(depth >= 4 && depth <= 256, s"AsyncQueue depth must be 4..256, got $depth")
-  Seq(
-    "pushAlmostEmptyLevel" -> pushAlmostEmptyLevel,
-    "pushAlmostFullLevel"  -> pushAlmostFullLevel,
-    "popAlmostEmptyLevel"  -> popAlmostEmptyLevel,
-    "popAlmostFullLevel"   -> popAlmostFullLevel
-  ).foreach: (name, level) =>
-    require(level >= 1 && level <= depth - 1, s"AsyncQueue $name must be 1..depth-1, got $level")
-  require(pushSync >= 1 && pushSync <= 3, s"AsyncQueue pushSync must be 1..3, got $pushSync")
-  require(popSync >= 1 && popSync <= 3, s"AsyncQueue popSync must be 1..3, got $popSync")
-
-  /** Number of bits used by the physical RAM addresses. */
-  def addressWidth: Int = QueueHelper.bitWidth(depth)
-
-  /** Physical RAM depth required by the centered non-power-of-two pointer mapping. */
-  def effectiveDepth: Int = QueueHelper.effectiveDepth(depth)
-
-given upickle.default.ReadWriter[AsyncQueueParameter] = upickle.default.macroRW
-
-class AsyncQueueLayers(parameter: AsyncQueueParameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("Verification"))
-
-class AsyncQueuePortIO extends Bundle:
-  /** Local clock for this push or pop endpoint. */
-  val clock = Flipped(Clock())
-
-  /** Active-low push or pop request sampled in this endpoint's clock domain. */
-  val requestN = Flipped(Bool())
-
-  /** Local synchronized view indicating that the queue contains no entries. */
-  val empty = Aligned(Bool())
-
-  /** Local synchronized view indicating occupancy at or below the configured almost-empty level. */
-  val almostEmpty = Aligned(Bool())
-
-  /** Local synchronized view indicating occupancy at or above half the logical depth. */
-  val halfFull = Aligned(Bool())
-
-  /** Local synchronized view indicating occupancy at or above the configured almost-full threshold. */
-  val almostFull = Aligned(Bool())
-
-  /** Local synchronized view indicating that all logical entries are occupied. */
-  val full = Aligned(Bool())
-
-  /** Registered overflow or underflow indication for this endpoint. */
-  val error = Aligned(Bool())
-
-class AsyncQueueIO(parameter: AsyncQueueParameter) extends HWBundle(parameter):
-  /** Shared active-low reset for queue control state and, when enabled, RAM contents. */
-  val resetN = Flipped(Reset())
-
-  /** Push-clock-domain request and status interface. */
-  val push = Aligned(new AsyncQueuePortIO)
-
-  /** Pop-clock-domain request and status interface. */
-  val pop = Aligned(new AsyncQueuePortIO)
-
-  /** Data written when a push request is accepted. */
-  val dataIn = Flipped(UInt(parameter.width))
-
-  /** Data at the current pop address; consumed only by an accepted pop request. */
-  val dataOut = Aligned(UInt(parameter.width))
-
-class AsyncQueueProbe(parameter: AsyncQueueParameter) extends DVBundle[AsyncQueueParameter, AsyncQueueLayers](parameter)
 
 /** Registers owned by one endpoint's clock domain. Only `grayPointer` is observed by the opposite domain. */
 private final case class AsyncDirectionState(
@@ -450,3 +363,44 @@ object AsyncQueue extends Generator[AsyncQueueParameter, AsyncQueueLayers, Async
     ram.io.writeData    := io.dataIn
 
     io.dataOut := ram.io.readData
+
+given AsyncQueueImpl with
+  def apply(
+    parameter: AsyncQueueParameter
+  )(
+    using Arena,
+    Context,
+    Block,
+    sourcecode.File,
+    sourcecode.Line,
+    sourcecode.Name.Machine,
+    InstanceContext
+  ): Wire[AsyncQueueIO] =
+    val io    = Wire(new AsyncQueueIO(parameter))
+    val queue =
+      if parameter.depth == 1 then SingleEntryAsyncQueue.instantiate(parameter)
+      else AsyncQueue.instantiate(parameter)
+
+    queue.io.resetN        := io.resetN
+    queue.io.push.clock    := io.push.clock
+    queue.io.push.requestN := io.push.requestN
+    io.push.empty          := queue.io.push.empty
+    io.push.almostEmpty    := queue.io.push.almostEmpty
+    io.push.halfFull       := queue.io.push.halfFull
+    io.push.almostFull     := queue.io.push.almostFull
+    io.push.full           := queue.io.push.full
+    io.push.error          := queue.io.push.error
+    queue.io.pop.clock     := io.pop.clock
+    queue.io.pop.requestN  := io.pop.requestN
+    io.pop.empty           := queue.io.pop.empty
+    io.pop.almostEmpty     := queue.io.pop.almostEmpty
+    io.pop.halfFull        := queue.io.pop.halfFull
+    io.pop.almostFull      := queue.io.pop.almostFull
+    io.pop.full            := queue.io.pop.full
+    io.pop.error           := queue.io.pop.error
+    queue.io.dataIn        := io.dataIn
+    io.dataOut             := queue.io.dataOut
+
+    io
+
+end given
