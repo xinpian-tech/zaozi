@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.BrentKungAdder" %s --
+// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.adder.default.BrentKungAdder" %s --
 // DEFINE: %{bmc} = circt-bmc %t.dir/w8.contract.hw.mlir --module=BrentKungAdder_width8_radix2_CheckContract_0 -b 1 --shared-libs=%Z3LIB --run
 
 // width 8, radix 2
@@ -40,10 +40,10 @@
 // CONTRACT8: firrtl.int.verif.ensure
 
 // VERILOG8-LABEL: module BrentKungAdder_width8_radix2
-// VERILOG8: input{{ +}}[7:0]{{ +}}A,
-// VERILOG8: input{{ +}}CI,
-// VERILOG8: output{{ +}}CO,
-// VERILOG8: output{{ +}}[7:0]{{ +}}SUM
+// VERILOG8: input{{ +}}[7:0]{{ +}}a,
+// VERILOG8: input{{ +}}ci,
+// VERILOG8: output{{ +}}co,
+// VERILOG8: output{{ +}}[7:0]{{ +}}sum
 
 // LOWERED8-LABEL: hw.module @BrentKungAdder_width8_radix2
 // LOWERED8: verif.assume
@@ -57,17 +57,18 @@
 // CONFIG32R8: {"width":32,"radix":8}
 
 // VERILOG32R8-LABEL: module BrentKungAdder_width32_radix8
-// VERILOG32R8: input{{ +}}[31:0]{{ +}}A,
-// VERILOG32R8: input{{ +}}CI,
-// VERILOG32R8: output{{ +}}CO,
-// VERILOG32R8: output{{ +}}[31:0]{{ +}}SUM
+// VERILOG32R8: input{{ +}}[31:0]{{ +}}a,
+// VERILOG32R8: input{{ +}}ci,
+// VERILOG32R8: output{{ +}}co,
+// VERILOG32R8: output{{ +}}[31:0]{{ +}}sum
 // The radix-8 group-propagate fold emits wide AND-chains.
 // VERILOG32R8: {{.+ & .+ & .+ & .+ & .+ & .+ & .+ & .+}}
 
-// CONFIG32R4: {"width":32,"radix":4}
+// The default radix is omitted from the serialized configuration.
+// CONFIG32R4: {"width":32}
 
 // VERILOG32R4-LABEL: module BrentKungAdder_width32_radix4
-// VERILOG32R4: input{{ +}}[31:0]{{ +}}A,
-// VERILOG32R4: input{{ +}}CI,
-// VERILOG32R4: output{{ +}}CO,
-// VERILOG32R4: output{{ +}}[31:0]{{ +}}SUM
+// VERILOG32R4: input{{ +}}[31:0]{{ +}}a,
+// VERILOG32R4: input{{ +}}ci,
+// VERILOG32R4: output{{ +}}co,
+// VERILOG32R4: output{{ +}}[31:0]{{ +}}sum

@@ -48,7 +48,11 @@ class generator extends MacroAnnotation:
             MethodType(List("parameter"))(methodType => List(tptParam.tpe), methodType => resultType.tpe)
           ),
           (argss: List[List[Tree]]) =>
-            Some(Select.unique(New(resultType), "<init>").appliedTo(argss.head.head.asExpr.asTerm))
+            val constructor        = Select.unique(New(resultType), "<init>")
+            val appliedConstructor = resultType.tpe match
+              case AppliedType(_, typeArgs) => constructor.appliedToTypes(typeArgs)
+              case _                        => constructor
+            Some(appliedConstructor.appliedTo(argss.head.head.asExpr.asTerm))
         )
 
         def parseParameterDef =
