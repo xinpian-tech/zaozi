@@ -15,6 +15,7 @@
 #include <circt-c/Dialect/FIRRTL.h>
 #include <circt-c/Dialect/Comb.h>
 #include <circt-c/Dialect/Seq.h>
+#include <circt-c/Dialect/Sim.h>
 #include <circt-c/Dialect/LTL.h>
 #include <circt-c/Dialect/CHIRRTL.h>
 #include <circt-c/Dialect/SV.h>
