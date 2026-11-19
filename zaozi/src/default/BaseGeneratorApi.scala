@@ -169,16 +169,17 @@ object BaseGeneratorHelper:
   ): Unit =
     Elaborate.withModules: modules =>
       if !modules.contains(moduleName) then
-        given module: MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-        try
-          given Circuit = summon[CircuitApi].op(moduleName)
-          summon[Circuit].appendToModule()
-          createModule(summon[Zone], summon[Context], summon[Circuit])
-          me.jiuyang.zaozi.magic.validateCircuit()
-          modules.add(moduleName, module)
-        catch
-          case t: Throwable =>
-            module.destroy()
-            throw t
+        modules.withModuleStorage:
+          given module: MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+          try
+            given Circuit = summon[CircuitApi].op(moduleName)
+            summon[Circuit].appendToModule()
+            createModule(summon[Zone], summon[Context], summon[Circuit])
+            me.jiuyang.zaozi.magic.validateCircuit()
+            modules.add(moduleName, module)
+          catch
+            case t: Throwable =>
+              module.destroy()
+              throw t
 
 end BaseGeneratorHelper

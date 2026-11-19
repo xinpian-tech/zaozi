@@ -171,3 +171,9 @@ MLIR 和 CIRCT 的函数清单分别有 1,662 和 669 个不同名称。用清�
 已采用 Scala 3.8.4 与 Scala Native `0.5.13-20261114-143517b-SNAPSHOT`。工作线程进入 Scala 是选用该 revision 的具体原因。sn-bindgen 采用上游源码，项目内维护 C 声明修正和生成规则；语言服务器的 Native 后端过滤补丁也由项目维护。[绑定生成](../native/bindings.py) · [生命周期入口](../mlirlib/src/Mlir.scala) · [语言服务器补丁](../nix/patches/scala-native-presentation-compiler.patch) · [开发和独立插件用法](development.md)
 
 **安装包验收。** `nix build .#zaozi` 使用重新生成的依赖锁在离线 Mill 构建中产出 `bin/zaozi-opt` 和 `share/maven`，其中包含 10 个 Native 库及 1 个宿主编译器插件。用该 Maven 目录在仓库外从源码构建 Write、Read 和 Passthrough 三个可执行文件，使用 `nix develop` 提供的 Scala CLI 和 clang。Write/Read 串联后的 bytecode 可由 mlir-opt 读出修改，Read 单独收到缺少所需属性的合法模块时以失败状态退出、stdout 为空。Passthrough 的 `config/design` 产物通过 firtool 和 FileCheck。另用安装包里的两个 `zaozi-opt` 进程串联，检查私有未使用函数被删除、公开函数仍在。
+
+### T1 下游验证与模块写盘
+
+T1 的完整 testbench 暴露了逐模块导出时的内存开销。文件模式现在由 MLIR 的 bytecode 回调直接写入临时文件，写完后原子替换目标。每个模块的 FFI 临时分配随该模块释放。内存模式下，供后续链接使用的模块仍归调用者的作用域管理。
+
+T1 从 zaozi 的 `zaozi-runtime` flake 输出取得 Native 库、源码 JAR 和编译器插件。在 x86-64 Linux 上，`vme64t` 的完整 testbench 用 4 GiB 托管堆导出了 287 份模块 bytecode，并生成 507 份 SystemVerilog。

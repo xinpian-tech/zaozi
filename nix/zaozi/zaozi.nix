@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 { lib, stdenv, mill, jdk25, circt-install, mlir-install, sn-bindgen, clang,
-  python3, which, lit, scala-cli, z3, espresso, riscv-opcodes, mkMavenRepository }:
+  python3, which, lit, scala-cli, z3, espresso, riscv-opcodes, mkMavenRepository,
+  withScaladoc ? true }:
+let
+  publish = if withScaladoc then "publishM2Local" else "publishM2LocalRuntime";
+in
 stdenv.mkDerivation {
   pname = "zaozi";
   version = "0.0.1-SNAPSHOT";
@@ -29,7 +33,7 @@ stdenv.mkDerivation {
   };
   buildPhase = ''
     runHook preBuild
-    mill --no-daemon --offline zaozi.opt.nativeLink + __.publishM2Local --m2RepoPath "$PWD/maven" || {
+    mill --no-daemon --offline -j "$NIX_BUILD_CORES" zaozi.opt.nativeLink + __.${publish} --m2RepoPath "$PWD/maven" || {
       test ! -f out/mill-launcher/log || cat out/mill-launcher/log >&2
       exit 1
     }

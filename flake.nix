@@ -75,6 +75,7 @@
         packages = {
           default = pkgs.zaozi.package;
           zaozi = pkgs.zaozi.package;
+          zaozi-runtime = pkgs.zaozi.package.override { withScaladoc = false; };
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
           sn-bindgen = pkgs.sn-bindgen;

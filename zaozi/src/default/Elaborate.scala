@@ -21,13 +21,25 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManagerApi}
 import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
 
-import scala.scalanative.unsafe.Zone
-import org.llvm.mlir.scalalib.Mlir
+import scala.scalanative.unsafe.{extern, name, toCString, CString, Zone}
+import scala.scalanative.unsafe.Ptr
+import org.llvm.mlir.raw.structs.MlirOperation
+
+@extern
+private object BytecodeFile:
+  @name("zaozi_write_bytecode_file")
+  def write(operation: Ptr[MlirOperation], path: CString): Int = extern
 
 /** Where elaborated modules go, and elaborating a generator into one linked circuit in memory. */
 object Elaborate:
   /** Where elaborated modules go, by module name. A module already there is not elaborated again. */
   private[default] trait Modules:
+    // Collected MLIR handles continue to use the caller's zone.
+    def withModuleStorage[A](
+      body: Zone ?=> A
+    )(
+      using Zone
+    ): A = body
     def contains(name: String): Boolean
     def add(
       name:   String,
@@ -38,6 +50,12 @@ object Elaborate:
 
   /** Modules written as mlirbc files under `ZAOZI_OUTDIR`, once per name in the current elaboration. */
   private final class Files extends Modules:
+    override def withModuleStorage[A](
+      body: Zone ?=> A
+    )(
+      using Zone
+    ): A =
+      org.llvm.mlir.scalalib.Mlir.withZone(body)
     private val written = scala.collection.mutable.HashSet.empty[String]
     def contains(name: String): Boolean = written.contains(name)
     def add(
@@ -46,8 +64,20 @@ object Elaborate:
     )(
       using Zone
     ): Unit =
-      val file = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", ""), os.pwd) / s"$name.mlirbc"
-      os.write.over(file, Mlir.bytecode(module))
+      val file      = os.Path(sys.env.getOrElse("ZAOZI_OUTDIR", ""), os.pwd) / s"$name.mlirbc"
+      // Let fopen create new output with the caller's umask inside a private directory.
+      val staging   = os.temp.dir(dir = file / os.up, prefix = ".zaozi-", deleteOnExit = false)
+      val temporary = staging / "module.mlirbc"
+      try
+        val error = BytecodeFile.write(module.getOperation.native, toCString(temporary.toString))
+        if error != 0 then throw new java.io.IOException(s"Cannot write $file (errno $error)")
+        java.nio.file.Files.move(
+          temporary.toNIO,
+          file.toNIO,
+          java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+      finally os.remove.all(staging)
       written.add(name)
       module.destroy()
 

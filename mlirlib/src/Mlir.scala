@@ -8,17 +8,21 @@ import org.llvm.mlir.scalalib.capi.support.given
 import scala.scalanative.unsafe.{CSize, Ptr, Zone}
 
 object Mlir:
-  def withContext[A](body: (Zone, Context) ?=> A): A =
+  /** Shared by the main thread and MLIR callbacks for the duration of the body. */
+  def withZone[A](body: Zone ?=> A): A =
     Zone.acquire { zone =>
-      // MLIR can enter Scala from several native worker threads in the same context.
       given Zone = new Zone:
         def alloc(size: CSize): Ptr[Byte] = zone.synchronized(zone.alloc(size))
         def isClosed:           Boolean   = zone.isClosed
         def close():            Unit      = zone.synchronized(zone.close())
-      given context: Context = summon[ContextApi].contextCreate
-      try body
-      finally context.destroy()
+      body
     }
+
+  def withContext[A](body: (Zone, Context) ?=> A): A = withZone {
+    given context: Context = summon[ContextApi].contextCreate
+    try body
+    finally context.destroy()
+  }
 
   def withPassManager[A](
     body: PassManager => A

@@ -87,6 +87,16 @@ trait ZaoziScalaModule extends NativeModule {
 }
 
 trait ZaoziPublishModule extends PublishModule {
+  /** Install the libraries and sources used by downstream builds into a local Maven repository. */
+  def publishM2LocalRuntime(m2RepoPath: String) = Task.Command {
+    val artifact = artifactMetadata()
+    val files = mill.javalib.publish.LocalM2Publisher.createFileSetContents(
+      pom().path, artifact, allPublishInfos(sources = true, docs = false)()
+    )
+    val repository = os.Path(m2RepoPath, mill.api.BuildCtx.workspaceRoot)
+    new mill.javalib.publish.LocalM2Publisher(repository).publish(artifact, files).map(PathRef(_))
+  }
+
   def publishVersion: mill.T[String] = "0.0.1-SNAPSHOT"
 
   def pomSettings = Task(

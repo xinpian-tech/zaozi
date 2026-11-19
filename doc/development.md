@@ -46,6 +46,8 @@ while their underlying IR is alive. Keep bytes to use the result in a later
 invocation. Use `Mlir.withPassManager` for pipelines assembled in Scala.
 
 `nix build` installs a local Maven repository under `result/share/maven`.
+Downstream builds can use `nix build .#zaozi-runtime` for the compiled libraries,
+source JARs, Maven metadata and `zaozi-opt`. The default package also includes Scaladoc.
 Use it in a downstream Scala Native build, keeping the Scala and Native
 versions from [build.mill](../build.mill). The Native artifacts use
 `me.jiuyang:mlirlib_native0.5_3:0.0.1-SNAPSHOT` and
