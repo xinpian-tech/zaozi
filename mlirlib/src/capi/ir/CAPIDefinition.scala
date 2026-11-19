@@ -2,32 +2,33 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
+import org.llvm.mlir.raw.structs as MlirStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.diagnostic.Diagnostic
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
-class Context(val _segment: MemorySegment)
-trait ContextApi extends HasSegment[Context] with HasSizeOf[Context]:
+class Context(handle: Ptr[MlirStructs.MlirContext]) extends NativeHandle(handle)
+trait ContextApi                                    extends HasSizeOf[Context]:
   inline def contextCreate(
-    using arena: Arena
+    using zone: Zone
   ): Context
   inline def contextCreateWithThreading(
     threadingEnabled: Boolean
   )(
-    using arena:      Arena
+    using zone:       Zone
   ): Context
   inline def contextCreateWithRegistry(
     registry:         DialectRegistry,
     threadingEnabled: Boolean
   )(
-    using arena:      Arena
+    using zone:       Zone
   ): Context
   extension (context: Context)
     inline def getOrLoadDialect(
-      name:        String
+      name:       String
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                            Dialect
     inline def destroy():                                         Unit
     inline def allowUnregisteredDialects(allow: Boolean):         Unit
@@ -36,25 +37,25 @@ trait ContextApi extends HasSegment[Context] with HasSizeOf[Context]:
     inline def loadAllAvailableDialects():                        Unit
     inline def setThreadPool(threadPool:        LlvmThreadPool):  Unit
     def attachDiagnosticHandler(
-      handler:     Diagnostic => Boolean
+      handler:    Diagnostic => Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                            Long
     inline def detachDiagnosticHandler(id:      Long):            Unit
 end ContextApi
 
-class Dialect(val _segment: MemorySegment)
-trait DialectApi extends HasSegment[Dialect] with HasSizeOf[Dialect]
+class Dialect(handle: Ptr[MlirStructs.MlirDialect]) extends NativeHandle(handle)
+trait DialectApi                                    extends HasSizeOf[Dialect]
 
-class DialectHandle(val _segment: MemorySegment)
-trait DialectHandleApi extends HasSegment[DialectHandle] with HasSizeOf[DialectHandle]:
+class DialectHandle(handle: Ptr[MlirStructs.MlirDialectHandle]) extends NativeHandle(handle)
+trait DialectHandleApi                                          extends HasSizeOf[DialectHandle]:
   extension (dialectHandle: DialectHandle)
     inline def getNamespace(
-      using arena: Arena
+      using zone: Zone
     ):                                                          String
     inline def loadDialect(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                          Unit
     inline def insertDialect(dialectRegistry: DialectRegistry): Unit
     inline def insertDialect(
@@ -63,144 +64,146 @@ trait DialectHandleApi extends HasSegment[DialectHandle] with HasSizeOf[DialectH
     ):                                                          Unit
 end DialectHandleApi
 
-class DialectRegistry(val _segment: MemorySegment)
-trait DialectRegistryApi extends HasSegment[DialectRegistry] with HasSizeOf[DialectRegistry]:
+class DialectRegistry(handle: Ptr[MlirStructs.MlirDialectRegistry]) extends NativeHandle(handle)
+trait DialectRegistryApi                                            extends HasSizeOf[DialectRegistry]:
   inline def registryCreate(
   )(
-    using arena: Arena
+    using zone: Zone
   ):                                                                 DialectRegistry
   extension (dialectRegistry: DialectRegistry) inline def destroy(): Unit
 end DialectRegistryApi
 
-class Location(val _segment: MemorySegment)
-trait LocationApi extends HasSegment[Location] with HasSizeOf[Location]:
+class Location(handle: Ptr[MlirStructs.MlirLocation]) extends NativeHandle(handle)
+trait LocationApi                                     extends HasSizeOf[Location]:
   inline def locationFromAttribute(
-    attribute: Attribute
-  )(arena:     Arena
+    attribute:  Attribute
+  )(
+    using zone: Zone
   ): Location
   inline def locationFileLineColGet(
-    filename:    String,
-    line:        Int,
-    col:         Int
+    filename:   String,
+    line:       Int,
+    col:        Int
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Location
   inline def locationCallSiteGet(
-    callee:      Location,
-    caller:      Location
+    callee:     Location,
+    caller:     Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Location
   inline def locationFusedGet(
-    locations:   Seq[Location],
-    metadata:    Attribute
+    locations:  Seq[Location],
+    metadata:   Attribute
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Location
   inline def locationNameGet(
-    name:        String,
-    childLoc:    Location
+    name:       String,
+    childLoc:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Location
   inline def locationUnknownGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Location
   extension (location: Location)
     inline def getAttribute(
-      using arena: Arena
+      using zone: Zone
     ): Attribute
     inline def getContext(
-      using arena: Arena
+      using zone: Zone
     ): Context
     inline def print(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
 end LocationApi
 
-class Module(val _segment: MemorySegment)
-trait ModuleApi extends HasSegment[Module] with HasSizeOf[Module]:
+class Module(handle: Ptr[MlirStructs.MlirModule]) extends NativeHandle(handle)
+trait ModuleApi                                   extends HasSizeOf[Module]:
+  extension (module: Module) inline def isNull: Boolean
   inline def moduleCreateEmpty(
-    location:    Location
+    location:   Location
   )(
-    using arena: Arena
-  ): Module
+    using zone: Zone
+  ):                                            Module
   inline def moduleCreateParse(
-    module:      String | Array[Byte]
+    module:     String | Array[Byte]
   )(
-    using arena: Arena,
-    context:     Context
-  ): Module
+    using zone: Zone,
+    context:    Context
+  ):                                            Module
   inline def moduleFromOperation(
-    op:          Operation
+    op:         Operation
   )(
-    using arena: Arena
-  ): Module
+    using zone: Zone
+  ):                                            Module
   extension (module: Module)
     inline def getContext(
-      using arena: Arena
+      using zone: Zone
     ):                    Context
     inline def getBody(
-      using arena: Arena
+      using zone: Zone
     ):                    Block
     inline def getOperation(
-      using arena: Arena
+      using zone: Zone
     ):                    Operation
     inline def destroy(): Unit
 end ModuleApi
 
-class OperationState(val _segment: MemorySegment)
-trait OperationStateApi extends HasSegment[OperationState] with HasSizeOf[OperationState]:
+class OperationState(handle: Ptr[MlirStructs.MlirOperationState]) extends NativeHandle(handle)
+trait OperationStateApi                                           extends HasSizeOf[OperationState]:
   inline def operationStateGet(
-    name:        String,
-    loc:         Location
+    name:       String,
+    loc:        Location
   )(
-    using arena: Arena
+    using zone: Zone
   ): OperationState
   extension (operationState: OperationState)
     inline def addResults(
-      results:     Seq[Type]
+      results:    Seq[Type]
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                      Unit
     inline def addOperands(
-      operands:    Seq[Value]
+      operands:   Seq[Value]
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                      Unit
     inline def addOwnedRegions(
-      regions:     Seq[Region]
+      regions:    Seq[Region]
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                      Unit
     inline def addSuccessors(
-      blocks:      Seq[Block]
+      blocks:     Seq[Block]
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                      Unit
     inline def addAttributes(
-      attrs:       Seq[NamedAttribute]
+      attrs:      Seq[NamedAttribute]
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                      Unit
     inline def enableResultTypeInference(): Unit
 end OperationStateApi
 
-class AsmState(val _segment: MemorySegment)
-trait AsmStateApi extends HasSegment[AsmState] with HasSizeOf[AsmState]
+class AsmState(handle: Ptr[MlirStructs.MlirAsmState]) extends NativeHandle(handle)
+trait AsmStateApi                                     extends HasSizeOf[AsmState]
 
-class OpPrintingFlags(val _segment: MemorySegment)
-trait OpPrintingFlagsApi extends HasSegment[OpPrintingFlags] with HasSizeOf[OpPrintingFlags]:
+class OpPrintingFlags(handle: Ptr[MlirStructs.MlirOpPrintingFlags]) extends NativeHandle(handle)
+trait OpPrintingFlagsApi                                            extends HasSizeOf[OpPrintingFlags]:
   inline def opPrintingFlagsCreate(
   )(
-    using arena: Arena
+    using zone: Zone
   ): OpPrintingFlags
 
   extension (opPrintingFlags: OpPrintingFlags)
@@ -214,16 +217,17 @@ trait OpPrintingFlagsApi extends HasSegment[OpPrintingFlags] with HasSizeOf[OpPr
     inline def flagsSkipRegions():                                                              Unit
 end OpPrintingFlagsApi
 
-class BytecodeWriterConfig(val _segment: MemorySegment)
-trait BytecodeWriterConfigApi extends HasSegment[BytecodeWriterConfig] with HasSizeOf[BytecodeWriterConfig]
+class BytecodeWriterConfig(handle: Ptr[MlirStructs.MlirBytecodeWriterConfig]) extends NativeHandle(handle)
+trait BytecodeWriterConfigApi                                                 extends HasSizeOf[BytecodeWriterConfig]
 
-class Operation(val _segment: MemorySegment)
-trait OperationApi extends HasSegment[Operation] with HasSizeOf[Operation]:
+class Operation(handle: Ptr[MlirStructs.MlirOperation]) extends NativeHandle(handle)
+trait OperationApi                                      extends HasSizeOf[Operation]:
+  extension (operation: Operation) inline def isNull: Boolean
   inline def operationCreate(
-    state:       OperationState
+    state:      OperationState
   )(
-    using arena: Arena
-  ): Operation
+    using zone: Zone
+  ):                                                  Operation
   inline def operationCreate(
     name:                     String,
     location:                 Location,
@@ -233,98 +237,98 @@ trait OperationApi extends HasSegment[Operation] with HasSizeOf[Operation]:
     resultsTypes:             Option[Seq[Type]] = None,
     inferredResultsTypes:     Option[Int] = None
   )(
-    using arena:              Arena,
+    using zone:               Zone,
     context:                  Context
-  ): Operation
+  ):                                                  Operation
   inline def operationCreateParse(
-    sourceStr:   String,
-    sourceName:  String
+    sourceStr:  String,
+    sourceName: String
   )(
-    using arena: Arena,
-    context:     Context
-  ): Operation
+    using zone: Zone,
+    context:    Context
+  ):                                                  Operation
   inline def operationClone(
-    op:          Operation
+    op:         Operation
   )(
-    using arena: Arena
-  ): Operation
+    using zone: Zone
+  ):                                                  Operation
   extension (operation: Operation)
     inline def getContext(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Context
     inline def getLocation(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Location
     inline def getTypeID(
-      using arena: Arena
+      using zone: Zone
     ):                                                   TypeID
     inline def getName(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Identifier
     inline def getBlock(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Block
     inline def getParentOperation(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Operation
     inline def getRegion(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Region
     inline def getNextInBlock(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Operation
     inline def getOperand(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Value
     inline def getResult(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Value
     inline def getNumResults:                            Long
     inline def verify:                                   Boolean
     inline def getSuccessor(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Block
     inline def getInherentAttributeByName(
-      name:        String
+      name:       String
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Attribute
     inline def getDiscardableAttribute(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   NamedAttribute
     inline def getDiscardableAttributeByName(
-      name:        String
+      name:       String
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Attribute
     inline def getAttribute(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   NamedAttribute
     inline def getAttributeByName(
-      name:        String
+      name:       String
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Attribute
     inline def writeBytecodeWithConfig(
-      config:      BytecodeWriterConfig,
-      callback:    Array[Byte] => Unit
+      config:     BytecodeWriterConfig,
+      callback:   Array[Byte] => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   LogicalResult
     inline def getFirstRegion(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Region
     inline def destroy():                                Unit
     inline def removeFromParent():                       Unit
@@ -332,56 +336,56 @@ trait OperationApi extends HasSegment[Operation] with HasSizeOf[Operation]:
     inline def setOperands(
       operands: Seq[Value]
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def setSuccessor(pos: Long, block:    Block): Unit
     inline def setInherentAttributeByName(
       name: String,
       attr: Attribute
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def setDiscardableAttributeByName(
       name: String,
       attr: Attribute
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def setAttributeByName(
       name: String,
       attr: Attribute
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def print(
       callback: String => Unit
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def printWithFlags(
       callback: String => Unit
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def printWithState(
       asmState: AsmState,
       callback: String => Unit
     )(
-      using Arena
+      using Zone
     ):                                                   Unit
     inline def writeBytecode(
-      callBack:    Array[Byte] => Unit
+      callBack:   Array[Byte] => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Unit
     inline def dump():                                   Unit
     inline def moveAfter(other:  Operation):             Unit
     inline def moveBefore(other: Operation):             Unit
     inline def walk(
-      callback:    Operation => WalkResultEnum,
-      walk:        WalkEnum
+      callback:   Operation => WalkResultEnum,
+      walk:       WalkEnum
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                   Unit
 
     inline def appendToBlock(
@@ -405,8 +409,8 @@ trait OperationApi extends HasSegment[Operation] with HasSizeOf[Operation]:
     ): Unit
 end OperationApi
 
-class OperationWalkCallback(val _segment: MemorySegment)
-trait OperationWalkCallbackApi extends HasSegment[OperationWalkCallback]
+class OperationWalkCallback(val run: Operation => WalkResultEnum)
+trait OperationWalkCallbackApi
 
 enum WalkResultEnum:
   case Advance
@@ -421,21 +425,21 @@ enum WalkEnum:
 end WalkEnum
 trait WalkEnumApi extends HasSizeOf[WalkEnum] with EnumHasToNative[WalkEnum]
 
-class Region(val _segment: MemorySegment)
-trait RegionApi extends HasSegment[Region] with HasSizeOf[Region]:
+class Region(handle: Ptr[MlirStructs.MlirRegion]) extends NativeHandle(handle)
+trait RegionApi                                   extends HasSizeOf[Region]:
   inline def regionCreate(
-    using arena: Arena
+    using zone: Zone
   ): Region
   extension (op: Region)
     inline def getFirstBlock(
-      using arena: Arena
+      using zone: Zone
     ):                                                                 Block
     inline def getNextInOperation(
-      using arena: Arena
+      using zone: Zone
     ):                                                                 Region
     inline def destroy(
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                                 Unit
     inline def appendOwnedBlock(
       block: Block
@@ -445,48 +449,45 @@ trait RegionApi extends HasSegment[Region] with HasSizeOf[Region]:
     inline def insertOwnedBlockBefore(reference: Block, block: Block): Unit
 end RegionApi
 
-class Block(val _segment: MemorySegment)
-trait BlockApi extends HasSegment[Block] with HasSizeOf[Block]:
+class Block(handle: Ptr[MlirStructs.MlirBlock]) extends NativeHandle(handle)
+trait BlockApi                                  extends HasSizeOf[Block]:
   inline def blockCreate(
-    args:        Seq[Type],
-    locs:        Seq[Location]
+    args:       Seq[Type],
+    locs:       Seq[Location]
   )(
-    using arena: Arena
+    using zone: Zone
   ): Block
   extension (block: Block)
     inline def getParentOperation(
-      using arena: Arena
+      using zone: Zone
     ):                                                                                 Operation
     inline def getNextInRegion(
-      using arena: Arena
+      using zone: Zone
     ):                                                                                 Block
     inline def getFirstOperation(
-      using arena: Arena
+      using zone: Zone
     ):                                                                                 Operation
     inline def getTerminator(
-      using arena: Arena
+      using zone: Zone
     ):                                                                                 Operation
     inline def addArgument(
-      tpe:         Type,
-      loc:         Location
+      tpe:        Type,
+      loc:        Location
     )(
-      using arena: Arena
-    ):                                                                                 Operation
-    inline def insertArgument(
-      pos:         Int,
-      tpe:         Type,
-      loc:         Location
-    )(
-      using arena: Arena
-    ):                                                                                 Operation
-    inline def getArgument(
-      pos:         Long
-    )(
-      using arena: Arena
+      using zone: Zone
     ):                                                                                 Value
-    inline def argumentGetOwner(
-      using arena: Arena
-    ):                                                                                 Block
+    inline def insertArgument(
+      pos:        Int,
+      tpe:        Type,
+      loc:        Location
+    )(
+      using zone: Zone
+    ):                                                                                 Value
+    inline def getArgument(
+      pos:        Long
+    )(
+      using zone: Zone
+    ):                                                                                 Value
     inline def destroy():                                                              Unit
     inline def detach():                                                               Unit
     inline def appendOwnedOperation(operation:       Operation):                       Unit
@@ -495,163 +496,166 @@ trait BlockApi extends HasSegment[Block] with HasSizeOf[Block]:
     inline def insertOwnedOperationBefore(reference: Operation, operation: Operation): Unit
     inline def eraseArgument(index:                  Int):                             Unit
     inline def print(
-      callBack:    String => Unit
+      callBack:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                                                                 Unit
 end BlockApi
 
-class Value(val _segment: MemorySegment)
-trait ValueApi extends HasSegment[Value] with HasSizeOf[Value]:
+class Value(handle: Ptr[MlirStructs.MlirValue]) extends NativeHandle(handle)
+trait ValueApi                                  extends HasSizeOf[Value]:
   extension (value: Value)
+    inline def argumentGetOwner(
+      using Zone
+    ):                                         Block
     inline def getType(
-      using arena: Arena
+      using zone: Zone
     ):                                         Type
     inline def getFirstUse(
-      using arena: Arena
-    ):                                         Type
+      using zone: Zone
+    ):                                         OpOperand
     inline def setType(tpe:            Type):  Unit
     inline def dump():                         Unit
     inline def print(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                         Unit
     inline def printAsOperand(
-      state:       AsmState,
-      callback:    String => Unit
+      state:      AsmState,
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                         Unit
     inline def replaceAllUsesOfWith(w: Value): Unit
     inline def isOpResult:                     Boolean
     inline def isBlockArgument:                Boolean
     inline def opResultGetOwner(
-      using arena: Arena
+      using zone: Zone
     ):                                         Operation
     inline def opResultGetResultNumber:        Long
     inline def blockArgumentGetOwner(
-      using arena: Arena
+      using zone: Zone
     ):                                         Block
     inline def blockArgumentGetArgNumber:      Long
 end ValueApi
 
-class OpOperand(val _segment: MemorySegment)
-trait OpOperandApi extends HasSegment[OpOperand] with HasSizeOf[OpOperand]
+class OpOperand(handle: Ptr[MlirStructs.MlirOpOperand]) extends NativeHandle(handle)
+trait OpOperandApi                                      extends HasSizeOf[OpOperand]
 
-class Type(val _segment: MemorySegment)
-trait TypeApi extends HasSegment[Type] with HasSizeOf[Type]:
+class Type(handle: Ptr[MlirStructs.MlirType]) extends NativeHandle(handle)
+trait TypeApi                                 extends HasSizeOf[Type]:
   inline def f64TypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
 
   inline def noneTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
 
   extension (width: Int)
     inline def integerTypeSignedGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type
     inline def integerTypeUnsignedGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type
     inline def integerTypeGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type
   extension (tpe:   Type)
     inline def equal(that: Type): Boolean
     inline def print(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                            Unit
 end TypeApi
 
-class Attribute(val _segment: MemorySegment)
-trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
+class Attribute(handle: Ptr[MlirStructs.MlirAttribute]) extends NativeHandle(handle)
+trait AttributeApi                                      extends HasSizeOf[Attribute]:
   inline def allocateAttribute(
-    using arena: Arena
+    using zone: Zone
   ):                                                      Attribute
   inline def getNull(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                      Attribute
   extension (attribute: Attribute)
     inline def getType(
-      using arena: Arena
+      using zone: Zone
     ):                                                    Type
   // Location
   extension (attribute: Attribute) inline def isLocation: Boolean
   // Array
   inline def arrayAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):                                                      TypeID
   extension (array:     Seq[Attribute])
     inline def arrayAttrGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                    Attribute
   extension (attribute: Attribute)
     inline def isArray:                 Boolean
     inline def arrayAttrGetNumElements: Int
     inline def arrayAttrGetElement(
-      idx:         Int
+      idx:        Int
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                  Attribute
   // Dictionary
   inline def dictionaryAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):                                                      TypeID
   extension (map:       Map[String, Attribute])
     inline def directoryAttrGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                    Attribute
   extension (attribute: Attribute)
     inline def isDictionary:                 Boolean
     inline def dictionaryAttrGetNumElements: Int
     inline def dictionaryAttrGetElement(
-      idx:         Int
+      idx:        Int
     )(
-      using arena: Arena
-    ):                                       Attribute
+      using zone: Zone
+    ):                                       NamedAttribute
   // Floating point
   inline def floatAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):                                                      TypeID
   extension (double:    Double)
     inline def floatAttrDoubleGet(
-      tpe:         Type
+      tpe:        Type
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
     inline def floatAttrDoubleGetChecked(
-      tpe:         Type
+      tpe:        Type
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      location:   Location
     ): Attribute
   extension (attribute: Attribute)
     inline def isFloat:                 Boolean
     inline def floatAttrGetValueDouble: Double
   // Integer
   inline def integerAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):                                                      TypeID
   extension (int:       Long)
     inline def integerAttrGet(
-      tpe:         Type
+      tpe:        Type
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                    Attribute
   extension (attribute: Attribute)
     inline def isInteger:               Boolean
@@ -661,8 +665,8 @@ trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
   // Bool
   extension (bool:      Boolean)
     inline def boolAttrGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                    Attribute
   extension (attribute: Attribute)
     inline def isBool:           Boolean
@@ -670,132 +674,132 @@ trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
 
   // String
   def stringAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ): TypeID
 
   extension (string:    String)
     inline def stringAttrGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
     inline def stringAttrTypedGet(
-      tpe:         Type
+      tpe:        Type
     )(
-      using arena: Arena
+      using zone: Zone
     ): Attribute
   extension (attribute: Attribute)
     inline def isString: Boolean
     inline def stringAttrGetValue(
-      using arena: Arena
+      using zone: Zone
     ):                   String
   // SymbolRef
   inline def symbolRefAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ): TypeID
 
   extension (symbol:    String)
     inline def symbolRefAttrGet(
-      references:  Seq[Attribute]
+      references: Seq[Attribute]
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):    Attribute
   extension (attribute: Attribute)
     inline def isSymbolRef:                         Boolean
     inline def symbolRefAttrGetRootReference(
-      using arena: Arena
+      using zone: Zone
     ):                                              String
     inline def symbolRefAttrGetLeafReference(
-      using arena: Arena
+      using zone: Zone
     ):                                              String
     inline def symbolRefAttrGetNumNestedReferences: Long
     inline def symbolRefAttrGetNestedReference(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                              Attribute
     inline def distinctAttrCreate(
-      using arena: Arena
+      using zone: Zone
     ):                                              Attribute
     inline def disctinctAttrCreate(
-      using arena: Arena
+      using zone: Zone
     ):                                              Attribute
   // Flat SymbolRef
   extension (string:    String)
     inline def flatSymbolRefAttrGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):    Attribute
   extension (attribute: Attribute)
     inline def isFlatSymbolRef: Boolean
     inline def flatSymbolRefAttrGetValue(
-      using arena: Arena
+      using zone: Zone
     ):                          String
 
   // Type
   inline def typeAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ): TypeID
 
   extension (tpe:       Type)
     inline def typeAttrGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):       Attribute
   extension (attribute: Attribute)
     inline def isType: Boolean
     inline def typeAttrGetValue(
-      using arena: Arena
+      using zone: Zone
     ):                 Type
 
   // Unit
   inline def unitAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ): TypeID
 
   inline def unitAttrGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Attribute
 
   extension (attribute: Attribute) inline def isUnit: Boolean
 
   inline def denseArrayAttrGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ): TypeID
 
   extension (bools:     Seq[Boolean])
     inline def denseBoolArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):     Attribute
   extension (ints:      Seq[Int])
     inline def denseI8ArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
     inline def denseI16ArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
     inline def denseI32ArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
   extension (longs:     Seq[Long])
     inline def denseI64ArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):     Attribute
   extension (floats:    Seq[Float])
     inline def denseF32ArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):     Attribute
   extension (doubles:   Seq[Double])
     inline def denseF64ArrayGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):     Attribute
   extension (attribute: Attribute)
     inline def isDenseBoolArray:                    Boolean
@@ -815,31 +819,31 @@ trait AttributeApi extends HasSegment[Attribute] with HasSizeOf[Attribute]:
     inline def denseF64ArrayGetElement(pos:  Long): Double
 end AttributeApi
 
-class NamedAttribute(val _segment: MemorySegment)
-trait NamedAttributeApi extends HasSegment[NamedAttribute] with HasSizeOf[NamedAttribute]:
+class NamedAttribute(handle: Ptr[MlirStructs.MlirNamedAttribute]) extends NativeHandle(handle)
+trait NamedAttributeApi                                           extends HasSizeOf[NamedAttribute]:
   inline def namedAttributeGet(
-    identifier:  Identifier,
-    attribute:   Attribute
+    identifier: Identifier,
+    attribute:  Attribute
   )(
-    using arena: Arena
+    using zone: Zone
   ): NamedAttribute
 end NamedAttributeApi
 
-class Identifier(val _segment: MemorySegment)
-trait IdentifierApi extends HasSegment[Identifier] with HasSizeOf[Identifier]:
+class Identifier(handle: Ptr[MlirStructs.MlirIdentifier]) extends NativeHandle(handle)
+trait IdentifierApi                                       extends HasSizeOf[Identifier]:
   extension (identifierString: String)
     inline def identifierGet(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Identifier
   extension (identifier:       Identifier)
     inline def getContext(
-      using arena: Arena
+      using zone: Zone
     ): Context
     inline def str(
-      using arena: Arena
+      using zone: Zone
     ): String
 end IdentifierApi
 
-class SymbolTable(val _segment: MemorySegment)
-trait SymbolTableApi extends HasSegment[SymbolTable] with HasSizeOf[SymbolTable]
+class SymbolTable(handle: Ptr[MlirStructs.MlirSymbolTable]) extends NativeHandle(handle)
+trait SymbolTableApi                                        extends HasSizeOf[SymbolTable]

@@ -17,12 +17,12 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   VerifRequireApi,
   given
 }
-import org.llvm.mlir.MlirOperation
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Operation, Value, given}
 
-import scala.collection.mutable.{ArrayBuffer, ArrayDeque}
+import scala.collection.mutable.ArrayBuffer
+import scala.util.DynamicVariable
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private enum ContractClauseKind:
   case Require, Ensure
@@ -33,21 +33,20 @@ private final case class ContractClause(
   label:    Option[String],
   location: Location)
 
-private val contractScopes = ArrayDeque.empty[ArrayBuffer[ContractClause]]
+private val contractScopes = new DynamicVariable(List.empty[ArrayBuffer[ContractClause]])
 
 export given_ContractApi.{Contract, Ensure, Require}
 
 given ContractApi with
-  private def operationIsNull(op: Operation): Boolean = MlirOperation.ptr(op.segment).address == 0
 
   // Lower all public Contract overloads through a flat Seq, while preserving the
   // user-facing body argument and result shapes through the mapping functions.
   private def mapped[R, O](
     args:    Seq[Referable[? <: Data]],
     mapping: Seq[Referable[? <: Data]] => O
-  )(body:    O => (Arena, Context, Block) ?=> Unit
+  )(body:    O => (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -74,24 +73,22 @@ given ContractApi with
       if args.isEmpty then
         var current = summon[Block].getFirstOperation
         var last    = Option.empty[Operation]
-        while !operationIsNull(current) do
+        while !current.isNull do
           last = Some(current)
           current = current.getNextInBlock
         last
       else None
-    contractScopes.append(clauses)
-    try
+    contractScopes.withValue(clauses :: contractScopes.value) {
       body(mapping(bodyArgs))(
-        using summon[Arena],
+        using summon[Zone],
         summon[Context],
         contract.block
       )
-    finally
-      contractScopes.remove(contractScopes.length - 1)
+    }
     if args.isEmpty then
       val bodyOps = ArrayBuffer.empty[Operation]
       var current = beforeBody.map(_.getNextInBlock).getOrElse(summon[Block].getFirstOperation)
-      while !operationIsNull(current) do
+      while !current.isNull do
         val next = current.getNextInBlock
         bodyOps.append(current)
         current = next
@@ -124,7 +121,7 @@ given ContractApi with
   def Contract(
     body: => Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -135,9 +132,9 @@ given ContractApi with
 
   def Contract[T <: Data](
     arg:  Referable[T]
-  )(body: (Referable[T]) => (Arena, Context, Block) ?=> Unit
+  )(body: (Referable[T]) => (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -151,11 +148,11 @@ given ContractApi with
 
   def Contract[A <: Tuple](
     args:            A
-  )(body:            ContractTuple[A] => (Arena, Context, Block) ?=> Unit
+  )(body:            ContractTuple[A] => (Zone, Context, Block) ?=> Unit
   )(
     using tupleArgs: ContractTupleArgs[A]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -170,7 +167,7 @@ given ContractApi with
   def Require(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -183,14 +180,14 @@ given ContractApi with
       case immediate: Immediate => immediate.refer
       case sequence:  Sequence  => sequence.refer
       case prop:      Property  => prop.refer
-    if contractScopes.nonEmpty then
-      contractScopes.last.append(ContractClause(ContractClauseKind.Require, value, Some(valName), locate))
+    if contractScopes.value.nonEmpty then
+      contractScopes.value.head.append(ContractClause(ContractClauseKind.Require, value, Some(valName), locate))
     else summon[VerifAssumeApi].op(value, Some(valName), locate).operation.appendToBlock()
 
   def Ensure(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -203,15 +200,15 @@ given ContractApi with
       case immediate: Immediate => immediate.refer
       case sequence:  Sequence  => sequence.refer
       case prop:      Property  => prop.refer
-    if contractScopes.nonEmpty then
-      contractScopes.last.append(ContractClause(ContractClauseKind.Ensure, value, Some(valName), locate))
+    if contractScopes.value.nonEmpty then
+      contractScopes.value.head.append(ContractClause(ContractClauseKind.Ensure, value, Some(valName), locate))
     else summon[VerifAssertApi].op(value, Some(valName), locate).operation.appendToBlock()
 
   def Require(
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -222,15 +219,15 @@ given ContractApi with
       case immediate: Immediate => immediate.refer
       case sequence:  Sequence  => sequence.refer
       case prop:      Property  => prop.refer
-    if contractScopes.nonEmpty then
-      contractScopes.last.append(ContractClause(ContractClauseKind.Require, value, Some(label), locate))
+    if contractScopes.value.nonEmpty then
+      contractScopes.value.head.append(ContractClause(ContractClauseKind.Require, value, Some(label), locate))
     else summon[VerifAssumeApi].op(value, Some(label), locate).operation.appendToBlock()
 
   def Ensure(
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -241,6 +238,6 @@ given ContractApi with
       case immediate: Immediate => immediate.refer
       case sequence:  Sequence  => sequence.refer
       case prop:      Property  => prop.refer
-    if contractScopes.nonEmpty then
-      contractScopes.last.append(ContractClause(ContractClauseKind.Ensure, value, Some(label), locate))
+    if contractScopes.value.nonEmpty then
+      contractScopes.value.head.append(ContractClause(ContractClauseKind.Ensure, value, Some(label), locate))
     else summon[VerifAssertApi].op(value, Some(label), locate).operation.appendToBlock()

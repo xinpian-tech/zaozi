@@ -2,58 +2,51 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.target.exportsmtlib
 
-import org.llvm.mlir.CAPI.{mlirTranslateModuleToSMTLIB, mlirTranslateOperationToSMTLIB}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Module, Operation, given}
-
-import java.lang.foreign.{Arena, MemorySegment}
 
 given ExportSmtlibApi with
   extension (module: Module)
     inline def exportSMTLIB(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit = module.exportSMTLIB(callback, true)
     inline def exportSMTLIB(
-      callback:    String => Unit,
-      emitReset:   Boolean
+      callback:   String => Unit,
+      emitReset:  Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult =
       LogicalResult(
-        mlirTranslateModuleToSMTLIB(
-          arena,
-          module.segment,
-          callback.stringToStringCallback.segment,
-          MemorySegment.NULL,
-          false,
-          false,
-          emitReset
-        )
+        callback.stringToStringCallback.use { (fn, data) =>
+          nativeResult[MlirStructs.MlirLogicalResult](out =>
+            mlirApi.mlirTranslateModuleToSMTLIB(module.native, fn, data, false, false, emitReset)(out)
+          )
+        }
       )
 
   extension (operation: Operation)
     inline def exportSMTLIB(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit = operation.exportSMTLIB(callback, true)
     inline def exportSMTLIB(
-      callback:    String => Unit,
-      emitReset:   Boolean
+      callback:   String => Unit,
+      emitReset:  Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult =
       LogicalResult(
-        mlirTranslateOperationToSMTLIB(
-          arena,
-          operation.segment,
-          callback.stringToStringCallback.segment,
-          MemorySegment.NULL,
-          false,
-          false,
-          emitReset
-        )
+        callback.stringToStringCallback.use { (fn, data) =>
+          nativeResult[MlirStructs.MlirLogicalResult](out =>
+            mlirApi.mlirTranslateOperationToSMTLIB(operation.native, fn, data, false, false, emitReset)(out)
+          )
+        }
       )
 end given

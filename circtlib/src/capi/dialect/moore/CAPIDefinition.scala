@@ -6,7 +6,7 @@ package org.llvm.circt.scalalib.capi.dialect.moore
 
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** Arc Dialect Api
   * {{{
@@ -15,8 +15,8 @@ import java.lang.foreign.Arena
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
@@ -44,33 +44,33 @@ trait TypeApi:
     size:        Int,
     elementType: Type
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Type
   inline def assocArrayTypeGet(
     elementType: Type,
     indexType:   Type
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Type
   inline def chandleTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def eventTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def intTypeGetInt(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def intTypeGetLogic(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   extension (tpe: Type)
     inline def isFourValuedType(): Boolean
@@ -78,37 +78,37 @@ trait TypeApi:
   inline def openArrayTypeGet(
     elementType: Type
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Type
   inline def openUnpackedArrayTypeGet(
     elementType: Type
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Type
   inline def queueTypeGet(
     elementType: Type,
     bound:       Int
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Type
   inline def realTypeGet(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def stringTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def unpackedArrayTypeGet(
     size:        Int,
     elementType: Type
   )(
-    using arena: Arena
+    using zone:  Zone
   ): Type
   inline def voidTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
 end TypeApi

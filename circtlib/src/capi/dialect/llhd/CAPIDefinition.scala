@@ -6,7 +6,7 @@ package org.llvm.circt.scalalib.capi.dialect.llhd
 
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** LLHD Dialect Api
   *
@@ -16,8 +16,8 @@ import java.lang.foreign.Arena
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
@@ -35,13 +35,13 @@ end DialectApi
 trait AttributeApi:
   extension (attribute: Attribute) def isTimeAttr(): Boolean
   def TimeAttrGet(
-    timeUnit:    String,
-    seconds:     BigInt,
-    delta:       BigInt,
-    epsilon:     BigInt
+    timeUnit:   String,
+    seconds:    BigInt,
+    delta:      BigInt,
+    epsilon:    BigInt
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                                                 Attribute
   extension (attribute: Attribute)
     def TimeAttrGetDelta():   BigInt
@@ -49,7 +49,7 @@ trait AttributeApi:
     def TimeAttrGetSeconds(): BigInt
     def TimeAttrGetTimeUnit(
     )(
-      using arena: Arena
+      using zone: Zone
     ):                        String
 end AttributeApi
 

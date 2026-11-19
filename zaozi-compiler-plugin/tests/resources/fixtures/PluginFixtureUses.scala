@@ -6,16 +6,16 @@ import me.jiuyang.zaozi.{InstanceContext, TypeImpl}
 import me.jiuyang.zaozi.reftpe.{Interface, Referable}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
-/** Dynamic bundle-field accesses; the bodies never run, they only need to typecheck so that the
-  * `selectDynamic` macro expands and SemanticDB is emitted for the access sites.
+/** Dynamic bundle-field accesses; the bodies never run, they only need to typecheck so that the `selectDynamic` macro
+  * expands and SemanticDB is emitted for the access sites.
   */
 object PluginFixtureUses:
   def throughReferable(
     io: Referable[OuterBundle]
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     TypeImpl,
@@ -30,7 +30,7 @@ object PluginFixtureUses:
   def throughInterface(
     io: Interface[FixtureIO]
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     TypeImpl,

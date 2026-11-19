@@ -5,32 +5,32 @@ package org.llvm.mlir.scalalib.capi.target.exportsmtlib
 import org.llvm.mlir.scalalib.capi.ir.{Module, Operation}
 import org.llvm.mlir.scalalib.capi.support.LogicalResult
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait ExportSmtlibApi:
   extension (module: Module)
     inline def exportSMTLIB(
-      callBack:    String => Unit
+      callBack:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def exportSMTLIB(
-      callBack:    String => Unit,
-      emitReset:   Boolean
+      callBack:   String => Unit,
+      emitReset:  Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult
 
   extension (operation: Operation)
     inline def exportSMTLIB(
-      callBack:    String => Unit
+      callBack:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def exportSMTLIB(
-      callBack:    String => Unit,
-      emitReset:   Boolean
+      callBack:   String => Unit,
+      emitReset:  Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult
 end ExportSmtlibApi

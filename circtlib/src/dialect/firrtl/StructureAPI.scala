@@ -6,25 +6,25 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlCon
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Location, Module as MlirModule, Operation, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 class Circuit(val _operation: Operation)
 trait CircuitApi extends HasOperation[Circuit]:
   inline def op(
     circuitName: String
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
   ): Circuit
 
   extension (c: Circuit)
     inline def block(
-      using Arena
+      using Zone
     ): Block
     inline def appendToModule(
     )(
-      using arena: Arena,
-      module:      MlirModule
+      using zone: Zone,
+      module:     MlirModule
     ): Unit
 
     /** Declares each module an instance in the circuit references but the circuit neither defines nor declares, as an
@@ -32,7 +32,7 @@ trait CircuitApi extends HasOperation[Circuit]:
       */
     def declareInstantiatedModules(
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit
 end CircuitApi
@@ -45,16 +45,16 @@ trait ContractApi extends HasOperation[Contract]:
     resultTypes: Seq[Type],
     location:    Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Contract
 
   extension (ref: Contract)
     def block(
-      using Arena
+      using Zone
     ): Block
     def result(
-      using Arena
+      using Zone
     ): Value
 end ContractApi
 
@@ -72,15 +72,15 @@ trait ExtModuleApi extends HasOperation[ExtModule]:
     layers:           Seq[Seq[String]],
     verilogParameter: Seq[(String, VerilogParameterType)]
   )(
-    using Arena,
+    using Zone,
     Context
   ): ExtModule
 
   extension (ref: ExtModule)
     inline def appendToCircuit(
     )(
-      using arena: Arena,
-      circuit:     Circuit
+      using zone: Zone,
+      circuit:    Circuit
     ): Unit
 end ExtModuleApi
 
@@ -95,23 +95,23 @@ trait ModuleApi extends HasOperation[Module]:
     interface:        Seq[(FirrtlBundleField, Location)],
     layers:           Seq[Seq[String]]
   )(
-    using arena:      Arena,
+    using zone:       Zone,
     context:          Context
   ): Module
 
   extension (m: Module)
     inline def block(
-      using Arena
+      using Zone
     ): Block
     inline def appendToCircuit(
     )(
-      using arena: Arena,
-      circuit:     Circuit
+      using zone: Zone,
+      circuit:    Circuit
     ): Unit
     inline def getIO(
       idx: Long
     )(
-      using Arena
+      using Zone
     ): Value
 end ModuleApi
 
@@ -123,32 +123,32 @@ trait LayerApi      extends HasOperation[Layer]:
     location:        Location,
     layerConvention: FirrtlLayerConvention
   )(
-    using arena:     Arena,
+    using zone:      Zone,
     context:         Context
   ): Layer
 end LayerApi
 class OptionCase(val _operation: Operation)
 trait OptionCaseApi extends HasOperation[OptionCase]:
   inline def op(
-    name:        String,
-    location:    Location
+    name:       String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): OptionCase
 end OptionCaseApi
 class Option(val _operation: Operation)
 trait OptionApi     extends HasOperation[Option]:
   inline def op(
-    name:        String,
-    location:    Location
+    name:       String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Option
 
   extension (ref: Option)
     inline def block(
-      using Arena
+      using Zone
     ): Block
 end OptionApi

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS %s --
 // RUN: rm -rf %t && mkdir -p %t && cd %t
 // RUN: %{test} config %t/config.json --input-width 32
 // RUN: FileCheck %s -check-prefix=CONFIG --input-file=%t/config.json
@@ -13,8 +13,6 @@ import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.zaozi.default.{*, given}
-
-import java.lang.foreign.Arena
 
 // CONFIG: {"inputWidth":32}
 case class TruncateParameter(inputWidth: Int, outputWidth: Int = 16) extends Parameter:
@@ -32,7 +30,7 @@ class TruncateProbe(parameter: TruncateParameter) extends DVBundle[TruncateParam
 
 @generator
 object Truncate extends Generator[TruncateParameter, TruncateLayers, TruncateIO, TruncateProbe]:
-  // VERILOG-LABEL: module Truncate_90db6580(
+  // VERILOG-LABEL: module Truncate_{{[0-9a-f]+}}(
   def architecture(parameter: TruncateParameter) =
     // VERILOG-NEXT:   input  [31:0] i,
     // VERILOG-NEXT:   output [15:0] o

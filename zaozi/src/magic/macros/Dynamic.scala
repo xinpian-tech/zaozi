@@ -10,8 +10,8 @@ private def summonContextualParameters(
   using Quotes
 ) =
   import quotes.reflect.*
-  val arena           = Expr.summon[java.lang.foreign.Arena].getOrElse {
-    report.errorAndAbort("No implicit value found for Arena.")
+  val zone            = Expr.summon[scala.scalanative.unsafe.Zone].getOrElse {
+    report.errorAndAbort("No implicit value found for Zone.")
   }
   val typeImpl        = Expr.summon[me.jiuyang.zaozi.TypeImpl].getOrElse {
     report.errorAndAbort("No implicit value found for TypeImpl.")
@@ -36,7 +36,7 @@ private def summonContextualParameters(
       report.errorAndAbort("No implicit value found for me.jiuyang.zaozi.InstanceContext.")
     }
 
-  (arena, typeImpl, context, block, file, line, valName, instanceContext)
+  (zone, typeImpl, context, block, file, line, valName, instanceContext)
 
 /** This macro takes `fieldName` from dynamic access, retrieve type at compile time and call runtimeSelectDynamic to do
   * subaccess
@@ -115,14 +115,14 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
 ): Expr[Any] =
   import quotes.reflect.*
 
-  val (arena, typeImpl, context, block, file, line, _, _) = summonContextualParameters
+  val (zone, typeImpl, context, block, file, line, _, _) = summonContextualParameters
 
   resolveFieldShape[T](fieldName) match
     case FieldShape.Aligned(elem)  =>
       elem.asInstanceOf[Type[?]] match
         case '[tpe] =>
           '{
-            given java.lang.foreign.Arena                = $arena
+            given scala.scalanative.unsafe.Zone          = $zone
             given me.jiuyang.zaozi.TypeImpl              = $typeImpl
             given org.llvm.mlir.scalalib.capi.ir.Context = $context
             given org.llvm.mlir.scalalib.capi.ir.Block   = $block
@@ -136,7 +136,7 @@ def referableSelectDynamic[T <: me.jiuyang.zaozi.valuetpe.Data: Type](
       elem.asInstanceOf[Type[?]] match
         case '[tpe] =>
           '{
-            given java.lang.foreign.Arena                = $arena
+            given scala.scalanative.unsafe.Zone          = $zone
             given me.jiuyang.zaozi.TypeImpl              = $typeImpl
             given org.llvm.mlir.scalalib.capi.ir.Context = $context
             given org.llvm.mlir.scalalib.capi.ir.Block   = $block
@@ -218,8 +218,8 @@ private def applyCallOnField(
   import quotes.reflect.*
 
   val contextualArgs = summonContextualParameters match
-    case (arena, _, context, block, file, line, valName, instanceContext) =>
-      List(arena, context, block, file, line, valName, instanceContext).map(_.asTerm)
+    case (zone, _, context, block, file, line, valName, instanceContext) =>
+      List(zone, context, block, file, line, valName, instanceContext).map(_.asTerm)
   val fieldValueTerm = fieldValueExpr.asTerm
 
   // If we have more than one apply() method, we can dispatch them here based on the args type.

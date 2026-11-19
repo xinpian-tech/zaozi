@@ -6,7 +6,7 @@ package org.llvm.circt.scalalib.capi.dialect.chirrtl
 
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** Chirrtl Dialect API
   *
@@ -16,8 +16,8 @@ import java.lang.foreign.Arena
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
@@ -33,11 +33,11 @@ trait TypeApi:
     elementType: Type,
     numElements: Int
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
   ): Type
   inline def getCMemoryPort(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
 end TypeApi

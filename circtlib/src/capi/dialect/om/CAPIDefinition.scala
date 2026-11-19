@@ -4,16 +4,17 @@
 // circt-c/Dialect/OM.h
 package org.llvm.circt.scalalib.capi.dialect.om
 
+import org.llvm.circt.raw.structs as CirctStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Identifier, Location, Module, Type, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
+class OMEvaluator(handle: Ptr[CirctStructs.OMEvaluator]) extends NativeHandle(handle)
+trait OMEvaluatorApi                                     extends HasSizeOf[OMEvaluator]
 
-class OMEvaluator(val _segment: MemorySegment)
-trait OMEvaluatorApi extends HasSegment[OMEvaluator] with HasSizeOf[OMEvaluator]
-
-class OMEvaluatorValue(val _segment: MemorySegment)
-trait OMEvaluatorValueApi extends HasSegment[OMEvaluatorValue] with HasSizeOf[OMEvaluatorValue]
+class OMEvaluatorValue(handle: Ptr[CirctStructs.OMEvaluatorValue]) extends NativeHandle(handle)
+trait OMEvaluatorValueApi                                          extends HasSizeOf[OMEvaluatorValue]
 
 /** OM Dialect Api
   * {{{
@@ -22,8 +23,8 @@ trait OMEvaluatorValueApi extends HasSegment[OMEvaluatorValue] with HasSizeOf[OM
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
@@ -45,27 +46,27 @@ end DialectApi
   */
 trait TypeApi:
   inline def anyTypeGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):   TypeID
   extension (tpe: Type)
     inline def classTypeGetName(
-      using arena: Arena
+      using zone: Zone
     ): Identifier
   inline def classTypeGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):   TypeID
   inline def frozenBasePathTypeGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):   TypeID
   inline def frozenPathTypeGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):   TypeID
   extension (tpe: Type)
     inline def listTypeGetElementType(
-      using arena: Arena
+      using zone: Zone
     ): Type
   inline def listTypeGetTypeID(
-    using arena: Arena
+    using zone: Zone
   ):   TypeID
   extension (tpe: Type)
     inline def isAnyType:            Boolean
@@ -105,73 +106,73 @@ end TypeApi
   */
 trait EvaluatorApi:
   inline def basePathGetEmpty(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): OMEvaluatorValue
 
   extension (evaluator: OMEvaluator)
     inline def getModule(
-      using arena: Arena
+      using zone: Zone
     ): Module
     inline def instantiate(
       className:    String,
       actualParams: OMEvaluatorValue*
     )(
-      using arena:  Arena,
+      using zone:   Zone,
       context:      Context
     ): OMEvaluatorValue
 
   extension (evaluatorValue: OMEvaluatorValue)
     inline def listGetElement(
-      pos:         Int
+      pos:        Int
     )(
-      using arena: Arena
+      using zone: Zone
     ):                             OMEvaluatorValue
     inline def listGetNumElements: Int
   inline def evaluatorNew(
-    module:      Module
+    module:     Module
   )(
-    using arena: Arena
+    using zone: Zone
   ):   OMEvaluator
   extension (omObject:       OMEvaluatorValue)
     inline def objectGetField(
-      name:        String
+      name:       String
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                              OMEvaluatorValue
     inline def objectGetFieldNames(
-      using arena: Arena
+      using zone: Zone
     ):                                              Attribute
     inline def objectGetHash:                       Int
     inline def objectGetType(
-      using arena: Arena
+      using zone: Zone
     ):                                              Type
     inline def objectIsEq(other: OMEvaluatorValue): Boolean
     inline def objectIsNull:                        Boolean
   extension (evaluatorValue: OMEvaluatorValue)
     inline def pathGetAsString(
-      using arena: Arena
+      using zone: Zone
     ): Attribute
   inline def fromPrimitive(
-    primitive:   Attribute
+    primitive:  Attribute
   )(
-    using arena: Arena
+    using zone: Zone
   ):   OMEvaluatorValue
   extension (primitive:      Attribute)
     /** wrapper to [[fromPrimitive]] */
     inline def toEvaluatorValue(
-      using arena: Arena
+      using zone: Zone
     ): OMEvaluatorValue
   extension (evaluatorValue: OMEvaluatorValue)
     inline def getContext(
-      using arena: Arena
+      using zone: Zone
     ):                      Context
     inline def getLoc(
-      using arena: Arena
+      using zone: Zone
     ):                      Location
     inline def getPrimitive(
-      using arena: Arena
+      using zone: Zone
     ):                      Attribute
     inline def isBasePath:  Boolean
     inline def isList:      Boolean
@@ -199,21 +200,21 @@ trait AttributeApi:
     inline def isListAttr:             Boolean
     inline def isReferenceAttr:        Boolean
     inline def integerAttrGet(
-      using arena: Arena
+      using zone: Zone
     ):                                 Attribute
     inline def integerAttrGetInt(
-      using arena: Arena
+      using zone: Zone
     ):                                 Attribute
     inline def integerAttrToString(
-      using arena: Arena
+      using zone: Zone
     ):                                 String
     inline def listAttrGetElement(
-      pos:         Int
+      pos:        Int
     )(
-      using arena: Arena
+      using zone: Zone
     ):                                 Attribute
     inline def listAttrGetNumElements: Int
     inline def referenceAttrGetInnerRef(
-      using arena: Arena
+      using zone: Zone
     ):                                 Attribute
 end AttributeApi

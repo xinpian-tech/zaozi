@@ -1,76 +1,43 @@
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.support
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.mlirStringRefCreateFromCString
-
-import java.lang.foreign.{Arena, MemorySegment}
+import java.nio.charset.StandardCharsets.UTF_8
+import org.llvm.mlir.raw.structs.MlirStringRef
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
 given StringRefApi with
-  extension (stringRef: StringRef)
-    inline def segment:       MemorySegment = stringRef._segment
-    inline def sizeOf:        Int           = MlirStringRef.sizeof().toInt
-    inline def toBytes:       Array[Byte]   =
-      MlirStringRef
-        .data(stringRef.segment)
-        .asSlice(0, MlirStringRef.length(stringRef.segment))
-        .toArray(java.lang.foreign.ValueLayout.JAVA_BYTE)
-    inline def toScalaString: String        = String(toBytes)
-  extension (string:    String)
+  extension (ref: StringRef)
+    inline def sizeOf:        Int         = sizeof[MlirStringRef].toInt
+    inline def toBytes:       Array[Byte] = NativeCallbacks.copyBytes((!ref.native).data, (!ref.native).length)
+    inline def toScalaString: String      = new String(toBytes, UTF_8)
+
+  extension (value: String)
     inline def toStringRef(
-      using arena: Arena
-    ): StringRef =
-      val bytes  = string.getBytes()
-      val buffer = arena.allocate(bytes.length + 1)
-      buffer.copyFrom(MemorySegment.ofArray(bytes))
-      StringRef(mlirStringRefCreateFromCString(arena, buffer))
+      using Zone
+    ): StringRef = value.getBytes(UTF_8).toStringRef
 
   extension (bytes: Array[Byte])
     inline def toStringRef(
-      using arena: Arena
+      using Zone
     ): StringRef =
-      val buffer    = arena.allocate(bytes.length)
-      buffer.copyFrom(MemorySegment.ofArray(bytes))
-      StringRef(mlirStringRefCreateFromCString(arena, buffer))
-      val stringRef = MlirStringRef.allocate(arena)
-      MlirStringRef.data(stringRef, buffer)
-      MlirStringRef.length(stringRef, bytes.length)
-      StringRef(stringRef)
-end given
+      // MLIR's parser can inspect the sentinel after a buffer. Its length
+      // remains explicit so embedded zero bytes survive a bytecode round trip.
+      val data = summon[Zone].alloc(bytes.length.toUSize + 1.toUSize)
+      if bytes.nonEmpty then scala.scalanative.libc.string.memcpy(data, bytes.at(0), bytes.length.toUSize)
+      data(bytes.length) = 0.toByte
+      StringRef(nativeResult[MlirStringRef] { ref =>
+        (!ref).data = data
+        (!ref).length = bytes.length.toUSize
+      })
 
 given StringCallbackApi with
-  extension (stringCallBack: String => Unit)
+  extension (callback: String => Unit)
     inline def stringToStringCallback(
-      using arena: Arena
+      using Zone
     ): StringCallback =
-      StringCallback(
-        MlirStringCallback.allocate(
-          (message: MemorySegment, userData: MemorySegment) =>
-            try stringCallBack(StringRef(message).toScalaString)
-            catch
-              case t: Throwable =>
-                System.err.println(s"[zaozi:upcall:string-callback] ${t.getClass.getName}: ${t.getMessage}")
-                t.printStackTrace(System.err)
-          ,
-          arena
-        )
-      )
-  extension (bytesCallBack:  Array[Byte] => Unit)
+      StringCallback(bytes => callback(new String(bytes, UTF_8)))
+  extension (callback: Array[Byte] => Unit)
     inline def bytesToStringCallback(
-      using arena: Arena
-    ): StringCallback =
-      StringCallback(
-        MlirStringCallback.allocate(
-          (message: MemorySegment, userData: MemorySegment) =>
-            try bytesCallBack(StringRef(message).toBytes)
-            catch
-              case t: Throwable =>
-                System.err.println(s"[zaozi:upcall:bytes-callback] ${t.getClass.getName}: ${t.getMessage}")
-                t.printStackTrace(System.err)
-          ,
-          arena
-        )
-      )
-  extension (stringCallBack: StringCallback) inline def segment: MemorySegment = stringCallBack._segment
-end given
+      using Zone
+    ): StringCallback = StringCallback(callback)

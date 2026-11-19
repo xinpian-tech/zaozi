@@ -10,7 +10,7 @@ import me.jiuyang.zaozi.reftpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block as MlirBlock, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** An instance whose module is chosen after elaboration among architectures sharing one interface.
   *
@@ -20,10 +20,10 @@ import java.lang.foreign.Arena
 object InstanceChoice:
   inline def apply[L <: LayerInterface[?], I <: HWInterface[?], P <: DVInterface[?, ?]](
     inline cases:    Seq[
-      (String, (Arena, Context, MlirBlock, Interface[I], ProbeInterface[P], L, InstanceContext) ?=> Unit)
+      (String, (Zone, Context, MlirBlock, Interface[I], ProbeInterface[P], L, InstanceContext) ?=> Unit)
     ]
   )(
-    using arena:     Arena,
+    using zone:      Zone,
     context:         Context,
     block:           MlirBlock,
     file:            sourcecode.File,
@@ -31,11 +31,11 @@ object InstanceChoice:
     name:            sourcecode.Name.Machine,
     instanceContext: InstanceContext
   ): Instance[I, P] =
-    ${ instanceChoiceImpl[L, I, P]('cases, 'arena, 'context, 'block, 'file, 'line, 'name, 'instanceContext) }
+    ${ instanceChoiceImpl[L, I, P]('cases, 'zone, 'context, 'block, 'file, 'line, 'name, 'instanceContext) }
 
 def instanceChoiceImpl[L <: LayerInterface[?]: Type, I <: HWInterface[?]: Type, P <: DVInterface[?, ?]: Type](
-  cases:           Expr[Seq[(String, (Arena, Context, MlirBlock, Interface[I], ProbeInterface[P], L, InstanceContext) ?=> Unit)]],
-  arena:           Expr[Arena],
+  cases:           Expr[Seq[(String, (Zone, Context, MlirBlock, Interface[I], ProbeInterface[P], L, InstanceContext) ?=> Unit)]],
+  zone:            Expr[Zone],
   context:         Expr[Context],
   block:           Expr[MlirBlock],
   file:            Expr[sourcecode.File],
@@ -46,7 +46,7 @@ def instanceChoiceImpl[L <: LayerInterface[?]: Type, I <: HWInterface[?]: Type, 
   using Quotes
 ): Expr[Instance[I, P]] =
   import quotes.reflect.*
-  type Architecture = (Arena, Context, MlirBlock, Interface[I], ProbeInterface[P], L, InstanceContext) ?=> Unit
+  type Architecture = (Zone, Context, MlirBlock, Interface[I], ProbeInterface[P], L, InstanceContext) ?=> Unit
   val api                = Expr.summon[GeneratorApi].getOrElse(report.errorAndAbort("No GeneratorApi found"))
   val generatorType      = TypeRepr.of[Generator[?, ?, ?, ?]].typeSymbol
   val architectureMethod = generatorType.declaredMethod("architecture").head
@@ -106,7 +106,7 @@ def instanceChoiceImpl[L <: LayerInterface[?]: Type, I <: HWInterface[?]: Type, 
       .appliedToTypes(typeArguments)
       .appliedTo(Ref(generator))
       .appliedTo(Ref(argument))
-      .appliedToArgs(List(arena.asTerm, context.asTerm))
+      .appliedToArgs(List(zone.asTerm, context.asTerm))
     val target = '{
       (
         ${ Ref(caseName).asExprOf[String] },
@@ -130,7 +130,7 @@ def instanceChoiceImpl[L <: LayerInterface[?]: Type, I <: HWInterface[?]: Type, 
       ${ Expr(TypeRepr.of[I].typeSymbol.name) },
       ${ Expr.ofSeq(targets) }
     )(
-      using $arena,
+      using $zone,
       $context,
       $block,
       $file,

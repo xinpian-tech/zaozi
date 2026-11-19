@@ -39,8 +39,6 @@ jobs:
 
           git add 'flake.lock'
           git add 'mtf.lock.json'
-          git add 'circtlib/capi'
-          git add 'mlirlib/capi'
 
           if ! git diff --quiet --cached --exit-code; then
             updatedFiles=$(git diff --cached --name-only)

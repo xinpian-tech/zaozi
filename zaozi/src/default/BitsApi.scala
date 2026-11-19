@@ -37,12 +37,12 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
 }
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given BitsApi with
   extension [LHS <: Referable[Bits]](ref: LHS)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -52,7 +52,7 @@ given BitsApi with
     ): Propagated[LHS, Bits] = propagate[LHS, Bits](ref, ref.getType, ref.refer)
 
     def asSInt(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -73,7 +73,7 @@ given BitsApi with
         private[zaozi] val _width = op0.result.getType.getBitWidth(true).toInt
       propagate[LHS, SInt](ref, tpe, nodeOp.operation.getResult(0))
     def asUInt(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -92,7 +92,7 @@ given BitsApi with
         private[zaozi] val _width = nodeOp.operation.getResult(0).getType.getBitWidth(true).toInt
       propagate[LHS, UInt](ref, tpe, nodeOp.operation.getResult(0))
     def asBool(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -116,7 +116,7 @@ given BitsApi with
     def asBundle[T <: Bundle](
       tpe: T
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -134,7 +134,7 @@ given BitsApi with
     def asRecord[T <: Record](
       tpe: T
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -152,7 +152,7 @@ given BitsApi with
     def asVec[E <: Data](
       tpe: E
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -176,7 +176,7 @@ given BitsApi with
       bitcastOp.operation.appendToBlock()
       propagate[LHS, Vec[E]](ref, Vec[E](count, tpe), bitcastOp.operation.getResult(0))
     def unary_~(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -199,7 +199,7 @@ given BitsApi with
         val _refer: Value = nodeOp.operation.getResult(0)
 
     def andR(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -221,7 +221,7 @@ given BitsApi with
         val _refer: Value = nodeOp.operation.getResult(0)
 
     def orR(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -243,7 +243,7 @@ given BitsApi with
         val _refer: Value = nodeOp.operation.getResult(0)
 
     def xorR(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -267,7 +267,7 @@ given BitsApi with
     def ===[RHS <: Referable[Bits]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -290,7 +290,7 @@ given BitsApi with
     def =/=[RHS <: Referable[Bits]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -313,7 +313,7 @@ given BitsApi with
     def &[RHS <: Referable[Bits]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -337,7 +337,7 @@ given BitsApi with
     def |[RHS <: Referable[Bits]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -362,7 +362,7 @@ given BitsApi with
     def ^[RHS <: Referable[Bits]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -387,7 +387,7 @@ given BitsApi with
     def ##[RHS <: Referable[Bits]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -411,7 +411,7 @@ given BitsApi with
     def <<(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -441,7 +441,7 @@ given BitsApi with
     def >>(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -476,7 +476,7 @@ given BitsApi with
     def head(
       that: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -500,7 +500,7 @@ given BitsApi with
     def tail(
       that: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -524,7 +524,7 @@ given BitsApi with
     def pad(
       that: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -549,7 +549,7 @@ given BitsApi with
       hi: Int,
       lo: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -574,7 +574,7 @@ given BitsApi with
     def bit(
       idx: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -588,7 +588,7 @@ given BitsApi with
       hi: Int,
       lo: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -600,7 +600,7 @@ given BitsApi with
     def apply(
       idx: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

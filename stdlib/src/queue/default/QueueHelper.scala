@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib.queue.default
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
@@ -27,7 +27,7 @@ private[default] object QueueHelper:
     binary: Referable[UInt],
     width:  Int
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -43,7 +43,7 @@ private[default] object QueueHelper:
     gray:  Referable[UInt],
     width: Int
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

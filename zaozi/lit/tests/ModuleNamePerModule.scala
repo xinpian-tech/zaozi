@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 
 // Two equal parameters that name different modules: each name gets its own module.
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class NamedTop %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class NamedTop %s --
 // RUN: rm -rf %t && mkdir -p %t && cd %t
 // RUN: %{test} config %t/config.json --width 4 --tag top
 // RUN: %{test} design %t/config.json
@@ -24,8 +24,8 @@ import me.jiuyang.zaozi.valuetpe.*
 case class NamedParameter(width: Int, tag: String) extends Parameter:
   override def equals(that: Any): Boolean = that match
     case that: NamedParameter => width == that.width
-    case _                    => false
-  override def hashCode: Int = width.hashCode
+    case _ => false
+  override def hashCode:          Int     = width.hashCode
 given upickle.default.ReadWriter[NamedParameter] = upickle.default.macroRW
 
 class NamedLayers(parameter: NamedParameter) extends LayerInterface(parameter):
@@ -53,4 +53,4 @@ object NamedTop extends Generator[NamedParameter, NamedLayers, NamedIO, NamedPro
     val y  = Named.instantiate(parameter.copy(tag = "y"))
     x.io.a := io.a
     y.io.a := x.io.b
-    io.b := y.io.b
+    io.b   := y.io.b

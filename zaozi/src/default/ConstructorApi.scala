@@ -33,7 +33,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
 }
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 // When Import the default, all method in ConstructorApi should be exported
 export given_ConstructorApi.*
@@ -66,9 +66,9 @@ given ConstructorApi with
 
   def when[COND <: Referable[Bool]](
     cond: COND
-  )(body: (Arena, Context, Block) ?=> Unit
+  )(body: (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -77,7 +77,7 @@ given ConstructorApi with
     val op0 = summon[WhenApi].op(cond.refer, locate)
     op0.operation.appendToBlock()
     body(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op0.condBlock
     )
@@ -85,9 +85,9 @@ given ConstructorApi with
 
   extension (when: When)
     def otherwise(
-      body: (Arena, Context, Block) ?=> Unit
+      body: (Zone, Context, Block) ?=> Unit
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit =
       given Block = when.elseBlock
@@ -108,7 +108,7 @@ given ConstructorApi with
   def layer(
     layerName: String
   )(body:      (
-      Arena,
+      Zone,
       Context,
       Block,
       LayerTree,      // Current Layer
@@ -117,7 +117,7 @@ given ConstructorApi with
       sourcecode.Line
     ) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     Seq[LayerTree],
@@ -127,7 +127,7 @@ given ConstructorApi with
     val op0 = summon[LayerBlockApi].op(summon[Seq[LayerTree]](layerName).nameHierarchy, locate)
     op0.operation.appendToBlock()
     body(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op0.block,
       summon[Seq[LayerTree]](layerName),
@@ -139,7 +139,7 @@ given ConstructorApi with
   def Wire[T <: Data](
     refType: T
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -163,7 +163,7 @@ given ConstructorApi with
   )(
     using ClockScope
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -192,7 +192,7 @@ given ConstructorApi with
   )(
     using ResetScope
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -222,7 +222,7 @@ given ConstructorApi with
   def Node[T <: Data](
     ref: Referable[T]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -245,7 +245,7 @@ given ConstructorApi with
     def U(
       width: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -263,14 +263,14 @@ given ConstructorApi with
           private[zaozi] val _width = constOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _refer: Value = constOp.operation.getResult(0)
     def U(
-      using Arena,
+      using Zone,
       Context,
       Block
     ): Const[UInt] = bigInt.U(scala.math.max(1, bigInt.bitLength))
     def B(
       width: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -288,14 +288,14 @@ given ConstructorApi with
           private[zaozi] val _width = constOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _refer: Value = constOp.operation.getResult(0)
     def B(
-      using Arena,
+      using Zone,
       Context,
       Block
     ): Const[Bits] = bigInt.B(scala.math.max(1, bigInt.bitLength))
     def S(
       width: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -313,7 +313,7 @@ given ConstructorApi with
           private[zaozi] val _width = constOp.operation.getResult(0).getType.getBitWidth(true).toInt
         val _refer: Value = constOp.operation.getResult(0)
     def S(
-      using Arena,
+      using Zone,
       Context,
       Block
     ): Const[SInt] =
@@ -321,7 +321,7 @@ given ConstructorApi with
       bigInt.S(bigInt.bitLength + 1)
   extension (bool:   Boolean)
     def B(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

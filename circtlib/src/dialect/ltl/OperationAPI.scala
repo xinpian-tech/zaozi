@@ -6,7 +6,7 @@ import org.llvm.circt.scalalib.capi.dialect.ltl.LTLClockEdge
 import org.llvm.mlir.scalalib.capi.support.HasOperation
 import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 class And(val _operation: Operation)
 trait AndApi extends HasOperation[And]:
@@ -14,12 +14,12 @@ trait AndApi extends HasOperation[And]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   And
   extension (ref: And)
     def result(
-      using Arena
+      using Zone
     ): Value
 end AndApi
 
@@ -29,12 +29,12 @@ trait BooleanConstantApi extends HasOperation[BooleanConstant]:
     value:    Boolean,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   BooleanConstant
   extension (ref: BooleanConstant)
     def result(
-      using Arena
+      using Zone
     ): Value
 end BooleanConstantApi
 
@@ -46,12 +46,12 @@ trait ClockedAtomApi extends HasOperation[ClockedAtom]:
     clock:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   ClockedAtom
   extension (ref: ClockedAtom)
     def result(
-      using Arena
+      using Zone
     ): Value
 end ClockedAtomApi
 
@@ -65,12 +65,12 @@ trait ClockedDelayApi extends HasOperation[ClockedDelay]:
     length:   Option[Long],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   ClockedDelay
   extension (ref: ClockedDelay)
     def result(
-      using Arena
+      using Zone
     ): Value
 end ClockedDelayApi
 
@@ -80,12 +80,12 @@ trait ConcatApi extends HasOperation[Concat]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Concat
   extension (ref: Concat)
     def result(
-      using Arena
+      using Zone
     ): Value
 end ConcatApi
 
@@ -96,12 +96,12 @@ trait ImplicationApi extends HasOperation[Implication]:
     consequent: Value,
     location:   Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Implication
   extension (ref: Implication)
     def result(
-      using Arena
+      using Zone
     ): Value
 end ImplicationApi
 
@@ -111,12 +111,12 @@ trait IntersectApi extends HasOperation[Intersect]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Intersect
   extension (ref: Intersect)
     def result(
-      using Arena
+      using Zone
     ): Value
 end IntersectApi
 
@@ -126,12 +126,12 @@ trait NotApi extends HasOperation[Not]:
     input:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Not
   extension (ref: Not)
     def result(
-      using Arena
+      using Zone
     ): Value
 end NotApi
 
@@ -141,12 +141,12 @@ trait OrApi extends HasOperation[Or]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Or
   extension (ref: Or)
     def result(
-      using Arena
+      using Zone
     ): Value
 end OrApi
 
@@ -158,12 +158,12 @@ trait PastApi extends HasOperation[Past]:
     clock:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Past
   extension (ref: Past)
     def result(
-      using Arena
+      using Zone
     ): Value
 end PastApi
 
@@ -173,11 +173,11 @@ trait SampledApi extends HasOperation[Sampled]:
     expression: Value,
     location:   Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   Sampled
   extension (ref: Sampled)
     def result(
-      using Arena
+      using Zone
     ): Value
 end SampledApi

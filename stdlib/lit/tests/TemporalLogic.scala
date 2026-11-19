@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.TemporalLogic" %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class "me.jiuyang.stdlib.TemporalLogic" %s --
 // DEFINE: %{bmc} = circt-bmc %t.dir/w4.bmc.hw.mlir --module=TemporalLogic_width4_CheckContract_0 -b 4 --shared-libs=%Z3LIB --run
 
 // RUN: rm -rf %t.dir && mkdir -p %t.dir

@@ -9,7 +9,7 @@ import me.jiuyang.zaozi.magic.macros.{referableApplyDynamic, referableApplyDynam
 import org.llvm.circt.scalalib.dialect.firrtl.operation.Module as CirctModule
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import scala.language.dynamics
 
 // TODO: consider propagating Const through arithmetic operators (e.g. Const[UInt] + Const[UInt] => Const[UInt])
@@ -29,17 +29,17 @@ trait Referable[T <: Data] extends Readable[T], Dynamic:
   def getType = _tpe
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value
 
   def definingOp(
-    using Arena
+    using Zone
   ): Option[Operation] =
     if _refer.isOpResult then Some(_refer.opResultGetOwner) else None
 
   def width(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Int = _tpe.width
@@ -47,7 +47,7 @@ trait Referable[T <: Data] extends Readable[T], Dynamic:
   private[zaozi] def subRef(
     name: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     TypeImpl,
@@ -59,7 +59,7 @@ trait Referable[T <: Data] extends Readable[T], Dynamic:
   private[zaozi] def subRefOption(
     name: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     TypeImpl,

@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private type _BaseHardwareDataType = Bits | Bool | Bundle | Record | SInt | UInt
 // there is no recursive type in Scala so ...
@@ -18,7 +18,7 @@ type HardwareDataType              = _BaseHardwareDataType | Vec[_BaseHardwareDa
 trait TypeUtilsApi:
   extension [D <: HardwareDataType, R <: Referable[D]](ref: R)
     inline def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -31,7 +31,7 @@ trait TypeUtilsApi:
     inline def asType[D <: HardwareDataType](
       tpe: D
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

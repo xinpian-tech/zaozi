@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class DefaultQueueTop %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class DefaultQueueTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 // RUN: %{test} config %t.dir/config.json --width 8 --entries 4 --pipe true --flow true --asyncReset true --resetMem true
 // RUN: cd %t.dir && %{test} design %t.dir/config.json
 // RUN: firld %t.dir/*.mlirbc --base-circuit DefaultQueueTop_width8_entries4_pipetrue_flowtrue_asyncResettrue_resetMemtrue --no-mangle | firtool --format=mlir | FileCheck %s
 // RUN: rm -rf %t.dir
-
-import java.lang.foreign.Arena
 
 import mainargs.TokensReader
 import me.jiuyang.stdlib.*
@@ -66,7 +64,7 @@ object DefaultQueueTop
       s"_asyncReset${p.asyncReset}_resetMem${p.resetMem}"
 
   def architecture(parameter: DefaultQueueSpecParameter) =
-    val io = summon[Interface[DefaultQueueSpecIO]]
+    val io    = summon[Interface[DefaultQueueSpecIO]]
     val queue = Queue(
       QueueParameter(
         gen = io.enq.bits.getType,

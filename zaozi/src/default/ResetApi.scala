@@ -10,13 +10,13 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_TypeApi, FirrtlNameKin
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{NodeApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import org.llvm.circt.scalalib.dialect.firrtl.operation.AsUIntPrimApi
 
 given ResetApi with
   extension [R <: Referable[Reset]](ref: R)
     def asBool(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 <liu@jiuyang.me>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class Outer %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class Outer %s --
 // RUN: rm -rf %t && mkdir -p %t && cd %t
 // RUN: %{test} config %t/config.json --width 32
 // RUN: %{test} design %t/config.json
-// RUN: firld %t/*.mlirbc --base-circuit Outer_e4dbbef1 | firtool -format=mlir | FileCheck %s
+// RUN: firld %t/*.mlirbc --base-circuit Outer | firtool -format=mlir | FileCheck %s
 // RUN: rm -rf %t
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-
-import java.lang.foreign.Arena
 
 val fooLayers = Seq(
   Layer(
@@ -50,37 +48,38 @@ class InnerIO(parameter: InnerParameter) extends HWBundle(parameter):
   val a0b1   = Flipped(UInt(parameter.width))
 
 class InnerProbe(parameter: InnerParameter) extends DVBundle[InnerParameter, InnerLayers](parameter):
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0 a0_0.a0p
+  // CHECK-DAG: `define ref_Inner_a0 a0_0.a0p
   val a0     = ProbeRead(UInt(parameter.width), layers("A0"))
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b0 a0_a0B0.a0b0p
+  // CHECK-DAG: `define ref_Inner_a0b0 a0_a0B0.a0b0p
   val a0b0   = ProbeRead(UInt(parameter.width), layers("A0")("A0B0"))
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b0c0 a0_a0B0_a0B0C0.a0b0c0p
+  // CHECK-DAG: `define ref_Inner_a0b0c0 a0_a0B0_a0B0C0.a0b0c0p
   val a0b0c0 = ProbeRead(UInt(parameter.width), layers("A0")("A0B0")("A0B0C0"))
-  // CHECK-DAG: `define ref_Inner_7b2bb635_a0b1 a0_a0B1.a0b1p
+  // CHECK-DAG: `define ref_Inner_a0b1 a0_a0B1.a0b1p
   val a0b1   = ProbeRead(UInt(parameter.width), layers("A0")("A0B1"))
 
 @generator
 object Inner extends Generator[InnerParameter, InnerLayers, InnerIO, InnerProbe]:
+  override def moduleName(parameter: InnerParameter): String = "Inner"
   def architecture(parameter: InnerParameter) =
     val io    = summon[Interface[InnerIO]]
     val probe = summon[ProbeInterface[InnerProbe]]
     layer("A0"):
-      // CHECK-DAG: bind Inner_7b2bb635 Inner_7b2bb635_A0 a0_0 ();
+      // CHECK-DAG: bind Inner Inner_A0 a0_0 ();
       val a0p = Wire(UInt(parameter.width))
       a0p := (io.a0 + 1.U).asBits.tail(parameter.width).asUInt
       probe.a0 <== a0p
       layer("A0B0"):
-        // CHECK-DAG: bind Inner_7b2bb635 Inner_7b2bb635_A0_A0B0 a0_a0B0 ();
+        // CHECK-DAG: bind Inner Inner_A0_A0B0 a0_a0B0 ();
         val a0b0p = Wire(UInt(parameter.width))
         a0b0p := (io.a0b0 - 1.U).asBits.tail(parameter.width).asUInt
         probe.a0b0 <== a0b0p
         layer("A0B0C0"):
-          // CHECK-DAG: bind Inner_7b2bb635 Inner_7b2bb635_A0_A0B0_A0B0C0 a0_a0B0_a0B0C0 ();
+          // CHECK-DAG: bind Inner Inner_A0_A0B0_A0B0C0 a0_a0B0_a0B0C0 ();
           val a0b0c0p = Wire(UInt(parameter.width))
           a0b0c0p := (io.a0b0c0 * 3.U).asBits.tail(parameter.width).asUInt
           probe.a0b0c0 <== a0b0c0p
       layer("A0B1"):
-        // CHECK-DAG: bind Inner_7b2bb635 Inner_7b2bb635_A0_A0B1 a0_a0B1 ();
+        // CHECK-DAG: bind Inner Inner_A0_A0B1 a0_a0B1 ();
         val a0b1p = Wire(UInt(parameter.width))
         a0b1p := (io.a0b1 << 1).asBits.tail(parameter.width).asUInt
         probe.a0b1 <== a0b1p
@@ -98,17 +97,18 @@ class OuterIO(parameter: OuterParameter) extends HWBundle(parameter):
   val a0b1   = Flipped(UInt(parameter.width))
 
 class OuterProbe(parameter: OuterParameter) extends DVBundle[OuterParameter, OuterLayers](parameter):
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0 a0_0.a0_val
+  // CHECK-DAG: `define ref_Outer_a0 a0_0.a0_val
   val a0     = ProbeRead(UInt(parameter.width), layers("A0"))
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b0 a0_a0B0.a0b0_val
+  // CHECK-DAG: `define ref_Outer_a0b0 a0_a0B0.a0b0_val
   val a0b0   = ProbeRead(UInt(parameter.width), layers("A0")("A0B0"))
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b0c0 a0_a0B0_a0B0C0.a0b0c0_val
+  // CHECK-DAG: `define ref_Outer_a0b0c0 a0_a0B0_a0B0C0.a0b0c0_val
   val a0b0c0 = ProbeRead(UInt(parameter.width), layers("A0")("A0B0")("A0B0C0"))
-  // CHECK-DAG: `define ref_Outer_e4dbbef1_a0b1 a0_a0B1.a0b1_val
+  // CHECK-DAG: `define ref_Outer_a0b1 a0_a0B1.a0b1_val
   val a0b1   = ProbeRead(UInt(parameter.width), layers("A0")("A0B1"))
 
 @generator
 object Outer extends Generator[OuterParameter, OuterLayers, OuterIO, OuterProbe]:
+  override def moduleName(parameter: OuterParameter): String = "Outer"
   def architecture(parameter: OuterParameter) =
     val io    = summon[Interface[OuterIO]]
     val probe = summon[ProbeInterface[OuterProbe]]
@@ -120,22 +120,22 @@ object Outer extends Generator[OuterParameter, OuterLayers, OuterIO, OuterProbe]
     inner.io.a0b1   := io.a0b1
 
     layer("A0"):
-      // CHECK-DAG: bind Outer_e4dbbef1 Outer_e4dbbef1_A0 a0_0 ();
+      // CHECK-DAG: bind Outer Outer_A0 a0_0 ();
       val a0_val = Wire(UInt(parameter.width))
       a0_val <== inner.probe.a0
       probe.a0 <== a0_val
       layer("A0B0"):
-        // CHECK-DAG: bind Outer_e4dbbef1 Outer_e4dbbef1_A0_A0B0 a0_a0B0 ();
+        // CHECK-DAG: bind Outer Outer_A0_A0B0 a0_a0B0 ();
         val a0b0_val = Wire(UInt(parameter.width))
         a0b0_val <== inner.probe.a0b0
         probe.a0b0 <== a0b0_val
         layer("A0B0C0"):
-          // CHECK-DAG: bind Outer_e4dbbef1 Outer_e4dbbef1_A0_A0B0_A0B0C0 a0_a0B0_a0B0C0 ();
+          // CHECK-DAG: bind Outer Outer_A0_A0B0_A0B0C0 a0_a0B0_a0B0C0 ();
           val a0b0c0_val = Wire(UInt(parameter.width))
           a0b0c0_val <== inner.probe.a0b0c0
           probe.a0b0c0 <== a0b0c0_val
       layer("A0B1"):
-        // CHECK-DAG: bind Outer_e4dbbef1 Outer_e4dbbef1_A0_A0B1 a0_a0B1 ();
+        // CHECK-DAG: bind Outer Outer_A0_A0B1 a0_a0B1 ();
         val a0b1_val = Wire(UInt(parameter.width))
         a0b1_val <== inner.probe.a0b1
         probe.a0b1 <== a0b1_val

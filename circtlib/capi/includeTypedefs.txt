@@ -1,7 +1,0 @@
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-
-CirctESIServiceGeneratorFunc              # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/ESI.h
-HWInstanceGraphNodeCallback      # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/HW.h
-CirctMSFTPlacementCallback                    # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/MSFT.h
-CirctMSFTPrimitiveType                        # header: $CIRCT_INSTALL_PATH/include/circt-c/Dialect/MSFT.h

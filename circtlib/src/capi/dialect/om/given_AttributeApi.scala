@@ -2,42 +2,44 @@
 // SPDX-FileCopyrightText: 2025 Yuhang Zeng <unlsycn@unlsycn.com>
 package org.llvm.circt.scalalib.capi.dialect.om
 
-import org.llvm.circt.CAPI.{
-  omAttrIsAIntegerAttr,
-  omAttrIsAListAttr,
-  omAttrIsAReferenceAttr,
-  omIntegerAttrGet,
-  omIntegerAttrGetInt,
-  omIntegerAttrToString,
-  omListAttrGetElement,
-  omListAttrGetNumElements,
-  omReferenceAttrGetInnerRef
-}
-import org.llvm.mlir.scalalib.capi.ir.{Attribute, Identifier, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.ir.{Attribute, Identifier, given}
 
 given AttributeApi with
   extension (attr: Attribute)
-    inline def isIntegerAttr:          Boolean = omAttrIsAIntegerAttr(attr.segment)
-    inline def isListAttr:             Boolean = omAttrIsAListAttr(attr.segment)
-    inline def isReferenceAttr:        Boolean = omAttrIsAReferenceAttr(attr.segment)
+    inline def isIntegerAttr:          Boolean = circtApi.omAttrIsAIntegerAttr(attr.native)
+    inline def isListAttr:             Boolean = circtApi.omAttrIsAListAttr(attr.native)
+    inline def isReferenceAttr:        Boolean = circtApi.omAttrIsAReferenceAttr(attr.native)
     inline def integerAttrGet(
-      using arena: Arena
-    ): Attribute = Attribute(omIntegerAttrGet(arena, attr.segment))
+      using zone: Zone
+    ): Attribute = Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out => circtApi.omIntegerAttrGet(attr.native)(out))
+    )
     inline def integerAttrGetInt(
-      using arena: Arena
-    ): Attribute = Attribute(omIntegerAttrGetInt(arena, attr.segment))
+      using zone: Zone
+    ): Attribute = Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out => circtApi.omIntegerAttrGetInt(attr.native)(out))
+    )
     inline def integerAttrToString(
-      using arena: Arena
-    ): String = omIntegerAttrToString(arena, attr.segment).toString
+      using zone: Zone
+    ): String =
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.omIntegerAttrToString(attr.native)(out)).toString
     inline def listAttrGetElement(
-      pos:         Int
+      pos:        Int
     )(
-      using arena: Arena
-    ): Attribute = Attribute(omListAttrGetElement(arena, attr.segment, pos))
-    inline def listAttrGetNumElements: Int     = omListAttrGetNumElements(attr.segment).toInt
+      using zone: Zone
+    ): Attribute = Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out => circtApi.omListAttrGetElement(attr.native, pos.toSize)(out))
+    )
+    inline def listAttrGetNumElements: Int     = circtApi.omListAttrGetNumElements(attr.native).toLong.toInt
     inline def referenceAttrGetInnerRef(
-      using arena: Arena
-    ): Attribute = Attribute(omReferenceAttrGetInnerRef(arena, attr.segment))
+      using zone: Zone
+    ): Attribute = Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out => circtApi.omReferenceAttrGetInnerRef(attr.native)(out))
+    )
 end given

@@ -10,7 +10,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [D <: HardwareDataType, T <: DecoupledIO[D], R <: Referable[T]]: HasFire[T, R] with
   extension (ref: R)
@@ -21,6 +21,6 @@ given [D <: HardwareDataType, T <: DecoupledIO[D], R <: Referable[T]]: HasFire[T
       valName:   sourcecode.Name.Machine,
       instCtx:   InstanceContext
     )(
-      using Arena,
+      using Zone,
       Block
     ): Node[Bool] = ref.valid & ref.ready

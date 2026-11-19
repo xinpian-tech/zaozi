@@ -2,157 +2,127 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.firrtl
 
-import org.llvm.circt.*
-import org.llvm.circt.CAPI.{
-  firrtlTypeGetAnalog,
-  firrtlTypeGetAnyRef,
-  firrtlTypeGetBitWidth,
-  firrtlTypeGetBoolean,
-  firrtlTypeGetBundle,
-  firrtlTypeGetBundleFieldByIndex,
-  firrtlTypeGetBundleFieldIndex,
-  firrtlTypeGetBundleNumFields,
-  firrtlTypeGetClass,
-  firrtlTypeGetClock,
-  firrtlTypeGetColoredRef,
-  firrtlTypeGetConstType,
-  firrtlTypeGetDouble,
-  firrtlTypeGetInteger,
-  firrtlTypeGetList,
-  firrtlTypeGetMaskType,
-  firrtlTypeGetPath,
-  firrtlTypeGetRef,
-  firrtlTypeGetReset,
-  firrtlTypeGetSInt,
-  firrtlTypeGetString,
-  firrtlTypeGetUInt,
-  firrtlTypeGetVector,
-  firrtlTypeGetVectorElement,
-  firrtlTypeGetVectorNumElements,
-  firrtlTypeIsAAnalog,
-  firrtlTypeIsAAnyRef,
-  firrtlTypeIsABoolean,
-  firrtlTypeIsABundle,
-  firrtlTypeIsAClass,
-  firrtlTypeIsAClock,
-  firrtlTypeIsADouble,
-  firrtlTypeIsAInteger,
-  firrtlTypeIsAList,
-  firrtlTypeIsAOpenBundle,
-  firrtlTypeIsAPath,
-  firrtlTypeIsARef,
-  firrtlTypeIsAReset,
-  firrtlTypeIsASInt,
-  firrtlTypeIsAString,
-  firrtlTypeIsAUInt,
-  firrtlTypeIsAVector,
-  firrtlTypeIsConst,
-  firrtlTypeIsPassive,
-  firrtlTypesAreEquivalent
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.structs as CirctStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, DialectHandle, Type, given}
-
-import java.lang.foreign.Arena
 
 given TypeApi with
   extension (width:                    Int)
     inline def getAnalog(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(firrtlTypeGetAnalog(arena, context.segment, width))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetAnalog(context.native, width)(out)))
   inline def getAnyRef(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetAnyRef(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetAnyRef(context.native)(out)))
   extension (tpe:                      Type)
-    inline def getBitWidth(ignoreFlip: Boolean): Long = firrtlTypeGetBitWidth(tpe.segment, ignoreFlip)
+    inline def getBitWidth(ignoreFlip: Boolean): Long = circtApi.firrtlTypeGetBitWidth(tpe.native, ignoreFlip).toLong
   inline def getBoolean(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetBoolean(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetBoolean(context.native)(out)))
   extension (firrtlBundleFields:       Seq[FirrtlBundleField])
     inline def getBundle(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type =
-      val buffer = FIRRTLBundleField.allocateArray(firrtlBundleFields.size, arena)
-      firrtlBundleFields.zipWithIndex.foreach:
-        case (field, i) =>
-          buffer.asSlice(field.sizeOf * i, field.sizeOf).copyFrom(field.segment)
-      Type(firrtlTypeGetBundle(arena, context.segment, firrtlBundleFields.size, buffer))
+      val buffer = firrtlBundleFields.toMlirArray
+      Type(
+        nativeResult[MlirStructs.MlirType](out =>
+          circtApi.firrtlTypeGetBundle(context.native, firrtlBundleFields.size.toUSize, buffer)(out)
+        )
+      )
   extension (tpe:                      Type)
     inline def getBundleFieldByIndex(
-      idx:         Int
+      idx:        Int
     )(
-      using arena: Arena
+      using zone: Zone
     ): FirrtlBundleField =
-      val buffer = FIRRTLBundleField.allocate(arena)
-      firrtlTypeGetBundleFieldByIndex(tpe.segment, idx, buffer)
+      val buffer = alloc[CirctStructs.FIRRTLBundleField]()
+      require(
+        circtApi.firrtlTypeGetBundleFieldByIndex(tpe.native, idx.toUSize, buffer),
+        s"unknown bundle field index $idx"
+      )
       FirrtlBundleField(buffer)
     inline def getBundleFieldIndex(
-      fieldName:   String
+      fieldName:  String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Int =
-      firrtlTypeGetBundleFieldIndex(tpe.segment, fieldName.toStringRef.segment)
-    inline def getBundleNumFields: Long = firrtlTypeGetBundleNumFields(tpe.segment)
+      circtApi.firrtlTypeGetBundleFieldIndex(tpe.native, fieldName.toStringRef.native).toInt
+    inline def getBundleNumFields: Long = circtApi.firrtlTypeGetBundleNumFields(tpe.native).toLong
   inline def getClassTpe(
     name:                String,
     firrtlClassElements: Seq[FirrtlClassElement]
   )(
-    using arena:         Arena,
+    using zone:          Zone,
     context:             Context
   ): Type =
-    val buffer = FIRRTLClassElement.allocateArray(firrtlClassElements.size, arena)
-    firrtlClassElements.zipWithIndex.foreach:
-      case (element, i) =>
-        buffer.asSlice(element.sizeOf * i, element.sizeOf).copyFrom(element.segment)
-    Type(firrtlTypeGetClass(arena, context.segment, name.toStringRef.segment, firrtlClassElements.size, buffer))
+    val buffer = firrtlClassElements.toMlirArray
+    Type(
+      nativeResult[MlirStructs.MlirType](out =>
+        circtApi.firrtlTypeGetClass(
+          context.native,
+          name.flatSymbolRefAttrGet.native,
+          firrtlClassElements.size.toUSize,
+          buffer
+        )(out)
+      )
+    )
   inline def getClock(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetClock(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetClock(context.native)(out)))
   extension (tpe:                      Type)
     inline def getConstType(
-      using arena: Arena
-    ): Type = Type(firrtlTypeGetConstType(arena, tpe.segment, true))
+      using zone: Zone
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetConstType(tpe.native, true)(out)))
   inline def getDouble(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetDouble(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetDouble(context.native)(out)))
   inline def getInteger(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetInteger(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetInteger(context.native)(out)))
   inline def getList(
-    element:     Type
+    element:    Type
   )(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetList(arena, context.segment, element.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetList(context.native, element.native)(out))
+  )
   inline def getMaskType(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetMaskType(arena, context.segment))
+    tpe:        Type
+  )(
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetMaskType(tpe.native)(out)))
   inline def getPath(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetPath(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetPath(context.native)(out)))
   extension (tpe:                      Type)
     inline def getRef(
-      forceable:   Boolean
+      forceable:  Boolean
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type =
-      Type(firrtlTypeGetRef(arena, tpe.segment, forceable))
+      Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetRef(tpe.native, forceable)(out)))
     inline def getRef(
-      forceable:   Boolean,
-      layers:      Seq[String]
+      forceable:  Boolean,
+      layers:     Seq[String]
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Type =
       val layersAttr =
         if (layers.isEmpty) throw new IllegalArgumentException("Layer sequence cannot be empty")
@@ -160,58 +130,66 @@ given TypeApi with
           layers match
             case Seq(root)    => root.flatSymbolRefAttrGet
             case root +: rest => root.symbolRefAttrGet(rest.map(_.flatSymbolRefAttrGet))
-      Type(firrtlTypeGetColoredRef(arena, tpe.segment, forceable, layersAttr.segment))
+      Type(
+        nativeResult[MlirStructs.MlirType](out =>
+          circtApi.firrtlTypeGetColoredRef(tpe.native, forceable, layersAttr.native)(out)
+        )
+      )
   inline def getReset(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetReset(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetReset(context.native)(out)))
   extension (width:                    Int)
     inline def getSInt(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(firrtlTypeGetSInt(arena, context.segment, width))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetSInt(context.native, width)(out)))
   inline def getString(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(firrtlTypeGetString(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetString(context.native)(out)))
   extension (width:                    Int)
     inline def getUInt(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(firrtlTypeGetUInt(arena, context.segment, width))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetUInt(context.native, width)(out)))
   extension (tpe:                      Type)
     inline def getVector(
-      count:       Int
+      count:      Int
     )(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(firrtlTypeGetVector(arena, context.segment, tpe.segment, count))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out =>
+        circtApi.firrtlTypeGetVector(context.native, tpe.native, count.toUSize)(out)
+      )
+    )
     inline def getVectorElementType(
-      using arena: Arena
-    ): Type = Type(firrtlTypeGetVectorElement(arena, tpe.segment))
-    inline def getVectorElementNum: Long = firrtlTypeGetVectorNumElements(tpe.segment)
+      using zone: Zone
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.firrtlTypeGetVectorElement(tpe.native)(out)))
+    inline def getVectorElementNum: Long = circtApi.firrtlTypeGetVectorNumElements(tpe.native).toLong
   extension (tpe:                      Type)
-    inline def isAnalog:     Boolean = firrtlTypeIsAAnalog(tpe.segment)
-    inline def isAnyRef:     Boolean = firrtlTypeIsAAnyRef(tpe.segment)
-    inline def isBoolean:    Boolean = firrtlTypeIsABoolean(tpe.segment)
-    inline def isBundle:     Boolean = firrtlTypeIsABundle(tpe.segment)
-    inline def isClass:      Boolean = firrtlTypeIsAClass(tpe.segment)
-    inline def isClock:      Boolean = firrtlTypeIsAClock(tpe.segment)
-    inline def isDouble:     Boolean = firrtlTypeIsADouble(tpe.segment)
-    inline def isInteger:    Boolean = firrtlTypeIsAInteger(tpe.segment)
-    inline def isList:       Boolean = firrtlTypeIsAList(tpe.segment)
-    inline def isOpenBundle: Boolean = firrtlTypeIsAOpenBundle(tpe.segment)
-    inline def isPath:       Boolean = firrtlTypeIsAPath(tpe.segment)
-    inline def isRef:        Boolean = firrtlTypeIsARef(tpe.segment)
-    inline def isReset:      Boolean = firrtlTypeIsAReset(tpe.segment)
-    inline def isSInt:       Boolean = firrtlTypeIsASInt(tpe.segment)
-    inline def isString:     Boolean = firrtlTypeIsAString(tpe.segment)
-    inline def isUInt:       Boolean = firrtlTypeIsAUInt(tpe.segment)
-    inline def isVector:     Boolean = firrtlTypeIsAVector(tpe.segment)
-    inline def isConst:      Boolean = firrtlTypeIsConst(tpe.segment)
-    inline def isPassive:    Boolean = firrtlTypeIsPassive(tpe.segment)
+    inline def isAnalog:     Boolean = circtApi.firrtlTypeIsAAnalog(tpe.native)
+    inline def isAnyRef:     Boolean = circtApi.firrtlTypeIsAAnyRef(tpe.native)
+    inline def isBoolean:    Boolean = circtApi.firrtlTypeIsABoolean(tpe.native)
+    inline def isBundle:     Boolean = circtApi.firrtlTypeIsABundle(tpe.native)
+    inline def isClass:      Boolean = circtApi.firrtlTypeIsAClass(tpe.native)
+    inline def isClock:      Boolean = circtApi.firrtlTypeIsAClock(tpe.native)
+    inline def isDouble:     Boolean = circtApi.firrtlTypeIsADouble(tpe.native)
+    inline def isInteger:    Boolean = circtApi.firrtlTypeIsAInteger(tpe.native)
+    inline def isList:       Boolean = circtApi.firrtlTypeIsAList(tpe.native)
+    inline def isOpenBundle: Boolean = circtApi.firrtlTypeIsAOpenBundle(tpe.native)
+    inline def isPath:       Boolean = circtApi.firrtlTypeIsAPath(tpe.native)
+    inline def isRef:        Boolean = circtApi.firrtlTypeIsARef(tpe.native)
+    inline def isReset:      Boolean = circtApi.firrtlTypeIsAReset(tpe.native)
+    inline def isSInt:       Boolean = circtApi.firrtlTypeIsASInt(tpe.native)
+    inline def isString:     Boolean = circtApi.firrtlTypeIsAString(tpe.native)
+    inline def isUInt:       Boolean = circtApi.firrtlTypeIsAUInt(tpe.native)
+    inline def isVector:     Boolean = circtApi.firrtlTypeIsAVector(tpe.native)
+    inline def isConst:      Boolean = circtApi.firrtlTypeIsConst(tpe.native)
+    inline def isPassive:    Boolean = circtApi.firrtlTypeIsPassive(tpe.native)
     inline def isEquivalentTo(
       that:              Type,
       requireSameWidths: Boolean
-    ): Boolean = firrtlTypesAreEquivalent(tpe.segment, that.segment, requireSameWidths)
+    ): Boolean = circtApi.firrtlTypesAreEquivalent(tpe.native, that.native, requireSameWidths)
 end given

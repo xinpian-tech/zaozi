@@ -46,12 +46,12 @@ import org.llvm.mlir.scalalib.capi.ir.{
 }
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 // Declare the layers each module uses, and every module the circuit instantiates.
 def validateCircuit(
 )(
-  using Arena,
+  using Zone,
   Context,
   Circuit
 ): Unit =

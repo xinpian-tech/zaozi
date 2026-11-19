@@ -4,122 +4,122 @@ package org.llvm.circt.scalalib.capi.conversion
 
 import org.llvm.mlir.scalalib.capi.pass.Pass
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait ConversionCreateApi:
   def affineToLoopSchedule(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def cfToHandshake(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def calyxNative(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def calyxRemoveGroupsFromFSM(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def calyxToFSM(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def calyxToHW(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertCombToArith(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertCombToSMT(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertFSMToSV(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertHWToBTOR2(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertHWToLLVM(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertHWToSMT(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertHWToSystemC(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertMooreToCore(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def convertVerifToSMT(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def dcToHW(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def exportSplitVerilog(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def exportVerilog(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def hwArithToHW(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def handshakeRemoveBlock(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def handshakeToDC(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def handshakeToHW(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def legalizeAnonEnums(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def loopScheduleToCalyx(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerArcToLLVM(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerFIRRTLToHW(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerFirMem(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerHWToSV(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerLTLToCore(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerSMTToZ3LLVM(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerSeqToSV(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerSimToSV(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def lowerVerifToSV(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def materializeCalyxToFSM(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def pipelineToHW(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def prepareForEmission(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def scfToCalyx(
-    using arena: Arena
+    using zone: Zone
   ): Pass
   def testApplyLoweringOption(
-    using arena: Arena
+    using zone: Zone
   ): Pass
 end ConversionCreateApi
 

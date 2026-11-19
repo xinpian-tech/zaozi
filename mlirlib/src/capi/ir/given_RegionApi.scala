@@ -2,46 +2,40 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirRegionAppendOwnedBlock,
-  mlirRegionCreate,
-  mlirRegionDestroy,
-  mlirRegionGetFirstBlock,
-  mlirRegionGetNextInOperation,
-  mlirRegionInsertOwnedBlock,
-  mlirRegionInsertOwnedBlockAfter,
-  mlirRegionInsertOwnedBlockBefore
-}
-
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
 given RegionApi with
   inline def regionCreate(
-    using arena: Arena
+    using zone: Zone
   ): Region =
-    Region(mlirRegionCreate(arena))
+    Region(nativeResult[MlirStructs.MlirRegion](out => mlirApi.mlirRegionCreate()(out)))
 
   extension (region: Region)
     inline def getFirstBlock(
-      using arena: Arena
-    ): Block = Block(mlirRegionGetFirstBlock(arena, region.segment))
+      using zone: Zone
+    ): Block = Block(nativeResult[MlirStructs.MlirBlock](out => mlirApi.mlirRegionGetFirstBlock(region.native)(out)))
     inline def getNextInOperation(
-      using arena: Arena
-    ): Region = Region(mlirRegionGetNextInOperation(arena, region.segment))
+      using zone: Zone
+    ): Region = Region(
+      nativeResult[MlirStructs.MlirRegion](out => mlirApi.mlirRegionGetNextInOperation(region.native)(out))
+    )
     inline def destroy(
     )(
-      using arena: Arena
-    ): Unit = mlirRegionDestroy(region.segment)
-    inline def appendOwnedBlock(block: Block):                         Unit          =
-      mlirRegionAppendOwnedBlock(region.segment, block.segment)
-    inline def insertOwnedBlock(pos: Long, block: Block):              Unit          =
-      mlirRegionInsertOwnedBlock(region.segment, pos, block.segment)
-    inline def insertOwnedBlockAfter(reference: Block, block: Block):  Unit          =
-      mlirRegionInsertOwnedBlockAfter(region.segment, reference.segment, block.segment)
-    inline def insertOwnedBlockBefore(reference: Block, block: Block): Unit          =
-      mlirRegionInsertOwnedBlockBefore(region.segment, reference.segment, block.segment)
-    inline def segment:                                                MemorySegment = region._segment
-    inline def sizeOf:                                                 Int           = MlirRegion.sizeof().toInt
+      using zone: Zone
+    ): Unit = mlirApi.mlirRegionDestroy(region.native)
+    inline def appendOwnedBlock(block: Block):                         Unit =
+      mlirApi.mlirRegionAppendOwnedBlock(region.native, block.native)
+    inline def insertOwnedBlock(pos: Long, block: Block):              Unit =
+      mlirApi.mlirRegionInsertOwnedBlock(region.native, pos.toSize, block.native)
+    inline def insertOwnedBlockAfter(reference: Block, block: Block):  Unit =
+      mlirApi.mlirRegionInsertOwnedBlockAfter(region.native, reference.native, block.native)
+    inline def insertOwnedBlockBefore(reference: Block, block: Block): Unit =
+      mlirApi.mlirRegionInsertOwnedBlockBefore(region.native, reference.native, block.native)
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirRegion].toInt
 
 end given

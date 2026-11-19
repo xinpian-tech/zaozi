@@ -15,12 +15,12 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given
 }
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private inline def labelAttrs(
   label: Option[String]
 )(
-  using Arena,
+  using Zone,
   Context
 ): Seq[NamedAttribute] =
   label.map(value => summon[NamedAttributeApi].namedAttributeGet("label".identifierGet, value.stringAttrGet)).toSeq
@@ -31,7 +31,7 @@ given ContractApi with
     resultTypes: Seq[Type],
     location:    Location
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
   ): Contract =
     Contract(
@@ -50,10 +50,10 @@ given ContractApi with
   extension (ref: Contract)
     def operation: Operation = ref._operation
     def block(
-      using Arena
+      using Zone
     ): Block = operation.getFirstRegion.getFirstBlock
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 end given
 
@@ -63,7 +63,7 @@ given AssertApi with
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Assert =
     Assert(
@@ -83,7 +83,7 @@ given AssumeApi with
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Assume =
     Assume(
@@ -103,7 +103,7 @@ given CoverApi with
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Cover =
     Cover(
@@ -123,7 +123,7 @@ given RequireApi with
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Require =
     Require(
@@ -143,7 +143,7 @@ given EnsureApi with
     label:    Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Ensure =
     Ensure(

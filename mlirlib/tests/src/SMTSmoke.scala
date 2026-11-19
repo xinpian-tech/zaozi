@@ -12,19 +12,19 @@ import org.llvm.mlir.scalalib.capi.dialect.func.given_DialectApi
 import org.llvm.mlir.scalalib.capi.ir.{Module as MlirModule, ModuleApi as MlirModuleApi, TypeApi as _, *, given}
 import utest.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import org.llvm.mlir.scalalib.capi.ir.given
 
 object SMTSmoke extends TestSuite:
-  // Per-leaf arena + Context lifecycle via utest beforeEach/afterEach hooks.
+  // Per-leaf zone + Context lifecycle via utest beforeEach/afterEach hooks.
   // utest's macro rejects `test()` nested in `try/finally`, so the hook
   // pattern is the only way to make the cleanup exception-safe without
   // restructuring every leaf body.
-  private var currentArena:   Arena   = null
+  private var currentArena:   Zone    = null
   private var currentContext: Context = null
 
   override def utestBeforeEach(path: Seq[String]): Unit =
-    currentArena = Arena.ofConfined()
+    currentArena = Zone.open()
     currentContext = null
 
   override def utestAfterEach(path: Seq[String]): Unit =
@@ -36,8 +36,8 @@ object SMTSmoke extends TestSuite:
     finally if a != null then a.close()
 
   val tests: Tests = Tests:
-    test("Load Panama Context"):
-      given Arena = currentArena
+    test("Create MLIR context"):
+      given Zone = currentArena
       test("Load Dialect"):
         val context         = summon[ContextApi].contextCreate
         currentContext = context

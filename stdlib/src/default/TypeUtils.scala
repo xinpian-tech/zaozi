@@ -10,12 +10,12 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given TypeUtilsApi with
   extension [D <: HardwareDataType, R <: Referable[D]](ref: R)
     inline def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -40,7 +40,7 @@ given TypeUtilsApi with
     inline def asType[D <: HardwareDataType](
       tpe: D
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

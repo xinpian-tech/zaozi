@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib.queue.default
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 import me.jiuyang.stdlib.*
 import me.jiuyang.stdlib.default.{*, given}
@@ -270,7 +270,7 @@ given QueueImpl with
   def apply[D <: HardwareDataType](
     parameter: QueueParameter[D]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

@@ -2,86 +2,47 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.conversion
 
-import org.llvm.circt.CAPI.{
-  mlirRegisterCIRCTConversionAffineToLoopSchedule,
-  mlirRegisterCIRCTConversionCFToHandshake,
-  mlirRegisterCIRCTConversionCalyxNative,
-  mlirRegisterCIRCTConversionCalyxRemoveGroupsFromFSM,
-  mlirRegisterCIRCTConversionCalyxToFSM,
-  mlirRegisterCIRCTConversionCalyxToHW,
-  mlirRegisterCIRCTConversionConvertCombToArith,
-  mlirRegisterCIRCTConversionConvertCombToSMT,
-  mlirRegisterCIRCTConversionConvertFSMToSV,
-  mlirRegisterCIRCTConversionConvertHWToBTOR2,
-  mlirRegisterCIRCTConversionConvertHWToLLVM,
-  mlirRegisterCIRCTConversionConvertHWToSMT,
-  mlirRegisterCIRCTConversionConvertHWToSystemC,
-  mlirRegisterCIRCTConversionConvertMooreToCore,
-  mlirRegisterCIRCTConversionConvertVerifToSMT,
-  mlirRegisterCIRCTConversionDCToHW,
-  mlirRegisterCIRCTConversionExportSplitVerilog,
-  mlirRegisterCIRCTConversionExportVerilog,
-  mlirRegisterCIRCTConversionHWArithToHW,
-  mlirRegisterCIRCTConversionHandshakeRemoveBlock,
-  mlirRegisterCIRCTConversionHandshakeToDC,
-  mlirRegisterCIRCTConversionHandshakeToHW,
-  mlirRegisterCIRCTConversionLegalizeAnonEnums,
-  mlirRegisterCIRCTConversionLoopScheduleToCalyx,
-  mlirRegisterCIRCTConversionLowerArcToLLVM,
-  mlirRegisterCIRCTConversionLowerFIRRTLToHW,
-  mlirRegisterCIRCTConversionLowerFirMem,
-  mlirRegisterCIRCTConversionLowerHWToSV,
-  mlirRegisterCIRCTConversionLowerLTLToCore,
-  mlirRegisterCIRCTConversionLowerSMTToZ3LLVM,
-  mlirRegisterCIRCTConversionLowerSeqToSV,
-  mlirRegisterCIRCTConversionLowerSimToSV,
-  mlirRegisterCIRCTConversionLowerVerifToSV,
-  mlirRegisterCIRCTConversionMaterializeCalyxToFSM,
-  mlirRegisterCIRCTConversionPasses,
-  mlirRegisterCIRCTConversionPipelineToHW,
-  mlirRegisterCIRCTConversionPrepareForEmission,
-  mlirRegisterCIRCTConversionSCFToCalyx,
-  mlirRegisterCIRCTConversionTestApplyLoweringOption
-}
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
 
 given ConversionRegisterApi with
-  def affineToLoopSchedule:     Unit = mlirRegisterCIRCTConversionAffineToLoopSchedule()
-  def cfToHandshake:            Unit = mlirRegisterCIRCTConversionCFToHandshake()
-  def calyxNative:              Unit = mlirRegisterCIRCTConversionCalyxNative()
-  def calyxRemoveGroupsFromFSM: Unit = mlirRegisterCIRCTConversionCalyxRemoveGroupsFromFSM()
-  def calyxToFSM:               Unit = mlirRegisterCIRCTConversionCalyxToFSM()
-  def calyxToHW:                Unit = mlirRegisterCIRCTConversionCalyxToHW()
-  def convertCombToArith:       Unit = mlirRegisterCIRCTConversionConvertCombToArith()
-  def convertCombToSMT:         Unit = mlirRegisterCIRCTConversionConvertCombToSMT()
-  def convertFSMToSV:           Unit = mlirRegisterCIRCTConversionConvertFSMToSV()
-  def convertHWToBTOR2:         Unit = mlirRegisterCIRCTConversionConvertHWToBTOR2()
-  def convertHWToLLVM:          Unit = mlirRegisterCIRCTConversionConvertHWToLLVM()
-  def convertHWToSMT:           Unit = mlirRegisterCIRCTConversionConvertHWToSMT()
-  def convertHWToSystemC:       Unit = mlirRegisterCIRCTConversionConvertHWToSystemC()
-  def convertMooreToCore:       Unit = mlirRegisterCIRCTConversionConvertMooreToCore()
-  def convertVerifToSMT:        Unit = mlirRegisterCIRCTConversionConvertVerifToSMT()
-  def dcToHW:                   Unit = mlirRegisterCIRCTConversionDCToHW()
-  def exportSplitVerilog:       Unit = mlirRegisterCIRCTConversionExportSplitVerilog()
-  def exportVerilog:            Unit = mlirRegisterCIRCTConversionExportVerilog()
-  def hwArithToHW:              Unit = mlirRegisterCIRCTConversionHWArithToHW()
-  def handshakeRemoveBlock:     Unit = mlirRegisterCIRCTConversionHandshakeRemoveBlock()
-  def handshakeToDC:            Unit = mlirRegisterCIRCTConversionHandshakeToDC()
-  def handshakeToHW:            Unit = mlirRegisterCIRCTConversionHandshakeToHW()
-  def legalizeAnonEnums:        Unit = mlirRegisterCIRCTConversionLegalizeAnonEnums()
-  def loopScheduleToCalyx:      Unit = mlirRegisterCIRCTConversionLoopScheduleToCalyx()
-  def lowerArcToLLVM:           Unit = mlirRegisterCIRCTConversionLowerArcToLLVM()
-  def lowerFIRRTLToHW:          Unit = mlirRegisterCIRCTConversionLowerFIRRTLToHW()
-  def lowerFirMem:              Unit = mlirRegisterCIRCTConversionLowerFirMem()
-  def lowerHWToSV:              Unit = mlirRegisterCIRCTConversionLowerHWToSV()
-  def lowerLTLToCore:           Unit = mlirRegisterCIRCTConversionLowerLTLToCore()
-  def lowerSMTToZ3LLVM:         Unit = mlirRegisterCIRCTConversionLowerSMTToZ3LLVM()
-  def lowerSeqToSV:             Unit = mlirRegisterCIRCTConversionLowerSeqToSV()
-  def lowerSimToSV:             Unit = mlirRegisterCIRCTConversionLowerSimToSV()
-  def lowerVerifToSV:           Unit = mlirRegisterCIRCTConversionLowerVerifToSV()
-  def materializeCalyxToFSM:    Unit = mlirRegisterCIRCTConversionMaterializeCalyxToFSM()
-  def passes:                   Unit = mlirRegisterCIRCTConversionPasses()
-  def pipelineToHW:             Unit = mlirRegisterCIRCTConversionPipelineToHW()
-  def prepareForEmission:       Unit = mlirRegisterCIRCTConversionPrepareForEmission()
-  def scfToCalyx:               Unit = mlirRegisterCIRCTConversionSCFToCalyx()
-  def testApplyLoweringOption:  Unit = mlirRegisterCIRCTConversionTestApplyLoweringOption()
+  def affineToLoopSchedule:     Unit = circtApi.mlirRegisterCIRCTConversionAffineToLoopSchedule()
+  def cfToHandshake:            Unit = circtApi.mlirRegisterCIRCTConversionCFToHandshake()
+  def calyxNative:              Unit = circtApi.mlirRegisterCIRCTConversionCalyxNative()
+  def calyxRemoveGroupsFromFSM: Unit = circtApi.mlirRegisterCIRCTConversionCalyxRemoveGroupsFromFSM()
+  def calyxToFSM:               Unit = circtApi.mlirRegisterCIRCTConversionCalyxToFSM()
+  def calyxToHW:                Unit = circtApi.mlirRegisterCIRCTConversionCalyxToHW()
+  def convertCombToArith:       Unit = circtApi.mlirRegisterCIRCTConversionConvertCombToArith()
+  def convertCombToSMT:         Unit = circtApi.mlirRegisterCIRCTConversionConvertCombToSMT()
+  def convertFSMToSV:           Unit = circtApi.mlirRegisterCIRCTConversionConvertFSMToSV()
+  def convertHWToBTOR2:         Unit = circtApi.mlirRegisterCIRCTConversionConvertHWToBTOR2()
+  def convertHWToLLVM:          Unit = circtApi.mlirRegisterCIRCTConversionConvertHWToLLVM()
+  def convertHWToSMT:           Unit = circtApi.mlirRegisterCIRCTConversionConvertHWToSMT()
+  def convertHWToSystemC:       Unit = circtApi.mlirRegisterCIRCTConversionConvertHWToSystemC()
+  def convertMooreToCore:       Unit = circtApi.mlirRegisterCIRCTConversionConvertMooreToCore()
+  def convertVerifToSMT:        Unit = circtApi.mlirRegisterCIRCTConversionConvertVerifToSMT()
+  def dcToHW:                   Unit = circtApi.mlirRegisterCIRCTConversionDCToHW()
+  def exportSplitVerilog:       Unit = circtApi.mlirRegisterCIRCTConversionExportSplitVerilog()
+  def exportVerilog:            Unit = circtApi.mlirRegisterCIRCTConversionExportVerilog()
+  def hwArithToHW:              Unit = circtApi.mlirRegisterCIRCTConversionHWArithToHW()
+  def handshakeRemoveBlock:     Unit = circtApi.mlirRegisterCIRCTConversionHandshakeRemoveBlock()
+  def handshakeToDC:            Unit = circtApi.mlirRegisterCIRCTConversionHandshakeToDC()
+  def handshakeToHW:            Unit = circtApi.mlirRegisterCIRCTConversionHandshakeToHW()
+  def legalizeAnonEnums:        Unit = circtApi.mlirRegisterCIRCTConversionLegalizeAnonEnums()
+  def loopScheduleToCalyx:      Unit = circtApi.mlirRegisterCIRCTConversionLoopScheduleToCalyx()
+  def lowerArcToLLVM:           Unit = circtApi.mlirRegisterCIRCTConversionLowerArcToLLVM()
+  def lowerFIRRTLToHW:          Unit = circtApi.mlirRegisterCIRCTConversionLowerFIRRTLToHW()
+  def lowerFirMem:              Unit = circtApi.mlirRegisterCIRCTConversionLowerFirMem()
+  def lowerHWToSV:              Unit = circtApi.mlirRegisterCIRCTConversionLowerHWToSV()
+  def lowerLTLToCore:           Unit = circtApi.mlirRegisterCIRCTConversionLowerLTLToCore()
+  def lowerSMTToZ3LLVM:         Unit = circtApi.mlirRegisterCIRCTConversionLowerSMTToZ3LLVM()
+  def lowerSeqToSV:             Unit = circtApi.mlirRegisterCIRCTConversionLowerSeqToSV()
+  def lowerSimToSV:             Unit = circtApi.mlirRegisterCIRCTConversionLowerSimToSV()
+  def lowerVerifToSV:           Unit = circtApi.mlirRegisterCIRCTConversionLowerVerifToSV()
+  def materializeCalyxToFSM:    Unit = circtApi.mlirRegisterCIRCTConversionMaterializeCalyxToFSM()
+  def passes:                   Unit = circtApi.mlirRegisterCIRCTConversionPasses()
+  def pipelineToHW:             Unit = circtApi.mlirRegisterCIRCTConversionPipelineToHW()
+  def prepareForEmission:       Unit = circtApi.mlirRegisterCIRCTConversionPrepareForEmission()
+  def scfToCalyx:               Unit = circtApi.mlirRegisterCIRCTConversionSCFToCalyx()
+  def testApplyLoweringOption:  Unit = circtApi.mlirRegisterCIRCTConversionTestApplyLoweringOption()
 end given

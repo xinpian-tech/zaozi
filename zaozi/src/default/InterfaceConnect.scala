@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private def bulkShape(x: Readable[?]): Data = x match
   case iface: Interface[?] => iface.getType
@@ -21,7 +21,7 @@ private def bulkFieldRef(
   idx:  Int,
   name: String
 )(
-  using Arena,
+  using Zone,
   Block,
   Context,
   TypeImpl,
@@ -38,7 +38,7 @@ private[zaozi] def bulkConnect(
   src:  Readable[?],
   dir:  ConnDir
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   TypeImpl,

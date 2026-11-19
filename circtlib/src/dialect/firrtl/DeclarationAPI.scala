@@ -7,7 +7,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{FirrtlBundleField, FirrtlEve
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 class InstanceChoice(val _operation: Operation)
 trait InstanceChoiceApi extends HasOperation[InstanceChoice]:
@@ -22,7 +22,7 @@ trait InstanceChoiceApi extends HasOperation[InstanceChoice]:
     interface:    Seq[FirrtlBundleField],
     layers:       Seq[Seq[String]]
   )(
-    using arena:  Arena,
+    using zone:   Zone,
     context:      Context
   ): InstanceChoice
 end InstanceChoiceApi
@@ -36,7 +36,7 @@ trait InstanceApi       extends HasOperation[Instance]:
     interface:    Seq[FirrtlBundleField],
     layers:       Seq[Seq[String]]
   )(
-    using arena:  Arena,
+    using zone:   Zone,
     context:      Context
   ): Instance
 end InstanceApi
@@ -48,15 +48,15 @@ class Object(val _operation: Operation)
 class Reg(val _operation: Operation)
 trait RegApi            extends HasOperation[Reg]:
   inline def op(
-    name:        String,
-    location:    Location,
-    nameKind:    FirrtlNameKind,
-    tpe:         Type,
-    clock:       Value,
-    clockEdge:   FirrtlEventControl
+    name:       String,
+    location:   Location,
+    nameKind:   FirrtlNameKind,
+    tpe:        Type,
+    clock:      Value,
+    clockEdge:  FirrtlEventControl
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Reg
 end RegApi
 class RegReset(val _operation: Operation)
@@ -113,23 +113,23 @@ trait RegResetApi extends HasOperation[RegReset]:
     resetType:     RegResetType,
     resetPolarity: RegResetPolarity
   )(
-    using arena:   Arena,
+    using zone:    Zone,
     context:       Context
   ): RegReset
 end RegResetApi
 class Wire(val _operation: Operation)
 trait WireApi     extends HasOperation[Wire]:
   def op(
-    name:        String,
-    location:    Location,
-    nameKind:    FirrtlNameKind,
-    tpe:         Type
+    name:       String,
+    location:   Location,
+    nameKind:   FirrtlNameKind,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):   Wire
   extension (ref: Wire)
     def result(
-      using Arena
+      using Zone
     ): Value
 end WireApi

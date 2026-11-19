@@ -22,10 +22,10 @@ import org.llvm.circt.scalalib.capi.firtool.FirtoolApi
 import org.llvm.circt.scalalib.capi.firtool.given
 import org.llvm.circt.scalalib.capi.firtool.FirtoolOptions
 import org.llvm.circt.scalalib.capi.exportfirrtl.given_ExportFirrtlApi
+import org.llvm.mlir.scalalib.Mlir
 import org.llvm.mlir.scalalib.capi.ir.{
   given_AttributeApi,
   given_BlockApi,
-  given_ContextApi,
   given_IdentifierApi,
   given_LocationApi,
   given_ModuleApi,
@@ -36,7 +36,6 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given_ValueApi,
   Block,
   Context,
-  ContextApi,
   LocationApi,
   Module as MlirModule,
   ModuleApi as MlirModuleApi,
@@ -44,10 +43,20 @@ import org.llvm.mlir.scalalib.capi.ir.{
   OperationApi,
   Type
 }
-import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi, PassManager, PassManagerApi}
+import org.llvm.mlir.scalalib.capi.pass.{given_OpPassManagerApi, given_PassManagerApi}
 import utest.assert
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
+
+private def withTestModule[A](
+  body: MlirModule ?=> A
+)(
+  using Zone,
+  Context
+): A =
+  given module: MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+  try body
+  finally module.destroy()
 
 trait HasMlirTest:
   this: Generator[?, ?, ?, ?] =>
@@ -56,25 +65,22 @@ trait HasMlirTest:
   def mlirString(
     parameter: this.TPARAM
   ): String =
-    val arena = Arena.ofConfined()
-    try
-      given Arena      = arena
-      given Context    = summon[ContextApi].contextCreate
+    Mlir.withContext {
       summon[FirrtlDialectApi].loadDialect
       summon[LTLDialectApi].loadDialect
       summon[VerifDialectApi].loadDialect
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-      summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
-      validateCircuit()
+      withTestModule {
+        given Circuit = summon[CircuitApi].op(self.moduleName(parameter))
+        summon[Circuit].appendToModule()
+        self.module(parameter).appendToCircuit()
+        validateCircuit()
 
-      val out = new StringBuilder
-      summon[MlirModule].getOperation.print(out ++= _)
-      summon[Context].destroy()
+        val out = new StringBuilder
+        summon[MlirModule].getOperation.print(out ++= _)
 
-      out.toString
-    finally arena.close()
+        out.toString
+      }
+    }
 
   def mlirTest(
     parameter: this.TPARAM
@@ -93,25 +99,22 @@ trait HasFirrtlTest:
   def firrtlString(
     parameter: this.TPARAM
   ): String =
-    val arena = Arena.ofConfined()
-    try
-      given Arena      = arena
-      given Context    = summon[ContextApi].contextCreate
+    Mlir.withContext {
       summon[FirrtlDialectApi].loadDialect
       summon[LTLDialectApi].loadDialect
       summon[VerifDialectApi].loadDialect
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-      summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
+      withTestModule {
+        given Circuit = summon[CircuitApi].op(self.moduleName(parameter))
+        summon[Circuit].appendToModule()
+        self.module(parameter).appendToCircuit()
 
-      validateCircuit()
-      val out = new StringBuilder
-      summon[MlirModule].exportFIRRTL(out ++= _)
-      summon[Context].destroy()
+        validateCircuit()
+        val out = new StringBuilder
+        summon[MlirModule].exportFIRRTL(out ++= _)
 
-      out.toString
-    finally arena.close()
+        out.toString
+      }
+    }
 
   def firrtlTest(
     parameter: this.TPARAM
@@ -130,10 +133,7 @@ trait HasVerilogTest:
   def verilogString(
     parameter: this.TPARAM
   ): String =
-    val arena = Arena.ofConfined()
-    try
-      given Arena          = arena
-      given Context        = summon[ContextApi].contextCreate
+    Mlir.withContext {
       summon[FirrtlDialectApi].loadDialect
       summon[LTLDialectApi].loadDialect
       summon[SvDialectApi].loadDialect
@@ -142,34 +142,37 @@ trait HasVerilogTest:
       summon[VerifDialectApi].registerPasses
       given FirtoolOptions = summon[FirtoolApi].firtoolOptionsCreateDefault
 
-      given PassManager  = summon[PassManagerApi].passManagerCreate
-      val out            = new StringBuilder
-      val firtoolOptions = summon[FirtoolOptions]
+      try
+        Mlir.withPassManager { manager =>
+          val out            = new StringBuilder
+          val firtoolOptions = summon[FirtoolOptions]
 
-      summon[PassManager].preprocessTransforms(firtoolOptions)
-      summon[PassManager].chirrtlToLowFIRRTL(firtoolOptions)
-      summon[PassManager].lowFIRRTLToHW(firtoolOptions, "")
-      summon[PassManager].getAsOpPassManager.addPipeline(
-        "lower-contracts,verif-lower-symbolic-values{mode=yosys},verif-lower-tests",
-        err => throw new RuntimeException(s"verif pipeline parse error: $err")
-      )
-      summon[PassManager].hwToSV(firtoolOptions)
-      // TODO: we need a pass for export verilog on a MLIRModule, not it export empty string.
-      summon[PassManager].exportVerilog(firtoolOptions, out ++= _)
+          manager.preprocessTransforms(firtoolOptions)
+          manager.chirrtlToLowFIRRTL(firtoolOptions)
+          manager.lowFIRRTLToHW(firtoolOptions, "")
+          manager.getAsOpPassManager.addPipeline(
+            "lower-contracts,verif-lower-symbolic-values{mode=yosys},verif-lower-tests",
+            err => throw new RuntimeException(s"verif pipeline parse error: $err")
+          )
+          manager.hwToSV(firtoolOptions)
+          // TODO: we need a pass for export verilog on a MLIRModule, not it export empty string.
+          manager.exportVerilog(firtoolOptions, out ++= _)
 
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-      summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
-      validateCircuit()
-      summon[PassManager].runOnOpOrThrow(
-        summon[MlirModule].getOperation,
-        s"firtool lowering pipeline for module '${self.moduleName(parameter)}'"
-      )
-      summon[Context].destroy()
+          withTestModule {
+            given Circuit = summon[CircuitApi].op(self.moduleName(parameter))
+            summon[Circuit].appendToModule()
+            self.module(parameter).appendToCircuit()
+            validateCircuit()
+            manager.runOnOpOrThrow(
+              summon[MlirModule].getOperation,
+              s"firtool lowering pipeline for module '${self.moduleName(parameter)}'"
+            )
 
-      out.toString
-    finally arena.close()
+            out.toString
+          }
+        }
+      finally summon[FirtoolOptions].destroy
+    }
 
   def verilogTest(
     parameter: this.TPARAM
@@ -188,20 +191,17 @@ trait HasCompileErrorTest:
   def compileErrorTest(
     parameter: this.TPARAM
   ) =
-    val arena = Arena.ofConfined()
-    try
-      given Arena      = arena
-      given Context    = summon[ContextApi].contextCreate
+    Mlir.withContext {
       summon[FirrtlDialectApi].loadDialect
       summon[LTLDialectApi].loadDialect
       summon[VerifDialectApi].loadDialect
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
-      summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
-
-      summon[Context].destroy()
-    finally arena.close()
+      withTestModule {
+        given Circuit = summon[CircuitApi].op(self.moduleName(parameter))
+        summon[Circuit].appendToModule()
+        self.module(parameter).appendToCircuit()
+        ()
+      }
+    }
 
 def xfail(reason: String)(body: => Any): Unit =
   val unexpectedlyPassed =

@@ -2,54 +2,52 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirF64TypeGet,
-  mlirIntegerTypeGet,
-  mlirIntegerTypeGetWidth,
-  mlirIntegerTypeSignedGet,
-  mlirIntegerTypeUnsignedGet,
-  mlirNoneTypeGet,
-  mlirTypeEqual,
-  mlirTypePrint
-}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 given TypeApi with
   inline def f64TypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mlirF64TypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => mlirApi.mlirF64TypeGet(context.native)(out)))
 
   inline def noneTypeGet(
-    using arena: Arena,
-    context:     Context
-  ) = Type(mlirNoneTypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ) = Type(nativeResult[MlirStructs.MlirType](out => mlirApi.mlirNoneTypeGet(context.native)(out)))
 
   extension (width: Int)
     inline def integerTypeSignedGet(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(mlirIntegerTypeSignedGet(arena, context.segment, width))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out => mlirApi.mlirIntegerTypeSignedGet(context.native, width.toUInt)(out))
+    )
     inline def integerTypeUnsignedGet(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(mlirIntegerTypeUnsignedGet(arena, context.segment, width))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out => mlirApi.mlirIntegerTypeUnsignedGet(context.native, width.toUInt)(out))
+    )
     inline def integerTypeGet(
-      using arena: Arena,
-      context:     Context
-    ): Type = Type(mlirIntegerTypeGet(arena, context.segment, width))
+      using zone: Zone,
+      context:    Context
+    ): Type = Type(
+      nativeResult[MlirStructs.MlirType](out => mlirApi.mlirIntegerTypeGet(context.native, width.toUInt)(out))
+    )
   extension (tpe:   Type)
-    inline def integerTypeGetWidth: Int           =
-      mlirIntegerTypeGetWidth(tpe.segment)
-    inline def equal(that: Type):   Boolean       = mlirTypeEqual(tpe.segment, that.segment)
+    inline def integerTypeGetWidth: Int     =
+      mlirApi.mlirIntegerTypeGetWidth(tpe.native).toInt
+    inline def equal(that: Type):   Boolean = mlirApi.mlirTypeEqual(tpe.native, that.native)
     inline def print(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
-    ): Unit = mlirTypePrint(tpe.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
-    inline def segment:             MemorySegment = tpe._segment
-    inline def sizeOf:              Int           = MlirType.sizeof().toInt
+      using zone: Zone
+    ): Unit = callback.stringToStringCallback.use { (fn, data) => mlirApi.mlirTypePrint(tpe.native, fn, data) }
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirType].toInt
 end given

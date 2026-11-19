@@ -10,16 +10,14 @@ import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.decoder.*
 import me.jiuyang.stdlib.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 @generator
 object PLADecoder extends Generator[DecoderParameter, DecoderLayers, DecoderIO, DecoderProbe]:
   override def moduleName(parameter: DecoderParameter): String =
     val outputs = parameter.tables.map(t => s"${t.name}:${t.outputBits}").mkString(",")
-    val digest  = java.security.MessageDigest
-      .getInstance("SHA-256")
-      .digest(s"${parameter.pla}\n$outputs".getBytes(java.nio.charset.StandardCharsets.UTF_8))
-    "PLA" + "_" + parameter.name + "_" + digest.take(8).map(b => f"$b%02x").mkString
+    val digest  = scala.util.hashing.MurmurHash3.stringHash(s"${parameter.pla}\n$outputs")
+    f"PLA_${parameter.name}_${digest}%08x"
   def architecture(parameter: DecoderParameter) =
     val io                        = summon[Interface[DecoderIO]]
     val (inputTerms, outputTerms) = parameter.pla.table.unzip
