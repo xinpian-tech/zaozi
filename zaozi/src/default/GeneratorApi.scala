@@ -5,7 +5,6 @@ package me.jiuyang.zaozi.default
 import scala.util.Try
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.magic.validateCircuit
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -32,7 +31,6 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   Circuit,
   CircuitApi,
   InstanceApi,
-  Module as CirctModule,
   ModuleApi,
   OpenSubfieldApi,
   RefDefineApi,
@@ -74,12 +72,15 @@ given GeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: Generator[PARAM, L, I, P]
   )
-    def module(
+    def appendModule(
       parameter: PARAM
     )(
       using Arena,
-      Context
-    ): CirctModule =
+      Context,
+      Circuit
+    ): Unit =
+      val layerInterface      = generator.layers(parameter)
+      val declaredLayers      = layerInterface.layers
       val io                  = generator.interface(parameter)
       val probe               = generator.probe(parameter)
       val unknownLocation     = summon[LocationApi].locationUnknownGet
@@ -93,7 +94,7 @@ given GeneratorApi:
         unknownLocation,
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
-        generator.layers(parameter).nameHierarchies
+        declaredLayers.toLayerTrees.nameHierarchies
       )
       given Block             = module.block
       val probeWire           = summon[WireApi].op(
@@ -125,9 +126,10 @@ given GeneratorApi:
           val _tpe:   P     = probe
           val _refer: Value = probeWire.operation.getResult(0)
       given InstanceContext   = new InstanceContext
-      given L                 = generator.layers(parameter)
+      given L                 = layerInterface
       generator.architecture(parameter)
-      module
+      module.appendToCircuit()
+      BaseGeneratorHelper.declareLayers(declaredLayers, summon[Circuit].block)
 
     def instance(
       parameter: PARAM
@@ -159,7 +161,7 @@ given GeneratorApi:
           given Arena   = arena
           given Context = context
           given Circuit = circuit
-          generator.module(parameter).appendToCircuit()
+          generator.appendModule(parameter)
       )
 
     def instantiate(

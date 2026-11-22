@@ -3,7 +3,6 @@
 package me.jiuyang.zaozi.default
 
 import me.jiuyang.zaozi.*
-import me.jiuyang.zaozi.magic.validateCircuit
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -25,7 +24,6 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   Circuit,
   CircuitApi,
   ConnectApi,
-  ExtModule as CirctExtModule,
   ExtModuleApi,
   InstanceApi,
   OpenSubfieldApi,
@@ -69,12 +67,14 @@ given VerilogWrapperApi:
     V <: VerilogParameter
   ](wrapper: VerilogWrapper[PARAM, L, I, P, V]
   )
-    def extmodule(
+    private def appendExtModule(
       parameter: PARAM
     )(
       using Arena,
-      Context
-    ): CirctExtModule =
+      Context,
+      Circuit
+    ): Unit =
+      val declaredLayers  = wrapper.layers(parameter).layers
       val io              = wrapper.interface(parameter)
       val probe           = wrapper.probe(parameter)
       val unknownLocation = summon[LocationApi].locationUnknownGet
@@ -106,10 +106,11 @@ given VerilogWrapperApi:
         unknownLocation,
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
-        wrapper.layers(parameter).nameHierarchies,
+        declaredLayers.toLayerTrees.nameHierarchies,
         paramsMap
       )
-      extmodule
+      extmodule.appendToCircuit()
+      BaseGeneratorHelper.declareLayers(declaredLayers, summon[Circuit].block)
 
     def instance(
       parameter: PARAM
@@ -141,7 +142,7 @@ given VerilogWrapperApi:
           given Arena   = arena
           given Context = context
           given Circuit = circuit
-          wrapper.extmodule(parameter).appendToCircuit()
+          wrapper.appendExtModule(parameter)
       )
 
     def instantiate(

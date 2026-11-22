@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class ElaborateTop %s --
+// DEFINE: %{scala} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS
+// DEFINE: %{test} = %{scala} --main-class ElaborateTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir && cd %t.dir
 // RUN: %{test} > %t.dir/top.mlir
 // RUN: FileCheck %s --check-prefix=IR --input-file=%t.dir/top.mlir
@@ -9,8 +10,9 @@
 // RUN: firtool --format=mlir %t.dir/top.mlir --strip-debug-info | FileCheck %s --check-prefix=RTL
 // RUN: ls %t.dir | FileCheck %s --check-prefix=FILES
 // RUN: mkdir -p %t.dir/modules && echo '{"width":7}' > %t.dir/config.json
-// RUN: cd %t.dir/modules && %{test} design %t.dir/config.json
-// RUN: circt-opt %t.dir/modules/ExternalBuffer_*.mlirbc -o /dev/null
+// RUN: cd %t.dir/modules && %{scala} --main-class ElaborateChild %s -- design %t.dir/config.json
+// RUN: circt-opt %t.dir/modules/ExternalBuffer_*.mlirbc | FileCheck %s --check-prefix=LAYERS
+// RUN: circt-opt %t.dir/modules/ElaborateChild_*.mlirbc | FileCheck %s --check-prefix=LAYERS
 // RUN: rm -rf %t.dir
 
 import me.jiuyang.zaozi.*
@@ -28,7 +30,7 @@ case class ElaborateParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[ElaborateParameter] = upickle.default.macroRW
 
 class ElaborateLayers(parameter: ElaborateParameter) extends LayerInterface(parameter):
-  def layers = Seq(Layer("Verification"))
+  def layers = Seq(Layer("A", Seq(Layer("Check"))), Layer("B", Seq(Layer("Check"))), Layer("A", Seq(Layer("Other"))))
 
 class ElaborateIO(parameter: ElaborateParameter) extends HWBundle(parameter):
   val a = Flipped(Bits(parameter.width))
@@ -62,7 +64,6 @@ object ElaborateTop extends Generator[ElaborateParameter, ElaborateLayers, Elabo
       given org.llvm.mlir.scalalib.capi.ir.Context = summon[ContextApi].contextCreate
       summon[FirrtlDialect].loadDialect
       summon[LtlDialect].loadDialect
-      if args.nonEmpty then ElaborateChild.main(args)
       summon[VerifDialect].loadDialect
       val module = Elaborate(ElaborateTop, ElaborateParameter(7))
       require(module.getOperation.verify)
@@ -80,10 +81,14 @@ object ElaborateTop extends Generator[ElaborateParameter, ElaborateLayers, Elabo
 // IR-DAG:  firrtl.extmodule {{.*}}@ExternalBuffer_{{.*}}defname = "ExternalBuffer"
 // IR-DAG:  firrtl.module {{.*}}@ElaborateChild_
 // IR-DAG:  firrtl.module @ElaborateTop(
-// IR-DAG:  firrtl.layer @Verification
+// LAYERS:      firrtl.layer @A bind {
+// LAYERS-NEXT:   firrtl.layer @Check bind
+// LAYERS:        firrtl.layer @Other bind
+// LAYERS:      firrtl.layer @B bind {
+// LAYERS-NEXT:   firrtl.layer @Check bind
 
 // One declaration of each module and layer.
-// COUNT: {{^}}4{{$}}
+// COUNT: {{^}}8{{$}}
 
 // RTL-LABEL: module ElaborateChild_{{[a-f0-9]+}}(
 // RTL: ExternalBuffer #(

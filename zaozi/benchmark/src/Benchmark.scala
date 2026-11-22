@@ -4,7 +4,6 @@ package me.jiuyang.zaozi.benchmark
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.magic.validateCircuit
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
@@ -155,8 +154,8 @@ class ZaoziBenchmark {
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(GCD.moduleName(parameter))
       summon[Circuit].appendToModule()
-      GCD.module(parameter).appendToCircuit()
-      validateCircuit()
+      GCD.appendModule(parameter)
+      summon[Circuit].declareInstantiatedModules()
 
       summon[Context].destroy()
     finally arena.close()
