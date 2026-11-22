@@ -1134,7 +1134,7 @@ object ContractTupleArgs:
 
 trait ContractApi:
   def Contract(
-    body: => Unit
+  )(body: (Arena, Context, Block) ?=> Unit
   )(
     using Arena,
     Context,

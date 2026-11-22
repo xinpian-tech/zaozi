@@ -45,7 +45,7 @@ import me.jiuyang.zaozi.valuetpe.*
 // Properties relate this cycle to the previous one, so they hold from any initial state without a reset assumption.
 // The RegMap assertion layer is stripped: the contracts are an independent oracle.
 // Every property here fails on the RegMap as it stands before this series.
-// Clauses are contract operands because an operand-free `Contract:` crashes lower-contracts.
+// Clauses are contract operands because an operand-free `Contract():` crashes lower-contracts.
 
 case class RegMapReadParameter() extends Parameter:
   val status     = RegField("status", 8).readValue
