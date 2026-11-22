@@ -4,27 +4,23 @@
 // DEFINE: %{scala} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS
 // DEFINE: %{test} = %{scala} --main-class ElaborateTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir && cd %t.dir
-// RUN: %{test} > %t.dir/top.mlir
+// RUN: mkdir -p %t.dir/modules && echo stale > %t.dir/modules/unrelated.mlirbc
+// RUN: %{test} %t.dir/modules %t.dir/top.mlir
 // RUN: FileCheck %s --check-prefix=IR --input-file=%t.dir/top.mlir
 // RUN: grep -cE "firrtl\.(ext)?module |firrtl\.layer @" %t.dir/top.mlir | FileCheck %s --check-prefix=COUNT
-// RUN: firtool --format=mlir %t.dir/top.mlir --strip-debug-info | FileCheck %s --check-prefix=RTL
-// RUN: ls %t.dir | FileCheck %s --check-prefix=FILES
-// RUN: mkdir -p %t.dir/modules && echo '{"width":7}' > %t.dir/config.json
-// RUN: cd %t.dir/modules && %{scala} --main-class ElaborateChild %s -- design %t.dir/config.json
-// RUN: circt-opt %t.dir/modules/ExternalBuffer_*.mlirbc | FileCheck %s --check-prefix=LAYERS
-// RUN: circt-opt %t.dir/modules/ElaborateChild_*.mlirbc | FileCheck %s --check-prefix=LAYERS
+// RUN: firtool --format=mlir %t.dir/top.mlir --strip-debug-info -o %t.dir/design.sv
+// RUN: FileCheck %s --check-prefix=CHILD --input-file=%t.dir/design.sv
+// RUN: FileCheck %s --check-prefix=TOP --input-file=%t.dir/design.sv
+// RUN: mkdir -p %t.dir/child && echo '{"width":7}' > %t.dir/config.json
+// RUN: cd %t.dir/child && %{scala} --main-class ElaborateChild %s -- design %t.dir/config.json
+// RUN: circt-opt %t.dir/child/ExternalBuffer_*.mlirbc | FileCheck %s --check-prefix=LAYERS
+// RUN: circt-opt %t.dir/child/ElaborateChild_*.mlirbc | FileCheck %s --check-prefix=LAYERS
 // RUN: rm -rf %t.dir
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
 import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
-import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_DialectApi, DialectApi as FirrtlDialect}
-import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi, DialectApi as LtlDialect}
-import org.llvm.circt.scalalib.capi.dialect.verif.{given_DialectApi, DialectApi as VerifDialect}
-import org.llvm.mlir.scalalib.capi.ir.{ContextApi, given}
-
-import java.lang.foreign.Arena
 
 case class ElaborateParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[ElaborateParameter] = upickle.default.macroRW
@@ -58,17 +54,9 @@ object ElaborateChild extends Generator[ElaborateParameter, ElaborateLayers, Ela
 object ElaborateTop extends Generator[ElaborateParameter, ElaborateLayers, ElaborateIO, ElaborateProbe]:
   override def moduleName(parameter: ElaborateParameter): String = "ElaborateTop"
   override def main(args: Array[String]): Unit =
-    val arena = Arena.ofConfined()
-    try
-      given Arena   = arena
-      given org.llvm.mlir.scalalib.capi.ir.Context = summon[ContextApi].contextCreate
-      summon[FirrtlDialect].loadDialect
-      summon[LtlDialect].loadDialect
-      summon[VerifDialect].loadDialect
-      val module = Elaborate(ElaborateTop, ElaborateParameter(7))
-      require(module.getOperation.verify)
-      module.getOperation.print(print)
-    finally arena.close()
+    val result = Elaborate(ElaborateTop, ElaborateParameter(7), os.Path(args(0)))
+    val files  = result.modules(result.top) +: (result.modules - result.top).values.toSeq
+    os.proc("firld", s"--base-circuit=${result.top}", files, "-o", args(1)).call()
   def architecture(parameter: ElaborateParameter) =
     val io     = summon[Interface[ElaborateIO]]
     val first  = ElaborateChild.instantiate(parameter)
@@ -90,11 +78,9 @@ object ElaborateTop extends Generator[ElaborateParameter, ElaborateLayers, Elabo
 // One declaration of each module and layer.
 // COUNT: {{^}}8{{$}}
 
-// RTL-LABEL: module ElaborateChild_{{[a-f0-9]+}}(
-// RTL: ExternalBuffer #(
-// RTL-NEXT: .WIDTH(7)
-// RTL-LABEL: module ElaborateTop(
-// RTL: ElaborateChild_{{[a-f0-9]+}} first (
-// RTL: ElaborateChild_{{[a-f0-9]+}} second (
-
-// FILES-NOT: mlirbc
+// CHILD-LABEL: module ElaborateChild_{{[a-f0-9]+}}(
+// CHILD: ExternalBuffer #(
+// CHILD-NEXT: .WIDTH(7)
+// TOP-LABEL: module ElaborateTop(
+// TOP: ElaborateChild_{{[a-f0-9]+}} first (
+// TOP: ElaborateChild_{{[a-f0-9]+}} second (

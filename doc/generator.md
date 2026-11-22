@@ -110,7 +110,7 @@ override def moduleName(parameter: PARAM): String =
 
 ## Instantiation
 
-We invoke the `instantiate` method to create a module instance. Each generator maintains a cache for modules produced using the same parameter:
+We invoke the `instantiate` method to create a module instance. Within one elaboration, instances with the same module name share a single module definition.
 
 ```scala
 val sub1 = Subtractor.instantiate(SubtractorParameter(parameter.width))

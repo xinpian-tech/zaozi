@@ -154,14 +154,7 @@ given GeneratorApi:
       using Arena,
       Context
     ): Unit =
-      BaseGeneratorHelper.dumpMlirbc(
-        generator.moduleName(parameter),
-        (arena, context, circuit) =>
-          given Arena   = arena
-          given Context = context
-          given Circuit = circuit
-          generator.appendModule(parameter)
-      )
+      BaseGeneratorHelper.dumpMlirbc(generator.moduleName(parameter)) { generator.appendModule(parameter) }
 
     def instantiate(
       parameter: PARAM
@@ -189,18 +182,8 @@ given GeneratorApi:
     )(
       using upickle.default.Reader[PARAM]
     ) =
-      val arena = Arena.ofConfined()
-      try
-        given Arena   = arena
-        given Context = summon[ContextApi].contextCreate
-        summon[FirrtlDialectApi].loadDialect
-        summon[LTLDialectApi].loadDialect
-        summon[VerifDialectApi].loadDialect
-
-        generator.dumpMlirbc(upickle.default.read(os.read(configFile)))
-
-        summon[Context].destroy()
-      finally arena.close()
+      Elaborate(generator, upickle.default.read[PARAM](os.read(configFile)))
+      ()
 
     def mainImpl(
       args: Array[String]
