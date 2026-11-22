@@ -11,7 +11,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
-import org.llvm.circt.scalalib.dialect.firrtl.operation.{ExtModule as CirctExtModule, Module as CirctModule, When}
+import org.llvm.circt.scalalib.dialect.firrtl.operation.{Circuit, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
@@ -191,12 +191,13 @@ trait GeneratorApi:
   extension [PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface[PARAM], P <: DVInterface[PARAM, L]](
     generator: Generator[PARAM, L, I, P]
   )
-    private[zaozi] def module(
+    private[zaozi] def appendModule(
       parameter: PARAM
     )(
       using Arena,
-      Context
-    ): CirctModule
+      Context,
+      Circuit
+    ): Unit
 
     private[zaozi] def instance(
       parameter: PARAM

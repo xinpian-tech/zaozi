@@ -11,6 +11,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   given_FirrtlBundleFieldApi,
   given_FirrtlDirectionApi,
   given_TypeApi,
+  FirrtlLayerConvention,
   FirrtlNameKind
 }
 import org.llvm.circt.scalalib.dialect.firrtl.operation.given
@@ -18,6 +19,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   given_CircuitApi,
   given_InstanceApi,
   given_InstanceChoiceApi,
+  given_LayerApi,
   given_OpenSubfieldApi,
   given_RefDefineApi,
   given_WireApi,
@@ -25,6 +27,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   CircuitApi,
   InstanceApi,
   InstanceChoiceApi,
+  LayerApi,
   OpenSubfieldApi,
   RefDefineApi,
   WireApi
@@ -52,6 +55,24 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import java.lang.foreign.Arena
 
 object BaseGeneratorHelper:
+  private[default] def declareLayers(
+    layers: Seq[Layer],
+    parent: Block
+  )(
+    using Arena,
+    Context
+  ): Unit =
+    // A layer can be extended by another declaration under the same parent.
+    val siblings = layers.groupBy(_.name)
+    layers.iterator
+      .map(_.name)
+      .distinct
+      .foreach: name =>
+        val declaration =
+          summon[LayerApi].op(name, summon[LocationApi].locationUnknownGet, FirrtlLayerConvention.Bind)
+        parent.appendOwnedOperation(declaration.operation)
+        declareLayers(siblings(name).flatMap(_.children), declaration.block)
+
   def createInstance[
     PARAM <: Parameter,
     L <: LayerInterface[PARAM],
@@ -173,7 +194,7 @@ object BaseGeneratorHelper:
       given Circuit    = summon[CircuitApi].op(moduleName)
       summon[Circuit].appendToModule()
       createModule(summon[Arena], summon[Context], summon[Circuit])
-      me.jiuyang.zaozi.magic.validateCircuit()
+      summon[Circuit].declareInstantiatedModules()
       modules.add(moduleName, summon[MlirModule])
 
 end BaseGeneratorHelper

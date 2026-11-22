@@ -4,7 +4,6 @@ package me.jiuyang.testlib
 
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
-import me.jiuyang.zaozi.magic.validateCircuit
 import me.jiuyang.zaozi.reftpe.*
 import org.llvm.circt.scalalib.capi.dialect.firrtl.DialectApi as FirrtlDialectApi
 import org.llvm.circt.scalalib.capi.dialect.sv.DialectApi as SvDialectApi
@@ -66,8 +65,8 @@ trait HasMlirTest:
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
-      validateCircuit()
+      self.appendModule(parameter)
+      summon[Circuit].declareInstantiatedModules()
 
       val out = new StringBuilder
       summon[MlirModule].getOperation.print(out ++= _)
@@ -103,10 +102,10 @@ trait HasFirrtlTest:
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
+      self.appendModule(parameter)
 
-      validateCircuit()
-      val out = new StringBuilder
+      summon[Circuit].declareInstantiatedModules()
+      val out          = new StringBuilder
       summon[MlirModule].exportFIRRTL(out ++= _)
       summon[Context].destroy()
 
@@ -160,8 +159,8 @@ trait HasVerilogTest:
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
-      validateCircuit()
+      self.appendModule(parameter)
+      summon[Circuit].declareInstantiatedModules()
       summon[PassManager].runOnOpOrThrow(
         summon[MlirModule].getOperation,
         s"firtool lowering pipeline for module '${self.moduleName(parameter)}'"
@@ -198,7 +197,7 @@ trait HasCompileErrorTest:
       given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
       given Circuit    = summon[CircuitApi].op(self.moduleName(parameter))
       summon[Circuit].appendToModule()
-      self.module(parameter).appendToCircuit()
+      self.appendModule(parameter)
 
       summon[Context].destroy()
     finally arena.close()
