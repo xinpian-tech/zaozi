@@ -60,7 +60,7 @@ def validateCircuit(
       op =>
         op.getName.str match
           // get layers from module, append it to circuit to create symbol table.
-          case i if i == "firrtl.module" =>
+          case "firrtl.module" | "firrtl.extmodule" =>
             val layersAttrs = op.getInherentAttributeByName("layers")
             val layers      = Seq.tabulate(layersAttrs.arrayAttrGetNumElements): idx =>
               val attr = layersAttrs.arrayAttrGetElement(idx)
@@ -117,7 +117,7 @@ def validateCircuit(
                 else
                   layerMap(parent.value).block.appendOwnedOperation(layerMap(node.value).operation)
               case (node, None)         =>
-          case _                         => // Do Nothing
+          case _                                    => // Do Nothing
         WalkResultEnum.Advance
       ,
       WalkEnum.PreOrder
