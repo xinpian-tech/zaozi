@@ -8,6 +8,9 @@
 // RUN: grep -cE "firrtl\.(ext)?module |firrtl\.layer @" %t.dir/top.mlir | FileCheck %s --check-prefix=COUNT
 // RUN: firtool --format=mlir %t.dir/top.mlir --strip-debug-info | FileCheck %s --check-prefix=RTL
 // RUN: ls %t.dir | FileCheck %s --check-prefix=FILES
+// RUN: mkdir -p %t.dir/modules && echo '{"width":7}' > %t.dir/config.json
+// RUN: cd %t.dir/modules && %{test} design %t.dir/config.json
+// RUN: circt-opt %t.dir/modules/ExternalBuffer_*.mlirbc -o /dev/null
 // RUN: rm -rf %t.dir
 
 import me.jiuyang.zaozi.*
@@ -59,6 +62,7 @@ object ElaborateTop extends Generator[ElaborateParameter, ElaborateLayers, Elabo
       given org.llvm.mlir.scalalib.capi.ir.Context = summon[ContextApi].contextCreate
       summon[FirrtlDialect].loadDialect
       summon[LtlDialect].loadDialect
+      if args.nonEmpty then ElaborateChild.main(args)
       summon[VerifDialect].loadDialect
       val module = Elaborate(ElaborateTop, ElaborateParameter(7))
       require(module.getOperation.verify)
