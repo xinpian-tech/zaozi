@@ -53,6 +53,24 @@ import org.llvm.mlir.scalalib.capi.support.{*, given}
 import java.lang.foreign.{Arena, MemorySegment}
 
 given OperationApi with
+  // MLIR calls the bytecode sink synchronously. An exception must only reach Scala after the native call returns.
+  private def withBytecodeCallback[A](
+    consume:     Array[Byte] => Unit
+  )(write:       MemorySegment => A
+  )(
+    using arena: Arena
+  ): A =
+    var failure: Throwable = null
+
+    val receive: MlirStringCallback.Function = (message, _) =>
+      if failure == null then
+        try consume(StringRef(message).toBytes)
+        catch case error: Throwable => failure = error
+
+    val result = write(MlirStringCallback.allocate(receive, arena))
+    if failure != null then throw failure
+    result
+
   inline def operationCreate(
     state:       OperationState
   )(
@@ -180,15 +198,11 @@ given OperationApi with
       callback:    Array[Byte] => Unit
     )(
       using arena: Arena
-    ): LogicalResult = LogicalResult(
-      mlirOperationWriteBytecodeWithConfig(
-        arena,
-        operation.segment,
-        config.segment,
-        callback.bytesToStringCallback.segment,
-        MemorySegment.NULL
+    ): LogicalResult = withBytecodeCallback(callback) { sink =>
+      LogicalResult(
+        mlirOperationWriteBytecodeWithConfig(arena, operation.segment, config.segment, sink, MemorySegment.NULL)
       )
-    )
+    }
     inline def getFirstRegion(
       using arena: Arena
     ): Region = Region(mlirOperationGetFirstRegion(arena, operation.segment))
@@ -248,7 +262,9 @@ given OperationApi with
       callBack:    Array[Byte] => Unit
     )(
       using arena: Arena
-    ): Unit = mlirOperationWriteBytecode(operation.segment, callBack.bytesToStringCallback.segment, MemorySegment.NULL)
+    ): Unit = withBytecodeCallback(callBack) { sink =>
+      mlirOperationWriteBytecode(operation.segment, sink, MemorySegment.NULL)
+    }
 
     inline def dump():                       Unit          = mlirOperationDump(operation.segment)
     inline def moveAfter(other:  Operation): Unit          = mlirOperationMoveAfter(operation.segment, other.segment)

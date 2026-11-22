@@ -136,14 +136,7 @@ given VerilogWrapperApi:
       using Arena,
       Context
     ): Unit =
-      BaseGeneratorHelper.dumpMlirbc(
-        wrapper.moduleName(parameter),
-        (arena, context, circuit) =>
-          given Arena   = arena
-          given Context = context
-          given Circuit = circuit
-          wrapper.appendExtModule(parameter)
-      )
+      BaseGeneratorHelper.dumpMlirbc(wrapper.moduleName(parameter)) { wrapper.appendExtModule(parameter) }
 
     def instantiate(
       parameter: PARAM

@@ -54,6 +54,11 @@ import org.llvm.mlir.scalalib.capi.ir.{
 
 import java.lang.foreign.Arena
 
+import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_DialectApi, DialectApi as FirrtlDialect}
+import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi as given_Ltl, DialectApi as LtlDialect}
+import org.llvm.circt.scalalib.capi.dialect.verif.{given_DialectApi as given_Verif, DialectApi as VerifDialect}
+import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, ContextApi}
+
 object BaseGeneratorHelper:
   private[default] def declareLayers(
     layers: Seq[LayerTree],
@@ -176,20 +181,27 @@ object BaseGeneratorHelper:
         private[zaozi] val _tpe   = probeTpe
         private[zaozi] val _refer = probeWire.operation.getResult(0)
 
-  def dumpMlirbc(
-    moduleName:   String,
-    createModule: (Arena, Context, Circuit) => Unit
-  )(
-    using Arena,
-    Context
-  ): Unit =
-    val modules = Elaborate.modules.value
-    if !modules.contains(moduleName) then
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(moduleName)
-      summon[Circuit].appendToModule()
-      createModule(summon[Arena], summon[Context], summon[Circuit])
-      summon[Circuit].declareInstantiatedModules()
-      modules.add(moduleName, summon[MlirModule])
+  def dumpMlirbc(moduleName: String)(createModule: (Arena, Context, Circuit) ?=> Unit): Unit =
+    Elaborate.generate(moduleName)(file => writeMlirbc(moduleName, file)(createModule))
+
+  private[default] def writeMlirbc(moduleName: String, file: os.Path)(createModule: (Arena, Context, Circuit) ?=> Unit)
+    : Unit =
+    given arena: Arena = Arena.ofConfined()
+    try
+      given context: Context = summon[ContextApi].contextCreateWithThreading(false)
+      try
+        summon[FirrtlDialect].loadDialect
+        summon[LtlDialect].loadDialect
+        summon[VerifDialect].loadDialect
+        given module: MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+        try
+          given Circuit = summon[CircuitApi].op(moduleName)
+          summon[Circuit].appendToModule()
+          createModule
+          summon[Circuit].declareInstantiatedModules()
+          ModuleBytecode.write(module, file)
+        finally module.destroy()
+      finally context.destroy()
+    finally arena.close()
 
 end BaseGeneratorHelper
