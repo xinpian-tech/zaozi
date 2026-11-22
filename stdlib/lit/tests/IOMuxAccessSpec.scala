@@ -113,8 +113,8 @@ object IOMuxAccess extends Generator[IOMuxAccessParameter, IOMuxAccessLayers, IO
     val readback = !wasSelectorRead | (io.rsp.bits.data === heldSelector.pad(parameter.dataWidth))
     val identityReadback = !wasIdentityRead | (io.rsp.bits.data === expectedIdentity)
     val active = !previousReset & !io.reset.asBool
-    Contract((active, answered, stable, selected, unchanged, readback, identityReadback)):
-      case (active, answered, stable, selected, unchanged, readback, identityReadback) =>
+    Contract(active, answered, stable, selected, unchanged, readback, identityReadback):
+      (active, answered, stable, selected, unchanged, readback, identityReadback) =>
         Ensure((!active | answered).I)
         Ensure((!active | stable).I)
         Ensure((!active | selected).I)

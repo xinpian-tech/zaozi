@@ -95,6 +95,7 @@ given GeneratorApi:
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
         layerInterface.nameHierarchies
       )
+      module.appendToCircuit()
       given Block             = module.block
       val probeWire           = summon[WireApi].op(
         "probe",
@@ -127,7 +128,6 @@ given GeneratorApi:
       given InstanceContext   = new InstanceContext
       given L                 = layerInterface
       generator.architecture(parameter)
-      module.appendToCircuit()
       BaseGeneratorHelper.declareLayers(layerInterface, summon[Circuit].block)
 
     def instance(
