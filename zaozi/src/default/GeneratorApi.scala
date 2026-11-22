@@ -80,7 +80,6 @@ given GeneratorApi:
       Circuit
     ): Unit =
       val layerInterface      = generator.layers(parameter)
-      val declaredLayers      = layerInterface.layers
       val io                  = generator.interface(parameter)
       val probe               = generator.probe(parameter)
       val unknownLocation     = summon[LocationApi].locationUnknownGet
@@ -94,7 +93,7 @@ given GeneratorApi:
         unknownLocation,
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
-        declaredLayers.toLayerTrees.nameHierarchies
+        layerInterface.nameHierarchies
       )
       given Block             = module.block
       val probeWire           = summon[WireApi].op(
@@ -129,7 +128,7 @@ given GeneratorApi:
       given L                 = layerInterface
       generator.architecture(parameter)
       module.appendToCircuit()
-      BaseGeneratorHelper.declareLayers(declaredLayers, summon[Circuit].block)
+      BaseGeneratorHelper.declareLayers(layerInterface, summon[Circuit].block)
 
     def instance(
       parameter: PARAM

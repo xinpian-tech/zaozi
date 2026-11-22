@@ -40,25 +40,34 @@ trait LayerTree:
 
 /** Serializable Layer definition. */
 case class Layer(name: String, children: Seq[Layer] = Seq.empty):
-  layer =>
-  def toLayerTree: LayerTree =
-    new LayerTree:
-      def name:     String         = layer.name
-      def children: Seq[LayerTree] = layer.children.map(_.toLayerTree)
-    ._rebuild
-extension (layers: Seq[Layer]) def toLayerTrees: Seq[LayerTree]   = layers.map(_.toLayerTree)
+  def toLayerTree: LayerTree = Seq(this).toLayerTrees.head
+
+extension (layers: Seq[Layer])
+  def toLayerTrees: Seq[LayerTree] =
+    def build(siblings: Seq[Layer], enclosing: Option[LayerTree]): Seq[LayerTree] =
+      val byName = siblings.groupBy(_.name)
+      siblings
+        .distinctBy(_.name)
+        .map: first =>
+          new LayerTree:
+            val name            = first.name
+            override val parent = enclosing
+            lazy val children   = build(byName(name).flatMap(_.children), Some(this))
+    build(layers, None)
+
 extension (layer:  LayerTree) def nameHierarchy = layer.hierarchy.map(_.name)
 extension (layers: Seq[LayerTree])
-  def nameHierarchies:                           Seq[Seq[String]] =
+  def nameHierarchies: Seq[Seq[String]] =
     layers.flatMap(_._dfs).filter(_.children.isEmpty).map(_.nameHierarchy)
 
 abstract class Parameter                                     extends Product
 abstract class LayerInterface[-P <: Parameter](parameter: P) extends Seq[LayerTree]:
   def layers: Seq[Layer]
 
-  final override def apply(idx: Int) = layers.toLayerTrees(idx)
-  final override def iterator        = layers.toLayerTrees.iterator
-  final override def length          = layers.toLayerTrees.length
+  private lazy val roots             = layers.toLayerTrees
+  final override def apply(idx: Int) = roots(idx)
+  final override def iterator        = roots.iterator
+  final override def length          = roots.length
 
 trait HWInterface[-P <: Parameter](parameter: P)      extends Aggregate:
   this: Bundle | Record =>

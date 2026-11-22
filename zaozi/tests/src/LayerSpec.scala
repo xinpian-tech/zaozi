@@ -20,25 +20,9 @@ given upickle.default.ReadWriter[LayerSpecParameter] = upickle.default.macroRW
 
 class LayerSpecLayers(parameter: LayerSpecParameter) extends LayerInterface(parameter):
   def layers = Seq(
-    Layer(
-      "A0",
-      Seq(
-        Layer(
-          "A0B0",
-          Seq(
-            Layer(
-              "A0B0C0"
-            ),
-            Layer(
-              "A0B0C1"
-            )
-          )
-        ),
-        Layer("A0B1"),
-        Layer("A0B2")
-      )
-    ),
-    Layer("A1")
+    Layer("A0", Seq(Layer("A0B0", Seq(Layer("A0B0C1"))), Layer("A0B2"))),
+    Layer("A1"),
+    Layer("A0", Seq(Layer("A0B0", Seq(Layer("A0B0C0"), Layer("A0B0C1"))), Layer("A0B1")))
   )
 
 class LayerSpecIO(parameter: LayerSpecParameter) extends HWBundle(parameter):
@@ -55,6 +39,18 @@ class LayerSpecProbe(parameter: LayerSpecParameter) extends DVBundle[LayerSpecPa
 
 object LayerSpec extends TestSuite:
   val tests = Tests:
+    test("repeated declarations extend the same layer in first-declaration order"):
+      val layers = new LayerSpecLayers(LayerSpecParameter(32))
+      assert(
+        layers.nameHierarchies == Seq(
+          Seq("A0", "A0B0", "A0B0C1"),
+          Seq("A0", "A0B0", "A0B0C0"),
+          Seq("A0", "A0B2"),
+          Seq("A0", "A0B1"),
+          Seq("A1")
+        )
+      )
+
     test("Simple Layer"):
       @generator
       object SimpleLayer
