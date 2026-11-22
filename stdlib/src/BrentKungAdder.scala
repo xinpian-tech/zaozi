@@ -108,7 +108,7 @@ object BrentKungAdder
     val coLeaf    = leaves.find(_.idx == width).get
     val carryOut  = hsMap(coLeaf) ^ leafCarries(width)
 
-    val (checkedCO, checkedSUM) = Contract((carryOut, sumWord)) { case (co, sum) =>
+    val (checkedCO, checkedSUM) = Contract(carryOut, sumWord) { (co, sum) =>
       val observed = (co.asBits ## sum).asUInt
       val expected = (io.A.asUInt + io.B.asUInt + io.CI.asBits.asUInt).asBits.bits(width, 0).asUInt
       Ensure((observed === expected).I, "prefix_adder_matches_add")

@@ -45,7 +45,7 @@ import me.jiuyang.zaozi.valuetpe.*
 // Properties relate this cycle to the previous one, so they hold from any initial state without a reset assumption.
 // The RegMap assertion layer is stripped: the contracts are an independent oracle.
 // Every property here fails on the RegMap as it stands before this series.
-// Clauses are contract operands because an operand-free `Contract:` crashes lower-contracts.
+// Clauses are contract operands because an operand-free `Contract():` crashes lower-contracts.
 
 case class RegMapReadParameter() extends Parameter:
   val status     = RegField("status", 8).readValue
@@ -128,8 +128,8 @@ object RegMapRead extends Generator[RegMapReadParameter, RegMapReadLayers, RegMa
     val sampleExact     = sampleFire === (acceptedRead(1) & lane0)
     val sampleDelivered = !sampleAccepted | (responseRead & (io.rsp.bits.data === word(heldSample)))
 
-    Contract((responseStable, statusDelivered, sampleExact, sampleDelivered)):
-      case (responseStable, statusDelivered, sampleExact, sampleDelivered) =>
+    Contract(responseStable, statusDelivered, sampleExact, sampleDelivered):
+      (responseStable, statusDelivered, sampleExact, sampleDelivered) =>
         Ensure(responseStable.I)
         Ensure(statusDelivered.I)
         Ensure(sampleExact.I)
@@ -227,8 +227,8 @@ object RegMapWrite extends Generator[RegMapWriteParameter, RegMapWriteLayers, Re
     val ctrlUpdated    = !ctrlWritten | (ctrl === heldWriteData)
     val ctrlHeld       = previousReset | ctrlWritten | (ctrl === heldCtrl)
 
-    Contract((requestStable, commandStable, commandExact, writeAnswered, ctrlUpdated, ctrlHeld)):
-      case (requestStable, commandStable, commandExact, writeAnswered, ctrlUpdated, ctrlHeld) =>
+    Contract(requestStable, commandStable, commandExact, writeAnswered, ctrlUpdated, ctrlHeld):
+      (requestStable, commandStable, commandExact, writeAnswered, ctrlUpdated, ctrlHeld) =>
         Require(requestStable.I)
         Ensure(commandStable.I)
         Ensure(commandExact.I)

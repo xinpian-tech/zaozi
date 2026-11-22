@@ -77,7 +77,7 @@ object TemporalLogic
     delayed   := io.input
     io.output := delayed
 
-    Contract {
+    Contract() { _ =>
       given ClockEvent = posedge(io.clock)
 
       val outputFollowsInput = (0 until parameter.width)

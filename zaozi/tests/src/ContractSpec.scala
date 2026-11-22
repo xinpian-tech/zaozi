@@ -8,6 +8,9 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 
+import org.llvm.mlir.MlirOperation
+import org.llvm.mlir.scalalib.capi.ir.{Block, given}
+
 import utest.*
 
 case class ContractSpecParameter(width: Int) extends Parameter
@@ -42,7 +45,7 @@ object ContractSpec extends TestSuite:
           val io = summon[Interface[ContractSpecIO]]
           val p  = io.p
 
-          Contract {
+          Contract() { _ =>
             Require((p >= 1.U).I)
             Ensure((p + p >= 2.U).I)
           }
@@ -52,15 +55,79 @@ object ContractSpec extends TestSuite:
         "  %c1_ui1 = firrtl.constant 1 : !firrtl.uint<1>",
         "  %0 = firrtl.geq %p, %c1_ui1 : (!firrtl.uint<8>, !firrtl.uint<1>) -> !firrtl.uint<1>",
         "  %_GEN_0 = firrtl.node interesting_name %0 : !firrtl.uint<1>",
+        "  firrtl.int.verif.require %_GEN_0 {label = \"_GEN_1\"} : !firrtl.uint<1>",
         "  %1 = firrtl.add %p, %p : (!firrtl.uint<8>, !firrtl.uint<8>) -> !firrtl.uint<9>",
         "  %_GEN_2 = firrtl.node interesting_name %1 : !firrtl.uint<9>",
         "  %c2_ui2 = firrtl.constant 2 : !firrtl.uint<2>",
         "  %2 = firrtl.geq %_GEN_2, %c2_ui2 : (!firrtl.uint<9>, !firrtl.uint<2>) -> !firrtl.uint<1>",
         "  %_GEN_3 = firrtl.node interesting_name %2 : !firrtl.uint<1>",
-        "  firrtl.int.verif.require %_GEN_0 {label = \"_GEN_1\"} : !firrtl.uint<1>",
         "  firrtl.int.verif.ensure %_GEN_3 {label = \"_GEN_4\"} : !firrtl.uint<1>",
         "}"
       )
+
+    test("clauses follow their enclosing IR blocks"):
+      @generator
+      object Scoped
+          extends Generator[ContractSpecParameter, ContractSpecLayers, ContractSpecIO, ContractSpecProbe]
+          with HasMlirTest:
+        def architecture(parameter: ContractSpecParameter) =
+          val io       = summon[Interface[ContractSpecIO]]
+          val enabled  = io.p === io.q
+          val property = enabled.I
+          Require(property, "outside")
+          Contract() { _ =>
+            when(enabled) { Require(property, "conditional") }.otherwise { Ensure(property, "alternative") }
+            Contract() { _ => Ensure(property, "inner") }
+            intercept[IllegalArgumentException] {
+              Contract() { _ =>
+                Ensure(property, "discarded")
+                io.p.asBits.asVec(UInt(3))
+              }
+            }
+            Ensure(property, "outer")
+          }
+          Ensure(property, "after")
+
+      val ir   = os.proc("circt-opt").call(stdin = Scoped.mlirString(parameter)).out.text()
+      val body = ir.linesIterator.map(_.trim).mkString("\n")
+      assert(body.contains("""firrtl.int.verif.assume %enabled {label = "outside"} : !firrtl.uint<1>
+                             |firrtl.contract {
+                             |firrtl.when %enabled : !firrtl.uint<1> {
+                             |firrtl.int.verif.require %enabled {label = "conditional"} : !firrtl.uint<1>
+                             |} else {
+                             |firrtl.int.verif.ensure %enabled {label = "alternative"} : !firrtl.uint<1>
+                             |}
+                             |firrtl.contract {
+                             |firrtl.int.verif.ensure %enabled {label = "inner"} : !firrtl.uint<1>
+                             |}
+                             |firrtl.int.verif.ensure %enabled {label = "outer"} : !firrtl.uint<1>
+                             |}
+                             |firrtl.int.verif.assert %enabled {label = "after"} : !firrtl.uint<1>""".stripMargin))
+
+    test("the circuit owns the module and its contracts while architecture runs"):
+      @generator
+      object Owner
+          extends Generator[ContractSpecParameter, ContractSpecLayers, ContractSpecIO, ContractSpecProbe]
+          with HasMlirTest:
+        def architecture(parameter: ContractSpecParameter) =
+          val module  = summon[Block].getParentOperation
+          val circuit = module.getParentOperation
+          assert(MlirOperation.ptr(circuit.segment).address != 0)
+          assert(circuit.getName.str == "firrtl.circuit", circuit.getParentOperation.getName.str == "builtin.module")
+          val io      = summon[Interface[ContractSpecIO]]
+          val checked: (Referable[UInt], Referable[Bool]) = Contract(io.p, io.p === io.q) { (p, equal) =>
+            val owner = summon[Block].getParentOperation.getParentOperation
+            assert(MlirOperation.ptr(owner.segment) == MlirOperation.ptr(module.segment))
+            assert(p.definingOp.isEmpty, equal.definingOp.isEmpty)
+          }
+          val (p, equal) = checked
+          assert(
+            p.definingOp.exists(_.getName.str == "firrtl.contract"),
+            equal.definingOp.exists(_.getName.str == "firrtl.contract")
+          )
+
+      val ir = os.proc("circt-opt").call(stdin = Owner.mlirString(parameter)).out.text()
+      assert(ir.contains("firrtl.contract"))
 
     test("single argument"):
       @generator
@@ -108,7 +175,7 @@ object ContractSpec extends TestSuite:
           val s  = (pb ^ qb ^ rb).asUInt
           val c  = ((pb & qb | (pb ^ qb) & rb).asUInt) << 1
 
-          val (u, v) = Contract((c, s)) { case (u, v) =>
+          val (u, v) = Contract(c, s) { (u, v) =>
             Ensure((u + v === p + q + r).I)
           }
 

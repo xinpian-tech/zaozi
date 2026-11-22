@@ -1109,32 +1109,33 @@ trait ClockApi extends AsBool[Clock]
 
 trait ResetApi extends AsBool[Reset]
 
-type ContractTuple[A <: Tuple] <: Tuple = A match
-  case EmptyTuple           => EmptyTuple
-  case Referable[t] *: tail => (Referable[t]) *: ContractTuple[tail]
+sealed trait ContractArgs[-In, Out]:
+  private[zaozi] def values(args:  In):                                           Seq[Referable[? <: Data]]
+  private[zaozi] def results(args: In, valueAt: Long => Value, index: Long = 0L): Out
 
-trait ContractTupleArgs[A <: Tuple]:
-  def values(args:    A):                         Seq[Referable[? <: Data]]
-  def results(values: Seq[Referable[? <: Data]]): ContractTuple[A]
+object ContractArgs:
+  given empty: ContractArgs[EmptyTuple, EmptyTuple] with
+    private[zaozi] def values(args:  EmptyTuple)                                      = Seq.empty
+    private[zaozi] def results(args: EmptyTuple, valueAt: Long => Value, index: Long) = EmptyTuple
 
-object ContractTupleArgs:
-  given empty: ContractTupleArgs[EmptyTuple] with
-    def values(args: EmptyTuple):                   Seq[Referable[? <: Data]] = Seq.empty
-    def results(values: Seq[Referable[? <: Data]]): EmptyTuple                =
-      EmptyTuple
+  given single[T <: Data]: ContractArgs[Referable[T], Referable[T]] with
+    private[zaozi] def values(arg: Referable[T])                                       = Seq(arg)
+    private[zaozi] def results(arg: Referable[T], valueAt: Long => Value, index: Long) =
+      new ContractResult(arg._tpe, valueAt(index))
 
-  given cons[T <: Data, H <: Referable[T], Tail <: Tuple](
-    using tailArgs: ContractTupleArgs[Tail]
-  ): ContractTupleArgs[H *: Tail] with
-    def values(args: H *: Tail): Seq[Referable[? <: Data]] =
-      args.head +: tailArgs.values(args.tail)
-
-    def results(values: Seq[Referable[? <: Data]]): ContractTuple[H *: Tail] =
-      (values.head *: tailArgs.results(values.tail)).asInstanceOf[ContractTuple[H *: Tail]]
+  given cons[T <: Data, Tail <: Tuple, TailOut <: Tuple](
+    using tail: ContractArgs[Tail, TailOut]
+  ): ContractArgs[Referable[T] *: Tail, Referable[T] *: TailOut] with
+    private[zaozi] def values(args: Referable[T] *: Tail)                                       = args.head +: tail.values(args.tail)
+    private[zaozi] def results(args: Referable[T] *: Tail, valueAt: Long => Value, index: Long) =
+      new ContractResult(args.head._tpe, valueAt(index)) *: tail.results(args.tail, valueAt, index + 1)
 
 trait ContractApi:
-  def Contract(
-    body: => Unit
+  def Contract[In <: Referable[?] | Tuple, Out](
+    args: In = EmptyTuple
+  )(
+    using ContractArgs[In, Out]
+  )(body: Out => (Arena, Context, Block) ?=> Unit
   )(
     using Arena,
     Context,
@@ -1142,32 +1143,7 @@ trait ContractApi:
     sourcecode.File,
     sourcecode.Line,
     TypeImpl
-  ): Unit
-
-  def Contract[T <: Data](
-    arg:  Referable[T]
-  )(body: (Referable[T]) => (Arena, Context, Block) ?=> Unit
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line,
-    TypeImpl
-  ): Referable[T]
-  def Contract[A <: Tuple](
-    args: A
-  )(body: ContractTuple[A] => (Arena, Context, Block) ?=> Unit
-  )(
-    using ContractTupleArgs[A]
-  )(
-    using Arena,
-    Context,
-    Block,
-    sourcecode.File,
-    sourcecode.Line,
-    TypeImpl
-  ): ContractTuple[A]
+  ): Out
 
   def Require(
     property: Immediate | Sequence | Property
