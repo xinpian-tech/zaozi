@@ -56,22 +56,17 @@ import java.lang.foreign.Arena
 
 object BaseGeneratorHelper:
   private[default] def declareLayers(
-    layers: Seq[Layer],
+    layers: Seq[LayerTree],
     parent: Block
   )(
     using Arena,
     Context
   ): Unit =
-    // A layer can be extended by another declaration under the same parent.
-    val siblings = layers.groupBy(_.name)
-    layers.iterator
-      .map(_.name)
-      .distinct
-      .foreach: name =>
-        val declaration =
-          summon[LayerApi].op(name, summon[LocationApi].locationUnknownGet, FirrtlLayerConvention.Bind)
-        parent.appendOwnedOperation(declaration.operation)
-        declareLayers(siblings(name).flatMap(_.children), declaration.block)
+    layers.foreach: layer =>
+      val declaration =
+        summon[LayerApi].op(layer.name, summon[LocationApi].locationUnknownGet, FirrtlLayerConvention.Bind)
+      parent.appendOwnedOperation(declaration.operation)
+      declareLayers(layer.children, declaration.block)
 
   def createInstance[
     PARAM <: Parameter,

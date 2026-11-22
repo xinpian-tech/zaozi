@@ -74,7 +74,7 @@ given VerilogWrapperApi:
       Context,
       Circuit
     ): Unit =
-      val declaredLayers  = wrapper.layers(parameter).layers
+      val declaredLayers  = wrapper.layers(parameter)
       val io              = wrapper.interface(parameter)
       val probe           = wrapper.probe(parameter)
       val unknownLocation = summon[LocationApi].locationUnknownGet
@@ -106,7 +106,7 @@ given VerilogWrapperApi:
         unknownLocation,
         FirrtlConvention.Scalarized,
         bfs.map(i => (i, unknownLocation)), // TODO: record location for Bundle?
-        declaredLayers.toLayerTrees.nameHierarchies,
+        declaredLayers.nameHierarchies,
         paramsMap
       )
       extmodule.appendToCircuit()
