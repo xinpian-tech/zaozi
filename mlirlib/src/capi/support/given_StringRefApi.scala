@@ -30,9 +30,8 @@ given StringRefApi with
     inline def toStringRef(
       using arena: Arena
     ): StringRef =
-      val buffer    = arena.allocate(bytes.length)
+      val buffer    = arena.allocate(bytes.length.toLong + 1)
       buffer.copyFrom(MemorySegment.ofArray(bytes))
-      StringRef(mlirStringRefCreateFromCString(arena, buffer))
       val stringRef = MlirStringRef.allocate(arena)
       MlirStringRef.data(stringRef, buffer)
       MlirStringRef.length(stringRef, bytes.length)
