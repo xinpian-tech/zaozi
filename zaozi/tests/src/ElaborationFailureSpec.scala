@@ -9,7 +9,7 @@ import utest.*
 
 object ElaborationFailureSpec extends TestSuite:
   val tests = Tests:
-    test("retry a child whose first definition failed"):
+    test("retry elaboration after a child worker fails"):
       val marker   = new IllegalStateException("first child definition")
       var attempts = 0
 
@@ -25,17 +25,17 @@ object ElaborationFailureSpec extends TestSuite:
       object Parent extends Generator[WidthSpecParameter, WidthSpecLayers, WidthSpecIO, WidthSpecProbe]:
         def architecture(parameter: WidthSpecParameter) =
           val io    = summon[Interface[WidthSpecIO]]
-          val child =
-            try Child.instantiate(parameter)
-            catch case error: IllegalStateException if error eq marker => Child.instantiate(parameter)
+          val child = Child.instantiate(parameter)
           child.io.i := io.i
-          io.o := child.io.o
+          io.o       := child.io.o
 
       val p         = WidthSpecParameter(8)
       val directory = os.temp.dir(deleteOnExit = false)
       try
         val file   = directory / s"${Child.moduleName(p)}.mlirbc"
         os.write(file, "previous run")
+        val caught = intercept[IllegalStateException] { Elaborate(Parent, p, directory) }
+        assert(caught eq marker, os.read(file) == "previous run")
         val result = Elaborate(Parent, p, directory)
         assert(attempts == 2, result.modules(Child.moduleName(p)) == file)
         os.proc("circt-opt", file).call()
