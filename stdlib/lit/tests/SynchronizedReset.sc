@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class me.jiuyang.stdlib.default.SynchronizedReset %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class me.jiuyang.stdlib.default.SynchronizedReset %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 // RUN: %{test} config %t.dir/config.json --stages 2 --polarity active-high
 // RUN: cd %t.dir && %{test} design %t.dir/config.json

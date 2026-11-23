@@ -58,7 +58,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Value
 }
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 export given_SVAApi.{always, eventually, negedge, posedge, Assert, Assume, Cover}
 
@@ -73,7 +73,7 @@ given SVAApi with
   )(
     using clock: ClockEvent
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -96,7 +96,7 @@ given SVAApi with
   )(
     using clock: ClockEvent
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -117,7 +117,7 @@ given SVAApi with
     def S(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -131,7 +131,7 @@ given SVAApi with
         private[zaozi] val _refer: Value = seq.operation.getResult(0)
 
     def I(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -147,7 +147,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -165,7 +165,7 @@ given SVAApi with
 
   extension (ref: Immediate)
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -181,7 +181,7 @@ given SVAApi with
     def &(
       that: Immediate
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -197,7 +197,7 @@ given SVAApi with
     def &(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -213,7 +213,7 @@ given SVAApi with
     def &(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -229,7 +229,7 @@ given SVAApi with
     def |(
       that: Immediate
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -245,7 +245,7 @@ given SVAApi with
     def |(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -261,7 +261,7 @@ given SVAApi with
     def |(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -277,7 +277,7 @@ given SVAApi with
     infix def intersect(
       that: Immediate
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -293,7 +293,7 @@ given SVAApi with
     infix def intersect(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -309,7 +309,7 @@ given SVAApi with
     infix def intersect(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -325,7 +325,7 @@ given SVAApi with
     def |->(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -345,7 +345,7 @@ given SVAApi with
     def #-#(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -369,7 +369,7 @@ given SVAApi with
     infix def implies(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -391,7 +391,7 @@ given SVAApi with
     infix def iff(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -419,7 +419,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -442,7 +442,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -464,7 +464,7 @@ given SVAApi with
 
   extension (ref: Sequence)
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -480,7 +480,7 @@ given SVAApi with
     def ##(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -498,7 +498,7 @@ given SVAApi with
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -513,7 +513,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -543,7 +543,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -573,7 +573,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -594,7 +594,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -623,7 +623,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -651,7 +651,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -678,7 +678,7 @@ given SVAApi with
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -692,7 +692,7 @@ given SVAApi with
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -706,7 +706,7 @@ given SVAApi with
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -723,7 +723,7 @@ given SVAApi with
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -740,7 +740,7 @@ given SVAApi with
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -767,7 +767,7 @@ given SVAApi with
     def &(
       that: Immediate | Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -786,7 +786,7 @@ given SVAApi with
     def &(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -802,7 +802,7 @@ given SVAApi with
     def |(
       that: Immediate | Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -821,7 +821,7 @@ given SVAApi with
     def |(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -837,7 +837,7 @@ given SVAApi with
     infix def intersect(
       that: Immediate | Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -856,7 +856,7 @@ given SVAApi with
     infix def intersect(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -872,7 +872,7 @@ given SVAApi with
     def |->(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -892,7 +892,7 @@ given SVAApi with
     def #-#(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -916,7 +916,7 @@ given SVAApi with
     infix def implies(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -938,7 +938,7 @@ given SVAApi with
     infix def iff(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -966,7 +966,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -989,7 +989,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1011,7 +1011,7 @@ given SVAApi with
 
   extension (ref: Property)
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1027,7 +1027,7 @@ given SVAApi with
     def &(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1047,7 +1047,7 @@ given SVAApi with
     def |(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1067,7 +1067,7 @@ given SVAApi with
     infix def intersect(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1087,7 +1087,7 @@ given SVAApi with
     infix def implies(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1109,7 +1109,7 @@ given SVAApi with
     infix def iff(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1137,7 +1137,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1160,7 +1160,7 @@ given SVAApi with
     )(
       using clock: ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1183,7 +1183,7 @@ given SVAApi with
   def Assert(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1203,7 +1203,7 @@ given SVAApi with
   def Assume(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1223,7 +1223,7 @@ given SVAApi with
   def Cover(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1244,7 +1244,7 @@ given SVAApi with
     property: Immediate | Sequence | Property,
     enable:   Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1265,7 +1265,7 @@ given SVAApi with
     property: Immediate | Sequence | Property,
     enable:   Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1286,7 +1286,7 @@ given SVAApi with
     property: Immediate | Sequence | Property,
     enable:   Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1307,7 +1307,7 @@ given SVAApi with
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1328,7 +1328,7 @@ given SVAApi with
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1349,7 +1349,7 @@ given SVAApi with
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1371,7 +1371,7 @@ given SVAApi with
     enable:   Referable[Bool],
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1393,7 +1393,7 @@ given SVAApi with
     enable:   Referable[Bool],
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1415,7 +1415,7 @@ given SVAApi with
     enable:   Referable[Bool],
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

@@ -63,7 +63,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
 
 import java.io.ByteArrayOutputStream
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import java.nio.file.StandardOpenOption.*
 
 export me.jiuyang.zaozi.magic.macros.{generator, InstanceChoice}
@@ -75,7 +75,7 @@ given GeneratorApi:
     def appendModule(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Circuit
     ): Unit =
@@ -133,7 +133,7 @@ given GeneratorApi:
     def instance(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -151,7 +151,7 @@ given GeneratorApi:
     def dumpMlirbc(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit =
       BaseGeneratorHelper.dumpMlirbc(generator.moduleName(parameter)) { generator.appendModule(parameter) }
@@ -159,7 +159,7 @@ given GeneratorApi:
     def instantiate(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

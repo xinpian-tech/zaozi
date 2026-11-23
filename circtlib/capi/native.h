@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
-#ifndef JEXTRACT_HEADERS_H
-#define JEXTRACT_HEADERS_H
+#ifndef ZAOZI_CIRCT_C_H
+#define ZAOZI_CIRCT_C_H
 
 #include <circt-c/Firtool/Firtool.h>
 #include <circt-c/ExportVerilog.h>
@@ -30,4 +30,4 @@
 #include <circt-c/Dialect/HWArith.h>
 #include <circt-c/ExportFIRRTL.h>
 
-#endif // JEXTRACT_HEADERS_H
+#endif // ZAOZI_CIRCT_C_H

@@ -52,7 +52,8 @@ import org.llvm.mlir.scalalib.capi.ir.{
   Value
 }
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.Mlir
+import scala.scalanative.unsafe.Zone
 
 import org.llvm.circt.scalalib.capi.dialect.firrtl.{given_DialectApi, DialectApi as FirrtlDialect}
 import org.llvm.circt.scalalib.capi.dialect.ltl.{given_DialectApi as given_Ltl, DialectApi as LtlDialect}
@@ -64,7 +65,7 @@ object BaseGeneratorHelper:
     layers: Seq[LayerTree],
     parent: Block
   )(
-    using Arena,
+    using Zone,
     Context
   ): Unit =
     layers.foreach: layer =>
@@ -83,7 +84,7 @@ object BaseGeneratorHelper:
     probeTpe:   P,
     layers:     L
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -109,7 +110,7 @@ object BaseGeneratorHelper:
     option: String,
     cases:  Seq[(String, String, I, P, L)]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -141,7 +142,7 @@ object BaseGeneratorHelper:
     ioTpe:      I,
     probeTpe:   P
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -181,13 +182,12 @@ object BaseGeneratorHelper:
         private[zaozi] val _tpe   = probeTpe
         private[zaozi] val _refer = probeWire.operation.getResult(0)
 
-  def dumpMlirbc(moduleName: String)(createModule: (Arena, Context, Circuit) ?=> Unit): Unit =
+  def dumpMlirbc(moduleName: String)(createModule: (Zone, Context, Circuit) ?=> Unit): Unit =
     Elaborate.generate(moduleName)(file => writeMlirbc(moduleName, file)(createModule))
 
-  private[default] def writeMlirbc(moduleName: String, file: os.Path)(createModule: (Arena, Context, Circuit) ?=> Unit)
+  private[default] def writeMlirbc(moduleName: String, file: os.Path)(createModule: (Zone, Context, Circuit) ?=> Unit)
     : Unit =
-    given arena: Arena = Arena.ofConfined()
-    try
+    Mlir.withZone {
       given context: Context = summon[ContextApi].contextCreateWithThreading(false)
       try
         summon[FirrtlDialect].loadDialect
@@ -202,6 +202,6 @@ object BaseGeneratorHelper:
           ModuleBytecode.write(module, file)
         finally module.destroy()
       finally context.destroy()
-    finally arena.close()
+    }
 
 end BaseGeneratorHelper

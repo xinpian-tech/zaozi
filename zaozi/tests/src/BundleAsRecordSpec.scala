@@ -10,7 +10,7 @@ import me.jiuyang.testlib.*
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
 import utest.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import me.jiuyang.zaozi.magic.macros.generator
 
 case class BARParameter(width: Int) extends Parameter

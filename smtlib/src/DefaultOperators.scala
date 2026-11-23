@@ -2,13 +2,16 @@
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
 package me.jiuyang.smtlib.default
 
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.dialect.smt.{given_TypeApi, TypeApi}
 import org.llvm.mlir.scalalib.dialect.smt.operation.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value, given}
 import me.jiuyang.smtlib.*
 import me.jiuyang.smtlib.tpe.*
-
-import java.lang.foreign.Arena
 
 // When Import the default, all method in ConstructorApi should be exported
 val constructorApi = summon[ConstructorApi]
@@ -17,16 +20,16 @@ export constructorApi.*
 // Local declarations in a quantifier body denote bound variables, represented
 // by MLIR block arguments. Captures from the enclosing solver remain free.
 private def bindQuantifier(
-  op:          Operation,
-  block:       Block,
-  names:       Seq[String]
+  op:         Operation,
+  block:      Block,
+  names:      Seq[String]
 )(
-  using arena: Arena,
-  context:     Context
+  using zone: Zone,
+  context:    Context
 ): Unit =
   val declarations = Iterator
     .iterate(block.getFirstOperation)(_.getNextInBlock)
-    .takeWhile(value => org.llvm.mlir.MlirOperation.ptr(value.segment).address() != 0)
+    .takeWhile(value => !value.isNull)
     .filter(_.getName.str == "smt.declare_fun")
     .toVector
   require(declarations.nonEmpty, "a quantifier must declare at least one bound variable")
@@ -36,13 +39,10 @@ private def bindQuantifier(
   op.setAttributeByName("boundVarNames", boundNames.map(_.stringAttrGet).arrayAttrGet)
   declarations.foreach: declaration =>
     val value    = declaration.getResult(0)
-    val argument = org.llvm.mlir.CAPI.mlirBlockAddArgument(
-      arena,
-      block.segment,
-      value.getType.segment,
-      declaration.getLocation.segment
+    val argument = nativeResult[MlirStructs.MlirValue](out =>
+      mlirApi.mlirBlockAddArgument(block.native, value.getType.native, declaration.getLocation.native)(out)
     )
-    org.llvm.mlir.CAPI.mlirValueReplaceAllUsesOfWith(value.segment, argument)
+    mlirApi.mlirValueReplaceAllUsesOfWith(value.native, argument)
     declaration.removeFromParent()
     declaration.destroy()
 
@@ -50,7 +50,7 @@ given ConstructorApi with
   // types
   extension (value: Int)
     def S(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -66,7 +66,7 @@ given ConstructorApi with
       isSigned: Boolean,
       width:    Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -83,7 +83,7 @@ given ConstructorApi with
 
   extension (value: Boolean)
     def B(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -132,7 +132,7 @@ given ConstructorApi with
   def smtValue[T <: Data](
     rangeType: T
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -150,7 +150,7 @@ given ConstructorApi with
     domainTypes: Seq[T],
     rangeType:   U
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -168,7 +168,7 @@ given ConstructorApi with
   def smtDistinct[T <: Data, D <: Referable[T]](
     values: D*
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -184,7 +184,7 @@ given ConstructorApi with
   def smtAssert(
     value: Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -198,7 +198,7 @@ given ConstructorApi with
       val _operation = op.operation
 
   def smtReset(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -211,7 +211,7 @@ given ConstructorApi with
   def smtSetLogic(
     logic: String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -224,7 +224,7 @@ given ConstructorApi with
   def smtEq[R <: Referable[?]](
     values: R*
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -241,9 +241,9 @@ given ConstructorApi with
     weight:        BigInt,
     noPattern:     Boolean,
     boundVarNames: Seq[String]
-  )(body:          (Arena, Context, Block) ?=> Unit
+  )(body:          (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -253,7 +253,7 @@ given ConstructorApi with
     val op = summon[ExistsApi].op(weight, noPattern, boundVarNames, locate)
     op.operation.appendToBlock()
     body(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op.bodyBlock
     )
@@ -266,9 +266,9 @@ given ConstructorApi with
     weight:        BigInt,
     noPattern:     Boolean,
     boundVarNames: Seq[String]
-  )(body:          (Arena, Context, Block) ?=> Unit
+  )(body:          (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -278,7 +278,7 @@ given ConstructorApi with
     val op = summon[ForallApi].op(weight, noPattern, boundVarNames, locate)
     op.operation.appendToBlock()
     body(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op.bodyBlock
     )
@@ -292,7 +292,7 @@ given ConstructorApi with
   )(thenBody: THEN
   )(elseBody: ELSE
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -308,7 +308,7 @@ given ConstructorApi with
   def smtPush(
     count: Int
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -321,7 +321,7 @@ given ConstructorApi with
   def smtPop(
     count: Int
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -332,7 +332,7 @@ given ConstructorApi with
     op.operation.appendToBlock()
 
   def smtCheck(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -341,17 +341,17 @@ given ConstructorApi with
   ): Unit =
     val op = summon[CheckApi].op(locate)
     smtYield()(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op.satBlock
     )
     smtYield()(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op.unknownBlock
     )
     smtYield()(
-      using summon[Arena],
+      using summon[Zone],
       summon[Context],
       op.unsatBlock
     )
@@ -360,7 +360,7 @@ given ConstructorApi with
   def smtYield[T <: Data, R <: Referable[T]](
     values: R*
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -371,9 +371,9 @@ given ConstructorApi with
     op.operation.appendToBlock()
 
   def solver(
-    body: (Arena, Context, Block, SolverContext) ?=> Unit
+    body: (Zone, Context, Block, SolverContext) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     SolverContext,
     sourcecode.File,
@@ -387,42 +387,42 @@ end given
 given TypeImpl with
   extension (ref: Array[?, ?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[TypeApi].getArray(ref._domainType.toMlirType, ref._rangeType.toMlirType)
       mlirType
   extension (ref: BitVector)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[TypeApi].getBitVector(ref._width)
       mlirType
   extension (ref: Bool)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[TypeApi].getBool
       mlirType
   extension (ref: SInt)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[TypeApi].getInt
       mlirType
   extension (ref: SMTFunc[?, ?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[TypeApi].getSMTFunc(ref._domainTypes.map(_.toMlirType), ref._rangeType.toMlirType)
       mlirType
   extension (ref: Sort[?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[TypeApi].getSort(ref._identifier, ref._sortParams.map(_.toMlirType))
@@ -432,12 +432,12 @@ given TypeImpl with
   extension (ref: Const[?])
     def operationImpl: Operation = ref._operation
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
   extension (ref: Ref[?])
     def operationImpl: Operation = ref._operation
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -446,7 +446,7 @@ given [T <: Data, U <: Data, R <: Referable[Array[T, U]], S <: Referable[U]]: Ar
     def apply(
       index: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -463,7 +463,7 @@ given [T <: Data, U <: Data, R <: Referable[Array[T, U]], S <: Referable[U]]: Ar
       index: Int,
       value: S
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -481,7 +481,7 @@ given [T <: Data, U <: Data, R <: Referable[Array[T, U]], S <: Referable[U]]: Ar
     def broadcast(
       value: S
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -502,7 +502,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def +>>(
       that: R | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -523,7 +523,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def >>(
       that: R | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -544,7 +544,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def +(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -562,7 +562,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def *(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -580,7 +580,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def /(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -600,7 +600,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def %(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -620,7 +620,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def <<(
       that: R | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -641,7 +641,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def &(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -659,7 +659,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def |(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -677,7 +677,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def ^(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -695,7 +695,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def ++(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -714,7 +714,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
       lowBit: Int,
       tpe:    BitVector
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -732,7 +732,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def repeat(
       tpe: BitVector
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -748,7 +748,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
         val _operation: Operation = op.operation
 
     def unary_~(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -764,7 +764,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
         val _operation: Operation = op.operation
 
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -782,7 +782,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def <(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -798,7 +798,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def <=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -814,7 +814,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def >(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -830,7 +830,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def >=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -846,7 +846,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def ===(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -862,7 +862,7 @@ given [R <: Referable[BitVector]]: BitVectorApi[R] with
     def =/=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -881,7 +881,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
     def &(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -897,7 +897,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
     def |(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -911,7 +911,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
         val _operation: Operation = op.operation
 
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -927,7 +927,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
     def ^(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -943,7 +943,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
     def ==>(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -959,7 +959,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
     def ===(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -975,7 +975,7 @@ given [R <: Referable[Bool]]: BoolApi[R] with
     def =/=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -994,7 +994,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def +(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1009,7 +1009,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def -(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1025,7 +1025,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def *(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1041,7 +1041,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def /(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1057,7 +1057,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def %(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1073,7 +1073,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def <(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1089,7 +1089,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def <=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1105,7 +1105,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def >(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1121,7 +1121,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def >=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1137,7 +1137,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def ===(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1153,7 +1153,7 @@ given [R <: Referable[SInt]]: SIntApi[R] with
     def =/=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1173,7 +1173,7 @@ given [T <: Data, U <: Data, R <: Referable[SMTFunc[?, U]], S <: Referable[?]]: 
     def apply(
       args: S*
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

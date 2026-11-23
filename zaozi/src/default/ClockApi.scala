@@ -10,12 +10,12 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlNameKind
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{AsUIntPrimApi, NodeApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given ClockApi with
   extension [R <: Referable[Clock]](ref: R)
     def asBool(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

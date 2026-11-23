@@ -2,33 +2,29 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.seq
 
-import org.llvm.circt.CAPI.{
-  seqClockTypeGet,
-  seqImmutableTypeGet,
-  seqImmutableTypeGetInnerType,
-  seqTypeIsAClock,
-  seqTypeIsAImmutable
-}
-import org.llvm.mlir.scalalib.capi.ir.{Context, Type, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.ir.{Context, Type, given}
 
 given TypeApi with
   def clockTypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(seqClockTypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.seqClockTypeGet(context.native)(out)))
   def immutableTypeGet(
-    tpe:         Type
+    tpe:        Type
   )(
-    using arena: Arena
-  ): Type = Type(seqImmutableTypeGet(arena, tpe.segment))
+    using zone: Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.seqImmutableTypeGet(tpe.native)(out)))
   def immutableTypeGetInnerType(
-    tpe:         Type
+    tpe:        Type
   )(
-    using arena: Arena
-  ): Type = Type(seqImmutableTypeGetInnerType(arena, tpe.segment))
+    using zone: Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.seqImmutableTypeGetInnerType(tpe.native)(out)))
   extension (tpe: Type)
-    def isClock:     Boolean = seqTypeIsAClock(tpe.segment)
-    def isImmutable: Boolean = seqTypeIsAImmutable(tpe.segment)
+    def isClock:     Boolean = circtApi.seqTypeIsAClock(tpe.native)
+    def isImmutable: Boolean = circtApi.seqTypeIsAImmutable(tpe.native)
 end given

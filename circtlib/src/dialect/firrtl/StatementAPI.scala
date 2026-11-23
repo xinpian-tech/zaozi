@@ -5,7 +5,7 @@ package org.llvm.circt.scalalib.dialect.firrtl.operation
 import org.llvm.mlir.scalalib.capi.support.HasOperation
 import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 class Assert(val _operation: Operation)
 class Assume(val _operation: Operation)
@@ -47,7 +47,7 @@ trait VerifAssertApi       extends HasOperation[VerifAssert]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifAssert = op(property, None, label, location)
 
@@ -57,7 +57,7 @@ trait VerifAssertApi       extends HasOperation[VerifAssert]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifAssert
 end VerifAssertApi
@@ -68,7 +68,7 @@ trait VerifAssumeApi       extends HasOperation[VerifAssume]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifAssume = op(property, None, label, location)
 
@@ -78,7 +78,7 @@ trait VerifAssumeApi       extends HasOperation[VerifAssume]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifAssume
 end VerifAssumeApi
@@ -89,7 +89,7 @@ trait VerifCoverApi        extends HasOperation[VerifCover]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifCover = op(property, None, label, location)
 
@@ -99,7 +99,7 @@ trait VerifCoverApi        extends HasOperation[VerifCover]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifCover
 end VerifCoverApi
@@ -110,7 +110,7 @@ trait VerifRequireApi      extends HasOperation[VerifRequire]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifRequire
 end VerifRequireApi
@@ -121,7 +121,7 @@ trait VerifEnsureApi       extends HasOperation[VerifEnsure]:
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifEnsure
 end VerifEnsureApi

@@ -9,7 +9,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.stdlib.default.{*, given}
 import me.jiuyang.testlib.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import utest.*
 
 case class VecUtilsSpecParameter(width: Int, vecCount: Int) extends Parameter

@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.TypeImpl
 import org.llvm.circt.scalalib.dialect.firrtl.operation.Module as CirctModule
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import scala.language.dynamics
 
 /** Due to Scala not allowing deferred macro call(calling user defined macro from outer macro). Any implementation to
@@ -21,7 +21,7 @@ trait DynamicSubfield:
     refer:        Value,
     fieldValName: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     sourcecode.File,
@@ -34,7 +34,7 @@ trait DynamicSubfield:
     refer:        Value,
     fieldValName: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     sourcecode.File,
@@ -48,7 +48,7 @@ trait UntypedDynamicSubfield:
     refer:        Value,
     fieldValName: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     sourcecode.File,

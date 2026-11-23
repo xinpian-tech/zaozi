@@ -10,10 +10,27 @@ import mill.scalalib.scalafmt._
 import build.{v, ZaoziPublishModule, ZaoziScalaModule}
 
 object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule {
-  def scalaVersion = Task(v.scala)
-  def mvnDeps      = Seq(v.mainargs, v.oslib, v.upickle)
 
-  object tests extends ScalaTests with ScalafmtModule with Utest {
-    def mvnDeps = Seq(v.utest)
+  def mvnDeps = Seq(v.mainargs, v.oslib, v.upickle)
+
+  def opcodeSource       = Task.Input(PathRef(os.Path(Task.env("RISCV_OPCODES_INSTALL_PATH"))))
+  override def resources = Task {
+    os.proc(
+      "tar",
+      "--sort=name",
+      "--mtime=@0",
+      "--owner=0",
+      "--group=0",
+      "-cf",
+      Task.dest / "riscv-opcodes.tar",
+      "-C",
+      opcodeSource().path,
+      "."
+    ).call()
+    super.resources() :+ PathRef(Task.dest)
+  }
+
+  object tests extends NativeTests with ScalafmtModule with Utest {
+    override def mvnDeps = super.mvnDeps() ++ Seq(v.utest)
   }
 }

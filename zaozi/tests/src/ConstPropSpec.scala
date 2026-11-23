@@ -9,7 +9,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Context, ContextApi}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import utest.*
 import me.jiuyang.zaozi.magic.macros.generator
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{scala} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS
+// DEFINE: %{scala} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS
 // DEFINE: %{test} = %{scala} --main-class ElaborateTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir && cd %t.dir
 // RUN: mkdir -p %t.dir/modules && echo stale > %t.dir/modules/unrelated.mlirbc

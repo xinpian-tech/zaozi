@@ -5,7 +5,7 @@ package me.jiuyang.zaozi.valuetpe
 import me.jiuyang.zaozi.TypeImpl
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait Vec[E <: Data] extends Connectable:
   private[zaozi] val _elementType: E
@@ -14,13 +14,13 @@ trait Vec[E <: Data] extends Connectable:
   def elementType = _elementType
 
   def count(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Int = this.countImpl
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl

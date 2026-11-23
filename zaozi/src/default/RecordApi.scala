@@ -12,12 +12,12 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{*, given}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_BitCastApi, given_NodeApi, BitCast, BitCastApi, NodeApi}
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [T <: Record | ProbeRecord]: RecordApi[T] with
   extension [R <: Referable[T]](ref: R)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -38,7 +38,7 @@ given [T <: Record | ProbeRecord]: RecordApi[T] with
     def field[T <: Data](
       fieldName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,

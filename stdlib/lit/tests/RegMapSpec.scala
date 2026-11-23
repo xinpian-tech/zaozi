@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{read} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class RegMapRead %s --
-// DEFINE: %{write} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class RegMapWrite %s --
+// DEFINE: %{read} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class RegMapRead %s --
+// DEFINE: %{write} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class RegMapWrite %s --
 
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 // RUN: %{read} config %t.dir/read.json
@@ -48,10 +48,10 @@ import me.jiuyang.zaozi.valuetpe.*
 // Clauses are contract operands because an operand-free `Contract():` crashes lower-contracts.
 
 case class RegMapReadParameter() extends Parameter:
-  val status     = RegField("status", 8).readValue
-  val sample     = RegField("sample", 8).readReadyValid
+  val status       = RegField("status", 8).readValue
+  val sample       = RegField("sample", 8).readReadyValid
   val verification = Layer("Verification")
-  val regMap     = RegMapDefinition(
+  val regMap       = RegMapDefinition(
     indexWidth = 6,
     dataWidth = 32,
     queueEntries = 1,
@@ -68,14 +68,14 @@ class RegMapReadLayers(parameter: RegMapReadParameter) extends LayerInterface(pa
   def layers = Seq(parameter.verification)
 
 class RegMapReadIO(parameter: RegMapReadParameter) extends HWBundle(parameter):
-  val clock        = Flipped(Clock())
-  val reset        = Flipped(Reset())
-  val req          = Flipped(Decoupled(new RegMapRequest(parameter.regMap.indexWidth, parameter.regMap.dataWidth)))
-  val rsp          = Aligned(Decoupled(new RegMapResponse(parameter.regMap.dataWidth, parameter.regMap.reportError)))
-  val status       = Flipped(Bits(parameter.status.width))
-  val sampleReady  = Aligned(Bool())
-  val sampleValid  = Flipped(Bool())
-  val sampleData   = Flipped(Bits(parameter.sample.width))
+  val clock       = Flipped(Clock())
+  val reset       = Flipped(Reset())
+  val req         = Flipped(Decoupled(new RegMapRequest(parameter.regMap.indexWidth, parameter.regMap.dataWidth)))
+  val rsp         = Aligned(Decoupled(new RegMapResponse(parameter.regMap.dataWidth, parameter.regMap.reportError)))
+  val status      = Flipped(Bits(parameter.status.width))
+  val sampleReady = Aligned(Bool())
+  val sampleValid = Flipped(Bool())
+  val sampleData  = Flipped(Bits(parameter.sample.width))
 
 class RegMapReadProbe(parameter: RegMapReadParameter) extends DVBundle[RegMapReadParameter, RegMapReadLayers](parameter)
 
@@ -136,10 +136,10 @@ object RegMapRead extends Generator[RegMapReadParameter, RegMapReadLayers, RegMa
         Ensure(sampleDelivered.I)
 
 case class RegMapWriteParameter() extends Parameter:
-  val command    = RegField("command", 8).writeReadyValid
-  val ctrl       = RegField("ctrl", 8).writeValue
+  val command      = RegField("command", 8).writeReadyValid
+  val ctrl         = RegField("ctrl", 8).writeValue
   val verification = Layer("Verification")
-  val regMap     = RegMapDefinition(
+  val regMap       = RegMapDefinition(
     indexWidth = 6,
     dataWidth = 32,
     queueEntries = 1,
@@ -216,16 +216,16 @@ object RegMapWrite extends Generator[RegMapWriteParameter, RegMapWriteLayers, Re
     heldWriteData     := writeData
     heldCtrl          := ctrl
 
-    val requestStable  = !requestWasStalled | (
+    val requestStable = !requestWasStalled | (
       io.req.valid & (io.req.bits.read === heldRequestRead) & (io.req.bits.index === heldRequestIndex) &
         (io.req.bits.data === heldRequestData) & (io.req.bits.mask === heldRequestMask)
     )
-    val commandStable  = !commandWasStalled | (io.commandValid & (io.commandData === heldCommandData))
-    val commandExact   =
+    val commandStable = !commandWasStalled | (io.commandValid & (io.commandData === heldCommandData))
+    val commandExact  =
       (commandFire === (acceptedWrite(0) & lane0)) & (!commandFire | (io.commandData === writeData))
-    val writeAnswered  = !writeAccepted | (io.rsp.valid & !io.rsp.bits.read)
-    val ctrlUpdated    = !ctrlWritten | (ctrl === heldWriteData)
-    val ctrlHeld       = previousReset | ctrlWritten | (ctrl === heldCtrl)
+    val writeAnswered = !writeAccepted | (io.rsp.valid & !io.rsp.bits.read)
+    val ctrlUpdated   = !ctrlWritten | (ctrl === heldWriteData)
+    val ctrlHeld      = previousReset | ctrlWritten | (ctrl === heldCtrl)
 
     Contract(requestStable, commandStable, commandExact, writeAnswered, ctrlUpdated, ctrlHeld):
       (requestStable, commandStable, commandExact, writeAnswered, ctrlUpdated, ctrlHeld) =>

@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.magic.DynamicSubfield
 import me.jiuyang.zaozi.reftpe.Ref
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 // The ProbeBundle is only defined at the interface of a module
 trait ProbeBundle extends Aggregate with DynamicSubfield:
@@ -33,7 +33,7 @@ trait ProbeBundle extends Aggregate with DynamicSubfield:
     refer:        Value,
     fieldValName: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     sourcecode.File,
@@ -49,7 +49,7 @@ trait ProbeBundle extends Aggregate with DynamicSubfield:
     refer:        Value,
     fieldValName: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     sourcecode.File,
@@ -62,7 +62,7 @@ trait ProbeBundle extends Aggregate with DynamicSubfield:
   )
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl

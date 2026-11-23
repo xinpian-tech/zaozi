@@ -2,12 +2,11 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.support
 
-import org.llvm.mlir.*
-
-import java.lang.foreign.MemorySegment
+import org.llvm.mlir.raw.structs as MlirStructs
+import scala.scalanative.unsafe.*
 
 given TypeIDApi with
   extension (typeID: TypeID)
-    inline def segment: MemorySegment = typeID._segment
-    inline def sizeOf:  Int           = MlirTypeID.sizeof().toInt
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirTypeID].toInt
 end given

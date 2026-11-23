@@ -10,12 +10,12 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given VecUtilsApi with
   extension [E <: Data, V <: Vec[E], R <: Referable[V]](ref: R)
     def toSeq(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -30,7 +30,7 @@ given VecUtilsApi with
 
   extension [E <: Connectable](seq: Seq[Referable[E]])
     def toVec(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

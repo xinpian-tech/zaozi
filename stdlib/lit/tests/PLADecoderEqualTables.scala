@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jiuyang Liu <liu@jiuyang.me>
 
 // Two decoders whose tables match the same values but are written differently simplify to one module.
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class EqualTables %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class EqualTables %s --
 // RUN: rm -rf %t && mkdir -p %t && cd %t
 // RUN: %{test} config %t/config.json --width 3
 // RUN: %{test} design %t/config.json
@@ -41,10 +41,10 @@ class EqualTablesProbe(parameter: EqualTablesParameter)
 object EqualTables extends Generator[EqualTablesParameter, EqualTablesLayers, EqualTablesIO, EqualTablesProbe]:
   override def moduleName(parameter: EqualTablesParameter): String = "EqualTables"
   def architecture(parameter: EqualTablesParameter) =
-    val io = summon[Interface[EqualTablesIO]]
+    val io     = summon[Interface[EqualTablesIO]]
     val first  = PLADecoder.instantiate(DecoderParameter("D", Seq(TruthTable("[t][n][y:1,n:0][1??:y]"))))
     val second = PLADecoder.instantiate(DecoderParameter("D", Seq(TruthTable("[t][n][y:1,n:0][10?|11?:y]"))))
     first.io.instruction  := io.i
     second.io.instruction := io.i
-    io.a := first.io.output.field[Bits]("t")
-    io.b := second.io.output.field[Bits]("t")
+    io.a                  := first.io.output.field[Bits]("t")
+    io.b                  := second.io.output.field[Bits]("t")

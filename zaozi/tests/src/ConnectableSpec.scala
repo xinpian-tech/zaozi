@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.reftpe.{Interface, ProbeInterface}
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import utest.*
 
 case class ConnParameter(width: Int) extends Parameter

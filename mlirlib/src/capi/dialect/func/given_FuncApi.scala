@@ -2,6 +2,12 @@
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
 package org.llvm.mlir.scalalib.capi.dialect.func
 
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.{nativeResult, toMlirArray}
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import org.llvm.mlir.scalalib.capi.ir.{
   AttributeApi,
   Block,
@@ -15,21 +21,20 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given
 }
 
-import java.lang.foreign.Arena
 import org.llvm.mlir.scalalib.capi.support.given
 
 // Structure
 given FuncApi with
   inline def op(
-    symName:     String
+    symName:    String
     // funcType: Type,
     // symVisibility: String,
     // argAttrs: Seq[NamedAttribute],
     // resAttrs: Seq[NamedAttribute],
     // noInline: Boolean,
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Func = Func(
     summon[OperationApi].operationCreate(
       name = "func.func",
@@ -69,13 +74,20 @@ given FuncApi with
     results:        Seq[Type],
     emitCInterface: Boolean
   )(
-    using arena:    Arena,
+    using zone:     Zone,
     context:        Context
   ): Func =
     val location     = summon[LocationApi].locationUnknownGet
     val functionType = Type(
-      org.llvm.mlir.CAPI
-        .mlirFunctionTypeGet(arena, context.segment, inputs.size, inputs.toMlirArray, results.size, results.toMlirArray)
+      nativeResult[MlirStructs.MlirType](out =>
+        mlirApi.mlirFunctionTypeGet(
+          context.native,
+          inputs.size.toSize,
+          inputs.toMlirArray,
+          results.size.toSize,
+          results.toMlirArray
+        )(out)
+      )
     )
     val named        = summon[NamedAttributeApi]
     Func(
@@ -95,12 +107,12 @@ given FuncApi with
 
   extension (c:   Func)
     inline def block(
-      using Arena
+      using Zone
     ): Block = c.operation.getFirstRegion.getFirstBlock
     inline def appendToModule(
     )(
-      using arena: Arena,
-      module:      Module
+      using zone: Zone,
+      module:     Module
     ): Unit =
       module.getBody.appendOwnedOperation(c.operation)
   extension (ref: Func) def operation: Operation = ref._operation

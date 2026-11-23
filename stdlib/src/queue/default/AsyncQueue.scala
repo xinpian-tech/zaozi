@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib.queue.default
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 import me.jiuyang.stdlib.{BKAIncrementerParameter, BrentKungAdder, BrentKungAdderParameter, Incrementer, PrefixAdderIO}
 import me.jiuyang.stdlib.default.{Ram, RamParameter}
@@ -148,7 +148,7 @@ private final class AsyncDirection(
   synchronizerStages: Int,
   kind:               AsyncDirectionKind
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   sourcecode.File,

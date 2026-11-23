@@ -7,65 +7,14 @@ import mill.scalalib._
 import mill.scalalib.TestModule.Utest
 import mill.scalalib.scalafmt._
 
-import build.{v, PanamaModule, ZaoziPublishModule, ZaoziScalaModule}
+import build.{v, RawBindingsModule, ZaoziPublishModule, ZaoziScalaModule}
 
-object `package` extends ZaoziScalaModule with ScalafmtModule with PanamaModule with ZaoziPublishModule {
-  def scalaVersion = Task(v.scala)
-
-  override def dumpIncludes() = Task.Command {
-    super.dumpIncludes()()
-    includeFiles().foreach { file =>
-      val lines =
-        os.read
-          .lines(file.path)
-          .filter(str => str.contains(mlirInstallPath().toString))
-          // to eliminte error cause by a jextract bug
-          .filter(str => !str.contains("mlirTypeIDAllocatorAllocateTypeID"))
-          .map(_.replaceAll(mlirInstallPath().toString, "\\$MLIR_INSTALL_PATH").trim)
-      os.write.over(file.path, (license ++ lines).mkString("\n"))
-    }
+object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule {
+  object raw   extends RawBindingsModule                          {
+    def group = "mlir"
   }
-
-  def includeConstantsFile = Task.Source(moduleDir / "capi" / "includeConstants.txt")
-
-  def includeFunctionsFile = Task.Source(moduleDir / "capi" / "includeFunctions.txt")
-
-  def includeStructsFile = Task.Source(moduleDir / "capi" / "includeStructs.txt")
-
-  def includeTypedefsFile = Task.Source(moduleDir / "capi" / "includeTypedefs.txt")
-
-  def includeUnionsFile = Task.Source(moduleDir / "capi" / "includeUnions.txt")
-
-  def includeVarsFile = Task.Source(moduleDir / "capi" / "includeVars.txt")
-
-  def linkLibrariesFile = Task.Source(moduleDir / "capi" / "linkLibraries.txt")
-
-  def target = Task("org.llvm.mlir")
-
-  def headerClassName = Task("CAPI")
-
-  def header = Task.Source(moduleDir / "capi" / "jextract-headers.h")
-
-  def mlirInstallPath = Task.Input(
-    os.Path(Task.env.getOrElse("MLIR_INSTALL_PATH", "MLIR_INSTALL_PATH not found, you are not in the nix env?"))
-  )
-
-  def jextractBinary = Task.Input(
-    os.Path(
-      Task.env.getOrElse("JEXTRACT_INSTALL_PATH", "JEXTRACT_INSTALL_PATH not found, you are not in the nix env?")
-    ) / "bin" / "jextract"
-  )
-
-  def includePaths = Task(Seq(PathRef(mlirInstallPath() / "include")))
-
-  def libraryPaths = Task(Seq(PathRef(mlirInstallPath() / "lib")))
-
-  object tests extends ScalaTests with ScalafmtModule with Utest {
-    def mvnDeps = Seq(v.utest)
-
-    override def forkArgs: T[Seq[String]] = Task(
-      super.forkArgs() ++ Seq("--enable-native-access=ALL-UNNAMED")
-        ++ libraryPaths().map(p => s"-Djava.library.path=${p.path}")
-    )
+  def moduleDeps = Seq(raw)
+  object tests extends NativeTests with ScalafmtModule with Utest {
+    override def mvnDeps = super.mvnDeps() ++ Seq(v.utest)
   }
 }

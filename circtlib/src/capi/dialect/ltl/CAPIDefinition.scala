@@ -7,7 +7,7 @@ package org.llvm.circt.scalalib.capi.dialect.ltl
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 enum LTLClockEdge:
   case Pos
@@ -23,8 +23,8 @@ trait LTLClockEdgeApi extends HasSizeOf[LTLClockEdge] with EnumHasToNative[LTLCl
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
@@ -38,12 +38,12 @@ end DialectApi
   */
 trait TypeApi:
   inline def sequenceTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def propertyTypeGet(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   extension (tpe: Type)
     inline def isSequence: Boolean
@@ -60,8 +60,8 @@ end TypeApi
 trait AttributeApi:
   extension (edge:      LTLClockEdge)
     inline def toAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):      Attribute
   extension (attribute: Attribute)
     inline def isClockEdgeAttr:       Boolean

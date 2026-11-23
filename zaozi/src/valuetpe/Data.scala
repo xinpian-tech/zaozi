@@ -7,7 +7,7 @@ import me.jiuyang.zaozi.magic.{DynamicSubfield, UntypedDynamicSubfield}
 
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait Data:
   // toMlirType is called lazily when constructing MLIR operations.
@@ -16,12 +16,12 @@ trait Data:
   // To query type information from existing operations, use methods like ref.width
   // which retrieve data directly from MLIR instead of the cached Scala fields.
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type
   def width(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Int = this.widthImpl

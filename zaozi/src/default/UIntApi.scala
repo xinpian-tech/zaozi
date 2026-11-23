@@ -29,12 +29,12 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
 }
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given UIntApi with
   extension [LHS <: Referable[UInt]](ref: LHS)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -56,7 +56,7 @@ given UIntApi with
     def +[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -80,7 +80,7 @@ given UIntApi with
     def -[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -104,7 +104,7 @@ given UIntApi with
     def *[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -128,7 +128,7 @@ given UIntApi with
     def /[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -152,7 +152,7 @@ given UIntApi with
     def %[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -176,7 +176,7 @@ given UIntApi with
     def <[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -199,7 +199,7 @@ given UIntApi with
     def <=[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -223,7 +223,7 @@ given UIntApi with
     def >[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -247,7 +247,7 @@ given UIntApi with
     def >=[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -271,7 +271,7 @@ given UIntApi with
     def ===[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -295,7 +295,7 @@ given UIntApi with
     def =/=[RHS <: Referable[UInt]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -319,7 +319,7 @@ given UIntApi with
     def <<(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -349,7 +349,7 @@ given UIntApi with
     def >>(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

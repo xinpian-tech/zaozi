@@ -2,18 +2,25 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.ltl
 
-import org.llvm.circt.CAPI.{ltlAttrIsAClockEdgeAttr, ltlClockEdgeAttrGet, ltlClockEdgeAttrGetValue}
-import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.enumerations as CEnums
+import org.llvm.circt.raw.functions as circtApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, given}
 
 given AttributeApi with
   extension (edge:      LTLClockEdge)
     inline def toAttribute(
-      using arena: Arena,
-      context:     Context
-    ): Attribute = Attribute(ltlClockEdgeAttrGet(arena, context.segment, edge.toNative))
+      using zone: Zone,
+      context:    Context
+    ): Attribute = Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out =>
+        circtApi.ltlClockEdgeAttrGet(context.native, CEnums.LTLClockEdge.define(edge.toNative))(out)
+      )
+    )
   extension (attribute: Attribute)
-    inline def isClockEdgeAttr:       Boolean      = ltlAttrIsAClockEdgeAttr(attribute.segment)
-    inline def clockEdgeAttrGetValue: LTLClockEdge = ltlClockEdgeAttrGetValue(attribute.segment).fromNative
+    inline def isClockEdgeAttr:       Boolean      = circtApi.ltlAttrIsAClockEdgeAttr(attribute.native)
+    inline def clockEdgeAttrGetValue: LTLClockEdge = circtApi.ltlClockEdgeAttrGetValue(attribute.native).int.fromNative
 end given

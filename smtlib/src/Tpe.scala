@@ -6,12 +6,12 @@ import me.jiuyang.smtlib.TypeImpl
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, Operation, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import scala.language.dynamics
 
 trait Data:
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type
@@ -21,7 +21,7 @@ trait Array[T <: Data, U <: Data] extends Data:
   private[smtlib] val _rangeType:  U
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl
@@ -31,21 +31,21 @@ trait BitVector extends Data:
   private[smtlib] val _width:    Int
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl
 
 trait Bool extends Data:
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl
 
 trait SInt extends Data:
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl
@@ -55,7 +55,7 @@ trait SMTFunc[+T <: Data, U <: Data] extends Data:
   private[smtlib] val _rangeType:   U
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl
@@ -65,7 +65,7 @@ trait Sort[+T <: Data] extends Data:
   private[smtlib] val _sortParams: Seq[T]
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl
@@ -74,7 +74,7 @@ trait Referable[T <: Data] extends Dynamic:
   private[smtlib] val _tpe: T
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value
 
@@ -94,7 +94,7 @@ trait Const[T <: Data] extends Referable[T] with HasOperation:
   ): Operation = this.operationImpl
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value = this.referImpl
 
@@ -107,6 +107,6 @@ trait Ref[T <: Data] extends Referable[T] with HasOperation:
   ): Operation = this.operationImpl
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value = this.referImpl

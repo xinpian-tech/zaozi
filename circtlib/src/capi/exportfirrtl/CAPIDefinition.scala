@@ -5,13 +5,13 @@ package org.llvm.circt.scalalib.capi.exportfirrtl
 import org.llvm.mlir.scalalib.capi.support.LogicalResult
 import org.llvm.mlir.scalalib.capi.ir.Module
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait ExportFirrtlApi:
   extension (module: Module)
     inline def exportFIRRTL(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult
 end ExportFirrtlApi

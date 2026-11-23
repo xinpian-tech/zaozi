@@ -2,98 +2,102 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.moore
 
-import org.llvm.circt.CAPI.{
-  mooreArrayTypeGet,
-  mooreAssocArrayTypeGet,
-  mooreChandleTypeGet,
-  mooreEventTypeGet,
-  mooreIntTypeGetInt,
-  mooreIntTypeGetLogic,
-  mooreIsFourValuedType,
-  mooreIsTwoValuedType,
-  mooreOpenArrayTypeGet,
-  mooreOpenUnpackedArrayTypeGet,
-  mooreQueueTypeGet,
-  mooreRealTypeGet,
-  mooreStringTypeGet,
-  mooreUnpackedArrayTypeGet,
-  mooreVoidTypeGet
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type, given}
-
-import java.lang.foreign.Arena
 
 given TypeApi with
   inline def arrayTypeGet(
     size:        Int,
     elementType: Type
   )(
-    using arena: Arena
-  ): Type = Type(mooreArrayTypeGet(arena, size, elementType.segment))
+    using zone:  Zone
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreArrayTypeGet(size.toUInt, elementType.native)(out))
+  )
   inline def assocArrayTypeGet(
     elementType: Type,
     indexType:   Type
   )(
-    using arena: Arena
-  ): Type = Type(mooreAssocArrayTypeGet(arena, elementType.segment, indexType.segment))
+    using zone:  Zone
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out =>
+      circtApi.mooreAssocArrayTypeGet(elementType.native, indexType.native)(out)
+    )
+  )
   inline def chandleTypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreChandleTypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.mooreChandleTypeGet(context.native)(out)))
   inline def eventTypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreEventTypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.mooreEventTypeGet(context.native)(out)))
   inline def intTypeGetInt(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreIntTypeGetInt(arena, context.segment, width))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreIntTypeGetInt(context.native, width.toUInt)(out))
+  )
   inline def intTypeGetLogic(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreIntTypeGetLogic(arena, context.segment, width))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreIntTypeGetLogic(context.native, width.toUInt)(out))
+  )
   extension (tpe: Type)
-    inline def isFourValuedType(): Boolean = mooreIsFourValuedType(tpe.segment)
-    inline def isTwoValuedType():  Boolean = mooreIsTwoValuedType(tpe.segment)
+    inline def isFourValuedType(): Boolean = circtApi.mooreIsFourValuedType(tpe.native)
+    inline def isTwoValuedType():  Boolean = circtApi.mooreIsTwoValuedType(tpe.native)
   inline def openArrayTypeGet(
     elementType: Type
   )(
-    using arena: Arena
-  ): Type = Type(mooreOpenArrayTypeGet(arena, elementType.segment))
+    using zone:  Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.mooreOpenArrayTypeGet(elementType.native)(out)))
   inline def openUnpackedArrayTypeGet(
     elementType: Type
   )(
-    using arena: Arena
-  ): Type = Type(mooreOpenUnpackedArrayTypeGet(arena, elementType.segment))
+    using zone:  Zone
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreOpenUnpackedArrayTypeGet(elementType.native)(out))
+  )
   inline def queueTypeGet(
     elementType: Type,
     bound:       Int
   )(
-    using arena: Arena
-  ): Type = Type(mooreQueueTypeGet(arena, elementType.segment, bound))
+    using zone:  Zone
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreQueueTypeGet(elementType.native, bound.toUInt)(out))
+  )
   inline def realTypeGet(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreRealTypeGet(arena, context.segment, width))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreRealTypeGet(context.native, width.toUInt)(out))
+  )
   inline def stringTypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreStringTypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.mooreStringTypeGet(context.native)(out)))
   inline def unpackedArrayTypeGet(
     size:        Int,
     elementType: Type
   )(
-    using arena: Arena
-  ): Type = Type(mooreUnpackedArrayTypeGet(arena, size, elementType.segment))
+    using zone:  Zone
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out => circtApi.mooreUnpackedArrayTypeGet(size.toUInt, elementType.native)(out))
+  )
   inline def voidTypeGet(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(mooreVoidTypeGet(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.mooreVoidTypeGet(context.native)(out)))
 end given

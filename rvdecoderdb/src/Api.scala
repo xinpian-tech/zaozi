@@ -76,8 +76,19 @@ def csrs(riscvOpcodes: os.Path): Seq[(String, Int)] =
     }.toMap
   )
 
-def extractResource(cl: ClassLoader): os.Path =
-  val rvdecoderdbPath = os.temp.dir()
-  val rvdecoderdbTar  = os.temp(os.read(os.resource(cl) / "riscv-opcodes.tar"))
-  os.proc("tar", "xf", rvdecoderdbTar).call(rvdecoderdbPath)
-  rvdecoderdbPath
+/** Extract the opcode data bundled in the Native library. The caller owns the directory. */
+def extractResource(): os.Path =
+  val stream = Option(EmbeddedOpcodes.getClass.getResourceAsStream("/riscv-opcodes.tar"))
+    .getOrElse(throw new java.io.FileNotFoundException("riscv-opcodes.tar"))
+  try
+    val directory = os.temp.dir()
+    try
+      os.proc("tar", "xf", "-").call(cwd = directory, stdin = stream)
+      directory
+    catch
+      case t: Throwable =>
+        os.remove.all(directory)
+        throw t
+  finally stream.close()
+
+private object EmbeddedOpcodes

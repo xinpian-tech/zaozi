@@ -14,27 +14,26 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{
   VerifRequireApi,
   given
 }
-import org.llvm.mlir.MlirOperation
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 export given_ContractApi.{Contract, Ensure, Require}
 
 given ContractApi with
   private def inContract(
-    using Arena,
+    using Zone,
     Block
   ): Boolean =
     Iterator
       .iterate(summon[Block].getParentOperation)(_.getParentOperation)
-      .takeWhile(op => MlirOperation.ptr(op.segment).address != 0)
+      .takeWhile(op => !op.isNull)
       .exists(_.getName.str == "firrtl.contract")
 
   private def propertyValue(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value =
     property match
@@ -46,9 +45,9 @@ given ContractApi with
     args:        In = EmptyTuple
   )(
     using shape: ContractArgs[In, Out]
-  )(body:        Out => (Arena, Context, Block) ?=> Unit
+  )(body:        Out => (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -64,7 +63,7 @@ given ContractApi with
       val block    = contract.block
       val bodyArgs = shape.results(args, block.getArgument)
       body(bodyArgs)(
-        using summon[Arena],
+        using summon[Zone],
         summon[Context],
         block
       )
@@ -79,7 +78,7 @@ given ContractApi with
   def Require(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -93,7 +92,7 @@ given ContractApi with
   def Ensure(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -108,7 +107,7 @@ given ContractApi with
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -125,7 +124,7 @@ given ContractApi with
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

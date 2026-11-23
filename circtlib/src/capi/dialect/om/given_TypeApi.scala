@@ -2,57 +2,44 @@
 // SPDX-FileCopyrightText: 2025 Yuhang Zeng <unlsycn@unlsycn.com>
 package org.llvm.circt.scalalib.capi.dialect.om
 
-import org.llvm.circt.*
-import org.llvm.circt.CAPI.{
-  omAnyTypeGetTypeID,
-  omClassTypeGetName,
-  omClassTypeGetTypeID,
-  omFrozenBasePathTypeGetTypeID,
-  omFrozenPathTypeGetTypeID,
-  omListTypeGetElementType,
-  omListTypeGetTypeID,
-  omTypeIsAAnyType,
-  omTypeIsAClassType,
-  omTypeIsAFrozenBasePathType,
-  omTypeIsAFrozenPathType,
-  omTypeIsAListType,
-  omTypeIsAStringType
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
 
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Identifier, Type, given}
 
-import java.lang.foreign.Arena
-
 given TypeApi with
   inline def anyTypeGetTypeID(
-    using arena: Arena
-  ): TypeID = TypeID(omAnyTypeGetTypeID(arena))
+    using zone: Zone
+  ): TypeID = TypeID(nativeResult[MlirStructs.MlirTypeID](out => circtApi.omAnyTypeGetTypeID()(out)))
   extension (tpe: Type)
     inline def classTypeGetName(
-      using arena: Arena
-    ): Identifier = Identifier(omClassTypeGetName(arena, tpe.segment))
+      using zone: Zone
+    ): Identifier = Identifier(
+      nativeResult[MlirStructs.MlirIdentifier](out => circtApi.omClassTypeGetName(tpe.native)(out))
+    )
   inline def classTypeGetTypeID(
-    using arena: Arena
-  ): TypeID = TypeID(omClassTypeGetTypeID(arena))
+    using zone: Zone
+  ): TypeID = TypeID(nativeResult[MlirStructs.MlirTypeID](out => circtApi.omClassTypeGetTypeID()(out)))
   inline def frozenBasePathTypeGetTypeID(
-    using arena: Arena
-  ): TypeID = TypeID(omFrozenBasePathTypeGetTypeID(arena))
+    using zone: Zone
+  ): TypeID = TypeID(nativeResult[MlirStructs.MlirTypeID](out => circtApi.omFrozenBasePathTypeGetTypeID()(out)))
   inline def frozenPathTypeGetTypeID(
-    using arena: Arena
-  ): TypeID = TypeID(omFrozenPathTypeGetTypeID(arena))
+    using zone: Zone
+  ): TypeID = TypeID(nativeResult[MlirStructs.MlirTypeID](out => circtApi.omFrozenPathTypeGetTypeID()(out)))
   extension (tpe: Type)
     inline def listTypeGetElementType(
-      using arena: Arena
-    ): Type = Type(omListTypeGetElementType(arena, tpe.segment))
+      using zone: Zone
+    ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.omListTypeGetElementType(tpe.native)(out)))
   inline def listTypeGetTypeID(
-    using arena: Arena
-  ): TypeID = TypeID(omListTypeGetTypeID(arena))
+    using zone: Zone
+  ): TypeID = TypeID(nativeResult[MlirStructs.MlirTypeID](out => circtApi.omListTypeGetTypeID()(out)))
   extension (tpe: Type)
-    inline def isAnyType:            Boolean = omTypeIsAAnyType(tpe.segment)
-    inline def isClassType:          Boolean = omTypeIsAClassType(tpe.segment)
-    inline def isFrozenBasePathType: Boolean = omTypeIsAFrozenBasePathType(tpe.segment)
-    inline def isFrozenPathType:     Boolean = omTypeIsAFrozenPathType(tpe.segment)
-    inline def isListType:           Boolean = omTypeIsAListType(tpe.segment)
-    inline def isStringType:         Boolean = omTypeIsAStringType(tpe.segment)
+    inline def isAnyType:            Boolean = circtApi.omTypeIsAAnyType(tpe.native)
+    inline def isClassType:          Boolean = circtApi.omTypeIsAClassType(tpe.native)
+    inline def isFrozenBasePathType: Boolean = circtApi.omTypeIsAFrozenBasePathType(tpe.native)
+    inline def isFrozenPathType:     Boolean = circtApi.omTypeIsAFrozenPathType(tpe.native)
+    inline def isListType:           Boolean = circtApi.omTypeIsAListType(tpe.native)
+    inline def isStringType:         Boolean = circtApi.omTypeIsAStringType(tpe.native)
 end given

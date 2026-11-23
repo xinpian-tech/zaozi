@@ -3,316 +3,302 @@
 
 package org.llvm.circt.scalalib.capi.firtool
 
-import org.llvm.circt.CAPI.{
-  circtFirtoolOptionsCreateDefault,
-  circtFirtoolOptionsDestroy,
-  circtFirtoolOptionsSetAddMuxPragmas,
-  circtFirtoolOptionsSetAddVivadoRAMAddressConflictSynthesisBugWorkaround,
-  circtFirtoolOptionsSetBlackBoxRootPath,
-  circtFirtoolOptionsSetBuildMode,
-  circtFirtoolOptionsSetCkgEnableName,
-  circtFirtoolOptionsSetCkgInputName,
-  circtFirtoolOptionsSetCkgModuleName,
-  circtFirtoolOptionsSetCkgOutputName,
-  circtFirtoolOptionsSetCkgTestEnableName,
-  circtFirtoolOptionsSetCompanionMode,
-  circtFirtoolOptionsSetDisableAggressiveMergeConnections,
-  circtFirtoolOptionsSetDisableAnnotationsClassless,
-  circtFirtoolOptionsSetDisableCSEinClasses,
-  circtFirtoolOptionsSetDisableLayerSink,
-  circtFirtoolOptionsSetDisableOptimization,
-  circtFirtoolOptionsSetDisableRandom,
-  circtFirtoolOptionsSetDisableUnknownAnnotations,
-  circtFirtoolOptionsSetEmitSeparateAlwaysBlocks,
-  circtFirtoolOptionsSetEnableAnnotationWarning,
-  circtFirtoolOptionsSetEnableDebugInfo,
-  circtFirtoolOptionsSetExportModuleHierarchy,
-  circtFirtoolOptionsSetIgnoreReadEnableMem,
-  circtFirtoolOptionsSetLowerAnnotationsNoRefTypePorts,
-  circtFirtoolOptionsSetLowerMemories,
-  circtFirtoolOptionsSetNoDedup,
-  circtFirtoolOptionsSetOutputAnnotationFilename,
-  circtFirtoolOptionsSetOutputFilename,
-  circtFirtoolOptionsSetPreserveAggregate,
-  circtFirtoolOptionsSetPreserveValues,
-  circtFirtoolOptionsSetReplSeqMem,
-  circtFirtoolOptionsSetReplSeqMemFile,
-  circtFirtoolOptionsSetSelectDefaultInstanceChoice,
-  circtFirtoolOptionsSetStripDebugInfo,
-  circtFirtoolOptionsSetStripFirDebugInfo,
-  circtFirtoolOptionsSetVbToBv,
-  circtFirtoolOptionsSetVerificationFlavor,
-  circtFirtoolPopulateCHIRRTLToLowFIRRTL,
-  circtFirtoolPopulateExportSplitVerilog,
-  circtFirtoolPopulateExportVerilog,
-  circtFirtoolPopulateFinalizeIR,
-  circtFirtoolPopulateHWToSV,
-  circtFirtoolPopulateLowFIRRTLToHW,
-  circtFirtoolPopulatePreprocessTransforms
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.structs as CirctStructs
+import org.llvm.circt.raw.enumerations as CEnums
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.pass.{PassManager, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
 given FirtoolApi with
   inline def firtoolOptionsCreateDefault(
-    using arena: Arena
-  ): FirtoolOptions = FirtoolOptions(circtFirtoolOptionsCreateDefault(arena))
+    using zone: Zone
+  ): FirtoolOptions = FirtoolOptions(
+    nativeResult[CirctStructs.CirctFirtoolFirtoolOptions](out => circtApi.circtFirtoolOptionsCreateDefault()(out))
+  )
   extension (firtoolOptions: FirtoolOptions)
     inline def destroy(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsDestroy(firtoolOptions.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsDestroy(firtoolOptions.native)
     inline def setAddMuxPragmas(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetAddMuxPragmas(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetAddMuxPragmas(firtoolOptions.native, value)
     inline def setAddVivadoRAMAddressConflictSynthesisBugWorkaround(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetAddVivadoRAMAddressConflictSynthesisBugWorkaround(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit =
+      circtApi.circtFirtoolOptionsSetAddVivadoRAMAddressConflictSynthesisBugWorkaround(firtoolOptions.native, value)
     inline def setBlackBoxRootPath(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetBlackBoxRootPath(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetBlackBoxRootPath(firtoolOptions.native, value.toStringRef.native)
     inline def setBuildMode(
-      value:       CirctFirtoolBuildMode
+      value:      CirctFirtoolBuildMode
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetBuildMode(firtoolOptions.segment, value.toNative)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetBuildMode(
+      firtoolOptions.native,
+      CEnums.CirctFirtoolBuildMode.define(value.toNative)
+    )
     inline def setCkgEnableName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetCkgEnableName(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetCkgEnableName(firtoolOptions.native, value.toStringRef.native)
     inline def setCkgInputName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetCkgInputName(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetCkgInputName(firtoolOptions.native, value.toStringRef.native)
     inline def setCkgModuleName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetCkgModuleName(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetCkgModuleName(firtoolOptions.native, value.toStringRef.native)
     inline def setCkgOutputName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetCkgOutputName(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetCkgOutputName(firtoolOptions.native, value.toStringRef.native)
     inline def setCkgTestEnableName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetCkgTestEnableName(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetCkgTestEnableName(firtoolOptions.native, value.toStringRef.native)
     inline def setCompanionMode(
-      value:       CirctFirtoolCompanionMode
+      value:      CirctFirtoolCompanionMode
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetCompanionMode(firtoolOptions.segment, value.toNative)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetCompanionMode(
+      firtoolOptions.native,
+      CEnums.CirctFirtoolCompanionMode.define(value.toNative)
+    )
     inline def setDisableAggressiveMergeConnections(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableAggressiveMergeConnections(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableAggressiveMergeConnections(firtoolOptions.native, value)
     inline def setDisableAnnotationsClassless(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableAnnotationsClassless(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableAnnotationsClassless(firtoolOptions.native, value)
     inline def setDisableCSEinClasses(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableCSEinClasses(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableCSEinClasses(firtoolOptions.native, value)
     inline def setDisableLayerSink(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableLayerSink(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableLayerSink(firtoolOptions.native, value)
     inline def setDisableOptimization(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableOptimization(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableOptimization(firtoolOptions.native, value)
     inline def setDisableRandom(
-      value:       CirctFirtoolRandomKind
+      value:      CirctFirtoolRandomKind
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableRandom(firtoolOptions.segment, value.toNative)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableRandom(
+      firtoolOptions.native,
+      CEnums.CirctFirtoolRandomKind.define(value.toNative)
+    )
     inline def setDisableUnknownAnnotations(
-      disable:     Boolean
+      disable:    Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetDisableUnknownAnnotations(firtoolOptions.segment, disable)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetDisableUnknownAnnotations(firtoolOptions.native, disable)
     inline def setEmitSeparateAlwaysBlocks(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetEmitSeparateAlwaysBlocks(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetEmitSeparateAlwaysBlocks(firtoolOptions.native, value)
     inline def setEnableAnnotationWarning(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetEnableAnnotationWarning(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetEnableAnnotationWarning(firtoolOptions.native, value)
     inline def setEnableDebugInfo(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetEnableDebugInfo(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetEnableDebugInfo(firtoolOptions.native, value)
     inline def setExportModuleHierarchy(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetExportModuleHierarchy(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetExportModuleHierarchy(firtoolOptions.native, value)
     inline def setIgnoreReadEnableMem(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetIgnoreReadEnableMem(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetIgnoreReadEnableMem(firtoolOptions.native, value)
     inline def setLowerAnnotationsNoRefTypePorts(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetLowerAnnotationsNoRefTypePorts(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetLowerAnnotationsNoRefTypePorts(firtoolOptions.native, value)
     inline def setLowerMemories(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetLowerMemories(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetLowerMemories(firtoolOptions.native, value)
     inline def setNoDedup(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetNoDedup(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetNoDedup(firtoolOptions.native, value)
     inline def setOutputAnnotationFilename(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetOutputAnnotationFilename(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetOutputAnnotationFilename(firtoolOptions.native, value.toStringRef.native)
     inline def setOutputFilename(
-      filename:    String
+      filename:   String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetOutputFilename(firtoolOptions.segment, filename.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetOutputFilename(firtoolOptions.native, filename.toStringRef.native)
     inline def setPreserveAggregate(
-      value:       CirctFirtoolPreserveAggregateMode
+      value:      CirctFirtoolPreserveAggregateMode
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetPreserveAggregate(firtoolOptions.segment, value.toNative)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetPreserveAggregate(
+      firtoolOptions.native,
+      CEnums.CirctFirtoolPreserveAggregateMode.define(value.toNative)
+    )
     inline def setPreserveValues(
-      value:       CirctFirtoolPreserveValuesMode
+      value:      CirctFirtoolPreserveValuesMode
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetPreserveValues(firtoolOptions.segment, value.toNative)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetPreserveValues(
+      firtoolOptions.native,
+      CEnums.CirctFirtoolPreserveValuesMode.define(value.toNative)
+    )
     inline def setReplSeqMem(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetReplSeqMem(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetReplSeqMem(firtoolOptions.native, value)
     inline def setReplSeqMemFile(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetReplSeqMemFile(firtoolOptions.segment, value.toStringRef.segment)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetReplSeqMemFile(firtoolOptions.native, value.toStringRef.native)
     inline def setSelectDefaultInstanceChoice(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetSelectDefaultInstanceChoice(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetSelectDefaultInstanceChoice(firtoolOptions.native, value)
     inline def setStripDebugInfo(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetStripDebugInfo(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetStripDebugInfo(firtoolOptions.native, value)
     inline def setStripFirDebugInfo(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetStripFirDebugInfo(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetStripFirDebugInfo(firtoolOptions.native, value)
     inline def setVbToBv(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetVbToBv(firtoolOptions.segment, value)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetVbToBv(firtoolOptions.native, value)
     inline def setVerificationFlavor(
-      value:       CirctFirtoolVerificationFlavor
+      value:      CirctFirtoolVerificationFlavor
     )(
-      using arena: Arena
-    ): Unit = circtFirtoolOptionsSetVerificationFlavor(firtoolOptions.segment, value.toNative)
+      using zone: Zone
+    ): Unit = circtApi.circtFirtoolOptionsSetVerificationFlavor(
+      firtoolOptions.native,
+      CEnums.CirctFirtoolVerificationFlavor.define(value.toNative)
+    )
   extension (pm:             PassManager)
     // See inputFilename usage in https://github.com/llvm/circt/blob/ff847edb042541c44c79b59f1a680f641241b485/lib/Firtool/Firtool.cpp#L254
     def chirrtlToLowFIRRTL(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult = LogicalResult(
-      circtFirtoolPopulateCHIRRTLToLowFIRRTL(
-        arena,
-        pm.segment,
-        firtoolOptions.segment
+      nativeResult[MlirStructs.MlirLogicalResult](out =>
+        circtApi.circtFirtoolPopulateCHIRRTLToLowFIRRTL(pm.native, firtoolOptions.native)(out)
       )
     )
     def exportSplitVerilog(
       firtoolOptions: FirtoolOptions,
       directory:      String
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult = LogicalResult(
-      circtFirtoolPopulateExportSplitVerilog(
-        arena,
-        pm.segment,
-        firtoolOptions.segment,
-        directory.toStringRef.segment
+      nativeResult[MlirStructs.MlirLogicalResult](out =>
+        circtApi.circtFirtoolPopulateExportSplitVerilog(pm.native, firtoolOptions.native, directory.toStringRef.native)(
+          out
+        )
       )
     )
     def exportVerilog(
       firtoolOptions: FirtoolOptions,
       callback:       String => Unit
     )(
-      using arena:    Arena
-    ): LogicalResult = LogicalResult(
-      circtFirtoolPopulateExportVerilog(
-        arena,
-        pm.segment,
-        firtoolOptions.segment,
-        callback.stringToStringCallback.segment,
-        MemorySegment.NULL
+      using zone:     Zone
+    ): LogicalResult =
+      val data = NativeCallbacks.retain(callback.stringToStringCallback.consume)
+      pm._callbackStates.add(data)
+      LogicalResult(
+        nativeResult[MlirStructs.MlirLogicalResult](out =>
+          circtApi.circtFirtoolPopulateExportVerilog(
+            pm.native,
+            firtoolOptions.native,
+            CallbackFunctions.string(),
+            data
+          )(out)
+        )
       )
-    )
     def finalizeIR(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult = LogicalResult(
-      circtFirtoolPopulateFinalizeIR(arena, pm.segment, firtoolOptions.segment)
+      nativeResult[MlirStructs.MlirLogicalResult](out =>
+        circtApi.circtFirtoolPopulateFinalizeIR(pm.native, firtoolOptions.native)(out)
+      )
     )
     def hwToSV(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
-    ): LogicalResult = LogicalResult(circtFirtoolPopulateHWToSV(arena, pm.segment, firtoolOptions.segment))
+      using zone:     Zone
+    ): LogicalResult = LogicalResult(
+      nativeResult[MlirStructs.MlirLogicalResult](out =>
+        circtApi.circtFirtoolPopulateHWToSV(pm.native, firtoolOptions.native)(out)
+      )
+    )
     def lowFIRRTLToHW(
       firtoolOptions: FirtoolOptions,
       inputFilename:  String
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult = LogicalResult(
-      circtFirtoolPopulateLowFIRRTLToHW(
-        arena,
-        pm.segment,
-        firtoolOptions.segment,
-        inputFilename.toStringRef.segment
+      nativeResult[MlirStructs.MlirLogicalResult](out =>
+        circtApi.circtFirtoolPopulateLowFIRRTLToHW(pm.native, firtoolOptions.native, inputFilename.toStringRef.native)(
+          out
+        )
       )
     )
     def preprocessTransforms(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult = LogicalResult(
-      circtFirtoolPopulatePreprocessTransforms(arena, pm.segment, firtoolOptions.segment)
+      nativeResult[MlirStructs.MlirLogicalResult](out =>
+        circtApi.circtFirtoolPopulatePreprocessTransforms(pm.native, firtoolOptions.native)(out)
+      )
     )
 end given

@@ -5,11 +5,11 @@ package me.jiuyang.zaozi.valuetpe
 import me.jiuyang.zaozi.TypeImpl
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait Reset extends Element with CanProbe:
   final def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl

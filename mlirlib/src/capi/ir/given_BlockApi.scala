@@ -2,90 +2,90 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirBlockAddArgument,
-  mlirBlockAppendOwnedOperation,
-  mlirBlockArgumentGetOwner,
-  mlirBlockCreate,
-  mlirBlockDestroy,
-  mlirBlockDetach,
-  mlirBlockEraseArgument,
-  mlirBlockGetArgument,
-  mlirBlockGetFirstOperation,
-  mlirBlockGetNextInRegion,
-  mlirBlockGetParentOperation,
-  mlirBlockGetTerminator,
-  mlirBlockInsertArgument,
-  mlirBlockInsertOwnedOperation,
-  mlirBlockInsertOwnedOperationAfter,
-  mlirBlockInsertOwnedOperationBefore,
-  mlirBlockPrint
-}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 given BlockApi with
   inline def blockCreate(
-    args:        Seq[Type],
-    locs:        Seq[Location]
+    args:       Seq[Type],
+    locs:       Seq[Location]
   )(
-    using arena: Arena
+    using zone: Zone
   ): Block =
-    Block(mlirBlockCreate(arena, args.length, args.toMlirArray, locs.toMlirArray))
+    Block(
+      nativeResult[MlirStructs.MlirBlock](out =>
+        mlirApi.mlirBlockCreate(args.length.toSize, args.toMlirArray, locs.toMlirArray)(out)
+      )
+    )
 
   extension (block: Block)
     inline def getParentOperation(
-      using arena: Arena
-    ): Operation = Operation(mlirBlockGetParentOperation(arena, block.segment))
+      using zone: Zone
+    ): Operation = Operation(
+      nativeResult[MlirStructs.MlirOperation](out => mlirApi.mlirBlockGetParentOperation(block.native)(out))
+    )
     inline def getNextInRegion(
-      using arena: Arena
-    ): Block = Block(mlirBlockGetNextInRegion(arena, block.segment))
+      using zone: Zone
+    ): Block = Block(nativeResult[MlirStructs.MlirBlock](out => mlirApi.mlirBlockGetNextInRegion(block.native)(out)))
     inline def getFirstOperation(
-      using arena: Arena
-    ): Operation = Operation(mlirBlockGetFirstOperation(arena, block.segment))
+      using zone: Zone
+    ): Operation = Operation(
+      nativeResult[MlirStructs.MlirOperation](out => mlirApi.mlirBlockGetFirstOperation(block.native)(out))
+    )
     inline def getTerminator(
-      using arena: Arena
-    ): Operation = Operation(mlirBlockGetTerminator(arena, block.segment))
+      using zone: Zone
+    ): Operation = Operation(
+      nativeResult[MlirStructs.MlirOperation](out => mlirApi.mlirBlockGetTerminator(block.native)(out))
+    )
     inline def addArgument(
-      tpe:         Type,
-      loc:         Location
+      tpe:        Type,
+      loc:        Location
     )(
-      using arena: Arena
-    ): Operation = Operation(mlirBlockAddArgument(arena, block.segment, tpe.segment, loc.segment))
+      using zone: Zone
+    ): Value = Value(
+      nativeResult[MlirStructs.MlirValue](out =>
+        mlirApi.mlirBlockAddArgument(block.native, tpe.native, loc.native)(out)
+      )
+    )
     inline def insertArgument(
-      pos:         Int,
-      tpe:         Type,
-      loc:         Location
+      pos:        Int,
+      tpe:        Type,
+      loc:        Location
     )(
-      using arena: Arena
-    ): Operation = Operation(mlirBlockInsertArgument(arena, block.segment, pos, tpe.segment, loc.segment))
+      using zone: Zone
+    ): Value = Value(
+      nativeResult[MlirStructs.MlirValue](out =>
+        mlirApi.mlirBlockInsertArgument(block.native, pos.toSize, tpe.native, loc.native)(out)
+      )
+    )
     inline def getArgument(
-      pos:         Long
+      pos:        Long
     )(
-      using arena: Arena
-    ): Value = Value(mlirBlockGetArgument(arena, block.segment, pos))
-    inline def argumentGetOwner(
-      using arena: Arena
-    ): Block = Block(mlirBlockArgumentGetOwner(arena, block.segment))
-    inline def destroy():                                                              Unit          = mlirBlockDestroy(block.segment)
-    inline def detach():                                                               Unit          = mlirBlockDetach(block.segment)
-    inline def appendOwnedOperation(operation: Operation):                             Unit          =
-      mlirBlockAppendOwnedOperation(block.segment, operation.segment)
-    inline def insertOwnedOperation(pos: Long, operation: Operation):                  Unit          =
-      mlirBlockInsertOwnedOperation(block.segment, pos, operation.segment)
-    inline def insertOwnedOperationAfter(reference: Operation, operation: Operation):  Unit          =
-      mlirBlockInsertOwnedOperationAfter(block.segment, reference.segment, operation.segment)
-    inline def insertOwnedOperationBefore(reference: Operation, operation: Operation): Unit          =
-      mlirBlockInsertOwnedOperationBefore(block.segment, reference.segment, operation.segment)
-    inline def eraseArgument(index: Int):                                              Unit          = mlirBlockEraseArgument(block.segment, index)
+      using zone: Zone
+    ): Value = Value(
+      nativeResult[MlirStructs.MlirValue](out => mlirApi.mlirBlockGetArgument(block.native, pos.toSize)(out))
+    )
+    inline def destroy():                                                              Unit = mlirApi.mlirBlockDestroy(block.native)
+    inline def detach():                                                               Unit = mlirApi.mlirBlockDetach(block.native)
+    inline def appendOwnedOperation(operation: Operation):                             Unit =
+      mlirApi.mlirBlockAppendOwnedOperation(block.native, operation.native)
+    inline def insertOwnedOperation(pos: Long, operation: Operation):                  Unit =
+      mlirApi.mlirBlockInsertOwnedOperation(block.native, pos.toSize, operation.native)
+    inline def insertOwnedOperationAfter(reference: Operation, operation: Operation):  Unit =
+      mlirApi.mlirBlockInsertOwnedOperationAfter(block.native, reference.native, operation.native)
+    inline def insertOwnedOperationBefore(reference: Operation, operation: Operation): Unit =
+      mlirApi.mlirBlockInsertOwnedOperationBefore(block.native, reference.native, operation.native)
+    inline def eraseArgument(index: Int):                                              Unit = mlirApi.mlirBlockEraseArgument(block.native, index.toUInt)
     inline def print(
-      callBack:    String => Unit
+      callBack:   String => Unit
     )(
-      using arena: Arena
-    ): Unit = mlirBlockPrint(block.segment, callBack.stringToStringCallback.segment, MemorySegment.NULL)
-    inline def segment:                                                                MemorySegment = block._segment
-    inline def sizeOf:                                                                 Int           = MlirBlock.sizeof().toInt
+      using zone: Zone
+    ): Unit = callBack.stringToStringCallback.use { (fn, data) => mlirApi.mlirBlockPrint(block.native, fn, data) }
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirBlock].toInt
 
 end given

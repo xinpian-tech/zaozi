@@ -7,7 +7,7 @@ import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, given_LocationApi, Cont
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
 import org.llvm.mlir.scalalib.capi.support.given_LogicalResultApi
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 final class PassRunException(message: String) extends RuntimeException(message)
 
@@ -15,7 +15,7 @@ def withCapturedDiagnostics[A](
   body: => A
 )(
   using Context,
-  Arena
+  Zone
 ): (A, String) =
   val sink      = new StringBuilder
   val handlerId = summon[Context].attachDiagnosticHandler { diagnostic =>
@@ -34,7 +34,7 @@ extension (passManager: PassManager)
     what:      String
   )(
     using Context,
-    Arena
+    Zone
   ): Unit =
     val (result, captured) = withCapturedDiagnostics(passManager.runOnOp(operation))
     if result.failed then

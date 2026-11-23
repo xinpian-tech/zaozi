@@ -16,45 +16,45 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given
 }
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private inline def i64Attr(
-  value:       Long
+  value:      Long
 )(
-  using arena: Arena,
-  context:     Context
+  using zone: Zone,
+  context:    Context
 ): Attribute = value.integerAttrGet(64.integerTypeGet)
 
 private inline def integerRangeAttrs(
-  baseName:    String,
-  base:        Long,
-  moreName:    String,
-  more:        Option[Long]
+  baseName:   String,
+  base:       Long,
+  moreName:   String,
+  more:       Option[Long]
 )(
-  using arena: Arena,
-  context:     Context
+  using zone: Zone,
+  context:    Context
 ): Seq[NamedAttribute] =
   val namedAttributeApi = summon[NamedAttributeApi]
   Seq(namedAttributeApi.namedAttributeGet(baseName.identifierGet, i64Attr(base))) ++
     more.map(value => namedAttributeApi.namedAttributeGet(moreName.identifierGet, i64Attr(value))).toSeq
 
 private inline def sequenceType(
-  using Arena,
+  using Zone,
   Context
 ) = summon[LTLTypeApi].sequenceTypeGet
 
 private inline def propertyType(
-  using Arena,
+  using Zone,
   Context
 ) = summon[LTLTypeApi].propertyTypeGet
 
 given AndApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): And =
     And(
       summon[OperationApi].operationCreate(
@@ -67,17 +67,17 @@ given AndApi with
   extension (ref: And)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given BooleanConstantApi with
   def op(
-    value:       Boolean,
-    location:    Location
+    value:      Boolean,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BooleanConstant =
     BooleanConstant(
       summon[OperationApi].operationCreate(
@@ -92,19 +92,19 @@ given BooleanConstantApi with
   extension (ref: BooleanConstant)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ClockedAtomApi with
   def op(
-    input:       Value,
-    edge:        LTLClockEdge,
-    clock:       Value,
-    location:    Location
+    input:      Value,
+    edge:       LTLClockEdge,
+    clock:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ClockedAtom =
     ClockedAtom(
       summon[OperationApi].operationCreate(
@@ -120,21 +120,21 @@ given ClockedAtomApi with
   extension (ref: ClockedAtom)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ClockedDelayApi with
   def op(
-    input:       Value,
-    edge:        LTLClockEdge,
-    clock:       Value,
-    delay:       Long,
-    length:      Option[Long],
-    location:    Location
+    input:      Value,
+    edge:       LTLClockEdge,
+    clock:      Value,
+    delay:      Long,
+    length:     Option[Long],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ClockedDelay =
     ClockedDelay(
       summon[OperationApi].operationCreate(
@@ -149,17 +149,17 @@ given ClockedDelayApi with
   extension (ref: ClockedDelay)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ConcatApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Concat =
     Concat(
       summon[OperationApi].operationCreate(
@@ -172,18 +172,18 @@ given ConcatApi with
   extension (ref: Concat)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given ImplicationApi with
   def op(
-    antecedent:  Value,
-    consequent:  Value,
-    location:    Location
+    antecedent: Value,
+    consequent: Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Implication =
     Implication(
       summon[OperationApi].operationCreate(
@@ -196,17 +196,17 @@ given ImplicationApi with
   extension (ref: Implication)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given IntersectApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Intersect =
     Intersect(
       summon[OperationApi].operationCreate(
@@ -219,17 +219,17 @@ given IntersectApi with
   extension (ref: Intersect)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given NotApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Not =
     Not(
       summon[OperationApi].operationCreate(
@@ -242,17 +242,17 @@ given NotApi with
   extension (ref: Not)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given OrApi with
   def op(
-    inputs:      Seq[Value],
-    location:    Location
+    inputs:     Seq[Value],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Or =
     Or(
       summon[OperationApi].operationCreate(
@@ -265,19 +265,19 @@ given OrApi with
   extension (ref: Or)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given PastApi with
   def op(
-    input:       Value,
-    delay:       Long,
-    clock:       Value,
-    location:    Location
+    input:      Value,
+    delay:      Long,
+    clock:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Past =
     Past(
       summon[OperationApi].operationCreate(
@@ -293,17 +293,17 @@ given PastApi with
   extension (ref: Past)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given SampledApi with
   def op(
-    expression:  Value,
-    location:    Location
+    expression: Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Sampled =
     Sampled(
       summon[OperationApi].operationCreate(
@@ -316,6 +316,6 @@ given SampledApi with
   extension (ref: Sampled)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given

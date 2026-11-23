@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class ChoiceTop %s
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class ChoiceTop %s
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 // RUN: %{test} -- config %t.dir/config.json
 // RUN: cd %t.dir && %{test} -- design %t.dir/config.json
@@ -11,7 +11,7 @@
 // RUN: FileCheck %s --check-prefix=RTL --input-file=%t.dir/rtl/ChoiceTop.sv
 // RUN: FileCheck %s --check-prefix=LIBRARY --input-file %t.dir/rtl/ClockLibrary_*.sv
 // RUN: mkdir %t.dir/parallel %t.dir/serial && mv %t.dir/*.mlirbc %t.dir/parallel/
-// RUN: cd %t.dir/serial && %{test} --java-opt=-XX:ActiveProcessorCount=1 -- design %t.dir/config.json
+// RUN: cd %t.dir/serial && %onecpu %{test} -- design %t.dir/config.json
 // RUN: diff -r %t.dir/parallel %t.dir/serial
 // RUN: rm -rf %t.dir
 

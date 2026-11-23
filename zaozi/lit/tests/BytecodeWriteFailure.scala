@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS %s
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS %s
 // RUN: rm -rf %t.dir && mkdir -p %t.dir && cd %t.dir
 // RUN: env ZAOZI_OUTDIR=%t.dir %{test}
 // RUN: circt-opt %t.dir/probe.mlirbc -o /dev/null
@@ -8,7 +8,7 @@
 
 package me.jiuyang.zaozi.default
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.Mlir
 import java.nio.file.Files
 import scala.util.Using
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
@@ -20,8 +20,7 @@ object BytecodeWriteFailure:
 
     def publish(configured: Boolean, fail: Boolean): Unit =
       Elaborate.generate("probe") { file =>
-        given arena: Arena = Arena.ofConfined()
-        try
+        Mlir.withZone {
           given context: Context = summon[ContextApi].contextCreateWithThreading(false)
           try
             val module = summon[ModuleApi].moduleCreateParse("module @probe {}")
@@ -41,7 +40,7 @@ object BytecodeWriteFailure:
               }
             finally module.destroy()
           finally context.destroy()
-        finally arena.close()
+        }
       }
 
     val file = os.pwd / "probe.mlirbc"

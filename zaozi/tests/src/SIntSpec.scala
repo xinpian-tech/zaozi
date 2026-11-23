@@ -11,7 +11,7 @@ import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, Context
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
 import utest.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 case class SIntSpecParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[SIntSpecParameter] = upickle.default.macroRW
@@ -68,7 +68,7 @@ object SIntSpec extends TestSuite:
           node: Node[SInt]
         )(
           using Sub[SInt, SInt],
-          Arena,
+          Zone,
           Context,
           Block,
           sourcecode.File,
@@ -83,7 +83,7 @@ object SIntSpec extends TestSuite:
           const: Const[SInt]
         )(
           using Geq[SInt, Bool],
-          Arena,
+          Zone,
           Context,
           Block,
           sourcecode.File,

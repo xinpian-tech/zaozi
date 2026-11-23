@@ -2,163 +2,138 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.conversion
 
-import org.llvm.circt.CAPI.{
-  mlirCreateCIRCTConversionAffineToLoopSchedule,
-  mlirCreateCIRCTConversionCFToHandshake,
-  mlirCreateCIRCTConversionCalyxNative,
-  mlirCreateCIRCTConversionCalyxRemoveGroupsFromFSM,
-  mlirCreateCIRCTConversionCalyxToFSM,
-  mlirCreateCIRCTConversionCalyxToHW,
-  mlirCreateCIRCTConversionConvertCombToArith,
-  mlirCreateCIRCTConversionConvertCombToSMT,
-  mlirCreateCIRCTConversionConvertFSMToSV,
-  mlirCreateCIRCTConversionConvertHWToBTOR2,
-  mlirCreateCIRCTConversionConvertHWToLLVM,
-  mlirCreateCIRCTConversionConvertHWToSMT,
-  mlirCreateCIRCTConversionConvertHWToSystemC,
-  mlirCreateCIRCTConversionConvertMooreToCore,
-  mlirCreateCIRCTConversionConvertVerifToSMT,
-  mlirCreateCIRCTConversionDCToHW,
-  mlirCreateCIRCTConversionExportSplitVerilog,
-  mlirCreateCIRCTConversionExportVerilog,
-  mlirCreateCIRCTConversionHWArithToHW,
-  mlirCreateCIRCTConversionHandshakeRemoveBlock,
-  mlirCreateCIRCTConversionHandshakeToDC,
-  mlirCreateCIRCTConversionHandshakeToHW,
-  mlirCreateCIRCTConversionLegalizeAnonEnums,
-  mlirCreateCIRCTConversionLoopScheduleToCalyx,
-  mlirCreateCIRCTConversionLowerArcToLLVM,
-  mlirCreateCIRCTConversionLowerFIRRTLToHW,
-  mlirCreateCIRCTConversionLowerFirMem,
-  mlirCreateCIRCTConversionLowerHWToSV,
-  mlirCreateCIRCTConversionLowerLTLToCore,
-  mlirCreateCIRCTConversionLowerSMTToZ3LLVM,
-  mlirCreateCIRCTConversionLowerSeqToSV,
-  mlirCreateCIRCTConversionLowerSimToSV,
-  mlirCreateCIRCTConversionLowerVerifToSV,
-  mlirCreateCIRCTConversionMaterializeCalyxToFSM,
-  mlirCreateCIRCTConversionPipelineToHW,
-  mlirCreateCIRCTConversionPrepareForEmission,
-  mlirCreateCIRCTConversionSCFToCalyx,
-  mlirCreateCIRCTConversionTestApplyLoweringOption
-}
-import org.llvm.mlir.scalalib.capi.pass.Pass
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.pass.Pass
 
 given ConversionCreateApi with
   def affineToLoopSchedule(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionAffineToLoopSchedule(arena))
+    using zone: Zone
+  ): Pass = Pass(
+    nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionAffineToLoopSchedule()(out))
+  )
   def cfToHandshake(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionCFToHandshake(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionCFToHandshake()(out)))
   def calyxNative(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionCalyxNative(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionCalyxNative()(out)))
   def calyxRemoveGroupsFromFSM(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionCalyxRemoveGroupsFromFSM(arena))
+    using zone: Zone
+  ): Pass = Pass(
+    nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionCalyxRemoveGroupsFromFSM()(out))
+  )
   def calyxToFSM(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionCalyxToFSM(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionCalyxToFSM()(out)))
   def calyxToHW(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionCalyxToHW(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionCalyxToHW()(out)))
   def convertCombToArith(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertCombToArith(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertCombToArith()(out)))
   def convertCombToSMT(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertCombToSMT(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertCombToSMT()(out)))
   def convertFSMToSV(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertFSMToSV(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertFSMToSV()(out)))
   def convertHWToBTOR2(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertHWToBTOR2(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertHWToBTOR2()(out)))
   def convertHWToLLVM(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertHWToLLVM(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertHWToLLVM()(out)))
   def convertHWToSMT(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertHWToSMT(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertHWToSMT()(out)))
   def convertHWToSystemC(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertHWToSystemC(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertHWToSystemC()(out)))
   def convertMooreToCore(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertMooreToCore(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertMooreToCore()(out)))
   def convertVerifToSMT(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionConvertVerifToSMT(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionConvertVerifToSMT()(out)))
   def dcToHW(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionDCToHW(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionDCToHW()(out)))
   def exportSplitVerilog(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionExportSplitVerilog(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionExportSplitVerilog()(out)))
   def exportVerilog(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionExportVerilog(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionExportVerilog()(out)))
   def hwArithToHW(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionHWArithToHW(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionHWArithToHW()(out)))
   def handshakeRemoveBlock(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionHandshakeRemoveBlock(arena))
+    using zone: Zone
+  ): Pass = Pass(
+    nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionHandshakeRemoveBlock()(out))
+  )
   def handshakeToDC(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionHandshakeToDC(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionHandshakeToDC()(out)))
   def handshakeToHW(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionHandshakeToHW(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionHandshakeToHW()(out)))
   def legalizeAnonEnums(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLegalizeAnonEnums(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLegalizeAnonEnums()(out)))
   def loopScheduleToCalyx(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLoopScheduleToCalyx(arena))
+    using zone: Zone
+  ): Pass = Pass(
+    nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLoopScheduleToCalyx()(out))
+  )
   def lowerArcToLLVM(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerArcToLLVM(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerArcToLLVM()(out)))
   def lowerFIRRTLToHW(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerFIRRTLToHW(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerFIRRTLToHW()(out)))
   def lowerFirMem(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerFirMem(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerFirMem()(out)))
   def lowerHWToSV(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerHWToSV(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerHWToSV()(out)))
   def lowerLTLToCore(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerLTLToCore(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerLTLToCore()(out)))
   def lowerSMTToZ3LLVM(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerSMTToZ3LLVM(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerSMTToZ3LLVM()(out)))
   def lowerSeqToSV(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerSeqToSV(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerSeqToSV()(out)))
   def lowerSimToSV(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerSimToSV(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerSimToSV()(out)))
   def lowerVerifToSV(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionLowerVerifToSV(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionLowerVerifToSV()(out)))
   def materializeCalyxToFSM(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionMaterializeCalyxToFSM(arena))
+    using zone: Zone
+  ): Pass = Pass(
+    nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionMaterializeCalyxToFSM()(out))
+  )
   def pipelineToHW(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionPipelineToHW(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionPipelineToHW()(out)))
   def prepareForEmission(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionPrepareForEmission(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionPrepareForEmission()(out)))
   def scfToCalyx(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionSCFToCalyx(arena))
+    using zone: Zone
+  ): Pass = Pass(nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionSCFToCalyx()(out)))
   def testApplyLoweringOption(
-    using arena: Arena
-  ): Pass = Pass(mlirCreateCIRCTConversionTestApplyLoweringOption(arena))
+    using zone: Zone
+  ): Pass = Pass(
+    nativeResult[MlirStructs.MlirPass](out => circtApi.mlirCreateCIRCTConversionTestApplyLoweringOption()(out))
+  )
 end given

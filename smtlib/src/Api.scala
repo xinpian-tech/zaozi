@@ -5,7 +5,7 @@ package me.jiuyang.smtlib
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value, given}
 import me.jiuyang.smtlib.tpe.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait ConstructorApi:
   // types
@@ -40,7 +40,7 @@ trait ConstructorApi:
   def smtValue[T <: Data](
     rangeType: T
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -54,7 +54,7 @@ trait ConstructorApi:
     domainTypes: Seq[T],
     rangeType:   U
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -67,7 +67,7 @@ trait ConstructorApi:
   def smtDistinct[T <: Data, D <: Referable[T]](
     values: Seq[D]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -78,7 +78,7 @@ trait ConstructorApi:
   def smtAssert(
     value: Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -87,7 +87,7 @@ trait ConstructorApi:
   ): Ref[Bool]
 
   def smtReset(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -98,7 +98,7 @@ trait ConstructorApi:
   def smtSetLogic(
     logic: String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -109,7 +109,7 @@ trait ConstructorApi:
   def smtEq[R <: Referable[?]](
     values: Seq[R]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -122,9 +122,9 @@ trait ConstructorApi:
     weight:        BigInt,
     noPattern:     Boolean,
     boundVarNames: Seq[String]
-  )(body:          (Arena, Context, Block) ?=> Unit
+  )(body:          (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -137,9 +137,9 @@ trait ConstructorApi:
     weight:        BigInt,
     noPattern:     Boolean,
     boundVarNames: Seq[String]
-  )(body:          (Arena, Context, Block) ?=> Unit
+  )(body:          (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -152,7 +152,7 @@ trait ConstructorApi:
   )(thenBody: THEN
   )(elseBody: ELSE
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -163,7 +163,7 @@ trait ConstructorApi:
   def smtPush(
     count: Int
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -174,7 +174,7 @@ trait ConstructorApi:
   def smtPop(
     count: Int
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -183,7 +183,7 @@ trait ConstructorApi:
   ): Unit
 
   def smtCheck(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -194,7 +194,7 @@ trait ConstructorApi:
   def smtYield[T <: Data, R <: Referable[T]](
     values: Seq[R]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -204,7 +204,7 @@ trait ConstructorApi:
 
   /** Executes the checks in the body and returns their statuses in order. No check is added implicitly. When
     * configured, SolverContext.debug receives replayable SMT-LIB before execution. Native storage is owned by the
-    * caller's arena. The body is built once before execution; statuses are available only after it completes.
+    * caller's zone. The body is built once before execution; statuses are available only after it completes.
     * SolverContext resolves Z3_LIB once on the first native execution and shares that library configuration across
     * solver invocations.
     *
@@ -223,9 +223,9 @@ trait ConstructorApi:
     * }}}
     */
   def solver(
-    body: (Arena, Context, Block, SolverContext) ?=> Unit
+    body: (Zone, Context, Block, SolverContext) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     SolverContext,
     sourcecode.File,
@@ -239,43 +239,43 @@ trait TypeImpl:
   // value type
   extension (ref: Array[?, ?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: BitVector)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: Bool)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: SInt)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: SMTFunc[?, ?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: Sort[?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: Const[?])
     def operationImpl: Operation
     def referImpl(
-      using Arena
+      using Zone
     ):                 Value
   extension (ref: Ref[?])
     def operationImpl: Operation
     def referImpl(
-      using Arena
+      using Zone
     ):                 Value
 
 // type operation trait
@@ -286,7 +286,7 @@ trait Ashr[D <: Data, RET <: Data, R <: Referable[D]]:
     def +>>(
       that: R | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -298,7 +298,7 @@ trait Lshr[D <: Data, RET <: Data, R <: Referable[D]]:
     def >>(
       that: R | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -310,7 +310,7 @@ trait Shl[D <: Data, RET <: Data, R <: Referable[D]]:
     def <<(
       that: R | Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -324,7 +324,7 @@ trait Add[D <: Data, RET <: Data, R <: Referable[D]]:
     def +(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -336,7 +336,7 @@ trait Sub[D <: Data, RET <: Data, R <: Referable[D]]:
     def -(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -348,7 +348,7 @@ trait Mul[D <: Data, RET <: Data, R <: Referable[D]]:
     def *(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -360,7 +360,7 @@ trait Div[D <: Data, RET <: Data, R <: Referable[D]]:
     def /(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -372,7 +372,7 @@ trait Rem[D <: Data, RET <: Data, R <: Referable[D]]:
     def %(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -384,7 +384,7 @@ trait Lt[D <: Data, RET <: Data, R <: Referable[D]]:
     def <(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -396,7 +396,7 @@ trait Leq[D <: Data, RET <: Data, R <: Referable[D]]:
     def <=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -408,7 +408,7 @@ trait Gt[D <: Data, RET <: Data, R <: Referable[D]]:
     def >(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -420,7 +420,7 @@ trait Geq[D <: Data, RET <: Data, R <: Referable[D]]:
     def >=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -432,7 +432,7 @@ trait Eq[D <: Data, RET <: Data, R <: Referable[D]]:
     def ===(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -444,7 +444,7 @@ trait Neq[D <: Data, RET <: Data, R <: Referable[D]]:
     def =/=(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -456,7 +456,7 @@ trait And[D <: Data, RET <: Data, R <: Referable[D]]:
     def &(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -468,7 +468,7 @@ trait Or[D <: Data, RET <: Data, R <: Referable[D]]:
     def |(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -481,7 +481,7 @@ trait Xor[D <: Data, RET <: Data, R <: Referable[D]]:
     def ^(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -494,7 +494,7 @@ trait Concat[D <: Data, RET <: Data, R <: Referable[D]]:
     def ++(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -508,7 +508,7 @@ trait Extract[D <: Data, RET <: Data, R <: Referable[D]]:
       lowBit: Int,
       tpe:    RET
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -521,7 +521,7 @@ trait Repeat[D <: Data, RET <: Data, R <: Referable[D]]:
     def repeat(
       tpe: RET
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -532,7 +532,7 @@ trait Repeat[D <: Data, RET <: Data, R <: Referable[D]]:
 trait Neg[D <: Data, RET <: Data, R <: Referable[D]]:
   extension (ref: R)
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -543,7 +543,7 @@ trait Neg[D <: Data, RET <: Data, R <: Referable[D]]:
 trait Not[D <: Data, RET <: Data, R <: Referable[D]]:
   extension (ref: R)
     def unary_~(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -556,7 +556,7 @@ trait Implies[D <: Data, RET <: Data, R <: Referable[D]]:
     def ==>(
       that: R
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -570,7 +570,7 @@ trait Apply[T <: Data, U <: Data, R <: Referable[Array[T, U]]]:
     def apply(
       index: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -584,7 +584,7 @@ trait Update[T <: Data, U <: Data, R <: Referable[Array[T, U]], S <: Referable[U
       index: Int,
       value: S
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -597,7 +597,7 @@ trait BroadCast[T <: Data, U <: Data, R <: Referable[Array[T, U]], S <: Referabl
     def broadcast(
       value: S
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -611,7 +611,7 @@ trait ApplyFunc[T <: Data, U <: Data, R <: Referable[SMTFunc[?, U]], S <: Refera
     def apply(
       args: Seq[S]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

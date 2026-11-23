@@ -6,19 +6,19 @@ import me.jiuyang.zaozi.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Context, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** A clock-less immediate boolean expression. */
 trait Immediate:
   private[zaozi] val _refer: Value
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value = this.referImpl
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl

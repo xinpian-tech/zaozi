@@ -2,159 +2,154 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.hw
 
-import org.llvm.circt.CAPI.{
-  hwAttrIsAInnerRefAttr,
-  hwAttrIsAInnerSymAttr,
-  hwAttrIsAOutputFileAttr,
-  hwAttrIsAParamDeclAttr,
-  hwAttrIsAParamDeclRefAttr,
-  hwAttrIsAParamVerbatimAttr,
-  hwInnerRefAttrGet,
-  hwInnerRefAttrGetModule,
-  hwInnerRefAttrGetName,
-  hwInnerSymAttrGet,
-  hwInnerSymAttrGetEmpty,
-  hwInnerSymAttrGetSymName,
-  hwOutputFileGetFileName,
-  hwOutputFileGetFromFileName,
-  hwParamDeclAttrGet,
-  hwParamDeclAttrGetName,
-  hwParamDeclAttrGetType,
-  hwParamDeclAttrGetValue,
-  hwParamDeclRefAttrGet,
-  hwParamDeclRefAttrGetName,
-  hwParamDeclRefAttrGetType,
-  hwParamVerbatimAttrGet
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
 given AttributeApi with
   extension (attr: Attribute)
-    inline def isInnerRefAttr:      Boolean = hwAttrIsAInnerRefAttr(attr.segment)
-    inline def isInnerSymAttr:      Boolean = hwAttrIsAInnerSymAttr(attr.segment)
-    inline def isOutputFileAttr:    Boolean = hwAttrIsAOutputFileAttr(attr.segment)
-    inline def isParamDeclAttr:     Boolean = hwAttrIsAParamDeclAttr(attr.segment)
-    inline def isParamDeclRefAttr:  Boolean = hwAttrIsAParamDeclRefAttr(attr.segment)
-    inline def isParamVerbatimAttr: Boolean = hwAttrIsAParamVerbatimAttr(attr.segment)
+    inline def isInnerRefAttr:      Boolean = circtApi.hwAttrIsAInnerRefAttr(attr.native)
+    inline def isInnerSymAttr:      Boolean = circtApi.hwAttrIsAInnerSymAttr(attr.native)
+    inline def isOutputFileAttr:    Boolean = circtApi.hwAttrIsAOutputFileAttr(attr.native)
+    inline def isParamDeclAttr:     Boolean = circtApi.hwAttrIsAParamDeclAttr(attr.native)
+    inline def isParamDeclRefAttr:  Boolean = circtApi.hwAttrIsAParamDeclRefAttr(attr.native)
+    inline def isParamVerbatimAttr: Boolean = circtApi.hwAttrIsAParamVerbatimAttr(attr.native)
   inline def innerRefAttrGet(
-    moduleName:  Attribute,
-    innerSym:    Attribute
+    moduleName: Attribute,
+    innerSym:   Attribute
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Attribute =
     Attribute(
-      hwInnerRefAttrGet(
-        arena,
-        moduleName.segment,
-        innerSym.segment
+      nativeResult[MlirStructs.MlirAttribute](out =>
+        circtApi.hwInnerRefAttrGet(moduleName.native, innerSym.native)(out)
       )
     )
   inline def innerRefAttrGet(
-    moduleName:  String,
-    innerSym:    String
+    moduleName: String,
+    innerSym:   String
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Attribute = innerRefAttrGet(
     moduleName.stringAttrGet,
     innerSym.stringAttrGet
   )
   extension (attr: Attribute)
     inline def innerRefAttrGetModule(
-      using arena: Arena
+      using zone: Zone
     ): Attribute =
-      Attribute(hwInnerRefAttrGetModule(arena, attr.segment))
+      Attribute(nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwInnerRefAttrGetModule(attr.native)(out)))
     inline def innerRefAttrGetName(
-      using arena: Arena
+      using zone: Zone
     ): Attribute =
-      Attribute(hwInnerRefAttrGetName(arena, attr.segment))
+      Attribute(nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwInnerRefAttrGetName(attr.native)(out)))
   inline def innerSymAttrGet(
-    symName:     Attribute
+    symName:    Attribute
   )(
-    using arena: Arena
+    using zone: Zone
   ): Attribute =
     Attribute(
-      hwInnerSymAttrGet(
-        arena,
-        symName.segment
-      )
+      nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwInnerSymAttrGet(symName.native)(out))
     )
   inline def innerSymAttrGet(
-    symName:     String
+    symName:    String
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Attribute = innerSymAttrGet(symName.stringAttrGet)
   inline def innerSymAttrGetEmpty(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Attribute =
-    Attribute(hwInnerSymAttrGetEmpty(arena, context.segment))
+    Attribute(nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwInnerSymAttrGetEmpty(context.native)(out)))
   extension (attr: Attribute)
     inline def innerSymAttrGetSymName(
-      using arena: Arena
+      using zone: Zone
     ): Attribute =
-      Attribute(hwInnerSymAttrGetSymName(arena, attr.segment))
+      Attribute(nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwInnerSymAttrGetSymName(attr.native)(out)))
   inline def outputFileGetFileName(
-    outputFile:  Attribute
+    outputFile: Attribute
   )(
-    using arena: Arena
-  ): Attribute =
-    Attribute(hwOutputFileGetFileName(arena, outputFile.segment))
+    using zone: Zone
+  ): String =
+    StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwOutputFileGetFileName(outputFile.native)(out))
+    ).toScalaString
   inline def outputFileGetFromFileName(
     text:                Attribute,
     excludeFromFileList: Boolean,
     includeReplicatedOp: Boolean
   )(
-    using arena:         Arena
+    using zone:          Zone
   ): Attribute =
-    Attribute(hwOutputFileGetFromFileName(arena, text.segment, excludeFromFileList, includeReplicatedOp))
+    Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out =>
+        circtApi.hwOutputFileGetFromFileName(text.native, excludeFromFileList, includeReplicatedOp)(out)
+      )
+    )
   def paramDeclAttrGet(
-    name:        String,
-    tpe:         Type,
-    value:       Attribute
+    name:       String,
+    tpe:        Type,
+    value:      Attribute
   )(
-    using arena: Arena
+    using zone: Zone
   ): Attribute =
-    Attribute(hwParamDeclAttrGet(arena, name.toStringRef.segment, tpe.segment, value.segment))
+    Attribute(
+      nativeResult[MlirStructs.MlirAttribute](out =>
+        circtApi.hwParamDeclAttrGet(name.toStringRef.native, tpe.native, value.native)(out)
+      )
+    )
   def paramDeclAttrGetName(
-    decl:        Attribute
+    decl:       Attribute
   )(
-    using arena: Arena
-  ): String = StringRef(hwParamDeclAttrGetName(arena, decl.segment)).toScalaString
+    using zone: Zone
+  ): String = StringRef(
+    nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwParamDeclAttrGetName(decl.native)(out))
+  ).toScalaString
   def paramDeclAttrGetType(
-    decl:        Attribute
+    decl:       Attribute
   )(
-    using arena: Arena
-  ): Type = Type(hwParamDeclAttrGetType(arena, decl.segment))
+    using zone: Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwParamDeclAttrGetType(decl.native)(out)))
   def paramDeclAttrGetValue(
-    decl:        Attribute
+    decl:       Attribute
   )(
-    using arena: Arena
-  ): Attribute = Attribute(hwParamDeclAttrGetValue(arena, decl.segment))
+    using zone: Zone
+  ): Attribute = Attribute(
+    nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwParamDeclAttrGetValue(decl.native)(out))
+  )
   def paramDeclRefAttrGet(
-    cName:       String
+    cName:      String
   )(
-    using arena: Arena,
-    context:     Context
-  ): Attribute = Attribute(hwParamDeclRefAttrGet(arena, context.segment, cName.toStringRef.segment))
+    using zone: Zone,
+    context:    Context
+  ): Attribute = Attribute(
+    nativeResult[MlirStructs.MlirAttribute](out =>
+      circtApi.hwParamDeclRefAttrGet(context.native, cName.toStringRef.native)(out)
+    )
+  )
   def paramDeclRefAttrGetName(
-    decl:        Attribute
+    decl:       Attribute
   )(
-    using arena: Arena
-  ): String = StringRef(hwParamDeclRefAttrGetName(arena, decl.segment)).toScalaString
+    using zone: Zone
+  ): String = StringRef(
+    nativeResult[MlirStructs.MlirStringRef](out => circtApi.hwParamDeclRefAttrGetName(decl.native)(out))
+  ).toScalaString
   def paramDeclRefAttrGetType(
-    decl:        Attribute
+    decl:       Attribute
   )(
-    using arena: Arena
-  ): Type = Type(hwParamDeclRefAttrGetType(arena, decl.segment))
+    using zone: Zone
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.hwParamDeclRefAttrGetType(decl.native)(out)))
   def paramVerbatimAttrGet(
-    text:        Attribute
+    text:       Attribute
   )(
-    using arena: Arena
-  ): Attribute = Attribute(hwParamVerbatimAttrGet(arena, text.segment))
+    using zone: Zone
+  ): Attribute = Attribute(
+    nativeResult[MlirStructs.MlirAttribute](out => circtApi.hwParamVerbatimAttrGet(text.native)(out))
+  )
 end given

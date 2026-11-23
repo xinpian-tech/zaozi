@@ -11,7 +11,7 @@ import me.jiuyang.decoder.*
 import org.llvm.mlir.scalalib.capi.ir.Block
 import org.llvm.mlir.scalalib.capi.ir.Context
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 case class DecoderParameter(name: String, tables: Seq[TruthTable]) extends Parameter:
   lazy val pla: PLA = espresso(tables)
@@ -50,12 +50,12 @@ class DecoderIO(parameter: DecoderParameter) extends HWRecord(parameter):
 
 extension (decoderIO: Interface[DecoderIO])
   def instruction(
-    using Arena,
+    using Zone,
     Block,
     Context
   ) = decoderIO.field[Bits]("instruction")
   def output(
-    using Arena,
+    using Zone,
     Block,
     Context
   ) = decoderIO.field[DecoderOutput]("output")

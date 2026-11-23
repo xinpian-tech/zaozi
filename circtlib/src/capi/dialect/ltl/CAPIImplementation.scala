@@ -2,18 +2,17 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.ltl
 
-import org.llvm.circt.CAPI.{LTL_CLOCK_EDGE_BOTH, LTL_CLOCK_EDGE_NEG, LTL_CLOCK_EDGE_POS}
-
+import org.llvm.circt.raw.enumerations as CirctEnums
 given LTLClockEdgeApi with
   extension (int: Int)
     override inline def fromNative: LTLClockEdge = int match
-      case i if i == LTL_CLOCK_EDGE_POS()  => LTLClockEdge.Pos
-      case i if i == LTL_CLOCK_EDGE_NEG()  => LTLClockEdge.Neg
-      case i if i == LTL_CLOCK_EDGE_BOTH() => LTLClockEdge.Both
+      case i if i == CirctEnums.LTLClockEdge.LTL_CLOCK_EDGE_POS.int  => LTLClockEdge.Pos
+      case i if i == CirctEnums.LTLClockEdge.LTL_CLOCK_EDGE_NEG.int  => LTLClockEdge.Neg
+      case i if i == CirctEnums.LTLClockEdge.LTL_CLOCK_EDGE_BOTH.int => LTLClockEdge.Both
   extension (ref: LTLClockEdge)
     inline def toNative: Int = ref match
-      case LTLClockEdge.Pos  => LTL_CLOCK_EDGE_POS()
-      case LTLClockEdge.Neg  => LTL_CLOCK_EDGE_NEG()
-      case LTLClockEdge.Both => LTL_CLOCK_EDGE_BOTH()
+      case LTLClockEdge.Pos  => CirctEnums.LTLClockEdge.LTL_CLOCK_EDGE_POS.int
+      case LTLClockEdge.Neg  => CirctEnums.LTLClockEdge.LTL_CLOCK_EDGE_NEG.int
+      case LTLClockEdge.Both => CirctEnums.LTLClockEdge.LTL_CLOCK_EDGE_BOTH.int
     inline def sizeOf:   Int = 4
 end given

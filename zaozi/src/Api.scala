@@ -15,7 +15,7 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{Circuit, When}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Operation, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** Rebuild the [[Layer]] with each [[Layer]] contains the entire tree. */
 trait LayerTree:
@@ -143,10 +143,14 @@ trait Generator[PARAM <: Parameter, L <: LayerInterface[PARAM], I <: HWInterface
   type TPROBE = P
 
   def moduleName(parameter: PARAM): String =
-    s"${this.getClass.getSimpleName.stripSuffix("$")}_${parameter.hashCode.toHexString}"
+    // On Native a local object can have a numeric getSimpleName ("2").
+    // Keep the declared generator name when stripping the local-class suffix.
+    val parts = getClass.getName.split("[.$]")
+    val name  = parts.reverseIterator.find(p => p.nonEmpty && !p.forall(_.isDigit)).getOrElse("Generator")
+    s"${name}_${parameter.hashCode.toHexString}"
 
   def architecture(parameter: PARAM): (
-    Arena,
+    Zone,
     Context,
     Block,
     Interface[I],
@@ -203,7 +207,7 @@ trait GeneratorApi:
     private[zaozi] def appendModule(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Circuit
     ): Unit
@@ -211,7 +215,7 @@ trait GeneratorApi:
     private[zaozi] def instance(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -223,7 +227,7 @@ trait GeneratorApi:
     def instantiate(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -235,7 +239,7 @@ trait GeneratorApi:
     def dumpMlirbc(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit
 
@@ -257,7 +261,7 @@ trait VerilogWrapperApi:
     private[zaozi] def instance(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -269,7 +273,7 @@ trait VerilogWrapperApi:
     def instantiate(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -295,9 +299,9 @@ trait ConstructorApi:
 
   def when[COND <: Referable[Bool]](
     cond: COND
-  )(body: (Arena, Context, Block) ?=> Unit
+  )(body: (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -306,9 +310,9 @@ trait ConstructorApi:
 
   extension (when: When)
     def otherwise(
-      body: (Arena, Context, Block) ?=> Unit
+      body: (Zone, Context, Block) ?=> Unit
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit
 
@@ -319,7 +323,7 @@ trait ConstructorApi:
   def layer(
     layerName: String
   )(body:      (
-      Arena,
+      Zone,
       Context,
       Block,
       LayerTree,
@@ -328,7 +332,7 @@ trait ConstructorApi:
       sourcecode.Line
     ) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     Seq[LayerTree],
@@ -339,7 +343,7 @@ trait ConstructorApi:
   def Wire[T <: Data](
     refType: T
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -352,7 +356,7 @@ trait ConstructorApi:
   )(
     using ClockScope
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -367,7 +371,7 @@ trait ConstructorApi:
   )(
     using ResetScope
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -378,7 +382,7 @@ trait ConstructorApi:
   def Node[T <: Data](
     ref: Referable[T]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -390,39 +394,39 @@ trait ConstructorApi:
     def U(
       width: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
       sourcecode.Line
     ): Const[UInt]
     def U(
-      using Arena,
+      using Zone,
       Context,
       Block
     ): Const[UInt]
     def B(
-      using Arena,
+      using Zone,
       Context,
       Block
     ): Const[Bits]
     def S(
       width: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
       sourcecode.Line
     ): Const[SInt]
     def S(
-      using Arena,
+      using Zone,
       Context,
       Block
     ): Const[SInt]
   extension (bool:   Boolean)
     def B(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -433,7 +437,7 @@ end ConstructorApi
 trait AsBits[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -444,7 +448,7 @@ trait AsBits[D <: Data]:
 trait AsBool[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asBool(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -455,7 +459,7 @@ trait AsBool[D <: Data]:
 trait AsClock[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asClock(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -466,7 +470,7 @@ trait AsClock[D <: Data]:
 trait AsReset[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asReset(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -477,7 +481,7 @@ trait AsReset[D <: Data]:
 trait AsSInt[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asSInt(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -488,7 +492,7 @@ trait AsSInt[D <: Data]:
 trait AsUInt[D <: Data]:
   extension [R <: Referable[D]](ref: R)
     def asUInt(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -502,7 +506,7 @@ trait AsBundle[D <: Data]:
     def asBundle[T <: Bundle](
       tpe: T
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -516,7 +520,7 @@ trait AsRecord[D <: Data]:
     def asRecord[T <: Record](
       tpe: T
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -530,7 +534,7 @@ trait AsVec[D <: Data]:
     def asVec[E <: Data](
       tpe: E
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -554,7 +558,7 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
     def <==(
       that: DATA
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       LayerTree,
@@ -566,7 +570,7 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
     def <==(
       that: PROBE
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       LayerTree,
@@ -579,7 +583,7 @@ trait ProbeConnect[D <: Data & CanProbe, P <: RWProbe[D] | RProbe[D], DATA <: Re
     def <==(
       that: PROBE
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       LayerTree,
@@ -591,7 +595,7 @@ trait DontCare[D <: Data, SINK <: Writable[D]]:
   extension (ref: SINK)
     def dontCare(
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -606,7 +610,7 @@ trait Connect[A <: Connectable]:
       src: SRC
     )(
       using A <:< Element,
-      Arena,
+      Zone,
       Context,
       Block,
       sourcecode.File,
@@ -616,7 +620,7 @@ trait Connect[A <: Connectable]:
     def :<>=[SRC <: Writable[A]](
       src: SRC
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       TypeImpl,
@@ -626,7 +630,7 @@ trait Connect[A <: Connectable]:
     def :<=[SRC <: Readable[A]](
       src: SRC
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       TypeImpl,
@@ -637,7 +641,7 @@ trait Connect[A <: Connectable]:
     def :>=[SRC <: Writable[A]](
       src: SRC
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       TypeImpl,
@@ -647,7 +651,7 @@ trait Connect[A <: Connectable]:
 trait Cvt[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def zext(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -658,7 +662,7 @@ trait Cvt[D <: Data, RET <: Data]:
 trait Neg[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -669,7 +673,7 @@ trait Neg[D <: Data, RET <: Data]:
 trait Not[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def unary_~(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -680,7 +684,7 @@ trait Not[D <: Data, RET <: Data]:
 trait AndR[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def andR(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -691,7 +695,7 @@ trait AndR[D <: Data, RET <: Data]:
 trait OrR[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def orR(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -702,7 +706,7 @@ trait OrR[D <: Data, RET <: Data]:
 trait XorR[D <: Data, RET <: Data]:
   extension [R <: Referable[D]](ref: R)
     def xorR(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -715,7 +719,7 @@ trait Add[D <: Data, RET <: Data]:
     def +[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -728,7 +732,7 @@ trait Sub[D <: Data, RET <: Data]:
     def -[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -741,7 +745,7 @@ trait Mul[D <: Data, RET <: Data]:
     def *[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -754,7 +758,7 @@ trait Div[D <: Data, RET <: Data]:
     def /[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -767,7 +771,7 @@ trait Rem[D <: Data, RET <: Data]:
     def %[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -780,7 +784,7 @@ trait Lt[D <: Data, RET <: Data]:
     def <[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -793,7 +797,7 @@ trait Leq[D <: Data, RET <: Data]:
     def <=[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -806,7 +810,7 @@ trait Gt[D <: Data, RET <: Data]:
     def >[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -819,7 +823,7 @@ trait Geq[D <: Data, RET <: Data]:
     def >=[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -832,7 +836,7 @@ trait Eq[D <: Data, RET <: Data]:
     def ===[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -845,7 +849,7 @@ trait Neq[D <: Data, RET <: Data]:
     def =/=[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -858,7 +862,7 @@ trait And[D <: Data, RET <: Data]:
     def &[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -871,7 +875,7 @@ trait Or[D <: Data, RET <: Data]:
     def |[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -884,7 +888,7 @@ trait Xor[D <: Data, RET <: Data]:
     def ^[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -897,7 +901,7 @@ trait Cat[D <: Data]:
     def ##[RHS <: Referable[D]](
       that: RHS
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -911,7 +915,7 @@ trait Shl[D <: Data, OUT <: Data]:
     def <<(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -924,7 +928,7 @@ trait Shr[D <: Data, OUT <: Data]:
     def >>(
       that: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -937,7 +941,7 @@ trait Head[D <: Data, OUT <: Data]:
     def head(
       that: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -950,7 +954,7 @@ trait Tail[D <: Data, OUT <: Data]:
     def tail(
       that: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -963,7 +967,7 @@ trait Pad[D <: Data, OUT <: Data]:
     def pad(
       that: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -977,7 +981,7 @@ trait ExtractRange[D <: Data, E <: Data]:
       hi: Int,
       lo: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -990,7 +994,7 @@ trait ExtractElement[D <: Data, E <: Data]:
     def bit(
       idx: Int
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1004,7 +1008,7 @@ trait Mux[Cond <: Data]:
       con: Referable[Ret],
       alt: Referable[Ret]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1017,7 +1021,7 @@ trait RefElement[D <: Data, E <: Data]:
     def ref(
       idx: Int | Referable[UInt]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1028,7 +1032,7 @@ trait RefElement[D <: Data, E <: Data]:
 trait GetLength[E <: Data, V <: Vec[E]]:
   extension [R <: Referable[V]](ref: R)
     def length(
-      using Arena,
+      using Zone,
       Context
     ): Int
 
@@ -1135,9 +1139,9 @@ trait ContractApi:
     args: In = EmptyTuple
   )(
     using ContractArgs[In, Out]
-  )(body: Out => (Arena, Context, Block) ?=> Unit
+  )(body: Out => (Zone, Context, Block) ?=> Unit
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1148,7 +1152,7 @@ trait ContractApi:
   def Require(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1161,7 +1165,7 @@ trait ContractApi:
   def Ensure(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1175,7 +1179,7 @@ trait ContractApi:
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1187,7 +1191,7 @@ trait ContractApi:
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1206,7 +1210,7 @@ trait SVAApi:
   )(
     using ClockEvent
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1222,7 +1226,7 @@ trait SVAApi:
   )(
     using ClockEvent
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -1235,7 +1239,7 @@ trait SVAApi:
     def S(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1245,7 +1249,7 @@ trait SVAApi:
     ): Sequence
 
     def I(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1261,7 +1265,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1277,7 +1281,7 @@ trait SVAApi:
       * `!ltl.property`.
       */
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1291,7 +1295,7 @@ trait SVAApi:
     def &(
       that: Immediate
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1302,7 +1306,7 @@ trait SVAApi:
     def &(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1313,7 +1317,7 @@ trait SVAApi:
     def &(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1327,7 +1331,7 @@ trait SVAApi:
     infix def intersect(
       that: Immediate
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1338,7 +1342,7 @@ trait SVAApi:
     infix def intersect(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1349,7 +1353,7 @@ trait SVAApi:
     infix def intersect(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1363,7 +1367,7 @@ trait SVAApi:
     def |(
       that: Immediate
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1374,7 +1378,7 @@ trait SVAApi:
     def |(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1385,7 +1389,7 @@ trait SVAApi:
     def |(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1399,7 +1403,7 @@ trait SVAApi:
     def |->(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1413,7 +1417,7 @@ trait SVAApi:
     def #-#(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1427,7 +1431,7 @@ trait SVAApi:
     infix def implies(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1441,7 +1445,7 @@ trait SVAApi:
     infix def iff(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1457,7 +1461,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1473,7 +1477,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1489,7 +1493,7 @@ trait SVAApi:
       * `!ltl.property`.
       */
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1503,7 +1507,7 @@ trait SVAApi:
     def ##(
       that: Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1519,7 +1523,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1536,7 +1540,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1554,7 +1558,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1570,7 +1574,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1593,7 +1597,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1610,7 +1614,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1627,7 +1631,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1643,7 +1647,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1659,7 +1663,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1675,7 +1679,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1691,7 +1695,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1707,7 +1711,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1721,7 +1725,7 @@ trait SVAApi:
     def &(
       that: Immediate | Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1732,7 +1736,7 @@ trait SVAApi:
     def &(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1746,7 +1750,7 @@ trait SVAApi:
     infix def intersect(
       that: Immediate | Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1757,7 +1761,7 @@ trait SVAApi:
     infix def intersect(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1771,7 +1775,7 @@ trait SVAApi:
     def |(
       that: Immediate | Sequence
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1782,7 +1786,7 @@ trait SVAApi:
     def |(
       that: Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1796,7 +1800,7 @@ trait SVAApi:
     def |->(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1810,7 +1814,7 @@ trait SVAApi:
     def #-#(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1824,7 +1828,7 @@ trait SVAApi:
     infix def implies(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1838,7 +1842,7 @@ trait SVAApi:
     infix def iff(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1854,7 +1858,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1870,7 +1874,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1886,7 +1890,7 @@ trait SVAApi:
       * `!ltl.property`.
       */
     def unary_!(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1900,7 +1904,7 @@ trait SVAApi:
     def &(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1914,7 +1918,7 @@ trait SVAApi:
     infix def intersect(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1928,7 +1932,7 @@ trait SVAApi:
     def |(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1942,7 +1946,7 @@ trait SVAApi:
     infix def implies(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1956,7 +1960,7 @@ trait SVAApi:
     infix def iff(
       that: Immediate | Sequence | Property
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1972,7 +1976,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -1988,7 +1992,7 @@ trait SVAApi:
     )(
       using ClockEvent
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -2000,7 +2004,7 @@ trait SVAApi:
   def Assert(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2011,7 +2015,7 @@ trait SVAApi:
   def Assume(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2022,7 +2026,7 @@ trait SVAApi:
   def Cover(
     property: Immediate | Sequence | Property
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2034,7 +2038,7 @@ trait SVAApi:
     property: Immediate | Sequence | Property,
     enable:   Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2046,7 +2050,7 @@ trait SVAApi:
     property: Immediate | Sequence | Property,
     enable:   Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2058,7 +2062,7 @@ trait SVAApi:
     property: Immediate | Sequence | Property,
     enable:   Referable[Bool]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2070,7 +2074,7 @@ trait SVAApi:
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2082,7 +2086,7 @@ trait SVAApi:
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2094,7 +2098,7 @@ trait SVAApi:
     property: Immediate | Sequence | Property,
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2107,7 +2111,7 @@ trait SVAApi:
     enable:   Referable[Bool],
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2120,7 +2124,7 @@ trait SVAApi:
     enable:   Referable[Bool],
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2133,7 +2137,7 @@ trait SVAApi:
     enable:   Referable[Bool],
     label:    String
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,
@@ -2145,94 +2149,94 @@ trait SVAApi:
 trait TypeImpl:
   extension (ref: ProbeInterface[?])
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
   extension (ref: Wire[?])
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
   extension (ref: Reg[?])
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
   extension (ref: Node[?])
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
   extension (ref: Ref[?])
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
   extension (ref: Const[?])
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
   extension (ref: Instance[?, ?])
     private[zaozi] def operationImpl:        Operation
     private[zaozi] def probeImpl[T <: Data]: Wire[T]
   extension (ref: Sequence)
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: Property)
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref: Immediate)
     private[zaozi] def referImpl(
-      using Arena
+      using Zone
     ): Value
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
 
   extension (ref:  Reset)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  Clock)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  UInt)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  SInt)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  Bits)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  Analog)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  Bool)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Type
   extension (ref:  ProbeBundle)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
     private[zaozi] def ReadProbeImpl[T <: Data & CanProbe](
@@ -2249,7 +2253,7 @@ trait TypeImpl:
     ): BundleField[RWProbe[T]]
   extension (ref:  Bundle)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
     private[zaozi] def FlippedImpl[T <: Data](
@@ -2265,7 +2269,7 @@ trait TypeImpl:
   extension (ref:  Aggregate) def elements: Seq[BundleField[?]]
   extension (ref:  ProbeRecord)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
     private[zaozi] def ReadProbeImpl[T <: Data & CanProbe](
@@ -2280,7 +2284,7 @@ trait TypeImpl:
     ): BundleField[RWProbe[T]]
   extension (ref:  Record)
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
     private[zaozi] def FlippedImpl[T <: Data](
@@ -2293,28 +2297,28 @@ trait TypeImpl:
     ): BundleField[T]
   extension (ref:  RProbe[?])
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context,
       TypeImpl
     ):                                      Type
   extension (ref:  RWProbe[?])
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context,
       TypeImpl
     ):                                      Type
   extension (data: Data)
     private[zaozi] def widthImpl(
-      using Arena,
+      using Zone,
       Context
     ):                                      Int
   extension (ref:  Vec[?])
     private[zaozi] def countImpl(
-      using Arena,
+      using Zone,
       Context
     ): Int
     private[zaozi] def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type
   extension (ref:  ProbeBundle)
@@ -2322,7 +2326,7 @@ trait TypeImpl:
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -2334,7 +2338,7 @@ trait TypeImpl:
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -2347,7 +2351,7 @@ trait TypeImpl:
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -2359,7 +2363,7 @@ trait TypeImpl:
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -2373,7 +2377,7 @@ trait TypeImpl:
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -2387,7 +2391,7 @@ trait TypeImpl:
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,

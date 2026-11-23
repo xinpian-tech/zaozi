@@ -2,60 +2,59 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirModuleCreateEmpty,
-  mlirModuleCreateParse,
-  mlirModuleDestroy,
-  mlirModuleFromOperation,
-  mlirModuleGetBody,
-  mlirModuleGetContext,
-  mlirModuleGetOperation
-}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
 given ModuleApi with
+  extension (module: Module) inline def isNull: Boolean = (!module.native).ptr == null
+
   inline def moduleCreateEmpty(
-    location:    Location
+    location:   Location
   )(
-    using arena: Arena
-  ): Module = new Module(mlirModuleCreateEmpty(arena, location.segment))
+    using zone: Zone
+  ): Module = new Module(
+    nativeResult[MlirStructs.MlirModule](out => mlirApi.mlirModuleCreateEmpty(location.native)(out))
+  )
 
   inline def moduleCreateParse(
-    module:      String | Array[Byte]
+    module:     String | Array[Byte]
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Module = new Module(
-    mlirModuleCreateParse(
-      arena,
-      context.segment,
-      (module match
-        case string: String      => string.toStringRef
-        case bytes:  Array[Byte] => bytes.toStringRef
-      ).segment
+    nativeResult[MlirStructs.MlirModule](out =>
+      mlirApi.mlirModuleCreateParse(
+        context.native,
+        (module match
+          case string: String      => string.toStringRef
+          case bytes:  Array[Byte] => bytes.toStringRef
+        ).native
+      )(out)
     )
   )
 
   inline def moduleFromOperation(
-    op:          Operation
+    op:         Operation
   )(
-    using arena: Arena
-  ): Module = new Module(mlirModuleFromOperation(arena, op.segment))
+    using zone: Zone
+  ): Module = new Module(nativeResult[MlirStructs.MlirModule](out => mlirApi.mlirModuleFromOperation(op.native)(out)))
 
   extension (module: Module)
     inline def getContext(
-      using arena: Arena
-    ): Context = Context(mlirModuleGetContext(arena, module.segment))
+      using zone: Zone
+    ): Context = Context(nativeResult[MlirStructs.MlirContext](out => mlirApi.mlirModuleGetContext(module.native)(out)))
     inline def getBody(
-      using arena: Arena
-    ) = Block(mlirModuleGetBody(arena, segment))
+      using zone: Zone
+    ) = Block(nativeResult[MlirStructs.MlirBlock](out => mlirApi.mlirModuleGetBody(module.native)(out)))
     inline def getOperation(
-      using arena: Arena
-    ): Operation = Operation(mlirModuleGetOperation(arena, module.segment))
-    inline def destroy(): Unit          = mlirModuleDestroy(module.segment)
-    inline def segment:   MemorySegment = module._segment
-    inline def sizeOf:    Int           = MlirModule.sizeof().toInt
+      using zone: Zone
+    ): Operation = Operation(
+      nativeResult[MlirStructs.MlirOperation](out => mlirApi.mlirModuleGetOperation(module.native)(out))
+    )
+    inline def destroy(): Unit = mlirApi.mlirModuleDestroy(module.native)
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirModule].toInt
 end given

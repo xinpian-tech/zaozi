@@ -1,3 +1,4 @@
+import shlex
 import platform
 import os
 import lit.formats
@@ -16,11 +17,15 @@ config.suffixes = [".scala", ".sc"]
 # project root is three directories up.
 config.repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
 config.substitutions = [
+    # Scala Native reads the process CPU affinity on Linux.
+    ('%onecpu', 'taskset -c ' + str(min(os.sched_getaffinity(0))) if hasattr(os, 'sched_getaffinity') else ''),
     ('%SCALAVERSION', config.scala_version),
     ('%RUNCLASSPATH', ':'.join(config.run_classpath)),
-    ('%JAVAHOME', config.java_home),
-    ('%JAVALIBRARYPATH', ':'.join(config.java_library_path)),
-    ('%JAVAOPTS', ' '.join(config.java_opts)),
+    ('%NATIVEOPTS', shlex.join(
+        ['--native', '--native-version', config.native_version, '--repository', config.native_repo] +
+        [arg for root in config.native_installs for arg in
+         ('--native-compile', '-I' + root + '/include', '--native-linking', '-L' + root + '/lib',
+          '--native-linking', '-Wl,-rpath,' + root + '/lib')])),
     ('%REPOROOT', config.repo_root),
 ]
 config.test_source_root = os.path.dirname(__file__)
@@ -31,7 +36,7 @@ config.test_source_root = os.path.dirname(__file__)
 # nix develop provides the locked local repository through
 # COURSIER_REPOSITORIES.
 env_vars_to_pass = [
-    "SCALA_CLI_HOME", "JAVA_OPTS", "JAVA_TOOL_OPTIONS",
+    "CLANG", "CLANGPP", "CC", "CXX", "PATH", "LIBRARY_PATH", "CPATH", "SCALA_CLI_HOME", "JAVA_HOME", "JAVA_OPTS", "JAVA_TOOL_OPTIONS",
     "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
     "http_proxy", "https_proxy", "all_proxy", "no_proxy",
     "COURSIER_CACHE", "COURSIER_REPOSITORIES", "COURSIER_MIRRORS"

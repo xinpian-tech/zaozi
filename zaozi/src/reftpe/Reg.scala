@@ -6,17 +6,17 @@ import me.jiuyang.zaozi.TypeImpl
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.mlir.scalalib.capi.ir.{Operation, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 abstract class Reg[T <: Data] extends Referable[T], Writable[T]:
   private[zaozi] val _tpe:   T
   private[zaozi] val _refer: Value
 
   def operation(
-    using Arena
+    using Zone
   ): Operation = _refer.opResultGetOwner
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value = this.referImpl
