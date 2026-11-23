@@ -21,7 +21,7 @@ import contrib.jmh.JmhModule
 import os.Path
 
 object v {
-  val scala      = "3.8.4"
+  val scala      = "3.10.1"
   val mainargs   = mvn"com.lihaoyi::mainargs:0.7.6"
   val oslib      = mvn"com.lihaoyi::os-lib:0.11.3"
   val upickle    = mvn"com.lihaoyi::upickle:4.0.2"
@@ -33,6 +33,9 @@ object v {
 }
 
 trait ZaoziScalaModule extends ScalaModule {
+  // Older dependencies pull in scala3-library_3, whose classes now live in scala-library.
+  override def depManagement = Task(super.depManagement() :+ mvn"org.scala-lang::scala3-library:${v.scala}")
+
   override def scalacOptions: T[Seq[String]] = Task(
     super.scalacOptions() ++ Seq(
       "-java-output-version",

@@ -91,8 +91,8 @@ def instanceChoiceImpl[L <: LayerInterface[?]: Type, I <: HWInterface[?]: Type, 
     case _                                                        => report.errorAndAbort("InstanceChoice needs an inline Seq of architecture calls", cases)
   val targets = entries.map: entry =>
     val (label, architecture) = entry match
-      case '{ ($label: String).->[Architecture]($architecture) } => (label, architecture)
-      case _                                                     => report.errorAndAbort("InstanceChoice cases must be name -> generator.architecture(parameter)", entry)
+      case '{ Tuple2[String, Architecture]($label, $architecture) } => (label, architecture)
+      case _                                                        => report.errorAndAbort("InstanceChoice cases must be name -> generator.architecture(parameter)", entry)
     val (receiver, parameter) = directCall(architecture.asTerm)
     val generator =
       Symbol.newVal(Symbol.spliceOwner, "generator", receiver.tpe.widen, Flags.EmptyFlags, Symbol.noSymbol)
