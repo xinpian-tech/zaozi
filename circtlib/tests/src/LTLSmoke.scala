@@ -13,14 +13,14 @@ import org.llvm.circt.scalalib.dialect.ltl.operation.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, ContextApi, LocationApi, OperationApi, TypeApi as MlirTypeApi, given}
 import utest.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 object LTLSmoke extends TestSuite:
-  private var currentArena:   Arena   = null
+  private var currentArena:   Zone    = null
   private var currentContext: Context = null
 
   override def utestBeforeEach(path: Seq[String]): Unit =
-    currentArena = Arena.ofConfined()
+    currentArena = Zone.open()
     currentContext = null
 
   override def utestAfterEach(path: Seq[String]): Unit =
@@ -33,7 +33,7 @@ object LTLSmoke extends TestSuite:
 
   val tests: Tests = Tests:
     test("LTL dialect"):
-      given Arena         = currentArena
+      given Zone          = currentArena
       val context         = summon[ContextApi].contextCreate
       currentContext = context
       context.allowUnregisteredDialects(true)

@@ -56,7 +56,7 @@ import org.llvm.mlir.scalalib.capi.ir.{
 }
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given VerilogWrapperApi:
   extension [
@@ -70,7 +70,7 @@ given VerilogWrapperApi:
     private def appendExtModule(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Circuit
     ): Unit =
@@ -115,7 +115,7 @@ given VerilogWrapperApi:
     def instance(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -133,7 +133,7 @@ given VerilogWrapperApi:
     def dumpMlirbc(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit =
       BaseGeneratorHelper.dumpMlirbc(wrapper.moduleName(parameter)) { wrapper.appendExtModule(parameter) }
@@ -141,7 +141,7 @@ given VerilogWrapperApi:
     def instantiate(
       parameter: PARAM
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

@@ -1,4 +1,4 @@
-name: Zaozi JMH Benchmark
+name: Zaozi Native Benchmark
 on:
   pull_request:
     types:
@@ -14,9 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  run-jmh:
-    name: "Run zaozi JMH benchmark"
+  run-benchmark:
+    name: "Run zaozi Native benchmark"
     runs-on: [self-hosted, linux, nixos]
     steps:
       - uses: actions/checkout@v4
-      - run: nix develop -c bash -c "mill --no-daemon --ticker false zaozi.benchmark.runJmh -wi 0 -i 1 -r 1s -f 1 2>&1 | grep -E '^Iteration|^Benchmark|^ZaoziBenchmark' > $GITHUB_STEP_SUMMARY"
+      - run: |
+          set -o pipefail
+          nix develop -c mill --no-daemon --ticker false zaozi.benchmark.run 1 | tee -a "$GITHUB_STEP_SUMMARY"

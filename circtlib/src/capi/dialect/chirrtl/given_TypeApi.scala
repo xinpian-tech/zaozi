@@ -2,21 +2,28 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.chirrtl
 
-import org.llvm.circt.CAPI.{chirrtlTypeGetCMemory, chirrtlTypeGetCMemoryPort}
-import org.llvm.mlir.scalalib.capi.ir.{Context, Type, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.ir.{Context, Type, given}
 
 given TypeApi with
   inline def getCMemory(
     elementType: Type,
     numElements: Int
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
-  ): Type = Type(chirrtlTypeGetCMemory(arena, context.segment, elementType.segment, numElements))
+  ): Type = Type(
+    nativeResult[MlirStructs.MlirType](out =>
+      circtApi.chirrtlTypeGetCMemory(context.native, elementType.native, numElements.toULong)(out)
+    )
+  )
   inline def getCMemoryPort(
-    using arena: Arena,
-    context:     Context
-  ): Type = Type(chirrtlTypeGetCMemoryPort(arena, context.segment))
+    using zone: Zone,
+    context:    Context
+  ): Type = Type(nativeResult[MlirStructs.MlirType](out => circtApi.chirrtlTypeGetCMemoryPort(context.native)(out)))
 end given

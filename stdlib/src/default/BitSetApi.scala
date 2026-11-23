@@ -11,7 +11,7 @@ import me.jiuyang.zaozi.default.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.Block
 import org.llvm.mlir.scalalib.capi.ir.Context
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [B <: BitSet]: BitSetApi[B] with
   extension (bs: B)
@@ -19,7 +19,7 @@ given [B <: BitSet]: BitSetApi[B] with
     def cover(
       signal: Referable[Bits]
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

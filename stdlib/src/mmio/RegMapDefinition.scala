@@ -14,7 +14,7 @@ import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{RegResetPolarity, RegResetType}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 final case class RegMapRegister(byteOffset: BigInt, fields: Seq[RegFieldDefinition])
 
@@ -67,7 +67,7 @@ final case class RegMapDefinition(
     rsp:      Referable[DecoupledIO[RegMapResponse]] & Writable[DecoupledIO[RegMapResponse]]
   )(accesses: AppliedRegAccess*
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

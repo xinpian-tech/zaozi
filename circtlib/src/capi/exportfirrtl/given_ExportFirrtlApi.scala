@@ -2,19 +2,22 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.exportfirrtl
 
-import org.llvm.circt.CAPI.mlirExportFIRRTL
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Module, given}
-
-import java.lang.foreign.{Arena, MemorySegment}
 
 given ExportFirrtlApi with
   extension (module: Module)
     inline def exportFIRRTL(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult = LogicalResult(
-      mlirExportFIRRTL(arena, module.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
+      callback.stringToStringCallback.use { (fn, data) =>
+        nativeResult[MlirStructs.MlirLogicalResult](out => circtApi.mlirExportFIRRTL(module.native, fn, data)(out))
+      }
     )
 end given

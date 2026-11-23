@@ -9,7 +9,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** Generic decoupled FIFO configuration used by all [[QueueImpl]] backends. */
 case class QueueParameter[D <: HardwareDataType](
@@ -70,7 +70,7 @@ object Queue:
   def apply[D <: HardwareDataType](
     parameter: QueueParameter[D]
   )(
-    using Arena,
+    using Zone,
     QueueImpl,
     Context,
     Block,
@@ -84,7 +84,7 @@ trait QueueImpl:
   def apply[D <: HardwareDataType](
     parameter: QueueParameter[D]
   )(
-    using Arena,
+    using Zone,
     Context,
     Block,
     sourcecode.File,

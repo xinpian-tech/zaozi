@@ -26,10 +26,9 @@ import org.llvm.mlir.scalalib.capi.ir.{
   NamedAttributeApi
 }
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.ir.given_OperationApi
+import scala.scalanative.unsafe.Zone
 import mainargs.TokensReader
-import org.openjdk.jmh.annotations.*
-import org.openjdk.jmh.infra.Blackhole
 
 trait HasFire[T <: Bundle, R <: Referable[T]]:
   extension (ref: R)
@@ -40,7 +39,7 @@ trait HasFire[T <: Bundle, R <: Referable[T]]:
       valName:   sourcecode.Name.Machine,
       instCtx:   InstanceContext
     )(
-      using Arena,
+      using Zone,
       Block
     ): Node[Bool]
 
@@ -61,7 +60,7 @@ given [E <: Bundle, T <: DecoupledIO[E], R <: Referable[T]]: HasFire[T, R] with
       valName:   sourcecode.Name.Machine,
       instCtx:   InstanceContext
     )(
-      using Arena,
+      using Zone,
       Block
     ): Node[Bool] = ref.valid & ref.ready
 
@@ -96,7 +95,7 @@ class GCDProbe(parameter: GCDParameter) extends DVBundle[GCDParameter, GCDLayers
 @generator
 object GCD extends Generator[GCDParameter, GCDLayers, GCDIO, GCDProbe]:
   def architecture(parameter: GCDParameter) =
-    val io            = summon[Interface[GCDIO]]
+    val io           = summon[Interface[GCDIO]]
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope =
       if parameter.useAsyncReset then ResetScope.asyncActiveHigh(io.reset)
@@ -133,30 +132,23 @@ object GCD extends Generator[GCDParameter, GCDLayers, GCDIO, GCDProbe]:
     )
 
 // Run with:
-// mill zaozi.benchmark.runJmh
-class ZaoziBenchmark {
-
-  // This is just an example, copy-paste and modify as appropriate
-  // Typically 10 iterations for both warmup and measurement is better
-  @Benchmark
-  @Warmup(iterations = 3)
-  @Measurement(iterations = 3)
-  @Fork(value = 1)
-  @Threads(value = 1)
-  def ZaoziGCDTest(blackHole: Blackhole): Unit =
-    val parameter = GCDParameter(32, false)
-    val arena     = Arena.ofConfined()
-    try
-      given Arena   = arena
-      given Context = summon[ContextApi].contextCreate
-      summon[FirrtlDialectApi].loadDialect
-
-      given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
-      given Circuit    = summon[CircuitApi].op(GCD.moduleName(parameter))
-      summon[Circuit].appendToModule()
-      GCD.appendModule(parameter)
-      summon[Circuit].declareInstantiatedModules()
-
-      summon[Context].destroy()
-    finally arena.close()
-}
+// mill zaozi.benchmark.run 1
+object ZaoziBenchmark:
+  def main(args: Array[String]): Unit =
+    val runs = args.headOption.map(_.toInt).getOrElse(10)
+    require(runs > 0)
+    for i <- 1 to runs do
+      val start = System.nanoTime()
+      org.llvm.mlir.scalalib.Mlir.withContext {
+        summon[FirrtlDialectApi].loadDialect
+        val parameter    = GCDParameter(32, false)
+        given MlirModule = summon[MlirModuleApi].moduleCreateEmpty(summon[LocationApi].locationUnknownGet)
+        try
+          given Circuit = summon[CircuitApi].op(GCD.moduleName(parameter))
+          summon[Circuit].appendToModule()
+          GCD.appendModule(parameter)
+          summon[Circuit].declareInstantiatedModules()
+          require(summon[MlirModule].getOperation.verify)
+        finally summon[MlirModule].destroy()
+      }
+      println(s"GCD $i ${System.nanoTime() - start} ns")

@@ -4,51 +4,51 @@ package org.llvm.mlir.scalalib.capi.dialect.smt
 
 import org.llvm.mlir.scalalib.capi.ir.{Attribute, Context, Type, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait DialectApi:
   inline def loadDialect(
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
 trait TypeApi:
   inline def getArray(
-    domainType:  Type,
-    rangeType:   Type
+    domainType: Type,
+    rangeType:  Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def getBitVector(
-    width:       Int
+    width:      Int
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def getBool(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def getInt(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   inline def getSMTFunc(
     domainTypes: Seq[Type],
     rangeType:   Type
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
   ): Type
   inline def getSort(
-    identifier:  String,
-    sortParams:  Seq[Type]
+    identifier: String,
+    sortParams: Seq[Type]
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Type
   extension (tpe: Type)
     inline def isAnyNonFuncSMTValueType: Boolean
@@ -64,28 +64,28 @@ end TypeApi
 trait AttributeApi:
   extension (str:   String)
     inline def getBVCmpPredicateAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
     inline def getIntPredicateAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Attribute
   extension (value: Int)
     inline def getBitVectorAttribute(
-      width:       Int
+      width:      Int
     )(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ):                                                    Attribute
   extension (attr:  Attribute) inline def isSMTAttribute: Boolean
   extension (str:   String)
     inline def checkBVCmpPredicateAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Boolean
     inline def checkIntPredicateAttribute(
-      using arena: Arena,
-      context:     Context
+      using zone: Zone,
+      context:    Context
     ): Boolean
 end AttributeApi

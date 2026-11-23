@@ -2,29 +2,30 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.hw
 
+import org.llvm.circt.raw.structs as CirctStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Context, Module, Operation, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
-class InstanceGraphNodeCallback(val _segment: MemorySegment)
-trait HWInstanceGraphNodeCallbackApi extends HasSegment[InstanceGraphNodeCallback]:
+class InstanceGraphNodeCallback(val run: HWInstanceGraphNode => Unit)
+trait HWInstanceGraphNodeCallbackApi:
   extension (hwInstanceGraphNodeCallback: HWInstanceGraphNode => Unit)
     inline def toHWInstanceGraphNodeCallback(
-      using arena: Arena
+      using zone: Zone
     ): InstanceGraphNodeCallback
 
-class HWInstanceGraph(val _segment: MemorySegment)
-trait HWInstanceGraphApi extends HasSegment[HWInstanceGraph] with HasSizeOf[HWInstanceGraph]
+class HWInstanceGraph(handle: Ptr[CirctStructs.HWInstanceGraph]) extends NativeHandle(handle)
+trait HWInstanceGraphApi                                         extends HasSizeOf[HWInstanceGraph]
 
-class HWInstanceGraphNode(val _segment: MemorySegment)
-trait HWInstanceGraphNodeApi extends HasSegment[HWInstanceGraphNode] with HasSizeOf[HWInstanceGraphNode]
+class HWInstanceGraphNode(handle: Ptr[CirctStructs.HWInstanceGraphNode]) extends NativeHandle(handle)
+trait HWInstanceGraphNodeApi                                             extends HasSizeOf[HWInstanceGraphNode]
 
-class HWModulePort(val _segment: MemorySegment)
-trait HWModulePortApi extends HasSegment[HWModulePort] with HasSizeOf[HWModulePort]
+class HWModulePort(handle: Ptr[CirctStructs.HWModulePort]) extends NativeHandle(handle)
+trait HWModulePortApi                                      extends HasSizeOf[HWModulePort]
 
-class HWStructFieldInfo(val _segment: MemorySegment)
-trait HWStructFieldInfoApi extends HasSegment[HWStructFieldInfo] with HasSizeOf[HWStructFieldInfo]
+class HWStructFieldInfo(handle: Ptr[CirctStructs.HWStructFieldInfo]) extends NativeHandle(handle)
+trait HWStructFieldInfoApi                                           extends HasSizeOf[HWStructFieldInfo]
 
 /** HW Dialect API
   * {{{
@@ -34,8 +35,8 @@ trait HWStructFieldInfoApi extends HasSegment[HWStructFieldInfo] with HasSizeOf[
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                  Unit
   def registerPasses: Unit
 end DialectApi
@@ -121,23 +122,23 @@ trait InstanceGraphApi:
   extension (hwInstanceGraph:     HWInstanceGraph)
     inline def destroy: Unit
     inline def getTopLevelNode(
-      using arena: Arena
+      using zone: Zone
     ):                  HWInstanceGraphNode
     inline def forEachNode(
-      callback:    HWInstanceGraphNode => Unit
+      callback:   HWInstanceGraphNode => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ):                  Unit
   extension (operation:           Operation)
     inline def instanceGraphGet(
-      using arena: Arena
+      using zone: Zone
     ):     HWInstanceGraph
   extension (hwInstanceGraphNode: HWInstanceGraphNode)
     inline def equal(that: HWInstanceGraphNode): Boolean
     inline def getModule(
-      using arena: Arena
+      using zone: Zone
     ):                                           Module
     inline def getModuleOp(
-      using arena: Arena
+      using zone: Zone
     ):                                           Operation
 end InstanceGraphApi

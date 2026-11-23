@@ -2,40 +2,38 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.ir
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirDialectHandleGetNamespace,
-  mlirDialectHandleInsertDialect,
-  mlirDialectHandleLoadDialect,
-  mlirDialectHandleRegisterDialect,
-  mlirGetDialectHandle__func__
-}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
 
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 given DialectApi with
   extension (dialect: Dialect)
-    inline def segment: MemorySegment = dialect._segment
-    inline def sizeOf:  Int           = MlirDialect.sizeof().toInt
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirDialect].toInt
 end given
 
 given DialectHandleApi with
   extension (dialectHandle: DialectHandle)
     inline def getNamespace(
-      using arena: Arena
-    ): String = StringRef(mlirDialectHandleGetNamespace(arena, dialectHandle.segment)).toScalaString
+      using zone: Zone
+    ): String = StringRef(
+      nativeResult[MlirStructs.MlirStringRef](out => mlirApi.mlirDialectHandleGetNamespace(dialectHandle.native)(out))
+    ).toScalaString
     inline def loadDialect(
-      using arena: Arena,
-      context:     Context
-    ): Unit = mlirDialectHandleLoadDialect(arena, dialectHandle.segment, context.segment)
-    inline def insertDialect(dialectRegistry: DialectRegistry): Unit          =
-      mlirDialectHandleInsertDialect(dialectHandle.segment, dialectRegistry.segment)
+      using zone: Zone,
+      context:    Context
+    ): Unit = nativeResult[MlirStructs.MlirDialect](out =>
+      mlirApi.mlirDialectHandleLoadDialect(dialectHandle.native, context.native)(out)
+    )
+    inline def insertDialect(dialectRegistry: DialectRegistry): Unit =
+      mlirApi.mlirDialectHandleInsertDialect(dialectHandle.native, dialectRegistry.native)
     inline def insertDialect(
     )(
       using context: Context
     ): Unit =
-      mlirDialectHandleRegisterDialect(dialectHandle.segment, context.segment)
-    inline def segment:                                         MemorySegment = dialectHandle._segment
-    inline def sizeOf:                                          Int           = MlirDialectHandle.sizeof().toInt
+      mlirApi.mlirDialectHandleRegisterDialect(dialectHandle.native, context.native)
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirDialectHandle].toInt
 end given

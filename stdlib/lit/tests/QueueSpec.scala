@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Yuhang Zeng <unlsycn@unlsycn.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class DwbbFifoTop %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class DwbbFifoTop %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 // RUN: %{test} config %t.dir/config.json --width 16 --asyncReset false
 // RUN: cd %t.dir && %{test} design %t.dir/config.json
-// RUN: firld %t.dir/*.mlirbc --base-circuit DwbbFifoTop_2a94835e --no-mangle | firtool --format=mlir | FileCheck %s
+// RUN: firld %t.dir/*.mlirbc --base-circuit DwbbFifoTop --no-mangle | firtool --format=mlir | FileCheck %s
 // RUN: rm -rf %t.dir
 
 import me.jiuyang.stdlib.*
@@ -19,7 +19,6 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule}
 
-import java.lang.foreign.Arena
 import mainargs.TokensReader
 
 case class QueueSpecParameter(width: Int, asyncReset: Boolean) extends Parameter
@@ -28,7 +27,7 @@ given upickle.default.ReadWriter[QueueSpecParameter] = upickle.default.macroRW
 class QueueSpecLayers(parameter: QueueSpecParameter) extends LayerInterface(parameter):
   def layers = Seq.empty
 
-// CHECK-DAG:      module DwbbFifoTop_{{.*}}(
+// CHECK-DAG:      module DwbbFifoTop(
 // CHECK-DAG-NEXT:   input         clock,
 // CHECK-DAG-NEXT:                 reset,
 // CHECK-DAG-NEXT:   output        i_ready,
@@ -70,6 +69,7 @@ class QueueSpecProbe(parameter: QueueSpecParameter) extends DVBundle[QueueSpecPa
 // CHECK-DAG-NEXT: );
 @generator
 object DwbbFifoTop extends Generator[QueueSpecParameter, QueueSpecLayers, QueueSpecIO, QueueSpecProbe]:
+  override def moduleName(parameter: QueueSpecParameter): String = "DwbbFifoTop"
   def architecture(parameter: QueueSpecParameter) =
     val io   = summon[Interface[QueueSpecIO]]
     val fifo = Queue(QueueParameter(io.i.bits.getType, 32, asyncReset = parameter.asyncReset))

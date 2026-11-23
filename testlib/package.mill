@@ -11,13 +11,10 @@ import os.Path
 import build.{circtlib, v, zaozi, ZaoziScalaModule}
 
 object `package` extends ZaoziScalaModule with ScalafmtModule { m =>
-  def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(zaozi)
-  def mvnDeps      = Seq(v.utest)
+
+  def moduleDeps       = Seq(zaozi)
+  override def mvnDeps = super.mvnDeps() ++ Seq(v.utest)
 
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
-  override def forkArgs: T[Seq[String]] = Task(
-    super.forkArgs() ++ circtlib.forkArgs()
-  )
 }

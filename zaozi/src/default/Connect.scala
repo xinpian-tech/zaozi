@@ -10,7 +10,7 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.given
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{ConnectApi, SubfieldApi, SubindexApi, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private[zaozi] enum ConnDir(val connectToConsumer: Boolean, val connectToProducer: Boolean):
   case Bi      extends ConnDir(true, true)
@@ -30,7 +30,7 @@ private[zaozi] def checkConnectable(
   src:    Data,
   opName: String
 )(
-  using Arena,
+  using Zone,
   Context,
   TypeImpl,
   sourcecode.File,
@@ -60,7 +60,7 @@ private[zaozi] def rawConnect(
   dest:   Value,
   source: Value
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   sourcecode.File,
@@ -73,7 +73,7 @@ private[zaozi] def subfieldValue(
   v: Value,
   i: Int
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   sourcecode.File,
@@ -87,7 +87,7 @@ private[zaozi] def subindexValue(
   v: Value,
   i: Int
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   sourcecode.File,
@@ -103,7 +103,7 @@ given [A <: Connectable]: Connect[A] with
       src: SRC
     )(
       using A <:< Element,
-      Arena,
+      Zone,
       Context,
       Block,
       sourcecode.File,
@@ -117,7 +117,7 @@ given [A <: Connectable]: Connect[A] with
     def :<>=[SRC <: Writable[A]](
       src: SRC
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       TypeImpl,
@@ -127,7 +127,7 @@ given [A <: Connectable]: Connect[A] with
     def :<=[SRC <: Readable[A]](
       src: SRC
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       TypeImpl,
@@ -138,7 +138,7 @@ given [A <: Connectable]: Connect[A] with
     def :>=[SRC <: Writable[A]](
       src: SRC
     )(
-      using Arena,
+      using Zone,
       Context,
       Block,
       TypeImpl,
@@ -154,7 +154,7 @@ private[zaozi] def connect(
   src:  Readable[?],
   dir:  ConnDir
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   TypeImpl,
@@ -169,7 +169,7 @@ private def connectReferable(
   src:  Referable[?],
   dir:  ConnDir
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   TypeImpl,

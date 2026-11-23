@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Huang Rui <vowstar@gmail.com>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class IOMuxAccess %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class IOMuxAccess %s --
 // RUN: rm -rf %t.dir && mkdir -p %t.dir/32 %t.dir/64
 // RUN: %{test} config %t.dir/32/config.json --dataWidth 32
 // RUN: %{test} config %t.dir/64/config.json --dataWidth 64

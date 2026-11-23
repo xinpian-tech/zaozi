@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.executionengine
 
+import org.llvm.mlir.raw.structs as MlirStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.Module
-import java.lang.foreign.{Arena, MemorySegment}
 
-class ExecutionEngine(val _segment: MemorySegment)
-trait ExecutionEngineApi extends HasSegment[ExecutionEngine] with HasSizeOf[ExecutionEngine]:
+class ExecutionEngine(handle: Ptr[MlirStructs.MlirExecutionEngine]) extends NativeHandle(handle)
+trait ExecutionEngineApi                                            extends HasSizeOf[ExecutionEngine]:
   def executionEngineCreate(
     module:           Module,
     optLevel:         Int = 0,
@@ -15,7 +17,7 @@ trait ExecutionEngineApi extends HasSegment[ExecutionEngine] with HasSizeOf[Exec
     enableObjectDump: Boolean = false,
     enablePIC:        Boolean = false
   )(
-    using Arena
+    using Zone
   ): ExecutionEngine
 
   extension (engine: ExecutionEngine)
@@ -28,30 +30,30 @@ trait ExecutionEngineApi extends HasSegment[ExecutionEngine] with HasSizeOf[Exec
       */
     def invokePacked(
       name:      String,
-      arguments: Seq[MemorySegment]
+      arguments: Seq[Ptr[?]]
     )(
-      using Arena
+      using Zone
     ): LogicalResult
     def lookup(
       name: String
     )(
-      using Arena
-    ): MemorySegment
+      using Zone
+    ): Ptr[Byte]
     def lookupPacked(
       name: String
     )(
-      using Arena
-    ): MemorySegment
+      using Zone
+    ): Ptr[Byte]
 
-    /** The caller owns the symbol's lifetime, including any upcall arena. */
+    /** The caller owns the symbol's lifetime, including any upcall zone. */
     def registerSymbol(
       name:   String,
-      symbol: MemorySegment
+      symbol: Ptr[Byte]
     )(
-      using Arena
+      using Zone
     ): Unit
     def dumpToObjectFile(
       fileName: String
     )(
-      using Arena
+      using Zone
     ): Unit

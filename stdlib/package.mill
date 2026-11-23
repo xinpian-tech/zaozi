@@ -12,42 +12,29 @@ import build.{circtlib, decoder, v, zaozi, LitModule, ZaoziPublishModule, ZaoziS
 import build.testlib
 
 object `package` extends ZaoziScalaModule with ScalafmtModule with ZaoziPublishModule { m =>
-  def scalaVersion = Task(v.scala)
-  def moduleDeps   = Seq(zaozi, decoder)
+
+  def moduleDeps = Seq(zaozi, decoder)
 
   override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions() ++ Seq("-experimental"))
 
-  override def forkArgs: T[Seq[String]] = Task(
-    super.forkArgs() ++ circtlib.forkArgs()
-  )
-
   object lit extends ZaoziScalaModule with ScalafmtModule {
-    def scalaVersion = Task(v.scala)
-    def moduleDeps   = Seq(m)
-    override def forkArgs: T[Seq[String]] = Task(
-      super.forkArgs() ++ circtlib.forkArgs()
-    )
+
+    def moduleDeps = Seq(m)
     object tests extends LitModule {
-      def scalaVersion:    T[String]       = Task(m.scalaVersion())
-      def runClasspath:    T[Seq[os.Path]] = Task(lit.runClasspath().map(_.path))
-      def javaLibraryPath: T[Seq[os.Path]] = Task(
-        (circtlib.libraryPaths()).map(_.path)
-      )
-      def javaHome:        T[os.Path]      = Task.Input(os.Path(sys.props("java.home")))
-      def litDir:          T[os.Path]      = Task(moduleDir)
-      def litConfigIn:     T[PathRef]      = Task.Source(moduleDir / "lit.site.cfg.py.in")
+      def scalaVersion: T[String]       = Task(m.scalaVersion())
+      def runClasspath: T[Seq[os.Path]] = Task(lit.runClasspath().map(_.path))
+      def nativeInstalls = circtlib.nativeInstalls()
+      def litDir:      T[os.Path] = Task(moduleDir)
+      def litConfigIn: T[PathRef] = Task.Source(moduleDir / "lit.site.cfg.py.in")
     }
   }
 
-  object tests extends ScalaTests with ScalafmtModule with Utest {
+  object tests extends NativeTests with ScalafmtModule with Utest {
     override def scalacOptions: T[Seq[String]] = Task(super.scalacOptions().filterNot(_ == "-Xcheck-macros"))
 
-    def mvnDeps = Seq(v.utest)
+    override def mvnDeps = super.mvnDeps() ++ Seq(v.utest)
 
     override def moduleDeps: Seq[JavaModule] = Seq(m, testlib)
 
-    override def forkArgs: T[Seq[String]] = Task(
-      super.forkArgs() ++ circtlib.forkArgs()
-    )
   }
 }

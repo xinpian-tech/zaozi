@@ -6,7 +6,7 @@ package org.llvm.circt.scalalib.capi.dialect.hwarith
 
 import org.llvm.mlir.scalalib.capi.ir.Context
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 /** HWArith Dialect Api
   * {{{
@@ -16,8 +16,8 @@ import java.lang.foreign.Arena
   */
 trait DialectApi:
   inline def loadDialect(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ):                  Unit
   def registerPasses: Unit
 end DialectApi

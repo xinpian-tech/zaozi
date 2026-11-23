@@ -6,6 +6,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
     circt-nix.url = "github:xinpian-tech/circt-nix/xinpian-main";
+    sn-bindgen.url = "github:indoorvivants/sn-bindgen/main";
     flake-utils.url = "github:numtide/flake-utils";
     mvn-trace-forge.url = "github:Avimitin/mvn-trace-forge";
     scala3-bsp-semantic-ls.url = "github:xinpian-tech/scala3-bsp-semantic-ls";
@@ -35,13 +36,21 @@
         pkgs = import nixpkgs {
           overlays = [
             circt-nix.overlays.default
+            (final: _: { sn-bindgen = import ./nix/pkgs/sn-bindgen.nix {
+              upstream = inputs.sn-bindgen;
+              inherit system;
+            }; })
             mvn-trace-forge.overlays.default
             overlay
             local-overlay
           ];
           inherit system;
         };
-        scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default;
+        scala3BspSemanticLs = scala3-bsp-semantic-ls.packages.${system}.default.override {
+          rustWorkspace = scala3-bsp-semantic-ls.checks.${system}.rust-build.overrideAttrs (old: {
+            patches = (old.patches or [ ]) ++ [ ./nix/patches/scala-native-presentation-compiler.patch ];
+          });
+        };
         zedSettings = pkgs.writeText "zaozi-zed-settings.json" ''
           {
             "languages": {
@@ -64,20 +73,26 @@
         formatter = pkgs.nixpkgs-fmt;
         legacyPackages = pkgs;
         packages = {
-          default = pkgs.zaozi.zaozi-assembly;
-          zaozi-assembly = pkgs.zaozi.zaozi-assembly;
+          default = pkgs.zaozi.package;
+          zaozi = pkgs.zaozi.package;
+          zaozi-runtime = pkgs.zaozi.package.override { withScaladoc = false; };
           mlir-install = pkgs.mlir-install;
           circt-install = pkgs.circt-install;
+          sn-bindgen = pkgs.sn-bindgen;
+          scala3-bsp-semantic-ls = scala3BspSemanticLs;
         };
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ pkgs.zaozi.zaozi-assembly ];
-          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 ] ++ lib.optionals stdenv.isLinux [
+          inputsFrom = [ pkgs.zaozi.package ];
+          nativeBuildInputs = with pkgs; [ mtf nixd jdk25 sn-bindgen clang ] ++ lib.optionals stdenv.isLinux [
             scala3BspSemanticLs
+            util-linux # taskset for the single-CPU elaboration test
           ];
           env = with pkgs; {
             CIRCT_INSTALL_PATH = circt-install;
             MLIR_INSTALL_PATH = mlir-install;
-            JEXTRACT_INSTALL_PATH = jextract;
+            SN_BINDGEN = "${sn-bindgen}/bin/bindgen";
+            CLANG = "${clang}/bin/clang";
+            CLANGPP = "${clang}/bin/clang++";
             LIBC_INCLUDE_PATH = "${stdenv.cc.libc.dev}/include";
             LIT_INSTALL_PATH = lit;
             # Share regular Mill outputs with BSP so SemanticDB produced by
@@ -87,16 +102,7 @@
             RISCV_OPCODES_INSTALL_PATH = riscv-opcodes;
             Z3_LIB = "${z3.lib}/lib/libz3.so";
           };
-          # -Djextract.decls.per.header=65535 is scoped to the jextract
-          # subprocess via PanamaModule.jextractEnv in build.mill, so it no
-          # longer leaks into mill, scalac, or every test/lit fork.
-          #
-          # -Xss32m stays in the global JAVA_TOOL_OPTIONS because scalac's
-          # JavaParser deep-recurses through the 95K-line single-class CAPI.java
-          # the jextract.decls.per.header property forces jextract to emit;
-          # without it scalac throws StackOverflowError in pullOutFirstConstr.
           shellHook = ''
-            export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Xss32m"
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               install -Dm644 ${zedSettings} .zed/settings.json
             ''}

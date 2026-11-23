@@ -1,0 +1,25 @@
+--- a/crates/ls-server/src/pc.rs
++++ b/crates/ls-server/src/pc.rs
+@@ -343,7 +343,21 @@
+     let mut i = 0;
+     while i < scalac_options.len() {
+         let opt = &scalac_options[i];
+-        if opt == "-Xsemanticdb" || opt == "-Ysemanticdb" {
++        if let Some(paths) = opt.strip_prefix("-Xplugin:") {
++            // Native's code-generation plugin prevents the JVM presentation
++            // compiler from typing even an ordinary val. Keep navigation plugins.
++            let keep: Vec<_> = std::env::split_paths(paths)
++                .filter(|p| !p.file_name().and_then(|s| s.to_str()).is_some_and(|s| {
++                    s.starts_with("nscplugin_") && s.ends_with(".jar")
++                }))
++                .collect();
++            if !keep.is_empty() {
++                let paths = std::env::join_paths(keep).expect("paths came from a classpath");
++                out.push(format!("-Xplugin:{}", paths.to_string_lossy()));
++            }
++        } else if opt.starts_with("-P:scalanative:") {
++            // These flags configure the removed backend plugin.
++        } else if opt == "-Xsemanticdb" || opt == "-Ysemanticdb" {
+             // Drop the single-token generation flags.
+         } else if TWO_TOKEN.contains(&opt.as_str()) && i + 1 < scalac_options.len() {
+             // Drop the flag and skip its separate value token.

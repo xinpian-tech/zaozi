@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" --
+// DEFINE: %{test} = %t.bin
+// RUN: scala-cli --power package --force --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class "me.jiuyang.stdlib.queue.default.SyncQueue" %s -o %t.bin
 
 // RUN: rm -rf %t.dir && mkdir -p %t.dir
 

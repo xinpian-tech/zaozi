@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.firtool
 
+import org.llvm.circt.raw.structs as CirctStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.*
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.pass.PassManager
-
-import java.lang.foreign.Arena
-import java.lang.foreign.MemorySegment
 
 enum CirctFirtoolPreserveAggregateMode:
   case None
@@ -64,235 +64,235 @@ trait CirctFirtoolVerificationFlavorApi
     extends HasSizeOf[CirctFirtoolVerificationFlavor]
     with EnumHasToNative[CirctFirtoolVerificationFlavor]
 
-class FirtoolOptions(val _segment: MemorySegment)
-trait FirtoolOptionsApi extends HasSegment[FirtoolOptions] with HasSizeOf[FirtoolOptions]
+class FirtoolOptions(handle: Ptr[CirctStructs.CirctFirtoolFirtoolOptions]) extends NativeHandle(handle)
+trait FirtoolOptionsApi                                                    extends HasSizeOf[FirtoolOptions]
 
 trait FirtoolApi:
   inline def firtoolOptionsCreateDefault(
-    using arena: Arena
+    using zone: Zone
   ): FirtoolOptions
   extension (firtoolOptions: FirtoolOptions)
     inline def destroy(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setAddMuxPragmas(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setAddVivadoRAMAddressConflictSynthesisBugWorkaround(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setBlackBoxRootPath(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setBuildMode(
-      value:       CirctFirtoolBuildMode
+      value:      CirctFirtoolBuildMode
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setCkgEnableName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setCkgInputName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setCkgModuleName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setCkgOutputName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setCkgTestEnableName(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setCompanionMode(
-      value:       CirctFirtoolCompanionMode
+      value:      CirctFirtoolCompanionMode
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableAggressiveMergeConnections(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableAnnotationsClassless(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableCSEinClasses(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableLayerSink(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableOptimization(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableRandom(
-      value:       CirctFirtoolRandomKind
+      value:      CirctFirtoolRandomKind
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setDisableUnknownAnnotations(
-      disable:     Boolean
+      disable:    Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setEmitSeparateAlwaysBlocks(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setEnableAnnotationWarning(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setEnableDebugInfo(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setExportModuleHierarchy(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setIgnoreReadEnableMem(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setLowerAnnotationsNoRefTypePorts(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setLowerMemories(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setNoDedup(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setOutputAnnotationFilename(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setOutputFilename(
-      filename:    String
+      filename:   String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setPreserveAggregate(
-      value:       CirctFirtoolPreserveAggregateMode
+      value:      CirctFirtoolPreserveAggregateMode
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setPreserveValues(
-      value:       CirctFirtoolPreserveValuesMode
+      value:      CirctFirtoolPreserveValuesMode
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setReplSeqMem(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setReplSeqMemFile(
-      value:       String
+      value:      String
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setSelectDefaultInstanceChoice(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setStripDebugInfo(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setStripFirDebugInfo(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setVbToBv(
-      value:       Boolean
+      value:      Boolean
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
     inline def setVerificationFlavor(
-      value:       CirctFirtoolVerificationFlavor
+      value:      CirctFirtoolVerificationFlavor
     )(
-      using arena: Arena
+      using zone: Zone
     ): Unit
   extension (pm:             PassManager)
     // See inputFilename usage in https://github.com/llvm/circt/blob/ff847edb042541c44c79b59f1a680f641241b485/lib/Firtool/Firtool.cpp#L254
     def chirrtlToLowFIRRTL(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
     def exportSplitVerilog(
       firtoolOptions: FirtoolOptions,
       directory:      String
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
     def exportVerilog(
       firtoolOptions: FirtoolOptions,
       callback:       String => Unit
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
     def finalizeIR(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
     def hwToSV(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
     def lowFIRRTLToHW(
       firtoolOptions: FirtoolOptions,
       inputFilename:  String
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
     def preprocessTransforms(
       firtoolOptions: FirtoolOptions
     )(
-      using arena:    Arena
+      using zone:     Zone
     ): LogicalResult
 end FirtoolApi

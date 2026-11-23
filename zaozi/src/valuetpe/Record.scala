@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.reftpe.Ref
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Type, Value}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait Record extends Aggregate with Connectable with UntypedDynamicSubfield:
   def Flipped[T <: Data](
@@ -29,7 +29,7 @@ trait Record extends Aggregate with Connectable with UntypedDynamicSubfield:
     refer:        Value,
     fieldValName: String
   )(
-    using Arena,
+    using Zone,
     Block,
     Context,
     sourcecode.File,
@@ -42,7 +42,7 @@ trait Record extends Aggregate with Connectable with UntypedDynamicSubfield:
   )
 
   def toMlirType(
-    using Arena,
+    using Zone,
     Context,
     TypeImpl
   ): Type = this.toMlirTypeImpl

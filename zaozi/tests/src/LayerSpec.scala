@@ -12,7 +12,7 @@ import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, Context
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
 import utest.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import scala.annotation.meta.param
 
 case class LayerSpecParameter(width: Int) extends Parameter

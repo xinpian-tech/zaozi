@@ -2,72 +2,67 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.pass
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.{
-  mlirOpPassManagerAddOwnedPass,
-  mlirOpPassManagerAddPipeline,
-  mlirOpPassManagerGetNestedUnder,
-  mlirParsePassPipeline,
-  mlirPrintPassPipeline
-}
-import org.llvm.mlir.scalalib.capi.support.{*, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import scala.scalanative.unsafe.*
 
-import java.lang.foreign.{Arena, MemorySegment}
+import org.llvm.mlir.scalalib.capi.support.{*, given}
 
 given OpPassManagerApi with
   extension (opPassManager: OpPassManager)
     inline def getNestedUnder(
-      passManager:   PassManager,
       operationName: String
     )(
-      using arena:   Arena
+      using zone:    Zone
     ): OpPassManager =
       OpPassManager(
-        mlirOpPassManagerGetNestedUnder(arena, passManager.segment, operationName.toStringRef.segment),
-        passManager._callbackArenas,
-        passManager._ownedPasses
+        nativeResult[MlirStructs.MlirOpPassManager](out =>
+          mlirApi.mlirOpPassManagerGetNestedUnder(opPassManager.native, operationName.toStringRef.native)(out)
+        ),
+        opPassManager._callbackStates,
+        opPassManager._ownedPasses
       )
     inline def addPipeline(
       pipelineElements: String,
       callback:         String => Unit
     )(
-      using arena:      Arena
+      using zone:       Zone
     ): LogicalResult =
       LogicalResult(
-        mlirOpPassManagerAddPipeline(
-          arena,
-          opPassManager.segment,
-          pipelineElements.toStringRef.segment,
-          callback.stringToStringCallback.segment,
-          MemorySegment.NULL
-        )
+        callback.stringToStringCallback.use { (fn, data) =>
+          nativeResult[MlirStructs.MlirLogicalResult](out =>
+            mlirApi.mlirOpPassManagerAddPipeline(opPassManager.native, pipelineElements.toStringRef.native, fn, data)(
+              out
+            )
+          )
+        }
       )
     inline def parsePassPipeline(
-      pipeline:    String,
-      callback:    String => Unit
+      pipeline:   String,
+      callback:   String => Unit
     )(
-      using arena: Arena
+      using zone: Zone
     ): LogicalResult = LogicalResult(
-      mlirParsePassPipeline(
-        arena,
-        opPassManager.segment,
-        pipeline.toStringRef.segment,
-        callback.stringToStringCallback.segment,
-        MemorySegment.NULL
-      )
+      callback.stringToStringCallback.use { (fn, data) =>
+        nativeResult[MlirStructs.MlirLogicalResult](out =>
+          mlirApi.mlirParsePassPipeline(opPassManager.native, pipeline.toStringRef.native, fn, data)(out)
+        )
+      }
     )
     inline def addOwnedPass(
       pass: Pass
     ): Unit =
-      mlirOpPassManagerAddOwnedPass(opPassManager.segment, pass.segment)
-      val a = pass._callbackArena
-      if a != null then opPassManager._callbackArenas.add(a)
+      mlirApi.mlirOpPassManagerAddOwnedPass(opPassManager.native, pass.native)
+      val a = pass._callbackState
+      if a != null then opPassManager._callbackStates.add(a)
       opPassManager._ownedPasses.add(pass)
     inline def printPassPipeline(
-      callback:    String => Unit
+      callback:   String => Unit
     )(
-      using arena: Arena
-    ): Unit = mlirPrintPassPipeline(opPassManager.segment, callback.stringToStringCallback.segment, MemorySegment.NULL)
-    inline def segment: MemorySegment = opPassManager._segment
-    inline def sizeOf:  Int           = MlirOpPassManager.sizeof().toInt
+      using zone: Zone
+    ): Unit = callback.stringToStringCallback.use { (fn, data) =>
+      mlirApi.mlirPrintPassPipeline(opPassManager.native, fn, data)
+    }
+
+    inline def sizeOf: Int = sizeof[MlirStructs.MlirOpPassManager].toInt
 end given

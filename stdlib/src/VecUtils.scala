@@ -8,14 +8,14 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait VecUtilsApi:
   extension [E <: Data, V <: Vec[E], R <: Referable[V]](ref: R)
     // Each element access emits a SubindexOp into the Block captured at the toSeq call site,
     // not the Block at the point of access. This matters inside when/otherwise.
     def toSeq(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,
@@ -27,7 +27,7 @@ trait VecUtilsApi:
 
   extension [E <: Connectable](seq: Seq[Referable[E]])
     def toVec(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

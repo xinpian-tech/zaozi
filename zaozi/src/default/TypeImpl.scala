@@ -13,14 +13,14 @@ import org.llvm.circt.scalalib.dialect.firrtl.operation.{OpenSubfieldApi, Subfie
 import org.llvm.circt.scalalib.capi.dialect.firrtl.TypeApi as FirrtlTypeApi
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, LocationApi, Operation, Type, Value, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import scala.collection.immutable.SeqMap
 
 given TypeImpl with
   private def buildBundleMlirType(
     ref: Aggregate
   )(
-    using Arena,
+    using Zone,
     Context
   ): Type =
     ref.instantiating = false
@@ -34,107 +34,107 @@ given TypeImpl with
 
   extension (ref: ProbeInterface[?])
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
   extension (ref: Wire[?])
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
   extension (ref: Reg[?])
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
   extension (ref: Node[?])
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
   extension (ref: Ref[?])
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
   extension (ref: Const[?])
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
   extension (ref: Instance[?, ?])
     def operationImpl:        Operation = ref._operation
     def probeImpl[T <: Data]: Wire[T]   = ref._probeWire.asInstanceOf[Wire[T]]
   extension (ref: Sequence)
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
     // LTL refs have no aggregate MLIR type; `1.getUInt` is an unconsumed placeholder.
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = 1.getUInt
   extension (ref: Property)
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = 1.getUInt
   extension (ref: Immediate)
     def referImpl(
-      using Arena
+      using Zone
     ): Value = ref._refer
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = 1.getUInt
 
   extension (ref: Reset)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = 1.getUInt
   extension (ref: Clock)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = summon[FirrtlTypeApi].getClock
       mlirType
   extension (ref: UInt)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = ref._width.getUInt
       mlirType
   extension (ref: SInt)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = ref._width.getSInt
       mlirType
   extension (ref: Bits)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = ref._width.getUInt
       mlirType
   extension (ref: Analog)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = ref._width.getAnalog
       mlirType
   extension (ref: Bool)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = 1.getUInt
       mlirType
   extension (ref: ProbeBundle)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = buildBundleMlirType(ref)
     def ReadProbeImpl[T <: Data & CanProbe](
@@ -166,7 +166,7 @@ given TypeImpl with
 
   extension (ref: Bundle)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = buildBundleMlirType(ref)
     def FlippedImpl[T <: Data](
@@ -195,7 +195,7 @@ given TypeImpl with
       ref._elements.toSeq
   extension (ref: ProbeRecord)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = buildBundleMlirType(ref)
     def ReadProbeImpl[T <: Data & CanProbe](
@@ -225,7 +225,7 @@ given TypeImpl with
 
   extension (ref: Record)
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type = buildBundleMlirType(ref)
     def FlippedImpl[T <: Data](
@@ -248,7 +248,7 @@ given TypeImpl with
 
   extension (ref: RProbe[?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context,
       TypeImpl
     ): Type =
@@ -256,7 +256,7 @@ given TypeImpl with
 
   extension (ref: RWProbe[?])
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context,
       TypeImpl
     ): Type =
@@ -264,17 +264,17 @@ given TypeImpl with
 
   extension (data: Data)
     def widthImpl(
-      using Arena,
+      using Zone,
       Context
     ): Int =
       data.toMlirType.getBitWidth(true).toInt
   extension (ref:  Vec[?])
     def countImpl(
-      using Arena,
+      using Zone,
       Context
     ): Int = ref.toMlirType.getVectorElementNum.toInt
     def toMlirTypeImpl(
-      using Arena,
+      using Zone,
       Context
     ): Type =
       val mlirType = ref._elementType.toMlirType.getVector(ref._count)
@@ -284,7 +284,7 @@ given TypeImpl with
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -297,7 +297,7 @@ given TypeImpl with
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -325,7 +325,7 @@ given TypeImpl with
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -338,7 +338,7 @@ given TypeImpl with
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -366,7 +366,7 @@ given TypeImpl with
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,
@@ -395,7 +395,7 @@ given TypeImpl with
       refer:        Value,
       fieldValName: String
     )(
-      using Arena,
+      using Zone,
       Block,
       Context,
       sourcecode.File,

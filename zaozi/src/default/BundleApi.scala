@@ -12,12 +12,12 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{*, given}
 import org.llvm.circt.scalalib.dialect.firrtl.operation.{given_BitCastApi, given_WireApi, BitCastApi, WireApi}
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 given [T <: Bundle | ProbeBundle]: BundleApi[T] with
   extension [R <: Referable[T]](ref: R)
     def asBits(
-      using Arena,
+      using Zone,
       Context,
       Block,
       sourcecode.File,

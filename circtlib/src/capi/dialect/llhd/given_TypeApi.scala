@@ -2,11 +2,11 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.circt.scalalib.capi.dialect.llhd
 
-import org.llvm.circt.CAPI.llhdTypeIsATimeType
+import org.llvm.circt.raw.functions as circtApi
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.ir.{Type, given}
 
-import java.lang.foreign.Arena
-
 given TypeApi with
-  extension (tpe: Type) inline def isTimeType: Boolean = llhdTypeIsATimeType(tpe.segment)
+  extension (tpe: Type) inline def isTimeType: Boolean = circtApi.llhdTypeIsATimeType(tpe.native)
 end given

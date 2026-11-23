@@ -11,7 +11,7 @@ import org.llvm.mlir.scalalib.capi.ir.{given_ContextApi, Block, Context, Context
 import org.llvm.mlir.scalalib.capi.pass.{given_PassManagerApi, PassManager, PassManagerApi}
 import utest.*
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 case class UIntSpecParameter(width: Int) extends Parameter
 given upickle.default.ReadWriter[UIntSpecParameter] = upickle.default.macroRW
@@ -68,7 +68,7 @@ object UIntSpec extends TestSuite:
           node: Node[UInt]
         )(
           using Add[UInt, UInt],
-          Arena,
+          Zone,
           Context,
           Block,
           sourcecode.File,
@@ -83,7 +83,7 @@ object UIntSpec extends TestSuite:
           const: Const[UInt]
         )(
           using Eq[UInt, Bool],
-          Arena,
+          Zone,
           Context,
           Block,
           sourcecode.File,

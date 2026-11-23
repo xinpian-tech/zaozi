@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package me.jiuyang.smtlib
 
-import java.lang.foreign.{Arena, ValueLayout}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
 import me.jiuyang.smtlib.parser.Z3Status
 import org.llvm.circt.scalalib.capi.conversion.{ConversionCreateApi, given}
-import org.llvm.mlir.CAPI
 import org.llvm.mlir.scalalib.capi.ir.{*, given}
 import org.llvm.mlir.scalalib.capi.dialect.func.{FuncApi, given}
 import org.llvm.mlir.scalalib.capi.pass.{*, given}
@@ -14,16 +18,16 @@ import org.llvm.mlir.scalalib.capi.target.exportsmtlib.given
 import org.llvm.mlir.scalalib.dialect.smt.operation.{CheckApi, SolverApi, YieldApi, given}
 
 private[smtlib] def executeSolver(
-  body:        (Arena, Context, Block, SolverContext) ?=> Unit,
-  config:      SolverContext,
-  location:    Location
+  body:       (Zone, Context, Block, SolverContext) ?=> Unit,
+  config:     SolverContext,
+  location:   Location
 )(
-  using arena: Arena,
-  context:     Context
+  using zone: Zone,
+  context:    Context
 ): Seq[Z3Status] =
   val registry = summon[DialectRegistryApi].registryCreate()
   try
-    CAPI.mlirRegisterAllDialects(registry.segment)
+    mlirApi.mlirRegisterAllDialects(registry.native)
     context.appendDialectRegistry(registry)
   finally registry.destroy()
   Seq("smt", "func", "arith", "llvm").foreach(context.getOrLoadDialect)
@@ -33,7 +37,7 @@ private[smtlib] def executeSolver(
     val source        = summon[SolverApi].op(location)
     module.getBody.appendOwnedOperation(source.operation)
     body(
-      using arena,
+      using zone,
       context,
       source.bodyBlock,
       solverContext
@@ -47,13 +51,15 @@ private[smtlib] def executeSolver(
 
     val operations = Iterator
       .iterate(source.bodyBlock.getFirstOperation)(_.getNextInBlock)
-      .takeWhile(op => org.llvm.mlir.MlirOperation.ptr(op.segment).address() != 0)
+      .takeWhile(op => !op.isNull)
       .toVector
     val checks     = operations.filter(_.getName.str == "smt.check")
     if checks.isEmpty then Vector.empty
     else
       val i32        = 32.integerTypeGet
-      val ptr        = Type(CAPI.mlirLLVMPointerTypeGet(arena, context.segment, 0))
+      val ptr        = Type(
+        nativeResult[MlirStructs.MlirType](out => mlirApi.mlirLLVMPointerTypeGet(context.native, 0.toUInt)(out))
+      )
       val function   = summon[FuncApi].op("solver", Seq(ptr), Seq.empty, true)
       module.getBody.appendOwnedOperation(function.operation)
       // Pass the output buffer through the solver's native block argument.
@@ -111,7 +117,11 @@ private[smtlib] def executeSolver(
       val passes = summon[PassManagerApi].passManagerCreate
       try
         passes.addOwnedPass(summon[ConversionCreateApi].lowerSMTToZ3LLVM)
-        passes.addOwnedPass(Pass(CAPI.mlirCreateConversionReconcileUnrealizedCastsPass(arena)))
+        passes.addOwnedPass(
+          Pass(
+            nativeResult[MlirStructs.MlirPass](out => mlirApi.mlirCreateConversionReconcileUnrealizedCastsPass()(out))
+          )
+        )
         require(passes.runOnOp(module.getOperation).succeeded, "SMT to Z3 LLVM lowering failed")
       finally passes.destroy()
       val engine =
@@ -119,12 +129,12 @@ private[smtlib] def executeSolver(
       require(!engine.isNull, "could not create SMT execution engine")
       try
         engine.initialize()
-        val results  = arena.allocate(ValueLayout.JAVA_INT, checks.size)
-        val argument = arena.allocate(ValueLayout.ADDRESS)
-        argument.set(ValueLayout.ADDRESS, 0, results)
-        require(engine.invokePacked("solver", Seq(argument)).succeeded, "SMT invocation failed")
+        val results  = alloc[Int](checks.size)
+        val argument = alloc[Ptr[Int]]()
+        !argument = results
+        require(engine.invokePacked("solver", Seq(argument.asInstanceOf[Ptr[Byte]])).succeeded, "SMT invocation failed")
         checks.indices.map: index =>
-          results.getAtIndex(ValueLayout.JAVA_INT, index) match
+          results(index) match
             case 1     => Z3Status.Sat
             case -1    => Z3Status.Unsat
             case 0     => Z3Status.Unknown

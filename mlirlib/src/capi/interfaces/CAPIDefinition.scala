@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.interfaces
 
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
-
-class ShapedTypeComponentsCallback(val _segment: MemorySegment)
-trait ShapedTypeComponentsCallbackApi extends HasSegment[ShapedTypeComponentsCallback]
+class ShapedTypeComponentsCallback(val native: org.llvm.mlir.raw.aliases.MlirShapedTypeComponentsCallback)
+trait ShapedTypeComponentsCallbackApi

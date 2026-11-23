@@ -6,7 +6,7 @@ import me.jiuyang.zaozi.TypeImpl
 import me.jiuyang.zaozi.valuetpe.*
 import org.llvm.mlir.scalalib.capi.ir.Value
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 private[zaozi] final class ContractResult[T <: Data](
   tpe:      T,
@@ -16,6 +16,6 @@ private[zaozi] final class ContractResult[T <: Data](
   private[zaozi] val _refer: Value = refValue
 
   def refer(
-    using Arena,
+    using Zone,
     TypeImpl
   ): Value = _refer

@@ -19,8 +19,17 @@ jobs:
     runs-on: [self-hosted, linux, nixos]
     steps:
       - uses: actions/checkout@v4
-      - run: nix develop -c mill --no-daemon '__.testForked'
-      - run: |
-          export SCALA_CLI_HOME=$(mktemp -d)
-          export JAVA_OPTS="$JAVA_TOOL_OPTIONS -Duser.home=$(mktemp -d)"
-          nix develop -c mill --no-daemon '__.lit.tests.run'
+      - name: Run unit and lit tests
+        run: |
+          # Native build products exceed the runner's /run tmpfs.
+          scratch=$(mktemp -d /var/tmp/zaozi-native.XXXXXXXX)
+          trap 'rm -rf "$scratch"' EXIT
+          mkdir -p "$scratch/src" "$scratch/tmp"
+          git archive HEAD | tar -x -C "$scratch/src"
+          cd "$scratch/src"
+          export TMPDIR="$scratch/tmp"
+          nix develop "$GITHUB_WORKSPACE" -c mill --no-daemon '__.testForked'
+          export SCALA_CLI_HOME="$scratch/scala-cli"
+          export JAVA_OPTS="${JAVA_TOOL_OPTIONS:-} -Duser.home=$scratch/home"
+          export LIT_OPTS="-j 2"
+          nix develop "$GITHUB_WORKSPACE" -c mill --no-daemon '__.lit.tests.run'

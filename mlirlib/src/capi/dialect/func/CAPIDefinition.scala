@@ -5,28 +5,28 @@ package org.llvm.mlir.scalalib.capi.dialect.func
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module, Operation, Type, given}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 trait DialectApi:
   inline def loadDialect(
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit
 end DialectApi
 
 class Func(val _operation: Operation)
 trait FuncApi extends HasOperation[Func]:
   inline def op(
-    symName:     String
+    symName:    String
     // funcType: Type,
     // symVisibility: String,
     // argAttrs: Seq[NamedAttribute],
     // resAttrs: Seq[NamedAttribute],
     // noInline: Boolean,
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Func
 
   def op(
@@ -35,17 +35,17 @@ trait FuncApi extends HasOperation[Func]:
     results:        Seq[Type],
     emitCInterface: Boolean
   )(
-    using Arena,
+    using Zone,
     Context
   ): Func
 
   extension (c: Func)
     inline def block(
-      using Arena
+      using Zone
     ): Block
     inline def appendToModule(
     )(
-      using arena: Arena,
-      module:      Module
+      using zone: Zone,
+      module:     Module
     ): Unit
 end FuncApi

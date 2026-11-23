@@ -2,20 +2,22 @@
 // SPDX-FileCopyrightText: 2025 Jianhao Ye <Clo91eaf@qq.com>
 package org.llvm.mlir.scalalib.capi.dialect.smt
 
-import org.llvm.mlir.*
-import org.llvm.mlir.CAPI.mlirGetDialectHandle__smt__
-import org.llvm.mlir.scalalib.capi.ir.{Context, DialectHandle, given}
+import org.llvm.mlir.raw.structs as MlirStructs
+import org.llvm.mlir.raw.functions as mlirApi
+import org.llvm.mlir.scalalib.capi.support.nativeResult
+import scala.scalanative.unsafe.*
 
-import java.lang.foreign.Arena
+import org.llvm.mlir.scalalib.capi.ir.{Context, DialectHandle, given}
 
 given DialectApi with
   inline def loadDialect(
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Unit =
-    DialectHandle(mlirGetDialectHandle__smt__(arena)).loadDialect(
-      using arena,
-      context
-    )
+    DialectHandle(nativeResult[MlirStructs.MlirDialectHandle](out => mlirApi.mlirGetDialectHandle__smt__()(out)))
+      .loadDialect(
+        using zone,
+        context
+      )
 end given

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 xinpian-tech
 package me.jiuyang.stdlib
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context}
 import me.jiuyang.zaozi.*
 import me.jiuyang.zaozi.default.{*, given}
@@ -61,7 +61,7 @@ def prefixTreePropagates(
   internal:      Seq[PrefixNode]
 )(leafPropagate: PrefixNode => Referable[Bool]
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   sourcecode.File,
@@ -83,7 +83,7 @@ def prefixTreeGenerates(
   propagates:   SeqMap[PrefixNode, Referable[Bool]]
 )(leafGenerate: PrefixNode => Referable[Bool]
 )(
-  using Arena,
+  using Zone,
   Context,
   Block,
   sourcecode.File,

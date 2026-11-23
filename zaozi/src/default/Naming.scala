@@ -4,7 +4,7 @@ package me.jiuyang.zaozi.default
 
 import org.llvm.mlir.scalalib.capi.ir.{given_LocationApi, Context, Location, LocationApi}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import me.jiuyang.zaozi.Parameter
 import me.jiuyang.zaozi.HWInterface
 import me.jiuyang.zaozi.DVInterface
@@ -13,10 +13,9 @@ import me.jiuyang.zaozi.reftpe.{Const, Node, Propagated, Referable}
 import me.jiuyang.zaozi.valuetpe.Data
 import me.jiuyang.zaozi.ConstructorApi
 import me.jiuyang.zaozi.InstanceContext
-import javax.naming.NameNotFoundException
 
 private inline def locate(
-  using Arena,
+  using Zone,
   Context,
   sourcecode.File,
   sourcecode.Line
@@ -38,7 +37,7 @@ private inline def bundleFieldName(
   using sourcecode.Name.Machine
 ): String = summon[sourcecode.Name.Machine].value match
   case actualName if !sourcecode.Util.isSyntheticName(actualName) => actualName
-  case anonName                                                   => throw NameNotFoundException(s"Cannot find name for BundleField ${anonName}")
+  case anonName                                                   => throw IllegalArgumentException(s"Cannot find name for BundleField ${anonName}")
 
 private[zaozi] def propagate[R <: Referable[?], RET <: Data](
   source:   R,

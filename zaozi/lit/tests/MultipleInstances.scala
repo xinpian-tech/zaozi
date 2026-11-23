@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 <liu@jiuyang.me>
 
-// DEFINE: %{test} = scala-cli --server=false --java-home=%JAVAHOME --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %JAVAOPTS --main-class GCD %s --
+// DEFINE: %{test} = scala-cli --server=false --extra-jars=%RUNCLASSPATH --scala-version=%SCALAVERSION -O="-experimental" %NATIVEOPTS --main-class GCD %s --
 // RUN: rm -rf %t && mkdir -p %t && cd %t
 // RUN: %{test} config %t/config.json --width 32 --use-async-reset false
 // RUN: %{test} design %t/config.json
-// RUN: firld %t/*.mlirbc --base-circuit GCD_35bf2066 --no-mangle | firtool --format=mlir | FileCheck %s --check-prefixes=GCD,SUB
+// RUN: firld %t/*.mlirbc --base-circuit GCD --no-mangle | firtool --format=mlir | FileCheck %s --check-prefixes=GCD,SUB
 // RUN: rm -rf %t
 
 import me.jiuyang.zaozi.*
@@ -16,7 +16,7 @@ import me.jiuyang.zaozi.valuetpe.*
 
 import org.llvm.mlir.scalalib.capi.ir.{Block, Context, Module as MlirModule}
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 import mainargs.TokensReader
 
 trait HasFire[T <: Bundle, R <: Referable[T]]:
@@ -28,7 +28,7 @@ trait HasFire[T <: Bundle, R <: Referable[T]]:
       valName:   sourcecode.Name.Machine,
       instCtx:   InstanceContext
     )(
-      using Arena,
+      using Zone,
       Block
     ): Node[Bool]
 
@@ -49,7 +49,7 @@ given [E <: Bundle, T <: DecoupledIO[E], R <: Referable[T]]: HasFire[T, R] with
       valName:   sourcecode.Name.Machine,
       instCtx:   InstanceContext
     )(
-      using Arena,
+      using Zone,
       Block
     ): Node[Bool] = ref.valid & ref.ready
 
@@ -73,7 +73,7 @@ class GCDInput(parameter: GCDParameter) extends Bundle:
 class GCDOutput(parameter: GCDParameter) extends Bundle:
   val z: BundleField[UInt] = Aligned(UInt(parameter.width))
 
-// GCD-DAG:      module GCD_{{.*}}(
+// GCD-DAG:      module GCD(
 // GCD-DAG-NEXT:   input         clock,
 // GCD-DAG-NEXT:                 reset,
 // GCD-DAG-NEXT:   output        input_ready,
@@ -183,8 +183,9 @@ object GenY extends Generator[GenYParameter, GenYLayers, GenYIO, GenYProbe]:
 
 @generator
 object GCD extends Generator[GCDParameter, GCDLayers, GCDIO, GCDProbe]:
+  override def moduleName(parameter: GCDParameter): String = "GCD"
   def architecture(parameter: GCDParameter) =
-    val io            = summon[Interface[GCDIO]]
+    val io           = summon[Interface[GCDIO]]
     given ClockScope = ClockScope.posedge(io.clock)
     given ResetScope =
       if parameter.useAsyncReset then ResetScope.asyncActiveHigh(io.reset)

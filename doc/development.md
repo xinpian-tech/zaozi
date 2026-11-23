@@ -1,35 +1,64 @@
 # Development Documentation
 
-The Zaozi project is a Scala project that links to CIRCT with the
-[Project Panama](https://openjdk.org/projects/panama/).
+### Building and testing
 
-## Development Flow
-### Nix Flow
+Enter `nix develop`, then run:
 
-Zaozi by default use the nix flow to help you to get anything done for zaozi 
-development in linux or darwin.
+```sh
+mill zaozi.compile
+mill __.testForked
+mill __.lit.tests.run
+mill zaozi.benchmark.run 1
+```
 
-### Non-Nix Flow
-For the development reason, e.g. swap to a debug version of CIRCT, or don't
-want to use nix for development. You need to prepare such dependencies:
-- [mill](https://mill-build.org) for build system in env.
-- [JDK 25](https://openjdk.org/projects/jdk/25/) for setup Java environment.
-  zaozi compiles with `--release 25` (classfile major version 69), so JDK 25
-  is the minimum runtime and the only supported development JDK.
-- [jextract](https://github.com/openjdk/jextract) provided by `JEXTRACT_INSTALL_PATH`
-- [CIRCT](https://github.com/llvm/circt/) provided by `CIRCT_INSTALL_PATH`
-- [MLIR](https://github.com/llvm/circt/) provided by `MLIR_INSTALL_PATH`,
-  version of MLIR should match to CIRCT.
-- [Lit](https://llvm.org/docs/CommandGuide/lit.html) provided by 
-  `LIT_INSTALL_PATH` for running lit tests under zaozi.
+The build runs Scala 3.8.4 on JDK 25 and links generators with Scala Native.
+The flake pins sn-bindgen to upstream main and the Native toolchain to a
+revision with foreign-thread callbacks for external MLIR passes.
 
-The version of the dependencies are managed by nix, since CI only checks with
-Nix, users should use version that provided by Nix.
+For a custom installation, point `MLIR_INSTALL_PATH` and `CIRCT_INSTALL_PATH`
+at matching prefixes with headers and C API libraries. Set `CLANG`, `CLANGPP`
+and `SN_BINDGEN` to their executables. The build uses Python 3 for the generated
+by-value C adapters. Tests also use lit, FileCheck, firtool, firld, espresso and
+Z3. The pinned CIRCT C header declares a verification-flavor setter missing from
+its shared library. The Nix CIRCT prefix builds the adapter in
+[nix/pkgs/firtool.cpp](../nix/pkgs/firtool.cpp).
+
+### Writing an MLIR bytecode plugin
+
+```scala
+import org.llvm.mlir.raw.{functions as raw}
+import org.llvm.mlir.scalalib.{Mlir, ModuleTransform}
+
+object Canonicalize:
+  def main(args: Array[String]): Unit =
+    val plugin = ModuleTransform(raw.mlirRegisterTransformsPasses()) { module =>
+      Mlir.runPipeline(module, "builtin.module(canonicalize)")
+    }
+    plugin.main(args)
+```
+
+A transform declares the dialects used by its input and registers the passes
+it needs. The example accepts builtin IR. Read from stdin and redirect stdout
+to a file or a second plugin. Diagnostics go to stderr. The framework creates
+a context for each invocation, verifies the modified module and copies out its
+bytecode before destroying the module and context. Helpers can share operations
+while their underlying IR is alive. Keep bytes to use the result in a later
+invocation. Use `Mlir.withPassManager` for pipelines assembled in Scala.
+
+`nix build` installs a local Maven repository under `result/share/maven`.
+Downstream builds can use `nix build .#zaozi-runtime` for the compiled libraries,
+source JARs, Maven metadata and `zaozi-opt`. The default package also includes Scaladoc.
+Use it in a downstream Scala Native build, keeping the Scala and Native
+versions from [build.mill](../build.mill). The Native artifacts use
+`me.jiuyang:mlirlib_native0.5_3:0.0.1-SNAPSHOT` and
+`me.jiuyang:zaozi_native0.5_3:0.0.1-SNAPSHOT`. Use `-experimental` for
+generator macro annotations. Give clang both installation prefixes' include
+and library directories, and make their shared libraries available at run time.
+The SemanticDB plugin is a separate JVM compiler JAR.
 
 ## IDE Setup
-You can use `nix develop` to enter the development environment in the Nix flow,
-after you installed the dependencies and set the env. You can use
-`mill mill.bsp.BSP/install` to config BSP and open with Intellij IDEA or metal.
+From the development shell, run `mill --bsp-install` in the project root.
+Open the workspace with a BSP client such as Metals or IntelliJ IDEA.
 
 ### Zed
 
@@ -45,9 +74,10 @@ Depending on the Zed installation, the command may be named `zed` instead of
 language servers are enabled. On Linux, the development shell hook generates
 the project-level `.zed/settings.json`, selecting the
 `scala3-bsp-semantic-ls` adapter and its exact Nix store binary path. Zed does
-not discover or download the server. The existing development-shell hook also
-generates `.bsp/mill-bsp.json`; the shared Mill module enables the SemanticDB
-options required by the server.
+not discover or download the server. Run the BSP install command above to generate `.bsp/mill-bsp.json`. The Native targets emit SemanticDB for cross-file references and rename. The
+Nix-packaged server keeps the zaozi navigation plugin in the JVM presentation
+compiler and filters out the Scala Native code-generation plugin there. This
+lets hover and go-to-definition resolve nested Bundle fields in unsaved edits.
 
 ## Swap CIRCT for development
 Zaozi always follows the latest version of CIRCT. To use the specific version
@@ -91,19 +121,7 @@ configure the `CIRCT_INSTALL_PATH` to `build`, and run tests.
 
 ### Debug Flow
 
-It requires using lldb or gdb to attach to the jvm subprocess for debugging
-
-- Firstly add
-```C
-#include <csignal>
-#include <iostream>
-#include <bits/signum-arch.h>
-#include <unistd.h>
-
-...
-  std::cerr << "Current PID: " << getpid() << std::endl;
-  raise(SIGSTOP);
-```
-to the entrance of your library, for example `populatePreprocessTransforms`,
-then run test which will stack. Now you can attach gdb/lldb to this PID and send
-`SIGCONT` to start debug.
+Build the relevant target with `nativeLink`, then launch its executable
+under gdb or lldb. For example, use `gdb out/zaozi/opt/nativeLink.dest/out`
+to set a breakpoint in a pass and run the pipeline with bytecode redirected
+from a file.

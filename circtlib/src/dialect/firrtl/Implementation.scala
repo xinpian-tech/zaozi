@@ -11,7 +11,6 @@ import org.llvm.circt.scalalib.capi.dialect.firrtl.{
   FirrtlNameKind,
   given
 }
-import org.llvm.mlir.MlirOperation
 import org.llvm.mlir.scalalib.capi.ir.{
   Block,
   Context,
@@ -28,14 +27,14 @@ import org.llvm.mlir.scalalib.capi.ir.{
   given
 }
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 // Structure
 given CircuitApi with
   inline def op(
     circuitName: String
   )(
-    using arena: Arena,
+    using zone:  Zone,
     context:     Context
   ): Circuit = Circuit(
     summon[OperationApi].operationCreate(
@@ -66,21 +65,21 @@ given CircuitApi with
   )
   extension (c:   Circuit)
     inline def block(
-      using Arena
+      using Zone
     ): Block = c.operation.getFirstRegion.getFirstBlock
     inline def appendToModule(
     )(
-      using arena: Arena,
-      module:      MlirModule
+      using zone: Zone,
+      module:     MlirModule
     ): Unit =
       module.getBody.appendOwnedOperation(c.operation)
     def declareInstantiatedModules(
     )(
-      using Arena,
+      using Zone,
       Context
     ): Unit =
       def opsIn(first: Operation): Seq[Operation] =
-        Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => MlirOperation.ptr(op.segment).address != 0).toSeq
+        Iterator.iterate(first)(_.getNextInBlock).takeWhile(op => !op.isNull).toSeq
       def symbol(op: Operation):   String         = op.getInherentAttributeByName("sym_name").stringAttrGetValue
       val circuitOps = opsIn(c.block.getFirstOperation)
       val moduleKinds =
@@ -223,7 +222,7 @@ given ContractApi with
     resultTypes: Seq[Type],
     location:    Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): Contract =
     Contract(
@@ -242,10 +241,10 @@ given ContractApi with
   extension (ref: Contract)
     def operation: Operation = ref._operation
     def block(
-      using Arena
+      using Zone
     ): Block = operation.getFirstRegion.getFirstBlock
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 end given
 
@@ -259,7 +258,7 @@ given ExtModuleApi with
     layers:           Seq[Seq[String]],
     verilogParameter: Seq[(String, VerilogParameterType)]
   )(
-    using Arena,
+    using Zone,
     Context
   ): ExtModule =
     new ExtModule(
@@ -359,8 +358,8 @@ given ExtModuleApi with
     inline def operation: Operation = ref._operation
     inline def appendToCircuit(
     )(
-      using arena: Arena,
-      circuit:     Circuit
+      using zone: Zone,
+      circuit:    Circuit
     ): Unit =
       circuit.block.appendOwnedOperation(ref.operation)
 end given
@@ -373,7 +372,7 @@ given ModuleApi with
     interface:        Seq[(FirrtlBundleField, Location)],
     layers:           Seq[Seq[String]]
   )(
-    using arena:      Arena,
+    using zone:       Zone,
     context:          Context
   ): Module = new Module(
     summon[OperationApi].operationCreate(
@@ -441,19 +440,19 @@ given ModuleApi with
   )
   extension (ref: Module)
     inline def block(
-      using Arena
+      using Zone
     ): Block = operation.getFirstRegion.getFirstBlock
 
     inline def getIO(
       idx: Long
     )(
-      using Arena
+      using Zone
     ): Value = block.getArgument(idx)
 
     inline def appendToCircuit(
     )(
-      using arena: Arena,
-      circuit:     Circuit
+      using zone: Zone,
+      circuit:    Circuit
     ): Unit =
       circuit.block.appendOwnedOperation(ref.operation)
 
@@ -466,7 +465,7 @@ given LayerApi with
     location:        Location,
     layerConvention: FirrtlLayerConvention
   )(
-    using arena:     Arena,
+    using zone:      Zone,
     context:         Context
   ): Layer =
     Layer(
@@ -496,18 +495,18 @@ given LayerApi with
     )
   extension (ref: Layer)
     inline def block(
-      using Arena
+      using Zone
     ): Block = operation.getFirstRegion.getFirstBlock
     inline def operation: Operation = ref._operation
 end given
 
 given OptionApi with
   inline def op(
-    name:        String,
-    location:    Location
+    name:       String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Option =
     new Option(
       summon[OperationApi].operationCreate(
@@ -519,18 +518,18 @@ given OptionApi with
     )
   extension (ref: Option)
     inline def block(
-      using Arena
+      using Zone
     ): Block = operation.getFirstRegion.getFirstBlock
     inline def operation: Operation = ref._operation
 end given
 
 given OptionCaseApi with
   inline def op(
-    name:        String,
-    location:    Location
+    name:       String,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): OptionCase =
     new OptionCase(
       summon[OperationApi].operationCreate(
@@ -551,7 +550,7 @@ given InstanceApi with
     interface:    Seq[FirrtlBundleField],
     layers:       Seq[Seq[String]]
   )(
-    using arena:  Arena,
+    using zone:   Zone,
     context:      Context
   ): Instance =
     new Instance(
@@ -622,7 +621,7 @@ given InstanceChoiceApi with
     interface:    Seq[FirrtlBundleField],
     layers:       Seq[Seq[String]]
   )(
-    using arena:  Arena,
+    using zone:   Zone,
     context:      Context
   ): InstanceChoice =
     new InstanceChoice(
@@ -688,13 +687,13 @@ end given
 
 given NodeApi with
   inline def op(
-    name:        String,
-    location:    Location,
-    nameKind:    FirrtlNameKind,
-    input:       Value
+    name:       String,
+    location:   Location,
+    nameKind:   FirrtlNameKind,
+    input:      Value
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Node =
     Node(
       summon[OperationApi].operationCreate(
@@ -724,15 +723,15 @@ end given
 
 given RegApi with
   inline def op(
-    name:        String,
-    location:    Location,
-    nameKind:    FirrtlNameKind,
-    tpe:         Type,
-    clock:       Value,
-    clockEdge:   FirrtlEventControl
+    name:       String,
+    location:   Location,
+    nameKind:   FirrtlNameKind,
+    tpe:        Type,
+    clock:      Value,
+    clockEdge:  FirrtlEventControl
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Reg = Reg(
     summon[OperationApi].operationCreate(
       name = "firrtl.reg",
@@ -776,7 +775,7 @@ given RegResetApi with
     resetType:     RegResetType,
     resetPolarity: RegResetPolarity
   )(
-    using arena:   Arena,
+    using zone:    Zone,
     context:       Context
   ): RegReset = RegReset(
     summon[OperationApi].operationCreate(
@@ -820,13 +819,13 @@ given RegResetApi with
 end given
 given WireApi with
   def op(
-    name:        String,
-    location:    Location,
-    nameKind:    FirrtlNameKind,
-    tpe:         Type
+    name:       String,
+    location:   Location,
+    nameKind:   FirrtlNameKind,
+    tpe:        Type
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Wire =
     Wire(
       summon[OperationApi].operationCreate(
@@ -853,19 +852,19 @@ given WireApi with
   extension (ref: Wire)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 // Statements
 given ConnectApi with
   inline def op(
-    src:         Value,
-    dst:         Value,
-    location:    Location
+    src:        Value,
+    dst:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Connect =
     Connect(
       summon[OperationApi].operationCreate(
@@ -879,11 +878,11 @@ end given
 
 given LayerBlockApi with
   inline def op(
-    layerPath:   Seq[String],
-    location:    Location
+    layerPath:  Seq[String],
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): LayerBlock =
     LayerBlock(
       summon[OperationApi].operationCreate(
@@ -905,19 +904,19 @@ given LayerBlockApi with
     )
   extension (ref: LayerBlock)
     inline def block(
-      using Arena
+      using Zone
     ): Block = operation.getFirstRegion.getFirstBlock
     def operation: Operation = ref._operation
 end given
 
 given RefDefineApi with
   inline def op(
-    dest:        Value,
-    src:         Value,
-    location:    Location
+    dest:       Value,
+    src:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefDefine =
     RefDefine(
       summon[OperationApi].operationCreate(
@@ -931,13 +930,13 @@ end given
 
 given RefForceInitialApi with
   inline def op(
-    predicate:   Value,
-    dest:        Value,
-    src:         Value,
-    location:    Location
+    predicate:  Value,
+    dest:       Value,
+    src:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefForceInitial =
     RefForceInitial(
       summon[OperationApi].operationCreate(
@@ -952,14 +951,14 @@ end given
 
 given RefForceApi with
   inline def op(
-    clock:       Value,
-    predicate:   Value,
-    dest:        Value,
-    src:         Value,
-    location:    Location
+    clock:      Value,
+    predicate:  Value,
+    dest:       Value,
+    src:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefForce =
     RefForce(
       summon[OperationApi].operationCreate(
@@ -973,12 +972,12 @@ end given
 
 given RefReleaseInitialApi with
   inline def op(
-    predicate:   Value,
-    dest:        Value,
-    location:    Location
+    predicate:  Value,
+    dest:       Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefReleaseInitial =
     RefReleaseInitial(
       summon[OperationApi].operationCreate(
@@ -993,13 +992,13 @@ end given
 
 given RefReleaseApi with
   inline def op(
-    clock:       Value,
-    predicate:   Value,
-    dest:        Value,
-    location:    Location
+    clock:      Value,
+    predicate:  Value,
+    dest:       Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefRelease =
     RefRelease(
       summon[OperationApi].operationCreate(
@@ -1013,11 +1012,11 @@ end given
 
 given WhenApi with
   inline def op(
-    cond:        Value,
-    location:    Location
+    cond:       Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): When =
     When(
       summon[OperationApi].operationCreate(
@@ -1035,10 +1034,10 @@ given WhenApi with
   extension (ref: When)
     def operation: Operation = ref._operation
     def condBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(0).getFirstBlock
     def elseBlock(
-      using Arena
+      using Zone
     ): Block = operation.getRegion(1).getFirstBlock
 end given
 
@@ -1049,7 +1048,7 @@ given VerifAssertApi with
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifAssert =
     VerifAssert(
@@ -1072,7 +1071,7 @@ given VerifAssumeApi with
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifAssume =
     VerifAssume(
@@ -1095,7 +1094,7 @@ given VerifCoverApi with
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifCover =
     VerifCover(
@@ -1117,7 +1116,7 @@ given VerifRequireApi with
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifRequire =
     VerifRequire(
@@ -1139,7 +1138,7 @@ given VerifEnsureApi with
     label:    scala.Option[String],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): VerifEnsure =
     VerifEnsure(
@@ -1161,7 +1160,7 @@ given LTLAndIntrinsicApi with
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLAndIntrinsic =
     LTLAndIntrinsic(
@@ -1175,7 +1174,7 @@ given LTLAndIntrinsicApi with
   extension (ref: LTLAndIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1186,7 +1185,7 @@ given LTLClockedAtomIntrinsicApi with
     clock:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedAtomIntrinsic =
     val edgeAttr = summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.attrGetEventControl)
@@ -1202,7 +1201,7 @@ given LTLClockedAtomIntrinsicApi with
   extension (ref: LTLClockedAtomIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1215,7 +1214,7 @@ given LTLClockedDelayIntrinsicApi with
     length:   scala.Option[Long],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedDelayIntrinsic =
     val namedAttributeApi = summon[NamedAttributeApi]
@@ -1240,7 +1239,7 @@ given LTLClockedDelayIntrinsicApi with
   extension (ref: LTLClockedDelayIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1251,7 +1250,7 @@ given LTLClockedEventuallyIntrinsicApi with
     clock:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedEventuallyIntrinsic =
     val edgeAttr = summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.attrGetEventControl)
@@ -1267,7 +1266,7 @@ given LTLClockedEventuallyIntrinsicApi with
   extension (ref: LTLClockedEventuallyIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1280,7 +1279,7 @@ given LTLClockedGoToRepeatIntrinsicApi with
     more:     Long,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedGoToRepeatIntrinsic =
     val namedAttributeApi = summon[NamedAttributeApi]
@@ -1300,7 +1299,7 @@ given LTLClockedGoToRepeatIntrinsicApi with
   extension (ref: LTLClockedGoToRepeatIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1313,7 +1312,7 @@ given LTLClockedNonConsecutiveRepeatIntrinsicApi with
     more:     Long,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedNonConsecutiveRepeatIntrinsic =
     val namedAttributeApi = summon[NamedAttributeApi]
@@ -1333,7 +1332,7 @@ given LTLClockedNonConsecutiveRepeatIntrinsicApi with
   extension (ref: LTLClockedNonConsecutiveRepeatIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1346,7 +1345,7 @@ given LTLClockedRepeatIntrinsicApi with
     more:     scala.Option[Long],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedRepeatIntrinsic =
     val namedAttributeApi = summon[NamedAttributeApi]
@@ -1371,7 +1370,7 @@ given LTLClockedRepeatIntrinsicApi with
   extension (ref: LTLClockedRepeatIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1383,7 +1382,7 @@ given LTLClockedUntilIntrinsicApi with
     clock:     Value,
     location:  Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLClockedUntilIntrinsic =
     val edgeAttr = summon[NamedAttributeApi].namedAttributeGet("edge".identifierGet, edge.attrGetEventControl)
@@ -1399,7 +1398,7 @@ given LTLClockedUntilIntrinsicApi with
   extension (ref: LTLClockedUntilIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1408,7 +1407,7 @@ given LTLConcatIntrinsicApi with
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLConcatIntrinsic =
     LTLConcatIntrinsic(
@@ -1422,7 +1421,7 @@ given LTLConcatIntrinsicApi with
   extension (ref: LTLConcatIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1432,7 +1431,7 @@ given LTLImplicationIntrinsicApi with
     consequent: Value,
     location:   Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLImplicationIntrinsic =
     LTLImplicationIntrinsic(
@@ -1446,7 +1445,7 @@ given LTLImplicationIntrinsicApi with
   extension (ref: LTLImplicationIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1455,7 +1454,7 @@ given LTLIntersectIntrinsicApi with
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLIntersectIntrinsic =
     LTLIntersectIntrinsic(
@@ -1469,7 +1468,7 @@ given LTLIntersectIntrinsicApi with
   extension (ref: LTLIntersectIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1478,7 +1477,7 @@ given LTLNotIntrinsicApi with
     input:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLNotIntrinsic =
     LTLNotIntrinsic(
@@ -1492,7 +1491,7 @@ given LTLNotIntrinsicApi with
   extension (ref: LTLNotIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
@@ -1501,7 +1500,7 @@ given LTLOrIntrinsicApi with
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ): LTLOrIntrinsic =
     LTLOrIntrinsic(
@@ -1515,18 +1514,18 @@ given LTLOrIntrinsicApi with
   extension (ref: LTLOrIntrinsic)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given AddPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AddPrim =
     AddPrim(
       summon[OperationApi].operationCreate(
@@ -1539,18 +1538,18 @@ given AddPrimApi with
   extension (ref: AddPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given AndPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AndPrim =
     AndPrim(
       summon[OperationApi].operationCreate(
@@ -1563,18 +1562,18 @@ given AndPrimApi with
   extension (ref: AndPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 
 end given
 
 given AndRPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AndRPrim = AndRPrim(
     summon[OperationApi].operationCreate(
       name = "firrtl.andr",
@@ -1586,18 +1585,18 @@ given AndRPrimApi with
   extension (ref: AndRPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 
 end given
 
 given AsResetPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AsResetPrim =
     AsResetPrim(
       summon[OperationApi].operationCreate(
@@ -1610,18 +1609,18 @@ given AsResetPrimApi with
   extension (ref: AsResetPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given AsClockPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AsClockPrim =
     AsClockPrim(
       summon[OperationApi].operationCreate(
@@ -1634,18 +1633,18 @@ given AsClockPrimApi with
   extension (ref: AsClockPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given AsSIntPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AsSIntPrim =
     AsSIntPrim(
       summon[OperationApi].operationCreate(
@@ -1658,17 +1657,17 @@ given AsSIntPrimApi with
   extension (ref: AsSIntPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 end given
 
 given AsUIntPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): AsUIntPrim =
     AsUIntPrim(
       summon[OperationApi].operationCreate(
@@ -1681,19 +1680,19 @@ given AsUIntPrimApi with
   extension (ref: AsUIntPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 end given
 
 given BitsPrimApi with
   def op(
-    input:       Value,
-    hi:          BigInt,
-    lo:          BigInt,
-    location:    Location
+    input:      Value,
+    hi:         BigInt,
+    lo:         BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BitsPrim =
     BitsPrim(
       summon[OperationApi].operationCreate(
@@ -1719,19 +1718,19 @@ given BitsPrimApi with
   extension (ref: BitsPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given BitCastApi with
   def op(
-    input:       Value,
-    tpe:         Type,
-    location:    Location
+    input:      Value,
+    tpe:        Type,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): BitCast =
     BitCast(
       summon[OperationApi].operationCreate(
@@ -1744,19 +1743,19 @@ given BitCastApi with
   extension (ref: BitCast)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = operation.getResult(0)
 
 end given
 
 given CatPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): CatPrim =
     CatPrim(
       summon[OperationApi].operationCreate(
@@ -1769,20 +1768,20 @@ given CatPrimApi with
   extension (ref: CatPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given ConstantApi with
   def op(
-    input:       BigInt,
-    width:       Int,
-    signed:      Boolean,
-    location:    Location
+    input:      BigInt,
+    width:      Int,
+    signed:     Boolean,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Constant =
     if (!signed)
       require(input >= 0)
@@ -1823,17 +1822,17 @@ given ConstantApi with
   extension (ref: Constant)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given CvtPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): CvtPrim =
     CvtPrim(
       summon[OperationApi].operationCreate(
@@ -1846,19 +1845,19 @@ given CvtPrimApi with
   extension (ref: CvtPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given DShlPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): DShlPrim =
     DShlPrim(
       summon[OperationApi].operationCreate(
@@ -1871,19 +1870,19 @@ given DShlPrimApi with
   extension (ref: DShlPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given DShrPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): DShrPrim =
     DShrPrim(
       summon[OperationApi].operationCreate(
@@ -1896,18 +1895,18 @@ given DShrPrimApi with
   extension (ref: DShrPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given DivPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): DivPrim =
     DivPrim(
       summon[OperationApi].operationCreate(
@@ -1920,19 +1919,19 @@ given DivPrimApi with
   extension (ref: DivPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given EQPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): EQPrim =
     EQPrim(
       summon[OperationApi].operationCreate(
@@ -1945,19 +1944,19 @@ given EQPrimApi with
   extension (ref: EQPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given GEQPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): GEQPrim =
     GEQPrim(
       summon[OperationApi].operationCreate(
@@ -1970,19 +1969,19 @@ given GEQPrimApi with
   extension (ref: GEQPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given GTPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): GTPrim =
     GTPrim(
       summon[OperationApi].operationCreate(
@@ -1995,19 +1994,19 @@ given GTPrimApi with
   extension (ref: GTPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given HeadPrimApi with
   def op(
-    input:       Value,
-    amount:      BigInt,
-    location:    Location
+    input:      Value,
+    amount:     BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): HeadPrim =
     HeadPrim(
       summon[OperationApi].operationCreate(
@@ -2028,17 +2027,17 @@ given HeadPrimApi with
   extension (ref: HeadPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given InvalidValueApi with
   def op(
-    tpe:         Type,
-    location:    Location
+    tpe:        Type,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): InvalidValue = InvalidValue(
     summon[OperationApi].operationCreate(
       name = "firrtl.invalidvalue",
@@ -2049,19 +2048,19 @@ given InvalidValueApi with
   extension (ref: InvalidValue)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given LEQPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): LEQPrim =
     LEQPrim(
       summon[OperationApi].operationCreate(
@@ -2074,19 +2073,19 @@ given LEQPrimApi with
   extension (ref: LEQPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given LTPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): LTPrim =
     LTPrim(
       summon[OperationApi].operationCreate(
@@ -2099,19 +2098,19 @@ given LTPrimApi with
   extension (ref: LTPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given MulPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): MulPrim =
     MulPrim(
       summon[OperationApi].operationCreate(
@@ -2124,20 +2123,20 @@ given MulPrimApi with
   extension (ref: MulPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given MuxPrimApi with
   def op(
-    sel:         Value,
-    high:        Value,
-    low:         Value,
-    location:    Location
+    sel:        Value,
+    high:       Value,
+    low:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): MuxPrim =
     MuxPrim(
       summon[OperationApi].operationCreate(
@@ -2150,19 +2149,19 @@ given MuxPrimApi with
   extension (ref: MuxPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given NEQPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): NEQPrim =
     NEQPrim(
       summon[OperationApi].operationCreate(
@@ -2175,18 +2174,18 @@ given NEQPrimApi with
   extension (ref: NEQPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given NegPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): NegPrim =
     NegPrim(
       summon[OperationApi].operationCreate(
@@ -2199,18 +2198,18 @@ given NegPrimApi with
   extension (ref: NegPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given NotPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): NotPrim =
     NotPrim(
       summon[OperationApi].operationCreate(
@@ -2223,18 +2222,18 @@ given NotPrimApi with
   extension (ref: NotPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given OpenSubfieldApi with
   def op(
-    input:       Value,
-    fieldIndex:  BigInt,
-    location:    Location
+    input:      Value,
+    fieldIndex: BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Subfield =
     Subfield(
       summon[OperationApi].operationCreate(
@@ -2259,18 +2258,18 @@ given OpenSubfieldApi with
   extension (ref: OpenSubfield)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given OrPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): OrPrim =
     OrPrim(
       summon[OperationApi].operationCreate(
@@ -2283,18 +2282,18 @@ given OrPrimApi with
   extension (ref: OrPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given OrRPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): OrRPrim =
     OrRPrim(
       summon[OperationApi].operationCreate(
@@ -2307,18 +2306,18 @@ given OrRPrimApi with
   extension (ref: OrRPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given PadPrimApi with
   def op(
-    input:       Value,
-    amount:      BigInt,
-    location:    Location
+    input:      Value,
+    amount:     BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): PadPrim =
     PadPrim(
       summon[OperationApi].operationCreate(
@@ -2339,18 +2338,18 @@ given PadPrimApi with
   extension (ref: PadPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given RefCastApi with
   def op(
-    input:       Value,
-    tpe:         Type,
-    location:    Location
+    input:      Value,
+    tpe:        Type,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefCast =
     RefCast(
       summon[OperationApi].operationCreate(
@@ -2363,17 +2362,17 @@ given RefCastApi with
   extension (ref: RefCast)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given RefResolveApi with
   def op(
-    ref:         Value,
-    location:    Location
+    ref:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefResolve =
     RefResolve(
       summon[OperationApi].operationCreate(
@@ -2386,17 +2385,17 @@ given RefResolveApi with
   extension (ref: RefResolve)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given RefSendApi with
   def op(
-    ref:         Value,
-    location:    Location
+    ref:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefSend =
     RefSend(
       summon[OperationApi].operationCreate(
@@ -2409,18 +2408,18 @@ given RefSendApi with
   extension (ref: RefSend)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given RefSubApi with
   def op(
-    input:       Value,
-    index:       BigInt,
-    location:    Location
+    input:      Value,
+    index:      BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RefSub =
     RefSub(
       summon[OperationApi].operationCreate(
@@ -2442,18 +2441,18 @@ given RefSubApi with
   extension (ref: RefSub)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given RemPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): RemPrim =
     RemPrim(
       summon[OperationApi].operationCreate(
@@ -2466,19 +2465,19 @@ given RemPrimApi with
   extension (ref: RemPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given ShlPrimApi with
   def op(
-    input:       Value,
-    amount:      BigInt,
-    location:    Location
+    input:      Value,
+    amount:     BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ShlPrim =
     ShlPrim(
       summon[OperationApi].operationCreate(
@@ -2499,19 +2498,19 @@ given ShlPrimApi with
   extension (ref: ShlPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given ShrPrimApi with
   def op(
-    input:       Value,
-    amount:      BigInt,
-    location:    Location
+    input:      Value,
+    amount:     BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): ShrPrim =
     ShrPrim(
       summon[OperationApi].operationCreate(
@@ -2532,19 +2531,19 @@ given ShrPrimApi with
   extension (ref: ShrPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given SubPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): SubPrim =
     SubPrim(
       summon[OperationApi].operationCreate(
@@ -2557,19 +2556,19 @@ given SubPrimApi with
   extension (ref: SubPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given SubaccessApi with
   def op(
-    input:       Value,
-    index:       Value,
-    location:    Location
+    input:      Value,
+    index:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Subaccess =
     Subaccess(
       summon[OperationApi].operationCreate(
@@ -2582,19 +2581,19 @@ given SubaccessApi with
   extension (ref: Subaccess)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given SubfieldApi with
   def op(
-    input:       Value,
-    fieldIndex:  BigInt,
-    location:    Location
+    input:      Value,
+    fieldIndex: BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Subfield =
     Subfield(
       summon[OperationApi].operationCreate(
@@ -2618,18 +2617,18 @@ given SubfieldApi with
   extension (ref: Subfield)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 end given
 
 given SubindexApi with
   def op(
-    input:       Value,
-    index:       BigInt,
-    location:    Location
+    input:      Value,
+    index:      BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): Subindex =
     Subindex(
       summon[OperationApi].operationCreate(
@@ -2650,19 +2649,19 @@ given SubindexApi with
   extension (ref: Subindex)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given TailPrimApi with
   def op(
-    input:       Value,
-    amount:      BigInt,
-    location:    Location
+    input:      Value,
+    amount:     BigInt,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): TailPrim =
     TailPrim(
       summon[OperationApi].operationCreate(
@@ -2683,19 +2682,19 @@ given TailPrimApi with
   extension (ref: TailPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given XorPrimApi with
   def op(
-    lhs:         Value,
-    rhs:         Value,
-    location:    Location
+    lhs:        Value,
+    rhs:        Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): XorPrim =
     XorPrim(
       summon[OperationApi].operationCreate(
@@ -2708,18 +2707,18 @@ given XorPrimApi with
   extension (ref: XorPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given
 
 given XorRPrimApi with
   def op(
-    input:       Value,
-    location:    Location
+    input:      Value,
+    location:   Location
   )(
-    using arena: Arena,
-    context:     Context
+    using zone: Zone,
+    context:    Context
   ): XorRPrim =
     XorRPrim(
       summon[OperationApi].operationCreate(
@@ -2732,7 +2731,7 @@ given XorRPrimApi with
   extension (ref: XorRPrim)
     def operation: Operation = ref._operation
     def result(
-      using Arena
+      using Zone
     ): Value = ref.operation.getResult(0)
 
 end given

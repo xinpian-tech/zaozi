@@ -2,23 +2,22 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package org.llvm.mlir.scalalib.capi.rewrite
 
+import org.llvm.mlir.raw.structs as MlirStructs
+import scala.scalanative.unsafe.*
+
 import org.llvm.mlir.scalalib.capi.support.{*, given}
 
-import java.lang.foreign.{Arena, MemorySegment}
+class FrozenRewritePatternSet(handle: Ptr[MlirStructs.MlirFrozenRewritePatternSet]) extends NativeHandle(handle)
+trait FrozenRewritePatternSetApi                                                    extends HasSizeOf[FrozenRewritePatternSet]
 
-class FrozenRewritePatternSet(val _segment: MemorySegment)
-trait FrozenRewritePatternSetApi extends HasSegment[FrozenRewritePatternSet] with HasSizeOf[FrozenRewritePatternSet]
+class GreedyRewriteDriverConfig(handle: Ptr[MlirStructs.MlirGreedyRewriteDriverConfig]) extends NativeHandle(handle)
+trait GreedyRewriteDriverConfigApi                                                      extends HasSizeOf[GreedyRewriteDriverConfig]
 
-class GreedyRewriteDriverConfig(val _segment: MemorySegment)
-trait GreedyRewriteDriverConfigApi
-    extends HasSegment[GreedyRewriteDriverConfig]
-    with HasSizeOf[GreedyRewriteDriverConfig]
+class PDLPatternModule(handle: Ptr[MlirStructs.MlirPDLPatternModule]) extends NativeHandle(handle)
+trait PDLPatternModuleApi                                             extends HasSizeOf[PDLPatternModule]
 
-class PDLPatternModule(val _segment: MemorySegment)
-trait PDLPatternModuleApi extends HasSegment[PDLPatternModule] with HasSizeOf[PDLPatternModule]
+class RewritePatternSet(handle: Ptr[MlirStructs.MlirRewritePatternSet]) extends NativeHandle(handle)
+trait RewritePatternSetApi                                              extends HasSizeOf[RewritePatternSet]
 
-class RewritePatternSet(val _segment: MemorySegment)
-trait RewritePatternSetApi extends HasSegment[RewritePatternSet] with HasSizeOf[RewritePatternSet]
-
-class RewriterBase(val _segment: MemorySegment)
-trait RewriterBaseApi extends HasSegment[RewriterBase] with HasSizeOf[RewriterBase]
+class RewriterBase(handle: Ptr[MlirStructs.MlirRewriterBase]) extends NativeHandle(handle)
+trait RewriterBaseApi                                         extends HasSizeOf[RewriterBase]

@@ -6,7 +6,7 @@ import org.llvm.mlir.scalalib.capi.support.HasOperation
 import org.llvm.mlir.scalalib.capi.ir.{Context, Location, Operation, Value}
 import org.llvm.circt.scalalib.capi.dialect.firrtl.FirrtlEventControl
 
-import java.lang.foreign.Arena
+import scala.scalanative.unsafe.Zone
 
 class AddPrim(val _operation: Operation)
 trait AddPrimApi extends HasOperation[AddPrim]
@@ -350,12 +350,12 @@ trait LTLAndIntrinsicApi extends HasOperation[LTLAndIntrinsic]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLAndIntrinsic
   extension (ref: LTLAndIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLAndIntrinsicApi
 
@@ -367,12 +367,12 @@ trait LTLClockedAtomIntrinsicApi extends HasOperation[LTLClockedAtomIntrinsic]:
     clock:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedAtomIntrinsic
   extension (ref: LTLClockedAtomIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedAtomIntrinsicApi
 
@@ -386,12 +386,12 @@ trait LTLClockedDelayIntrinsicApi extends HasOperation[LTLClockedDelayIntrinsic]
     length:   scala.Option[Long],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedDelayIntrinsic
   extension (ref: LTLClockedDelayIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedDelayIntrinsicApi
 
@@ -403,12 +403,12 @@ trait LTLClockedEventuallyIntrinsicApi extends HasOperation[LTLClockedEventually
     clock:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedEventuallyIntrinsic
   extension (ref: LTLClockedEventuallyIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedEventuallyIntrinsicApi
 
@@ -422,12 +422,12 @@ trait LTLClockedGoToRepeatIntrinsicApi extends HasOperation[LTLClockedGoToRepeat
     more:     Long,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedGoToRepeatIntrinsic
   extension (ref: LTLClockedGoToRepeatIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedGoToRepeatIntrinsicApi
 
@@ -441,12 +441,12 @@ trait LTLClockedNonConsecutiveRepeatIntrinsicApi extends HasOperation[LTLClocked
     more:     Long,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedNonConsecutiveRepeatIntrinsic
   extension (ref: LTLClockedNonConsecutiveRepeatIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedNonConsecutiveRepeatIntrinsicApi
 
@@ -460,12 +460,12 @@ trait LTLClockedRepeatIntrinsicApi extends HasOperation[LTLClockedRepeatIntrinsi
     more:     scala.Option[Long],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedRepeatIntrinsic
   extension (ref: LTLClockedRepeatIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedRepeatIntrinsicApi
 
@@ -478,12 +478,12 @@ trait LTLClockedUntilIntrinsicApi extends HasOperation[LTLClockedUntilIntrinsic]
     clock:     Value,
     location:  Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLClockedUntilIntrinsic
   extension (ref: LTLClockedUntilIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLClockedUntilIntrinsicApi
 
@@ -493,12 +493,12 @@ trait LTLConcatIntrinsicApi extends HasOperation[LTLConcatIntrinsic]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLConcatIntrinsic
   extension (ref: LTLConcatIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLConcatIntrinsicApi
 
@@ -509,12 +509,12 @@ trait LTLImplicationIntrinsicApi extends HasOperation[LTLImplicationIntrinsic]:
     consequent: Value,
     location:   Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLImplicationIntrinsic
   extension (ref: LTLImplicationIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLImplicationIntrinsicApi
 
@@ -524,12 +524,12 @@ trait LTLIntersectIntrinsicApi extends HasOperation[LTLIntersectIntrinsic]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLIntersectIntrinsic
   extension (ref: LTLIntersectIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLIntersectIntrinsicApi
 
@@ -539,12 +539,12 @@ trait LTLNotIntrinsicApi extends HasOperation[LTLNotIntrinsic]:
     input:    Value,
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLNotIntrinsic
   extension (ref: LTLNotIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLNotIntrinsicApi
 
@@ -554,11 +554,11 @@ trait LTLOrIntrinsicApi extends HasOperation[LTLOrIntrinsic]:
     inputs:   Seq[Value],
     location: Location
   )(
-    using Arena,
+    using Zone,
     Context
   ):   LTLOrIntrinsic
   extension (ref: LTLOrIntrinsic)
     def result(
-      using Arena
+      using Zone
     ): Value
 end LTLOrIntrinsicApi

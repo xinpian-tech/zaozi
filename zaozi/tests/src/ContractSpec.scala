@@ -8,7 +8,7 @@ import me.jiuyang.zaozi.reftpe.*
 import me.jiuyang.zaozi.valuetpe.*
 import me.jiuyang.testlib.*
 
-import org.llvm.mlir.MlirOperation
+import scala.scalanative.unsafe.*
 import org.llvm.mlir.scalalib.capi.ir.{Block, given}
 
 import utest.*
@@ -112,12 +112,12 @@ object ContractSpec extends TestSuite:
         def architecture(parameter: ContractSpecParameter) =
           val module  = summon[Block].getParentOperation
           val circuit = module.getParentOperation
-          assert(MlirOperation.ptr(circuit.segment).address != 0)
+          assert(!circuit.isNull)
           assert(circuit.getName.str == "firrtl.circuit", circuit.getParentOperation.getName.str == "builtin.module")
           val io      = summon[Interface[ContractSpecIO]]
           val checked: (Referable[UInt], Referable[Bool]) = Contract(io.p, io.p === io.q) { (p, equal) =>
             val owner = summon[Block].getParentOperation.getParentOperation
-            assert(MlirOperation.ptr(owner.segment) == MlirOperation.ptr(module.segment))
+            assert((!owner.native).ptr == (!module.native).ptr)
             assert(p.definingOp.isEmpty, equal.definingOp.isEmpty)
           }
           val (p, equal) = checked
