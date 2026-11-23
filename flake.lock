@@ -305,11 +305,11 @@
         "zaozi": "zaozi"
       },
       "locked": {
-        "lastModified": 1784826247,
-        "narHash": "sha256-KUmeMwE5NUxu5kVswrwhPIiRB4FWEZAusadd4GvtWoI=",
+        "lastModified": 1795451350,
+        "narHash": "sha256-thYKkeYptDgd6gVO5wwW6GzxpQjMgx6CdPhIWGYcZyo=",
         "owner": "xinpian-tech",
         "repo": "scala3-bsp-semantic-ls",
-        "rev": "b0af17cbfdbc22f247e6c4dc6e31ed4b041beafe",
+        "rev": "6878ef4818af25876adea970f2ad2c0d7c288a89",
         "type": "github"
       },
       "original": {
@@ -411,11 +411,11 @@
     "zaozi": {
       "flake": false,
       "locked": {
-        "lastModified": 1782478578,
-        "narHash": "sha256-pQYHzckyC1XYIdf3hYZhPM0jIkMB8ffuB4FbTqVOAHg=",
+        "lastModified": 1795449216,
+        "narHash": "sha256-3NkPWaCqLhPkkLQaLcrJMdOORgQIh2IIwMnHv3a1Vo8=",
         "owner": "xinpian-tech",
         "repo": "zaozi",
-        "rev": "fefb58e9a7d70d112cef3e7a891a849e43f3b43c",
+        "rev": "31f572d36b8defc4836df85b59c5319f65658b27",
         "type": "github"
       },
       "original": {
