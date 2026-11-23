@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Jiuyang Liu <liu@jiuyang.me>
 package me.jiuyang.zaozi.plugin
 
+import dotty.tools.dotc.interactive.{CachedLogicalPackage, InteractiveDriver}
 import dotty.tools.dotc.semanticdb.{Range, SymbolOccurrence, TextDocument, TextDocuments}
 import utest.*
 
@@ -212,7 +213,7 @@ object PluginSpec extends TestSuite:
         os.makeDir.all(out)
         val options        = List("-classpath", fixtureCp, "-d", out.toString, "-experimental")
           ++ (if withPlugin then List(s"-Xplugin:$pluginJar") else Nil)
-        val driver         = new dotty.tools.dotc.interactive.InteractiveDriver(options)
+        val driver         = new InteractiveDriver(options, CachedLogicalPackage.none)
         val uri            = java.net.URI.create(s"file:///NavProbe${if withPlugin then "On" else "Off"}.scala")
         val diags          = driver.run(uri, dotty.tools.dotc.util.SourceFile.virtual(uri.toString, buffer))
         assert(diags.isEmpty)
@@ -279,8 +280,9 @@ object PluginSpec extends TestSuite:
       // driver construction.
       val out    = scratchRoot / "interactive-out"
       os.makeDir.all(out)
-      val driver = new dotty.tools.dotc.interactive.InteractiveDriver(
-        List("-classpath", fixtureCp, "-d", out.toString, "-experimental", s"-Xplugin:$pluginJar")
+      val driver = new InteractiveDriver(
+        List("-classpath", fixtureCp, "-d", out.toString, "-experimental", s"-Xplugin:$pluginJar"),
+        CachedLogicalPackage.none
       )
       val uri    = java.net.URI.create("file:///InteractiveProbe.scala")
       val code   = "class InteractiveProbe { val x: Int = 1; def f: Int = x }"

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly SCALA_VERSION="3.8.4"
+readonly SCALA_VERSION="3.10.1"
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
@@ -66,7 +66,9 @@ mtf archive "${archive_args[@]}" -- \
   mill --no-daemon -j 1 --ticker false zaozi.docJar
 mtf archive "${archive_args[@]}" -- \
   mill --no-daemon -j 1 __.testForked
-mtf archive "${archive_args[@]}" -- \
+# Scala CLI and Coursier need absolute cache homes inside the archive sandbox.
+SCALA_CLI_HOME=/mtf/.scala-cli JAVA_OPTS="$JAVA_OPTS -Duser.home=/mtf" \
+  mtf archive "${archive_args[@]}" --export-env SCALA_CLI_HOME -- \
   mill --no-daemon -j 1 __.lit.tests.run
 mtf archive "${archive_args[@]}" -- \
   mill --no-daemon -j 1 --ticker false zaozi.benchmark.runJmh \

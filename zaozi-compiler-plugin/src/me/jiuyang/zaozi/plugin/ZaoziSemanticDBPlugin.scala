@@ -285,7 +285,7 @@ class ZaoziSemanticDBPhase extends PluginPhase:
       base.toAbsolutePath.normalize
         .resolve("META-INF")
         .resolve("semanticdb")
-        .resolve(SourceFile.relativePath(source, ctx.settings.sourceroot.value))
+        .resolve(source.pathRelativeToSourceRoot)
         .resolveSibling(source.name + ".semanticdb")
     }
 
